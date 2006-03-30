@@ -1,7 +1,7 @@
 from zipfile import *
 import os, sys, md5
 
-exp_path = r"\slpdev\stackless-web\binaries-pc"
+exp_path = r"..\..\..\binaries-pc"
 
 prog = """
 import md5
@@ -13,11 +13,11 @@ print ("matched", "NOT MATCHED!!") [received != expected]
 raw_input("press enter to continue")
 """
 
-filenames = "python23 stackless _tkinter".split()
+filenames = "python24 stackless _tkinter".split()
 # no longer needed
-filenames = "python23".split()
+filenames = "python24".split()
 for debug in ("", "_d"):
-    zname = os.path.join(exp_path, "python23%s.dll.zip" % debug)
+    zname = os.path.join(exp_path, "python24%s.dll.zip" % debug)
     z = ZipFile(zname, "w", ZIP_DEFLATED)
     for name in filenames:
         name += debug
