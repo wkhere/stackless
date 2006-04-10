@@ -40,6 +40,8 @@ the 1.0 and 2.0 designes, supporting both cooperative switching
 and stack switching, with the addition of partially complete
 support for real OS threads as a tasklet. Phew.
 
+*****************************************************************************
+
   Introduction to the ideas of the new Stackless Python
   Draft, CT 20020122
   Update 20020524: Software solution abandoned!
