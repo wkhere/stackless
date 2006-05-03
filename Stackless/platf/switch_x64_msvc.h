@@ -25,25 +25,13 @@
 #define alloca _alloca
 
 #define STACK_REFPLUS 1
-
-#ifdef SLP_EVAL
-
 #define STACK_MAGIC 0
 
-extern int slp_switch(void); /* defined in masm assembler */
+/* Use the generic support for an external assembly language slp_switch function. */
+#define EXTERNAL_ASM
 
-/* These two are called from the assembler module */
-SSIZE_T slp_save_state(intptr_t *ref) {
-	SSIZE_T diff;
-	SLP_SAVE_STATE(ref, diff);
-	return diff;
-}
-
-void slp_restore_state(void)
-{
-	SLP_RESTORE_STATE();
-}
-
+#ifdef SLP_EVAL
+/* This always uses the external masm assembly file. */
 #endif
 
 /*
@@ -62,6 +50,6 @@ static int IS_ON_STACK(void*p)
     int stackref;
     intptr_t stackbase = ((intptr_t)&stackref) & 0xfffff000;
     return (intptr_t)p >= stackbase && (intptr_t)p < stackbase + 0x00100000;
-} 
+}
 
 #endif

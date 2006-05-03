@@ -41,11 +41,24 @@ static PyTaskletObject *_prev;
 		slp_cstack_restore(_cst); \
 	}
 
-// #define USE_MASM	  // CCP addition, define to use masm code
-#ifdef USE_MASM
-//ccp addition: make these functions, to be called from assembler
-#define STACK_MAGIC 0
+/* This define is no longer needed now? */
+#define SLP_EVAL
+#include "platf/slp_platformselect.h"
 
+#ifdef EXTERNAL_ASM
+/* CCP addition: Make these functions, to be called from assembler.
+ * The token include file for the given platform should enable the
+ * EXTERNAL_ASM define so that this is included.
+ */
+
+/* There are two cases where slp_save_state would return 0, the
+ * first where there is no difference in where the stack pointer
+ * should be from where it is now.  And the second where
+ * SLP_SAVE_STATE returns without restoring because we are only
+ * here to save.  The assembler routine needs to differentiate
+ * between these, which is why we override the returns and flag
+ * the low bit of the return value on early exit.
+ */
 #undef __return
 #define __return(x) { exitcode = x; goto exit; }
 
@@ -64,11 +77,6 @@ void slp_restore_state(void){
 }
 
 extern int slp_switch(void);
-
-#else
-
-#define SLP_EVAL
-#include "platf/slp_platformselect.h"
 
 #endif
 

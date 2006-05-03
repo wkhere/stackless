@@ -20,6 +20,8 @@
 #include "switch_s390_unix.h"	/* Linux/S390 */
 #elif defined(__GNUC__) && defined(__s390x__) && defined(__linux__)
 #include "switch_s390_unix.h"	/* Linux/S390 zSeries (identical) */
+#elif defined(__GNUC__) && defined(__arm__) && defined(__thumb__)
+#include "switch_arm_thumb_gcc.h" /* gcc using arm thumb */
 #endif
 
 /* default definitions if not defined in above files */
