@@ -47,7 +47,7 @@ static PyTaskletObject *_prev;
 #define STACK_MAGIC 0
 
 #undef __return
-#define __return(x) exitcode = x; goto exit;
+#define __return(x) { exitcode = x; goto exit; }
 
 int slp_save_state(intptr_t *stack){
 	int exitcode;
