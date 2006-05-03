@@ -64,7 +64,13 @@ static PyTaskletObject *_prev;
 
 int slp_save_state(intptr_t *stack){
 	int exitcode;
+#ifdef SSIZE_T
+	/* Only on Windows apparently. */
 	SSIZE_T diff;
+#else
+	/* Py_ssize_t when we port to 2.5? */
+	int diff;
+#endif
 	SLP_SAVE_STATE(stack, diff);
 	return diff;
 exit:
