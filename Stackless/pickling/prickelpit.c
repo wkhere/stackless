@@ -1415,11 +1415,11 @@ dictiterkey_reduce(dictiterobject *di)
         }
     }
     /* masquerade as a PySeqIter */
-    tup = Py_BuildValue("(O(lO))",
-        &PySeqIter_Type,
-        0,
-        list
-        );
+    tup = Py_BuildValue("(O(Ol)())",
+	&wrap_PySeqIter_Type,
+	list,
+	0
+	);
     Py_DECREF(list);
     return tup;
 }
@@ -1455,11 +1455,11 @@ dictitervalue_reduce(dictiterobject *di)
         }
     }
     /* masquerade as a PySeqIter */
-    tup = Py_BuildValue("(O(lO))",
-        &PySeqIter_Type,
-        0,
-        list
-        );
+    tup = Py_BuildValue("(O(Ol)())",
+	&wrap_PySeqIter_Type,
+	list,
+	0
+	);
     Py_DECREF(list);
     return tup;
 }
@@ -1502,59 +1502,14 @@ dictiteritem_reduce(dictiterobject *di)
         }
     }
     /* masquerade as a PySeqIter */
-    tup = Py_BuildValue("(O(lO))",
-        &PySeqIter_Type,
-        0,
-        list
-        );
+    tup = Py_BuildValue("(O(Ol)())",
+	&wrap_PySeqIter_Type,
+	list,
+	0
+	);
     Py_DECREF(list);
     return tup;
 }
-
-#if 0
-static PyObject *
-dictiter_reduce(dictiterobject *di)
-{
-	PyObject *tup, *list, *key, *value, *res;
-	int i;
-
-	/* Make a list big enough to exhaust the dict */
-	list = PyList_New(0);
-	if (list == NULL)
-		return PyErr_NoMemory();
-
-	/* is this dictiter is already exhausted? */
-	if (di->di_dict != NULL) {
-		if (di->di_used != di->di_dict->ma_used) {
-			PyErr_SetString(PyExc_RuntimeError,
-			    "dictionary changed size during iteration");
-			di->di_used = -1; /* Make this state sticky */
-			return NULL;
-		}
-		i = di->di_pos;
-		while (PyDict_Next((PyObject *)di->di_dict, &i, &key,
-				   &value)) {
-			res = (*di->di_select)(key, value);
-			if (res == NULL) {
-				Py_DECREF(list);
-				return NULL;
-			}
-			if (PyList_Append(list, res) == -1) {
-				return NULL;
-			}
-			Py_DECREF(res);
-		}
-	}
-        /* masquerade as a PySeqIter */
-	tup = Py_BuildValue("(O(Ol)())",
-			    &wrap_PySeqIter_Type,
-			    list,
-			    0
-			    );
-	Py_DECREF(list);
-	return tup;
-}
-#endif
 
 static PyTypeObject wrap_PyDictIterKey_Type;
 
