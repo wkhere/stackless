@@ -315,9 +315,28 @@ tasklet_setstate(PyObject *self, PyObject *args)
 
 	nframes = PyList_GET_SIZE(lis);
 	TASKLET_SETVAL(t, tempval);
+
+	/* There is a unpickling race condition.  While it is rare,
+	 * sometimes tasklets get their setstate call after the
+	 * channel they are blocked on.  If this happens and we
+	 * do not account for it, they will be left in a broken
+	 * state where they are on the channels chain, but have
+	 * cleared their blocked flag.
+	 *
+	 * We will assume that the presence of a chain, can only
+	 * mean that the chain is that of a channel, rather than
+	 * that of the main tasklet/scheduler. And therefore
+	 * they can leave their blocked flag in place because the
+	 * channel would have set it.
+	 */
+	i = t->flags.blocked;
 	*(int *)&t->flags = flags;
-	/* we cannot restore blocked, must be done by a channel */
-	t->flags.blocked = 0;
+	if (t->next == NULL) {
+		t->flags.blocked = 0;
+	} else {
+		t->flags.blocked = i;
+	}
+
 	/* t->nesting_level = nesting_level;
 	   XXX how do we handle this?
 	   XXX to be done: pickle the cstate without a ref to the task.
