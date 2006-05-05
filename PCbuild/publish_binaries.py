@@ -1,7 +1,7 @@
 from zipfile import *
 import os, sys, md5
 
-exp_path = r"..\..\..\binaries-pc"
+exp_path = r"..\..\binaries-pc"
 
 prog = """
 import md5
@@ -13,25 +13,36 @@ print ("matched", "NOT MATCHED!!") [received != expected]
 raw_input("press enter to continue")
 """
 
-filenames = "python24 stackless _tkinter".split()
-# no longer needed
-filenames = "python24".split()
+fileList = [ r"..\Lib\copy_reg.py", r"..\Lib\pickle.py" ]
 for debug in ("", "_d"):
-    zname = os.path.join(exp_path, "python24%s.dll.zip" % debug)
-    z = ZipFile(zname, "w", ZIP_DEFLATED)
-    for name in filenames:
-        name += debug
-        for ext in ".dll .exp .lib .pyd".split():
-            export = name + ext
-            if os.path.exists(export):
-                z.write(export)
-    z.close()
-    expected = md5.md5(file(zname, "rb").read()).hexdigest()
-    signame = zname+".md5.py"
-    shortname = os.path.split(zname)[-1]
-    file(signame, "w").write(prog % (expected, shortname))
+    for suffix in ("dll", "lib", "exp"):
+        fileList.append("python24%s.%s" % (debug, suffix))
+
+pathBySuffix = {
+    "dll":  "",
+    "lib":  "libs/",
+    "exp":  "libs/",
+    "py":   "Lib/",
+}
+
+
+zname = os.path.join(exp_path, "python24.zip")
+z = ZipFile(zname, "w", ZIP_DEFLATED)
+for fileName in fileList:
+    if os.path.exists(fileName):
+        suffix = fileName[fileName.rfind(".")+1:]
+        s = open(fileName, "rb").read()
+        z.writestr(pathBySuffix[suffix] + os.path.basename(fileName), s)
+    else:
+        print "File not found:", fileName
+z.close()
+
+signame = zname+".md5.py"
+expected = md5.md5(file(zname, "rb").read()).hexdigest()
+shortname = os.path.split(zname)[-1]
+file(signame, "w").write(prog % (expected, shortname))
 
 # generate a reST include for upload time.
-import time
-txt = ".. |uploaded| replace:: " + time.ctime()
-print >> file(os.path.join(exp_path, "uploaded.txt"), "w"), txt
+#import time
+#txt = ".. |uploaded| replace:: " + time.ctime()
+#print >> file(os.path.join(exp_path, "uploaded.txt"), "w"), txt
