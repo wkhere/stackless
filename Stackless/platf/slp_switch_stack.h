@@ -22,6 +22,9 @@ slp_switch_stack(void)
 	}
 }
 
+#elif defined(MS_WIN64) && defined(_M_X64)
+
+
 #elif defined(__GNUC__) && defined(__i386__)
 
 static int
@@ -42,6 +45,28 @@ slp_switch_stack(void)
 		return 0;
 	}
 	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+}
+
+#elif defined(__GNUC__) && defined(__amd64__)
+
+static int
+slp_switch_stack(void)
+{
+    register long *stackref, stsizediff;
+    __asm__ volatile ("" : : : REGS_TO_SAVE);
+    __asm__ ("movq %%rsp, %0" : "=g" (stackref));
+    {
+        SLP_STACK_BEGIN(stackref, stsizediff);
+        __asm__ volatile (
+            "addq %0, %%rsp\n"
+            "addq %0, %%rbp\n"
+            :
+            : "r" (stsizediff)
+            );
+        SLP_STACK_END();
+        return 0;
+    }
+    __asm__ volatile ("" : : : REGS_TO_SAVE);
 }
 
 #elif defined(__GNUC__) && defined(__PPC__) && defined(__linux__)
@@ -189,6 +214,9 @@ slp_switch_stack(void)
 	}
 	__asm__ volatile ("" : : : REGS_TO_SAVE);
 }
+
+#elif defined(__GNUC__) && defined(__arm__) && defined(__thumb__)
+
 
 #endif
 
