@@ -2,6 +2,7 @@ import sys
 import types
 import unittest
 import cPickle as pickle
+import gc
 
 from stackless import schedule, tasklet, stackless
 
@@ -31,6 +32,12 @@ def rectest(nrec, lev=0, lst=None):
     else:
         schedule()
     return lst
+
+class TaskletChannel:
+    def __init__(self):
+        self.channel = stackless.channel()
+    def run(self):
+        self.channel.receive()
 
 def listtest(n, when):
     for i in range(n):
@@ -225,6 +232,25 @@ class TestConcretePickledTasklets(TestPickledTasklets):
 
     def testFakeModules(self):
         types.ModuleType('fakemodule!')
+
+    # Crash bug.  See SVN revision 45902.
+    # Unpickling race condition where a tasklet unexpectedly had setstate
+    # called on it before the channel it was blocked on.  This left it
+    # linked to the channel but not blocked, which meant that when it was
+    # scheduled it was not linked to the scheduler, and this caused a
+    # crash when the scheduler tried to remove it when it exited.
+    def testGarbageCollection(self):
+        # Make a class that holds onto a reference to a channel
+        # and then block it on that channel.
+        tc = TaskletChannel()
+        t = stackless.tasklet(tc.run)()
+        t.run()
+        # Pickle the tasklet that is blocking.
+        s = pickle.dumps(t)
+        # Unpickle it again, but don't hold a reference.
+        pickle.loads(s)
+        # Force the collection of the unpickled tasklet.
+        gc.collect()
 
 
 if __name__ == '__main__':
