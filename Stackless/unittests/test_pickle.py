@@ -50,11 +50,29 @@ def enumeratetest(n, when):
             schedule()
     return i
 
-def dicttest(n, when):
-    for i in {}.fromkeys(range(n)):
+def dicttestiterkeys(n, when):
+    for i in dict([ (i, i) for i in range(n) ]).iterkeys():
         if i == when:
             schedule()
     return n
+
+def dicttestitervalues(n, when):
+    for i in dict([ (i, i) for i in range(n) ]).itervalues():
+        if i == when:
+            schedule()
+    return n
+
+def dicttestiteritems(n, when):
+    for (i, j) in dict([ (i, i) for i in range(n) ]).iteritems():
+        if i == when:
+            schedule()
+    return n
+
+def settest(n, when):
+    for i in set(range(n)):
+        if i == when:
+            schedule()
+    return i
 
 def tupletest(n, when):
     for i in tuple(range(n)):
@@ -101,7 +119,7 @@ class TestPickledTasklets(unittest.TestCase):
 
         # clear out old errors
         reset()
-        
+
         if self.verbose: print "starting tasklet"
         t.run()
 
@@ -116,7 +134,7 @@ class TestPickledTasklets(unittest.TestCase):
         # if self.verbose: print repr(pi)
         # why do we want to remove it?
         # t.remove()
-        
+
         if self.verbose: print "unpickling"
         ip = pickle.loads(pi)
 
@@ -162,9 +180,23 @@ class TestConcretePickledTasklets(TestPickledTasklets):
     def testRecursive(self):
         self.run_pickled(rectest, 13)
 
-    if have_fromkeys:
-        def testDict(self):
-            self.run_pickled(dicttest, 20, 13)
+    ## Pickling of all three dictionary iterator types.
+
+    # Test picking of the dictionary keys iterator.
+    def testDictIterkeys(self):
+        self.run_pickled(dicttestiterkeys, 20, 13)
+
+    # Test picking of the dictionary values iterator.
+    def testDictItervalues(self):
+        self.run_pickled(dicttestitervalues, 20, 13)
+
+    # Test picking of the dictionary items iterator.
+    def testDictIteritems(self):
+        self.run_pickled(dicttestiteritems, 20, 13)
+
+    # Test pickling of iteration over the set type.
+    def testSet(self):
+        self.run_pickled(settest, 20, 13)
 
     if have_enumerate:
         def testEnumerate(self):
@@ -181,7 +213,7 @@ class TestConcretePickledTasklets(TestPickledTasklets):
             next-1 and self(self, next-1) or (schedule(), 42)[1]
         pickle.loads(pickle.dumps(recurse))
         self.run_pickled(recurse, recurse, 13)
-        
+
     def testRecursiveEmbedded(self):
         def rectest(nrec, lev=0):
             if self.verbose: print nrec, lev
