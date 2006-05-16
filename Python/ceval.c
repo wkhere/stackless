@@ -703,11 +703,19 @@ PyEval_EvalFrame(PyFrameObject *f)
 #ifdef STACKLESS
 	if (CSTACK_SAVE_NOW(tstate, f))
 		return slp_eval_frame_newstack(f, retval);
-#endif /* STACKLESS */
 
+	/* push frame */
+	if (Py_EnterRecursiveCall("")) {
+	    Py_XDECREF(retval);
+		tstate->frame = f->f_back;
+		Py_DECREF(f);
+		return NULL;
+	}
+#else
 	/* push frame */
 	if (Py_EnterRecursiveCall(""))
 		return NULL;
+#endif /* STACKLESS */
 
 	tstate->frame = f;
 
