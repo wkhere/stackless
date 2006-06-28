@@ -4,7 +4,9 @@
 	Version="7.10"
 	Name="_bsddb"
 	SccProjectName="_bsddb"
-	SccLocalPath="..">
+	SccAuxPath=""
+	SccLocalPath=".."
+	SccProvider="MSSCCI:Perforce SCM">
 	<Platforms>
 		<Platform
 			Name="Win32"/>
@@ -20,7 +22,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\Include;..\PC;&quot;..\..\db-4.4.20\build_win32&quot;"
+				AdditionalIncludeDirectories="..\Include;..\PC;..\Stackless;&quot;..\..\db-4.4.20\build_win32&quot;"
 				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
@@ -75,7 +77,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories="..\Include;..\PC;&quot;..\..\db-4.4.20\build_win32&quot;"
+				AdditionalIncludeDirectories="..\Include;..\PC;..\Stackless;&quot;..\..\db-4.4.20\build_win32&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				StringPooling="TRUE"
 				RuntimeLibrary="2"
@@ -133,7 +135,7 @@
 				AdditionalOptions=" /USECL:MS_ITANIUM"
 				Optimization="2"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories="..\Include;..\PC;&quot;..\..\db-4.4.20\build_win32&quot;"
+				AdditionalIncludeDirectories="..\Include;..\PC;..\Stackless;&quot;..\..\db-4.4.20\build_win32&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				StringPooling="TRUE"
 				BasicRuntimeChecks="0"
@@ -195,7 +197,7 @@
 				AdditionalOptions=" /USECL:MS_OPTERON /GS-"
 				Optimization="2"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories="..\Include;..\PC;&quot;..\..\db-4.4.20\build_win32&quot;"
+				AdditionalIncludeDirectories="..\Include;..\PC;..\Stackless;&quot;..\..\db-4.4.20\build_win32&quot;"
 				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS"
 				StringPooling="TRUE"
 				BasicRuntimeChecks="0"

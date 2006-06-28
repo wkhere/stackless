@@ -4,6 +4,9 @@
 extern "C" {
 #endif
 
+#ifdef STACKLESS
+#include "core/slp_exttype.h"
+#endif
 
 /* Object and type object interface */
 
@@ -342,8 +345,30 @@ typedef struct _typeobject {
 	struct _typeobject *tp_prev;
 	struct _typeobject *tp_next;
 #endif
+#ifdef STACKLESS
+	/* we need the extended structure right here */
+	PyNumberMethods as_number;
+	PyMappingMethods as_mapping;
+	PySequenceMethods as_sequence; /* as_sequence comes after as_mapping,
+					  so that the mapping wins when both
+					  the mapping and the sequence define
+					  a given operator (e.g. __getitem__).
+					  see add_operators() in typeobject.c . */
+	PyBufferProcs as_buffer;
+	PyObject *ht_name, *ht_slots;
+	slp_methodflags slpflags;
+#endif
 } PyTypeObject;
 
+
+#ifdef STACKLESS
+
+/* in Stackless, this is just a synonym */
+#define PyHeapTypeObject PyTypeObject
+
+#define PyHeapType_GET_MEMBERS(etype) \
+    ((PyMemberDef *)(((char *)etype) + (etype)->ob_type->tp_basicsize))
+#else
 
 /* The *real* layout of a type object when allocated on the heap */
 typedef struct _heaptypeobject {
@@ -366,6 +391,7 @@ typedef struct _heaptypeobject {
 #define PyHeapType_GET_MEMBERS(etype) \
     ((PyMemberDef *)(((char *)etype) + (etype)->ht_type.ob_type->tp_basicsize))
 
+#endif
 
 /* Generic type check */
 PyAPI_FUNC(int) PyType_IsSubtype(PyTypeObject *, PyTypeObject *);
@@ -509,7 +535,8 @@ given type object has a specified feature.
 
 /* These two bits are preserved for Stackless Python, next after this is 17 */
 #ifdef STACKLESS
-#define Py_TPFLAGS_HAVE_STACKLESS_EXTENSION (3L<<15)
+#define Py_TPFLAGS_HAVE_STACKLESS_CALL (1L<<15)
+#define Py_TPFLAGS_HAVE_STACKLESS_EXTENSION (1L<<16)
 #else
 #define Py_TPFLAGS_HAVE_STACKLESS_EXTENSION 0
 #endif

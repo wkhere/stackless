@@ -645,8 +645,9 @@ calculate_path(void)
 			/* 'look' will end up one character before the
 			   start of the path in question - even if this
 			   is one character before the start of the buffer
+			   CCP Change: Fix, so that bound check is before dereferencing!
 			*/
-			while (*look != DELIM && look >= module_search_path)
+			while (look >= module_search_path && *look != DELIM)
 				look--;
 			nchars = lookEnd-look;
 			strncpy(lookBuf, look+1, nchars);

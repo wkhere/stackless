@@ -746,7 +746,7 @@ _channel_send_sequence(PyChannelObject *self, PyObject *v)
  */
 
 static PyObject *
-channel_seq_callback(PyFrameObject *_f, PyObject *retval)
+channel_seq_callback(PyFrameObject *_f, int exc, PyObject *retval)
 {
 	PyThreadState *ts;
 	PyCFrameObject *f = (PyCFrameObject *) _f;

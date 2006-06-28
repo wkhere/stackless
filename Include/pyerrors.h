@@ -114,12 +114,15 @@ PyAPI_FUNC(void) PyErr_NormalizeException(PyObject**, PyObject**, PyObject**);
 	  ? (PyObject*)((PyInstanceObject*)(x))->in_class		\
 	  : (PyObject*)((x)->ob_type)))
 
-	
+
 /* Predefined exceptions */
 
 PyAPI_DATA(PyObject *) PyExc_BaseException;
 PyAPI_DATA(PyObject *) PyExc_Exception;
 PyAPI_DATA(PyObject *) PyExc_StopIteration;
+#ifdef STACKLESS
+PyAPI_DATA(PyObject *) PyExc_TaskletExit;
+#endif
 PyAPI_DATA(PyObject *) PyExc_GeneratorExit;
 PyAPI_DATA(PyObject *) PyExc_StandardError;
 PyAPI_DATA(PyObject *) PyExc_ArithmeticError;
@@ -227,7 +230,7 @@ PyAPI_FUNC(void) PyErr_WriteUnraisable(PyObject *);
 /* Issue a warning or exception */
 PyAPI_FUNC(int) PyErr_Warn(PyObject *, char *);
 PyAPI_FUNC(int) PyErr_WarnExplicit(PyObject *, const char *,
-				   const char *, int, 
+				   const char *, int,
 				   const char *, PyObject *);
 
 /* In sigcheck.c or signalmodule.c */

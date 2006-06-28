@@ -205,7 +205,7 @@ static PyMethodDef cframe_methods[] = {
 };
 
 
-static PyObject * run_cframe(PyFrameObject *f, PyObject *retval)
+static PyObject * run_cframe(PyFrameObject *f, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyCFrameObject *cf = (PyCFrameObject*) f;

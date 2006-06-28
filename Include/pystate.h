@@ -4,6 +4,9 @@
 
 #ifndef Py_PYSTATE_H
 #define Py_PYSTATE_H
+#ifdef STACKLESS
+#include "core/stackless_tstate.h"
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -93,6 +96,10 @@ typedef struct _ts {
 
     PyObject *async_exc; /* Asynchronous exception to raise */
     long thread_id; /* Thread id where this tstate was created */
+
+#ifdef STACKLESS
+	PyStacklessState st;
+#endif
 
     /* XXX signal handlers should also be here */
 

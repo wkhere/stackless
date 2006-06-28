@@ -1,6 +1,8 @@
 #include "Python.h"
 #include "cStringIO.h"
 #include "structmember.h"
+#include "core/stackless_impl.h"
+#include "platf/slp_platformselect.h"
 
 PyDoc_STRVAR(cPickle_module_documentation,
 "C implementation and optimization of the Python pickle module.");
@@ -123,7 +125,7 @@ static PyObject *__class___str, *__getinitargs___str, *__dict___str,
   *__getstate___str, *__setstate___str, *__name___str, *__reduce___str,
   *__reduce_ex___str,
   *write_str, *append_str,
-  *read_str, *readline_str, *__main___str, 
+  *read_str, *readline_str, *__main___str,
   *copy_reg_str, *dispatch_table_str;
 
 /*************************************************************************
@@ -345,6 +347,9 @@ typedef struct Picklerobject {
 	PyObject *dispatch_table;
 	int fast_container; /* count nested container dumps */
 	PyObject *fast_memo;
+#ifdef STACKLESS
+	PyObject *module_dict_ids;
+#endif
 } Picklerobject;
 
 #ifndef PY_CPICKLE_FAST_LIMIT
@@ -843,7 +848,7 @@ whichmodule(PyObject *global, PyObject *global_name)
 		*global_name_attr = 0, *name = 0;
 
 	module = PyObject_GetAttrString(global, "__module__");
-	if (module) 
+	if (module)
 		return module;
 	if (PyErr_ExceptionMatches(PyExc_AttributeError))
 		PyErr_Clear();
@@ -2294,11 +2299,21 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 	int res = -1;
 	int tmp, size;
 
+#ifdef STACKLESS
+	/* for debugging */
+	++self->nesting;
+	/* but we save the stack after a fixed watermark */
+	if (CSTACK_SAVE_NOW(PyThreadState_GET(), self)) {
+		res = slp_safe_pickling((void *)&save, (PyObject *)self, args, pers_save);
+		goto finally;
+	}
+#else
         if (self->nesting++ > Py_GetRecursionLimit()){
 		PyErr_SetString(PyExc_RuntimeError,
 				"maximum recursion depth exceeded");
 		goto finally;
 	}
+#endif
 
 	if (!pers_save && self->pers_func) {
 		if ((tmp = save_pers(self, args, self->pers_func)) != 0) {
@@ -2414,6 +2429,18 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 
         case 'd':
 		if (type == &PyDict_Type) {
+#ifdef STACKLESS
+			PyObject *ret = PyStackless_Pickle_ModuleDict(
+					    (PyObject *) self, args);
+
+			if (ret == NULL) return -1;
+			if (ret != Py_None) {
+				res = save_reduce(self, ret, args);
+				Py_DECREF(ret);
+				goto finally;
+			}
+			Py_DECREF(ret);
+#endif
 			res = save_dict(self, args);
 			goto finally;
 		}
@@ -2792,6 +2819,9 @@ newPicklerobject(PyObject *file, int proto)
 	self->fast_memo = NULL;
 	self->buf_size = 0;
 	self->dispatch_table = NULL;
+#ifdef STACKLESS
+	self->module_dict_ids = NULL;
+#endif
 
 	self->file = NULL;
 	if (file)
@@ -2905,6 +2935,9 @@ Pickler_dealloc(Picklerobject *self)
 	Py_XDECREF(self->inst_pers_func);
 	Py_XDECREF(self->dispatch_table);
 	PyMem_Free(self->write_buf);
+#ifdef STACKLESS
+	Py_XDECREF(self->module_dict_ids);
+#endif
 	self->ob_type->tp_free((PyObject *)self);
 }
 
@@ -2919,6 +2952,9 @@ Pickler_traverse(Picklerobject *self, visitproc visit, void *arg)
 	Py_VISIT(self->pers_func);
 	Py_VISIT(self->inst_pers_func);
 	Py_VISIT(self->dispatch_table);
+#ifdef STACKLESS
+	Py_VISIT(self->module_dict_ids);
+#endif
 	return 0;
 }
 
@@ -2933,6 +2969,9 @@ Pickler_clear(Picklerobject *self)
 	Py_CLEAR(self->pers_func);
 	Py_CLEAR(self->inst_pers_func);
 	Py_CLEAR(self->dispatch_table);
+#ifdef STACKLESS
+	Py_CLEAR(self->module_dict_ids);
+#endif
 	return 0;
 }
 
@@ -3002,6 +3041,36 @@ Pickler_set_memo(Picklerobject *p, PyObject *v)
 	return 0;
 }
 
+#ifdef STACKLESS
+static PyObject *
+Pickler_get_module_dict_ids(Picklerobject *p)
+{
+	if (p->module_dict_ids == NULL)
+		PyErr_SetString(PyExc_AttributeError, "module_dict_ids");
+	else
+		Py_INCREF(p->module_dict_ids);
+	return p->module_dict_ids;
+}
+
+static int
+Pickler_set_module_dict_ids(Picklerobject *p, PyObject *v)
+{
+	if (v == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"attribute deletion is not supported");
+		return -1;
+	}
+	if (!PyDict_Check(v)) {
+		PyErr_SetString(PyExc_TypeError, "module-dict-ids must be a dictionary");
+		return -1;
+	}
+	Py_XDECREF(p->module_dict_ids);
+	Py_INCREF(v);
+	p->module_dict_ids = v;
+	return 0;
+}
+#endif
+
 static PyObject *
 Pickler_get_error(Picklerobject *p)
 {
@@ -3022,6 +3091,9 @@ static PyGetSetDef Pickler_getsets[] = {
     {"inst_persistent_id", NULL, (setter)Pickler_set_inst_pers_func},
     {"memo", (getter)Pickler_get_memo, (setter)Pickler_set_memo},
     {"PicklingError", (getter)Pickler_get_error, NULL},
+#ifdef STACKLESS
+    {"module_dict_ids", (getter)Pickler_get_module_dict_ids, (setter)Pickler_set_module_dict_ids},
+#endif
     {NULL}
 };
 

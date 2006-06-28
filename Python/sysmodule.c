@@ -649,6 +649,10 @@ sys_getframe(PyObject *self, PyObject *args)
 
 	while (depth > 0 && f != NULL) {
 		f = f->f_back;
+#ifdef STACKLESS
+		if (f != NULL && !PyFrame_Check(f))
+			continue;
+#endif
 		--depth;
 	}
 	if (f == NULL) {
@@ -960,11 +964,15 @@ svnversion_init(void)
 	if (svn_initialized)
 		return;
 
+#ifdef STACKLESS
+	python = strstr(headurl, "/stackless/");
+#else
 	python = strstr(headurl, "/python/");
+#endif
 	if (!python)
 		Py_FatalError("subversion keywords missing");
 
-	br_start = python + 8;
+	br_start = python + 11;
 	br_end = strchr(br_start, '/');
 	/* Works even for trunk,
 	   as we are in trunk/Python/sysmodule.c */

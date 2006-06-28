@@ -64,9 +64,9 @@ struct _ts; /* Forward */
 
 void slp_kill_tasks_with_stacks(struct _ts *tstate);
 
-#define __STACKLESS_PYSTATE_ZAP \
+#define __STACKLESS_PYSTATE_CLEAR \
 	slp_kill_tasks_with_stacks(tstate); \
-	ZAP(tstate->st.initial_stub);
+	Py_CLEAR(tstate->st.initial_stub);
 
 #ifdef WITH_THREAD
 
@@ -77,14 +77,14 @@ void slp_kill_tasks_with_stacks(struct _ts *tstate);
 	tstate->st.thread.is_locked = 0;
 
 
-#define STACKLESS_PYSTATE_ZAP \
-	__STACKLESS_PYSTATE_ZAP \
-	ZAP(tstate->st.thread.self_lock); \
-	ZAP(tstate->st.thread.unlock_lock);
+#define STACKLESS_PYSTATE_CLEAR \
+	__STACKLESS_PYSTATE_CLEAR \
+	Py_CLEAR(tstate->st.thread.self_lock); \
+	Py_CLEAR(tstate->st.thread.unlock_lock);
 
 #else
 
 #define STACKLESS_PYSTATE_NEW __STACKLESS_PYSTATE_NEW
-#define STACKLESS_PYSTATE_ZAP __STACKLESS_PYSTATE_ZAP
+#define STACKLESS_PYSTATE_CLEAR __STACKLESS_PYSTATE_CLEAR
 
 #endif

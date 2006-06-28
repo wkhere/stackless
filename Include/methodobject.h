@@ -70,6 +70,12 @@ PyAPI_FUNC(PyObject *) PyCFunction_NewEx(PyMethodDef *, PyObject *,
 
 #define METH_COEXIST   0x0040
 
+#ifdef STACKLESS
+#define METH_STACKLESS 0x0080
+#else
+#define METH_STACKLESS 0x0000
+#endif
+
 typedef struct PyMethodChain {
     PyMethodDef *methods;		/* Methods of this type */
     struct PyMethodChain *link;	/* NULL or base type */

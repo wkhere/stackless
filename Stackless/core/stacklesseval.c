@@ -332,7 +332,7 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 /* cstack spilling for recursive calls */
 
 static PyObject *
-eval_frame_callback(PyFrameObject *f, PyObject *retval)
+eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *cur = ts->st.current;
@@ -343,7 +343,7 @@ eval_frame_callback(PyFrameObject *f, PyObject *retval)
 	ts->frame = f->f_back;
 	Py_DECREF(f);
 	cur->cstate = NULL;
-	retval = PyEval_EvalFrame_slp(ts->frame, retval);
+	retval = PyEval_EvalFrame_slp(ts->frame, exc, retval);
 	if (retval == NULL)
 		retval = slp_curexc_to_bomb();
 	if (retval == NULL)
@@ -358,7 +358,7 @@ eval_frame_callback(PyFrameObject *f, PyObject *retval)
 }
 
 PyObject *
-slp_eval_frame_newstack(PyFrameObject *f, PyObject *retval)
+slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *cur = ts->st.current;
@@ -368,7 +368,7 @@ slp_eval_frame_newstack(PyFrameObject *f, PyObject *retval)
 	if (ts->st.cstack_root == NULL) {
 		/* this is a toplevel call */
 		ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &f;
-		retval = PyEval_EvalFrame_slp(f, retval);
+		retval = PyEval_EvalFrame_slp(f, exc, retval);
 		return retval;
 	}
 
@@ -420,10 +420,10 @@ typedef struct {
  * was not faster, but considerably slower than this solution.
  */
 
-static PyObject* gen_iternext_callback(PyFrameObject *f, PyObject *retval);
+static PyObject* gen_iternext_callback(PyFrameObject *f, int exc, PyObject *retval);
 
 PyObject *
-slp_gen_iternext(PyObject *ob)
+slp_gen_send_ex(PyGenObject *ob, PyObject *arg, int exc)
 {
 	STACKLESS_GETARG();
 	genobject *gen = (genobject *) ob;
@@ -437,8 +437,12 @@ slp_gen_iternext(PyObject *ob)
 				"generator already executing");
 		return NULL;
 	}
-	if (f->f_stacktop == NULL)
+	if (f==NULL || f->f_stacktop == NULL) {
+		/* Only set exception if called from send() */
+		if (arg && !exc)
+			PyErr_SetNone(PyExc_StopIteration);
 		return NULL;
+	}
 
 	if (f->f_back == NULL &&
 		(f->f_back = (PyFrameObject *)
@@ -463,7 +467,10 @@ slp_gen_iternext(PyObject *ob)
 	Py_INCREF(f->f_back);
 
 	Py_INCREF(gen);
+	Py_INCREF(arg);
 	((PyCFrameObject *) f->f_back)->ob1 = (PyObject *) gen;
+	((PyCFrameObject *) f->f_back)->ob2 = arg;
+	((PyCFrameObject *) f->f_back)->i = (long) exc;
 	Py_INCREF(f);
 	ts->frame = f;
 	if (stackless)
@@ -472,11 +479,14 @@ slp_gen_iternext(PyObject *ob)
 }
 
 static PyObject*
-gen_iternext_callback(PyFrameObject *f, PyObject *retval)
+gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyCFrameObject *cf = (PyCFrameObject *) f;
 	genobject *gen = (genobject *) cf->ob1;
+	PyObject *arg = cf->ob2;
+
+	exc = (int) cf->i;
 
 	gen->gi_running = 0;
 	/* make refcount compatible to frames for tasklet unpickling */
@@ -492,19 +502,24 @@ gen_iternext_callback(PyFrameObject *f, PyObject *retval)
 	f = gen->gi_frame;
 	/* If the generator just returned (as opposed to yielding), signal
 	 * that the generator is exhausted. */
-	if (retval == Py_None && f->f_stacktop == NULL) {
-		Py_DECREF(retval);
-		retval = NULL;
+	if (result == Py_None && f->f_stacktop == NULL) {
+		Py_DECREF(result);
+		result = NULL;
+		if (arg)
+			PyErr_SetNone(PyExc_StopIteration);
+		/* Stackless extra handling */
 		/* are we awaited by a for_iter or called by next() ? */
-		if (ts->frame->f_execute != PyEval_EvalFrame_iter) {
+		else if (ts->frame->f_execute != PyEval_EvalFrame_iter) {
 			/* do the missing part of the next call */
 			if (!PyErr_Occurred())
 				PyErr_SetNone(PyExc_StopIteration);
 		}
 	}
 	cf->ob1 = NULL;
+	cf->ob2 = NULL;
 	Py_DECREF(gen);
-	return retval;
+	Py_DECREF(arg);
+	return result;
 }
 
 
@@ -578,7 +593,7 @@ slp_frame_dispatch(PyFrameObject *f, PyFrameObject *stopframe, PyObject *retval)
 
 	while (1) {
 
-		retval = f->f_execute(f, retval);
+		retval = f->f_execute(f, 0, retval);
 		f = ts->frame;
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);
@@ -604,7 +619,7 @@ slp_frame_dispatch_top(PyObject *retval)
 
 	while (1) {
 
-		retval = f->f_execute(f, retval);
+		retval = f->f_execute(f, 0, retval);
 		f = ts->frame;
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);

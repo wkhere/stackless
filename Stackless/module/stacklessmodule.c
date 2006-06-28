@@ -418,7 +418,7 @@ Usage: Cf. test_cframe().";
 
 static
 PyObject *
-test_cframe_nr_loop(PyFrameObject *f, PyObject *retval)
+test_cframe_nr_loop(PyFrameObject *f, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyCFrameObject *cf = (PyCFrameObject *) f;

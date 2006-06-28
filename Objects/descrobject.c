@@ -2,6 +2,7 @@
 
 #include "Python.h"
 #include "structmember.h" /* Why is this not included in Python.h? */
+#include "core/stackless_impl.h"
 
 static void
 descr_dealloc(PyDescrObject *descr)
@@ -31,28 +32,28 @@ descr_repr(PyDescrObject *descr, char *format)
 static PyObject *
 method_repr(PyMethodDescrObject *descr)
 {
-	return descr_repr((PyDescrObject *)descr, 
+	return descr_repr((PyDescrObject *)descr,
 			  "<method '%s' of '%s' objects>");
 }
 
 static PyObject *
 member_repr(PyMemberDescrObject *descr)
 {
-	return descr_repr((PyDescrObject *)descr, 
+	return descr_repr((PyDescrObject *)descr,
 			  "<member '%s' of '%s' objects>");
 }
 
 static PyObject *
 getset_repr(PyGetSetDescrObject *descr)
 {
-	return descr_repr((PyDescrObject *)descr, 
+	return descr_repr((PyDescrObject *)descr,
 			  "<attribute '%s' of '%s' objects>");
 }
 
 static PyObject *
 wrapperdescr_repr(PyWrapperDescrObject *descr)
 {
-	return descr_repr((PyDescrObject *)descr, 
+	return descr_repr((PyDescrObject *)descr,
 			  "<slot wrapper '%s' of '%s' objects>");
 }
 
@@ -209,6 +210,7 @@ getset_set(PyGetSetDescrObject *descr, PyObject *obj, PyObject *value)
 static PyObject *
 methoddescr_call(PyMethodDescrObject *descr, PyObject *args, PyObject *kwds)
 {
+	STACKLESS_GETARG();
 	Py_ssize_t argc;
 	PyObject *self, *func, *result;
 
@@ -243,7 +245,9 @@ methoddescr_call(PyMethodDescrObject *descr, PyObject *args, PyObject *kwds)
 		Py_DECREF(func);
 		return NULL;
 	}
+	STACKLESS_PROMOTE_ALL();
 	result = PyEval_CallObjectWithKeywords(func, args, kwds);
+	STACKLESS_ASSERT();
 	Py_DECREF(args);
 	Py_DECREF(func);
 	return result;
@@ -253,13 +257,16 @@ static PyObject *
 classmethoddescr_call(PyMethodDescrObject *descr, PyObject *args,
 		      PyObject *kwds)
 {
+	STACKLESS_GETARG();
 	PyObject *func, *result;
 
 	func = PyCFunction_New(descr->d_method, (PyObject *)descr->d_type);
 	if (func == NULL)
 		return NULL;
 
+	STACKLESS_PROMOTE_ALL();
 	result = PyEval_CallObjectWithKeywords(func, args, kwds);
+	STACKLESS_ASSERT();
 	Py_DECREF(func);
 	return result;
 }
@@ -267,6 +274,7 @@ classmethoddescr_call(PyMethodDescrObject *descr, PyObject *args,
 static PyObject *
 wrapperdescr_call(PyWrapperDescrObject *descr, PyObject *args, PyObject *kwds)
 {
+	STACKLESS_GETARG();
 	Py_ssize_t argc;
 	PyObject *self, *func, *result;
 
@@ -301,7 +309,9 @@ wrapperdescr_call(PyWrapperDescrObject *descr, PyObject *args, PyObject *kwds)
 		Py_DECREF(func);
 		return NULL;
 	}
+	STACKLESS_PROMOTE_ALL();
 	result = PyEval_CallObjectWithKeywords(func, args, kwds);
+	STACKLESS_ASSERT();
 	Py_DECREF(args);
 	Py_DECREF(func);
 	return result;
@@ -381,7 +391,11 @@ descr_traverse(PyObject *self, visitproc visit, void *arg)
 	return 0;
 }
 
+#ifdef STACKLESS
+PyTypeObject PyMethodDescr_Type = {
+#else
 static PyTypeObject PyMethodDescr_Type = {
+#endif
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
 	"method_descriptor",
@@ -419,8 +433,14 @@ static PyTypeObject PyMethodDescr_Type = {
 	0,					/* tp_descr_set */
 };
 
+STACKLESS_DECLARE_METHOD(&PyMethodDescr_Type, tp_call)
+
 /* This is for METH_CLASS in C, not for "f = classmethod(f)" in Python! */
+#ifdef STACKLESS
+PyTypeObject PyClassMethodDescr_Type = {
+#else
 static PyTypeObject PyClassMethodDescr_Type = {
+#endif
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
 	"classmethod_descriptor",
@@ -457,6 +477,8 @@ static PyTypeObject PyClassMethodDescr_Type = {
 	(descrgetfunc)classmethod_get,		/* tp_descr_get */
 	0,					/* tp_descr_set */
 };
+
+STACKLESS_DECLARE_METHOD(&PyClassMethodDescr_Type, tp_call)
 
 static PyTypeObject PyMemberDescr_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -572,6 +594,8 @@ PyTypeObject PyWrapperDescr_Type = {
 	0,					/* tp_descr_set */
 };
 
+/* STACKLESS_DECLARE_METHOD(&PyWrapperDescr_Type, tp_call) */
+
 static PyDescrObject *
 descr_new(PyTypeObject *descrtype, PyTypeObject *type, const char *name)
 {
@@ -648,6 +672,9 @@ PyDescr_NewWrapper(PyTypeObject *type, struct wrapperbase *base, void *wrapped)
 	if (descr != NULL) {
 		descr->d_base = base;
 		descr->d_wrapped = wrapped;
+#ifdef STACKLESS
+		descr->d_slpmask = 0;
+#endif
 	}
 	return (PyObject *)descr;
 }
@@ -978,12 +1005,17 @@ static PyGetSetDef wrapper_getsets[] = {
 static PyObject *
 wrapper_call(wrapperobject *wp, PyObject *args, PyObject *kwds)
 {
+	STACKLESS_GETARG();
 	wrapperfunc wrapper = wp->descr->d_base->wrapper;
 	PyObject *self = wp->self;
+	PyObject *ret;
 
 	if (wp->descr->d_base->flags & PyWrapperFlag_KEYWORDS) {
 		wrapperfunc_kwds wk = (wrapperfunc_kwds)wrapper;
-		return (*wk)(self, args, wp->descr->d_wrapped, kwds);
+		STACKLESS_PROMOTE_WRAPPER(wp);
+		ret = (*wk)(self, args, wp->descr->d_wrapped, kwds);
+		STACKLESS_ASSERT();
+		return ret;
 	}
 
 	if (kwds != NULL && (!PyDict_Check(kwds) || PyDict_Size(kwds) != 0)) {
@@ -992,7 +1024,10 @@ wrapper_call(wrapperobject *wp, PyObject *args, PyObject *kwds)
 			     wp->descr->d_base->name);
 		return NULL;
 	}
-	return (*wrapper)(self, args, wp->descr->d_wrapped);
+	STACKLESS_PROMOTE_WRAPPER(wp);
+	ret = (*wrapper)(self, args, wp->descr->d_wrapped);
+	STACKLESS_ASSERT();
+	return ret;
 }
 
 static int
@@ -1004,7 +1039,12 @@ wrapper_traverse(PyObject *self, visitproc visit, void *arg)
 	return 0;
 }
 
+#ifdef STACKLESS
+#define wrappertype PyMethodWrapper_Type
+PyTypeObject PyMethodWrapper_Type = {
+#else
 static PyTypeObject wrappertype = {
+#endif
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
 	"method-wrapper",			/* tp_name */
@@ -1042,6 +1082,8 @@ static PyTypeObject wrappertype = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 };
+
+STACKLESS_DECLARE_METHOD(&PyMethodWrapper_Type, tp_call)
 
 PyObject *
 PyWrapper_New(PyObject *d, PyObject *self)
@@ -1190,7 +1232,7 @@ property_init(PyObject *self, PyObject *args, PyObject *kwds)
 		del = NULL;
 
 	/* if no docstring given and the getter has one, use that one */
-	if ((doc == NULL || doc == Py_None) && get != NULL && 
+	if ((doc == NULL || doc == Py_None) && get != NULL &&
 	    PyObject_HasAttrString(get, "__doc__")) {
 		if (!(get_doc = PyObject_GetAttrString(get, "__doc__")))
 			return -1;

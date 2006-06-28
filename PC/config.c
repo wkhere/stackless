@@ -43,6 +43,9 @@ extern void initxxsubtype(void);
 extern void initzipimport(void);
 extern void init_random(void);
 extern void inititertools(void);
+#ifdef STACKLESS
+extern void initstackless(void);
+#endif
 extern void initcollections(void);
 extern void init_heapq(void);
 extern void init_bisect(void);

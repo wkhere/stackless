@@ -482,3 +482,8 @@ GLHACK=-Dclear=__GLclear
 
 # Another example -- the 'xxsubtype' module shows C-level subtyping in action
 xxsubtype xxsubtype.c
+
+# uncomment if you'd like to compile stackless statically.
+# Note that the static build puts the .o files into Modules.
+#SLP=./Stackless
+#stackless $(SLP)/stacklessmodule.c $(SLP)/atomicobject.c $(SLP)/cframeobject.c $(SLP)/channelobject.c $(SLP)/flextype.c $(SLP)/scheduling.c $(SLP)/schedulerobject.c $(SLP)/stackless_debug.c $(SLP)/stackless_util.c $(SLP)/taskletobject.c

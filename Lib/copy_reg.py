@@ -67,6 +67,13 @@ def _reduce_ex(self, proto):
     else:
         if base is self.__class__:
             raise TypeError, "can't pickle %s objects" % base.__name__
+        ## Stackless addition BEGIN
+        # if base is only supported by our shadow types in copy_reg,
+        # we need to substitute here:
+        reducer = dispatch_table.get(base)
+        if reducer and reducer.__module__ == "stackless._wrap":
+            base = reducer(self)[0]
+        ## Stackless addition END
         state = base(self)
     args = (self.__class__, base, state)
     try:

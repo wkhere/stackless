@@ -1,5 +1,7 @@
 /* Generator object implementation */
 
+#include "core/stackless_impl.h"
+
 #include "Python.h"
 #include "frameobject.h"
 #include "genobject.h"
@@ -38,7 +40,10 @@ gen_dealloc(PyGenObject *gen)
 	PyObject_GC_Del(gen);
 }
 
-
+#ifdef STACKLESS
+PyObject *slp_gen_send_ex(PyGenObject *gen, PyObject *arg, int exc);
+#define gen_send_ex slp_gen_send_ex
+#else
 static PyObject *
 gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
 {
@@ -106,6 +111,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
 
 	return result;
 }
+#endif
 
 PyDoc_STRVAR(send_doc,
 "send(arg) -> send 'arg' into generator,\n\
@@ -274,13 +280,11 @@ failed_throw:
 	return NULL;
 }
 
-
 static PyObject *
 gen_iternext(PyGenObject *gen)
 {
 	return gen_send_ex(gen, NULL, 0);
 }
-
 
 static PyMemberDef gen_memberlist[] = {
 	{"gi_frame",	T_OBJECT, offsetof(PyGenObject, gi_frame),	RO},
@@ -347,8 +351,15 @@ PyTypeObject PyGen_Type = {
 	gen_del,				/* tp_del */
 };
 
+STACKLESS_DECLARE_METHOD(&PyGen_Type, tp_iternext);
+
+#ifdef STACKLESS
+PyObject *
+PyGenerator_New(PyFrameObject *f)
+#else
 PyObject *
 PyGen_New(PyFrameObject *f)
+#endif
 {
 	PyGenObject *gen = PyObject_GC_New(PyGenObject, &PyGen_Type);
 	if (gen == NULL) {

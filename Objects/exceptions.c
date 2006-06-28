@@ -422,6 +422,13 @@ SimpleExtendsException(PyExc_Exception, StopIteration,
 SimpleExtendsException(PyExc_Exception, GeneratorExit,
                        "Request that a generator exit.");
 
+#ifdef STACKLESS
+/*
+ *    TaskletExit extends Exception
+ */
+SimpleExtendsException(PyExc_Exception, TaskletExit,
+                       "This exception is used to silently kill a tasklet");
+#endif
 
 /*
  *    SystemExit extends BaseException
@@ -2001,6 +2008,9 @@ _PyExc_Init(void)
     PRE_INIT(TypeError)
     PRE_INIT(StopIteration)
     PRE_INIT(GeneratorExit)
+#ifdef STACKLESS
+    PRE_INIT(TaskletExit);
+#endif
     PRE_INIT(SystemExit)
     PRE_INIT(KeyboardInterrupt)
     PRE_INIT(ImportError)
@@ -2066,6 +2076,7 @@ _PyExc_Init(void)
     POST_INIT(TypeError)
     POST_INIT(StopIteration)
     POST_INIT(GeneratorExit)
+    POST_INIT(TaskletExit)
     POST_INIT(SystemExit)
     POST_INIT(KeyboardInterrupt)
     POST_INIT(ImportError)

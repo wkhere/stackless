@@ -79,17 +79,17 @@ PyAPI_FUNC(PyObject *) slp_frame_dispatch_top(PyObject *retval);
 
 /* the now exported eval_frame */
 PyAPI_FUNC(PyObject *) PyEval_EvalFrame(struct _frame *f);
-PyObject * PyEval_EvalFrame_slp(struct _frame *, PyObject *);
+PyObject * PyEval_EvalFrame_slp(struct _frame *, int, PyObject *);
 
 /* eval_frame with stack overflow, triggered there with a macro */
-PyAPI_FUNC(PyObject *) slp_eval_frame_newstack(struct _frame *f, PyObject *retval);
+PyAPI_FUNC(PyObject *) slp_eval_frame_newstack(struct _frame *f, int throwflag, PyObject *retval);
 
 /* the new eval_frame loop with or without value or resuming an iterator */
-PyAPI_FUNC(PyObject *) PyEval_EvalFrame_value(struct _frame *f,
+PyAPI_FUNC(PyObject *) PyEval_EvalFrame_value(struct _frame *f,  int throwflag,
 					      PyObject *retval);
-PyAPI_FUNC(PyObject *) PyEval_EvalFrame_noval(struct _frame *f,
+PyAPI_FUNC(PyObject *) PyEval_EvalFrame_noval(struct _frame *f,  int throwflag,
 					      PyObject *retval);
-PyAPI_FUNC(PyObject *) PyEval_EvalFrame_iter(struct _frame *f,
+PyAPI_FUNC(PyObject *) PyEval_EvalFrame_iter(struct _frame *f,  int throwflag,
 					     PyObject *retval);
 
 /* rebirth of software stack avoidance */
@@ -110,7 +110,7 @@ PyAPI_FUNC(struct _frame *) slp_ensure_new_frame(struct _frame *f);
 
 PyAPI_DATA(PyTypeObject) PyGen_Type;
 PyAPI_FUNC(PyObject *) PyGenerator_New(struct _frame *f);
-PyAPI_FUNC(PyObject *) slp_gen_iternext(PyObject *gen);
+PyAPI_FUNC(PyObject *) slp_gen_send_ex(PyObject *gen, PyObject *arg, int exc);
 #define PyGenerator_Check(op) PyObject_TypeCheck(op, &PyGen_Type)
 
 PyAPI_DATA(PyTypeObject) PyMethodDescr_Type;

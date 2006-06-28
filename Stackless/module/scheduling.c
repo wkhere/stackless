@@ -426,7 +426,7 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
 /* non-recursive scheduling */
 
 static PyObject *
-restore_exception(PyFrameObject *f, PyObject *retval)
+restore_exception(PyFrameObject *f, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyCFrameObject *cf = (PyCFrameObject *) f;
@@ -442,7 +442,7 @@ restore_exception(PyFrameObject *f, PyObject *retval)
 }
 
 static PyObject *
-restore_tracing(PyFrameObject *f, PyObject *retval)
+restore_tracing(PyFrameObject *f, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyCFrameObject *cf = (PyCFrameObject *) f;
@@ -463,7 +463,7 @@ restore_tracing(PyFrameObject *f, PyObject *retval)
 /* jumping from a soft tasklet to a hard switched */
 
 static PyObject *
-jump_soft_to_hard(PyFrameObject *f, PyObject *retval)
+jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 

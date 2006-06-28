@@ -316,9 +316,12 @@ slp_register_execute(PyTypeObject *t, char *name, PyFrame_ExecFunc *good,
 	proxyobject *dp = NULL;
 	int ret = -1;
 
+/*
+	WE CANNOT BE DOING THIS HERE, AS THE EXCEPTION CLASSES ARE NOT INITIALISED.
 	assert(PyObject_IsSubclass((PyObject *)t, (PyObject *)&PyFrame_Type) ||
 	       PyObject_IsSubclass((PyObject *)t,
 				   (PyObject *)&PyCFrame_Type));
+*/
 	if (0
 	    || PyType_Ready(t) || name == NULL
 	    || (nameobj = PyString_FromString(name)) == NULL
@@ -709,7 +712,8 @@ static int init_functype(void)
 
  ******************************************************/
 
-#define frametuplefmt "O)(OiSOiOOiOiiOO"
+#define frametuplefmt "O)(OiSOiOOOiiOO"
+/* #define frametuplefmt "O)(OiSOiOOiOiiOO" */
 
 DEF_INVALID_EXEC(eval_frame)
 DEF_INVALID_EXEC(eval_frame_value)
@@ -792,7 +796,7 @@ frameobject_reduce(PyFrameObject *f)
 			     have_locals,
 			     have_locals ? f->f_locals : dummy_locals,
 			     f->f_trace != NULL ? f->f_trace : Py_None,
-			     f->f_restricted,
+/*			     f->f_restricted, */
 			     exc_as_tuple,
 			     f->f_lasti,
 			     f->f_lineno,
@@ -810,7 +814,8 @@ err_exit:
 }
 
 #define frametuplenewfmt "O!"
-#define frametuplesetstatefmt "O!iSO!iO!OiOiiO!O:frame_new"
+#define frametuplesetstatefmt "O!iSO!iO!OOiiO!O:frame_new"
+/*#define frametuplesetstatefmt "O!iSO!iO!OiOiiO!O:frame_new"*/
 
 static PyObject *
 frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -843,7 +848,7 @@ frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject *
 frame_setstate(PyFrameObject *f, PyObject *args)
 {
-	int f_restricted, f_lasti, f_lineno, i;
+	int /*f_restricted, */ f_lasti, f_lineno, i;
 	PyObject *f_globals, *f_locals, *blockstack_as_tuple;
         PyObject *localsplus_as_tuple, *exc_as_tuple, *trace, *f_code;
 	PyObject *exec_name = NULL;
@@ -869,7 +874,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 			       &have_locals,
 			       &PyDict_Type, &f_locals,
 			       &trace,
-			       &f_restricted,
+/*			       &f_restricted, */
 			       &exc_as_tuple,
 			       &f_lasti,
 			       &f_lineno,
@@ -904,7 +909,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 		f->f_trace = trace;
 	}
 
-	f->f_restricted = f_restricted;
+/*	f->f_restricted = f_restricted; */
 
 	if (exc_as_tuple != Py_None) {
 		if (PyTuple_GET_SIZE(exc_as_tuple) != 4) {
@@ -916,7 +921,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	}
 
 	if (PyTuple_Check(localsplus_as_tuple)) {
-		int space =  f->f_stacksize + (f->f_valuestack - f->f_localsplus);
+		int space =  f->f_code->co_stacksize + (f->f_valuestack - f->f_localsplus);
 
 		if (PyTuple_GET_SIZE(localsplus_as_tuple)-1 > space) {
 			PyErr_SetString(PyExc_ValueError, "invalid localsplus for frame");

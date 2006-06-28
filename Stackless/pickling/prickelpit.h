@@ -27,7 +27,7 @@ PyAPI_FUNC(PyObject *) slp_cannot_execute(PyFrameObject *f, char *exec_name,
 
 #define DEF_INVALID_EXEC(procname) \
 static PyObject *\
-cannot_##procname(PyFrameObject *f, PyObject *retval) \
+cannot_##procname(PyFrameObject *f, int exc, PyObject *retval) \
 { \
 	return slp_cannot_execute(f, #procname, retval); \
 }

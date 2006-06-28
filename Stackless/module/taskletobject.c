@@ -729,7 +729,7 @@ PyTasklet_Capture(PyTaskletObject *task, PyObject *retval)
 }
 
 static PyObject *
-post_schedule_remove(PyFrameObject *f, PyObject *retval)
+post_schedule_remove(PyFrameObject *f, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *parent = ts->st.current;
