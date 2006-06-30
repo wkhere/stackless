@@ -10,6 +10,9 @@ from stackless import schedule, tasklet, stackless
 VERBOSE = False
 glist = []
 
+def nothing():
+    pass
+
 def accumulate(ident, func, *args):
     rval = (ident, func(*args))
     glist.append(rval)
@@ -38,6 +41,9 @@ class TaskletChannel:
         self.channel = stackless.channel()
     def run(self):
         self.channel.receive()
+
+class CustomTasklet(tasklet):
+    __slots__ = [ "name" ]
 
 def listtest(n, when):
     for i in range(n):
@@ -175,6 +181,12 @@ class TestPickledTasklets(unittest.TestCase):
         have_fromkeys = False
 
 class TestConcretePickledTasklets(TestPickledTasklets):
+    def testClassPersistence(self):
+        t1 = CustomTasklet(nothing)()
+        s = pickle.dumps(t1)
+        t2 = pickle.loads(s)
+        self.assertEquals(t1.__class__, t2.__class__)
+
     def testGenerator(self):
         self.run_pickled(genoutertest, 20, 13)
 

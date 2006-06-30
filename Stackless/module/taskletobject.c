@@ -277,7 +277,7 @@ tasklet_reduce(PyTaskletObject * t)
 	if (PyList_Reverse(lis)) goto err_exit;
 	assert(t->cstate != NULL);
 	tup = Py_BuildValue("(O()(" TASKLET_TUPLEFMT "))",
-			    &PyTasklet_Type,
+			    t->ob_type,
 			    t->flags,
 			    t->tempval,
 			    t->cstate->nesting_level,
