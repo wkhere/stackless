@@ -981,7 +981,7 @@ channel_methods[] = {
 	{"__setstate__",	(PCF)channel_setstate,	    METH_O,
 	 channel_setstate__doc__},
 	{"send_sequence",   (PCF)channel_send_sequence,	  METH_OS,
-	 channel_send__doc__},
+	 channel_send_sequence__doc__},
 	{NULL,		    NULL}             /* sentinel */
 };
 
