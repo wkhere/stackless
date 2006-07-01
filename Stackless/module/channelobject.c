@@ -16,7 +16,7 @@ channel_clear(PyObject *ob)
 {
 	PyChannelObject *ch = (PyChannelObject *) ob;
 
-	/* 
+	/*
 	 * remove all tasklets and hope they will die.
 	 * Note that the channel might receive new actions
 	 * during tasklet deallocation, so we don't even know
@@ -24,7 +24,7 @@ channel_clear(PyObject *ob)
 	 */
 	while (ch->balance) {
 		int dir = ch->balance > 0 ? 1 : -1;
-		
+
 		ob = (PyObject *) slp_channel_remove(ch, dir);
 		Py_DECREF(ob);
 	}
@@ -84,7 +84,7 @@ slp_channel_remove(PyChannelObject *channel, int dir)
 /* the special case to remove a specific tasklet */
 
 PyTaskletObject *
-slp_channel_remove_specific(PyChannelObject *channel, int dir, 
+slp_channel_remove_specific(PyChannelObject *channel, int dir,
 			    PyTaskletObject *task)
 {
 	/* note: we assume that the task is in the channel! */
@@ -315,22 +315,22 @@ channel_callback(PyChannelObject *channel, PyTaskletObject *task, int sending, i
 	PyObject *args, *ret;
 	PyObject *type, *value, *traceback;
 	args = ret = NULL;
-  
+
 	args = Py_BuildValue("(OOii)", channel, task, sending, willblock);
 	if (args != NULL) {
-    
+
 		PyErr_Fetch(&type, &value, &traceback);
 		ret = PyObject_Call(channel_hook, args, NULL);
-    
+
 		if (ret != NULL) {
 			PyErr_Restore(type, value, traceback);
-		} 
+		}
 		else {
 			Py_XDECREF(type);
 			Py_XDECREF(value);
 			Py_XDECREF(traceback);
 		}
-    
+
 		Py_XDECREF(ret);
 		Py_DECREF(args);
 	}
@@ -368,7 +368,7 @@ the runnables list.";
 static PyObject *
 PyChannel_Send_M(PyChannelObject *self, PyObject *arg)
 {
-	return PyStackless_CallMethod_Main((PyObject *) self, "send", "(O)", 
+	return PyStackless_CallMethod_Main((PyObject *) self, "send", "(O)",
 					   arg);
 }
 
@@ -390,7 +390,7 @@ PyChannel_Send(PyChannelObject *self, PyObject *arg)
 }
 
 
-/* 
+/*
  * This generic function exchanges values over a channel.
  * the action can be either send or receive.
  * Note that this works even across threads. The insert action
@@ -527,7 +527,7 @@ static CHANNEL_SEND_EXCEPTION_HEAD(impl_channel_send_exception)
 
 static CHANNEL_SEND_EXCEPTION_HEAD(wrap_channel_send_exception)
 {
-	return PyObject_CallMethod((PyObject *) self, "send_exception", 
+	return PyObject_CallMethod((PyObject *) self, "send_exception",
 				   "(OO)", klass, args);
 }
 
@@ -654,11 +654,11 @@ channel_receive(PyObject *self)
 	  # got nested structure
 	  ch.send_sequence(parser())
 
-    parser()    
+    parser()
 
  *********************************************************/
 
-	
+
 /*
  * iterator extension.
  * This is probably the fastest way to run through a channel
@@ -697,7 +697,7 @@ static char channel_send_sequence__doc__[] =
 over the channel. Combined with a generator, this is\n\
 a very efficient way to build fast pipes.";
 
-/* 
+/*
  * this is the traight-forward and simple implementation,
  * but here we have almost no speedup, since all switches
  * are hard.
@@ -818,7 +818,7 @@ exit_frame:
 	ts->frame = f->f_back;
 	Py_DECREF(f);
 	return retval;
-}	
+}
 
 static PyObject *
 channel_send_sequence(PyChannelObject *self, PyObject *v)
@@ -900,7 +900,7 @@ channel_reduce(PyChannelObject * ch)
 		t = t->next;
 	}
 	tup = Py_BuildValue("(O()(iiO))",
-			    &PyChannel_Type,
+			    ch->ob_type,
 			    ch->balance,
 			    ch->flags,
 			    lis
@@ -925,7 +925,7 @@ channel_setstate(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "iiO!:channel",
 			      &balance,
-			      &flags, 
+			      &flags,
 			      &PyList_Type, &lis))
 		return NULL;
 
@@ -1053,7 +1053,7 @@ int init_channeltype(void)
 	PyTypeObject *t = &_PyChannel_Type;
 
 	if ( (t = PyFlexType_Build("stackless", "channel", t->tp_doc,
-				   t, sizeof(PyChannel_HeapType), 
+				   t, sizeof(PyChannel_HeapType),
 				   channel_cmethods) ) == NULL)
 		return -1;
 	PyChannel_TypePtr = t;
