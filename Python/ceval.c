@@ -514,7 +514,7 @@ PyEval_EvalFrame(PyFrameObject *f)
 PyObject *
 PyEval_EvalFrame_slp(PyFrameObject *f, int throwflag, PyObject *retval)
 {
-	return PyEval_EvalFrameEx_slp(f, throwflag, NULL);
+	return PyEval_EvalFrameEx_slp(f, throwflag, retval);
 }
 
 PyObject *
