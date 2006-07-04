@@ -464,6 +464,7 @@ slp_gen_send_ex(PyGenObject *ob, PyObject *arg, int exc)
 		/* Push arg onto the frame's value stack */
 		retval = arg ? arg : Py_None;
 		Py_INCREF(retval);
+	        *(f->f_stacktop++) = retval;
 	}
 
 	/* XXX give the patch to python-dev */
