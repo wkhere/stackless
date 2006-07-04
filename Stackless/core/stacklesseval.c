@@ -281,7 +281,7 @@ slp_eval_frame(PyFrameObject *f)
 		return slp_run_tasklet();
 	}
 	Py_INCREF(Py_None);
-	return slp_frame_dispatch(f, fprev, Py_None);
+	return slp_frame_dispatch(f, fprev, 0, Py_None);
 }
 
 void slp_kill_tasks_with_stacks(PyThreadState *ts)
@@ -343,7 +343,7 @@ eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
 	ts->frame = f->f_back;
 	Py_DECREF(f);
 	cur->cstate = NULL;
-	retval = PyEval_EvalFrame_slp(ts->frame, exc, retval);
+	retval = PyEval_EvalFrameEx_slp(ts->frame, exc, retval);
 	if (retval == NULL)
 		retval = slp_curexc_to_bomb();
 	if (retval == NULL)
@@ -368,7 +368,7 @@ slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
 	if (ts->st.cstack_root == NULL) {
 		/* this is a toplevel call */
 		ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &f;
-		retval = PyEval_EvalFrame_slp(f, exc, retval);
+		retval = PyEval_EvalFrameEx_slp(f, exc, retval);
 		return retval;
 	}
 
@@ -448,6 +448,24 @@ slp_gen_send_ex(PyGenObject *ob, PyObject *arg, int exc)
 		(f->f_back = (PyFrameObject *)
 			 slp_cframe_new(gen_iternext_callback, 0)) == NULL)
 		return NULL;
+
+	if (f->f_lasti == -1) {
+		if (arg && arg != Py_None) {
+			PyErr_SetString(PyExc_TypeError,
+					"can't send non-None value to a "
+					"just-started generator");
+			return NULL;
+		} else if (arg == NULL) {
+			retval = Py_None;
+			Py_INCREF(retval);
+		} else
+			retval = arg;
+	} else {
+		/* Push arg onto the frame's value stack */
+		retval = arg ? arg : Py_None;
+		Py_INCREF(retval);
+	}
+
 	/* XXX give the patch to python-dev */
 	f->f_tstate = ts;
 	/* Generators always return to their most recent caller, not
@@ -459,23 +477,20 @@ slp_gen_send_ex(PyGenObject *ob, PyObject *arg, int exc)
 
 	gen->gi_running = 1;
 
-	Py_INCREF(Py_None);
-	retval = Py_None;
-	f->f_execute = PyEval_EvalFrame_slp;
+	f->f_execute = PyEval_EvalFrameEx_slp;
 
 	/* make refcount compatible to frames for tasklet unpickling */
 	Py_INCREF(f->f_back);
 
 	Py_INCREF(gen);
-	Py_INCREF(arg);
+	Py_XINCREF(arg);
 	((PyCFrameObject *) f->f_back)->ob1 = (PyObject *) gen;
 	((PyCFrameObject *) f->f_back)->ob2 = arg;
-	((PyCFrameObject *) f->f_back)->i = (long) exc;
 	Py_INCREF(f);
 	ts->frame = f;
 	if (stackless)
 		return STACKLESS_PACK(retval);
-	return slp_frame_dispatch(f, stopframe, retval);
+	return slp_frame_dispatch(f, stopframe, exc, retval);
 }
 
 static PyObject*
@@ -485,8 +500,6 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 	PyCFrameObject *cf = (PyCFrameObject *) f;
 	genobject *gen = (genobject *) cf->ob1;
 	PyObject *arg = cf->ob2;
-
-	exc = (int) cf->i;
 
 	gen->gi_running = 0;
 	/* make refcount compatible to frames for tasklet unpickling */
@@ -518,7 +531,7 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 	cf->ob1 = NULL;
 	cf->ob2 = NULL;
 	Py_DECREF(gen);
-	Py_DECREF(arg);
+	Py_XDECREF(arg);
 	return result;
 }
 
@@ -574,7 +587,7 @@ PyUnwindObject *Py_UnwindToken = &unwind_token;
  */
 
 PyObject *
-slp_frame_dispatch(PyFrameObject *f, PyFrameObject *stopframe, PyObject *retval)
+slp_frame_dispatch(PyFrameObject *f, PyFrameObject *stopframe, int exc, PyObject *retval)
 {
 	PyThreadState *ts = PyThreadState_GET();
 
@@ -593,7 +606,8 @@ slp_frame_dispatch(PyFrameObject *f, PyFrameObject *stopframe, PyObject *retval)
 
 	while (1) {
 
-		retval = f->f_execute(f, 0, retval);
+		retval = f->f_execute(f, exc, retval);
+		/* exc = 0;  Maybe we should be unpacking this. */
 		f = ts->frame;
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);

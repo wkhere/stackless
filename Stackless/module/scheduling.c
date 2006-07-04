@@ -120,7 +120,7 @@ slp_make_bomb(PyObject *klass, PyObject *args, char *msg)
 	PyBombObject *bomb;
 	PyObject *tup;
 
-	if (! (PyObject_IsSubclass(klass, PyExc_Exception) == 1 ||
+	if (! (PyObject_IsSubclass(klass, PyExc_BaseException) == 1 ||
 	       PyString_Check(klass) ) ) {
 		char s[256];
 
@@ -1037,8 +1037,7 @@ tasklet_end(PyObject *retval)
 	 * otherwise make the exception into a bomb.
 	 */
 	if (retval == NULL) {
-		if (PyErr_Occurred() &&
-		    PyErr_ExceptionMatches(PyExc_SystemExit)) {
+		if (PyErr_ExceptionMatches(PyExc_SystemExit)) {
 			/* but if it is truly a SystemExit on the main thread, we want the exit! */
 			if (ts == slp_initial_tstate && !PyErr_ExceptionMatches(PyExc_TaskletExit))
 				PyStackless_HandleSystemExit();

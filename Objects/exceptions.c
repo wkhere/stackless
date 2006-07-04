@@ -422,14 +422,6 @@ SimpleExtendsException(PyExc_Exception, StopIteration,
 SimpleExtendsException(PyExc_Exception, GeneratorExit,
                        "Request that a generator exit.");
 
-#ifdef STACKLESS
-/*
- *    TaskletExit extends Exception
- */
-SimpleExtendsException(PyExc_Exception, TaskletExit,
-                       "This exception is used to silently kill a tasklet");
-#endif
-
 /*
  *    SystemExit extends BaseException
  */
@@ -485,6 +477,15 @@ static PyMemberDef SystemExit_members[] = {
 ComplexExtendsException(PyExc_BaseException, SystemExit, SystemExit,
                         SystemExit_dealloc, 0, SystemExit_members, 0,
                         "Request to exit from the interpreter.");
+
+#ifdef STACKLESS
+/*
+ *    TaskletExit extends SystemExit
+ */
+SimpleExtendsException(PyExc_SystemExit, TaskletExit,
+                       "This exception is used to silently kill a tasklet");
+#endif
+
 
 /*
  *    KeyboardInterrupt extends BaseException

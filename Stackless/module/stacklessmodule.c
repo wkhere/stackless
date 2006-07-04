@@ -626,7 +626,7 @@ _peek(PyObject *self, PyObject *v)
 		return PyInt_FromLong((int)(((PyCodeObject*)v)->co_code));
 	}
 	if (PyInt_Check(v) && PyInt_AS_LONG(v) == 0) {
-		return PyInt_FromLong((int)(&PyEval_EvalFrame_slp));
+		return PyInt_FromLong((int)(&PyEval_EvalFrameEx_slp));
 	}
 	if (!PyInt_Check(v)) goto noobject;
 	o = (PyObject*) PyInt_AS_LONG(v);

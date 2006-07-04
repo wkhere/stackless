@@ -1041,7 +1041,7 @@ MAKE_WRAPPERTYPE(PyFrame_Type, frame, "frame", frameobject_reduce, frame_new, fr
 static int init_frametype(void)
 {
 	return slp_register_execute(&PyFrame_Type, "eval_frame",
-				 PyEval_EvalFrame_slp, REF_INVALID_EXEC(eval_frame))
+				 PyEval_EvalFrameEx_slp, REF_INVALID_EXEC(eval_frame))
 	    || slp_register_execute(&PyFrame_Type, "eval_frame_value",
 				 PyEval_EvalFrame_value, REF_INVALID_EXEC(eval_frame_value))
 	    || slp_register_execute(&PyFrame_Type, "eval_frame_noval",

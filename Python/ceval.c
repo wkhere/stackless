@@ -512,12 +512,6 @@ PyEval_EvalFrame(PyFrameObject *f)
 }
 
 PyObject *
-PyEval_EvalFrame_slp(PyFrameObject *f, int throwflag, PyObject *retval)
-{
-	return PyEval_EvalFrameEx_slp(f, throwflag, retval);
-}
-
-PyObject *
 PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 {
 	return PyEval_EvalFrameEx_slp(f, throwflag, NULL);
@@ -2909,7 +2903,7 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 		return NULL;
 
 #ifdef STACKLESS
-	f->f_execute = PyEval_EvalFrame_slp;
+	f->f_execute = PyEval_EvalFrameEx_slp;
 #endif
 
 	fastlocals = f->f_localsplus;
@@ -3123,7 +3117,7 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 	else {
 		if (f->f_back != NULL)
 			/* use the faster path */
-			retval = slp_frame_dispatch(f, f->f_back, retval);
+			retval = slp_frame_dispatch(f, f->f_back, 0, retval);
         	else {
 			Py_DECREF(retval);
 			retval = slp_eval_frame(f);
@@ -3969,7 +3963,7 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
 			fastlocals[i] = *stack++;
 		}
 #ifdef STACKLESS
-		f->f_execute = PyEval_EvalFrame_slp;
+		f->f_execute = PyEval_EvalFrameEx_slp;
 		if (slp_enable_softswitch) {
 			Py_INCREF(Py_None);
 			retval = Py_None;

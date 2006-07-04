@@ -361,7 +361,7 @@ tasklet_setstate(PyObject *self, PyObject *args)
 	}
 	/* walk frames again and calculate recursion_depth */
 	for (f = t->f.frame; f != NULL; f = f->f_back) {
-		if (PyFrame_Check(f) && f->f_execute != PyEval_EvalFrame_slp) {
+		if (PyFrame_Check(f) && f->f_execute != PyEval_EvalFrameEx_slp) {
 			/*
 			 * we count running frames which *have* added
 			 * to recursion_depth 
