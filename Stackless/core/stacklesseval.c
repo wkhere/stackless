@@ -455,11 +455,7 @@ slp_gen_send_ex(PyGenObject *ob, PyObject *arg, int exc)
 					"can't send non-None value to a "
 					"just-started generator");
 			return NULL;
-		} else if (arg == NULL) {
-			retval = Py_None;
-			Py_INCREF(retval);
-		} else
-			retval = arg;
+		}
 	} else {
 		/* Push arg onto the frame's value stack */
 		retval = arg ? arg : Py_None;
@@ -489,6 +485,10 @@ slp_gen_send_ex(PyGenObject *ob, PyObject *arg, int exc)
 	((PyCFrameObject *) f->f_back)->ob2 = arg;
 	Py_INCREF(f);
 	ts->frame = f;
+
+	retval = Py_None;
+	Py_INCREF(retval);
+
 	if (stackless)
 		return STACKLESS_PACK(retval);
 	return slp_frame_dispatch(f, stopframe, exc, retval);
@@ -529,6 +529,12 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 				PyErr_SetNone(PyExc_StopIteration);
 		}
 	}
+
+	if (!result || f->f_stacktop == NULL) {
+		/* generator can't be rerun, so release the frame */
+		gen->gi_frame = NULL;
+	}
+
 	cf->ob1 = NULL;
 	cf->ob2 = NULL;
 	Py_DECREF(gen);
