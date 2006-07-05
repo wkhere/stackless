@@ -33,14 +33,15 @@
 #define STACK_MAGIC 3
 
 #define REGS_TO_SAVE "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", \
-       "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r31", \
+       "r21", "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", \
        "cr2", "cr3", "cr4"
 
 static int
 slp_switch(void)
 {
 	static int x = 0;
-	register int *stackref, stsizediff;
+	register intptr_t *stackref;
+	register int stsizediff;
 	__asm__ volatile (
 	    "; asm block 1\n"
 	    : /* no outputs */
@@ -70,7 +71,7 @@ slp_switch(void)
  * further self-processing support
  */
 
-/* 
+/*
  * if you want to add self-inspection tools, place them
  * here. See the x86_msvc for the necessary defines.
  * These features are highly experimental und not
