@@ -2025,9 +2025,9 @@ gen_setstate(PyObject *self, PyObject *args)
 	if (!gi_running) {
 		if ((f = slp_ensure_new_frame(f)) != NULL) {
 			/* use a second one for late initialization */
-			genobject *tmp;
+			genobject *tmpgen;
 			/* PyGenerator_New eats an existing reference */
-			if ((tmp = (genobject *)
+			if ((tmpgen = (genobject *)
 				   PyGenerator_New(f)) == NULL) {
 				Py_DECREF(f);
 				return NULL;
@@ -2035,7 +2035,13 @@ gen_setstate(PyObject *self, PyObject *args)
 			Py_INCREF(f);
 			Py_DECREF(gen->gi_frame);
 			gen->gi_frame = f;
-			Py_DECREF(tmp);
+			/* The frame the temporary generator references
+			   will have GeneratorExit raised on it, when the
+			   temporary generator is torn down.  So clearing
+			   the frame from the temporary generator before
+			   discarding it, will save the frame for later. */
+			Py_CLEAR(((PyGenObject *)tmpgen)->gi_frame);
+			Py_DECREF(tmpgen);
 			Py_INCREF(gen);
 			gen->ob_type = gen->ob_type->tp_base;
 		}
