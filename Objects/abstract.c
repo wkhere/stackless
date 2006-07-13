@@ -1799,15 +1799,6 @@ PyObject_Call(PyObject *func, PyObject *arg, PyObject *kw)
 
 	if ((call = func->ob_type->tp_call) != NULL) {
 		PyObject *result = NULL;
-#ifdef STACKLESS
-		/* We disable this recursiveness because it breaks our
-		   stackless expectations, this value gets passed all
-		   the way down to where we make current the main tasklet
-		   and then destroy it when it ends.  At which point
-		   schedule_task_destruct finds the recursion addition
-		   and disagrees with its presence asserting.
-		   */
-#else
 		/* slot_tp_call() will be called and ends up calling
 		   PyObject_Call() if the object returned for __call__ has
 		   __call__ itself defined upon it.  This can be an infinite
@@ -1816,12 +1807,9 @@ PyObject_Call(PyObject *func, PyObject *arg, PyObject *kw)
 		if (Py_EnterRecursiveCall(" in __call__")) {
 		    return NULL;
 		}
-#endif
 		result = (STACKLESS_PROMOTE(func), (*call)(func, arg, kw));
 		STACKLESS_ASSERT();
-#ifndef STACKLESS
 		Py_LeaveRecursiveCall();
-#endif
 		if (result == NULL && !PyErr_Occurred())
 			PyErr_SetString(
 				PyExc_SystemError,

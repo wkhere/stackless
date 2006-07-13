@@ -997,8 +997,8 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 		ts->st.nesting_level = 0;
 	}
 
-	/* update what's not yet updated */
-	assert(ts->recursion_depth == 0);
+	/* update what's not yet updated 
+	assert(ts->recursion_depth == 0);*/
 	prev->recursion_depth = 0;
 	assert(ts->frame == NULL);
 	prev->f.frame = NULL;

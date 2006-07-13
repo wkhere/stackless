@@ -1215,12 +1215,15 @@ PyObject *
 PyRun_StringFlags(const char *str, int start, PyObject *globals,
 		  PyObject *locals, PyCompilerFlags *flags)
 {
+	STACKLESS_GETARG();
 	PyObject *ret = NULL;
 	PyArena *arena = PyArena_New();
 	mod_ty mod = PyParser_ASTFromString(str, "<string>", start, flags,
 					    arena);
-	if (mod != NULL)
+	if (mod != NULL) {
+		STACKLESS_PROMOTE_ALL();
 		ret = run_mod(mod, "<string>", globals, locals, flags, arena);
+	}
 	PyArena_Free(arena);
 	return ret;
 }
