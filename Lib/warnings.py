@@ -254,11 +254,11 @@ def _getcategory(category):
             cat = getattr(m, klass)
         except AttributeError:
             raise _OptionError("unknown warning category: %r" % (category,))
-    if (not isinstance(cat, types.ClassType) or
-        not issubclass(cat, Warning)):
+    if not issubclass(cat, Warning):
         raise _OptionError("invalid warning category: %r" % (category,))
     return cat
 
 # Module initialization
 _processoptions(sys.warnoptions)
 simplefilter("ignore", category=PendingDeprecationWarning, append=1)
+simplefilter("ignore", category=ImportWarning, append=1)

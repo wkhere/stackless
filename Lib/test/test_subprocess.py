@@ -27,6 +27,18 @@ def remove_stderr_debug_decorations(stderr):
     return re.sub(r"\[\d+ refs\]\r?\n?$", "", stderr)
 
 class ProcessTestCase(unittest.TestCase):
+    def setUp(self):
+        # Try to minimize the number of children we have so this test
+        # doesn't crash on some buildbots (Alphas in particular).
+        if hasattr(test_support, "reap_children"):
+            test_support.reap_children()
+
+    def tearDown(self):
+        # Try to minimize the number of children we have so this test
+        # doesn't crash on some buildbots (Alphas in particular).
+        if hasattr(test_support, "reap_children"):
+            test_support.reap_children()
+
     def mkstemp(self):
         """wrapper for mkstemp, calling mktemp if mkstemp is not available"""
         if hasattr(tempfile, "mkstemp"):
@@ -384,7 +396,8 @@ class ProcessTestCase(unittest.TestCase):
 
     def test_no_leaking(self):
         # Make sure we leak no resources
-        if test_support.is_resource_enabled("subprocess") and not mswindows:
+        if not hasattr(test_support, "is_resource_enabled") \
+               or test_support.is_resource_enabled("subprocess") and not mswindows:
             max_handles = 1026 # too much for most UNIX systems
         else:
             max_handles = 65
@@ -599,6 +612,8 @@ class ProcessTestCase(unittest.TestCase):
 
 def test_main():
     test_support.run_unittest(ProcessTestCase)
+    if hasattr(test_support, "reap_children"):
+        test_support.reap_children()
 
 if __name__ == "__main__":
     test_main()

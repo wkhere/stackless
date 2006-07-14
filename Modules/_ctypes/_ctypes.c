@@ -1384,12 +1384,19 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		Py_DECREF(result);
 		return NULL;
 	}
+	fmt = getentry(PyString_AS_STRING(proto));
+	if (fmt == NULL) {
+		Py_DECREF(result);
+		PyErr_Format(PyExc_ValueError,
+			     "_type_ '%s' not supported",
+			     PyString_AS_STRING(proto));
+		return NULL;
+	}
+
 	stgdict = (StgDictObject *)PyObject_CallObject(
 		(PyObject *)&StgDict_Type, NULL);
 	if (!stgdict)
 		return NULL;
-
-	fmt = getentry(PyString_AS_STRING(proto));
 
 	stgdict->ffi_type_pointer = *fmt->pffi_type;
 	stgdict->align = fmt->pffi_type->alignment;
@@ -1633,9 +1640,8 @@ converters_from_argtypes(PyObject *ob)
 
 	for (i = 0; i < nArgs; ++i) {
 		PyObject *tp = PyTuple_GET_ITEM(ob, i);
-		StgDictObject *dict = PyType_stgdict(tp);
 		PyObject *cnv = PyObject_GetAttrString(tp, "from_param");
-		if (!dict || !cnv)
+		if (!cnv)
 			goto argtypes_error_1;
 		PyTuple_SET_ITEM(converters, i, cnv);
 	}
@@ -1646,7 +1652,7 @@ converters_from_argtypes(PyObject *ob)
 	Py_XDECREF(converters);
 	Py_DECREF(ob);
 	PyErr_Format(PyExc_TypeError,
-		     "item %d in _argtypes_ is not a valid C type", i+1);
+		     "item %d in _argtypes_ has no from_param method", i+1);
 	return NULL;
 }
 
@@ -2181,7 +2187,7 @@ _CData_set(CDataObject *dst, PyObject *type, SETFUNC setfunc, PyObject *value,
 			Py_DECREF(ob);
 			return result;
 		} else if (value == Py_None && PointerTypeObject_Check(type)) {
-			*(void **)dst->b_ptr = NULL;
+			*(void **)ptr = NULL;
 			Py_INCREF(Py_None);
 			return Py_None;
 		} else {
@@ -4555,7 +4561,9 @@ init_ctypes(void)
    ob_type is the metatype (the 'type'), defaults to PyType_Type,
    tp_base is the base type, defaults to 'object' aka PyBaseObject_Type.
 */
+#ifdef WITH_THREADS
 	PyEval_InitThreads();
+#endif
 	m = Py_InitModule3("_ctypes", module_methods, module_docs);
 	if (!m)
 		return;

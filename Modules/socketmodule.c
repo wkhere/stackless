@@ -161,7 +161,8 @@ shutdown(how) -- shut down traffic in one or both directions\n\
    (this includes the getaddrinfo emulation) protect access with a lock. */
 #if defined(WITH_THREAD) && (defined(__APPLE__) || \
     (defined(__FreeBSD__) && __FreeBSD_version+0 < 503000) || \
-    defined(__OpenBSD__) || defined(__NetBSD__) || !defined(HAVE_GETADDRINFO))
+    defined(__OpenBSD__) || defined(__NetBSD__) || \
+    defined(__VMS) || !defined(HAVE_GETADDRINFO))
 #define USE_GETADDRINFO_LOCK
 #endif
 
@@ -186,14 +187,7 @@ shutdown(how) -- shut down traffic in one or both directions\n\
 #endif
 
 #if defined(__VMS)
-#if ! defined(_SOCKADDR_LEN)
-#   ifdef getaddrinfo
-#      undef getaddrinfo
-#   endif
-#  include "TCPIP_IOCTL_ROUTINE"
-#else
 #  include <ioctl.h>
-#endif
 #endif
 
 #if defined(PYOS_OS2)
@@ -363,11 +357,6 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 #define SOCKETCLOSE close
 #endif
 
-#ifdef __VMS
-/* TCP/IP Services for VMS uses a maximum send/revc buffer length of 65535 */
-#define SEGMENT_SIZE 65535
-#endif
-
 #if defined(HAVE_BLUETOOTH_H) || defined(HAVE_BLUETOOTH_BLUETOOTH_H)
 #define USE_BLUETOOTH 1
 #if defined(__FreeBSD__)
@@ -384,6 +373,11 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 #define _BT_RC_MEMB(sa, memb) ((sa)->rc_##memb)
 #define _BT_SCO_MEMB(sa, memb) ((sa)->sco_##memb)
 #endif
+#endif
+
+#ifdef __VMS
+/* TCP/IP Services for VMS uses a maximum send/recv buffer length */
+#define SEGMENT_SIZE (32 * 1024 -1)
 #endif
 
 /*
@@ -417,14 +411,24 @@ static int taskwindow;
    there has to be a circular reference. */
 static PyTypeObject sock_type;
 
-/* Can we call select() with this socket without a buffer overrun? */
+#if defined(HAVE_POLL_H)
+#include <poll.h>
+#elif defined(HAVE_SYS_POLL_H)
+#include <sys/poll.h>
+#endif
+
 #ifdef Py_SOCKET_FD_CAN_BE_GE_FD_SETSIZE
 /* Platform can select file descriptors beyond FD_SETSIZE */
 #define IS_SELECTABLE(s) 1
+#elif defined(HAVE_POLL)
+/* Instead of select(), we'll use poll() since poll() works on any fd. */
+#define IS_SELECTABLE(s) 1
+/* Can we call select() with this socket without a buffer overrun? */
 #else
 /* POSIX says selecting file descriptors beyond FD_SETSIZE
-   has undefined behaviour. */
-#define IS_SELECTABLE(s) ((s)->sock_fd < FD_SETSIZE)
+   has undefined behaviour.  If there's no timeout left, we don't have to
+   call select, so it's a safe, little white lie. */
+#define IS_SELECTABLE(s) ((s)->sock_fd < FD_SETSIZE || s->sock_timeout <= 0.0)
 #endif
 
 static PyObject*
@@ -620,6 +624,30 @@ set_gaierror(int error)
 	return NULL;
 }
 
+#ifdef __VMS
+/* Function to send in segments */
+static int
+sendsegmented(int sock_fd, char *buf, int len, int flags)
+{
+	int n = 0;
+	int remaining = len;
+
+	while (remaining > 0) {
+		unsigned int segment;
+
+		segment = (remaining >= SEGMENT_SIZE ? SEGMENT_SIZE : remaining);
+		n = send(sock_fd, buf, segment, flags);
+		if (n < 0) {
+			return n;
+		}
+		remaining -= segment;
+		buf += segment;
+	} /* end while */
+
+	return len;
+}
+#endif
+
 /* Function to perform the setting of socket blocking mode
    internally. block = (1 | 0). */
 static int
@@ -644,8 +672,8 @@ internal_setblocking(PySocketSockObject *s, int block)
 	ioctl(s->sock_fd, FIONBIO, (caddr_t)&block, sizeof(block));
 #elif defined(__VMS)
 	block = !block;
-	ioctl(s->sock_fd, FIONBIO, (char *)&block);
-#else  /* !PYOS_OS2 && !_VMS */
+	ioctl(s->sock_fd, FIONBIO, (unsigned int *)&block);
+#else  /* !PYOS_OS2 && !__VMS */
 	delay_flag = fcntl(s->sock_fd, F_GETFL, 0);
 	if (block)
 		delay_flag &= (~O_NONBLOCK);
@@ -668,7 +696,7 @@ internal_setblocking(PySocketSockObject *s, int block)
 	return 1;
 }
 
-/* Do a select() on the socket, if necessary (sock_timeout > 0).
+/* Do a select()/poll() on the socket, if necessary (sock_timeout > 0).
    The argument writing indicates the direction.
    This does not raise an exception; we'll let our caller do that
    after they've reacquired the interpreter lock.
@@ -676,8 +704,6 @@ internal_setblocking(PySocketSockObject *s, int block)
 static int
 internal_select(PySocketSockObject *s, int writing)
 {
-	fd_set fds;
-	struct timeval tv;
 	int n;
 
 	/* Nothing to do unless we're in timeout mode (not non-blocking) */
@@ -688,17 +714,37 @@ internal_select(PySocketSockObject *s, int writing)
 	if (s->sock_fd < 0)
 		return 0;
 
-	/* Construct the arguments to select */
-	tv.tv_sec = (int)s->sock_timeout;
-	tv.tv_usec = (int)((s->sock_timeout - tv.tv_sec) * 1e6);
-	FD_ZERO(&fds);
-	FD_SET(s->sock_fd, &fds);
+	/* Prefer poll, if available, since you can poll() any fd
+	 * which can't be done with select(). */
+#ifdef HAVE_POLL
+	{
+		struct pollfd pollfd;
+		int timeout;
 
-	/* See if the socket is ready */
-	if (writing)
-		n = select(s->sock_fd+1, NULL, &fds, NULL, &tv);
-	else
-		n = select(s->sock_fd+1, &fds, NULL, NULL, &tv);
+		pollfd.fd = s->sock_fd;
+		pollfd.events = writing ? POLLOUT : POLLIN;
+
+		/* s->sock_timeout is in seconds, timeout in ms */
+		timeout = (int)(s->sock_timeout * 1000 + 0.5); 
+		n = poll(&pollfd, 1, timeout);
+	}
+#else
+	{
+		/* Construct the arguments to select */
+		fd_set fds;
+		struct timeval tv;
+		tv.tv_sec = (int)s->sock_timeout;
+		tv.tv_usec = (int)((s->sock_timeout - tv.tv_sec) * 1e6);
+		FD_ZERO(&fds);
+		FD_SET(s->sock_fd, &fds);
+
+		/* See if the socket is ready */
+		if (writing)
+			n = select(s->sock_fd+1, NULL, &fds, NULL, &tv);
+		else
+			n = select(s->sock_fd+1, &fds, NULL, NULL, &tv);
+	}
+#endif
 	if (n == 0)
 		return 1;
 	return 0;
@@ -1725,6 +1771,8 @@ sock_getsockopt(PySocketSockObject *s, PyObject *args)
 		return PyInt_FromLong(flag);
 	}
 #ifdef __VMS
+	/* socklen_t is unsigned so no negative test is needed,
+	   test buflen == 0 is previously done */
 	if (buflen > 1024) {
 #else
 	if (buflen <= 0 || buflen > 1024) {
@@ -2498,9 +2546,6 @@ sock_send(PySocketSockObject *s, PyObject *args)
 {
 	char *buf;
 	int len, n = 0, flags = 0, timeout;
-#ifdef __VMS
-	int send_length;
-#endif
 
 	if (!PyArg_ParseTuple(args, "s#|i:send", &buf, &len, &flags))
 		return NULL;
@@ -2508,11 +2553,14 @@ sock_send(PySocketSockObject *s, PyObject *args)
 	if (!IS_SELECTABLE(s))
 		return select_error();
 
-#ifndef __VMS
 	Py_BEGIN_ALLOW_THREADS
 	timeout = internal_select(s, 1);
 	if (!timeout)
+#ifdef __VMS
+		n = sendsegmented(s->sock_fd, buf, len, flags);
+#else
 		n = send(s->sock_fd, buf, len, flags);
+#endif
 	Py_END_ALLOW_THREADS
 
 	if (timeout) {
@@ -2521,36 +2569,6 @@ sock_send(PySocketSockObject *s, PyObject *args)
 	}
 	if (n < 0)
 		return s->errorhandler();
-#else
-	/* Divide packet into smaller segments for	*/
-	/*  TCP/IP Services for OpenVMS			*/
-	send_length = len;
-	while (send_length != 0) {
-		unsigned int segment;
-
-		segment = send_length / SEGMENT_SIZE;
-		if (segment != 0) {
-			segment = SEGMENT_SIZE;
-		}
-		else {
-			segment = send_length;
-		}
-		Py_BEGIN_ALLOW_THREADS
-		timeout = internal_select(s, 1);
-		if (!timeout)
-			n = send(s->sock_fd, buf, segment, flags);
-		Py_END_ALLOW_THREADS
-		if (timeout) {
-			PyErr_SetString(socket_timeout, "timed out");
-			return NULL;
-		}
-		if (n < 0) {
-			return s->errorhandler();
-		}
-		send_length -= segment;
-		buf += segment;
-	} /* end while */
-#endif /* !__VMS */
 	return PyInt_FromLong((long)n);
 }
 
@@ -2581,7 +2599,11 @@ sock_sendall(PySocketSockObject *s, PyObject *args)
 		timeout = internal_select(s, 1);
 		if (timeout)
 			break;
+#ifdef __VMS
+		n = sendsegmented(s->sock_fd, buf, len, flags);
+#else
 		n = send(s->sock_fd, buf, len, flags);
+#endif
 		if (n < 0)
 			break;
 		buf += n;

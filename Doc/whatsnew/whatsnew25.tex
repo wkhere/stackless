@@ -2,12 +2,11 @@
 \usepackage{distutils}
 % $Id$
 
-% wsgiref section
 % Fix XXX comments
 % Count up the patches and bugs
 
 \title{What's New in Python 2.5}
-\release{0.2}
+\release{0.3}
 \author{A.M. Kuchling}
 \authoraddress{\email{amk@amk.ca}}
 
@@ -15,31 +14,51 @@
 \maketitle
 \tableofcontents
 
-This article explains the new features in Python 2.5.  No release date
-for Python 2.5 has been set; it will probably be released in the
-autumn of 2006.  \pep{356} describes the planned release schedule.
+This article explains the new features in Python 2.5.  The final
+release of Python 2.5 is scheduled for August 2006;
+\pep{356} describes the planned release schedule.
 
-Comments, suggestions, and error reports are welcome; please e-mail them 
-to the author or open a bug in the Python bug tracker.
+The changes in Python 2.5 are an interesting mix of language and
+library improvements. The library enhancements will be more important
+to Python's user community, I think, because several widely-useful
+packages were added.  New modules include ElementTree for XML
+processing (section~\ref{module-etree}), the SQLite database module
+(section~\ref{module-sqlite}), and the \module{ctypes} module for
+calling C functions (section~\ref{module-ctypes}).
 
-% XXX Compare with previous release in 2 - 3 sentences here.
+The language changes are of middling significance.  Some pleasant new
+features were added, but most of them aren't features that you'll use
+every day.  Conditional expressions were finally added to the language
+using a novel syntax; see section~\ref{pep-308}.  The new
+'\keyword{with}' statement will make writing cleanup code easier
+(section~\ref{pep-343}).  Values can now be passed into generators
+(section~\ref{pep-342}).  Imports are now visible as either absolute
+or relative (section~\ref{pep-328}).  Some corner cases of exception
+handling are handled better (section~\ref{pep-341}).  All these
+improvements are worthwhile, but they're improvements to one specific
+language feature or another; none of them are broad modifications to
+Python's semantics.
 
-This article doesn't attempt to provide a complete specification of
-the new features, but instead provides a convenient overview.  For
-full details, you should refer to the documentation for Python 2.5.
+This article doesn't try to be a complete specification of the new
+features; instead changes are briefly introduced using helpful
+examples.  For full details, you should always refer to the
+documentation for Python 2.5.
 % XXX add hyperlink when the documentation becomes available online.
 If you want to understand the complete implementation and design
 rationale, refer to the PEP for a particular new feature.
 
+Comments, suggestions, and error reports for this document are
+welcome; please e-mail them to the author or open a bug in the Python
+bug tracker.
 
 %======================================================================
 \section{PEP 308: Conditional Expressions\label{pep-308}}
 
 For a long time, people have been requesting a way to write
-conditional expressions, expressions that return value A or value B
-depending on whether a Boolean value is true or false.  A conditional
-expression lets you write a single assignment statement that has the
-same effect as the following:
+conditional expressions, which are expressions that return value A or
+value B depending on whether a Boolean value is true or false.  A
+conditional expression lets you write a single assignment statement
+that has the same effect as the following:
 
 \begin{verbatim}
 if condition:
@@ -798,7 +817,7 @@ The new \module{contextlib} module provides some functions and a
 decorator that are useful for writing objects for use with the
 '\keyword{with}' statement.
 
-The decorator is called \function{contextfactory}, and lets you write
+The decorator is called \function{contextmanager}, and lets you write
 a single generator function instead of defining a new class.  The generator
 should yield exactly one value.  The code up to the \keyword{yield}
 will be executed as the \method{__enter__()} method, and the value
@@ -812,9 +831,9 @@ Our database example from the previous section could be written
 using this decorator as:
 
 \begin{verbatim}
-from contextlib import contextfactory
+from contextlib import contextmanager
 
-@contextfactory
+@contextmanager
 def db_transaction (connection):
     cursor = connection.cursor()
     try:
@@ -960,7 +979,7 @@ space for a \ctype{PyObject} representing the item.  2147483647*4 is
 already more bytes than a 32-bit address space can contain.
 
 It's possible to address that much memory on a 64-bit platform,
-however.  The pointers for a list that size would only require 16GiB
+however.  The pointers for a list that size would only require 16~GiB
 of space, so it's not unreasonable that Python programmers might
 construct lists that large.  Therefore, the Python interpreter had to
 be changed to use some type other than \ctype{int}, and this will be a
@@ -1151,9 +1170,12 @@ a line like this near the top of the source file:
 to include an \file{__init__.py} module in a package directory.
 Debugging this mistake can be confusing, and usually requires running
 Python with the \programopt{-v} switch to log all the paths searched.
-In Python 2.5, a new \exception{ImportWarning} warning is raised when
+In Python 2.5, a new \exception{ImportWarning} warning is triggered when
 an import would have picked up a directory as a package but no
-\file{__init__.py} was found.  (Implemented by Thomas Wouters.)
+\file{__init__.py} was found.  This warning is silently ignored by default;
+provide the \programopt{-Wd} option when running the Python executable
+to display the warning message.
+(Implemented by Thomas Wouters.)
 
 \item The list of base classes in a class definition can now be empty.  
 As an example, this is now legal:
@@ -1384,6 +1406,16 @@ keeps an example from being executed at all.  This is intended for
 code snippets that are usage examples intended for the reader and
 aren't actually test cases.
 
+An \var{encoding} parameter was added to the \function{testfile()}
+function and the \class{DocFileSuite} class to specify the file's
+encoding.  This makes it easier to use non-ASCII characters in 
+tests contained within a docstring.  (Contributed by Bjorn Tillenius.)
+% Patch 1080727
+
+\item The \module{email} package has been updated to version 4.0.
+% XXX need to provide some more detail here
+(Contributed by Barry Warsaw.)
+
 \item The \module{fileinput} module was made more flexible.
 Unicode filenames are now supported, and a \var{mode} parameter that
 defaults to \code{"r"} was added to the
@@ -1402,6 +1434,7 @@ collector; when these counts reach a specified threshold, a garbage
 collection sweep will be made.  The existing \function{gc.collect()}
 function now takes an optional \var{generation} argument of 0, 1, or 2
 to specify which generation to collect.
+(Contributed by Barry Warsaw.)
 
 \item The \function{nsmallest()} and 
 \function{nlargest()} functions in the \module{heapq} module 
@@ -1539,6 +1572,9 @@ speed.  It times particular operations such as function calls,
 tuple slicing, method lookups, and numeric operations, instead of
 performing many different operations and reducing the result to a
 single number as \file{pystone.py} does.
+
+\item The \module{pyexpat} module now uses version 2.0 of the Expat parser.
+(Contributed by Trent Mick.)
 
 \item The old \module{regex} and \module{regsub} modules, which have been 
 deprecated ever since Python 2.0, have finally been deleted.  
@@ -1682,6 +1718,14 @@ UUID('886313e1-3b8a-5372-9b90-0c9aee199e5d')
 
 (Contributed by Ka-Ping Yee.)
 
+\item The \module{weakref} module's \class{WeakKeyDictionary} and
+\class{WeakValueDictionary} types gained new methods for iterating
+over the weak references contained in the dictionary. 
+\method{iterkeyrefs()} and \method{keyrefs()} methods were
+added to \class{WeakKeyDictionary}, and
+\method{itervaluerefs()} and \method{valuerefs()} were added to
+\class{WeakValueDictionary}.  (Contributed by Fred L.~Drake, Jr.)
+
 \item The \module{webbrowser} module received a number of
 enhancements.
 It's now usable as a script with \code{python -m webbrowser}, taking a
@@ -1693,10 +1737,16 @@ to support this.  The module's \function{open()} function supports an
 additional feature, an \var{autoraise} parameter that signals whether
 to raise the open window when possible. A number of additional
 browsers were added to the supported list such as Firefox, Opera,
-Konqueror, and elinks.  (Contributed by Oleg Broytmann and George
+Konqueror, and elinks.  (Contributed by Oleg Broytmann and Georg
 Brandl.)
 % Patch #754022
 
+\item The standard library's XML-related package
+has been renamed to \module{xmlcore}.  The \module{xml} module will
+now import either the \module{xmlcore} or PyXML version of subpackages
+such as \module{xml.dom}.  The renaming means it will always be
+possible to import the standard library's XML support whether or not
+the PyXML package is installed.
 
 \item The \module{xmlrpclib} module now supports returning 
       \class{datetime} objects for the XML-RPC date type.  Supply 
@@ -1704,6 +1754,12 @@ Brandl.)
       or the \class{Unmarshaller} class to enable this feature.
       (Contributed by Skip Montanaro.)
 % Patch 1120353
+
+\item The \module{zipfile} module now supports the ZIP64 version of the 
+format, meaning that a .zip archive can now be larger than 4~GiB and
+can contain individual files larger than 4~GiB.  (Contributed by
+Ronald Oussoren.)
+% Patch 1446489
 
 \item The \module{zlib} module's \class{Compress} and \class{Decompress}
 objects now support a \method{copy()} method that makes a copy of the 
@@ -1794,6 +1850,9 @@ of extension modules, now that \module{ctypes} is included with core Python.
 
 \seeurl{http://starship.python.net/crew/theller/ctypes/}
 {The ctypes web page, with a tutorial, reference, and FAQ.}
+
+\seeurl{../lib/module-ctypes.html}{The documentation 
+for the \module{ctypes} module.}
 
 \end{seealso}
 
@@ -1906,7 +1965,6 @@ Please read the package's official documentation for more details.
 \seeurl{http://effbot.org/zone/element-index.htm}
 {Official documentation for ElementTree.}
 
-
 \end{seealso}
 
 
@@ -1956,6 +2014,13 @@ Once a hash object has been created, its methods are the same as before:
 current digest state, \method{digest()} and \method{hexdigest()}
 return the digest value as a binary string or a string of hex digits,
 and \method{copy()} returns a new hashing object with the same digest state.
+
+\begin{seealso}
+
+\seeurl{../lib/module-hashlib.html}{The documentation 
+for the \module{hashlib} module.}
+
+\end{seealso}
 
 
 %======================================================================
@@ -2067,6 +2132,9 @@ For more information about the SQL dialect supported by SQLite, see
 {The SQLite web page; the documentation describes the syntax and the
 available data types for the supported SQL dialect.}
 
+\seeurl{../lib/module-sqlite3.html}{The documentation 
+for the \module{sqlite3} module.}
+
 \seepep{249}{Database API Specification 2.0}{PEP written by
 Marc-Andr\'e Lemburg.}
 
@@ -2074,10 +2142,9 @@ Marc-Andr\'e Lemburg.}
 
 
 %======================================================================
-%\subsection{The wsgiref package\label{module-wsgiref}}
+\subsection{The wsgiref package\label{module-wsgiref}}
 
 % XXX should this be in a PEP 333 section instead?
-\begin{comment}
 
 The Web Server Gateway Interface (WSGI) v1.0 defines a standard
 interface between web servers and Python web applications and is
@@ -2086,10 +2153,7 @@ implementation of the WSGI specification.
 
 The package includes a basic HTTP server that will run a WSGI
 application; this server is useful for debugging but isn't intended for 
-production use.
-
-% XXX structure of WSGI applications?  
-% XXX provide an example using Django or some other framework?
+production use.  Setting up a server takes only a few lines of code:
 
 \begin{verbatim}
 from wsgiref import simple_server
@@ -2098,20 +2162,22 @@ wsgi_app = ...
 
 host = ''
 port = 8000
-httpd = make_server(host, port, wsgi_app)
+httpd = simple_server.make_server(host, port, wsgi_app)
 httpd.serve_forever()
 \end{verbatim}
 
+% XXX discuss structure of WSGI applications?  
+% XXX provide an example using Django or some other framework?
 
 \begin{seealso}
+
+\seeurl{http://www.wsgi.org}{A central web site for WSGI-related resources.}
 
 \seepep{333}{Python Web Server Gateway Interface v1.0}{PEP written by
 Phillip J. Eby.}
 
 \end{seealso}
 
-
-\end{comment}
 
 % ======================================================================
 \section{Build and C API Changes\label{build-api}}
@@ -2146,12 +2212,13 @@ assignment = ast.body[0]
 for_loop = ast.body[1]
 \end{verbatim}
 
-No documentation has been written for the AST code yet.  To start
-learning about it, read the definition of the various AST nodes in
-\file{Parser/Python.asdl}.  A Python script reads this file and
-generates a set of C structure definitions in
-\file{Include/Python-ast.h}.  The \cfunction{PyParser_ASTFromString()}
-and \cfunction{PyParser_ASTFromFile()}, defined in
+No official documentation has been written for the AST code yet, but
+\pep{339} discusses the design.  To start learning about the code, read the
+definition of the various AST nodes in \file{Parser/Python.asdl}.  A
+Python script reads this file and generates a set of C structure
+definitions in \file{Include/Python-ast.h}.  The
+\cfunction{PyParser_ASTFromString()} and
+\cfunction{PyParser_ASTFromFile()}, defined in
 \file{Include/pythonrun.h}, take Python source as input and return the
 root of an AST representing the contents.  This AST can then be turned
 into a code object by \cfunction{PyAST_Compile()}.  For more
@@ -2202,7 +2269,12 @@ the code can now be compiled with a {\Cpp} compiler without errors.
 
 \item The \cfunction{PyRange_New()} function was removed.  It was
 never documented, never used in the core code, and had dangerously lax
-error checking.
+error checking.  In the unlikely case that your extensions were using
+it, you can replace it by something like the following:
+\begin{verbatim}
+range = PyObject_CallFunction((PyObject*) &PyRange_Type, "lll", 
+                              start, stop, step);
+\end{verbatim}
 
 \end{itemize}
 
@@ -2308,6 +2380,10 @@ to allow only \code{'/'} and \code{'/RPC2'}.  Setting
 \member{rpc_paths} to \code{None} or an empty tuple disables 
 this path checking.
 
+\item Library: the \module{xml} package has been renamed to \module{xmlcore}.
+The PyXML package will therefore be \module{xml}, and the Python
+distribution's code will always be accessible as \module{xmlcore}.
+
 \item C API: Many functions now use \ctype{Py_ssize_t} 
 instead of \ctype{int} to allow processing more data on 64-bit
 machines.  Extension code may need to make the same change to avoid
@@ -2330,7 +2406,8 @@ freed with the corresponding family's \cfunction{*_Free()} function.
 
 The author would like to thank the following people for offering
 suggestions, corrections and assistance with various drafts of this
-article: Phillip J. Eby, Kent Johnson, Martin von~L\"owis, Fredrik Lundh, 
-Gustavo Niemeyer, James Pryor, Mike Rovner, Scott Weikart, Thomas Wouters.
+article: Nick Coghlan, Phillip J. Eby, Ralf W. Grosse-Kunstleve, Kent
+Johnson, Martin von~L\"owis, Fredrik Lundh, Gustavo Niemeyer, James
+Pryor, Mike Rovner, Scott Weikart, Barry Warsaw, Thomas Wouters.
 
 \end{document}

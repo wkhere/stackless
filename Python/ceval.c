@@ -2846,7 +2846,7 @@ stackless_call:
 	if (tstate->frame->f_back != f)
 		return retval;
 	STACKLESS_UNPACK(retval);
-	retval = tstate->frame->f_execute(tstate->frame, throwflag, retval);
+	retval = tstate->frame->f_execute(tstate->frame, 0, retval);
 	if (tstate->frame != f)
 		return retval;
 	if (STACKLESS_UNWINDING(retval))

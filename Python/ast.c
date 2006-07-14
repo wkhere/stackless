@@ -339,7 +339,7 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
     /* The ast defines augmented store and load contexts, but the
        implementation here doesn't actually use them.  The code may be
        a little more complex than necessary as a result.  It also means
-       that expressions in an augmented assignment have no context.
+       that expressions in an augmented assignment have a Store context.
        Consider restructuring so that augmented assignment uses
        set_context(), too.
     */
@@ -1484,6 +1484,57 @@ ast_for_trailer(struct compiling *c, const node *n, expr_ty left_expr)
 }
 
 static expr_ty
+ast_for_factor(struct compiling *c, const node *n)
+{
+    node *pfactor, *ppower, *patom, *pnum;
+    expr_ty expression;
+
+    /* If the unary - operator is applied to a constant, don't generate
+       a UNARY_NEGATIVE opcode.  Just store the approriate value as a
+       constant.  The peephole optimizer already does something like
+       this but it doesn't handle the case where the constant is
+       (sys.maxint - 1).  In that case, we want a PyIntObject, not a
+       PyLongObject.
+    */
+    if (TYPE(CHILD(n, 0)) == MINUS
+        && NCH(n) == 2
+        && TYPE((pfactor = CHILD(n, 1))) == factor
+        && NCH(pfactor) == 1
+        && TYPE((ppower = CHILD(pfactor, 0))) == power
+        && NCH(ppower) == 1
+        && TYPE((patom = CHILD(ppower, 0))) == atom
+        && TYPE((pnum = CHILD(patom, 0))) == NUMBER) {
+        char *s = PyObject_MALLOC(strlen(STR(pnum)) + 2);
+        if (s == NULL)
+            return NULL;
+        s[0] = '-';
+        strcpy(s + 1, STR(pnum));
+        PyObject_FREE(STR(pnum));
+        STR(pnum) = s;
+        return ast_for_atom(c, patom);
+    }
+
+    expression = ast_for_expr(c, CHILD(n, 1));
+    if (!expression)
+        return NULL;
+
+    switch (TYPE(CHILD(n, 0))) {
+        case PLUS:
+            return UnaryOp(UAdd, expression, LINENO(n), n->n_col_offset,
+                           c->c_arena);
+        case MINUS:
+            return UnaryOp(USub, expression, LINENO(n), n->n_col_offset,
+                           c->c_arena);
+        case TILDE:
+            return UnaryOp(Invert, expression, LINENO(n),
+                           n->n_col_offset, c->c_arena);
+    }
+    PyErr_Format(PyExc_SystemError, "unhandled factor: %d",
+                 TYPE(CHILD(n, 0)));
+    return NULL;
+}
+
+static expr_ty
 ast_for_power(struct compiling *c, const node *n)
 {
     /* power: atom trailer* ('**' factor)*
@@ -1662,30 +1713,12 @@ ast_for_expr(struct compiling *c, const node *n)
 	    }
 	    return Yield(exp, LINENO(n), n->n_col_offset, c->c_arena);
 	}
-        case factor: {
-            expr_ty expression;
-            
+        case factor:
             if (NCH(n) == 1) {
                 n = CHILD(n, 0);
                 goto loop;
             }
-
-            expression = ast_for_expr(c, CHILD(n, 1));
-            if (!expression)
-                return NULL;
-
-            switch (TYPE(CHILD(n, 0))) {
-                case PLUS:
-                    return UnaryOp(UAdd, expression, LINENO(n), n->n_col_offset, c->c_arena);
-                case MINUS:
-                    return UnaryOp(USub, expression, LINENO(n), n->n_col_offset, c->c_arena);
-                case TILDE:
-                    return UnaryOp(Invert, expression, LINENO(n), n->n_col_offset, c->c_arena);
-            }
-            PyErr_Format(PyExc_SystemError, "unhandled factor: %d",
-	    		 TYPE(CHILD(n, 0)));
-            break;
-        }
+	    return ast_for_factor(c, n);
         case power:
             return ast_for_power(c, n);
         default:
@@ -1901,7 +1934,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 
         if (!expr1)
             return NULL;
-        /* TODO(jhylton): Figure out why set_context() can't be used here. */
+        /* TODO(nas): Remove duplicated error checks (set_context does it) */
         switch (expr1->kind) {
             case GeneratorExp_kind:
                 ast_error(ch, "augmented assignment to generator "
@@ -1923,6 +1956,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
                           "assignment");
                 return NULL;
         }
+	set_context(expr1, Store, ch);
 
 	ch = CHILD(n, 2);
 	if (TYPE(ch) == testlist)
@@ -2142,7 +2176,14 @@ alias_for_import_name(struct compiling *c, const node *n)
  loop:
     switch (TYPE(n)) {
         case import_as_name:
-            str = (NCH(n) == 3) ? NEW_IDENTIFIER(CHILD(n, 2)) : NULL;
+            str = NULL;
+            if (NCH(n) == 3) {
+                if (strcmp(STR(CHILD(n, 1)), "as") != 0) {
+                    ast_error(n, "must use 'as' in import");
+                    return NULL;
+                }
+                str = NEW_IDENTIFIER(CHILD(n, 2));
+            }
             return alias(NEW_IDENTIFIER(CHILD(n, 0)), str, c->c_arena);
         case dotted_as_name:
             if (NCH(n) == 1) {
@@ -2151,6 +2192,10 @@ alias_for_import_name(struct compiling *c, const node *n)
             }
             else {
                 alias_ty a = alias_for_import_name(c, CHILD(n, 0));
+                if (strcmp(STR(CHILD(n, 1)), "as") != 0) {
+                    ast_error(n, "must use 'as' in import");
+                    return NULL;
+                }
                 assert(!a->asname);
                 a->asname = NEW_IDENTIFIER(CHILD(n, 2));
                 return a;

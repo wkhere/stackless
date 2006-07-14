@@ -617,7 +617,9 @@ static int _call_function_pointer(int flags,
 				  void *resmem,
 				  int argcount)
 {
+#ifdef WITH_THREADS
 	PyThreadState *_save = NULL; /* For Py_BLOCK_THREADS and Py_UNBLOCK_THREADS */
+#endif
 	ffi_cif cif;
 	int cc;
 #ifdef MS_WIN32
@@ -649,8 +651,10 @@ static int _call_function_pointer(int flags,
 		return -1;
 	}
 
+#ifdef WITH_THREADS
 	if ((flags & FUNCFLAG_PYTHONAPI) == 0)
 		Py_UNBLOCK_THREADS
+#endif
 #ifdef MS_WIN32
 #ifndef DONT_USE_SEH
 	__try {
@@ -667,8 +671,10 @@ static int _call_function_pointer(int flags,
 	}
 #endif
 #endif
+#ifdef WITH_THREADS
 	if ((flags & FUNCFLAG_PYTHONAPI) == 0)
 		Py_BLOCK_THREADS
+#endif
 #ifdef MS_WIN32
 #ifndef DONT_USE_SEH
 	if (dwExceptionCode) {
@@ -1480,7 +1486,12 @@ resize(PyObject *self, PyObject *args)
 	}
 	if (size < dict->size) {
 		PyErr_Format(PyExc_ValueError,
-			     "minimum size is %d", dict->size);
+#if PY_VERSION_HEX < 0x02050000
+			     "minimum size is %d",
+#else
+			     "minimum size is %zd",
+#endif
+			     dict->size);
 		return NULL;
 	}
 	if (obj->b_needsfree == 0) {

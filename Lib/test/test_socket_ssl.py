@@ -3,6 +3,7 @@
 import sys
 from test import test_support
 import socket
+import errno
 
 # Optionally test SSL support.  This requires the 'network' resource as given
 # on the regrtest command line.
@@ -33,6 +34,13 @@ def test_basic():
 def test_timeout():
     test_support.requires('network')
 
+    def error_msg(extra_msg):
+        print >> sys.stderr, """\
+    WARNING:  an attempt to connect to %r %s, in
+    test_timeout.  That may be legitimate, but is not the outcome we hoped
+    for.  If this message is seen often, test_timeout should be changed to
+    use a more reliable address.""" % (ADDR, extra_msg)
+
     if test_support.verbose:
         print "test_timeout ..."
 
@@ -48,12 +56,14 @@ def test_timeout():
     try:
         s.connect(ADDR)
     except socket.timeout:
-        print >> sys.stderr, """\
-    WARNING:  an attempt to connect to %r timed out, in
-    test_timeout.  That may be legitimate, but is not the outcome we hoped
-    for.  If this message is seen often, test_timeout should be changed to
-    use a more reliable address.""" % (ADDR,)
+        error_msg('timed out')
         return
+    except socket.error, exc:  # In case connection is refused.
+        if exc.args[0] == errno.ECONNREFUSED:
+            error_msg('was refused')
+            return
+        else:
+            raise
 
     ss = socket.ssl(s)
     # Read part of return welcome banner twice.

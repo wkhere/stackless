@@ -1799,17 +1799,8 @@ PyObject_Call(PyObject *func, PyObject *arg, PyObject *kw)
 
 	if ((call = func->ob_type->tp_call) != NULL) {
 		PyObject *result = NULL;
-		/* slot_tp_call() will be called and ends up calling
-		   PyObject_Call() if the object returned for __call__ has
-		   __call__ itself defined upon it.  This can be an infinite
-		   recursion if you set __call__ in a class to an instance of
-		   it. */
-		if (Py_EnterRecursiveCall(" in __call__")) {
-		    return NULL;
-		}
 		result = (STACKLESS_PROMOTE(func), (*call)(func, arg, kw));
 		STACKLESS_ASSERT();
-		Py_LeaveRecursiveCall();
 		if (result == NULL && !PyErr_Occurred())
 			PyErr_SetString(
 				PyExc_SystemError,

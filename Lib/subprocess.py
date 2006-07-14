@@ -234,7 +234,7 @@ Replacing os.system()
 sts = os.system("mycmd" + " myarg")
 ==>
 p = Popen("mycmd" + " myarg", shell=True)
-sts = os.waitpid(p.pid, 0)
+pid, sts = os.waitpid(p.pid, 0)
 
 Note:
 
@@ -941,7 +941,7 @@ class Popen(object):
 
 
         def _close_fds(self, but):
-            for i in range(3, MAXFD):
+            for i in xrange(3, MAXFD):
                 if i == but:
                     continue
                 try:

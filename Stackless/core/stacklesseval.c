@@ -614,7 +614,6 @@ slp_frame_dispatch(PyFrameObject *f, PyFrameObject *stopframe, int exc, PyObject
 	while (1) {
 
 		retval = f->f_execute(f, exc, retval);
-		/* exc = 0;  Maybe we should be unpacking this. */
 		f = ts->frame;
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);
