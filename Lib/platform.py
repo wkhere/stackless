@@ -1092,7 +1092,9 @@ def processor():
 
 ### Various APIs for extracting information from sys.version
 
+# The second element is the Stackless part of the version string.
 _sys_version_parser = re.compile(r'([\w.+]+)\s*'
+                                  '.*'
                                   '\(#?([^,]+),\s*([\w ]+),\s*([\w :]+)\)\s*'
                                   '\[([^\]]+)\]?')
 _sys_version_cache = None
