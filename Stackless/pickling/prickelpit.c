@@ -1555,6 +1555,72 @@ static int init_dictiteritemtype(void)
 
 /******************************************************
 
+  pickling of setiter
+
+ ******************************************************/
+
+/*
+ * unfortunately we have to copy here.
+ * XXX automate checking such situations.
+ */
+
+typedef struct {
+	PyObject_HEAD
+	PySetObject *si_set; /* Set to NULL when iterator is exhausted */
+	Py_ssize_t si_used;
+	Py_ssize_t si_pos;
+	Py_ssize_t len;
+} setiterobject;
+
+extern PyTypeObject PySetIter_Type;
+static PyTypeObject wrap_PySetIter_Type;
+
+static PyObject *
+setiter_reduce(setiterobject *it)
+{
+    PyObject *list, *set, *elem;
+    int i;
+
+    list = PyList_New(0);
+    if (list == NULL)
+        return PyErr_NoMemory();
+
+    /* is this setiter is already exhausted? */
+    if (it->si_set != NULL) {
+        if (it->si_used != it->si_set->used) {
+            PyErr_SetString(PyExc_RuntimeError,
+                "set changed size during iteration");
+            it->si_used = -1; /* Make this state sticky */
+            return NULL;
+        }
+        i = it->si_pos;
+        while (_PySet_Next((PyObject *)it->si_set, &i, &elem)) {
+            if (PyList_Append(list, elem) == -1) {
+                return NULL;
+            }
+        }
+    }
+    /* masquerade as a PySeqIter */
+    set = Py_BuildValue("(O(Ol)())",
+	&wrap_PySeqIter_Type,
+	list,
+	0
+	);
+    Py_DECREF(list);
+    return set;
+}
+
+MAKE_WRAPPERTYPE(PySetIter_Type, setiter, "setiterator", setiter_reduce, generic_new, generic_setstate)
+
+static int init_setitertype(void)
+{
+	return init_type(&wrap_PySetIter_Type, initchain);
+}
+#undef initchain
+#define initchain init_setitertype
+
+/******************************************************
+
   pickling of enumerate
 
  ******************************************************/
@@ -1799,7 +1865,6 @@ static int init_tupleitertype(void)
 #define initchain init_tupleitertype
 
 #endif /* PY_VERSION_HEX >= 0x02030000 */
-
 
 /******************************************************
 

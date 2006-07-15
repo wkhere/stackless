@@ -796,7 +796,11 @@ fail:
 	return NULL;
 }
 
+#ifdef STACKLESS
+PyTypeObject PySetIter_Type = {
+#else
 static PyTypeObject PySetIter_Type = {
+#endif
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
 	"setiterator",				/* tp_name */

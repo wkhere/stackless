@@ -219,6 +219,7 @@ PyAPI_DATA(PyTypeObject) PyDictIterKey_Type;
 PyAPI_DATA(PyTypeObject) PyDictIterValue_Type;
 PyAPI_DATA(PyTypeObject) PyDictIterItem_Type;
 PyAPI_DATA(PyTypeObject) PyListIter_Type;
+PyAPI_DATA(PyTypeObject) PySetIter_Type;
 PyAPI_DATA(PyTypeObject) PyRangeIter_Type;
 PyAPI_DATA(PyTypeObject) PyTupleIter_Type;
 PyAPI_DATA(PyTypeObject) PyEnum_Type;
