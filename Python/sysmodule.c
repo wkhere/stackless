@@ -981,7 +981,7 @@ svnversion_init(void)
 	if (svn_initialized)
 		return;
 
-#ifdef STACKLESS
+#if defined(STACKLESS) || defined(STACKLESS_OFF)
 	python = strstr(headurl, "/stackless/");
 #else
 	python = strstr(headurl, "/python/");

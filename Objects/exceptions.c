@@ -2077,7 +2077,9 @@ _PyExc_Init(void)
     POST_INIT(TypeError)
     POST_INIT(StopIteration)
     POST_INIT(GeneratorExit)
+#ifdef STACKLESS
     POST_INIT(TaskletExit)
+#endif
     POST_INIT(SystemExit)
     POST_INIT(KeyboardInterrupt)
     POST_INIT(ImportError)
