@@ -612,13 +612,13 @@ slp_frame_dispatch(PyFrameObject *f, PyFrameObject *stopframe, int exc, PyObject
  */
 
 	while (1) {
-
 		retval = f->f_execute(f, exc, retval);
 		f = ts->frame;
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);
 		if (f == stopframe)
 			break;
+		exc = 0;
 	}
 	--ts->st.nesting_level;
 	/* see whether we need to trigger a pending interrupt */
