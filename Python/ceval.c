@@ -2847,8 +2847,11 @@ stackless_call:
 		return retval;
 	STACKLESS_UNPACK(retval);
 	retval = tstate->frame->f_execute(tstate->frame, 0, retval);
-	if (tstate->frame != f)
+	if (tstate->frame != f) {
+		assert(f->f_execute == PyEval_EvalFrame_value || f->f_execute == PyEval_EvalFrame_noval);
+		f->f_execute = PyEval_EvalFrame_value;
 		return retval;
+	}
 	if (STACKLESS_UNWINDING(retval))
 		STACKLESS_UNPACK(retval);
 
