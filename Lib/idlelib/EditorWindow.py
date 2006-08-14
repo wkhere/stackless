@@ -85,17 +85,22 @@ class EditorWindow(object):
         self.flist = flist
         root = root or flist.root
         self.root = root
+        try:
+            sys.ps1
+        except AttributeError:
+            sys.ps1 = '>>> '
         self.menubar = Menu(root)
         self.top = top = WindowList.ListedToplevel(root, menu=self.menubar)
         if flist:
             self.tkinter_vars = flist.vars
             #self.top.instance_dict makes flist.inversedict avalable to
             #configDialog.py so it can access all EditorWindow instaces
-            self.top.instance_dict=flist.inversedict
+            self.top.instance_dict = flist.inversedict
         else:
             self.tkinter_vars = {}  # keys: Tkinter event names
                                     # values: Tkinter variable instances
-        self.recent_files_path=os.path.join(idleConf.GetUserCfgDir(),
+            self.top.instance_dict = {}
+        self.recent_files_path = os.path.join(idleConf.GetUserCfgDir(),
                 'recent-files.lst')
         self.vbar = vbar = Scrollbar(top, name='vbar')
         self.text_frame = text_frame = Frame(top)
@@ -121,6 +126,9 @@ class EditorWindow(object):
 
         self.top.protocol("WM_DELETE_WINDOW", self.close)
         self.top.bind("<<close-window>>", self.close_event)
+        if macosxSupport.runningAsOSXApp():
+            # Command-W on editorwindows doesn't work without this.
+            text.bind('<<close-window>>', self.close_event)
         text.bind("<<cut>>", self.cut)
         text.bind("<<copy>>", self.copy)
         text.bind("<<paste>>", self.paste)

@@ -387,6 +387,9 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
         case GeneratorExp_kind:
             expr_name = "generator expression";
             break;
+        case Yield_kind:
+            expr_name = "yield expression";
+            break;
         case ListComp_kind:
             expr_name = "list comprehension";
             break;
@@ -619,10 +622,10 @@ ast_for_arguments(struct compiling *c, const node *n)
     }
     args = (n_args ? asdl_seq_new(n_args, c->c_arena) : NULL);
     if (!args && n_args)
-    	return NULL; /* Don't need to go to NULL; nothing allocated */
+    	return NULL; /* Don't need to goto error; no objects allocated */
     defaults = (n_defaults ? asdl_seq_new(n_defaults, c->c_arena) : NULL);
     if (!defaults && n_defaults)
-        goto error;
+    	return NULL; /* Don't need to goto error; no objects allocated */
 
     /* fpdef: NAME | '(' fplist ')'
        fplist: fpdef (',' fpdef)* [',']
@@ -638,8 +641,11 @@ ast_for_arguments(struct compiling *c, const node *n)
                    anything other than EQUAL or a comma? */
                 /* XXX Should NCH(n) check be made a separate check? */
                 if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
-                    asdl_seq_SET(defaults, j++, 
-				    ast_for_expr(c, CHILD(n, i + 2)));
+                    expr_ty expression = ast_for_expr(c, CHILD(n, i + 2));
+                    if (!expression)
+                            goto error;
+                    assert(defaults != NULL);
+                    asdl_seq_SET(defaults, j++, expression);
                     i += 2;
 		    found_default = 1;
                 }
@@ -1926,18 +1932,17 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
         operator_ty newoperator;
 	node *ch = CHILD(n, 0);
 
-	if (TYPE(ch) == testlist)
-	    expr1 = ast_for_testlist(c, ch);
-	else
-	    expr1 = Yield(ast_for_expr(c, CHILD(ch, 0)), LINENO(ch), n->n_col_offset,
-                          c->c_arena);
-
+	expr1 = ast_for_testlist(c, ch);
         if (!expr1)
             return NULL;
         /* TODO(nas): Remove duplicated error checks (set_context does it) */
         switch (expr1->kind) {
             case GeneratorExp_kind:
                 ast_error(ch, "augmented assignment to generator "
+                          "expression not possible");
+                return NULL;
+            case Yield_kind:
+                ast_error(ch, "augmented assignment to yield "
                           "expression not possible");
                 return NULL;
             case Name_kind: {
@@ -1962,7 +1967,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	if (TYPE(ch) == testlist)
 	    expr2 = ast_for_testlist(c, ch);
 	else
-	    expr2 = Yield(ast_for_expr(c, ch), LINENO(ch), ch->n_col_offset, c->c_arena);
+	    expr2 = ast_for_expr(c, ch);
         if (!expr2)
             return NULL;
 
@@ -2666,6 +2671,7 @@ ast_for_for_stmt(struct compiling *c, const node *n)
     asdl_seq *_target, *seq = NULL, *suite_seq;
     expr_ty expression;
     expr_ty target;
+    const node *node_target;
     /* for_stmt: 'for' exprlist 'in' testlist ':' suite ['else' ':' suite] */
     REQ(n, for_stmt);
 
@@ -2675,10 +2681,13 @@ ast_for_for_stmt(struct compiling *c, const node *n)
             return NULL;
     }
 
-    _target = ast_for_exprlist(c, CHILD(n, 1), Store);
+    node_target = CHILD(n, 1);
+    _target = ast_for_exprlist(c, node_target, Store);
     if (!_target)
         return NULL;
-    if (asdl_seq_LEN(_target) == 1)
+    /* Check the # of children rather than the length of _target, since
+       for x, in ... has 1 element in _target, but still requires a Tuple. */
+    if (NCH(node_target) == 1)
 	target = (expr_ty)asdl_seq_GET(_target, 0);
     else
 	target = Tuple(_target, Store, LINENO(n), n->n_col_offset, c->c_arena);

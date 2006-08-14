@@ -6,12 +6,12 @@
 \modulesynopsis{A foreign function library for Python.}
 \versionadded{2.5}
 
-\code{ctypes} is a foreign function library for Python.
+\code{ctypes} is a foreign function library for Python.  It provides C
+compatible data types, and allows to call functions in dlls/shared
+libraries.  It can be used to wrap these libraries in pure Python.
 
 
 \subsection{ctypes tutorial\label{ctypes-ctypes-tutorial}}
-
-This tutorial describes version 0.9.9 of \code{ctypes}.
 
 Note: The code samples in this tutorial uses \code{doctest} to make sure
 that they actually work.  Since some code samples behave differently
@@ -150,8 +150,10 @@ be used as the NULL pointer):
 \end{verbatim}
 
 \code{ctypes} tries to protect you from calling functions with the wrong
-number of arguments.  Unfortunately this only works on Windows.  It
-does this by examining the stack after the function returns:
+number of arguments or the wrong calling convention.  Unfortunately
+this only works on Windows.  It does this by examining the stack after
+the function returns, so although an error is raised the function
+\emph{has} been called:
 \begin{verbatim}
 >>> windll.kernel32.GetModuleHandleA() # doctest: +WINDOWS
 Traceback (most recent call last):
@@ -163,6 +165,25 @@ Traceback (most recent call last):
 ValueError: Procedure probably called with too many arguments (4 bytes in excess)
 >>>
 \end{verbatim}
+
+The same exception is raised when you call an \code{stdcall} function
+with the \code{cdecl} calling convention, or vice versa:
+\begin{verbatim}
+>>> cdll.kernel32.GetModuleHandleA(None) # doctest: +WINDOWS
+Traceback (most recent call last):
+  File "<stdin>", line 1, in ?
+ValueError: Procedure probably called with not enough arguments (4 bytes missing)
+>>>
+
+>>> windll.msvcrt.printf("spam") # doctest: +WINDOWS
+Traceback (most recent call last):
+  File "<stdin>", line 1, in ?
+ValueError: Procedure probably called with too many arguments (4 bytes in excess)
+>>>
+\end{verbatim}
+
+To find out the correct calling convention you have to look into the C
+header file or the documentation for the function you want to call.
 
 On Windows, \code{ctypes} uses win32 structured exception handling to
 prevent crashes from general protection faults when functions are
@@ -790,10 +811,6 @@ Initializers of the correct type can also be specified:
 
 \subsubsection{Pointers\label{ctypes-pointers}}
 
-XXX Rewrite this section.  Normally one only uses indexing, not the .contents
-attribute!
-List some recipes with pointers.  bool(ptr),  POINTER(tp)(), ...?
-
 Pointer instances are created by calling the \code{pointer} function on a
 \code{ctypes} type:
 \begin{verbatim}
@@ -826,7 +843,8 @@ Assigning another \class{c{\_}int} instance to the pointer's contents
 attribute would cause the pointer to point to the memory location
 where this is stored:
 \begin{verbatim}
->>> pi.contents = c_int(99)
+>>> i = c_int(99)
+>>> pi.contents = i
 >>> pi.contents
 c_long(99)
 >>>
@@ -855,9 +873,6 @@ memory locations. Generally you only use this feature if you receive a
 pointer from a C function, and you \emph{know} that the pointer actually
 points to an array instead of a single item.
 
-
-\subsubsection{Pointer classes/types\label{ctypes-pointer-classestypes}}
-
 Behind the scenes, the \code{pointer} function does more than simply
 create pointer instances, it has to create pointer \emph{types} first.
 This is done with the \code{POINTER} function, which accepts any
@@ -872,6 +887,31 @@ Traceback (most recent call last):
 TypeError: expected c_long instead of int
 >>> PI(c_int(42))
 <ctypes.LP_c_long object at 0x...>
+>>>
+\end{verbatim}
+
+Calling the pointer type without an argument creates a \code{NULL}
+pointer.  \code{NULL} pointers have a \code{False} boolean value:
+\begin{verbatim}
+>>> null_ptr = POINTER(c_int)()
+>>> print bool(null_ptr)
+False
+>>>
+\end{verbatim}
+
+\code{ctypes} checks for \code{NULL} when dereferencing pointers (but
+dereferencing non-\code{NULL} pointers would crash Python):
+\begin{verbatim}
+>>> null_ptr[0]
+Traceback (most recent call last):
+    ....
+ValueError: NULL pointer access
+>>>
+
+>>> null_ptr[0] = 1234
+Traceback (most recent call last):
+    ....
+ValueError: NULL pointer access
 >>>
 \end{verbatim}
 
@@ -1357,35 +1397,6 @@ IndexError: invalid index
 >>>
 \end{verbatim}
 
-The solution is to use 1-element arrays; as a special case ctypes does
-no bounds checking on them:
-\begin{verbatim}
->>> short_array = (c_short * 1)()
->>> print sizeof(short_array)
-2
->>> resize(short_array, 32)
->>> sizeof(short_array)
-32
->>> sizeof(type(short_array))
-2
->>> short_array[0:8]
-[0, 0, 0, 0, 0, 0, 0, 0]
->>> short_array[7] = 42
->>> short_array[0:8]
-[0, 0, 0, 0, 0, 0, 0, 42]
->>>
-\end{verbatim}
-
-Using 1-element arrays as variable sized fields in structures works as
-well, but they should be used as the last field in the structure
-definition.  This example shows a definition from the Windows header
-files:
-\begin{verbatim}
-class SP_DEVICE_INTERFACE_DETAIL_DATA(Structure):
-    _fields_ = [("cbSize", c_int),
-                ("DevicePath", c_char * 1)]
-\end{verbatim}
-
 Another way to use variable-sized data types with \code{ctypes} is to use
 the dynamic nature of Python, and (re-)define the data type after the
 required size is already known, on a case by case basis.
@@ -1474,13 +1485,13 @@ locate the library at runtime.
 There are several ways to loaded shared libraries into the Python
 process.  One way is to instantiate one of the following classes:
 
-\begin{classdesc}{CDLL}{name, mode=RTLD_LOCAL, handle=None}
+\begin{classdesc}{CDLL}{name, mode=DEFAULT_MODE, handle=None}
 Instances of this class represent loaded shared libraries.
 Functions in these libraries use the standard C calling
 convention, and are assumed to return \code{int}.
 \end{classdesc}
 
-\begin{classdesc}{OleDLL}{name, mode=RTLD_LOCAL, handle=None}
+\begin{classdesc}{OleDLL}{name, mode=DEFAULT_MODE, handle=None}
 Windows only: Instances of this class represent loaded shared
 libraries, functions in these libraries use the \code{stdcall}
 calling convention, and are assumed to return the windows specific
@@ -1490,7 +1501,7 @@ with additional error code.  If the return value signals a
 failure, an \class{WindowsError} is automatically raised.
 \end{classdesc}
 
-\begin{classdesc}{WinDLL}{name, mode=RTLD_LOCAL, handle=None}
+\begin{classdesc}{WinDLL}{name, mode=DEFAULT_MODE, handle=None}
 Windows only: Instances of this class represent loaded shared
 libraries, functions in these libraries use the \code{stdcall}
 calling convention, and are assumed to return \code{int} by default.
@@ -1503,7 +1514,7 @@ convention on this platform.
 The Python GIL is released before calling any function exported by
 these libraries, and reaquired afterwards.
 
-\begin{classdesc}{PyDLL}{name, mode=RTLD_LOCAL, handle=None}
+\begin{classdesc}{PyDLL}{name, mode=DEFAULT_MODE, handle=None}
 Instances of this class behave like \class{CDLL} instances, except
 that the Python GIL is \emph{not} released during the function call,
 and after the function execution the Python error flag is checked.
@@ -1531,6 +1542,12 @@ is not available, it is defined as the integer zero.
 \begin{datadescni}{RTLD_LOCAL}
 Flag to use as \var{mode} parameter.  On platforms where this is not
 available, it is the same as \var{RTLD{\_}GLOBAL}.
+\end{datadescni}
+
+\begin{datadescni}{DEFAULT_MODE}
+The default mode which is used to load shared libraries.  On OSX
+10.3, this is \var{RTLD{\_}GLOBAL}, otherwise it is the same as
+\var{RTLD{\_}LOCAL}.
 \end{datadescni}
 
 Instances of these classes have no public methods, however
@@ -1566,10 +1583,9 @@ instance.  The result is cached, so repeated attribute accesses
 return the same library each time.
 \end{classdesc}
 
-\begin{methoddesc}{LoadLibrary}{name, mode=RTLD_LOCAL, handle=None}
+\begin{methoddesc}{LoadLibrary}{name}
 Load a shared library into the process and return it.  This method
-always creates a new instance of the library.  All three
-parameters are passed to the constructor of the library object.
+always returns a new instance of the library.
 \end{methoddesc}
 
 These prefabricated library loaders are available:
@@ -1810,8 +1826,8 @@ supply.  Here is the C declaration:
 \begin{verbatim}
 WINUSERAPI BOOL WINAPI
 GetWindowRect(
-    HWND hWnd,
-    LPRECT lpRect);
+     HWND hWnd,
+     LPRECT lpRect);
 \end{verbatim}
 
 Here is the wrapping with \code{ctypes}:

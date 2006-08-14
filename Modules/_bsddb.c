@@ -98,7 +98,7 @@
 #error "eek! DBVER can't handle minor versions > 9"
 #endif
 
-#define PY_BSDDB_VERSION "4.4.4"
+#define PY_BSDDB_VERSION "4.4.5"
 static char *rcs_id = "$Id$";
 
 
@@ -528,6 +528,7 @@ static int makeDBError(int err)
     PyObject *errObj = NULL;
     PyObject *errTuple = NULL;
     int exceptionRaised = 0;
+    unsigned int bytes_left;
 
     switch (err) {
         case 0:                     /* successful, no error */      break;
@@ -535,12 +536,15 @@ static int makeDBError(int err)
 #if (DBVER < 41)
         case DB_INCOMPLETE:
 #if INCOMPLETE_IS_WARNING
-            our_strlcpy(errTxt, db_strerror(err), sizeof(errTxt));
-            if (_db_errmsg[0]) {
+            bytes_left = our_strlcpy(errTxt, db_strerror(err), sizeof(errTxt));
+            /* Ensure that bytes_left never goes negative */
+            if (_db_errmsg[0] && bytes_left < (sizeof(errTxt) - 4)) {
+                bytes_left = sizeof(errTxt) - bytes_left - 4 - 1;
+		assert(bytes_left >= 0);
                 strcat(errTxt, " -- ");
-                strcat(errTxt, _db_errmsg);
-                _db_errmsg[0] = 0;
+                strncat(errTxt, _db_errmsg, bytes_left);
             }
+            _db_errmsg[0] = 0;
 #ifdef HAVE_WARNINGS
             exceptionRaised = PyErr_Warn(PyExc_RuntimeWarning, errTxt);
 #else
@@ -588,12 +592,15 @@ static int makeDBError(int err)
     }
 
     if (errObj != NULL) {
-        our_strlcpy(errTxt, db_strerror(err), sizeof(errTxt));
-        if (_db_errmsg[0]) {
+        bytes_left = our_strlcpy(errTxt, db_strerror(err), sizeof(errTxt));
+        /* Ensure that bytes_left never goes negative */
+        if (_db_errmsg[0] && bytes_left < (sizeof(errTxt) - 4)) {
+            bytes_left = sizeof(errTxt) - bytes_left - 4 - 1;
+            assert(bytes_left >= 0);
             strcat(errTxt, " -- ");
-            strcat(errTxt, _db_errmsg);
-            _db_errmsg[0] = 0;
+            strncat(errTxt, _db_errmsg, bytes_left);
         }
+        _db_errmsg[0] = 0;
 
 	errTuple = Py_BuildValue("(is)", err, errTxt);
         PyErr_SetObject(errObj, errTuple);
@@ -798,10 +805,12 @@ newDBObject(DBEnvObject* arg, int flags)
 
     MYDB_BEGIN_ALLOW_THREADS;
     err = db_create(&self->db, db_env, flags);
-    self->db->set_errcall(self->db, _db_errorCallback);
+    if (self->db != NULL) {
+        self->db->set_errcall(self->db, _db_errorCallback);
 #if (DBVER >= 33)
-    self->db->app_private = (void*)self;
+        self->db->app_private = (void*)self;
 #endif
+    }
     MYDB_END_ALLOW_THREADS;
     /* TODO add a weakref(self) to the self->myenvobj->open_child_weakrefs
      * list so that a DBEnv can refuse to close without aborting any open
@@ -3867,7 +3876,7 @@ DBEnv_dbremove(DBEnvObject* self, PyObject* args, PyObject* kwargs)
     static char* kwnames[] = { "file", "database", "txn", "flags",
                                      NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss|Oi:dbremove", kwnames,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|zOi:dbremove", kwnames,
 		&file, &database, &txnobj, &flags)) {
 	return NULL;
     }
@@ -3895,7 +3904,7 @@ DBEnv_dbrename(DBEnvObject* self, PyObject* args, PyObject* kwargs)
     static char* kwnames[] = { "file", "database", "newname", "txn",
                                      "flags", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sss|Oi:dbrename", kwnames,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "szs|Oi:dbrename", kwnames,
 		&file, &database, &newname, &txnobj, &flags)) {
 	return NULL;
     }

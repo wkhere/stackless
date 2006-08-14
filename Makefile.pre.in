@@ -334,6 +334,7 @@ OBJECT_OBJS=	\
 ##########################################################################
 # objects that get linked into the Python library
 LIBRARY_OBJS=	\
+		Modules/_typesmodule.o \
 		Modules/getbuildinfo.o \
 		$(PARSER_OBJS) \
 		$(OBJECT_OBJS) \
@@ -370,6 +371,7 @@ sharedmods: $(BUILDPYTHON)
 $(LIBRARY): $(LIBRARY_OBJS)
 	-rm -f $@
 	$(AR) cr $@ Modules/getbuildinfo.o
+	$(AR) cr $@ Modules/_typesmodule.o
 	$(AR) cr $@ $(PARSER_OBJS)
 	$(AR) cr $@ $(OBJECT_OBJS)
 	$(AR) cr $@ $(PYTHON_OBJS)
@@ -502,7 +504,7 @@ $(AST_H): $(AST_ASDL) $(ASDLGEN_FILES)
 
 $(AST_C): $(AST_ASDL) $(ASDLGEN_FILES)
 	$(ASDLGEN) -c $(AST_C_DIR) $(AST_ASDL)
-	
+
 Python/compile.o Python/symtable.o: $(GRAMMAR_H) $(AST_H)
 
 Python/getplatform.o: $(srcdir)/Python/getplatform.c
@@ -687,6 +689,7 @@ bininstall:	altbininstall
 	else true; \
 	fi
 	(cd $(DESTDIR)$(BINDIR); $(LN) python$(VERSION)$(EXE) $(PYTHON))
+	(cd $(DESTDIR)$(BINDIR); $(LN) -sf python$(VERSION)-config python-config)
 
 # Install the interpreter with $(VERSION) affixed
 # This goes into $(exec_prefix)
@@ -730,7 +733,7 @@ PLATDIR=	plat-$(MACHDEP)
 EXTRAPLATDIR= @EXTRAPLATDIR@
 EXTRAMACHDEPPATH=@EXTRAMACHDEPPATH@
 MACHDEPS=	$(PLATDIR) $(EXTRAPLATDIR)
-XMLLIBSUBDIRS=  xmlcore xmlcore/dom xmlcore/etree xmlcore/parsers xmlcore/sax
+XMLLIBSUBDIRS=  xml xml/dom xml/etree xml/parsers xml/sax
 PLATMACDIRS= plat-mac plat-mac/Carbon plat-mac/lib-scriptpackages \
 	plat-mac/lib-scriptpackages/_builtinSuites \
 	plat-mac/lib-scriptpackages/CodeWarrior \
@@ -900,8 +903,8 @@ libainstall:	all
 	$(INSTALL_SCRIPT) $(srcdir)/install-sh $(DESTDIR)$(LIBPL)/install-sh
 	# Substitution happens here, as the completely-expanded BINDIR
 	# is not available in configure
-	sed -e "s,@BINDIR@,$(BINDIR)," < $(srcdir)/Misc/python-config.in >python-config
-	$(INSTALL_SCRIPT) python-config $(DESTDIR)$(BINDIR)/python-config
+	sed -e "s,@EXENAME@,$(BINDIR)/python$(VERSION)$(EXE)," < $(srcdir)/Misc/python-config.in >python-config
+	$(INSTALL_SCRIPT) python-config $(DESTDIR)$(BINDIR)/python$(VERSION)-config
 	rm python-config
 	@if [ -s Modules/python.exp -a \
 		"`echo $(MACHDEP) | sed 's/^\(...\).*/\1/'`" = "aix" ]; then \
@@ -985,7 +988,7 @@ frameworkinstallstructure:	$(LDLIBRARY)
 # Install a number of symlinks to keep software that expects a normal unix
 # install (which includes python-config) happy.
 frameworkinstallmaclib:
-	ln -s "../../../Python" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config/libpython$(VERSION).a"
+	ln -fs "../../../Python" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config/libpython$(VERSION).a"
 	cd Mac && $(MAKE) installmacsubtree DESTDIR="$(DESTDIR)"
 
 # This installs the IDE, the Launcher and other apps into /Applications

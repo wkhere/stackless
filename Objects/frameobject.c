@@ -666,6 +666,7 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 		f->f_trace = NULL;
                 f->f_exc_type = f->f_exc_value = f->f_exc_traceback = NULL;
 	}
+	f->f_stacktop = f->f_valuestack;
 	f->f_builtins = builtins;
 	Py_XINCREF(back);
 	f->f_back = back;
@@ -696,7 +697,6 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 	f->f_lineno = code->co_firstlineno;
 	f->f_iblock = 0;
 
-        f->f_stacktop = f->f_valuestack;
 #ifdef STACKLESS
 	f->f_execute = NULL;
 #endif

@@ -1,3 +1,24 @@
+What's New in IDLE 1.2b3?
+=========================
+
+*Release date: 03-AUG-2006*
+
+- EditorWindow.test() was failing.  Bug 1417598
+
+- EditorWindow failed when used stand-alone if sys.ps1 not set.
+  Bug 1010370 Dave Florek
+
+- Tooltips failed on new-syle class __init__ args.  Bug 1027566 Loren Guthrie
+
+- Avoid occasional failure to detect closing paren properly.
+  Patch 1407280 Tal Einat
+
+- Rebinding Tab key was inserting 'tab' instead of 'Tab'.  Bug 1179168.
+
+- Colorizer now handles #<builtin> correctly, also unicode strings and
+  'as' keyword in comment directly following import command. Closes 1325071.
+  Patch 1479219 Tal Einat
+
 What's New in IDLE 1.2b2?
 =========================
 

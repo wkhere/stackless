@@ -1384,12 +1384,12 @@ set_symmetric_difference_update(PySetObject *so, PyObject *other)
 	while (set_next(otherset, &pos, &entry)) {
 		int rv = set_discard_entry(so, entry);
 		if (rv == -1) {
-			Py_XDECREF(otherset);
+			Py_DECREF(otherset);
 			return NULL;
 		}
 		if (rv == DISCARD_NOTFOUND) {
 			if (set_add_entry(so, entry) == -1) {
-				Py_XDECREF(otherset);
+				Py_DECREF(otherset);
 				return NULL;
 			}
 		}
@@ -1801,7 +1801,7 @@ static PyNumberMethods set_as_number = {
 PyDoc_STRVAR(set_doc,
 "set(iterable) --> set object\n\
 \n\
-Build an unordered collection.");
+Build an unordered collection of unique elements.");
 
 PyTypeObject PySet_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -1896,7 +1896,7 @@ static PyNumberMethods frozenset_as_number = {
 PyDoc_STRVAR(frozenset_doc,
 "frozenset(iterable) --> frozenset object\n\
 \n\
-Build an immutable unordered collection.");
+Build an immutable unordered collection of unique elements.");
 
 PyTypeObject PyFrozenSet_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)

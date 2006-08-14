@@ -4,6 +4,209 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.5 beta 3?
+================================
+
+*Release date: 03-AUG-2006*
+
+Core and builtins
+-----------------
+
+- _PyWeakref_GetWeakrefCount() now returns a Py_ssize_t, it previously
+  returned a long (see PEP 353).
+
+- Bug #1515471: string.replace() accepts character buffers again.
+
+- Add PyErr_WarnEx() so C code can pass the stacklevel to warnings.warn().
+  This provides the proper warning for struct.pack().
+  PyErr_Warn() is now deprecated in favor of PyErr_WarnEx().
+
+- Patch #1531113: Fix augmented assignment with yield expressions.
+  Also fix a SystemError when trying to assign to yield expressions.
+
+- Bug #1529871: The speed enhancement patch #921466 broke Python's compliance
+  with PEP 302.  This was fixed by adding an ``imp.NullImporter`` type that is
+  used in ``sys.path_importer_cache`` to cache non-directory paths and avoid
+  excessive filesystem operations during imports.
+
+- Bug #1521947: When checking for overflow, ``PyOS_strtol()`` used some
+  operations on signed longs that are formally undefined by C.
+  Unfortunately, at least one compiler now cares about that, so complicated
+  the code to make that compiler happy again.
+
+- Bug #1524310: Properly report errors from FindNextFile in os.listdir.
+
+- Patch #1232023: Stop including current directory in search
+  path on Windows.
+
+- Fix some potential crashes found with failmalloc.
+
+- Fix warnings reported by Klocwork's static analysis tool.
+
+- Bug #1512814, Fix incorrect lineno's when code within a function
+  had more than 255 blank lines.
+
+- Patch #1521179: Python now accepts the standard options ``--help`` and
+  ``--version`` as well as ``/?`` on Windows.
+
+- Bug #1520864: unpacking singleton tuples in a 'for' loop (for x, in) works
+  again.  Fixing this problem required changing the .pyc magic number.
+  This means that .pyc files generated before 2.5c1 will be regenerated.
+
+- Bug #1524317:  Compiling Python ``--without-threads`` failed.
+  The Python core compiles again then, and, in a build without threads, the
+  new ``sys._current_frames()`` returns a dictionary with one entry,
+  mapping the faux "thread id" 0 to the current frame.
+
+- Bug #1525447: build on MacOS X on a case-sensitive filesystem.
+
+
+Library
+-------
+
+- Correction of patch #1455898: In the mbcs decoder, set final=False
+  for stream decoder, but final=True for the decode function.
+
+- os.urandom no longer masks unrelated exceptions like SystemExit or
+  KeyboardInterrupt.
+
+- Bug #1525866: Don't copy directory stat times in 
+  shutil.copytree on Windows
+
+- Bug #1002398: The documentation for os.path.sameopenfile now correctly
+  refers to file descriptors, not file objects.
+
+- Rename of the xml package to xmlcore, and the import hackery done to
+  make it appear at both names, has been removed.  Bug #1511497,
+  #1513611, and probably others.
+
+- Bug #1441397: The compiler module now recognizes module and function
+  docstrings correctly as it did in Python 2.4.
+
+- Bug #1529297:  The rewrite of doctest for Python 2.4 unintentionally
+  lost that tests are sorted by name before being run.  This rarely
+  matters for well-written tests, but can create baffling symptoms if
+  side effects from one test to the next affect outcomes.  ``DocTestFinder``
+  has been changed to sort the list of tests it returns.
+
+- The distutils version has been changed to 2.5.0, and are now kept
+  in sync with sys.version_info[:3].
+
+- Bug #978833: Really close underlying socket in _socketobject.close.
+
+- Bug #1459963: urllib and urllib2 now normalize HTTP header names correctly
+  with title().
+
+- Patch #1525766: In pkgutil.walk_packages, correctly pass the onerror callback
+  to recursive calls and call it with the failing package name.
+
+- Bug #1525817: Don't truncate short lines in IDLE's tool tips.
+
+- Patch #1515343: Fix printing of deprecated string exceptions with a
+  value in the traceback module.
+
+- Resync optparse with Optik 1.5.3: minor tweaks for/to tests.
+
+- Patch #1524429: Use repr() instead of backticks in Tkinter again.
+
+- Bug #1520914: Change time.strftime() to accept a zero for any position in its
+  argument tuple.  For arguments where zero is illegal, the value is forced to
+  the minimum value that is correct.  This is to support an undocumented but
+  common way people used  to fill in inconsequential information in the time
+  tuple pre-2.4.
+
+- Patch #1220874: Update the binhex module for Mach-O.
+
+- The email package has improved RFC 2231 support, specifically for
+  recognizing the difference between encoded (name*0*=<blah>) and non-encoded
+  (name*0=<blah>) parameter continuations.  This may change the types of
+  values returned from email.message.Message.get_param() and friends.
+  Specifically in some cases where non-encoded continuations were used,
+  get_param() used to return a 3-tuple of (None, None, string) whereas now it
+  will just return the string (since non-encoded continuations don't have
+  charset and language parts).
+
+  Also, whereas % values were decoded in all parameter continuations, they are
+  now only decoded in encoded parameter parts.
+
+- Bug #1517990: IDLE keybindings on MacOS X now work correctly
+
+- Bug #1517996: IDLE now longer shows the default Tk menu when a
+  path browser, class browser or debugger is the frontmost window on MacOS X
+
+- Patch #1520294: Support for getset and member descriptors in types.py,
+  inspect.py, and pydoc.py.  Specifically, this allows for querying the type
+  of an object against these built-in types and more importantly, for getting
+  their docstrings printed in the interactive interpreter's help() function.
+
+
+Extension Modules
+-----------------
+
+- Patch #1519025 and bug #926423: If a KeyboardInterrupt occurs during
+  a socket operation on a socket with a timeout, the exception will be
+  caught correctly.  Previously, the exception was not caught.
+
+- Patch #1529514: The _ctypes extension is now compiled on more
+  openbsd target platforms.
+
+- The ``__reduce__()`` method of the new ``collections.defaultdict`` had
+  a memory leak, affecting pickles and deep copies.
+
+- Bug #1471938: Fix curses module build problem on Solaris 8; patch by
+  Paul Eggert.
+
+- Patch #1448199: Release interpreter lock in _winreg.ConnectRegistry.
+
+- Patch #1521817: Index range checking on ctypes arrays containing
+  exactly one element enabled again.  This allows iterating over these
+  arrays, without the need to check the array size before.
+
+- Bug #1521375: When the code in ctypes.util.find_library was
+  run with root privileges, it could overwrite or delete
+  /dev/null in certain cases; this is now fixed.
+
+- Bug #1467450: On Mac OS X 10.3, RTLD_GLOBAL is now used as the
+  default mode for loading shared libraries in ctypes.
+
+- Because of a misspelled preprocessor symbol, ctypes was always
+  compiled without thread support; this is now fixed.
+
+- pybsddb Bug #1527939: bsddb module DBEnv dbremove and dbrename
+  methods now allow their database parameter to be None as the
+  sleepycat API allows.
+
+- Bug #1526460: Fix socketmodule compile on NetBSD as it has a different
+  bluetooth API compared with Linux and FreeBSD.
+
+Tests
+-----
+
+- Bug #1501330: Change test_ossaudiodev to be much more tolerant in terms of
+  how long the test file should take to play.  Now accepts taking 2.93 secs
+  (exact time) +/- 10% instead of the hard-coded 3.1 sec.
+
+- Patch #1529686: The standard tests ``test_defaultdict``, ``test_iterlen``,
+  ``test_uuid`` and ``test_email_codecs`` didn't actually run any tests when
+  run via ``regrtest.py``. Now they do.
+
+Build
+-----
+
+- Bug #1439538: Drop usage of test -e in configure as it is not portable.
+
+Mac
+---
+
+- PythonLauncher now works correctly when the path to the script contains
+  characters that are treated specially by the shell (such as quotes).
+
+- Bug #1527397: PythonLauncher now launches scripts with the working directory
+  set to the directory that contains the script instead of the user home
+  directory. That latter was an implementation accident and not what users 
+  expect.
+
+
 What's New in Python 2.5 beta 2?
 ================================
 
@@ -45,6 +248,9 @@ Core and builtins
 
 Library
 -------
+
+- Bug #1257728: Mention Cygwin in distutils error message about a missing
+  VS 2003.
 
 - Patch #1519566: Update turtle demo, make begin_fill idempotent.
 
@@ -105,9 +311,9 @@ Library
 Extension Modules
 -----------------
 
-- #1494314: Fix a regression with high-numbered sockets in 2.4.3. This 
-  means that select() on sockets > FD_SETSIZE (typically 1024) work again. 
-  The patch makes sockets use poll() internally where available. 
+- #1494314: Fix a regression with high-numbered sockets in 2.4.3. This
+  means that select() on sockets > FD_SETSIZE (typically 1024) work again.
+  The patch makes sockets use poll() internally where available.
 
 - Assigning None to pointer type fields in ctypes structures possible
   overwrote the wrong fields, this is fixed now.
@@ -138,6 +344,8 @@ Extension Modules
 
 Build
 -----
+
+- Automate Windows build process for the Win64 SSL module.
 
 - 'configure' now detects the zlib library the same way as distutils.
   Previously, the slight difference could cause compilation errors of the
@@ -542,6 +750,10 @@ Extension Modules
 
 Library
 -------
+
+- Bug #1223937: subprocess.CalledProcessError reports the exit status
+  of the process using the returncode attribute, instead of
+  abusing errno.
 
 - Patch #1475231: ``doctest`` has a new ``SKIP`` option, which causes
   a doctest to be skipped (the code is not run, and the expected output
@@ -1161,6 +1373,10 @@ Extension Modules
 Library
 -------
 
+- Patch #1388073: Numerous __-prefixed attributes of unittest.TestCase have
+  been renamed to have only a single underscore prefix.  This was done to
+  make subclassing easier.
+
 - PEP 338: new module runpy defines a run_module function to support
   executing modules which provide access to source code or a code object
   via the PEP 302 import mechanisms.
@@ -1476,8 +1692,8 @@ Library
 - Bug #792570: SimpleXMLRPCServer had problems if the request grew too large.
   Fixed by reading the HTTP body in chunks instead of one big socket.read().
 
-- Patches #893642, #1039083: add allow_none, encoding arguments to constructors of
-  SimpleXMLRPCServer and CGIXMLRPCRequestHandler.
+- Patches #893642, #1039083: add allow_none, encoding arguments to
+  constructors of SimpleXMLRPCServer and CGIXMLRPCRequestHandler.
 
 - Bug #1110478: Revert os.environ.update to do putenv again.
 

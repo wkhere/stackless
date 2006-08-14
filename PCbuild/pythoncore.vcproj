@@ -460,9 +460,6 @@
 			RelativePath="..\Modules\_bisectmodule.c">
 		</File>
 		<File
-			RelativePath="..\Modules\_struct.c">
-		</File>
-		<File
 			RelativePath="..\Modules\cjkcodecs\_codecs_cn.c">
 		</File>
 		<File
@@ -487,6 +484,9 @@
 			RelativePath="..\Modules\_csv.c">
 		</File>
 		<File
+			RelativePath="..\Modules\_functoolsmodule.c">
+		</File>
+		<File
 			RelativePath="..\Modules\_heapqmodule.c">
 		</File>
 		<File
@@ -505,7 +505,13 @@
 			RelativePath="..\Modules\_sre.c">
 		</File>
 		<File
+			RelativePath="..\Modules\_struct.c">
+		</File>
+		<File
 			RelativePath="..\Pc\_subprocess.c">
+		</File>
+		<File
+			RelativePath="..\Modules\_typesmodule.c">
 		</File>
 		<File
 			RelativePath="..\Modules\_weakref.c">
@@ -629,9 +635,6 @@
 		</File>
 		<File
 			RelativePath="..\Objects\funcobject.c">
-		</File>
-		<File
-			RelativePath="..\Modules\_functoolsmodule.c">
 		</File>
 		<File
 			RelativePath="..\Python\future.c">

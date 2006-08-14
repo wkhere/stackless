@@ -664,7 +664,7 @@ class ZipFile:
 
                 if zinfo.header_offset > ZIP64_LIMIT:
                     extra.append(zinfo.header_offset)
-                    header_offset = 0xffffffff #-1
+                    header_offset = -1  # struct "l" format:  32 one bits
                 else:
                     header_offset = zinfo.header_offset
 
@@ -708,9 +708,10 @@ class ZipFile:
                         stringEndArchive64Locator, 0, pos2, 1)
                 self.fp.write(zip64locrec)
 
+                # XXX Why is `pos3` computed next?  It's never referenced.
                 pos3 = self.fp.tell()
                 endrec = struct.pack(structEndArchive, stringEndArchive,
-                         0, 0, count, count, pos2 - pos1, 0xffffffff, 0) # -1, 0)
+                            0, 0, count, count, pos2 - pos1, -1, 0)
                 self.fp.write(endrec)
 
             else:

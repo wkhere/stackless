@@ -763,6 +763,11 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
 			ps2 = PyString_AsString(w);
 	}
 	arena = PyArena_New();
+	if (arena == NULL) {
+		Py_XDECREF(v);
+		Py_XDECREF(w);
+		return -1;
+	}
 	mod = PyParser_ASTFromFile(fp, filename,
 				   Py_single_input, ps1, ps2,
 				   flags, &errcode, arena);
@@ -1088,6 +1093,17 @@ PyErr_PrintEx(int set_sys_last_vars)
 			}
 			PyErr_Fetch(&exception2, &v2, &tb2);
 			PyErr_NormalizeException(&exception2, &v2, &tb2);
+			/* It should not be possible for exception2 or v2
+			   to be NULL. However PyErr_Display() can't
+			   tolerate NULLs, so just be safe. */
+			if (exception2 == NULL) {
+				exception2 = Py_None;
+				Py_INCREF(exception2);
+			}
+			if (v2 == NULL) {
+				v2 = Py_None;
+				Py_INCREF(v2);
+			}
 			if (Py_FlushLine())
 				PyErr_Clear();
 			fflush(stdout);
@@ -1095,8 +1111,8 @@ PyErr_PrintEx(int set_sys_last_vars)
 			PyErr_Display(exception2, v2, tb2);
 			PySys_WriteStderr("\nOriginal exception was:\n");
 			PyErr_Display(exception, v, tb);
-			Py_XDECREF(exception2);
-			Py_XDECREF(v2);
+			Py_DECREF(exception2);
+			Py_DECREF(v2);
 			Py_XDECREF(tb2);
 		}
 		Py_XDECREF(result);
@@ -1217,9 +1233,12 @@ PyRun_StringFlags(const char *str, int start, PyObject *globals,
 {
 	STACKLESS_GETARG();
 	PyObject *ret = NULL;
+	mod_ty mod;
 	PyArena *arena = PyArena_New();
-	mod_ty mod = PyParser_ASTFromString(str, "<string>", start, flags,
-					    arena);
+	if (arena == NULL)
+		return NULL;
+	
+	mod = PyParser_ASTFromString(str, "<string>", start, flags, arena);
 	if (mod != NULL) {
 		STACKLESS_PROMOTE_ALL();
 		ret = run_mod(mod, "<string>", globals, locals, flags, arena);
@@ -1234,9 +1253,13 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 {
 	STACKLESS_GETARG();
 	PyObject *ret;
+	mod_ty mod;
 	PyArena *arena = PyArena_New();
-	mod_ty mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
-					  flags, NULL, arena);
+	if (arena == NULL)
+		return NULL;
+	
+	mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
+				   flags, NULL, arena);
 	if (mod == NULL) {
 		PyArena_Free(arena);
 		return NULL;
@@ -1303,8 +1326,12 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
 		      PyCompilerFlags *flags)
 {
 	PyCodeObject *co;
+	mod_ty mod;
 	PyArena *arena = PyArena_New();
-	mod_ty mod = PyParser_ASTFromString(str, filename, start, flags, arena);
+	if (arena == NULL)
+		return NULL;
+
+	mod = PyParser_ASTFromString(str, filename, start, flags, arena);
 	if (mod == NULL) {
 		PyArena_Free(arena);
 		return NULL;
@@ -1323,8 +1350,12 @@ struct symtable *
 Py_SymtableString(const char *str, const char *filename, int start)
 {
 	struct symtable *st;
+	mod_ty mod;
 	PyArena *arena = PyArena_New();
-	mod_ty mod = PyParser_ASTFromString(str, filename, start, NULL, arena);
+	if (arena == NULL)
+		return NULL;
+
+	mod = PyParser_ASTFromString(str, filename, start, NULL, arena);
 	if (mod == NULL) {
 		PyArena_Free(arena);
 		return NULL;

@@ -271,19 +271,51 @@ class UUID(object):
 
     version = property(get_version)
 
-def _ifconfig_getnode():
-    """Get the hardware address on Unix by running ifconfig."""
+def _find_mac(command, args, hw_identifiers, get_index):
     import os
     for dir in ['', '/sbin/', '/usr/sbin']:
+        executable = os.path.join(dir, command)
+        if not os.path.exists(executable):
+            continue
+
         try:
-            pipe = os.popen(os.path.join(dir, 'ifconfig'))
+            # LC_ALL to get English output, 2>/dev/null to
+            # prevent output on stderr
+            cmd = 'LC_ALL=C %s %s 2>/dev/null' % (executable, args)
+            pipe = os.popen(cmd)
         except IOError:
             continue
+
         for line in pipe:
             words = line.lower().split()
             for i in range(len(words)):
-                if words[i] in ['hwaddr', 'ether']:
-                    return int(words[i + 1].replace(':', ''), 16)
+                if words[i] in hw_identifiers:
+                    return int(words[get_index(i)].replace(':', ''), 16)
+    return None
+
+def _ifconfig_getnode():
+    """Get the hardware address on Unix by running ifconfig."""
+
+    # This works on Linux ('' or '-a'), Tru64 ('-av'), but not all Unixes.
+    for args in ('', '-a', '-av'):
+        mac = _find_mac('ifconfig', args, ['hwaddr', 'ether'], lambda i: i+1)
+        if mac:
+            return mac
+
+    import socket
+    ip_addr = socket.gethostbyname(socket.gethostname())
+
+    # Try getting the MAC addr from arp based on our IP address (Solaris).
+    mac = _find_mac('arp', '-an', [ip_addr], lambda i: -1)
+    if mac:
+        return mac
+
+    # This might work on HP-UX.
+    mac = _find_mac('lanscan', '-ai', ['lan0'], lambda i: 0)
+    if mac:
+        return mac
+
+    return None
 
 def _ipconfig_getnode():
     """Get the hardware address on Windows by running ipconfig.exe."""
@@ -359,6 +391,10 @@ try:
     # hardware address.  On Windows 2000 and later, UuidCreate makes a
     # random UUID and UuidCreateSequential gives a UUID containing the
     # hardware address.  These routines are provided by the RPC runtime.
+    # NOTE:  at least on Tim's WinXP Pro SP2 desktop box, while the last
+    # 6 bytes returned by UuidCreateSequential are fixed, they don't appear
+    # to bear any relationship to the MAC address of any network device
+    # on the box.
     try:
         lib = ctypes.windll.rpcrt4
     except:
@@ -386,10 +422,13 @@ def _random_getnode():
 _node = None
 
 def getnode():
-    """Get the hardware address as a 48-bit integer.  The first time this
-    runs, it may launch a separate program, which could be quite slow.  If
-    all attempts to obtain the hardware address fail, we choose a random
-    48-bit number with its eighth bit set to 1 as recommended in RFC 4122."""
+    """Get the hardware address as a 48-bit positive integer.
+
+    The first time this runs, it may launch a separate program, which could
+    be quite slow.  If all attempts to obtain the hardware address fail, we
+    choose a random 48-bit number with its eighth bit set to 1 as recommended
+    in RFC 4122.
+    """
 
     global _node
     if _node is not None:

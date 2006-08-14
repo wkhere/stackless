@@ -6,7 +6,7 @@
 % Count up the patches and bugs
 
 \title{What's New in Python 2.5}
-\release{0.3}
+\release{0.4}
 \author{A.M. Kuchling}
 \authoraddress{\email{amk@amk.ca}}
 
@@ -74,7 +74,7 @@ but there was no syntax that was preferred by a clear majority.
 Candidates included C's \code{cond ? true_v : false_v},
 \code{if cond then true_v else false_v}, and 16 other variations.
 
-GvR eventually chose a surprising syntax:
+Guido van~Rossum eventually chose a surprising syntax:
 
 \begin{verbatim}
 x = true_value if condition else false_value
@@ -407,7 +407,7 @@ specific exceptions.  You couldn't combine both \keyword{except} blocks and a
 combined version was complicated and it wasn't clear what the
 semantics of the combined should be.  
 
-GvR spent some time working with Java, which does support the
+Guido van~Rossum spent some time working with Java, which does support the
 equivalent of combining \keyword{except} blocks and a
 \keyword{finally} block, and this clarified what the statement should
 mean.  In Python 2.5, you can now write:
@@ -600,7 +600,11 @@ once the generator has been exhausted.
 \seepep{342}{Coroutines via Enhanced Generators}{PEP written by 
 Guido van~Rossum and Phillip J. Eby;
 implemented by Phillip J. Eby.  Includes examples of 
-some fancier uses of generators as coroutines.}
+some fancier uses of generators as coroutines.
+
+Earlier versions of these features were proposed in 
+\pep{288} by Raymond Hettinger and \pep{325} by Samuele Pedroni.
+}
 
 \seeurl{http://en.wikipedia.org/wiki/Coroutine}{The Wikipedia entry for 
 coroutines.}
@@ -1152,8 +1156,8 @@ print max(L)
 false values.  \function{any()} returns \constant{True} if any value
 returned by the iterator is true; otherwise it will return
 \constant{False}.  \function{all()} returns \constant{True} only if
-all of the values returned by the iterator evaluate as being true.
-(Suggested by GvR, and implemented by Raymond Hettinger.)
+all of the values returned by the iterator evaluate as true.
+(Suggested by Guido van~Rossum, and implemented by Raymond Hettinger.)
 
 \item ASCII is now the default encoding for modules.  It's now 
 a syntax error if a module contains string literals with 8-bit
@@ -1206,6 +1210,11 @@ produce string representations of themselves, but are also callable.
 Newbies who try \code{quit()} or \code{exit()} will now exit the
 interpreter as they expect.  (Implemented by Georg Brandl.)
 
+The Python executable now accepts the standard long options 
+\longprogramopt{help} and \longprogramopt{version}; on Windows, 
+it also accepts the \programopt{/?} option for displaying a help message.
+(Implemented by Georg Brandl.)
+
 
 %======================================================================
 \subsection{Optimizations\label{opts}}
@@ -1254,7 +1263,8 @@ Python's allocator functions instead of the system's
 \item The code generator's peephole optimizer now performs
 simple constant folding in expressions.  If you write something like
 \code{a = 2+3}, the code generator will do the arithmetic and produce
-code corresponding to \code{a = 5}.
+code corresponding to \code{a = 5}.  (Proposed and implemented 
+by Raymond Hettinger.)
 
 \item Function calls are now faster because code objects now keep 
 the most recently finished frame (a ``zombie frame'') in an internal
@@ -1348,10 +1358,13 @@ defaultdict(<type 'list'>, {'c': ['cammin', 'che'], 'e': ['era'],
         'r': ['ritrovai'], 'u': ['una'], 'v': ['vita', 'via']}
 \end{verbatim}
 
-The \class{deque} double-ended queue type supplied by the
+(Contributed by Guido van~Rossum.)
+
+\item The \class{deque} double-ended queue type supplied by the
 \module{collections} module now has a \method{remove(\var{value})}
 method that removes the first occurrence of \var{value} in the queue,
 raising \exception{ValueError} if the value isn't found.
+(Contributed by Raymond Hettinger.)
 
 \item New module: The \module{contextlib} module contains helper functions for use 
 with the new '\keyword{with}' statement.  See
@@ -1380,6 +1393,17 @@ currently-set limit.  The \class{reader} class now has a
 \member{line_num} attribute that counts the number of physical lines
 read from the source; records can span multiple physical lines, so
 \member{line_num} is not the same as the number of records read.
+
+The CSV parser is now stricter about multi-line quoted
+fields. Previously, if a line ended within a quoted field without a
+terminating newline character, a newline would be inserted into the
+returned field. This behavior caused problems when reading files that
+contained carriage return characters within fields, so the code was
+changed to return the field without inserting newlines. As a
+consequence, if newlines embedded within fields are important, the
+input should be split into lines in a manner that preserves the
+newline characters.
+
 (Contributed by Skip Montanaro and Andrew McNamara.)
 
 \item The \class{datetime} class in the \module{datetime} 
@@ -1640,7 +1664,7 @@ year, number, name = s.unpack(data)
 \end{verbatim}
 
 You can also pack and unpack data to and from buffer objects directly
-using the \method{pack_to(\var{buffer}, \var{offset}, \var{v1},
+using the \method{pack_into(\var{buffer}, \var{offset}, \var{v1},
 \var{v2}, ...)} and \method{unpack_from(\var{buffer}, \var{offset})}
 methods.  This lets you store data directly into an array or a
 memory-mapped file.
@@ -1662,14 +1686,20 @@ string of build information like this:
 \code{"trunk:45355:45356M, Apr 13 2006, 07:42:19"}.  
 (Contributed by Barry Warsaw.)
 
+\item Another new function, \function{sys._current_frames()}, returns
+the current stack frames for all running threads as a dictionary
+mapping thread identifiers to the topmost stack frame currently active
+in that thread at the time the function is called.  (Contributed by
+Tim Peters.)
+
 \item The \class{TarFile} class in the \module{tarfile} module now has
 an \method{extractall()} method that extracts all members from the
 archive into the current working directory.  It's also possible to set
 a different directory as the extraction target, and to unpack only a
-subset of the archive's members.  
+subset of the archive's members.
 
-A tarfile's compression can be autodetected by 
-using the mode \code{'r|*'}.
+The compression used for a tarfile opened in stream mode can now be
+autodetected using the mode \code{'r|*'}.
 % patch 918101
 (Contributed by Lars Gust\"abel.)
 
@@ -1740,13 +1770,6 @@ browsers were added to the supported list such as Firefox, Opera,
 Konqueror, and elinks.  (Contributed by Oleg Broytmann and Georg
 Brandl.)
 % Patch #754022
-
-\item The standard library's XML-related package
-has been renamed to \module{xmlcore}.  The \module{xml} module will
-now import either the \module{xmlcore} or PyXML version of subpackages
-such as \module{xml.dom}.  The renaming means it will always be
-possible to import the standard library's XML support whether or not
-the PyXML package is installed.
 
 \item The \module{xmlrpclib} module now supports returning 
       \class{datetime} objects for the XML-RPC date type.  Supply 
@@ -2186,6 +2209,11 @@ Changes to Python's build process and to the C API include:
 
 \begin{itemize}
 
+\item The Python source tree was converted from CVS to Subversion, 
+in a complex migration procedure that was supervised and flawlessly
+carried out by Martin von~L\"owis.  The procedure was developed as
+\pep{347}.
+
 \item The largest change to the C API came from \pep{353},
 which modifies the interpreter to use a \ctype{Py_ssize_t} type
 definition instead of \ctype{int}.  See the earlier
@@ -2263,6 +2291,13 @@ Lundh at the NeedForSpeed sprint.)
 \var{dict})} can now accept a tuple of base classes as its \var{base}
 argument.  (Contributed by Georg Brandl.)
 
+\item The \cfunction{PyErr_Warn()} function for issuing warnings
+is now deprecated in favour of \cfunction{PyErr_WarnEx(category,
+message, stacklevel)} which lets you specify the number of stack
+frames separating this function and the caller.  A \var{stacklevel} of
+1 is the function calling \cfunction{PyErr_WarnEx()}, 2 is the
+function above that, and so forth.  (Added by Neal Norwitz.)
+
 \item The CPython interpreter is still written in C, but 
 the code can now be compiled with a {\Cpp} compiler without errors.  
 (Implemented by Anthony Baxter, Martin von~L\"owis, Skip Montanaro.)
@@ -2305,7 +2340,7 @@ be searched for.
 
 As usual, there were a bunch of other improvements and bugfixes
 scattered throughout the source tree.  A search through the SVN change
-logs finds there were XXX patches applied and YYY bugs fixed between
+logs finds there were 334 patches applied and 443 bugs fixed between
 Python 2.4 and 2.5.  Both figures are likely to be underestimates.
 
 Some of the more notable changes are:
@@ -2366,6 +2401,10 @@ was always a frame object.  Because of the \pep{342} changes
 described in section~\ref{pep-342}, it's now possible
 for \member{gi_frame} to be \code{None}.
 
+\item Library: the \module{csv} module is now stricter about multi-line quoted
+fields.  If your files contain newlines embedded within fields, the
+input should be split into lines in a manner which preserves the
+newline characters.
 
 \item Library: The \module{pickle} and \module{cPickle} modules no
 longer accept a return value of \code{None} from the
@@ -2379,10 +2418,6 @@ XML-RPC operations to a limited set of URL paths; the default is
 to allow only \code{'/'} and \code{'/RPC2'}.  Setting 
 \member{rpc_paths} to \code{None} or an empty tuple disables 
 this path checking.
-
-\item Library: the \module{xml} package has been renamed to \module{xmlcore}.
-The PyXML package will therefore be \module{xml}, and the Python
-distribution's code will always be accessible as \module{xmlcore}.
 
 \item C API: Many functions now use \ctype{Py_ssize_t} 
 instead of \ctype{int} to allow processing more data on 64-bit
@@ -2406,8 +2441,10 @@ freed with the corresponding family's \cfunction{*_Free()} function.
 
 The author would like to thank the following people for offering
 suggestions, corrections and assistance with various drafts of this
-article: Nick Coghlan, Phillip J. Eby, Ralf W. Grosse-Kunstleve, Kent
-Johnson, Martin von~L\"owis, Fredrik Lundh, Gustavo Niemeyer, James
-Pryor, Mike Rovner, Scott Weikart, Barry Warsaw, Thomas Wouters.
+article: Nick Coghlan, Phillip J. Eby, Lars Gust\"abel, Raymond Hettinger, Ralf
+W. Grosse-Kunstleve, Kent Johnson, Martin von~L\"owis, Fredrik Lundh,
+Andrew McNamara, Skip Montanaro,
+Gustavo Niemeyer, James Pryor, Mike Rovner, Scott Weikart, Barry
+Warsaw, Thomas Wouters.
 
 \end{document}
