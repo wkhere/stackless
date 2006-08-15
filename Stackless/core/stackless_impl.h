@@ -110,7 +110,7 @@ PyAPI_FUNC(struct _frame *) slp_ensure_new_frame(struct _frame *f);
 
 PyAPI_DATA(PyTypeObject) PyGen_Type;
 PyAPI_FUNC(PyObject *) PyGenerator_New(struct _frame *f);
-PyAPI_FUNC(PyObject *) slp_gen_send_ex(PyObject *gen, PyObject *arg, int exc);
+PyAPI_FUNC(PyObject *) slp_gen_send_ex(PyGenObject *gen, PyObject *arg, int exc);
 #define PyGenerator_Check(op) PyObject_TypeCheck(op, &PyGen_Type)
 
 PyAPI_DATA(PyTypeObject) PyMethodDescr_Type;
