@@ -290,7 +290,8 @@ void slp_kill_tasks_with_stacks(PyThreadState *ts)
 
 	while (1) {
 		PyCStackObject *csfirst = slp_cstack_chain, *cs;
-		PyTaskletObject *t;
+		PyTaskletObject *t, *task;
+		PyTaskletObject **chain;
 
 		if (csfirst == NULL)
 			break;
@@ -310,6 +311,26 @@ void slp_kill_tasks_with_stacks(PyThreadState *ts)
 		t = cs->task;
 		Py_INCREF(t);
 
+		/* We need to ensure that the tasklet 't' is in the scheduler
+		 * tasklet chain before this one (our main).  This ensures
+		 * that this one is directly switched back to after 't' is
+		 * killed.  The reason we do this this is because if another
+		 * tasklet is switched to, this is of course it being scheduled
+		 * and run.  Why we do not need to do this for tasklets blocked
+		 * on channels is that when they are scheduled to be run and
+		 * killed, they will be implicitly placed before this one,
+		 * leaving it to run next.
+		 */
+		if (!t->flags.blocked) {
+			chain = &t;
+			SLP_CHAIN_REMOVE(PyTaskletObject, chain, task, next, prev)
+			chain = &cs->tstate->st.main;
+			task = cs->task;
+			SLP_CHAIN_INSERT(PyTaskletObject, chain, task, next, prev);
+			cs->tstate->st.current = cs->tstate->st.main;
+			t = cs->task;
+		}
+
 		PyTasklet_Kill(t);
 		PyErr_Clear();
 
@@ -325,6 +346,8 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 {
 	PyThreadState *ts = PyThreadState_Get();
 
+	if (ts->st.main == NULL)
+		initialize_main_and_current();
 	slp_kill_tasks_with_stacks(allthreads ? NULL : ts);
 }
 
