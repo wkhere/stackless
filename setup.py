@@ -902,8 +902,12 @@ class PyBuildExt(build_ext):
 
         # Curses support, requiring the System V version of curses, often
         # provided by the ncurses library.
+        panel_library = 'panel'
         if (self.compiler.find_library_file(lib_dirs, 'ncursesw')):
             curses_libs = ['ncursesw']
+            # Bug 1464056: If _curses.so links with ncursesw,
+            # _curses_panel.so must link with panelw.
+            panel_library = 'panelw'
             exts.append( Extension('_curses', ['_cursesmodule.c'],
                                    libraries = curses_libs) )
         elif (self.compiler.find_library_file(lib_dirs, 'ncurses')):
@@ -926,9 +930,9 @@ class PyBuildExt(build_ext):
 
         # If the curses module is enabled, check for the panel module
         if (module_enabled(exts, '_curses') and
-            self.compiler.find_library_file(lib_dirs, 'panel')):
+            self.compiler.find_library_file(lib_dirs, panel_library)):
             exts.append( Extension('_curses_panel', ['_curses_panel.c'],
-                                   libraries = ['panel'] + curses_libs) )
+                                   libraries = [panel_library] + curses_libs) )
 
 
         # Andrew Kuchling's zlib module.  Note that some versions of zlib
@@ -1349,6 +1353,7 @@ class PyBuildExt(build_ext):
         self.use_system_libffi = False
         include_dirs = []
         extra_compile_args = []
+        extra_link_args = []
         sources = ['_ctypes/_ctypes.c',
                    '_ctypes/callbacks.c',
                    '_ctypes/callproc.c',
@@ -1363,9 +1368,21 @@ class PyBuildExt(build_ext):
 # XXX Is this still needed?
 ##            extra_link_args.extend(['-read_only_relocs', 'warning'])
 
+        elif sys.platform == 'sunos5':
+            # XXX This shouldn't be necessary; it appears that some
+            # of the assembler code is non-PIC (i.e. it has relocations
+            # when it shouldn't. The proper fix would be to rewrite
+            # the assembler code to be PIC.
+            # This only works with GCC; the Sun compiler likely refuses
+            # this option. If you want to compile ctypes with the Sun
+            # compiler, please research a proper solution, instead of
+            # finding some -z option for the Sun compiler.
+            extra_link_args.append('-mimpure-text')
+
         ext = Extension('_ctypes',
                         include_dirs=include_dirs,
                         extra_compile_args=extra_compile_args,
+                        extra_link_args=extra_link_args,
                         libraries=[],
                         sources=sources,
                         depends=depends)

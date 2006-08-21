@@ -104,8 +104,14 @@ PyClass_New(PyObject *bases, PyObject *dict, PyObject *name)
 	op->cl_name = name;
 	if (getattrstr == NULL) {
 		getattrstr = PyString_InternFromString("__getattr__");
+		if (getattrstr == NULL)
+			return NULL;
 		setattrstr = PyString_InternFromString("__setattr__");
+		if (setattrstr == NULL)
+			return NULL;
 		delattrstr = PyString_InternFromString("__delattr__");
+		if (delattrstr == NULL)
+			return NULL;
 	}
 	op->cl_getattr = class_lookup(op, getattrstr, &dummy);
 	op->cl_setattr = class_lookup(op, setattrstr, &dummy);
@@ -523,11 +529,14 @@ PyInstance_New(PyObject *klass, PyObject *arg, PyObject *kw)
 	PyObject *init;
 	static PyObject *initstr;
 
+	if (initstr == NULL) {
+		initstr = PyString_InternFromString("__init__");
+		if (initstr == NULL)
+			return NULL;
+	}
 	inst = (PyInstanceObject *) PyInstance_NewRaw(klass, NULL);
 	if (inst == NULL)
 		return NULL;
-	if (initstr == NULL)
-		initstr = PyString_InternFromString("__init__");
 	init = instance_getattr2(inst, initstr);
 	if (init == NULL) {
 		if (PyErr_Occurred()) {
@@ -613,9 +622,12 @@ instance_dealloc(register PyInstanceObject *inst)
 	/* Save the current exception, if any. */
 	PyErr_Fetch(&error_type, &error_value, &error_traceback);
 	/* Execute __del__ method, if any. */
-	if (delstr == NULL)
+	if (delstr == NULL) {
 		delstr = PyString_InternFromString("__del__");
-	if ((del = instance_getattr2(inst, delstr)) != NULL) {
+		if (delstr == NULL)
+			PyErr_WriteUnraisable((PyObject*)inst);
+	}
+	if (delstr && (del = instance_getattr2(inst, delstr)) != NULL) {
 		PyObject *res = PyEval_CallObject(del, (PyObject *)NULL);
 		if (res == NULL)
 			PyErr_WriteUnraisable(del);
@@ -841,8 +853,11 @@ instance_repr(PyInstanceObject *inst)
 	PyObject *res;
 	static PyObject *reprstr;
 
-	if (reprstr == NULL)
+	if (reprstr == NULL) {
 		reprstr = PyString_InternFromString("__repr__");
+		if (reprstr == NULL)
+			return NULL;
+	}
 	func = instance_getattr(inst, reprstr);
 	if (func == NULL) {
 		PyObject *classname, *mod;
@@ -877,8 +892,11 @@ instance_str(PyInstanceObject *inst)
 	PyObject *res;
 	static PyObject *strstr;
 
-	if (strstr == NULL)
+	if (strstr == NULL) {
 		strstr = PyString_InternFromString("__str__");
+		if (strstr == NULL)
+			return NULL;
+	}
 	func = instance_getattr(inst, strstr);
 	if (func == NULL) {
 		if (!PyErr_ExceptionMatches(PyExc_AttributeError))
@@ -899,8 +917,11 @@ instance_hash(PyInstanceObject *inst)
 	long outcome;
 	static PyObject *hashstr, *eqstr, *cmpstr;
 
-	if (hashstr == NULL)
+	if (hashstr == NULL) {
 		hashstr = PyString_InternFromString("__hash__");
+		if (hashstr == NULL)
+			return -1;
+	}
 	func = instance_getattr(inst, hashstr);
 	if (func == NULL) {
 		if (!PyErr_ExceptionMatches(PyExc_AttributeError))
@@ -909,15 +930,21 @@ instance_hash(PyInstanceObject *inst)
 		/* If there is no __eq__ and no __cmp__ method, we hash on the
 		   address.  If an __eq__ or __cmp__ method exists, there must
 		   be a __hash__. */
-		if (eqstr == NULL)
+		if (eqstr == NULL) {
 			eqstr = PyString_InternFromString("__eq__");
+			if (eqstr == NULL)
+				return -1;
+		}
 		func = instance_getattr(inst, eqstr);
 		if (func == NULL) {
 			if (!PyErr_ExceptionMatches(PyExc_AttributeError))
 				return -1;
 			PyErr_Clear();
-			if (cmpstr == NULL)
+			if (cmpstr == NULL) {
 				cmpstr = PyString_InternFromString("__cmp__");
+				if (cmpstr == NULL)
+					return -1;
+			}
 			func = instance_getattr(inst, cmpstr);
 			if (func == NULL) {
 				if (!PyErr_ExceptionMatches(
@@ -935,11 +962,9 @@ instance_hash(PyInstanceObject *inst)
 	Py_DECREF(func);
 	if (res == NULL)
 		return -1;
-	if (PyInt_Check(res)) {
-		outcome = PyInt_AsLong(res);
-		if (outcome == -1)
-			outcome = -2;
-	}
+	if (PyInt_Check(res) || PyLong_Check(res))
+		/* This already converts a -1 result to -2. */
+		outcome = res->ob_type->tp_hash(res);
 	else {
 		PyErr_SetString(PyExc_TypeError,
 				"__hash__() should return an int");
@@ -967,8 +992,11 @@ instance_length(PyInstanceObject *inst)
 	PyObject *res;
 	Py_ssize_t outcome;
 
-	if (lenstr == NULL)
+	if (lenstr == NULL) {
 		lenstr = PyString_InternFromString("__len__");
+		if (lenstr == NULL)
+			return -1;
+	}
 	func = instance_getattr(inst, lenstr);
 	if (func == NULL)
 		return -1;
@@ -977,24 +1005,25 @@ instance_length(PyInstanceObject *inst)
 	if (res == NULL)
 		return -1;
 	if (PyInt_Check(res)) {
-		Py_ssize_t temp = PyInt_AsSsize_t(res);
-		if (temp == -1 && PyErr_Occurred()) {
+		outcome = PyInt_AsSsize_t(res);
+		if (outcome == -1 && PyErr_Occurred()) {
 			Py_DECREF(res);
 			return -1;
 		}
-		outcome = (Py_ssize_t)temp;
-#if SIZEOF_SIZE_T < SIZEOF_LONG
+#if SIZEOF_SIZE_T < SIZEOF_INT
 		/* Overflow check -- range of PyInt is more than C int */
-		if (outcome != temp) {
+		if (outcome != (int)outcome) {
 			PyErr_SetString(PyExc_OverflowError,
 			 "__len__() should return 0 <= outcome < 2**31");
 			outcome = -1;
 		}
 		else
 #endif
-		if (outcome < 0)
+		if (outcome < 0) {
 			PyErr_SetString(PyExc_ValueError,
 					"__len__() should return >= 0");
+			outcome = -1;
+		}
 	}
 	else {
 		PyErr_SetString(PyExc_TypeError,
@@ -1012,8 +1041,11 @@ instance_subscript(PyInstanceObject *inst, PyObject *key)
 	PyObject *arg;
 	PyObject *res;
 
-	if (getitemstr == NULL)
+	if (getitemstr == NULL) {
 		getitemstr = PyString_InternFromString("__getitem__");
+		if (getitemstr == NULL)
+			return NULL;
+	}
 	func = instance_getattr(inst, getitemstr);
 	if (func == NULL)
 		return NULL;
@@ -1036,13 +1068,19 @@ instance_ass_subscript(PyInstanceObject *inst, PyObject *key, PyObject *value)
 	PyObject *res;
 
 	if (value == NULL) {
-		if (delitemstr == NULL)
+		if (delitemstr == NULL) {
 			delitemstr = PyString_InternFromString("__delitem__");
+			if (delitemstr == NULL)
+				return -1;
+		}
 		func = instance_getattr(inst, delitemstr);
 	}
 	else {
-		if (setitemstr == NULL)
+		if (setitemstr == NULL) {
 			setitemstr = PyString_InternFromString("__setitem__");
+			if (setitemstr == NULL)
+				return -1;
+		}
 		func = instance_getattr(inst, setitemstr);
 	}
 	if (func == NULL)
@@ -1075,8 +1113,11 @@ instance_item(PyInstanceObject *inst, Py_ssize_t i)
 {
 	PyObject *func, *res;
 
-	if (getitemstr == NULL)
+	if (getitemstr == NULL) {
 		getitemstr = PyString_InternFromString("__getitem__");
+		if (getitemstr == NULL)
+			return NULL;
+	}
 	func = instance_getattr(inst, getitemstr);
 	if (func == NULL)
 		return NULL;
@@ -1091,8 +1132,11 @@ instance_slice(PyInstanceObject *inst, Py_ssize_t i, Py_ssize_t j)
 	PyObject *func, *arg, *res;
 	static PyObject *getslicestr;
 
-	if (getslicestr == NULL)
+	if (getslicestr == NULL) {
 		getslicestr = PyString_InternFromString("__getslice__");
+		if (getslicestr == NULL)
+			return NULL;
+	}
 	func = instance_getattr(inst, getslicestr);
 
 	if (func == NULL) {
@@ -1100,8 +1144,11 @@ instance_slice(PyInstanceObject *inst, Py_ssize_t i, Py_ssize_t j)
 			return NULL;
 		PyErr_Clear();
 
-		if (getitemstr == NULL)
+		if (getitemstr == NULL) {
 			getitemstr = PyString_InternFromString("__getitem__");
+			if (getitemstr == NULL)
+				return NULL;
+		}
 		func = instance_getattr(inst, getitemstr);
 		if (func == NULL)
 			return NULL;
@@ -1125,13 +1172,19 @@ instance_ass_item(PyInstanceObject *inst, Py_ssize_t i, PyObject *item)
 	PyObject *func, *arg, *res;
 
 	if (item == NULL) {
-		if (delitemstr == NULL)
+		if (delitemstr == NULL) {
 			delitemstr = PyString_InternFromString("__delitem__");
+			if (delitemstr == NULL)
+				return -1;
+		}
 		func = instance_getattr(inst, delitemstr);
 	}
 	else {
-		if (setitemstr == NULL)
+		if (setitemstr == NULL) {
 			setitemstr = PyString_InternFromString("__setitem__");
+			if (setitemstr == NULL)
+				return -1;
+		}
 		func = instance_getattr(inst, setitemstr);
 	}
 	if (func == NULL)
@@ -1160,17 +1213,23 @@ instance_ass_slice(PyInstanceObject *inst, Py_ssize_t i, Py_ssize_t j, PyObject 
 	static PyObject *setslicestr, *delslicestr;
 
 	if (value == NULL) {
-		if (delslicestr == NULL)
+		if (delslicestr == NULL) {
 			delslicestr =
 				PyString_InternFromString("__delslice__");
+			if (delslicestr == NULL)
+				return -1;
+		}
 		func = instance_getattr(inst, delslicestr);
 		if (func == NULL) {
 			if (!PyErr_ExceptionMatches(PyExc_AttributeError))
 				return -1;
 			PyErr_Clear();
-			if (delitemstr == NULL)
+			if (delitemstr == NULL) {
 				delitemstr =
 				    PyString_InternFromString("__delitem__");
+				if (delitemstr == NULL)
+					return -1;
+			}
 			func = instance_getattr(inst, delitemstr);
 			if (func == NULL)
 				return -1;
@@ -1181,17 +1240,23 @@ instance_ass_slice(PyInstanceObject *inst, Py_ssize_t i, Py_ssize_t j, PyObject 
 			arg = Py_BuildValue("(nn)", i, j);
 	}
 	else {
-		if (setslicestr == NULL)
+		if (setslicestr == NULL) {
 			setslicestr =
 				PyString_InternFromString("__setslice__");
+			if (setslicestr == NULL)
+				return -1;
+		}
 		func = instance_getattr(inst, setslicestr);
 		if (func == NULL) {
 			if (!PyErr_ExceptionMatches(PyExc_AttributeError))
 				return -1;
 			PyErr_Clear();
-			if (setitemstr == NULL)
+			if (setitemstr == NULL) {
 				setitemstr =
 				    PyString_InternFromString("__setitem__");
+				if (setitemstr == NULL)
+					return -1;
+			}
 			func = instance_getattr(inst, setitemstr);
 			if (func == NULL)
 				return -1;
@@ -1464,7 +1529,8 @@ instance_coerce(PyObject **pv, PyObject **pw)
 #define UNARY(funcname, methodname) \
 static PyObject *funcname(PyInstanceObject *self) { \
 	static PyObject *o; \
-	if (o == NULL) o = PyString_InternFromString(methodname); \
+	if (o == NULL) { o = PyString_InternFromString(methodname); \
+			 if (o == NULL) return NULL; } \
 	return generic_unary_op(self, o); \
 }
 
@@ -1636,14 +1702,20 @@ instance_nonzero(PyInstanceObject *self)
 	long outcome;
 	static PyObject *nonzerostr;
 
-	if (nonzerostr == NULL)
+	if (nonzerostr == NULL) {
 		nonzerostr = PyString_InternFromString("__nonzero__");
+		if (nonzerostr == NULL)
+			return -1;
+	}
 	if ((func = instance_getattr(self, nonzerostr)) == NULL) {
 		if (!PyErr_ExceptionMatches(PyExc_AttributeError))
 			return -1;
 		PyErr_Clear();
-		if (lenstr == NULL)
+		if (lenstr == NULL) {
 			lenstr = PyString_InternFromString("__len__");
+			if (lenstr == NULL)
+				return -1;
+		}
 		if ((func = instance_getattr(self, lenstr)) == NULL) {
 			if (!PyErr_ExceptionMatches(PyExc_AttributeError))
 				return -1;
@@ -1673,40 +1745,28 @@ instance_nonzero(PyInstanceObject *self)
 	return outcome > 0;
 }
 
-static Py_ssize_t
+static PyObject *
 instance_index(PyInstanceObject *self)
 {
 	PyObject *func, *res;
-	Py_ssize_t outcome;
 	static PyObject *indexstr = NULL;
 
 	if (indexstr == NULL) {
 		indexstr = PyString_InternFromString("__index__");
 		if (indexstr == NULL)
-			return -1;
+			return NULL;
 	}	
 	if ((func = instance_getattr(self, indexstr)) == NULL) {
 		if (!PyErr_ExceptionMatches(PyExc_AttributeError))
-			return -1;
+			return NULL;
 		PyErr_Clear();
 		PyErr_SetString(PyExc_TypeError, 
 				"object cannot be interpreted as an index");
-		return -1;
+		return NULL;
 	}
 	res = PyEval_CallObject(func, (PyObject *)NULL);
 	Py_DECREF(func);
-	if (res == NULL)
-		return -1;
-	if (PyInt_Check(res) || PyLong_Check(res)) {
-		outcome = res->ob_type->tp_as_number->nb_index(res);
-	}
-	else {
-		PyErr_SetString(PyExc_TypeError, 
-				"__index__ must return an int or a long");
-		outcome = -1;
-	}
-	Py_DECREF(res);
-	return outcome;
+	return res;
 }
 
 
@@ -1937,8 +1997,11 @@ instance_iternext(PyInstanceObject *self)
 {
 	PyObject *func;
 
-	if (nextstr == NULL)
+	if (nextstr == NULL) {
 		nextstr = PyString_InternFromString("next");
+		if (nextstr == NULL)
+			return NULL;
+	}
 
 	if ((func = instance_getattr(self, nextstr)) != NULL) {
 		PyObject *res = PyEval_CallObject(func, (PyObject *)NULL);
@@ -2032,7 +2095,7 @@ static PyNumberMethods instance_as_number = {
 	instance_truediv,		/* nb_true_divide */
 	instance_ifloordiv,		/* nb_inplace_floor_divide */
 	instance_itruediv,		/* nb_inplace_true_divide */
-	(lenfunc)instance_index,	/* nb_index */
+	(unaryfunc)instance_index,	/* nb_index */
 };
 
 PyTypeObject PyInstance_Type = {

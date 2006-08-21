@@ -382,16 +382,7 @@ class CodeGenerator:
         self.set_lineno(node)
         for default in node.defaults:
             self.visit(default)
-        frees = gen.scope.get_free_vars()
-        if frees:
-            for name in frees:
-                self.emit('LOAD_CLOSURE', name)
-            self.emit('LOAD_CONST', gen)
-            self.emit('MAKE_CLOSURE', len(node.defaults))
-        else:
-            self.emit('LOAD_CONST', gen)
-            self.emit('MAKE_FUNCTION', len(node.defaults))
-
+        self._makeClosure(gen, len(node.defaults))
         for i in range(ndecorators):
             self.emit('CALL_FUNCTION', 1)
 
@@ -405,14 +396,7 @@ class CodeGenerator:
         for base in node.bases:
             self.visit(base)
         self.emit('BUILD_TUPLE', len(node.bases))
-        frees = gen.scope.get_free_vars()
-        for name in frees:
-            self.emit('LOAD_CLOSURE', name)
-        self.emit('LOAD_CONST', gen)
-        if frees:
-            self.emit('MAKE_CLOSURE', 0)
-        else:
-            self.emit('MAKE_FUNCTION', 0)
+        self._makeClosure(gen, 0)
         self.emit('CALL_FUNCTION', 0)
         self.emit('BUILD_CLASS')
         self.storeName(node.name)
@@ -644,22 +628,25 @@ class CodeGenerator:
         self.newBlock()
         self.emit('POP_TOP')
 
+    def _makeClosure(self, gen, args):
+        frees = gen.scope.get_free_vars()
+        if frees:
+            for name in frees:
+                self.emit('LOAD_CLOSURE', name)
+            self.emit('BUILD_TUPLE', len(frees))
+            self.emit('LOAD_CONST', gen)
+            self.emit('MAKE_CLOSURE', args)
+        else:
+            self.emit('LOAD_CONST', gen)
+            self.emit('MAKE_FUNCTION', args)
+
     def visitGenExpr(self, node):
         gen = GenExprCodeGenerator(node, self.scopes, self.class_name,
                                    self.get_module())
         walk(node.code, gen)
         gen.finish()
         self.set_lineno(node)
-        frees = gen.scope.get_free_vars()
-        if frees:
-            for name in frees:
-                self.emit('LOAD_CLOSURE', name)
-            self.emit('LOAD_CONST', gen)
-            self.emit('MAKE_CLOSURE', 0)
-        else:
-            self.emit('LOAD_CONST', gen)
-            self.emit('MAKE_FUNCTION', 0)
-
+        self._makeClosure(gen, 0)
         # precomputation of outmost iterable
         self.visit(node.code.quals[0].iter)
         self.emit('GET_ITER')
@@ -671,18 +658,19 @@ class CodeGenerator:
 
         stack = []
         for i, for_ in zip(range(len(node.quals)), node.quals):
-            start, anchor = self.visit(for_)
+            start, anchor, end = self.visit(for_)
             cont = None
             for if_ in for_.ifs:
                 if cont is None:
                     cont = self.newBlock()
                 self.visit(if_, cont)
-            stack.insert(0, (start, cont, anchor))
+            stack.insert(0, (start, cont, anchor, end))
 
         self.visit(node.expr)
         self.emit('YIELD_VALUE')
+        self.emit('POP_TOP')
 
-        for start, cont, anchor in stack:
+        for start, cont, anchor, end in stack:
             if cont:
                 skip_one = self.newBlock()
                 self.emit('JUMP_FORWARD', skip_one)
@@ -691,14 +679,22 @@ class CodeGenerator:
                 self.nextBlock(skip_one)
             self.emit('JUMP_ABSOLUTE', start)
             self.startBlock(anchor)
+            self.emit('POP_BLOCK')
+            self.setups.pop()
+            self.startBlock(end)
+
         self.emit('LOAD_CONST', None)
 
     def visitGenExprFor(self, node):
         start = self.newBlock()
         anchor = self.newBlock()
+        end = self.newBlock()
+
+        self.setups.push((LOOP, start))
+        self.emit('SETUP_LOOP', end)
 
         if node.is_outmost:
-            self.loadName('[outmost-iterable]')
+            self.loadName('.0')
         else:
             self.visit(node.iter)
             self.emit('GET_ITER')
@@ -708,7 +704,7 @@ class CodeGenerator:
         self.emit('FOR_ITER', anchor)
         self.nextBlock()
         self.visit(node.assign)
-        return start, anchor
+        return start, anchor, end
 
     def visitGenExprIf(self, node, branch):
         self.set_lineno(node, force=True)

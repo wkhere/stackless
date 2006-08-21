@@ -768,7 +768,7 @@ builtin_globals(PyObject *self)
 	PyObject *d;
 
 	d = PyEval_GetGlobals();
-	Py_INCREF(d);
+	Py_XINCREF(d);
 	return d;
 }
 
@@ -1199,7 +1199,7 @@ builtin_locals(PyObject *self)
 	PyObject *d;
 
 	d = PyEval_GetLocals();
-	Py_INCREF(d);
+	Py_XINCREF(d);
 	return d;
 }
 
@@ -1734,7 +1734,7 @@ builtin_raw_input(PyObject *self, PyObject *args)
 		if (PyFile_WriteString(" ", fout) != 0)
 			return NULL;
 	}
-	if (PyFile_Check(fin) && PyFile_Check(fout)
+	if (PyFile_AsFile(fin) && PyFile_AsFile(fout)
             && isatty(fileno(PyFile_AsFile(fin)))
             && isatty(fileno(PyFile_AsFile(fout)))) {
 		PyObject *po;

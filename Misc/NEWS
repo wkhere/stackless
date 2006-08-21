@@ -4,6 +4,173 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.5 release candidate 1?
+=============================================
+
+*Release date: 17-AUG-2006*
+
+Core and builtins
+-----------------
+
+- Unicode objects will no longer raise an exception when being
+  compared equal or unequal to a string and a UnicodeDecodeError
+  exception occurs, e.g. as result of a decoding failure.
+
+  Instead, the equal (==) and unequal (!=) comparison operators will
+  now issue a UnicodeWarning and interpret the two objects as
+  unequal. The UnicodeWarning can be filtered as desired using
+  the warning framework, e.g. silenced completely, turned into an
+  exception, logged, etc.
+
+  Note that compare operators other than equal and unequal will still
+  raise UnicodeDecodeError exceptions as they've always done.
+
+- Fix segfault when doing string formatting on subclasses of long.
+
+- Fix bug related to __len__ functions using values > 2**32 on 64-bit machines
+  with new-style classes.
+
+- Fix bug related to __len__ functions returning negative values with
+  classic classes.
+
+- Patch #1538606, Fix __index__() clipping.  There were some problems
+  discovered with the API and how integers that didn't fit into Py_ssize_t
+  were handled.  This patch attempts to provide enough alternatives
+  to effectively use __index__.
+
+- Bug #1536021: __hash__ may now return long int; the final hash
+  value is obtained by invoking hash on the long int.
+
+- Bug #1536786: buffer comparison could emit a RuntimeWarning.
+
+- Bug #1535165: fixed a segfault in input() and raw_input() when
+  sys.stdin is closed.
+
+- On Windows, the PyErr_Warn function is now exported from
+  the Python dll again.
+
+- Bug #1191458: tracing over for loops now produces a line event
+  on each iteration.  Fixing this problem required changing the .pyc
+  magic number.  This means that .pyc files generated before 2.5c1
+  will be regenerated.
+
+- Bug #1333982: string/number constants were inappropriately stored
+  in the byte code and co_consts even if they were not used, ie
+  immediately popped off the stack.
+
+- Fixed a reference-counting problem in property().
+
+
+Library
+-------
+
+- Fix a bug in the ``compiler`` package that caused invalid code to be
+  generated for generator expressions.
+
+- The distutils version has been changed to 2.5.0. The change to
+  keep it programmatically in sync with the Python version running
+  the code (introduced in 2.5b3) has been reverted. It will continue
+  to be maintained manually as static string literal.
+
+- If the Python part of a ctypes callback function returns None,
+  and this cannot be converted to the required C type, an exception is
+  printed with PyErr_WriteUnraisable.  Before this change, the C
+  callback returned arbitrary values to the calling code.
+
+- The __repr__ method of a NULL ctypes.py_object() no longer raises
+  an exception.
+
+- uuid.UUID now has a bytes_le attribute. This returns the UUID in 
+  little-endian byte order for Windows. In addition, uuid.py gained some
+  workarounds for clocks with low resolution, to stop the code yielding
+  duplicate UUIDs.
+
+- Patch #1540892: site.py Quitter() class attempts to close sys.stdin
+  before raising SystemExit, allowing IDLE to honor quit() and exit().
+
+- Bug #1224621: make tabnanny recognize IndentationErrors raised by tokenize.
+
+- Patch #1536071: trace.py should now find the full module name of a
+  file correctly even on Windows.
+
+- logging's atexit hook now runs even if the rest of the module has
+  already been cleaned up.
+
+- Bug #1112549, fix DoS attack on cgi.FieldStorage.
+
+- Bug #1531405, format_exception no longer raises an exception if
+  str(exception) raised an exception.
+
+- Fix a bug in the ``compiler`` package that caused invalid code to be
+  generated for nested functions.
+
+
+Extension Modules
+-----------------
+
+- Patch #1511317: don't crash on invalid hostname (alias) info.
+
+- Patch #1535500: fix segfault in BZ2File.writelines and make sure it
+  raises the correct exceptions.
+
+- Patch # 1536908: enable building ctypes on OpenBSD/AMD64.  The
+  '-no-stack-protector' compiler flag for OpenBSD has been removed.
+
+- Patch #1532975 was applied, which fixes Bug #1533481: ctypes now
+  uses the _as_parameter_ attribute when objects are passed to foreign
+  function calls.  The ctypes version number was changed to 1.0.1.
+
+- Bug #1530559, struct.pack raises TypeError where it used to convert.
+  Passing float arguments to struct.pack when integers are expected
+  now triggers a DeprecationWarning.
+
+
+Tests
+-----
+
+- test_socketserver should now work on cygwin and not fail sporadically
+  on other platforms.
+
+- test_mailbox should now work on cygwin versions 2006-08-10 and later.
+
+- Bug #1535182: really test the xreadlines() method of bz2 objects.
+
+- test_threading now skips testing alternate thread stack sizes on
+  platforms that don't support changing thread stack size.
+
+
+Documentation
+-------------
+
+- Patch #1534922: unittest docs were corrected and enhanced.
+
+
+Build
+-----
+
+- Bug #1535502, build _hashlib on Windows, and use masm assembler
+  code in OpenSSL.
+
+- Bug #1534738, win32 debug version of _msi should be _msi_d.pyd.
+
+- Bug #1530448, ctypes build failure on Solaris 10 was fixed.
+
+
+C API
+-----
+
+- New API for Unicode rich comparisons: PyUnicode_RichCompare()
+
+- Bug #1069160.  Internal correctness changes were made to
+  ``PyThreadState_SetAsyncExc()``.  A test case was added, and
+  the documentation was changed to state that the return value
+  is always 1 (normal) or 0 (if the specified thread wasn't found).
+
+
+Mac
+---
+
+
 What's New in Python 2.5 beta 3?
 ================================
 
@@ -12,7 +179,7 @@ What's New in Python 2.5 beta 3?
 Core and builtins
 -----------------
 
-- _PyWeakref_GetWeakrefCount() now returns a Py_ssize_t, it previously
+- _PyWeakref_GetWeakrefCount() now returns a Py_ssize_t; it previously
   returned a long (see PEP 353).
 
 - Bug #1515471: string.replace() accepts character buffers again.
@@ -51,10 +218,10 @@ Core and builtins
 
 - Bug #1520864: unpacking singleton tuples in a 'for' loop (for x, in) works
   again.  Fixing this problem required changing the .pyc magic number.
-  This means that .pyc files generated before 2.5c1 will be regenerated.
+  This means that .pyc files generated before 2.5b3 will be regenerated.
 
 - Bug #1524317:  Compiling Python ``--without-threads`` failed.
-  The Python core compiles again then, and, in a build without threads, the
+  The Python core compiles again, and, in a build without threads, the
   new ``sys._current_frames()`` returns a dictionary with one entry,
   mapping the faux "thread id" 0 to the current frame.
 
@@ -70,14 +237,14 @@ Library
 - os.urandom no longer masks unrelated exceptions like SystemExit or
   KeyboardInterrupt.
 
-- Bug #1525866: Don't copy directory stat times in 
+- Bug #1525866: Don't copy directory stat times in
   shutil.copytree on Windows
 
 - Bug #1002398: The documentation for os.path.sameopenfile now correctly
   refers to file descriptors, not file objects.
 
-- Rename of the xml package to xmlcore, and the import hackery done to
-  make it appear at both names, has been removed.  Bug #1511497,
+- The renaming of the xml package to xmlcore, and the import hackery done 
+  to make it appear at both names, has been removed.  Bug #1511497,
   #1513611, and probably others.
 
 - Bug #1441397: The compiler module now recognizes module and function
@@ -89,7 +256,7 @@ Library
   side effects from one test to the next affect outcomes.  ``DocTestFinder``
   has been changed to sort the list of tests it returns.
 
-- The distutils version has been changed to 2.5.0, and are now kept
+- The distutils version has been changed to 2.5.0, and is now kept
   in sync with sys.version_info[:3].
 
 - Bug #978833: Really close underlying socket in _socketobject.close.
@@ -203,7 +370,7 @@ Mac
 
 - Bug #1527397: PythonLauncher now launches scripts with the working directory
   set to the directory that contains the script instead of the user home
-  directory. That latter was an implementation accident and not what users 
+  directory. That latter was an implementation accident and not what users
   expect.
 
 
@@ -375,6 +542,7 @@ Documentation
 - Patch #1509163: MS Toolkit Compiler no longer available.
 
 - Patch #1504046: Add documentation for xml.etree.
+
 
 What's New in Python 2.5 beta 1?
 ================================

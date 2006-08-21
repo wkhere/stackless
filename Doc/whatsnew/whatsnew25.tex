@@ -3,10 +3,9 @@
 % $Id$
 
 % Fix XXX comments
-% Count up the patches and bugs
 
 \title{What's New in Python 2.5}
-\release{0.4}
+\release{1.0}
 \author{A.M. Kuchling}
 \authoraddress{\email{amk@amk.ca}}
 
@@ -39,11 +38,16 @@ improvements are worthwhile, but they're improvements to one specific
 language feature or another; none of them are broad modifications to
 Python's semantics.
 
+As well as the language and library additions, other improvements and
+bugfixes were made throughout the source tree.  A search through the
+SVN change logs finds there were 353 patches applied and 458 bugs
+fixed between Python 2.4 and 2.5.  (Both figures are likely to be
+underestimates.)  
+
 This article doesn't try to be a complete specification of the new
 features; instead changes are briefly introduced using helpful
 examples.  For full details, you should always refer to the
-documentation for Python 2.5.
-% XXX add hyperlink when the documentation becomes available online.
+documentation for Python 2.5 at \url{http://docs.python.org}.
 If you want to understand the complete implementation and design
 rationale, refer to the PEP for a particular new feature.
 
@@ -746,7 +750,6 @@ either committed, meaning that all the changes are written into the
 database, or rolled back, meaning that the changes are all discarded
 and the database is unchanged.  See any database textbook for more
 information.)
-% XXX find a shorter reference?
 
 Let's assume there's an object representing a database connection.
 Our goal will be to let the user write code like this:
@@ -1094,10 +1097,10 @@ print d[3], d[4]   # Prints 0, 0
 
 \item Both 8-bit and Unicode strings have new \method{partition(sep)} 
 and \method{rpartition(sep)} methods that simplify a common use case.
+
 The \method{find(S)} method is often used to get an index which is
 then used to slice the string and obtain the pieces that are before
 and after the separator.  
-
 \method{partition(sep)} condenses this
 pattern into a single method call that returns a 3-tuple containing
 the substring before the separator, the separator itself, and the
@@ -1159,6 +1162,15 @@ returned by the iterator is true; otherwise it will return
 all of the values returned by the iterator evaluate as true.
 (Suggested by Guido van~Rossum, and implemented by Raymond Hettinger.)
 
+\item The result of a class's \method{__hash__()} method can now 
+be either a long integer or a regular integer.  If a long integer is
+returned, the hash of that value is taken.  In earlier versions the
+hash value was required to be a regular integer, but in 2.5 the
+\function{id()} built-in was changed to always return non-negative
+numbers, and users often seem to use \code{id(self)} in
+\method{__hash__()} methods (though this is discouraged).
+% Bug #1536021
+
 \item ASCII is now the default encoding for modules.  It's now 
 a syntax error if a module contains string literals with 8-bit
 characters but doesn't have an encoding declaration.  In Python 2.4
@@ -1169,6 +1181,35 @@ a line like this near the top of the source file:
 \begin{verbatim}
 # -*- coding: latin1 -*-
 \end{verbatim}
+
+\item A new warning, \class{UnicodeWarning}, is triggered when 
+you attempt to compare a Unicode string and an 8-bit string 
+that can't be converted to Unicode using the default ASCII encoding.  
+The result of the comparison is false:
+
+\begin{verbatim}
+>>> chr(128) == unichr(128)   # Can't convert chr(128) to Unicode
+__main__:1: UnicodeWarning: Unicode equal comparison failed 
+  to convert both arguments to Unicode - interpreting them 
+  as being unequal
+False
+>>> chr(127) == unichr(127)   # chr(127) can be converted
+True
+\end{verbatim}
+
+Previously this would raise a \class{UnicodeDecodeError} exception,
+but in 2.5 this could result in puzzling problems when accessing a
+dictionary.  If you looked up \code{unichr(128)} and \code{chr(128)}
+was being used as a key, you'd get a \class{UnicodeDecodeError}
+exception.  Other changes in 2.5 resulted in this exception being
+raised instead of suppressed by the code in \file{dictobject.c} that
+implements dictionaries.
+
+Raising an exception for such a comparison is strictly correct, but
+the change might have broken code, so instead 
+\class{UnicodeWarning} was introduced.
+
+(Implemented by Marc-Andr\'e Lemburg.)
 
 \item One error that Python programmers sometimes make is forgetting
 to include an \file{__init__.py} module in a package directory.
@@ -1290,9 +1331,6 @@ they exist or not so that the interpreter makes fewer
 % Patch 921466
 
 \end{itemize}
-
-The net result of the 2.5 optimizations is that Python 2.5 runs the
-pystone benchmark around XXX\% faster than Python 2.4.
 
 
 %======================================================================
@@ -1488,6 +1526,29 @@ itertools.islice(iterable, s.start, s.stop, s.step)
 \end{verbatim}
 
 (Contributed by Raymond Hettinger.)
+
+\item The \function{format()} function in the \module{locale} module
+has been modified and two new functions were added,
+\function{format_string()} and \function{currency()}.
+
+The \function{format()} function's \var{val} parameter could
+previously be a string as long as no more than one \%char specifier
+appeared; now the parameter must be exactly one \%char specifier with
+no surrounding text.  An optional \var{monetary} parameter was also
+added which, if \code{True}, will use the locale's rules for
+formatting currency in placing a separator between groups of three
+digits.
+
+To format strings with multiple \%char specifiers, use the new
+\function{format_string()} function that works like \function{format()}
+but also supports mixing \%char specifiers with
+arbitrary text.
+
+A new \function{currency()} function was also added that formats a
+number according to the current locale's settings.
+
+(Contributed by Georg Brandl.)
+% Patch 1180296
 
 \item The \module{mailbox} module underwent a massive rewrite to add
 the capability to modify mailboxes in addition to reading them.  A new
@@ -2214,13 +2275,20 @@ in a complex migration procedure that was supervised and flawlessly
 carried out by Martin von~L\"owis.  The procedure was developed as
 \pep{347}.
 
+\item Coverity, a company that markets a source code analysis tool
+called Prevent, provided the results of their examination of the Python
+source code.  The analysis found about 60 bugs that 
+were quickly fixed.  Many of the bugs were refcounting problems, often
+occurring in error-handling code.  See
+\url{http://scan.coverity.com} for the statistics.
+
 \item The largest change to the C API came from \pep{353},
 which modifies the interpreter to use a \ctype{Py_ssize_t} type
 definition instead of \ctype{int}.  See the earlier
 section~\ref{pep-353} for a discussion of this change.
 
-\item The design of the bytecode compiler has changed a great deal, to
-no longer generate bytecode by traversing the parse tree.  Instead
+\item The design of the bytecode compiler has changed a great deal, 
+no longer generating bytecode by traversing the parse tree.  Instead
 the parse tree is converted to an abstract syntax tree (or AST), and it is 
 the abstract syntax tree that's traversed to produce the bytecode.
 
@@ -2261,6 +2329,32 @@ Grant Edwards, John Ehresman, Kurt Kaiser, Neal Norwitz, Tim Peters,
 Armin Rigo, and Neil Schemenauer, plus the participants in a number of
 AST sprints at conferences such as PyCon.
  
+\item Evan Jones's patch to obmalloc, first described in a talk
+at PyCon DC 2005, was applied.  Python 2.4 allocated small objects in
+256K-sized arenas, but never freed arenas.  With this patch, Python
+will free arenas when they're empty.  The net effect is that on some
+platforms, when you allocate many objects, Python's memory usage may
+actually drop when you delete them and the memory may be returned to
+the operating system.  (Implemented by Evan Jones, and reworked by Tim
+Peters.)
+
+Note that this change means extension modules must be more careful
+when allocating memory.  Python's API has many different
+functions for allocating memory that are grouped into families.  For
+example, \cfunction{PyMem_Malloc()}, \cfunction{PyMem_Realloc()}, and
+\cfunction{PyMem_Free()} are one family that allocates raw memory,
+while \cfunction{PyObject_Malloc()}, \cfunction{PyObject_Realloc()},
+and \cfunction{PyObject_Free()} are another family that's supposed to
+be used for creating Python objects.  
+
+Previously these different families all reduced to the platform's
+\cfunction{malloc()} and \cfunction{free()} functions.  This meant 
+it didn't matter if you got things wrong and allocated memory with the
+\cfunction{PyMem} function but freed it with the \cfunction{PyObject}
+function.  With 2.5's changes to obmalloc, these families now do different
+things and mismatches will probably result in a segfault.  You should
+carefully test your C extension modules with Python 2.5.
+
 \item The built-in set types now have an official C API.  Call
 \cfunction{PySet_New()} and \cfunction{PyFrozenSet_New()} to create a
 new set, \cfunction{PySet_Add()} and \cfunction{PySet_Discard()} to
@@ -2336,54 +2430,6 @@ be searched for.
 
 
 %======================================================================
-\section{Other Changes and Fixes \label{section-other}}
-
-As usual, there were a bunch of other improvements and bugfixes
-scattered throughout the source tree.  A search through the SVN change
-logs finds there were 334 patches applied and 443 bugs fixed between
-Python 2.4 and 2.5.  Both figures are likely to be underestimates.
-
-Some of the more notable changes are:
-
-\begin{itemize}
-
-\item Evan Jones's patch to obmalloc, first described in a talk
-at PyCon DC 2005, was applied.  Python 2.4 allocated small objects in
-256K-sized arenas, but never freed arenas.  With this patch, Python
-will free arenas when they're empty.  The net effect is that on some
-platforms, when you allocate many objects, Python's memory usage may
-actually drop when you delete them, and the memory may be returned to
-the operating system.  (Implemented by Evan Jones, and reworked by Tim
-Peters.)
-
-Note that this change means extension modules need to be more careful
-with how they allocate memory.  Python's API has many different
-functions for allocating memory that are grouped into families.  For
-example, \cfunction{PyMem_Malloc()}, \cfunction{PyMem_Realloc()}, and
-\cfunction{PyMem_Free()} are one family that allocates raw memory,
-while \cfunction{PyObject_Malloc()}, \cfunction{PyObject_Realloc()},
-and \cfunction{PyObject_Free()} are another family that's supposed to
-be used for creating Python objects.  
-
-Previously these different families all reduced to the platform's
-\cfunction{malloc()} and \cfunction{free()} functions.  This meant 
-it didn't matter if you got things wrong and allocated memory with the
-\cfunction{PyMem} function but freed it with the \cfunction{PyObject}
-function.  With the obmalloc change, these families now do different
-things, and mismatches will probably result in a segfault.  You should
-carefully test your C extension modules with Python 2.5.
-
-\item Coverity, a company that markets a source code analysis tool
-  called Prevent, provided the results of their examination of the Python
-  source code.  The analysis found about 60 bugs that 
-  were quickly fixed.  Many of the bugs were refcounting problems, often
-  occurring in error-handling code.  See
-  \url{http://scan.coverity.com} for the statistics.
-
-\end{itemize}
-
-
-%======================================================================
 \section{Porting to Python 2.5\label{porting}}
 
 This section lists previously described changes that may require
@@ -2401,10 +2447,21 @@ was always a frame object.  Because of the \pep{342} changes
 described in section~\ref{pep-342}, it's now possible
 for \member{gi_frame} to be \code{None}.
 
+\item A new warning, \class{UnicodeWarning}, is triggered when 
+you attempt to compare a Unicode string and an 8-bit string that can't
+be converted to Unicode using the default ASCII encoding.  Previously
+such comparisons would raise a \class{UnicodeDecodeError} exception.
+
 \item Library: the \module{csv} module is now stricter about multi-line quoted
 fields.  If your files contain newlines embedded within fields, the
 input should be split into lines in a manner which preserves the
 newline characters.
+
+\item Library: the \module{locale} module's 
+\function{format()} function's would previously 
+accept any string as long as no more than one \%char specifier
+appeared.  In Python 2.5, the argument must be exactly one \%char
+specifier with no surrounding text. 
 
 \item Library: The \module{pickle} and \module{cPickle} modules no
 longer accept a return value of \code{None} from the
@@ -2441,10 +2498,10 @@ freed with the corresponding family's \cfunction{*_Free()} function.
 
 The author would like to thank the following people for offering
 suggestions, corrections and assistance with various drafts of this
-article: Nick Coghlan, Phillip J. Eby, Lars Gust\"abel, Raymond Hettinger, Ralf
-W. Grosse-Kunstleve, Kent Johnson, Martin von~L\"owis, Fredrik Lundh,
-Andrew McNamara, Skip Montanaro,
-Gustavo Niemeyer, James Pryor, Mike Rovner, Scott Weikart, Barry
-Warsaw, Thomas Wouters.
+article: Georg Brandl, Nick Coghlan, Phillip J. Eby, Lars Gust\"abel,
+Raymond Hettinger, Ralf W. Grosse-Kunstleve, Kent Johnson, Iain Lowe,
+Martin von~L\"owis, Fredrik Lundh, Andrew McNamara, Skip Montanaro,
+Gustavo Niemeyer, Paul Prescod, James Pryor, Mike Rovner, Scott
+Weikart, Barry Warsaw, Thomas Wouters.
 
 \end{document}

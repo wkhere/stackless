@@ -2450,14 +2450,13 @@ PyDoc_STRVAR(list_doc,
 "list() -> new list\n"
 "list(sequence) -> new list initialized from sequence's items");
 
-#define HASINDEX(o) PyType_HasFeature((o)->ob_type, Py_TPFLAGS_HAVE_INDEX)
 
 static PyObject *
 list_subscript(PyListObject* self, PyObject* item)
 {
-	PyNumberMethods *nb = item->ob_type->tp_as_number;	
-	if (nb != NULL && HASINDEX(item) && nb->nb_index != NULL) {
-		Py_ssize_t i = nb->nb_index(item);
+	if (PyIndex_Check(item)) {
+		Py_ssize_t i;
+		i = PyNumber_AsSsize_t(item, PyExc_IndexError);
 		if (i == -1 && PyErr_Occurred())
 			return NULL;
 		if (i < 0)
@@ -2504,9 +2503,8 @@ list_subscript(PyListObject* self, PyObject* item)
 static int
 list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 {
-	PyNumberMethods *nb = item->ob_type->tp_as_number;
-	if (nb != NULL && HASINDEX(item) && nb->nb_index != NULL) {
-		Py_ssize_t i = nb->nb_index(item);
+	if (PyIndex_Check(item)) {
+		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
 		if (i == -1 && PyErr_Occurred())
 			return -1;
 		if (i < 0)
@@ -2541,6 +2539,10 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 
 			garbage = (PyObject**)
 				PyMem_MALLOC(slicelength*sizeof(PyObject*));
+			if (!garbage) {
+				PyErr_NoMemory();
+				return -1;
+			}
 
 			/* drawing pictures might help
 			   understand these for loops */
@@ -2589,9 +2591,9 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 			else {
 				seq = PySequence_Fast(value,
 					"must assign iterable to extended slice");
-				if (!seq)
-					return -1;
 			}
+			if (!seq)
+				return -1;
 
 			if (PySequence_Fast_GET_SIZE(seq) != slicelength) {
 				PyErr_Format(PyExc_ValueError,

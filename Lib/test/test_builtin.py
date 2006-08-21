@@ -640,6 +640,19 @@ class BuiltinTest(unittest.TestCase):
         def f(): pass
         self.assertRaises(TypeError, hash, [])
         self.assertRaises(TypeError, hash, {})
+        # Bug 1536021: Allow hash to return long objects
+        class X:
+            def __hash__(self):
+                return 2**100
+        self.assertEquals(type(hash(X())), int)
+        class Y(object):
+            def __hash__(self):
+                return 2**100
+        self.assertEquals(type(hash(Y())), int)
+        class Z(long):
+            def __hash__(self):
+                return self
+        self.assertEquals(hash(Z(42)), hash(42L))
 
     def test_hex(self):
         self.assertEqual(hex(16), '0x10')
@@ -1432,6 +1445,14 @@ class BuiltinTest(unittest.TestCase):
             self.assertEqual(input('testing\n'), 2)
             self.assertEqual(raw_input(), 'The quick brown fox jumps over the lazy dog.')
             self.assertEqual(raw_input('testing\n'), 'Dear John')
+
+            # SF 1535165: don't segfault on closed stdin
+            # sys.stdout must be a regular file for triggering
+            sys.stdout = savestdout
+            sys.stdin.close()
+            self.assertRaises(ValueError, input)
+
+            sys.stdout = BitBucket()
             sys.stdin = cStringIO.StringIO("NULL\0")
             self.assertRaises(TypeError, input, 42, 42)
             sys.stdin = cStringIO.StringIO("    'whitespace'")

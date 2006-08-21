@@ -46,3 +46,4 @@ BaseException
            +-- UserWarning
            +-- FutureWarning
 	   +-- ImportWarning
+	   +-- UnicodeWarning
