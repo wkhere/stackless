@@ -621,6 +621,9 @@ testall:	all platform
 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
 
+teststackless:	all platform
+		pushd Stackless/unittests; $(RUNSHARED) ../../$(BUILDPYTHON) -E -tt runAll.py; popd
+
 #  Run the unitests for both architectures in a Universal build on OSX
 #  Must be run on an Intel box.
 testuniversal:	all platform
