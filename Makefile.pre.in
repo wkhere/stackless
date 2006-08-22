@@ -584,6 +584,9 @@ testall:	all platform
 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
 
+teststackless:	all platform
+		pushd Stackless/unittests; $(RUNSHARED) ../../$(BUILDPYTHON) -E -tt runAll.py; popd
+
 # Like testall, but with a single pass only
 buildbottest:	all platform
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall -rw
