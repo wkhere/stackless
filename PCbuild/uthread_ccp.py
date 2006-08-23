@@ -606,10 +606,10 @@ def PoolHelper(queue):
         try:
             while 1:
                 BeNice()
-                ctx, callingContext, func, loc, args, keywords = queue.get()
+                ctx, callingContext, func, args, keywords = queue.get()
                 if (queue.channel.balance >= 0):
                     new(PoolHelper, queue).context = "uthread::PoolHelper"
-                SetLocalStorage(loc)
+                #SetLocalStorage(loc)
                 # _tmpctx = t.PushTimer(ctx)
                 try:
                     apply( func, args, keywords )
@@ -617,8 +617,8 @@ def PoolHelper(queue):
                     ctx                 = None
                     callingContext      = None
                     func                = None
-                    t.localStorage      = {}
-                    loc                 = None
+                    #t.localStorage      = {}
+                    #loc                 = None
                     args                = None
                     keywords            = None
                     # t.PopTimer(_tmpctx)
@@ -671,11 +671,11 @@ def PoolWithoutTheStars(ctx,func,args,keywords,unsafe=0,worker=0):
         __uthread__queue__ = Queue()
         for i in range(60):
             new(PoolHelper, __uthread__queue__).context = "uthread::PoolHelper"
-    if unsafe or worker:
-        st = None
-    else:
-        st = copy.copy(GetLocalStorage())
-    __uthread__queue__.non_blocking_put( (str(ctx), callingContext, func, st, args, keywords,) )
+    #if unsafe or worker:
+    #    st = None
+    #else:
+    #    st = copy.copy(GetLocalStorage())
+    __uthread__queue__.non_blocking_put( (str(ctx), callingContext, func, args, keywords,) )
     return None
 
 def Pool(ctx,func,*args,**keywords):
