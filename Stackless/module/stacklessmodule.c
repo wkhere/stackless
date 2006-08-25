@@ -216,9 +216,9 @@ PyStackless_RunWatchdog(long timeout)
 	int err;
 
 	if (ts->st.main == NULL) return PyStackless_RunWatchdog_M(timeout);
-	if (ts != slp_initial_tstate || ts->st.current != ts->st.main)
+	if (ts->st.current != ts->st.main)
 		RUNTIME_ERROR(
-		    "run() must be run from the main thread's main tasklet.",
+		    "run() must be run from the main tasklet.",
 		    NULL);
 	
 	if (timeout <= 0) {

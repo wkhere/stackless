@@ -1,7 +1,7 @@
 from zipfile import *
 import os, sys, md5
 
-exp_path = r"..\..\binaries-pc"
+exp_path = r"..\..\..\binaries-pc"
 
 prog = """
 import md5
