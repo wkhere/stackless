@@ -591,6 +591,7 @@ PYTHON_HEADERS= \
 		Stackless/platf/switch_ppc_unix.h \
 		Stackless/platf/switch_s390_unix.h \
 		Stackless/platf/switch_sparc_sun_gcc.h \
+		Stackless/platf/switch_arm32_gcc.h \
 		Stackless/platf/switch_x86_msvc.h \
 		Stackless/platf/switch_x86_unix.h \
 		pyconfig.h
