@@ -1,7 +1,7 @@
 from zipfile import *
 import os, sys, md5
 
-exp_path = r"..\..\..\binaries-pc"
+exp_path = r"..\..\binaries-pc"
 
 prog = """
 import md5
@@ -16,7 +16,7 @@ raw_input("press enter to continue")
 fileList = [ r"..\Lib\copy_reg.py", r"..\Lib\pickle.py" ]
 for debug in ("", "_d"):
     for suffix in ("dll", "lib", "exp"):
-        fileList.append("python24%s.%s" % (debug, suffix))
+        fileList.append("python25%s.%s" % (debug, suffix))
 
 pathBySuffix = {
     "dll":  "",
@@ -26,7 +26,7 @@ pathBySuffix = {
 }
 
 
-zname = os.path.join(exp_path, "python24.zip")
+zname = os.path.join(exp_path, "python-trunk.zip")
 z = ZipFile(zname, "w", ZIP_DEFLATED)
 for fileName in fileList:
     if os.path.exists(fileName):
