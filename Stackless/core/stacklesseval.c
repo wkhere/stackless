@@ -321,7 +321,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *ts)
 		 * killed, they will be implicitly placed before this one,
 		 * leaving it to run next.
 		 */
-		if (!t->flags.blocked) {
+		if (!t->flags.blocked && t != cs->tstate->st.main) {
 			chain = &t;
 			SLP_CHAIN_REMOVE(PyTaskletObject, chain, task, next, prev)
 			chain = &cs->tstate->st.main;
