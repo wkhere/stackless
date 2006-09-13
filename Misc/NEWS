@@ -4,6 +4,125 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.5 release candidate 2?
+=============================================
+
+*Release date: 12-SEP-2006*
+
+Core and builtins
+-----------------
+
+- Make _PyGILState_NoteThreadState() static, it was not used anywhere
+  outside of pystate.c and should not be necessary.
+
+- Bug #1551432: Exceptions do not define an explicit __unicode__ method.  This
+  allows calling unicode() on exceptions classes directly to succeed.
+
+- Bug #1542051: Exceptions now correctly call PyObject_GC_UnTrack.
+  Also make sure that every exception class has __module__ set to
+  'exceptions'.
+
+- Bug #1550983: emit better error messages for erroneous relative
+  imports (if not in package and if beyond toplevel package).
+
+- Overflow checking code in integer division ran afoul of new gcc
+  optimizations.  Changed to be more standard-conforming.
+
+- Patch #1541585: fix buffer overrun when performing repr() on
+  a unicode string in a build with wide unicode (UCS-4) support.
+
+- Patch #1546288: fix seg fault in dict_equal due to ref counting bug.
+
+- The return tuple from str.rpartition(sep) is (tail, sep, head) where
+  head is the original string if sep was not found.
+
+- Bug #1520864: unpacking singleton tuples in list comprehensions and
+  generator expressions (x for x, in ... ) works again.  Fixing this problem
+  required changing the .pyc magic number.  This means that .pyc files
+  generated before 2.5c2 will be regenerated.
+
+
+Library
+-------
+
+- Reverted patch #1504333 because it introduced an infinite loop.
+
+- Patch #1553314: Fix the inspect.py slowdown that was hurting IPython & SAGE
+  by adding smarter caching in inspect.getmodule().
+
+- Fix missing import of the types module in logging.config.
+
+- Patch #1550886: Fix decimal module context management implementation
+  to match the localcontext() example from PEP 343.
+
+- Bug #1541863: uuid.uuid1 failed to generate unique identifiers
+  on systems with low clock resolution.
+
+- Bug #1543303, patch #1543897: remove NUL padding from tarfiles.
+
+- Bug #1531862: Do not close standard file descriptors in subprocess.
+
+
+Extension Modules
+-----------------
+
+- Fix bugs in ctypes:
+  - anonymous structure fields that have a bit-width specified did not work
+  - cast function did not accept c_char_p or c_wchar_p instances as first arg
+
+- Bug #1551427: fix a wrong NULL pointer check in the win32 version
+  of os.urandom().
+
+- Bug #1548092: fix curses.tparm seg fault on invalid input.
+
+- Bug #1550714: fix SystemError from itertools.tee on negative value for n.
+
+- Fixed a few bugs on cjkcodecs:
+  - gbk and gb18030 codec now handle U+30FB KATAKANA MIDDLE DOT correctly.
+  - iso2022_jp_2 codec now encodes into G0 for KS X 1001, GB2312
+    codepoints to conform the standard.
+  - iso2022_jp_3 and iso2022_jp_2004 codec can encode JIS X 0213:2
+    codepoints now.
+
+Tests
+-----
+
+- Fix bsddb test_basics.test06_Transactions to check the version
+  number properly.
+
+
+Documentation
+-------------
+
+- Bug #1541682: Fix example in the "Refcount details" API docs.
+  Additionally, remove a faulty example showing PySequence_SetItem applied
+  to a newly created list object and add notes that this isn't a good idea.
+
+
+Tools
+-----
+
+- Bug #1546372: Fixed small bugglet in pybench that caused a missing
+  file not to get reported properly.
+
+
+Build
+-----
+
+- Patch #1540470, for OpenBSD 4.0.
+
+- Patch #1545507: Exclude ctypes package in Win64 MSI file.
+
+- Fix OpenSSL debug build process.
+
+
+C API
+-----
+
+- Bug #1542693: remove semi-colon at end of PyImport_ImportModuleEx macro
+  so it can be used as an expression.
+
+
 What's New in Python 2.5 release candidate 1?
 =============================================
 
@@ -11,6 +130,10 @@ What's New in Python 2.5 release candidate 1?
 
 Core and builtins
 -----------------
+
+- Fix infinite recursion when subclassing long and overriding __hash__.
+
+- Fix concatenation (+=) of long strings.
 
 - Unicode objects will no longer raise an exception when being
   compared equal or unequal to a string and a UnicodeDecodeError
@@ -80,7 +203,7 @@ Library
 - The __repr__ method of a NULL ctypes.py_object() no longer raises
   an exception.
 
-- uuid.UUID now has a bytes_le attribute. This returns the UUID in 
+- uuid.UUID now has a bytes_le attribute. This returns the UUID in
   little-endian byte order for Windows. In addition, uuid.py gained some
   workarounds for clocks with low resolution, to stop the code yielding
   duplicate UUIDs.
@@ -107,6 +230,8 @@ Library
 
 Extension Modules
 -----------------
+
+- Ignore data that arrives before the opening start tag in C etree.
 
 - Patch #1511317: don't crash on invalid hostname (alias) info.
 
@@ -165,10 +290,6 @@ C API
   ``PyThreadState_SetAsyncExc()``.  A test case was added, and
   the documentation was changed to state that the return value
   is always 1 (normal) or 0 (if the specified thread wasn't found).
-
-
-Mac
----
 
 
 What's New in Python 2.5 beta 3?
@@ -243,7 +364,7 @@ Library
 - Bug #1002398: The documentation for os.path.sameopenfile now correctly
   refers to file descriptors, not file objects.
 
-- The renaming of the xml package to xmlcore, and the import hackery done 
+- The renaming of the xml package to xmlcore, and the import hackery done
   to make it appear at both names, has been removed.  Bug #1511497,
   #1513611, and probably others.
 
@@ -261,8 +382,8 @@ Library
 
 - Bug #978833: Really close underlying socket in _socketobject.close.
 
-- Bug #1459963: urllib and urllib2 now normalize HTTP header names correctly
-  with title().
+- Bug #1459963: urllib and urllib2 now normalize HTTP header names with
+  title().
 
 - Patch #1525766: In pkgutil.walk_packages, correctly pass the onerror callback
   to recursive calls and call it with the failing package name.

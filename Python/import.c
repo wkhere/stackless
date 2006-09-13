@@ -64,9 +64,10 @@ extern time_t PyOS_GetLastModificationTime(char *, FILE *);
        Python 2.5b3: 62111 (fix wrong code: x += yield)
        Python 2.5c1: 62121 (fix wrong lnotab with for loops and
        			    storing constants that should have been removed)
+       Python 2.5c2: 62131 (fix wrong code: for x, in ... in listcomp/genexp)
 .
 */
-#define MAGIC (62121 | ((long)'\r'<<16) | ((long)'\n'<<24))
+#define MAGIC (62131 | ((long)'\r'<<16) | ((long)'\n'<<24))
 
 /* Magic word as global; note that _PyImport_Init() can change the
    value of this global to accommodate for alterations of how the
@@ -795,14 +796,16 @@ parse_source_module(const char *pathname, FILE *fp)
 {
 	PyCodeObject *co = NULL;
 	mod_ty mod;
-        PyArena *arena = PyArena_New();
+	PyArena *arena = PyArena_New();
+	if (arena == NULL)
+		return NULL;
 
 	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0, 0, 
 				   NULL, arena);
 	if (mod) {
 		co = PyAST_Compile(mod, pathname, NULL, arena);
 	}
-        PyArena_Free(arena);
+	PyArena_Free(arena);
 	return co;
 }
 
@@ -2113,7 +2116,7 @@ get_parent(PyObject *globals, char *buf, Py_ssize_t *p_buflen, int level)
 		size_t len;
 		if (lastdot == NULL && level > 0) {
 			PyErr_SetString(PyExc_ValueError,
-					"Relative importpath too deep");
+				"Attempted relative import in non-package");
 			return NULL;
 		}
 		if (lastdot == NULL)
@@ -2132,7 +2135,8 @@ get_parent(PyObject *globals, char *buf, Py_ssize_t *p_buflen, int level)
 		char *dot = strrchr(buf, '.');
 		if (dot == NULL) {
 			PyErr_SetString(PyExc_ValueError,
-					"Relative importpath too deep");
+				"Attempted relative import beyond "
+				"toplevel package");
 			return NULL;
 		}
 		*dot = '\0';
