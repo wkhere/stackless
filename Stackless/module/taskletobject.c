@@ -79,8 +79,12 @@ kill_finally (PyObject *ob)
 	PyTaskletObject *self = (PyTaskletObject *) ob;
 	int is_mine = ts == self->cstate->tstate;
 
-	/* this could happen if we have a refcount bug, so catch it here. */
+	/* this could happen if we have a refcount bug, so catch it here.
 	assert(self != ts->st.current);
+	It also gets triggered on interpreter exit when we kill the tasks
+	with stacks (PyStackless_kill_tasks_with_stacks) and there is no
+	way to differentiate that case.. so it just gets commented out.
+	*/
 
 	self->flags.is_zombie = 1;
 	while (self->f.frame != NULL) {
@@ -103,6 +107,7 @@ tasklet_clear(PyTaskletObject *t)
 		Py_XDECREF(_hold); \
 	}
 
+	/* if (slp_get_frame(t) != NULL) */
 	if (t->f.frame != NULL)
 		kill_finally((PyObject *) t);
 	TASKLET_SETVAL(t, Py_None); /* always non-zero */
