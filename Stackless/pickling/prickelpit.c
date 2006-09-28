@@ -1376,8 +1376,8 @@ static int init_methodtype(void)
 typedef struct {
 	PyObject_HEAD
 	PyDictObject *di_dict; /* Set to NULL when iterator is exhausted */
-	int di_used;
-	int di_pos;
+	Py_ssize_t di_used;
+	Py_ssize_t di_pos;
 	binaryfunc di_select;
 } dictiterobject;
 
@@ -1393,7 +1393,7 @@ static PyObject *
 dictiterkey_reduce(dictiterobject *di)
 {
     PyObject *tup, *list, *key;
-    int i;
+    Py_ssize_t i;
 
     list = PyList_New(0);
     if (list == NULL)
@@ -1433,7 +1433,7 @@ static PyObject *
 dictitervalue_reduce(dictiterobject *di)
 {
     PyObject *tup, *list, *value;
-    int i;
+    Py_ssize_t i;
 
     list = PyList_New(0);
     if (list == NULL)
@@ -1473,7 +1473,7 @@ static PyObject *
 dictiteritem_reduce(dictiterobject *di)
 {
     PyObject *tup, *list, *key, *value, *res;
-    int i;
+    Py_ssize_t i;
 
     list = PyList_New(0);
     if (list == NULL)
@@ -1579,7 +1579,7 @@ static PyObject *
 setiter_reduce(setiterobject *it)
 {
     PyObject *list, *set, *elem;
-    int i;
+    Py_ssize_t i;
 
     list = PyList_New(0);
     if (list == NULL)
