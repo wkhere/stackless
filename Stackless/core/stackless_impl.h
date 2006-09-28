@@ -356,7 +356,7 @@ PyAPI_FUNC(PyObject *) slp_schedule_task(PyTaskletObject *prev,
 					 PyTaskletObject *next,
 					 int stackless);
 
-PyAPI_FUNC(int) initialize_main_and_current();
+PyAPI_FUNC(int) initialize_main_and_current(void);
 
 /* setting the tasklet's tempval, optimized for no change */
 

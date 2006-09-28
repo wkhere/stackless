@@ -41,7 +41,7 @@ find_size(PyObject * bases, int size)
 }
 
 static PyObject *
-builddict(char *modulename, char *doc)
+builddict(const char *modulename, const char *doc)
 {
 	return Py_BuildValue("{s:s,s:s,s:[]}",
 			     "__module__", modulename,
@@ -145,7 +145,7 @@ flextype_new(PyTypeObject *meta, PyObject *args, PyObject *kwds)
 
 
 static PyTypeObject *
-type_clone(PyTypeObject *meta, PyTypeObject *base, char *typename, PyObject *dict,
+type_clone(PyTypeObject *meta, PyTypeObject *base, const char *typename, PyObject *dict,
 	   size_t type_size, PyCMethodDef *ml)
 {
         PyObject *args = Py_BuildValue("(s(O)O)", typename, base, dict);
@@ -171,7 +171,7 @@ type_clone(PyTypeObject *meta, PyTypeObject *base, char *typename, PyObject *dic
 }
 
 static PyTypeObject *
-make_meta(char *modulename, char *type_name, size_t type_size)
+make_meta(const char *modulename, const char *type_name, size_t type_size)
 {
 	char metaname[200];
 	PyObject *dict;
@@ -189,8 +189,8 @@ make_meta(char *modulename, char *type_name, size_t type_size)
 }
 
 PyTypeObject * PyFlexType_Build( char *modulename,
-				 char *type_name,
-				 char *doc,
+				 const char *type_name,
+				 const char *doc,
 				 PyTypeObject *base,
 				 size_t type_size,
 				 PyCMethodDef *ml )
