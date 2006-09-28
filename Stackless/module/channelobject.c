@@ -693,7 +693,7 @@ channel_getiter(PyObject *self)
  */
 
 static char channel_send_sequence__doc__[] =
-"channel.send_sequence(seq) -- sed a stream of values\n\
+"channel.send_sequence(seq) -- send a stream of values\n\
 over the channel. Combined with a generator, this is\n\
 a very efficient way to build fast pipes.";
 
@@ -825,7 +825,7 @@ channel_send_sequence(PyChannelObject *self, PyObject *v)
 {
 	STACKLESS_GETARG();
 	PyThreadState *ts = PyThreadState_GET();
-	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
+	/*unused: PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;*/
 	PyObject *it;
 	PyCFrameObject *f;
 
@@ -981,7 +981,7 @@ channel_methods[] = {
 	{"__setstate__",	(PCF)channel_setstate,	    METH_O,
 	 channel_setstate__doc__},
 	{"send_sequence",   (PCF)channel_send_sequence,	  METH_OS,
-	 channel_send__doc__},
+	 channel_send_sequence__doc__},
 	{NULL,		    NULL}             /* sentinel */
 };
 
