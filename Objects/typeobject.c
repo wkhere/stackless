@@ -1725,12 +1725,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 
 		/* Are slots allowed? */
 		nslots = PyTuple_GET_SIZE(slots);
-#ifdef STACKLESS
-		if (nslots > 0 && base->tp_itemsize != 0 && !PyType_Check(base)) {
-			/* for the special case of meta types, allow slots */
-#else
 		if (nslots > 0 && base->tp_itemsize != 0) {
-#endif
 			PyErr_Format(PyExc_TypeError,
 				     "nonempty __slots__ "
 				     "not supported for subtype of '%s'",
