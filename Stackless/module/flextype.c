@@ -188,7 +188,7 @@ make_meta(const char *modulename, const char *type_name, size_t type_size)
 	return meta;
 }
 
-PyTypeObject * PyFlexType_Build( char *modulename,
+PyTypeObject * PyFlexType_Build( const char *modulename,
 				 const char *type_name,
 				 const char *doc,
 				 PyTypeObject *base,
@@ -231,4 +231,5 @@ init_flextype(void)
 	PyFlexType_TypePtr = type;
 	return 0;
 }
+
 
