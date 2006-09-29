@@ -83,6 +83,11 @@ AC_ARG_ENABLE(universalsdk,
 ])
 AC_SUBST(UNIVERSALSDK)
 
+AC_ARG_ENABLE(stacklessfewerregisters,
+	AC_HELP_STRING(--enable-stacklessfewerregisters, save fewer registers building c-stack switching),
+[STACKLESS_FRHACK=1],[ STACKLESS_FRHACK=0 ])
+AC_SUBST(STACKLESS_FRHACK)
+
 dnl quadrigraphs "@<:@" and "@:>@" produce "[" and "]" in the output
 AC_ARG_ENABLE(framework,
               AC_HELP_STRING(--enable-framework@<:@=INSTALLDIR@:>@, Build (MacOSX|Darwin) framework),
@@ -814,6 +819,7 @@ yes)
     then
       BASECFLAGS="$BASECFLAGS -fno-strict-aliasing"
     fi
+    BASECFLAGS="${BASECFLAGS} -DSTACKLESS_FRHACK=${STACKLESS_FRHACK}"
     case $ac_sys_system in
 	SCO_SV*)
 	    BASECFLAGS="$BASECFLAGS -m486 -DSCO5"

@@ -31,10 +31,14 @@ static int
 slp_switch(void)
 {
 	register int *stackref, stsizediff;
+#if STACKLESS_FRHACK
+	__asm__ volatile ("" : : : "esi", "edi");
+#else
 	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+#endif
 	__asm__ ("movl %%esp, %0" : "=g" (stackref));
 	{
-		SLP_SAVE_STATE(stackref, stsizediff);
+ 		SLP_SAVE_STATE(stackref, stsizediff);
 		__asm__ volatile (
 		    "addl %0, %%esp\n"
 		    "addl %0, %%ebp\n"
@@ -44,8 +48,13 @@ slp_switch(void)
 		SLP_RESTORE_STATE();
 		return 0;
 	}
+#if STACKLESS_FRHACK
+	__asm__ volatile ("" : : : "esi", "edi");
+#else
 	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+#endif
 }
+
 
 #endif
 
