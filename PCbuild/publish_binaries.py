@@ -23,6 +23,7 @@ pathBySuffix = {
     "lib":  "libs/",
     "exp":  "libs/",
     "py":   "Lib/",
+    "txt":  "Lib/test/",
 }
 
 
