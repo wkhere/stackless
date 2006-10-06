@@ -55,9 +55,9 @@ PyAPI_DATA(PyTypeObject *) PyFlexType_TypePtr;
 
 /* build a new type and its meta-type */
 
-PyAPI_FUNC(PyTypeObject *) PyFlexType_Build( char *modulename,
-					     char *type_name,
-					     char *doc,
+PyAPI_FUNC(PyTypeObject *) PyFlexType_Build( const char *modulename,
+					     const char *type_name,
+					     const char *doc,
 					     PyTypeObject *base,
 					     size_t type_size,
 					     PyCMethodDef *ml );

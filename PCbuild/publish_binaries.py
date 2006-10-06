@@ -13,7 +13,7 @@ print ("matched", "NOT MATCHED!!") [received != expected]
 raw_input("press enter to continue")
 """
 
-fileList = [ r"..\Lib\copy_reg.py", r"..\Lib\pickle.py" ]
+fileList = [ r"..\Lib\copy_reg.py", r"..\Lib\pickle.py", r"..\Lib\platform.py", r"..\Lib\test\exception_hierarchy.txt" ]
 for debug in ("", "_d"):
     for suffix in ("dll", "lib", "exp"):
         fileList.append("python25%s.%s" % (debug, suffix))
@@ -23,6 +23,7 @@ pathBySuffix = {
     "lib":  "libs/",
     "exp":  "libs/",
     "py":   "Lib/",
+    "txt":  "Lib/test/",
 }
 
 

@@ -1020,7 +1020,7 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 }
 
 /* defined in pythonrun.c */
-extern void PyStackless_HandleSystemExit();
+extern void PyStackless_HandleSystemExit(void);
 
 static PyObject *
 tasklet_end(PyObject *retval)

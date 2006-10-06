@@ -28,7 +28,7 @@ static PyTaskletObject *_prev;
     intptr_t stsizeb; \
 	stackref += STACK_MAGIC; \
 	if (_cstprev != NULL) { \
-        if (slp_cstack_new(_cstprev, stackref, _prev) == NULL) __return(-1); \
+        if (slp_cstack_new(_cstprev, (intptr_t *)stackref, _prev) == NULL) __return(-1); \
 		stsizeb = slp_cstack_save(*_cstprev); \
 	} \
 	else \
@@ -168,7 +168,7 @@ slp_transfer_return(PyCStackObject *cst)
 	\
 	stackref += STACK_MAGIC; \
 	if (_cstprev != NULL) { \
-		if (slp_cstack_new(_cstprev, stackref, _prev) == NULL) \
+		if (slp_cstack_new(_cstprev, (intptr_t*)stackref, _prev) == NULL) \
 			return -1; \
 		stsizeb = slp_cstack_save(*_cstprev); \
 	} \
