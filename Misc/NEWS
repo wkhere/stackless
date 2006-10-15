@@ -4,6 +4,236 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.6 alpha 1?
+=================================
+
+*Release date: XX-XXX-200X*
+
+Core and builtins
+-----------------
+
+- Update the peephole optimizer to remove more dead code (jumps after returns)
+  and inline unconditional jumps to returns.
+
+- Bug #1545497: when given an explicit base, int() did ignore NULs
+  embedded in the string to convert.
+
+- Bug #1569998: break inside a try statement (outside a loop) is now
+  recognized and rejected.
+
+- list.pop(x) accepts any object x following the __index__ protocol.
+
+- Fix some leftovers from the conversion from int to Py_ssize_t
+  (relevant to strings and sequences of more than 2**31 items).
+
+- A number of places, including integer negation and absolute value,
+  were fixed to not rely on undefined behaviour of the C compiler
+  anymore.
+
+- Bug #1566800: make sure that EnvironmentError can be called with any
+  number of arguments, as was the case in Python 2.4.
+
+- Patch #1567691: super() and new.instancemethod() now don't accept
+  keyword arguments any more (previously they accepted them, but didn't
+  use them).
+
+- Fix a bug in the parser's future statement handling that led to "with"
+  not being recognized as a keyword after, e.g., this statement:
+  from __future__ import division, with_statement
+
+- Bug #1557232: fix seg fault with def f((((x)))) and def f(((x),)).
+
+- Fix %zd string formatting on Mac OS X so it prints negative numbers.
+
+- Allow exception instances to be directly sliced again.
+
+- Bug #1551432: Exceptions do not define an explicit __unicode__ method.  This
+  allows calling unicode() on exceptions classes directly to succeed.
+
+- Make _PyGILState_NoteThreadState() static, it was not used anywhere
+  outside of pystate.c and should not be necessary.
+
+- Bug #1542051: Exceptions now correctly call PyObject_GC_UnTrack.
+  Also make sure that every exception class has __module__ set to
+  'exceptions'.
+
+- Bug #1550983: emit better error messages for erroneous relative
+  imports (if not in package and if beyond toplevel package).
+
+- Overflow checking code in integer division ran afoul of new gcc
+  optimizations.  Changed to be more standard-conforming.
+
+- Patch #1542451: disallow continue anywhere under a finally.
+
+- Patch #1546288: fix seg fault in dict_equal due to ref counting bug.
+
+- The return tuple from str.rpartition(sep) is (tail, sep, head) where
+  head is the original string if sep was not found.
+
+- Bug #1520864: unpacking singleton tuples in list comprehensions and
+  generator expressions (x for x, in ... ) works again.  Fixing this problem
+  required changing the .pyc magic number.  This means that .pyc files
+  generated before 2.5c2 will be regenerated.
+
+- with and as are now keywords.
+
+
+Library
+-------
+
+- Bug #813342: Start the IDLE subprocess with -Qnew if the parent
+  is started with that option.
+
+- Bug #1565150: Fix subsecond processing for os.utime on Windows.
+
+- Support for MSVC 8 was added to bdist_wininst.
+
+- Bug #1446043: correctly raise a LookupError if an encoding name given
+  to encodings.search_function() contains a dot.
+
+- Bug #1560617: in pyclbr, return full module name not only for classes,
+  but also for functions.
+
+- Bug #1457823: cgi.(Sv)FormContentDict's constructor now takes
+  keep_blank_values and strict_parsing keyword arguments.
+
+- Bug #1566602: correct failure of posixpath unittest when $HOME ends
+  with a slash.
+
+- Bug #1565661: in webbrowser, split() the command for the default
+  GNOME browser in case it is a command with args.
+
+- Made the error message for time.strptime when the data data and format do
+  match be more clear.
+
+- Fix a bug in traceback.format_exception_only() that led to an error
+  being raised when print_exc() was called without an exception set.
+  In version 2.4, this printed "None", restored that behavior.
+
+- Make webbrowser.BackgroundBrowser usable in Windows (it wasn't because
+  the close_fds arg to subprocess.Popen is not supported).
+
+- Reverted patch #1504333 to sgmllib because it introduced an infinite loop.
+
+- Patch #1553314: Fix the inspect.py slowdown that was hurting IPython & SAGE
+  by adding smarter caching in inspect.getmodule()
+
+- Fix missing import of the types module in logging.config.
+
+- Patch #1550886: Fix decimal module context management implementation
+  to match the localcontext() example from PEP 343.
+
+- Bug #1545341: The 'classifier' keyword argument to the Distutils setup() 
+  function now accepts tuples as well as lists.
+
+- Bug #1541863: uuid.uuid1 failed to generate unique identifiers
+  on systems with low clock resolution.
+
+- Bug #1531862: Do not close standard file descriptors in subprocess.
+
+- fixed a bug with bsddb.DB.stat: the flags and txn keyword arguments
+  were transposed.
+
+Extension Modules
+-----------------
+
+- Bug #1567666: Emulate GetFileAttributesExA for Win95.
+
+- Patch #1576166: Support os.utime for directories on Windows NT+.
+
+- Bug #1548891: The cStringIO.StringIO() constructor now encodes unicode
+  arguments with the system default encoding just like the write()
+  method does, instead of converting it to a raw buffer.
+
+- Patch #1572724: fix typo ('=' instead of '==') in _msi.c.
+
+- Bug #1572832: fix a bug in ISO-2022 codecs which may cause segfault
+  when encoding non-BMP unicode characters.
+
+- Bug #1556784: allow format strings longer than 127 characters in
+  datetime's strftime function.
+
+- Fix itertools.count(n) to work with negative numbers again.
+
+- RLIMIT_SBSIZE was added to the resource module where available.
+
+- Bug #1551427: fix a wrong NULL pointer check in the win32 version
+  of os.urandom().
+
+- Bug #1548092: fix curses.tparm seg fault on invalid input.
+
+- Bug #1550714: fix SystemError from itertools.tee on negative value for n.
+
+- Fixed a few bugs on cjkcodecs:
+  - gbk and gb18030 codec now handle U+30FB KATAKANA MIDDLE DOT correctly.
+  - iso2022_jp_2 codec now encodes into G0 for KS X 1001, GB2312
+    codepoints to conform the standard.
+  - iso2022_jp_3 and iso2022_jp_2004 codec can encode JIS X 0213:2
+    codepoints now.
+
+- Bug #1552726: in readline.c, avoid repeatedly polling in interactive
+  mode by only placing a timeout on the select() if an input hook has
+  been defined.  This prevents an interactive Python from waking up 10
+  times per second.  Patch by Richard Boulton.
+
+
+Tests
+-----
+
+- Converted test_imp to use unittest.
+
+- Fix bsddb test_basics.test06_Transactions to check the version
+  number properly.
+
+
+Documentation
+-------------
+
+- Bug #1565919: document set types in the Language Reference.
+
+- Bug #1546052: clarify that PyString_FromString(AndSize) copies the
+  string pointed to by its parameter.
+
+- Bug #1566663: remove obsolete example from datetime docs.
+
+- Bug #1541682: Fix example in the "Refcount details" API docs.
+  Additionally, remove a faulty example showing PySequence_SetItem applied
+  to a newly created list object and add notes that this isn't a good idea.
+
+
+Tools
+-----
+
+- Make auto-generated python.vim file list built-ins and exceptions in
+  alphatbetical order.  Makes output more deterministic and easier to tell if
+  the file is stale or not.
+
+- Bug #1546372: Fixed small bugglet in pybench that caused a missing
+  file not to get reported properly.
+
+
+Build
+-----
+
+- Patch #1576954: Update VC6 build directory; remove redundant
+  files in VC7.
+
+- Bug #1568842: Fix test for uintptr_t.
+
+- Patch #1540470, for OpenBSD 4.0.
+
+
+C API
+-----
+
+- Bug #1542693: remove semi-colon at end of PyImport_ImportModuleEx macro
+  so it can be used as an expression.
+
+
+Mac
+---
+
+
 What's New in Python 2.5 release candidate 1?
 =============================================
 
@@ -80,7 +310,7 @@ Library
 - The __repr__ method of a NULL ctypes.py_object() no longer raises
   an exception.
 
-- uuid.UUID now has a bytes_le attribute. This returns the UUID in 
+- uuid.UUID now has a bytes_le attribute. This returns the UUID in
   little-endian byte order for Windows. In addition, uuid.py gained some
   workarounds for clocks with low resolution, to stop the code yielding
   duplicate UUIDs.
@@ -167,10 +397,6 @@ C API
   is always 1 (normal) or 0 (if the specified thread wasn't found).
 
 
-Mac
----
-
-
 What's New in Python 2.5 beta 3?
 ================================
 
@@ -243,7 +469,7 @@ Library
 - Bug #1002398: The documentation for os.path.sameopenfile now correctly
   refers to file descriptors, not file objects.
 
-- The renaming of the xml package to xmlcore, and the import hackery done 
+- The renaming of the xml package to xmlcore, and the import hackery done
   to make it appear at both names, has been removed.  Bug #1511497,
   #1513611, and probably others.
 
@@ -261,8 +487,8 @@ Library
 
 - Bug #978833: Really close underlying socket in _socketobject.close.
 
-- Bug #1459963: urllib and urllib2 now normalize HTTP header names correctly
-  with title().
+- Bug #1459963: urllib and urllib2 now normalize HTTP header names with
+  title().
 
 - Patch #1525766: In pkgutil.walk_packages, correctly pass the onerror callback
   to recursive calls and call it with the failing package name.

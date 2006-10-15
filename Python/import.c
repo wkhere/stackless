@@ -64,9 +64,11 @@ extern time_t PyOS_GetLastModificationTime(char *, FILE *);
        Python 2.5b3: 62111 (fix wrong code: x += yield)
        Python 2.5c1: 62121 (fix wrong lnotab with for loops and
        			    storing constants that should have been removed)
+       Python 2.5c2: 62131 (fix wrong code: for x, in ... in listcomp/genexp)
+       Python 2.6a0: 62141 (peephole optimizations)
 .
 */
-#define MAGIC (62121 | ((long)'\r'<<16) | ((long)'\n'<<24))
+#define MAGIC (62141 | ((long)'\r'<<16) | ((long)'\n'<<24))
 
 /* Magic word as global; note that _PyImport_Init() can change the
    value of this global to accommodate for alterations of how the
@@ -795,14 +797,16 @@ parse_source_module(const char *pathname, FILE *fp)
 {
 	PyCodeObject *co = NULL;
 	mod_ty mod;
-        PyArena *arena = PyArena_New();
+	PyArena *arena = PyArena_New();
+	if (arena == NULL)
+		return NULL;
 
 	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0, 0, 
 				   NULL, arena);
 	if (mod) {
 		co = PyAST_Compile(mod, pathname, NULL, arena);
 	}
-        PyArena_Free(arena);
+	PyArena_Free(arena);
 	return co;
 }
 
@@ -1026,7 +1030,7 @@ is_builtin(char *name)
 
 /* Return an importer object for a sys.path/pkg.__path__ item 'p',
    possibly by fetching it from the path_importer_cache dict. If it
-   wasn't yet cached, traverse path_hooks until it a hook is found
+   wasn't yet cached, traverse path_hooks until a hook is found
    that can handle the path item. Return None if no hook could;
    this tells our caller it should fall back to the builtin
    import mechanism. Cache the result in path_importer_cache.
@@ -1798,7 +1802,7 @@ load_module(char *name, FILE *fp, char *buf, int type, PyObject *loader)
 
 
 /* Initialize a built-in module.
-   Return 1 for succes, 0 if the module is not found, and -1 with
+   Return 1 for success, 0 if the module is not found, and -1 with
    an exception set if the initialization failed. */
 
 static int
@@ -2113,7 +2117,7 @@ get_parent(PyObject *globals, char *buf, Py_ssize_t *p_buflen, int level)
 		size_t len;
 		if (lastdot == NULL && level > 0) {
 			PyErr_SetString(PyExc_ValueError,
-					"Relative importpath too deep");
+				"Attempted relative import in non-package");
 			return NULL;
 		}
 		if (lastdot == NULL)
@@ -2132,7 +2136,8 @@ get_parent(PyObject *globals, char *buf, Py_ssize_t *p_buflen, int level)
 		char *dot = strrchr(buf, '.');
 		if (dot == NULL) {
 			PyErr_SetString(PyExc_ValueError,
-					"Relative importpath too deep");
+				"Attempted relative import beyond "
+				"toplevel package");
 			return NULL;
 		}
 		*dot = '\0';

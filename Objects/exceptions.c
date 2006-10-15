@@ -81,6 +81,7 @@ BaseException_clear(PyBaseExceptionObject *self)
 static void
 BaseException_dealloc(PyBaseExceptionObject *self)
 {
+    _PyObject_GC_UNTRACK(self);
     BaseException_clear(self);
     self->ob_type->tp_free((PyObject *)self);
 }
@@ -174,27 +175,10 @@ BaseException_setstate(PyObject *self, PyObject *state)
     Py_RETURN_NONE;
 }
 
-#ifdef Py_USING_UNICODE
-/* while this method generates fairly uninspired output, it a least
- * guarantees that we can display exceptions that have unicode attributes
- */
-static PyObject *
-BaseException_unicode(PyBaseExceptionObject *self)
-{
-    if (PyTuple_GET_SIZE(self->args) == 0)
-        return PyUnicode_FromUnicode(NULL, 0);
-    if (PyTuple_GET_SIZE(self->args) == 1)
-        return PyObject_Unicode(PyTuple_GET_ITEM(self->args, 0));
-    return PyObject_Unicode(self->args);
-}
-#endif /* Py_USING_UNICODE */
 
 static PyMethodDef BaseException_methods[] = {
    {"__reduce__", (PyCFunction)BaseException_reduce, METH_NOARGS },
    {"__setstate__", (PyCFunction)BaseException_setstate, METH_O },
-#ifdef Py_USING_UNICODE
-   {"__unicode__", (PyCFunction)BaseException_unicode, METH_NOARGS },
-#endif
    {NULL, NULL, 0, NULL},
 };
 
@@ -206,12 +190,19 @@ BaseException_getitem(PyBaseExceptionObject *self, Py_ssize_t index)
     return PySequence_GetItem(self->args, index);
 }
 
+static PyObject *
+BaseException_getslice(PyBaseExceptionObject *self,
+			Py_ssize_t start, Py_ssize_t stop)
+{
+    return PySequence_GetSlice(self->args, start, stop);
+}
+
 static PySequenceMethods BaseException_as_sequence = {
     0,                      /* sq_length; */
     0,                      /* sq_concat; */
     0,                      /* sq_repeat; */
     (ssizeargfunc)BaseException_getitem,  /* sq_item; */
-    0,                      /* sq_slice; */
+    (ssizessizeargfunc)BaseException_getslice,  /* sq_slice; */
     0,                      /* sq_ass_item; */
     0,                      /* sq_ass_slice; */
     0,                      /* sq_contains; */
@@ -455,6 +446,7 @@ SystemExit_clear(PySystemExitObject *self)
 static void
 SystemExit_dealloc(PySystemExitObject *self)
 {
+    _PyObject_GC_UNTRACK(self);
     SystemExit_clear(self);
     self->ob_type->tp_free((PyObject *)self);
 }
@@ -526,7 +518,7 @@ EnvironmentError_init(PyEnvironmentErrorObject *self, PyObject *args,
     if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
         return -1;
 
-    if (PyTuple_GET_SIZE(args) <= 1) {
+    if (PyTuple_GET_SIZE(args) <= 1 || PyTuple_GET_SIZE(args) > 3) {
         return 0;
     }
 
@@ -570,6 +562,7 @@ EnvironmentError_clear(PyEnvironmentErrorObject *self)
 static void
 EnvironmentError_dealloc(PyEnvironmentErrorObject *self)
 {
+    _PyObject_GC_UNTRACK(self);
     EnvironmentError_clear(self);
     self->ob_type->tp_free((PyObject *)self);
 }
@@ -768,6 +761,7 @@ WindowsError_clear(PyWindowsErrorObject *self)
 static void
 WindowsError_dealloc(PyWindowsErrorObject *self)
 {
+    _PyObject_GC_UNTRACK(self);
     WindowsError_clear(self);
     self->ob_type->tp_free((PyObject *)self);
 }
@@ -1043,6 +1037,7 @@ SyntaxError_clear(PySyntaxErrorObject *self)
 static void
 SyntaxError_dealloc(PySyntaxErrorObject *self)
 {
+    _PyObject_GC_UNTRACK(self);
     SyntaxError_clear(self);
     self->ob_type->tp_free((PyObject *)self);
 }
@@ -1559,6 +1554,7 @@ UnicodeError_clear(PyUnicodeErrorObject *self)
 static void
 UnicodeError_dealloc(PyUnicodeErrorObject *self)
 {
+    _PyObject_GC_UNTRACK(self);
     UnicodeError_clear(self);
     self->ob_type->tp_free((PyObject *)self);
 }
@@ -1645,7 +1641,7 @@ UnicodeEncodeError_str(PyObject *self)
 static PyTypeObject _PyExc_UnicodeEncodeError = {
     PyObject_HEAD_INIT(NULL)
     0,
-    "UnicodeEncodeError",
+    EXC_MODULE_NAME "UnicodeEncodeError",
     sizeof(PyUnicodeErrorObject), 0,
     (destructor)UnicodeError_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     (reprfunc)UnicodeEncodeError_str, 0, 0, 0,
@@ -1820,7 +1816,7 @@ static PyTypeObject _PyExc_UnicodeTranslateError = {
     (destructor)UnicodeError_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     (reprfunc)UnicodeTranslateError_str, 0, 0, 0,
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
-    PyDoc_STR("Unicode decoding error."), (traverseproc)UnicodeError_traverse,
+    PyDoc_STR("Unicode translation error."), (traverseproc)UnicodeError_traverse,
     (inquiry)UnicodeError_clear, 0, 0, 0, 0, 0, UnicodeError_members,
     0, &_PyExc_UnicodeError, 0, 0, 0, offsetof(PyUnicodeErrorObject, dict),
     (initproc)UnicodeTranslateError_init, 0, BaseException_new,

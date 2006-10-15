@@ -144,7 +144,7 @@ def nti(s):
     # There are two possible encodings for a number field, see
     # itn() below.
     if s[0] != chr(0200):
-        n = int(s.rstrip(NUL) or "0", 8)
+        n = int(s.rstrip(NUL + " ") or "0", 8)
     else:
         n = 0L
         for i in xrange(len(s) - 1):
@@ -411,9 +411,6 @@ class _Stream:
             self.buf += self.cmp.flush()
 
         if self.mode == "w" and self.buf:
-            blocks, remainder = divmod(len(self.buf), self.bufsize)
-            if remainder > 0:
-                self.buf += NUL * (self.bufsize - remainder)
             self.fileobj.write(self.buf)
             self.buf = ""
             if self.comptype == "gz":

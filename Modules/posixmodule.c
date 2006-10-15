@@ -792,7 +792,7 @@ time_t_to_FILE_TIME(int time_in, int nsec_in, FILETIME *out_ptr)
 	/* XXX endianness */
 	__int64 out;
 	out = time_in + secs_between_epochs;
-	out = out * 10000000 + nsec_in;
+	out = out * 10000000 + nsec_in / 100;
 	memcpy(out_ptr, &out, sizeof(out));
 }
 
@@ -828,6 +828,106 @@ attribute_data_to_stat(WIN32_FILE_ATTRIBUTE_DATA *info, struct win32_stat *resul
 	return 0;
 }
 
+/* Emulate GetFileAttributesEx[AW] on Windows 95 */
+static int checked = 0;
+static BOOL (CALLBACK *gfaxa)(LPCSTR, GET_FILEEX_INFO_LEVELS, LPVOID);
+static BOOL (CALLBACK *gfaxw)(LPCWSTR, GET_FILEEX_INFO_LEVELS, LPVOID);
+static void
+check_gfax()
+{
+	HINSTANCE hKernel32;
+	if (checked)
+	    return;
+	checked = 1;
+	hKernel32 = GetModuleHandle("KERNEL32");
+	*(FARPROC*)&gfaxa = GetProcAddress(hKernel32, "GetFileAttributesExA");
+	*(FARPROC*)&gfaxw = GetProcAddress(hKernel32, "GetFileAttributesExW");
+}
+
+static BOOL WINAPI
+Py_GetFileAttributesExA(LPCSTR pszFile, 
+		       GET_FILEEX_INFO_LEVELS level,
+                       LPVOID pv)
+{
+	BOOL result;
+	HANDLE hFindFile;
+	WIN32_FIND_DATAA FileData;
+	LPWIN32_FILE_ATTRIBUTE_DATA pfad = pv;
+	/* First try to use the system's implementation, if that is
+	   available and either succeeds to gives an error other than
+	   that it isn't implemented. */
+	check_gfax();
+	if (gfaxa) {
+		result = gfaxa(pszFile, level, pv);
+		if (result || GetLastError() != ERROR_CALL_NOT_IMPLEMENTED)
+			return result;
+	}
+	/* It's either not present, or not implemented.
+	   Emulate using FindFirstFile. */
+	if (level != GetFileExInfoStandard) {
+		SetLastError(ERROR_INVALID_PARAMETER);
+		return FALSE;
+	}
+	/* Use GetFileAttributes to validate that the file name
+	   does not contain wildcards (which FindFirstFile would
+	   accept). */
+	if (GetFileAttributesA(pszFile) == 0xFFFFFFFF)
+		return FALSE;
+	hFindFile = FindFirstFileA(pszFile, &FileData);
+	if (hFindFile == INVALID_HANDLE_VALUE)
+		return FALSE;
+	FindClose(hFindFile);
+	pfad->dwFileAttributes = FileData.dwFileAttributes;
+	pfad->ftCreationTime   = FileData.ftCreationTime;
+	pfad->ftLastAccessTime = FileData.ftLastAccessTime;
+	pfad->ftLastWriteTime  = FileData.ftLastWriteTime;
+	pfad->nFileSizeHigh    = FileData.nFileSizeHigh;
+	pfad->nFileSizeLow     = FileData.nFileSizeLow;
+	return TRUE;
+}
+
+static BOOL WINAPI
+Py_GetFileAttributesExW(LPCWSTR pszFile, 
+		       GET_FILEEX_INFO_LEVELS level,
+                       LPVOID pv)
+{
+	BOOL result;
+	HANDLE hFindFile;
+	WIN32_FIND_DATAW FileData;
+	LPWIN32_FILE_ATTRIBUTE_DATA pfad = pv;
+	/* First try to use the system's implementation, if that is
+	   available and either succeeds to gives an error other than
+	   that it isn't implemented. */
+	check_gfax();
+	if (gfaxa) {
+		result = gfaxw(pszFile, level, pv);
+		if (result || GetLastError() != ERROR_CALL_NOT_IMPLEMENTED)
+			return result;
+	}
+	/* It's either not present, or not implemented.
+	   Emulate using FindFirstFile. */
+	if (level != GetFileExInfoStandard) {
+		SetLastError(ERROR_INVALID_PARAMETER);
+		return FALSE;
+	}
+	/* Use GetFileAttributes to validate that the file name
+	   does not contain wildcards (which FindFirstFile would
+	   accept). */
+	if (GetFileAttributesW(pszFile) == 0xFFFFFFFF)
+		return FALSE;
+	hFindFile = FindFirstFileW(pszFile, &FileData);
+	if (hFindFile == INVALID_HANDLE_VALUE)
+		return FALSE;
+	FindClose(hFindFile);
+	pfad->dwFileAttributes = FileData.dwFileAttributes;
+	pfad->ftCreationTime   = FileData.ftCreationTime;
+	pfad->ftLastAccessTime = FileData.ftLastAccessTime;
+	pfad->ftLastWriteTime  = FileData.ftLastWriteTime;
+	pfad->nFileSizeHigh    = FileData.nFileSizeHigh;
+	pfad->nFileSizeLow     = FileData.nFileSizeLow;
+	return TRUE;
+}
+
 static int 
 win32_stat(const char* path, struct win32_stat *result)
 {
@@ -835,7 +935,7 @@ win32_stat(const char* path, struct win32_stat *result)
 	int code;
 	char *dot;
 	/* XXX not supported on Win95 and NT 3.x */
-	if (!GetFileAttributesExA(path, GetFileExInfoStandard, &info)) {
+	if (!Py_GetFileAttributesExA(path, GetFileExInfoStandard, &info)) {
 		/* Protocol violation: we explicitly clear errno, instead of
 		   setting it to a POSIX error. Callers should use GetLastError. */
 		errno = 0;
@@ -863,7 +963,7 @@ win32_wstat(const wchar_t* path, struct win32_stat *result)
 	const wchar_t *dot;
 	WIN32_FILE_ATTRIBUTE_DATA info;
 	/* XXX not supported on Win95 and NT 3.x */
-	if (!GetFileAttributesExW(path, GetFileExInfoStandard, &info)) {
+	if (!Py_GetFileAttributesExW(path, GetFileExInfoStandard, &info)) {
 		/* Protocol violation: we explicitly clear errno, instead of
 		   setting it to a POSIX error. Callers should use GetLastError. */
 		errno = 0;
@@ -2458,7 +2558,8 @@ posix_utime(PyObject *self, PyObject *args)
 			wpath = PyUnicode_AS_UNICODE(obwpath);
 			Py_BEGIN_ALLOW_THREADS
 			hFile = CreateFileW(wpath, FILE_WRITE_ATTRIBUTES, 0,
-					    NULL, OPEN_EXISTING, 0, NULL);
+					    NULL, OPEN_EXISTING,
+					    FILE_FLAG_BACKUP_SEMANTICS, NULL);
 			Py_END_ALLOW_THREADS
 			if (hFile == INVALID_HANDLE_VALUE)
 				return win32_error_unicode("utime", wpath);
@@ -2473,7 +2574,8 @@ posix_utime(PyObject *self, PyObject *args)
 			return NULL;
 		Py_BEGIN_ALLOW_THREADS
 		hFile = CreateFileA(apath, FILE_WRITE_ATTRIBUTES, 0,
-				    NULL, OPEN_EXISTING, 0, NULL);
+				    NULL, OPEN_EXISTING,
+				    FILE_FLAG_BACKUP_SEMANTICS, NULL);
 		Py_END_ALLOW_THREADS
 		if (hFile == INVALID_HANDLE_VALUE) {
 			win32_error("utime", apath);
@@ -2501,11 +2603,11 @@ posix_utime(PyObject *self, PyObject *args)
 		if (extract_time(PyTuple_GET_ITEM(arg, 0),
 				 &atimesec, &ausec) == -1)
 			goto done;
-		time_t_to_FILE_TIME(atimesec, ausec, &atime);
+		time_t_to_FILE_TIME(atimesec, 1000*ausec, &atime);
 		if (extract_time(PyTuple_GET_ITEM(arg, 1),
 				 &mtimesec, &musec) == -1)
 			goto done;
-		time_t_to_FILE_TIME(mtimesec, musec, &mtime);
+		time_t_to_FILE_TIME(mtimesec, 1000*musec, &mtime);
 	}
 	if (!SetFileTime(hFile, NULL, &atime, &mtime)) {
 		/* Avoid putting the file name into the error here,
@@ -7877,7 +7979,7 @@ win32_urandom(PyObject *self, PyObject *args)
 
 		pCryptGenRandom = (CRYPTGENRANDOM)GetProcAddress(
 						hAdvAPI32, "CryptGenRandom");
-		if (pCryptAcquireContext == NULL)
+		if (pCryptGenRandom == NULL)
 			return PyErr_Format(PyExc_NotImplementedError,
 					    "CryptGenRandom not found");
 
@@ -8616,4 +8718,5 @@ INITFUNC(void)
 #ifdef __cplusplus
 }
 #endif
+
 

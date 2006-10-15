@@ -602,15 +602,15 @@ parameter and are called with a non-string parameter.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyString_FromString}{const char *v}
-  Return a new string object with the value \var{v} on success, and
-  \NULL{} on failure.  The parameter \var{v} must not be \NULL{}; it
-  will not be checked.
+  Return a new string object with a copy of the string \var{v} as value
+  on success, and \NULL{} on failure.  The parameter \var{v} must not be
+  \NULL{}; it will not be checked.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyString_FromStringAndSize}{const char *v,
                                                          Py_ssize_t len}
-  Return a new string object with the value \var{v} and length
-  \var{len} on success, and \NULL{} on failure.  If \var{v} is
+  Return a new string object with a copy of the string \var{v} as value
+  and length \var{len} on success, and \NULL{} on failure.  If \var{v} is
   \NULL{}, the contents of the string are uninitialized.
 \end{cfuncdesc}
 
@@ -1840,6 +1840,11 @@ format.
 \begin{cfuncdesc}{PyObject*}{PyList_New}{Py_ssize_t len}
   Return a new list of length \var{len} on success, or \NULL{} on
   failure.
+  \note{If \var{length} is greater than zero, the returned list object's
+        items are set to \code{NULL}.  Thus you cannot use abstract
+        API functions such as \cfunction{PySequence_SetItem()} 
+        or expose the object to Python code before setting all items to a
+        real object with \cfunction{PyList_SetItem()}.}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{Py_ssize_t}{PyList_Size}{PyObject *list}

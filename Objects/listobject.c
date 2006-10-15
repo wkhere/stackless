@@ -863,17 +863,12 @@ static PyObject *
 listpop(PyListObject *self, PyObject *args)
 {
 	Py_ssize_t i = -1;
-	PyObject *v, *arg = NULL;
+	PyObject *v;
 	int status;
 
-	if (!PyArg_UnpackTuple(args, "pop", 0, 1, &arg))
+	if (!PyArg_ParseTuple(args, "|n:pop", &i))
 		return NULL;
-	if (arg != NULL) {
-		if (PyInt_Check(arg))
-			i = PyInt_AS_LONG((PyIntObject*) arg);
-		else if (!PyArg_ParseTuple(args, "|n:pop", &i))
-   			return NULL;
-	}
+
 	if (self->ob_size == 0) {
 		/* Special-case most common failure cause */
 		PyErr_SetString(PyExc_IndexError, "pop from empty list");
@@ -1398,7 +1393,7 @@ merge_lo(MergeState *ms, PyObject **pa, Py_ssize_t na,
 	PyObject *compare;
 	PyObject **dest;
 	int result = -1;	/* guilty until proved innocent */
-	Py_ssize_t min_gallop = ms->min_gallop;
+	Py_ssize_t min_gallop;
 
 	assert(ms && pa && pb && na > 0 && nb > 0 && pa + na == pb);
 	if (MERGE_GETMEM(ms, na) < 0)
@@ -1414,6 +1409,7 @@ merge_lo(MergeState *ms, PyObject **pa, Py_ssize_t na,
 	if (na == 1)
 		goto CopyB;
 
+	min_gallop = ms->min_gallop;
 	compare = ms->compare;
 	for (;;) {
 		Py_ssize_t acount = 0;	/* # of times A won in a row */
@@ -1531,7 +1527,7 @@ merge_hi(MergeState *ms, PyObject **pa, Py_ssize_t na, PyObject **pb, Py_ssize_t
 	int result = -1;	/* guilty until proved innocent */
 	PyObject **basea;
 	PyObject **baseb;
-	Py_ssize_t min_gallop = ms->min_gallop;
+	Py_ssize_t min_gallop;
 
 	assert(ms && pa && pb && na > 0 && nb > 0 && pa + na == pb);
 	if (MERGE_GETMEM(ms, nb) < 0)
@@ -1550,6 +1546,7 @@ merge_hi(MergeState *ms, PyObject **pa, Py_ssize_t na, PyObject **pb, Py_ssize_t
 	if (nb == 1)
 		goto CopyA;
 
+	min_gallop = ms->min_gallop;
 	compare = ms->compare;
 	for (;;) {
 		Py_ssize_t acount = 0;	/* # of times A won in a row */

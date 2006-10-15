@@ -771,8 +771,8 @@ The original string is returned if
 Split the string at the last occurrence of \var{sep}, and return
 a 3-tuple containing the part before the separator, the separator
 itself, and the part after the separator.  If the separator is not
-found, return a 3-tuple containing the string itself, followed by
-two empty strings.
+found, return a 3-tuple containing two empty strings, followed by
+the string itself.
 \versionadded{2.5}
 \end{methoddesc}
 
@@ -1410,15 +1410,15 @@ arbitrary objects):
           {(1)}
   \lineiii{\var{a}.clear()}{remove all items from \code{a}}{}
   \lineiii{\var{a}.copy()}{a (shallow) copy of \code{a}}{}
-  \lineiii{\var{a}.has_key(\var{k})}
+  \lineiii{\var{k} in \var{a}}
           {\code{True} if \var{a} has a key \var{k}, else \code{False}}
-          {}
-  \lineiii{\var{k} \code{in} \var{a}}
-          {Equivalent to \var{a}.has_key(\var{k})}
           {(2)}
   \lineiii{\var{k} not in \var{a}}
-          {Equivalent to \code{not} \var{a}.has_key(\var{k})}
+          {Equivalent to \code{not} \var{k} in \var{a}}
           {(2)}
+  \lineiii{\var{a}.has_key(\var{k})}
+          {Equivalent to \var{k} \code{in} \var{a}, use that form in new code}
+          {}
   \lineiii{\var{a}.items()}
           {a copy of \var{a}'s list of (\var{key}, \var{value}) pairs}
           {(3)}
