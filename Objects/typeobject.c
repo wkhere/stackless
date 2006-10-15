@@ -99,7 +99,7 @@ type_module(PyTypeObject *type, void *context)
 		s = strrchr(type->tp_name, '.');
 		if (s != NULL)
 			return PyString_FromStringAndSize(
-				type->tp_name, (int)(s - type->tp_name));
+			    type->tp_name, (Py_ssize_t)(s - type->tp_name));
 		return PyString_FromString("__builtin__");
 	}
 }
@@ -4175,19 +4175,10 @@ slot_sq_length(PyObject *self)
 		return -1;
 	len = PyInt_AsSsize_t(res);
 	Py_DECREF(res);
-	if (len == -1 && PyErr_Occurred())
-		return -1;
-#if SIZEOF_SIZE_T < SIZEOF_INT
-	/* Overflow check -- range of PyInt is more than C ssize_t */
-	if (len != (int)len) {
-		PyErr_SetString(PyExc_OverflowError,
-			"__len__() should return 0 <= outcome < 2**31");
-		return -1;
-	}
-#endif
 	if (len < 0) {
-		PyErr_SetString(PyExc_ValueError,
-				"__len__() should return >= 0");
+		if (!PyErr_Occurred())
+			PyErr_SetString(PyExc_ValueError,
+					"__len__() should return >= 0");
 		return -1;
 	}
 	return len;
@@ -5924,6 +5915,8 @@ super_init(PyObject *self, PyObject *args, PyObject *kwds)
 	PyObject *obj = NULL;
 	PyTypeObject *obj_type = NULL;
 
+	if (!_PyArg_NoKeywords("super", kwds))
+		return -1;
 	if (!PyArg_ParseTuple(args, "O!|O:super", &PyType_Type, &type, &obj))
 		return -1;
 	if (obj == Py_None)

@@ -187,6 +187,8 @@ static int compiler_push_fblock(struct compiler *, enum fblocktype,
 				basicblock *);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype,
 				basicblock *);
+/* Returns true if there is a loop on the fblock stack. */
+static int compiler_in_loop(struct compiler *);
 
 static int inplace_binop(struct compiler *, operator_ty);
 static int expr_constant(expr_ty e);
@@ -2288,6 +2290,8 @@ static int
 compiler_continue(struct compiler *c)
 {
 	static const char LOOP_ERROR_MSG[] = "'continue' not properly in loop";
+	static const char IN_FINALLY_ERROR_MSG[] = 
+			"'continue' not supported inside 'finally' clause";
 	int i;
 
 	if (!c->u->u_nfblocks)
@@ -2299,15 +2303,19 @@ compiler_continue(struct compiler *c)
 		break;
 	case EXCEPT:
 	case FINALLY_TRY:
-		while (--i >= 0 && c->u->u_fblock[i].fb_type != LOOP)
-			;
+		while (--i >= 0 && c->u->u_fblock[i].fb_type != LOOP) {
+			/* Prevent try: ... finally:
+			      try: continue ...  or
+			      try: ... except: continue */
+			if (c->u->u_fblock[i].fb_type == FINALLY_END)
+				return compiler_error(c, IN_FINALLY_ERROR_MSG);
+		}
 		if (i == -1)
 			return compiler_error(c, LOOP_ERROR_MSG);
 		ADDOP_JABS(c, CONTINUE_LOOP, c->u->u_fblock[i].fb_block);
 		break;
 	case FINALLY_END:
-		return compiler_error(c,
-			"'continue' not supported inside 'finally' clause");
+		return compiler_error(c, IN_FINALLY_ERROR_MSG);
 	}
 
 	return 1;
@@ -2758,7 +2766,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 	case Pass_kind:
 		break;
 	case Break_kind:
-		if (!c->u->u_nfblocks)
+                if (!compiler_in_loop(c))
 			return compiler_error(c, "'break' outside loop");
 		ADDOP(c, BREAK_LOOP);
 		break;
@@ -3748,6 +3756,16 @@ compiler_pop_fblock(struct compiler *c, enum fblocktype t, basicblock *b)
 	assert(u->u_fblock[u->u_nfblocks].fb_block == b);
 }
 
+static int
+compiler_in_loop(struct compiler *c) {
+        int i;
+        struct compiler_unit *u = c->u;
+        for (i = 0; i < u->u_nfblocks; ++i) {
+                if (u->u_fblock[i].fb_type == LOOP)
+                        return 1;
+        }
+        return 0;
+}
 /* Raises a SyntaxError and returns 0.
    If something goes wrong, a different exception may be raised.
 */
