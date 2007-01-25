@@ -542,6 +542,7 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 	if (result == Py_None && f->f_stacktop == NULL) {
 		Py_DECREF(result);
 		result = NULL;
+		/* Set exception if not called by gen_iternext() */
 		if (arg)
 			PyErr_SetNone(PyExc_StopIteration);
 		/* Stackless extra handling */
@@ -553,13 +554,18 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 		}
 	}
 
+	/* We hold references to things in the cframe, if we release it
+	   before we clear the references, they get incorrectly and
+	   prematurely free. */
+	cf->ob1 = NULL;
+	cf->ob2 = NULL;
+
 	if (!result || f->f_stacktop == NULL) {
 		/* generator can't be rerun, so release the frame */
+		Py_DECREF(f);
 		gen->gi_frame = NULL;
 	}
 
-	cf->ob1 = NULL;
-	cf->ob2 = NULL;
 	Py_DECREF(gen);
 	Py_XDECREF(arg);
 	return result;
