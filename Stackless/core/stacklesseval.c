@@ -555,6 +555,7 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 
 	if (!result || f->f_stacktop == NULL) {
 		/* generator can't be rerun, so release the frame */
+		Py_DECREF(f);
 		gen->gi_frame = NULL;
 	}
 
