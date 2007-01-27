@@ -799,7 +799,7 @@ PyString_Repr(PyObject *obj, int smartquotes)
 	register PyStringObject* op = (PyStringObject*) obj;
 	size_t newsize = 2 + 4 * op->ob_size;
 	PyObject *v;
-	if (newsize > INT_MAX) {
+	if (newsize > INT_MAX || newsize / 4 != op->ob_size) {
 		PyErr_SetString(PyExc_OverflowError,
 			"string is too large to make repr");
 	}
@@ -1926,17 +1926,14 @@ do_argstrip(PyStringObject *self, int striptype, PyObject *args)
 			return res;
 		}
 #endif
-		else {
-			PyErr_Format(PyExc_TypeError,
+		PyErr_Format(PyExc_TypeError,
 #ifdef Py_USING_UNICODE
-				     "%s arg must be None, str or unicode",
+			     "%s arg must be None, str or unicode",
 #else
-				     "%s arg must be None or str",
+			     "%s arg must be None or str",
 #endif
-				     STRIPNAME(striptype));
-			return NULL;
-		}
-		return do_xstrip(self, striptype, sep);
+			     STRIPNAME(striptype));
+		return NULL;
 	}
 
 	return do_strip(self, striptype);
@@ -3665,12 +3662,15 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 	if (!result)
 		return NULL;
 
+	buf = PyString_AsString(result);
+	if (!buf)
+		return NULL;
+
 	/* To modify the string in-place, there can only be one reference. */
 	if (result->ob_refcnt != 1) {
 		PyErr_BadInternalCall();
 		return NULL;
 	}
-	buf = PyString_AsString(result);
 	len = PyString_Size(result);
 	if (buf[len-1] == 'L') {
 		--len;

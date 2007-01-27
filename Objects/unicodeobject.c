@@ -319,7 +319,9 @@ PyObject *PyUnicode_FromUnicode(const Py_UNICODE *u,
 
 	/* Single character Unicode objects in the Latin-1 range are
 	   shared when using this constructor */
-	if (size == 1 && *u < 256) {
+	/* XXX In Python 2.4, Py_UNICODE can, unfortunately, be a signed
+	   type. */
+	if (size == 1 && *u >= 0 && *u < 256) {
 	    unicode = unicode_latin1[*u];
 	    if (!unicode) {
 		unicode = _PyUnicode_New(1);
@@ -843,15 +845,23 @@ char utf7_special[128] = {
 
 };
 
+/* Note: The comparison (c) <= 0 is a trick to work-around gcc
+   warnings about the comparison always being false; since
+   utf7_special[0] is 1, we can safely make that one comparison
+   true  */
+
 #define SPECIAL(c, encodeO, encodeWS) \
-	(((c)>127 || utf7_special[(c)] == 1) || \
+    ((c) > 127 || (c) <= 0 || utf7_special[(c)] == 1 || \
 	 (encodeWS && (utf7_special[(c)] == 2)) || \
      (encodeO && (utf7_special[(c)] == 3)))
 
-#define B64(n)  ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[(n) & 0x3f])
-#define B64CHAR(c) (isalnum(c) || (c) == '+' || (c) == '/')
-#define UB64(c)        ((c) == '+' ? 62 : (c) == '/' ? 63 : (c) >= 'a' ? \
-                        (c) - 71 : (c) >= 'A' ? (c) - 65 : (c) + 4)
+#define B64(n)  \
+    ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[(n) & 0x3f])
+#define B64CHAR(c) \
+    (isalnum(c) || (c) == '+' || (c) == '/')
+#define UB64(c) \
+    ((c) == '+' ? 62 : (c) == '/' ? 63 : (c) >= 'a' ?                   \
+     (c) - 71 : (c) >= 'A' ? (c) - 65 : (c) + 4 )
 
 #define ENCODE(out, ch, bits) \
     while (bits >= 6) { \
@@ -864,8 +874,8 @@ char utf7_special[128] = {
         Py_UNICODE outCh = (Py_UNICODE) ((ch >> (bits-16)) & 0xffff); \
         bits -= 16; \
 		if (surrogate) { \
-			/* We have already generated an error for the high surrogate
-               so let's not bother seeing if the low surrogate is correct or not */\
+            /* We have already generated an error for the high surrogate \
+               so let's not bother seeing if the low surrogate is correct or not */ \
 			surrogate = 0; \
 		} else if (0xDC00 <= outCh && outCh <= 0xDFFF) { \
             /* This is a surrogate pair. Unfortunately we can't represent \
@@ -876,7 +886,7 @@ char utf7_special[128] = {
 		} else { \
 				*out++ = outCh; \
 		} \
-    } \
+    }
 
 PyObject *PyUnicode_DecodeUTF7(const char *s,
 			       int size,
@@ -1968,7 +1978,28 @@ PyObject *unicodeescape_string(const Py_UNICODE *s,
 
     static const char *hexdigit = "0123456789abcdef";
 
-    repr = PyString_FromStringAndSize(NULL, 2 + 6*size + 1);
+    /* Initial allocation is based on the longest-possible unichr
+       escape.
+
+       In wide (UTF-32) builds '\U00xxxxxx' is 10 chars per source
+       unichr, so in this case it's the longest unichr escape. In
+       narrow (UTF-16) builds this is five chars per source unichr
+       since there are two unichrs in the surrogate pair, so in narrow
+       (UTF-16) builds it's not the longest unichr escape.
+
+       In wide or narrow builds '\uxxxx' is 6 chars per source unichr,
+       so in the narrow (UTF-16) build case it's the longest unichr
+       escape.
+    */
+
+    repr = PyString_FromStringAndSize(NULL,
+        2
+#ifdef Py_UNICODE_WIDE
+        + 10*size
+#else
+        + 6*size
+#endif
+        + 1);
     if (repr == NULL)
         return NULL;
 
@@ -1993,15 +2024,6 @@ PyObject *unicodeescape_string(const Py_UNICODE *s,
 #ifdef Py_UNICODE_WIDE
         /* Map 21-bit characters to '\U00xxxxxx' */
         else if (ch >= 0x10000) {
-	    int offset = p - PyString_AS_STRING(repr);
-
-	    /* Resize the string if necessary */
-	    if (offset + 12 > PyString_GET_SIZE(repr)) {
-		if (_PyString_Resize(&repr, PyString_GET_SIZE(repr) + 100))
-		    return NULL;
-		p = PyString_AS_STRING(repr) + offset;
-	    }
-
             *p++ = '\\';
             *p++ = 'U';
             *p++ = hexdigit[(ch >> 28) & 0x0000000F];
@@ -2014,8 +2036,8 @@ PyObject *unicodeescape_string(const Py_UNICODE *s,
             *p++ = hexdigit[ch & 0x0000000F];
 	    continue;
         }
-#endif
-	/* Map UTF-16 surrogate pairs to Unicode \UXXXXXXXX escapes */
+#else
+	/* Map UTF-16 surrogate pairs to '\U00xxxxxx' */
 	else if (ch >= 0xD800 && ch < 0xDC00) {
 	    Py_UNICODE ch2;
 	    Py_UCS4 ucs;
@@ -2040,6 +2062,7 @@ PyObject *unicodeescape_string(const Py_UNICODE *s,
 	    s--;
 	    size++;
 	}
+#endif
 
         /* Map 16-bit characters to '\uxxxx' */
         if (ch >= 256) {
@@ -2293,6 +2316,7 @@ PyObject *_PyUnicode_DecodeUnicodeInternal(const char *s,
     PyObject *exc = NULL;
 
     unimax = PyUnicode_GetMax();
+    /* XXX overflow detection missing */
     v = _PyUnicode_New((size+Py_UNICODE_SIZE-1)/ Py_UNICODE_SIZE);
     if (v == NULL)
 	goto onError;
@@ -2302,7 +2326,7 @@ PyObject *_PyUnicode_DecodeUnicodeInternal(const char *s,
     end = s + size;
 
     while (s < end) {
-        *p = *(Py_UNICODE *)s;
+        memcpy(p, s, sizeof(Py_UNICODE));
         /* We have to sanity check the raw data, otherwise doom looms for
            some malformed UCS-4 data. */
         if (
@@ -2908,6 +2932,7 @@ PyObject *PyUnicode_DecodeCharmap(const char *s,
 		    int needed = (targetsize - extrachars) + \
 			         (targetsize << 2);
 		    extrachars += needed;
+                    /* XXX overflow detection missing */
 		    if (_PyUnicode_Resize(&v,
 					 PyUnicode_GET_SIZE(v) + needed) < 0) {
 			Py_DECREF(x);
@@ -7325,6 +7350,9 @@ void _PyUnicode_Init(void)
     unicode_freelist = NULL;
     unicode_freelist_size = 0;
     unicode_empty = _PyUnicode_New(0);
+    if (!unicode_empty)
+	return;
+
     strcpy(unicode_default_encoding, "ascii");
     for (i = 0; i < 256; i++)
 	unicode_latin1[i] = NULL;

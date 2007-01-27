@@ -198,7 +198,7 @@ Pdata_clear(Pdata *self, int clearto)
 	for (i = self->length, p = self->data + clearto;
 	     --i >= clearto;
 	     p++) {
-		Py_DECREF(*p);
+		Py_CLEAR(*p);
 	}
 	self->length = clearto;
 
@@ -210,6 +210,7 @@ Pdata_grow(Pdata *self)
 {
 	int bigger;
 	size_t nbytes;
+	PyObject **tmp;
 
 	bigger = self->size << 1;
 	if (bigger <= 0)	/* was 0, or new value overflows */
@@ -219,14 +220,14 @@ Pdata_grow(Pdata *self)
 	nbytes = (size_t)bigger * sizeof(PyObject *);
 	if (nbytes / sizeof(PyObject *) != (size_t)bigger)
 		goto nomemory;
-	self->data = realloc(self->data, nbytes);
-	if (self->data == NULL)
+	tmp = realloc(self->data, nbytes);
+	if (tmp == NULL)
 		goto nomemory;
+	self->data = tmp;
 	self->size = bigger;
 	return 0;
 
   nomemory:
-	self->size = 0;
 	PyErr_NoMemory();
 	return -1;
 }
@@ -1146,7 +1147,9 @@ save_float(Picklerobject *self, PyObject *args)
 	else {
 		char c_str[250];
 		c_str[0] = FLOAT;
-		PyOS_snprintf(c_str + 1, sizeof(c_str) - 1, "%.17g\n", x);
+		PyOS_ascii_formatd(c_str + 1, sizeof(c_str) - 2, "%.17g", x);
+		/* Extend the formatted string with a newline character */
+		strcat(c_str, "\n");
 
 		if (self->write_func(self, c_str, strlen(c_str)) < 0)
 			return -1;
@@ -2645,7 +2648,7 @@ Pickle_getvalue(Picklerobject *self, PyObject *args)
 			if (ik >= lm || ik == 0) {
 				PyErr_SetString(PicklingError,
 						"Invalid get data");
-				return NULL;
+				goto err;
 			}
 			if (have_get[ik]) /* with matching get */
 				rsize += ik < 256 ? 2 : 5;
@@ -2657,7 +2660,7 @@ Pickle_getvalue(Picklerobject *self, PyObject *args)
 			) {
 			PyErr_SetString(PicklingError,
 					"Unexpected data in internal list");
-			return NULL;
+			goto err;
 		}
 
 		else { /* put */
@@ -3464,11 +3467,11 @@ load_string(Unpicklerobject *self)
 	/********************************************/
 
 	str = PyString_DecodeEscape(p, len, NULL, 0, NULL);
+	free(s);
 	if (str) {
 		PDATA_PUSH(self->stack, str, -1);
 		res = 0;
 	}
-	free(s);
 	return res;
 
   insecure:
@@ -3703,10 +3706,14 @@ Instance_New(PyObject *cls, PyObject *args)
 
   err:
 	{
-		PyObject *tp, *v, *tb;
+		PyObject *tp, *v, *tb, *tmp_value;
 
 		PyErr_Fetch(&tp, &v, &tb);
-		if ((r=PyTuple_Pack(3,v,cls,args))) {
+		tmp_value = v;
+		/* NULL occurs when there was a KeyboardInterrupt */
+		if (tmp_value == NULL)
+			tmp_value = Py_None;
+		if ((r = PyTuple_Pack(3, tmp_value, cls, args))) {
 			Py_XDECREF(v);
 			v=r;
 		}
@@ -4234,6 +4241,7 @@ do_append(Unpicklerobject *self, int  x)
 		int list_len;
 
 		slice=Pdata_popList(self->stack, x);
+		if (!slice) return -1;
 		list_len = PyList_GET_SIZE(list);
 		i=PyList_SetSlice(list, list_len, list_len, slice);
 		Py_DECREF(slice);
@@ -5244,6 +5252,9 @@ newUnpicklerobject(PyObject *f)
 	if (!( self->memo = PyDict_New()))
 		goto err;
 
+	if (!self->stack)
+		goto err;
+
 	Py_INCREF(f);
 	self->file = f;
 
@@ -5807,6 +5818,8 @@ initcPickle(void)
 	m = Py_InitModule4("cPickle", cPickle_methods,
 			   cPickle_module_documentation,
 			   (PyObject*)NULL,PYTHON_API_VERSION);
+	if (m == NULL)
+		return;
 
 	/* Add some symbolic constants to the module */
 	d = PyModule_GetDict(m);

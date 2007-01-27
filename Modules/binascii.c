@@ -908,7 +908,7 @@ binascii_hexlify(PyObject *self, PyObject *args)
 	char* retbuf;
 	int i, j;
 
-	if (!PyArg_ParseTuple(args, "t#:b2a_hex", &argbuf, &arglen))
+	if (!PyArg_ParseTuple(args, "s#:b2a_hex", &argbuf, &arglen))
 		return NULL;
 
 	retval = PyString_FromStringAndSize(NULL, arglen*2);
@@ -1334,6 +1334,8 @@ initbinascii(void)
 
 	/* Create the module and add the functions */
 	m = Py_InitModule("binascii", binascii_module_methods);
+	if (m == NULL)
+		return;
 
 	d = PyModule_GetDict(m);
 	x = PyString_FromString(doc_binascii);

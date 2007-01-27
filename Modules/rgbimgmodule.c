@@ -410,6 +410,11 @@ longimagedata(PyObject *self, PyObject *args)
 		addlongimgtag(base, xsize, ysize);
 #endif
 		verdat = (unsigned char *)malloc(xsize);
+		if (!verdat) {
+			Py_CLEAR(rv);
+			goto finally;
+		}
+
 		fseek(inf, 512, SEEK_SET);
 		for (z = 0; z < zsize; z++) {
 			lptr = base;
@@ -431,10 +436,14 @@ longimagedata(PyObject *self, PyObject *args)
 			copybw((Py_Int32 *) base, xsize * ysize);
 	}
   finally:
-	free(starttab);
-	free(lengthtab);
-	free(rledat);
-	free(verdat);
+	if (starttab)
+		free(starttab);
+	if (lengthtab)
+		free(lengthtab);
+	if (rledat)
+		free(rledat);
+	if (verdat)
+		free(verdat);
 	fclose(inf);
 	return rv;
 }
@@ -756,6 +765,8 @@ initrgbimg(void)
 {
 	PyObject *m, *d;
 	m = Py_InitModule("rgbimg", rgbimg_methods);
+	if (m == NULL)
+		return;
 	d = PyModule_GetDict(m);
 	ImgfileError = PyErr_NewException("rgbimg.error", NULL, NULL);
 	if (ImgfileError != NULL)

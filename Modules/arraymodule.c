@@ -701,6 +701,8 @@ array_ass_slice(arrayobject *a, int ilow, int ihigh, PyObject *v)
 			/* Special case "a[i:j] = a" -- copy b first */
 			int ret;
 			v = array_slice(b, 0, n);
+			if (!v)
+				return -1;
 			ret = array_ass_slice(a, ilow, ihigh, v);
 			Py_DECREF(v);
 			return ret;
@@ -1468,7 +1470,7 @@ PyMethodDef array_methods[] = {
 	 copy_doc},
 	{"count",	(PyCFunction)array_count,	METH_O,
 	 count_doc},
-	{"__deepcopy__",(PyCFunction)array_copy,	METH_NOARGS,
+	{"__deepcopy__",(PyCFunction)array_copy,	METH_O,
 	 copy_doc},
 	{"extend",      (PyCFunction)array_extend,	METH_O,
 	 extend_doc},
@@ -1687,6 +1689,8 @@ array_ass_subscr(arrayobject* self, PyObject* item, PyObject* value)
 			if (self == av) { 
 				value = array_slice(av, 0, av->ob_size);
 				av = (arrayobject*)value;
+				if (!av)
+					return -1;
 			} 
 			else {
 				Py_INCREF(value);
@@ -2096,6 +2100,8 @@ initarray(void)
 	Arraytype.ob_type = &PyType_Type;
 	PyArrayIter_Type.ob_type = &PyType_Type;
 	m = Py_InitModule3("array", a_methods, module_doc);
+	if (m == NULL)
+		return;
 
         Py_INCREF((PyObject *)&Arraytype);
 	PyModule_AddObject(m, "ArrayType", (PyObject *)&Arraytype);

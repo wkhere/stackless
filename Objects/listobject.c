@@ -108,8 +108,10 @@ PyList_New(int size)
 		op->ob_item = NULL;
 	else {
 		op->ob_item = (PyObject **) PyMem_MALLOC(nbytes);
-		if (op->ob_item == NULL)
+		if (op->ob_item == NULL) {
+			Py_DECREF(op);
 			return PyErr_NoMemory();
+		}
 		memset(op->ob_item, 0, nbytes);
 	}
 	op->ob_size = size;
@@ -858,7 +860,8 @@ list_inplace_concat(PyListObject *self, PyObject *other)
 static PyObject *
 listpop(PyListObject *self, PyObject *args)
 {
-	int i = -1;
+	long ii = -1;
+	int i;
 	PyObject *v, *arg = NULL;
 	int status;
 
@@ -866,8 +869,8 @@ listpop(PyListObject *self, PyObject *args)
 		return NULL;
 	if (arg != NULL) {
 		if (PyInt_Check(arg))
-			i = (int)(PyInt_AS_LONG((PyIntObject*) arg));
-		else if (!PyArg_ParseTuple(args, "|i:pop", &i))
+			ii = PyInt_AS_LONG((PyIntObject*) arg);
+		else if (!PyArg_ParseTuple(args, "|l:pop", &ii))
    			return NULL;
 	}
 	if (self->ob_size == 0) {
@@ -875,12 +878,13 @@ listpop(PyListObject *self, PyObject *args)
 		PyErr_SetString(PyExc_IndexError, "pop from empty list");
 		return NULL;
 	}
-	if (i < 0)
-		i += self->ob_size;
-	if (i < 0 || i >= self->ob_size) {
+	if (ii < 0)
+		ii += self->ob_size;
+	if (ii < 0 || ii >= self->ob_size) {
 		PyErr_SetString(PyExc_IndexError, "pop index out of range");
 		return NULL;
 	}
+	i = (int)ii;
 	v = self->ob_item[i];
 	if (i == self->ob_size - 1) {
 		status = list_resize(self, self->ob_size - 1);
@@ -2548,6 +2552,10 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 
 			garbage = (PyObject**)
 				PyMem_MALLOC(slicelength*sizeof(PyObject*));
+			if (!garbage) {
+				PyErr_NoMemory();
+				return -1;
+			}
 
 			/* drawing pictures might help
 			   understand these for loops */
@@ -2596,9 +2604,9 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 			else {
 				seq = PySequence_Fast(value,
 					"must assign iterable to extended slice");
-				if (!seq)
-					return -1;
 			}
+			if (!seq)
+				return -1;
 
 			if (PySequence_Fast_GET_SIZE(seq) != slicelength) {
 				PyErr_Format(PyExc_ValueError,

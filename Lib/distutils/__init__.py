@@ -12,4 +12,4 @@ used from a setup script as
 
 __revision__ = "$Id: __init__.py 38355 2005-01-20 19:25:24Z theller $"
 
-__version__ = "2.4.1"
+__version__ = "2.4.4"

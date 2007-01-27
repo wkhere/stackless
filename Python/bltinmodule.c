@@ -696,7 +696,7 @@ builtin_globals(PyObject *self)
 	PyObject *d;
 
 	d = PyEval_GetGlobals();
-	Py_INCREF(d);
+	Py_XINCREF(d);
 	return d;
 }
 
@@ -1127,7 +1127,7 @@ builtin_locals(PyObject *self)
 	PyObject *d;
 
 	d = PyEval_GetLocals();
-	Py_INCREF(d);
+	Py_XINCREF(d);
 	return d;
 }
 
@@ -1618,7 +1618,7 @@ builtin_raw_input(PyObject *self, PyObject *args)
 		if (PyFile_WriteString(" ", fout) != 0)
 			return NULL;
 	}
-	if (PyFile_Check(fin) && PyFile_Check(fout)
+	if (PyFile_AsFile(fin) && PyFile_AsFile(fout)
             && isatty(fileno(PyFile_AsFile(fin)))
             && isatty(fileno(PyFile_AsFile(fout)))) {
 		PyObject *po;
@@ -1820,9 +1820,10 @@ builtin_sorted(PyObject *self, PyObject *args, PyObject *kwds)
 	PyObject *newlist, *v, *seq, *compare=NULL, *keyfunc=NULL, *newargs;
 	PyObject *callable;
 	static char *kwlist[] = {"iterable", "cmp", "key", "reverse", 0};
-	long reverse;
+	int reverse;
 
 	if (args != NULL) {
+	        /* args 1-4 should match listsort in Objects/listobject.c */
 		if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOi:sorted",
 			kwlist, &seq, &compare, &keyfunc, &reverse))
 			return NULL;

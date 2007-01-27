@@ -34,7 +34,9 @@
 
 #if defined(linux)
 
+#ifndef HAVE_STDINT_H
 typedef unsigned long uint32_t;
+#endif
 
 #elif defined(__FreeBSD__)
 
@@ -943,6 +945,8 @@ initossaudiodev(void)
     PyObject *m;
 
     m = Py_InitModule("ossaudiodev", ossaudiodev_methods);
+    if (m == NULL)
+	return;
 
     OSSAudioError = PyErr_NewException("ossaudiodev.OSSAudioError",
 				       NULL, NULL);
