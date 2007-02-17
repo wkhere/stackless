@@ -714,6 +714,41 @@ _get_all_objects(PyObject *self)
 
 #endif
 
+/******************************************************
+
+  Special support for RPython
+
+ ******************************************************/
+
+/*
+  In RPython, we are not allowed to use cyclic references
+  without explicitly breaking them, or we leak memory.
+  I wrote a tool to find out which code line causes
+  unreachable objects. It works by running a full GC run
+  after every line. To make this reasonably fast, it makes
+  sense to remove the existing GC objects temporarily.
+ */
+
+static PyObject *
+_gc_untrack(PyObject *self, PyObject *ob)
+{
+	PyObject_GC_UnTrack(ob);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyObject *
+_gc_track(PyObject *self, PyObject *ob)
+{
+	PyObject_GC_Track(ob);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static char _gc_untrack__doc__[] =
+"_gc_untrack, gc_track -- remove or add an object from the gc list.";
+
+
 /* List of functions defined in the module */
 
 #define PCF PyCFunction
@@ -748,6 +783,10 @@ static PyMethodDef stackless_methods[] = {
 	 slp_pickle_moduledict__doc__},
 	{"get_thread_info",	    (PCF)get_thread_info,	METH_VARARGS,
 	 get_thread_info__doc__},
+	{"_gc_untrack",		    (PCF)_gc_untrack,		METH_O,
+	_gc_untrack__doc__},
+	{"_gc_track",		    (PCF)_gc_track,		METH_O,
+	_gc_untrack__doc__},
 #ifdef STACKLESS_SPY
 	{"_peek",		    (PCF)_peek,			METH_O,
 	 _peek__doc__},
