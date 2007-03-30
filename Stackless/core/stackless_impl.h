@@ -18,7 +18,7 @@ extern "C" {
 #include "pickling/prickelpit.h"
 
 #undef STACKLESS_SPY
-/* 
+/*
  * if a platform wants to support self-inspection via _peek,
  * it must provide a function or macro CANNOT_READ_MEM(adr, len)
  * which allows to spy at memory without causing exceptions.
@@ -70,7 +70,7 @@ PyAPI_FUNC(void) PyStackless_kill_tasks_with_stacks(int allthreads);
 PyAPI_FUNC(PyObject *) slp_eval_frame(struct _frame *f);
 
 /* the frame dispatcher */
-PyAPI_FUNC(PyObject *) slp_frame_dispatch(PyFrameObject *f, 
+PyAPI_FUNC(PyObject *) slp_frame_dispatch(PyFrameObject *f,
 					  PyFrameObject *stopframe, int exc,
 					  PyObject *retval);
 
@@ -79,7 +79,7 @@ PyAPI_FUNC(PyObject *) slp_frame_dispatch_top(PyObject *retval);
 
 /* the now exported eval_frame */
 PyAPI_FUNC(PyObject *) PyEval_EvalFrame(struct _frame *f);
-PyObject * PyEval_EvalFrameEx_slp(struct _frame *, int, PyObject *);
+PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx_slp(struct _frame *, int, PyObject *);
 
 /* eval_frame with stack overflow, triggered there with a macro */
 PyAPI_FUNC(PyObject *) slp_eval_frame_newstack(struct _frame *f, int throwflag, PyObject *retval);
@@ -209,7 +209,7 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 	move the slp_try_stackless flag into the local variable "stackless".
 
   PROMOTE(func)
-  
+
 	if stackless was set and the function's type has set
 	Py_TPFLAGS_HAVE_STACKLESS_CALL, then this flag will be
 	put back into slp_try_stackless, and we expect that the
@@ -240,7 +240,7 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 
 	make sure that slp_ry_stackless was cleared. This debug feature
 	tries to ensure that no unexpected nonrecursive call can happen.
-	
+
   Some functions which are known to be stackless by nature
   just use the PROPOSE macros. They do not care about prior state.
   Most of them are used in ceval.c and other contexts which are
@@ -435,12 +435,12 @@ PyAPI_FUNC(int) slp_return_wrapper(PyObject *retval);
 PyAPI_FUNC(int) slp_int_wrapper(PyObject *retval);
 PyAPI_FUNC(int) slp_current_wrapper(int(*func)(PyTaskletObject*),
 				    PyTaskletObject *task);
-PyAPI_FUNC(int) slp_resurrect_and_kill(PyObject *self, 
+PyAPI_FUNC(int) slp_resurrect_and_kill(PyObject *self,
 				       void(*killer)(PyObject *));
 
 /* stackless pickling support */
 
-PyAPI_FUNC(int) slp_safe_pickling(int(*save)(PyObject *, PyObject *, int), 
+PyAPI_FUNC(int) slp_safe_pickling(int(*save)(PyObject *, PyObject *, int),
 				  PyObject *self, PyObject *args,
 				  int pers_save);
 
