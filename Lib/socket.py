@@ -139,8 +139,6 @@ class _closedsocket(object):
     __slots__ = []
     def _dummy(*args):
         raise error(EBADF, 'Bad file descriptor')
-    def close(self):
-        pass
     # All _delegate_methods must also be initialized here.
     send = recv = recv_into = sendto = recvfrom = recvfrom_into = _dummy
     __getattr__ = _dummy
@@ -159,7 +157,6 @@ class _socketobject(object):
             setattr(self, method, getattr(_sock, method))
 
     def close(self):
-        self._sock.close()
         self._sock = _closedsocket()
         dummy = self._sock._dummy
         for method in _delegate_methods:
@@ -204,9 +201,10 @@ class _fileobject(object):
 
     __slots__ = ["mode", "bufsize", "softspace",
                  # "closed" is a property, see below
-                 "_sock", "_rbufsize", "_wbufsize", "_rbuf", "_wbuf"]
+                 "_sock", "_rbufsize", "_wbufsize", "_rbuf", "_wbuf",
+                 "_close"]
 
-    def __init__(self, sock, mode='rb', bufsize=-1):
+    def __init__(self, sock, mode='rb', bufsize=-1, close=False):
         self._sock = sock
         self.mode = mode # Not actually used in this version
         if bufsize < 0:
@@ -222,6 +220,7 @@ class _fileobject(object):
         self._wbufsize = bufsize
         self._rbuf = "" # A string
         self._wbuf = [] # A list of strings
+        self._close = close
 
     def _getclosed(self):
         return self._sock is None
@@ -232,6 +231,8 @@ class _fileobject(object):
             if self._sock:
                 self.flush()
         finally:
+            if self._close:
+                self._sock.close()
             self._sock = None
 
     def __del__(self):

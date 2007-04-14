@@ -12,6 +12,10 @@ from cPickle import loads, dumps
 class ArraySubclass(array.array):
     pass
 
+class ArraySubclassWithKwargs(array.array):
+    def __init__(self, typecode, newarg=None):
+        array.array.__init__(typecode)
+
 tests = [] # list to accumulate all tests
 typecodes = "cubBhHiIlLfd"
 
@@ -85,6 +89,13 @@ class BaseTest(unittest.TestCase):
         self.assertNotEqual(id(a), id(b))
         self.assertEqual(a, b)
 
+    def test_deepcopy(self):
+        import copy
+        a = array.array(self.typecode, self.example)
+        b = copy.deepcopy(a)
+        self.assertNotEqual(id(a), id(b))
+        self.assertEqual(a, b)
+
     def test_pickle(self):
         for protocol in (0, 1, 2):
             a = array.array(self.typecode, self.example)
@@ -93,6 +104,21 @@ class BaseTest(unittest.TestCase):
             self.assertEqual(a, b)
 
             a = ArraySubclass(self.typecode, self.example)
+            a.x = 10
+            b = loads(dumps(a, protocol))
+            self.assertNotEqual(id(a), id(b))
+            self.assertEqual(a, b)
+            self.assertEqual(a.x, b.x)
+            self.assertEqual(type(a), type(b))
+
+    def test_pickle_for_empty_array(self):
+        for protocol in (0, 1, 2):
+            a = array.array(self.typecode)
+            b = loads(dumps(a, protocol))
+            self.assertNotEqual(id(a), id(b))
+            self.assertEqual(a, b)
+
+            a = ArraySubclass(self.typecode)
             a.x = 10
             b = loads(dumps(a, protocol))
             self.assertNotEqual(id(a), id(b))
@@ -676,6 +702,9 @@ class BaseTest(unittest.TestCase):
                 b = array.array('B', range(64))
             self.assertEqual(rc, sys.getrefcount(10))
 
+    def test_subclass_with_kwargs(self):
+        # SF bug #1486663 -- this used to erroneously raise a TypeError
+        ArraySubclassWithKwargs('b', newarg=1)
 
 
 class StringTest(BaseTest):

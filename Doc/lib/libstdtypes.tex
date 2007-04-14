@@ -834,7 +834,7 @@ boundaries.  Line breaks are not included in the resulting list unless
                                        start\optional{, end}}}
 Return \code{True} if string starts with the \var{prefix}, otherwise
 return \code{False}.  \var{prefix} can also be a tuple of
-suffixes to look for.  With optional \var{start}, test string beginning at
+prefixes to look for.  With optional \var{start}, test string beginning at
 that position.  With optional \var{end}, stop comparing string at that
 position.
 
@@ -875,6 +875,9 @@ Return a copy of the string where all characters occurring in the
 optional argument \var{deletechars} are removed, and the remaining
 characters have been mapped through the given translation table, which
 must be a string of length 256.
+
+You can use the \function{maketrans()} helper function in the
+\refmodule{string} module to create a translation table.
 
 For Unicode objects, the \method{translate()} method does not
 accept the optional \var{deletechars} argument.  Instead, it
@@ -1221,7 +1224,7 @@ Notes:
 	    \label{types-set}}
 \obindex{set}
 
-A \dfn{set} object is an unordered collection of immutable values.
+A \dfn{set} object is an unordered collection of distinct hashable objects.
 Common uses include membership testing, removing duplicates from a sequence,
 and computing mathematical operations such as intersection, union, difference,
 and symmetric difference.
@@ -1424,7 +1427,8 @@ arbitrary objects):
           {(3)}
   \lineiii{\var{a}.keys()}{a copy of \var{a}'s list of keys}{(3)}
   \lineiii{\var{a}.update(\optional{\var{b}})}
-          {updates (and overwrites) key/value pairs from \var{b}}
+          {updates \var{a} with key/value pairs from \var{b}, overwriting
+	   existing keys, returns \code{None}}
           {(9)}
   \lineiii{\var{a}.fromkeys(\var{seq}\optional{, \var{value}})}
           {Creates a new dictionary with keys from \var{seq} and values set to \var{value}}
@@ -1674,9 +1678,12 @@ flush the read-ahead buffer.
 
 \begin{methoddesc}[file]{seek}{offset\optional{, whence}}
   Set the file's current position, like \code{stdio}'s \cfunction{fseek()}.
-  The \var{whence} argument is optional and defaults to \code{0}
-  (absolute file positioning); other values are \code{1} (seek
-  relative to the current position) and \code{2} (seek relative to the
+  The \var{whence} argument is optional and defaults to 
+  \code{os.SEEK_SET} or \code{0}
+  (absolute file positioning); other values are \code{os.SEEK_CUR} or \code{1}
+  (seek
+  relative to the current position) and \code{os.SEEK_END} or \code{2} 
+  (seek relative to the
   file's end).  There is no return value.  Note that if the file is
   opened for appending (mode \code{'a'} or \code{'a+'}), any
   \method{seek()} operations will be undone at the next write.  If the

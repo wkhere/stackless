@@ -590,7 +590,11 @@ PyErr_WriteUnraisable(PyObject *obj)
 		PyFile_WriteString("Exception ", f);
 		if (t) {
 			PyObject* moduleName;
-			char* className = PyExceptionClass_Name(t);
+			char* className = NULL;
+			if (PyExceptionClass_Check(t))
+				className = PyExceptionClass_Name(t);
+			else if (PyString_Check(t))
+				className = PyString_AS_STRING(t);
 
 			if (className != NULL) {
 				char *dot = strrchr(className, '.');
@@ -640,7 +644,8 @@ PyErr_WarnEx(PyObject *category, const char *message, Py_ssize_t stack_level)
 
 	if (warnings_module != NULL) {
 		dict = PyModule_GetDict(warnings_module);
-		func = PyDict_GetItemString(dict, "warn");
+		if (dict != NULL)
+			func = PyDict_GetItemString(dict, "warn");
 	}
 	if (func == NULL) {
 		PySys_WriteStderr("warning: %s\n", message);

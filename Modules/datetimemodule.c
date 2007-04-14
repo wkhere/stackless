@@ -3166,8 +3166,11 @@ time_str(PyDateTime_Time *self)
 	return PyObject_CallMethod((PyObject *)self, "isoformat", "()");
 }
 
+/* Even though this silently ignores all arguments, it cannot
+   be fixed to reject them in release25-maint */
 static PyObject *
-time_isoformat(PyDateTime_Time *self)
+time_isoformat(PyDateTime_Time *self, PyObject *unused_args, 
+	       PyObject *unused_keywords)
 {
 	char buf[100];
 	PyObject *result;
@@ -3683,6 +3686,12 @@ datetime_from_timestamp(PyObject *cls, TM_FUNC f, double timestamp,
 		return NULL;
 	fraction = timestamp - (double)timet;
 	us = (int)round_to_long(fraction * 1e6);
+	if (us < 0) {
+		/* Truncation towards zero is not what we wanted
+		   for negative numbers (Python's mod semantics) */
+		timet -= 1;
+		us += 1000000;
+	}
 	/* If timestamp is less than one microsecond smaller than a
 	 * full second, round up. Otherwise, ValueErrors are raised
 	 * for some floats. */

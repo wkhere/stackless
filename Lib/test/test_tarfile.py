@@ -110,7 +110,7 @@ class ReadTest(BaseTest):
         """Test seek() method of _FileObject, incl. random reading.
         """
         if self.sep != "|":
-            filename = "0-REGTYPE"
+            filename = "0-REGTYPE-TEXT"
             self.tar.extract(filename, dirname())
             f = open(os.path.join(dirname(), filename), "rb")
             data = f.read()
@@ -149,6 +149,16 @@ class ReadTest(BaseTest):
             s2 = fobj.readlines()
             self.assert_(s1 == s2,
                          "readlines() after seek failed")
+            fobj.seek(0)
+            self.assert_(len(fobj.readline()) == fobj.tell(),
+                         "tell() after readline() failed")
+            fobj.seek(512)
+            self.assert_(len(fobj.readline()) + 512 == fobj.tell(),
+                         "tell() after seek() and readline() failed")
+            fobj.seek(0)
+            line = fobj.readline()
+            self.assert_(fobj.read() == data[len(line):],
+                         "read() after readline() failed")
             fobj.close()
 
     def test_old_dirtype(self):
@@ -280,6 +290,46 @@ class WriteTest(BaseTest):
             else:
                 self.dst.addfile(tarinfo, f)
 
+    def test_add_self(self):
+        dstname = os.path.abspath(self.dstname)
+
+        self.assertEqual(self.dst.name, dstname, "archive name must be absolute")
+
+        self.dst.add(dstname)
+        self.assertEqual(self.dst.getnames(), [], "added the archive to itself")
+
+        cwd = os.getcwd()
+        os.chdir(dirname())
+        self.dst.add(dstname)
+        os.chdir(cwd)
+        self.assertEqual(self.dst.getnames(), [], "added the archive to itself")
+
+
+class Write100Test(BaseTest):
+    # The name field in a tar header stores strings of at most 100 chars.
+    # If a string is shorter than 100 chars it has to be padded with '\0',
+    # which implies that a string of exactly 100 chars is stored without
+    # a trailing '\0'.
+
+    def setUp(self):
+        self.name = "01234567890123456789012345678901234567890123456789"
+        self.name += "01234567890123456789012345678901234567890123456789"
+
+        self.tar = tarfile.open(tmpname(), "w")
+        t = tarfile.TarInfo(self.name)
+        self.tar.addfile(t)
+        self.tar.close()
+
+        self.tar = tarfile.open(tmpname())
+
+    def tearDown(self):
+        self.tar.close()
+
+    def test(self):
+        self.assertEqual(self.tar.getnames()[0], self.name,
+                "failed to store 100 char filename")
+
+
 class WriteSize0Test(BaseTest):
     mode = 'w'
 
@@ -362,13 +412,6 @@ class WriteGNULongTest(unittest.TestCase):
        is tested as well.
     """
 
-    def setUp(self):
-        self.tar = tarfile.open(tmpname(), "w")
-        self.tar.posix = False
-
-    def tearDown(self):
-        self.tar.close()
-
     def _length(self, s):
         blocks, remainder = divmod(len(s) + 1, 512)
         if remainder:
@@ -397,11 +440,22 @@ class WriteGNULongTest(unittest.TestCase):
             tarinfo.linkname = link
             tarinfo.type = tarfile.LNKTYPE
 
-        self.tar.addfile(tarinfo)
+        tar = tarfile.open(tmpname(), "w")
+        tar.posix = False
+        tar.addfile(tarinfo)
 
         v1 = self._calc_size(name, link)
-        v2 = self.tar.offset
+        v2 = tar.offset
         self.assertEqual(v1, v2, "GNU longname/longlink creation failed")
+
+        tar.close()
+
+        tar = tarfile.open(tmpname())
+        member = tar.next()
+        self.failIf(member is None, "unable to read longname member")
+        self.assert_(tarinfo.name == member.name and \
+                     tarinfo.linkname == member.linkname, \
+                     "unable to read longname member")
 
     def test_longname_1023(self):
         self._test(("longnam/" * 127) + "longnam")
@@ -571,6 +625,15 @@ class FileModeTest(unittest.TestCase):
         self.assertEqual(tarfile.filemode(0755), '-rwxr-xr-x')
         self.assertEqual(tarfile.filemode(07111), '---s--s--t')
 
+class OpenFileobjTest(BaseTest):
+    # Test for SF bug #1496501.
+
+    def test_opener(self):
+        fobj = StringIO.StringIO("foo\n")
+        try:
+            tarfile.open("", "r", fileobj=fobj)
+        except tarfile.ReadError:
+            self.assertEqual(fobj.tell(), 0, "fileobj's position has moved")
 
 if bz2:
     # Bzip2 TestCases
@@ -616,6 +679,7 @@ def test_main():
 
     tests = [
         FileModeTest,
+        OpenFileobjTest,
         ReadTest,
         ReadStreamTest,
         ReadDetectTest,
@@ -623,6 +687,7 @@ def test_main():
         ReadAsteriskTest,
         ReadStreamAsteriskTest,
         WriteTest,
+        Write100Test,
         WriteSize0Test,
         WriteStreamTest,
         WriteGNULongTest,

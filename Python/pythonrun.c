@@ -201,6 +201,9 @@ Py_InitializeEx(int install_sigs)
 	interp->modules = PyDict_New();
 	if (interp->modules == NULL)
 		Py_FatalError("Py_Initialize: can't make modules dictionary");
+	interp->modules_reloading = PyDict_New();
+	if (interp->modules_reloading == NULL)
+		Py_FatalError("Py_Initialize: can't make modules_reloading dictionary");
 
 #ifdef Py_USING_UNICODE
 	/* Init Unicode implementation; relies on the codec registry */
@@ -286,7 +289,8 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		   PyFile_Check(sys_stream)) {
 			if (!PyFile_SetEncoding(sys_stream, codeset))
 				Py_FatalError("Cannot set codeset of stdin");
 		}
@@ -296,7 +300,8 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		   PyFile_Check(sys_stream)) {
 			if (!PyFile_SetEncoding(sys_stream, codeset))
 				Py_FatalError("Cannot set codeset of stdout");
 		}
@@ -306,7 +311,8 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		   PyFile_Check(sys_stream)) {
 			if (!PyFile_SetEncoding(sys_stream, codeset))
 				Py_FatalError("Cannot set codeset of stderr");
 		}
@@ -544,6 +550,7 @@ Py_NewInterpreter(void)
 	/* XXX The following is lax in error checking */
 
 	interp->modules = PyDict_New();
+	interp->modules_reloading = PyDict_New();
 
 	bimod = _PyImport_FindExtension("__builtin__", "__builtin__");
 	if (bimod != NULL) {
@@ -1269,12 +1276,12 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 	
 	mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
 				   flags, NULL, arena);
+	if (closeit)
+		fclose(fp);
 	if (mod == NULL) {
 		PyArena_Free(arena);
 		return NULL;
 	}
-	if (closeit)
-		fclose(fp);
 	STACKLESS_PROMOTE_ALL();
 	ret = run_mod(mod, filename, globals, locals, flags, arena);
 	PyArena_Free(arena);

@@ -333,6 +333,87 @@ isn't, there should be a syntax error.
    Traceback (most recent call last):
      ...
    SyntaxError: 'break' outside loop (<doctest test.test_syntax[42]>, line 3)
+
+This should probably raise a better error than a SystemError (or none at all).
+In 2.5 there was a missing exception and an assert was triggered in a debug
+build.  The number of blocks must be greater than CO_MAXBLOCKS.  SF #1565514
+
+   >>> while 1:
+   ...  while 2:
+   ...   while 3:
+   ...    while 4:
+   ...     while 5:
+   ...      while 6:
+   ...       while 8:
+   ...        while 9:
+   ...         while 10:
+   ...          while 11:
+   ...           while 12:
+   ...            while 13:
+   ...             while 14:
+   ...              while 15:
+   ...               while 16:
+   ...                while 17:
+   ...                 while 18:
+   ...                  while 19:
+   ...                   while 20:
+   ...                    while 21:
+   ...                     while 22:
+   ...                      break
+   Traceback (most recent call last):
+     ...
+   SystemError: too many statically nested blocks
+
+This tests assignment-context; there was a bug in Python 2.5 where compiling
+a complex 'if' (one with 'elif') would fail to notice an invalid suite,
+leading to spurious errors.
+
+   >>> if 1:
+   ...   x() = 1
+   ... elif 1:
+   ...   pass
+   Traceback (most recent call last):
+     ... 
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[44]>, line 2)
+
+   >>> if 1:
+   ...   pass
+   ... elif 1:
+   ...   x() = 1
+   Traceback (most recent call last):
+     ... 
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[45]>, line 4)
+
+   >>> if 1:
+   ...   x() = 1
+   ... elif 1:
+   ...   pass
+   ... else:
+   ...   pass
+   Traceback (most recent call last):
+     ... 
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[46]>, line 2)
+
+   >>> if 1:
+   ...   pass
+   ... elif 1:
+   ...   x() = 1
+   ... else:
+   ...   pass
+   Traceback (most recent call last):
+     ... 
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[47]>, line 4)
+
+   >>> if 1:
+   ...   pass
+   ... elif 1:
+   ...   pass
+   ... else:
+   ...   x() = 1
+   Traceback (most recent call last):
+     ... 
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[48]>, line 6)
+
 """
 
 import re

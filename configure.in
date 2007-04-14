@@ -219,6 +219,11 @@ case $ac_sys_system/$ac_sys_release in
   # Reconfirmed for OpenBSD 3.3 by Zachary Hamm, for 3.4 by Jason Ish.
   OpenBSD/2.* | OpenBSD/3.@<:@0123456789@:>@ | OpenBSD/4.@<:@0@:>@) 
     define_xopen_source=no;;
+  # Defining _XOPEN_SOURCE on NetBSD version prior to the introduction of
+  # _NETBSD_SOURCE disables certain features (eg. setgroups). Reported by
+  # Marc Recht
+  NetBSD/1.5 | NetBSD/1.5.* | NetBSD/1.6 | NetBSD/1.6.* | NetBSD/1.6[A-S])
+    define_xopen_source=no;;
   # On Solaris 2.6, sys/wait.h is inconsistent in the usage
   # of union __?sigval. Reported by Stuart Bishop.
   SunOS/5.6)
@@ -1556,9 +1561,11 @@ if test -z "$CCSHARED"
 then
 	case $ac_sys_system/$ac_sys_release in
 	SunOS*) if test "$GCC" = yes;
-	        then CCSHARED="-fPIC";
-		else CCSHARED="-xcode=pic32";
-	        fi;;
+		then CCSHARED="-fPIC";
+		elif test `uname -p` = sparc;
+		then CCSHARED="-xcode=pic32";
+		else CCSHARED="-Kpic";
+		fi;;
 	hp*|HP*) if test "$GCC" = yes;
 		 then CCSHARED="-fPIC";
 		 else CCSHARED="+z";
@@ -3355,8 +3362,27 @@ AC_TRY_COMPILE([#include <curses.h>], void *x=resizeterm,
   AC_MSG_RESULT(no)
 )
 
-AC_CHECK_FILE(/dev/ptmx, AC_DEFINE(HAVE_DEV_PTMX, 1, [Define if we have /dev/ptmx.]))
-AC_CHECK_FILE(/dev/ptc, AC_DEFINE(HAVE_DEV_PTC, 1, [Define if we have /dev/ptc.]))
+AC_MSG_CHECKING(for /dev/ptmx)
+
+if test -r /dev/ptmx
+then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_DEV_PTMX, 1,
+  [Define if we have /dev/ptmx.])
+else
+  AC_MSG_RESULT(no)
+fi
+
+AC_MSG_CHECKING(for /dev/ptc)
+
+if test -r /dev/ptc
+then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_DEV_PTC, 1,
+  [Define if we have /dev/ptc.])
+else
+  AC_MSG_RESULT(no)
+fi
 
 AC_MSG_CHECKING(for %zd printf() format support)
 AC_TRY_RUN([#include <stdio.h>

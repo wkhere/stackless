@@ -95,7 +95,7 @@ deque_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	dequeobject *deque;
 	block *b;
 
-	if (!_PyArg_NoKeywords("deque()", kwds))
+	if (type == &deque_type && !_PyArg_NoKeywords("deque()", kwds))
 		return NULL;
 
 	/* create dequeobject structure */
@@ -911,15 +911,14 @@ dequeiter_next(dequeiterobject *it)
 {
 	PyObject *item;
 
-	if (it->counter == 0)
-		return NULL;
-
 	if (it->deque->state != it->state) {
 		it->counter = 0;
 		PyErr_SetString(PyExc_RuntimeError,
 				"deque mutated during iteration");
 		return NULL;
 	}
+	if (it->counter == 0)
+		return NULL;        
 	assert (!(it->b == it->deque->rightblock &&
 		  it->index > it->deque->rightindex));
 
@@ -1076,7 +1075,7 @@ static PyTypeObject defdict_type; /* Forward */
 
 PyDoc_STRVAR(defdict_missing_doc,
 "__missing__(key) # Called by __getitem__ for missing key; pseudo-code:\n\
-  if self.default_factory is None: raise KeyError(key)\n\
+  if self.default_factory is None: raise KeyError((key,))\n\
   self[key] = value = self.default_factory()\n\
   return value\n\
 ");
@@ -1088,7 +1087,11 @@ defdict_missing(defdictobject *dd, PyObject *key)
 	PyObject *value;
 	if (factory == NULL || factory == Py_None) {
 		/* XXX Call dict.__missing__(key) */
-		PyErr_SetObject(PyExc_KeyError, key);
+		PyObject *tup;
+		tup = PyTuple_Pack(1, key);
+		if (!tup) return NULL;
+		PyErr_SetObject(PyExc_KeyError, tup);
+		Py_DECREF(tup);
 		return NULL;
 	}
 	value = PyEval_CallObject(factory, NULL);
@@ -1253,8 +1256,14 @@ defdict_init(PyObject *self, PyObject *args, PyObject *kwds)
 		newargs = PyTuple_New(0);
 	else {
 		Py_ssize_t n = PyTuple_GET_SIZE(args);
-		if (n > 0)
+		if (n > 0) {
 			newdefault = PyTuple_GET_ITEM(args, 0);
+			if (!PyCallable_Check(newdefault)) {
+				PyErr_SetString(PyExc_TypeError,
+					"first argument must be callable");                           
+				return -1;
+			}
+		}
 		newargs = PySequence_GetSlice(args, 1, n);
 	}
 	if (newargs == NULL)

@@ -7,10 +7,94 @@ Python News
 What's New in Python 2.5.1c1?
 =============================
 
-*Release date: XX-XXX-XXXX*
+*Release date: 05-APR-2007*
 
 Core and builtins
 -----------------
+
+- Patch #1682205: a TypeError while unpacking an iterable is no longer
+  masked by a generic one with the message "unpack non-sequence".
+
+- Patch #1642547: Fix an error/crash when encountering syntax errors in
+  complex if statements.
+
+- Patch #1462488: Python no longer segfaults when ``object.__reduce_ex__()``
+  is called with an object that is faking its type.
+
+- Patch #1680015: Don't modify __slots__ tuple if it contains an unicode
+  name.
+
+- Patch #922167: Python no longer segfaults when faced with infinitely
+  self-recursive reload() calls (as reported by bug #742342).
+
+- Patch #1675981: remove unreachable code from ``type.__new__()`` method.
+
+- Patch #1638879: don't accept strings with embedded NUL bytes in long().
+
+- Bug #1674503: close the file opened by execfile() in an error condition.
+
+- Patch #1674228: when assigning a slice (old-style), check for the
+  sq_ass_slice instead of the sq_slice slot.
+
+- Bug #1669182: prevent crash when trying to print an unraisable error
+  from a string exception.
+
+- The peephole optimizer left None as a global in functions with a docstring
+  and an explicit return value.
+
+- Bug #1653736: Properly discard third argument to slot_nb_inplace_power.
+
+- SF #151204:  enumerate() now raises an Overflow error at sys.maxint items.
+
+- Bug #1377858: Fix the segfaulting of the interpreter when an object created
+  a weakref on itself during a __del__ call for new-style classes (classic
+  classes still have the bug).
+
+- Bug #1648179:  set.update() did not recognize an overridden __iter__ 
+  method in subclasses of dict.
+
+- Bug #1579370: Make PyTraceBack_Here use the current thread, not the
+  frame's thread state.
+
+- patch #1630975: Fix crash when replacing sys.stdout in sitecustomize.py
+
+- Bug #1637022: Prefix AST symbols with _Py_.
+
+- Prevent seg fault on shutdown which could occur if an object
+  raised a warning.
+
+- Bug #1566280: Explicitly invoke threading._shutdown from Py_Main,
+  to avoid relying on atexit.
+
+- Bug #1590891: random.randrange don't return correct value for big number
+
+- Bug #1456209: In some obscure cases it was possible for a class with a
+  custom ``__eq__()`` method to confuse set internals when class instances
+  were used as a set's elements and the ``__eq__()`` method mutated the set.
+
+- The repr for self-referential sets and fronzensets now shows "..." instead
+  of falling into infinite recursion.
+
+- Eliminated unnecessary repeated calls to hash() by set.intersection() and
+  set.symmetric_difference_update().
+
+- Bug #1591996: Correctly forward exception in instance_contains().
+
+- Bug #1588287: fix invalid assertion for `1,2` in debug builds.
+
+- Bug #1576657: when setting a KeyError for a tuple key, make sure that
+  the tuple isn't used as the "exception arguments tuple".  Applied to
+  both sets and dictionaries.
+
+- Bug #1565514, SystemError not raised on too many nested blocks.
+
+- Bug #1576174: WindowsError now displays the windows error code
+  again, no longer the posix error code.
+
+- Patch #1549049: Support long values in structmember.
+
+- Bug #1542016: make sys.callstats() match its docstring and return an
+  11-tuple (only relevant when Python is compiled with -DCALL_PROFILE).
 
 - Bug #1545497: when given an explicit base, int() did ignore NULs
   embedded in the string to convert.
@@ -46,11 +130,65 @@ Core and builtins
 
 - Allow exception instances to be directly sliced again.
 
-- fixed a bug with bsddb.DB.stat: the flags and txn keyword arguments
-  were transposed.
 
 Extension Modules
 -----------------
+
+- Bug #1563759: struct.unpack doens't support buffer protocol objects
+
+- Bug #1686475: Support stat'ing open files on Windows again.
+
+- Bug #1647541: Array module's buffer interface can now handle empty arrays.
+
+- Bug #1693079: The array module can now successfully pickle empty arrays.
+
+- Bug #1688393: Prevent crash in socket.recvfrom if length is negative.
+
+- Bug #1622896: fix a rare corner case where the bz2 module raised an
+  error in spite of a succesful compression.
+
+- Patch #1654417: make operator.{get,set,del}slice use the full range
+  of Py_ssize_t.
+
+- Patch #1646728: datetime.fromtimestamp fails with negative
+  fractional times.  With unittest.
+
+- Patch #1494140: Add documentation for the new struct.Struct object.
+
+- Patch #1657276: Make NETLINK_DNRTMSG conditional.
+
+- Bug #1653736: Fix signature of time_isoformat.
+
+- operator.count() now raises an OverflowError when the count reaches sys.maxint.
+
+- Bug #1575169: operator.isSequenceType() now returns False for subclasses of dict.
+
+- collections.defaultdict() now verifies that the factory function is callable.
+
+- Bug #1486663: don't reject keyword arguments for subclasses of builtin
+  types.
+
+- The version number of the ctypes package was changed to "1.0.2".
+
+- Bug #1664966: Fix crash in exec if Unicode filename can't be decoded.
+
+- Patch #1544279: Improve thread-safety of the socket module by moving
+  the sock_addr_t storage out of the socket object.
+
+- Patch #1615868: make bz2.BZFile.seek() work for offsets >2GiB.
+
+- Bug #1563807: _ctypes built on AIX fails with ld ffi error.
+
+- Bug #1598620: A ctypes Structure cannot contain itself.
+ 
+- Bug #1588217: don't parse "= " as a soft line break in binascii's
+  a2b_qp() function, instead leave it in the string as quopri.decode()
+  does.
+
+- Patch #838546: Make terminal become controlling in pty.fork()
+
+- Patch #1560695: Add .note.GNU-stack to ctypes' sysv.S so that
+  ctypes isn't considered as requiring executable stacks.
 
 - Bug #1567666: Emulate GetFileAttributesExA for Win95.
 
@@ -72,8 +210,156 @@ Extension Modules
 
 - Make regex engine raise MemoryError if allocating memory fails.
 
+- fixed a bug with bsddb.DB.stat: the flags and txn keyword arguments
+  were transposed.
+
+- Added support for linking the bsddb module against BerkeleyDB 4.5.x.
+
+- Modifying an empty deque during iteration now raises RuntimeError
+  instead of StopIteration.
+
+- Bug #1552726: fix polling at the interpreter prompt when certain
+  versions of the readline library are in use.
+
+- Bug #1633621: if curses.resizeterm() or curses.resize_term() is called,
+  update _curses.LINES, _curses.COLS, curses.LINES and curses.COLS.
+
+- Fix an off-by-one bug in locale.strxfrm().
+
 Library
 -------
+
+- Patch #1685563: remove (don't add) duplicate paths in distutils.MSVCCompiler.
+
+- Bug #978833: Revert r50844, as it broke _socketobject.dup.
+
+- Bug #1675967: re patterns pickled with Python 2.4 and earlier can
+  now be unpickled with Python 2.5.
+
+- Bug #1684254: webbrowser now uses shlex to split any command lines
+  given to get(). It also detects when you use '&' as the last argument
+  and creates a BackgroundBrowser then.
+
+- Patch #1681153: the wave module now closes a file object it opened if
+  initialization failed.
+
+- Bug #767111: fix long-standing bug in urllib which caused an
+  AttributeError instead of an IOError when the server's response didn't
+  contain a valid HTTP status line.
+
+- Bug #1629369: Correctly parse multiline comment in address field.
+
+- Bug #1582282: Fix email.header.decode_header() to properly treat encoded
+  words with no delimiting whitespace as a single word.
+
+- Patch #1449244: Support Unicode strings in
+  email.message.Message.{set_charset,get_content_charset}.
+
+- Patch #1542681: add entries for "with", "as" and "CONTEXTMANAGERS" to
+  pydoc's help keywords.
+
+- Patch #1192590: Fix pdb's "ignore" and "condition" commands so they trap
+  the IndexError caused by passing in an invalid breakpoint number.
+
+- Bug #1531963: Make SocketServer.TCPServer's server_address always
+  be equal to calling getsockname() on the server's socket. Fixed by patch
+  #1545011.
+
+- Bug #1651235: When a tuple was passed to a ctypes function call,
+  Python would crash instead of raising an error.
+
+- Fix bug #1646630: ctypes.string_at(buf, 0) and ctypes.wstring_at(buf, 0)
+  returned string up to the first NUL character.
+
+- Bug #1637850:  make_table in difflib did not work with unicode
+
+- Bugs #1676321:  the empty() function in sched.py returned the wrong result
+
+- unittest now verifies more of its assumptions. In particular, TestCase
+  and TestSuite subclasses (not instances) are no longer accepted in
+  TestSuite.addTest(). This should cause no incompatibility since it
+  never made sense with ordinary subclasses -- the failure just occurred
+  later, with a more cumbersome exception.
+
+- Patch #685268: Consider a package's __path__ in imputil.
+
+- Patch 1463026: Support default namespace in XMLGenerator.
+
+- Patch 1571379: Make trace's --ignore-dir facility work in the face of
+  relative directory names.
+
+- Bug #1600860: Search for shared python library in LIBDIR, not lib/python/config,
+  on "linux" and "gnu" systems.
+
+- Bug #1124861: Automatically create pipes if GetStdHandle fails in
+  subprocess. 
+
+- Patch #783050: the pty.fork() function now closes the slave fd
+  correctly.
+
+- Patch #1638243: the compiler package is now able to correctly compile
+  a with statement; previously, executing code containing a with statement
+  compiled by the compiler package crashed the interpreter.
+
+- Bug #1643943: Fix %U handling for time.strptime.
+
+- Bug #1598181: Avoid O(N**2) bottleneck in subprocess communicate(). 
+
+- Patch #1627441: close sockets properly in urllib2.
+
+- Bug #1610795: ctypes.util.find_library works now on BSD systems.
+
+- Fix sort stability in heapq.nlargest() and nsmallest().
+
+- Patch #1504073: Fix tarfile.open() for mode "r" with a fileobj argument.
+
+- Patch #1262036: Prevent TarFiles from being added to themselves under
+  certain conditions.
+
+- Patch #1230446: tarfile.py: fix ExFileObject so that read() and tell()
+  work correctly together with readline().
+
+- Bug #737202: Make CGIHTTPServer work for scripts in subdirectories.
+  Fix by Titus Brown.
+
+- Patch #827559: Make SimpleHTTPServer redirect when a directory URL
+  is missing the trailing slash, so that relative links work correctly.
+  Patch by Chris Gonnerman.
+
+- Patch #1608267: fix a race condition in os.makedirs() is the directory
+  to be created is already there.
+
+- Patch #1610437: fix a tarfile bug with long filename headers.
+
+- Patch #1472877: Fix Tix subwidget name resolution.
+
+- Patch #1594554: Always close a tkSimpleDialog on ok(), even
+  if an exception occurs.
+
+- Patch #1538878: Don't make tkSimpleDialog dialogs transient if
+  the parent window is withdrawn.
+
+- Patch #1360200: Use unmangled_version RPM spec field to deal with
+  file name mangling.
+
+- Patch #1359217: Process 2xx response in an ftplib transfer
+  that precedes an 1xx response.
+
+- Patch #1060577: Extract list of RPM files from spec file in
+  bdist_rpm
+
+- Bug #1586613: fix zlib and bz2 codecs' incremental en/decoders.
+
+- Patch #1583880: fix tarfile's problems with long names and posix/
+  GNU modes.
+
+- Fix codecs.EncodedFile which did not use file_encoding in 2.5.0, and
+  fix all codecs file wrappers to work correctly with the "with"
+  statement (bug #1586513).
+
+- ctypes callback functions only support 'fundamental' data types as
+  result type.  Raise an error when something else is used.  This is a
+  partial fix for Bug #1574584.
 
 - Bug #813342: Start the IDLE subprocess with -Qnew if the parent
   is started with that option.
@@ -93,6 +379,36 @@ Library
 - Bug #1565661: in webbrowser, split() the command for the default
   GNOME browser in case it is a command with args.
 
+- Bug #1569790: mailbox.py: Maildir.get_folder() and MH.get_folder()
+  weren't passing the message factory on to newly created Maildir/MH
+  objects.
+
+- Bug #1575506: mailbox.py: Single-file mailboxes didn't re-lock
+  properly in their flush() method.
+
+- Patch #1514543: mailbox.py: In the Maildir class, report errors if there's 
+  a filename clash instead of possibly losing a message.  (Patch by David
+  Watson.)
+
+- Patch #1514544: mailbox.py: Try to ensure that messages/indexes have
+  been physically written to disk after calling .flush() or
+  .close(). (Patch by David Watson.)
+
+- mailbox.py: Change MH.pack() to not lock individual message files; this
+  wasn't consistent with existing implementations of message packing, and
+  was buggy on some platforms.
+
+- Bug #1633678: change old mailbox.UnixMailbox class to parse 
+  'From' lines less strictly.
+
+- Bug #1576241: fix functools.wraps() to work on built-in functions.
+
+- Patch #1574068: fix urllib/urllib2 to not insert line breaks when
+  HTTP authentication data was very long.
+
+- Patch #1617413: fix urllib's support for  HTTP Basic authentication via HTTPS
+  (patch by Dug Song).
+
 - Fix a bug in traceback.format_exception_only() that led to an error
   being raised when print_exc() was called without an exception set.
   In version 2.4, this printed "None", restored that behavior.
@@ -101,11 +417,64 @@ Library
   the close_fds arg to subprocess.Popen is not supported).
 
 
+Tools/Demos
+-----------
+
+- Patch #1552024: add decorator support to unparse.py demo script.
+
+- idle: Honor the "Cancel" action in the save dialog (Debian bug #299092).
+
+
+Tests
+-----
+
+- Cause test.test_socket_ssl:test_basic to raise
+  test.test_support.ResourceDenied when an HTTPS connection times out.
+
+- Remove passwd.adjunct.byname from list of maps
+  for test_nis.
+
+
 Build
 -----
 
+- Bug #1655392: don't add -L/usr/lib/pythonX.Y/config to the LDFLAGS
+  returned by python-config if Python was built with --enable-shared
+  because that prevented the shared library from being used.
+
+- Patch #1569798: fix a bug in distutils when building Python from a
+  directory within sys.exec_prefix.
+
+- Bug #1675511: Use -Kpic instead of -xcode=pic32 on Solaris/x86.
+
+- Disable _XOPEN_SOURCE on NetBSD 1.x.
+
+- Bug #1578513: Cross compilation was broken by a change to configure.
+  Repair so that it's back to how it was in 2.4.3.
+
 - Patch #1576954: Update VC6 build directory; remove redundant
   files in VC7.
+
+- Fix build failure on kfreebsd and on the hurd.
+
+- Fix the build of the library reference in info format.
+
+
+Windows
+-------
+
+- Conditionalize definition of _CRT_SECURE_NO_DEPRECATE
+  and _CRT_NONSTDC_NO_DEPRECATE.
+
+
+Documentation
+-------------
+
+- Patch #1489771: the syntax rules in Python Reference Manual were
+  updated to reflect the current Python syntax.
+
+- Patch #1686451: Fix return type for
+  PySequence_{Count,Index,Fast_GET_SIZE}.
 
 
 What's New in Python 2.5 (final)
@@ -178,6 +547,8 @@ Library
 Extension Modules
 -----------------
 
+- Bug #1599782: fix segfault on bsddb.db.DB().type().
+
 - Fix bugs in ctypes:
   - anonymous structure fields that have a bit-width specified did not work
   - cast function did not accept c_char_p or c_wchar_p instances as first arg
@@ -199,12 +570,22 @@ Extension Modules
 Tests
 -----
 
+- Patch #1559413: Fix test_cmd_line if sys.executable contains a space.
+
 - Fix bsddb test_basics.test06_Transactions to check the version
   number properly.
 
 
 Documentation
 -------------
+
+- Patch #1679379: add documentation for fnmatch.translate().
+
+- Patch #1671450: add a section about subclassing builtin types to the
+  "extending and embedding" tutorial.
+
+- Bug #1629125: fix wrong data type (int -> Py_ssize_t) in PyDict_Next
+  docs.
 
 - Bug #1565919: document set types in the Language Reference.
 

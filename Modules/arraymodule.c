@@ -1147,12 +1147,19 @@ array_reduce(arrayobject *array)
 		dict = Py_None;
 		Py_INCREF(dict);
 	}
-	result = Py_BuildValue("O(cs#)O", 
-		array->ob_type, 
-		array->ob_descr->typecode,
-		array->ob_item,
-		array->ob_size * array->ob_descr->itemsize,
-		dict);
+	if (array->ob_size > 0) {
+		result = Py_BuildValue("O(cs#)O", 
+			array->ob_type, 
+			array->ob_descr->typecode,
+			array->ob_item,
+			array->ob_size * array->ob_descr->itemsize,
+			dict);
+	} else {
+		result = Py_BuildValue("O(c)O", 
+			array->ob_type, 
+			array->ob_descr->typecode,
+			dict);
+	}
 	Py_DECREF(dict);
 	return result;
 }
@@ -1495,7 +1502,7 @@ PyMethodDef array_methods[] = {
 	 copy_doc},
 	{"count",	(PyCFunction)array_count,	METH_O,
 	 count_doc},
-	{"__deepcopy__",(PyCFunction)array_copy,	METH_NOARGS,
+	{"__deepcopy__",(PyCFunction)array_copy,	METH_O,
 	 copy_doc},
 	{"extend",      (PyCFunction)array_extend,	METH_O,
 	 extend_doc},
@@ -1738,6 +1745,8 @@ static PyMappingMethods array_as_mapping = {
 	(objobjargproc)array_ass_subscr
 };
 
+static const void *emptybuf = "";
+
 static Py_ssize_t
 array_buffer_getreadbuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 {
@@ -1747,6 +1756,8 @@ array_buffer_getreadbuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 		return -1;
 	}
 	*ptr = (void *)self->ob_item;
+	if (*ptr == NULL)
+		*ptr = emptybuf;
 	return self->ob_size*self->ob_descr->itemsize;
 }
 
@@ -1759,6 +1770,8 @@ array_buffer_getwritebuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 		return -1;
 	}
 	*ptr = (void *)self->ob_item;
+	if (*ptr == NULL)
+		*ptr = emptybuf;
 	return self->ob_size*self->ob_descr->itemsize;
 }
 
@@ -1797,7 +1810,7 @@ array_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *initial = NULL, *it = NULL;
 	struct arraydescr *descr;
 	
-	if (!_PyArg_NoKeywords("array.array()", kwds))
+	if (type == &Arraytype && !_PyArg_NoKeywords("array.array()", kwds))
 		return NULL;
 
 	if (!PyArg_ParseTuple(args, "c|O:array", &c, &initial))

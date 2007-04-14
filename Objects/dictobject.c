@@ -12,6 +12,20 @@
 typedef PyDictEntry dictentry;
 typedef PyDictObject dictobject;
 
+/* Set a key error with the specified argument, wrapping it in a
+ * tuple automatically so that tuple keys are not unpacked as the
+ * exception arguments. */
+static void
+set_key_error(PyObject *arg)
+{
+	PyObject *tup;
+	tup = PyTuple_Pack(1, arg);
+	if (!tup)
+		return; /* caller will expect error to be set anyway */
+	PyErr_SetObject(PyExc_KeyError, tup);
+	Py_DECREF(tup);
+}
+
 /* Define this out if you don't want conversion statistics on exit. */
 #undef SHOW_CONVERSION_COUNTS
 
@@ -307,6 +321,8 @@ lookdict(dictobject *mp, PyObject *key, register long hash)
 		else if (ep->me_key == dummy && freeslot == NULL)
 			freeslot = ep;
 	}
+	assert(0);	/* NOT REACHED */
+	return 0;
 }
 
 /*
@@ -366,6 +382,8 @@ lookdict_string(dictobject *mp, PyObject *key, register long hash)
 		if (ep->me_key == dummy && freeslot == NULL)
 			freeslot = ep;
 	}
+	assert(0);	/* NOT REACHED */
+	return 0;
 }
 
 /*
@@ -661,7 +679,7 @@ PyDict_DelItem(PyObject *op, PyObject *key)
 	if (ep == NULL)
 		return -1;
 	if (ep->me_value == NULL) {
-		PyErr_SetObject(PyExc_KeyError, key);
+		set_key_error(key);
 		return -1;
 	}
 	old_key = ep->me_key;
@@ -778,6 +796,34 @@ PyDict_Next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey, PyObject **pvalue)
 	*ppos = i+1;
 	if (i > mask)
 		return 0;
+	if (pkey)
+		*pkey = ep[i].me_key;
+	if (pvalue)
+		*pvalue = ep[i].me_value;
+	return 1;
+}
+
+/* Internal version of PyDict_Next that returns a hash value in addition to the key and value.*/
+int
+_PyDict_Next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey, PyObject **pvalue, long *phash)
+{
+	register Py_ssize_t i;
+	register Py_ssize_t mask;
+	register dictentry *ep;
+
+	if (!PyDict_Check(op))
+		return 0;
+	i = *ppos;
+	if (i < 0)
+		return 0;
+	ep = ((dictobject *)op)->ma_table;
+	mask = ((dictobject *)op)->ma_mask;
+	while (i <= mask && ep[i].me_value == NULL)
+		i++;
+	*ppos = i+1;
+	if (i > mask)
+		return 0;
+        *phash = (long)(ep[i].me_hash);
 	if (pkey)
 		*pkey = ep[i].me_key;
 	if (pvalue)
@@ -970,7 +1016,7 @@ dict_subscript(dictobject *mp, register PyObject *key)
 				return PyObject_CallFunctionObjArgs(missing,
 					(PyObject *)mp, key, NULL);
 		}
-		PyErr_SetObject(PyExc_KeyError, key);
+		set_key_error(key);
 		return NULL;
 	}
 	else
@@ -1128,6 +1174,24 @@ dict_fromkeys(PyObject *cls, PyObject *args)
 	d = PyObject_CallObject(cls, NULL);
 	if (d == NULL)
 		return NULL;
+
+	if (PyDict_CheckExact(d) && PyAnySet_CheckExact(seq)) {
+		dictobject *mp = (dictobject *)d;
+		Py_ssize_t pos = 0;
+		PyObject *key;
+		long hash;
+
+		if (dictresize(mp, PySet_GET_SIZE(seq)))
+			return NULL;
+
+		while (_PySet_NextEntry(seq, &pos, &key, &hash)) {
+			Py_INCREF(key);
+			Py_INCREF(value);
+			if (insertdict(mp, key, hash, value))
+				return NULL;
+		}
+		return d;
+	}
 
 	it = PyObject_GetIter(seq);
 	if (it == NULL){
@@ -1288,7 +1352,7 @@ PyDict_Merge(PyObject *a, PyObject *b, int override)
 		return -1;
 	}
 	mp = (dictobject*)a;
-	if (PyDict_Check(b)) {
+	if (PyDict_CheckExact(b)) {
 		other = (dictobject*)b;
 		if (other == mp || other->ma_used == 0)
 			/* a.update(a) or a.update({}); nothing to do */
@@ -1742,7 +1806,7 @@ dict_pop(dictobject *mp, PyObject *args)
 			Py_INCREF(deflt);
 			return deflt;
 		}
-		PyErr_SetObject(PyExc_KeyError, key);
+		set_key_error(key);
 		return NULL;
 	}
 	old_key = ep->me_key;
@@ -1965,6 +2029,17 @@ PyDict_Contains(PyObject *op, PyObject *key)
 		if (hash == -1)
 			return -1;
 	}
+	ep = (mp->ma_lookup)(mp, key, hash);
+	return ep == NULL ? -1 : (ep->me_value != NULL);
+}
+
+/* Internal version of PyDict_Contains used when the hash value is already known */
+int
+_PyDict_Contains(PyObject *op, PyObject *key, long hash)
+{
+	dictobject *mp = (dictobject *)op;
+	dictentry *ep;
+
 	ep = (mp->ma_lookup)(mp, key, hash);
 	return ep == NULL ? -1 : (ep->me_value != NULL);
 }

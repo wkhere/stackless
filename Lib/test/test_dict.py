@@ -189,6 +189,14 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(ValueError, {}.update, [(1, 2, 3)])
 
+        # SF #1615701:  make d.update(m) honor __getitem__() and keys() in dict subclasses
+        class KeyUpperDict(dict):
+            def __getitem__(self, key):
+                return key.upper()
+        d.clear()
+        d.update(KeyUpperDict.fromkeys('abc'))
+        self.assertEqual(d, {'a':'A', 'b':'B', 'c':'C'})
+
     def test_fromkeys(self):
         self.assertEqual(dict.fromkeys('abc'), {'a':None, 'b':None, 'c':None})
         d = {}
@@ -422,7 +430,7 @@ class DictTest(unittest.TestCase):
         except RuntimeError, err:
             self.assertEqual(err.args, (42,))
         else:
-            self.fail_("e[42] didn't raise RuntimeError")
+            self.fail("e[42] didn't raise RuntimeError")
         class F(dict):
             def __init__(self):
                 # An instance variable __missing__ should have no effect
@@ -433,7 +441,7 @@ class DictTest(unittest.TestCase):
         except KeyError, err:
             self.assertEqual(err.args, (42,))
         else:
-            self.fail_("f[42] didn't raise KeyError")
+            self.fail("f[42] didn't raise KeyError")
         class G(dict):
             pass
         g = G()
@@ -442,7 +450,17 @@ class DictTest(unittest.TestCase):
         except KeyError, err:
             self.assertEqual(err.args, (42,))
         else:
-            self.fail_("g[42] didn't raise KeyError")
+            self.fail("g[42] didn't raise KeyError")
+
+    def test_tuple_keyerror(self):
+        # SF #1576657
+        d = {}
+        try:
+            d[(1,)]
+        except KeyError, e:
+            self.assertEqual(e.args, ((1,),))
+        else:
+            self.fail("missing KeyError")
 
 
 from test import mapping_tests

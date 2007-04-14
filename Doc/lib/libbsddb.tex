@@ -2,7 +2,6 @@
          Interface to Berkeley DB library}
 
 \declaremodule{extension}{bsddb}
-  \platform{Unix, Windows}
 \modulesynopsis{Interface to Berkeley DB database library}
 \sectionauthor{Skip Montanaro}{skip@mojam.com}
 
@@ -16,7 +15,7 @@ serialize them somehow, typically using \function{marshal.dumps()} or
 \function{pickle.dumps()}.
 
 The \module{bsddb} module requires a Berkeley DB library version from
-3.3 thru 4.4.
+3.3 thru 4.5.
 
 \begin{seealso}
   \seeurl{http://pybsddb.sourceforge.net/}
@@ -46,10 +45,10 @@ portability, only the first two arguments should be used in most
 instances.
 
 \begin{funcdesc}{hashopen}{filename\optional{, flag\optional{,
-                           mode\optional{, bsize\optional{,
+                           mode\optional{, pgsize\optional{,
                            ffactor\optional{, nelem\optional{,
-                           cachesize\optional{, hash\optional{,
-                           lorder}}}}}}}}}
+                           cachesize\optional{, lorder\optional{,
+                           hflags}}}}}}}}}
 Open the hash format file named \var{filename}.  Files never intended
 to be preserved on disk may be created by passing \code{None} as the 
 \var{filename}.  The optional
@@ -80,7 +79,7 @@ interpretation.
 
 \begin{funcdesc}{rnopen}{filename\optional{, flag\optional{, mode\optional{,
 rnflags\optional{, cachesize\optional{, pgsize\optional{, lorder\optional{,
-reclen\optional{, bval\optional{, bfname}}}}}}}}}}
+rlen\optional{, delim\optional{, source\optional{, pad}}}}}}}}}}}
 
 Open a DB record format file named \var{filename}.  Files never intended 
 to be preserved on disk may be created by passing \code{None} as the 

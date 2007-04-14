@@ -667,6 +667,17 @@ subtype_dealloc(PyObject *self)
 			goto endlabel;	/* resurrected */
 		else
 			_PyObject_GC_UNTRACK(self);
+		/* New weakrefs could be created during the finalizer call.
+		    If this occurs, clear them out without calling their
+		    finalizers since they might rely on part of the object
+		    being finalized that has already been destroyed. */
+		if (type->tp_weaklistoffset && !base->tp_weaklistoffset) {
+			/* Modeled after GET_WEAKREFS_LISTPTR() */
+			PyWeakReference **list = (PyWeakReference **) \
+				PyObject_GET_WEAKREFS_LISTPTR(self);
+			while (*list)
+				_PyWeakref_ClearRef(*list);
+		}
 	}
 
 	/*  Clear slots up to the nearest base with a different tp_dealloc */
@@ -1569,29 +1580,33 @@ valid_identifier(PyObject *s)
 static PyObject *
 _unicode_to_string(PyObject *slots, Py_ssize_t nslots)
 {
-	PyObject *tmp = slots;
-	PyObject *o, *o1;
+	PyObject *tmp = NULL;
+	PyObject *slot_name, *new_name;
 	Py_ssize_t i;
-	ssizessizeargfunc copy = slots->ob_type->tp_as_sequence->sq_slice;
+
 	for (i = 0; i < nslots; i++) {
-		if (PyUnicode_Check(o = PyTuple_GET_ITEM(tmp, i))) {
-			if (tmp == slots) {
-				tmp = copy(slots, 0, PyTuple_GET_SIZE(slots));
+		if (PyUnicode_Check(slot_name = PyTuple_GET_ITEM(slots, i))) {
+			if (tmp == NULL) {
+				tmp = PySequence_List(slots);
 				if (tmp == NULL)
 					return NULL;
 			}
-			o1 = _PyUnicode_AsDefaultEncodedString
-					(o, NULL);
-			if (o1 == NULL) {
+			new_name = _PyUnicode_AsDefaultEncodedString(slot_name,
+								     NULL);
+			if (new_name == NULL) {
 				Py_DECREF(tmp);
-				return 0;
+				return NULL;
 			}
-			Py_INCREF(o1);
-			Py_DECREF(o);
-			PyTuple_SET_ITEM(tmp, i, o1);
+			Py_INCREF(new_name);
+			PyList_SET_ITEM(tmp, i, new_name);
+			Py_DECREF(slot_name);
 		}
 	}
-	return tmp;
+	if (tmp != NULL) {
+		slots = PyList_AsTuple(tmp);
+		Py_DECREF(tmp);
+	}
+	return slots;
 }
 #endif
 
@@ -1738,12 +1753,12 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 
 #ifdef Py_USING_UNICODE
 		tmp = _unicode_to_string(slots, nslots);
+		if (tmp == NULL)
+			goto bad_slots;
 		if (tmp != slots) {
 			Py_DECREF(slots);
 			slots = tmp;
 		}
-		if (!tmp)
-			return NULL;
 #endif
 		/* Check for valid slot names and two special cases */
 		for (i = 0; i < nslots; i++) {
@@ -1931,13 +1946,11 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 				PyTuple_GET_ITEM(slots, i));
 			mp->type = T_OBJECT_EX;
 			mp->offset = slotoffset;
-			if (base->tp_weaklistoffset == 0 &&
-			    strcmp(mp->name, "__weakref__") == 0) {
-				add_weak++;
-				mp->type = T_OBJECT;
-				mp->flags = READONLY;
-				type->tp_weaklistoffset = slotoffset;
-			}
+
+			/* __dict__ and __weakref__ are already filtered out */
+			assert(strcmp(mp->name, "__dict__") != 0);
+			assert(strcmp(mp->name, "__weakref__") != 0);
+
 			slotoffset += sizeof(PyObject *);
 		}
 	}
@@ -2724,11 +2737,54 @@ reduce_2(PyObject *obj)
 	return res;
 }
 
+/*
+ * There were two problems when object.__reduce__ and object.__reduce_ex__
+ * were implemented in the same function:
+ *  - trying to pickle an object with a custom __reduce__ method that
+ *    fell back to object.__reduce__ in certain circumstances led to
+ *    infinite recursion at Python level and eventual RuntimeError.
+ *  - Pickling objects that lied about their type by overwriting the
+ *    __class__ descriptor could lead to infinite recursion at C level
+ *    and eventual segfault.
+ *
+ * Because of backwards compatibility, the two methods still have to
+ * behave in the same way, even if this is not required by the pickle
+ * protocol. This common functionality was moved to the _common_reduce
+ * function.
+ */
+static PyObject *
+_common_reduce(PyObject *self, int proto)
+{
+	PyObject *copy_reg, *res;
+
+	if (proto >= 2)
+		return reduce_2(self);
+
+	copy_reg = import_copy_reg();
+	if (!copy_reg)
+		return NULL;
+
+	res = PyEval_CallMethod(copy_reg, "_reduce_ex", "(Oi)", self, proto);
+	Py_DECREF(copy_reg);
+
+	return res;
+}
+
+static PyObject *
+object_reduce(PyObject *self, PyObject *args)
+{
+	int proto = 0;
+
+	if (!PyArg_ParseTuple(args, "|i:__reduce__", &proto))
+		return NULL;
+
+	return _common_reduce(self, proto);
+}
+
 static PyObject *
 object_reduce_ex(PyObject *self, PyObject *args)
 {
-	/* Call copy_reg._reduce_ex(self, proto) */
-	PyObject *reduce, *copy_reg, *res;
+	PyObject *reduce, *res;
 	int proto = 0;
 
 	if (!PyArg_ParseTuple(args, "|i:__reduce_ex__", &proto))
@@ -2764,23 +2820,13 @@ object_reduce_ex(PyObject *self, PyObject *args)
 			Py_DECREF(reduce);
 	}
 
-	if (proto >= 2)
-		return reduce_2(self);
-
-	copy_reg = import_copy_reg();
-	if (!copy_reg)
-		return NULL;
-
-	res = PyEval_CallMethod(copy_reg, "_reduce_ex", "(Oi)", self, proto);
-	Py_DECREF(copy_reg);
-
-	return res;
+	return _common_reduce(self, proto);
 }
 
 static PyMethodDef object_methods[] = {
 	{"__reduce_ex__", object_reduce_ex, METH_VARARGS,
 	 PyDoc_STR("helper for pickle")},
-	{"__reduce__", object_reduce_ex, METH_VARARGS,
+	{"__reduce__", object_reduce, METH_VARARGS,
 	 PyDoc_STR("helper for pickle")},
 	{0}
 };
@@ -4475,7 +4521,13 @@ SLOT1(slot_nb_inplace_subtract, "__isub__", PyObject *, "O")
 SLOT1(slot_nb_inplace_multiply, "__imul__", PyObject *, "O")
 SLOT1(slot_nb_inplace_divide, "__idiv__", PyObject *, "O")
 SLOT1(slot_nb_inplace_remainder, "__imod__", PyObject *, "O")
-SLOT1(slot_nb_inplace_power, "__ipow__", PyObject *, "O")
+/* Can't use SLOT1 here, because nb_inplace_power is ternary */
+static PyObject * 
+slot_nb_inplace_power(PyObject *self, PyObject * arg1, PyObject *arg2) 
+{ 
+  static PyObject *cache_str; 
+  return call_method(self, "__ipow__", &cache_str, "(" "O" ")", arg1); 
+}
 SLOT1(slot_nb_inplace_lshift, "__ilshift__", PyObject *, "O")
 SLOT1(slot_nb_inplace_rshift, "__irshift__", PyObject *, "O")
 SLOT1(slot_nb_inplace_and, "__iand__", PyObject *, "O")
