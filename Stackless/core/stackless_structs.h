@@ -5,6 +5,9 @@
 extern "C" {
 #endif
 
+/* platform specific constants (mainly SEH stuff to store )*/
+#include "platf/slp_platformselect.h"
+
 
 
 /*** important structures: tasklet ***/
@@ -102,6 +105,9 @@ typedef struct _cstack {
 	struct _tasklet *task;
 	int nesting_level;
 	PyThreadState *tstate;
+#ifdef _SEH32
+	DWORD exception_list; /* SEH handler on Win32 */
+#endif
 	intptr_t *startaddr;
     intptr_t stack[1];
 } PyCStackObject;
