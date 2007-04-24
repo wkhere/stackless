@@ -474,7 +474,7 @@ ComplexExtendsException(PyExc_BaseException, SystemExit, SystemExit,
 /*
  *    TaskletExit extends SystemExit
  */
-SimpleExtendsException(PyExc_SystemExit, TaskletExit,
+MiddlingExtendsException(PyExc_SystemExit, TaskletExit, SystemExit,
                        "This exception is used to silently kill a tasklet");
 #endif
 
