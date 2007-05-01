@@ -12,7 +12,7 @@ extern "C" {
 
 /****************************************************************************
 
-  Stackless Python Internal Configuration 
+  Stackless Python Internal Configuration
 
   Some preliminary description can be found in the draft document readme.txt
 
@@ -27,14 +27,14 @@ extern "C" {
 
  ****************************************************************************/
 
-/* 
+/*
  * every platform needs to define its own interface here.
  * If this isn't defined, stackless is simply not compiled in.
  * Repeat the following sequence for every platform you support...
  * ...and then write your support code and mention it in the
  * common slp_platformselect.h file.
  */
-#define STACKLESS_OFF
+#define STACKLESS
 
 #ifdef STACKLESS_OFF
 #undef STACKLESS
