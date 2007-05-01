@@ -22,6 +22,16 @@
  *      Initial final version after lots of iterations for i386.
  */
 
+/* for the SEH things */
+#ifndef _WINDOWS_
+#define WIN32_LEAN_AND_MEAN
+#ifdef BYTE
+#undef BYTE
+#endif
+#include <windows.h>
+#endif
+#define _SEH32
+
 #define alloca _alloca
 
 #define STACK_REFPLUS 1
@@ -36,6 +46,7 @@
 
 #pragma optimize("", off)
 
+#pragma warning(disable:4731) /* disable ebp modification warning */
 static int
 slp_switch(void)
 {
@@ -54,6 +65,7 @@ slp_switch(void)
 	    SLP_RESTORE_STATE();
 	    return 0;
 	}
+#pragma warning(default:4731)
 }
 
 #endif

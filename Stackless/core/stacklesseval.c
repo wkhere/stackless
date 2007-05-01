@@ -111,6 +111,11 @@ slp_cstack_new(PyCStackObject **cst, intptr_t *stackref, PyTaskletObject *task)
 	(*cst)->task = task;
 	(*cst)->tstate = ts;
 	(*cst)->nesting_level = ts->st.nesting_level;
+#ifdef _SEH32
+	//save the SEH handler
+	(*cst)->exception_list = (DWORD)
+                    __readfsdword(FIELD_OFFSET(NT_TIB, ExceptionList));
+#endif
 	return *cst;
 }
 
@@ -121,10 +126,18 @@ slp_cstack_save(PyCStackObject *cstprev)
 
 	memcpy((cstprev)->stack, (cstprev)->startaddr - 
 				 (cstprev)->ob_size, stsizeb);
+#ifdef _SEH32
+	//save the SEH handler
+	cstprev->exception_list = (DWORD)
+                    __readfsdword(FIELD_OFFSET(NT_TIB, ExceptionList));
+#endif
 	return stsizeb;
 }
 
 void
+#ifdef _SEH32
+#pragma warning(disable:4733) /* disable warning about modifying FS[0] */
+#endif
 slp_cstack_restore(PyCStackObject *cst)
 {
 	cst->tstate->st.nesting_level = cst->nesting_level;
@@ -132,6 +145,11 @@ slp_cstack_restore(PyCStackObject *cst)
 	cst->task = NULL;
 	memcpy(cst->startaddr - cst->ob_size, &cst->stack,
 	       (cst->ob_size) * sizeof(intptr_t));
+#ifdef _SEH32
+	//restore the SEH handler
+	__writefsdword(FIELD_OFFSET(NT_TIB, ExceptionList), (DWORD)(cst->exception_list));
+	#pragma warning(default:4733)
+#endif
 }
 
 
