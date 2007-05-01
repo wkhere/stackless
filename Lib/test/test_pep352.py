@@ -19,6 +19,13 @@ class ExceptionClassTests(unittest.TestCase):
             self.failUnless(hasattr(ins, attr), "%s missing %s attribute" %
                     (ins.__class__.__name__, attr))
 
+    def stackless_enabled(self):
+        try:
+            import stackless
+            return True
+        except:
+            return False
+
     def test_inheritance(self):
         # Make sure the inheritance hierarchy matches the documentation
         exc_set = set(x for x in dir(exceptions) if not x.startswith('_'))
@@ -51,7 +58,9 @@ class ExceptionClassTests(unittest.TestCase):
                 try:
                     exc = getattr(__builtin__, exc_name)
                 except AttributeError:
-                    self.fail("%s not a built-in exception" % exc_name)
+                    # This exception is only compiled into Stackless.
+                    if self.stackless_enabled() or exc_name != "TaskletExit":
+                        self.fail("%s not a built-in exception" % exc_name)
                 if last_depth < depth:
                     superclasses.append((last_depth, last_exc))
                 elif last_depth > depth:
@@ -64,7 +73,9 @@ class ExceptionClassTests(unittest.TestCase):
                     self.verify_instance_interface(exc())
                 except TypeError:
                     pass
-                self.failUnless(exc_name in exc_set)
+                # This exception is only compiled into Stackless.
+                if self.stackless_enabled() or exc_name != "TaskletExit":
+                    self.failUnless(exc_name in exc_set)
                 exc_set.discard(exc_name)
                 last_exc = exc
                 last_depth = depth
