@@ -745,7 +745,7 @@ _channel_send_sequence(PyChannelObject *self, PyObject *v)
  * the loop all the time. Hopefully the idea is still visible.
  */
 
-static PyObject *
+PyObject *
 channel_seq_callback(PyFrameObject *_f, int exc, PyObject *retval)
 {
 	PyThreadState *ts;

@@ -5,6 +5,7 @@
 
 #include "core/stackless_impl.h"
 #include "pickling/prickelpit.h"
+#include "module/channelobject.h"
 
 /* platform specific constants */
 #include "platf/slp_platformselect.h"
@@ -719,6 +720,7 @@ DEF_INVALID_EXEC(eval_frame)
 DEF_INVALID_EXEC(eval_frame_value)
 DEF_INVALID_EXEC(eval_frame_noval)
 DEF_INVALID_EXEC(eval_frame_iter)
+DEF_INVALID_EXEC(channel_seq_callback)
 
 static PyTypeObject wrap_PyFrame_Type;
 
@@ -1048,6 +1050,8 @@ static int init_frametype(void)
 				 PyEval_EvalFrame_noval, REF_INVALID_EXEC(eval_frame_noval))
 	    || slp_register_execute(&PyFrame_Type, "eval_frame_iter",
 				 PyEval_EvalFrame_iter, REF_INVALID_EXEC(eval_frame_iter))
+	    || slp_register_execute(&PyCFrame_Type, "channel_seq_callback",
+				 channel_seq_callback, REF_INVALID_EXEC(channel_seq_callback))
 	    || init_type(&wrap_PyFrame_Type, initchain);
 }
 #undef initchain
