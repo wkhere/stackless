@@ -264,6 +264,32 @@ class TestConcretePickledTasklets(TestPickledTasklets):
         # Force the collection of the unpickled tasklet.
         gc.collect()
 
+    def testSendSequence(self):
+        # Send sequence when pickled was not handled.  It uses
+        # a custom cframe execute function which was not recognised
+        # by the pickling.
+        #
+        # Traceback (most recent call last):
+        #   File ".\test_pickle.py", line 283, in testSendSequence
+        #     pickle.dumps(t1)
+        # ValueError: frame exec function at 1e00bf40 is not registered!
+
+        def sender(chan):
+            l = [ 1, 2, 3, 4 ]
+            chan.send_sequence(l)
+            
+        def receiver(chan):
+            length = 4
+            while length:
+                v = chan.receive()
+                length -= 1
+                
+        c = stackless.channel()
+        t1 = stackless.tasklet(sender)(c)
+        t2 = stackless.tasklet(receiver)(c)
+        t1.run()
+
+        pickle.dumps(t1)
 
 if __name__ == '__main__':
     if not sys.argv[1:]:
