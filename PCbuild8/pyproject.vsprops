@@ -8,7 +8,7 @@
 	>
 	<Tool
 		Name="VCCLCompilerTool"
-		AdditionalIncludeDirectories="..\..\Include; ..\..\PC"
+		AdditionalIncludeDirectories="..\..\Include; ..\..\PC,..\..\Stackless"
 		PreprocessorDefinitions="_WIN32;_CRT_SECURE_NO_DEPRECATE"
 	/>
 	<Tool
