@@ -786,6 +786,10 @@ exit_eval_frame:
 	return NULL;
 }
 
+#if defined _MSC_VER && _MSC_VER >= 1400
+/* prevent VisualStudio from collapsing the following two functions */
+#pragma optimize("g", off)
+#endif
 PyObject *
 PyEval_EvalFrame_noval(PyFrameObject *f, int throwflag, PyObject *retval)
 {
@@ -805,9 +809,17 @@ PyEval_EvalFrame_iter(PyFrameObject *f, int throwflag, PyObject *retval)
 	 * it serves as a marker whether we are inside of a
 	 * for_iter operation. In this case we need to handle
 	 * null without error as valid result.
+	 * Note, it is not just a copy of the above function, but calls
+	 * the above.  This is to prevent clever compilers from
+	 * collapsing these two functions into one and thus ruining
+	 * our smart logic that tests f_execute for these functions.
 	 */
-	return PyEval_EvalFrame_value(f, throwflag, retval);
+	return PyEval_EvalFrame_noval(f, throwflag, retval);
 }
+
+#if defined _MSC_VER && _MSC_VER >= 1400
+#pragma optimize("", on)
+#endif
 
 PyObject *
 PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
