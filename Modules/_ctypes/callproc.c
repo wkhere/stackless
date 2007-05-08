@@ -64,6 +64,7 @@
 
 #ifdef MS_WIN32
 #include <windows.h>
+#include <tchar.h>
 #else
 #include "ctypes_dlfcn.h"
 #endif
@@ -97,9 +98,9 @@ static TCHAR *FormatError(DWORD code)
 			  0,
 			  NULL);
 	if (n) {
-		while (isspace(lpMsgBuf[n-1]))
+		while (_istspace(lpMsgBuf[n-1]))
 			--n;
-		lpMsgBuf[n] = '\0'; /* rstrip() */
+		lpMsgBuf[n] = _T('\0'); /* rstrip() */
 	}
 	return lpMsgBuf;
 }
@@ -538,8 +539,10 @@ static int ConvParam(PyObject *obj, int index, struct argument *pa)
 		size += 1; /* terminating NUL */
 		size *= sizeof(wchar_t);
 		pa->value.p = PyMem_Malloc(size);
-		if (!pa->value.p)
+		if (!pa->value.p) {
+			PyErr_NoMemory();
 			return -1;
+		}
 		memset(pa->value.p, 0, size);
 		pa->keep = PyCObject_FromVoidPtr(pa->value.p, PyMem_Free);
 		if (!pa->keep) {

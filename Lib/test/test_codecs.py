@@ -430,6 +430,11 @@ class UTF8SigTest(ReadTest):
         # SF bug #1601501: check that the codec works with a buffer
         unicode("\xef\xbb\xbf", "utf-8-sig")
 
+    def test_bom(self):
+        d = codecs.getincrementaldecoder("utf-8-sig")()
+        s = u"spam"
+        self.assertEqual(d.decode(s.encode("utf-8-sig")), s)
+
 class EscapeDecodeTest(unittest.TestCase):
     def test_empty(self):
         self.assertEquals(codecs.escape_decode(""), ("", 0))
@@ -916,7 +921,7 @@ class StreamReaderTest(unittest.TestCase):
         self.assertEquals(f.readlines(), [u'\ud55c\n', u'\uae00'])
 
 class EncodedFileTest(unittest.TestCase):
-    
+
     def test_basic(self):
         f = StringIO.StringIO('\xed\x95\x9c\n\xea\xb8\x80')
         ef = codecs.EncodedFile(f, 'utf-16-le', 'utf-8')

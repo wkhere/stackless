@@ -963,7 +963,7 @@ class TarInfo(object):
             stn(prefix, 155)
         ]
 
-        buf += struct.pack("%ds" % BLOCKSIZE, "".join(parts))
+        buf += "".join(parts).ljust(BLOCKSIZE, NUL)
         chksum = calc_chksums(buf[-BLOCKSIZE:])[0]
         buf = buf[:-364] + "%06o\0" % chksum + buf[-357:]
         self.buf = buf
@@ -1044,7 +1044,9 @@ class TarFile(object):
            can be determined, `mode' is overridden by `fileobj's mode.
            `fileobj' is not closed, when TarFile is closed.
         """
-        self.name = os.path.abspath(name)
+        self.name = name
+        if self.name is not None:
+            self.name = os.path.abspath(name)
 
         if len(mode) > 1 or mode not in "raw":
             raise ValueError("mode must be 'r', 'a' or 'w'")
@@ -1842,7 +1844,7 @@ class TarFile(object):
             tarinfo.type = DIRTYPE
 
         # Directory names should have a '/' at the end.
-        if tarinfo.isdir():
+        if tarinfo.isdir() and not tarinfo.name.endswith("/"):
             tarinfo.name += "/"
 
         self.members.append(tarinfo)

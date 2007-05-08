@@ -4,6 +4,37 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.5.2c1?
+=============================
+
+*Release date: XX-XXX-XXXX*
+
+Library
+-------
+
+- Bug #1290505: Properly clear time.strptime's locale cache when the locale
+  changes between calls.  Backport of r54646 and r54647.
+
+- Bug #1706381: Specifying the SWIG option "-c++" in the setup.py file
+  (as opposed to the command line) will now write file names ending in
+  ".cpp" too.
+
+- Patch #1695229: Fix a regression with tarfile.open() and a missing name
+  argument.
+
+- tarfile.py: Fix directory names to have only one trailing slash.
+
+- Fix test_pty.py to not hang on OS X (and theoretically other *nixes) when
+  run in verbose mode.
+
+
+Documentation
+-------------
+
+- Bug #1569057: Document that calling file.next() on a file open for writing
+  has undefined behaviour.  Backport of r54712.
+
+
 What's New in Python 2.5.1?
 =============================
 
@@ -483,6 +514,8 @@ Windows
 Documentation
 -------------
 
+- Patch #1698768: updated the "using Python on the Mac" intro.
+
 - Patch #1489771: the syntax rules in Python Reference Manual were
   updated to reflect the current Python syntax.
 
@@ -588,6 +621,8 @@ Tests
 - Fix bsddb test_basics.test06_Transactions to check the version
   number properly.
 
+- Fix utf-8-sig incremental decoder, which didn't recognise a BOM when the
+  first chunk fed to the decoder started with a BOM, but was longer than 3 bytes.
 
 Documentation
 -------------
