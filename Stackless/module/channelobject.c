@@ -921,7 +921,7 @@ channel_setstate(PyObject *self, PyObject *args)
 	PyObject *lis;
 	int flags, balance;
 	int dir;
-	int i, n;
+	Py_ssize_t i, n;
 
 	if (!PyArg_ParseTuple(args, "iiO!:channel",
 			      &balance,
