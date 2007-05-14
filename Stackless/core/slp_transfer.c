@@ -62,15 +62,9 @@ static PyTaskletObject *_prev;
 #undef __return
 #define __return(x) { exitcode = x; goto exit; }
 
-int slp_save_state(intptr_t *stack){
-	int exitcode;
-#ifdef SSIZE_T
-	/* Only on Windows apparently. */
-	SSIZE_T diff;
-#else
-	/* Py_ssize_t when we port to 2.5? */
-	int diff;
-#endif
+intptr_t slp_save_state(intptr_t *stack){
+	intptr_t exitcode;
+	intptr_t diff;
 	SLP_SAVE_STATE(stack, diff);
 	return diff;
 exit:
