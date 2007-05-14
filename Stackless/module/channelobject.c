@@ -244,6 +244,12 @@ PyChannel_SetScheduleAll(PyChannelObject *self, int val)
 	self->flags.schedule_all = val ? 1 : 0;
 }
 
+int
+PyChannel_GetBalance(PyChannelObject *self)
+{
+	return self->balance;
+}
+
 static PyGetSetDef channel_getsetlist[] = {
 	{"queue",		(getter)channel_get_queue, NULL,
 	 "the chain of waiting tasklets."},
