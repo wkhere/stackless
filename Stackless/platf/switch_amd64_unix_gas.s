@@ -25,14 +25,14 @@ slp_switch:
 
        call slp_save_state             # diff = slp_save_state([?]stackref)
 
-       cmp     $-1, %eax               # if (diff == -1)
+       cmp     $-1, %rax               # if (diff == -1)
        je      .exit                   #     return -1;
 
-       cmp     $1, %eax                # if (diff ==  1)
+       cmp     $1, %rax                # if (diff ==  1)
        je      .no_restore             #     return 0;
 
 .restore:
-       add    %eax, %esp               # Adjust the stack pointer for the state we are restoring.
+       add    %rax, %rsp               # Adjust the stack pointer for the state we are restoring.
 
        call slp_restore_state          # slp_restore_state()
 
