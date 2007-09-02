@@ -56,8 +56,8 @@ fill_free_list(void)
 	p = &((PyIntBlock *)p)->objects[0];
 	q = p + N_INTOBJECTS;
 	while (--q > p)
-		q->ob_type = (struct _typeobject *)(q-1);
-	q->ob_type = NULL;
+		Py_Type(q) = (struct _typeobject *)(q-1);
+	Py_Type(q) = NULL;
 	return p + N_INTOBJECTS - 1;
 }
 
@@ -102,7 +102,7 @@ PyInt_FromLong(long ival)
 	}
 	/* Inline PyObject_New */
 	v = free_list;
-	free_list = (PyIntObject *)v->ob_type;
+	free_list = (PyIntObject *)Py_Type(v);
 	PyObject_INIT(v, &PyInt_Type);
 	v->ob_ival = ival;
 	return (PyObject *) v;
@@ -128,17 +128,17 @@ static void
 int_dealloc(PyIntObject *v)
 {
 	if (PyInt_CheckExact(v)) {
-		v->ob_type = (struct _typeobject *)free_list;
+		Py_Type(v) = (struct _typeobject *)free_list;
 		free_list = v;
 	}
 	else
-		v->ob_type->tp_free((PyObject *)v);
+		Py_Type(v)->tp_free((PyObject *)v);
 }
 
 static void
 int_free(PyIntObject *v)
 {
-	v->ob_type = (struct _typeobject *)free_list;
+	Py_Type(v) = (struct _typeobject *)free_list;
 	free_list = v;
 }
 
@@ -152,7 +152,7 @@ PyInt_AsLong(register PyObject *op)
 	if (op && PyInt_Check(op))
 		return PyInt_AS_LONG((PyIntObject*) op);
 
-	if (op == NULL || (nb = op->ob_type->tp_as_number) == NULL ||
+	if (op == NULL || (nb = Py_Type(op)->tp_as_number) == NULL ||
 	    nb->nb_int == NULL) {
 		PyErr_SetString(PyExc_TypeError, "an integer is required");
 		return -1;
@@ -207,17 +207,16 @@ PyInt_AsSsize_t(register PyObject *op)
 	return PyInt_AsLong(op);
 #else
 
-	if ((nb = op->ob_type->tp_as_number) == NULL ||
+	if ((nb = Py_Type(op)->tp_as_number) == NULL ||
 	    (nb->nb_int == NULL && nb->nb_long == 0)) {
 		PyErr_SetString(PyExc_TypeError, "an integer is required");
 		return -1;
 	}
 
-	if (nb->nb_long != 0) {
+	if (nb->nb_long != 0)
 		io = (PyIntObject*) (*nb->nb_long) (op);
-	} else {
+	else
 		io = (PyIntObject*) (*nb->nb_int) (op);
-	}
 	if (io == NULL)
 		return -1;
 	if (!PyInt_Check(io)) {
@@ -257,7 +256,7 @@ PyInt_AsUnsignedLongMask(register PyObject *op)
 	if (op && PyLong_Check(op))
 		return PyLong_AsUnsignedLongMask(op);
 
-	if (op == NULL || (nb = op->ob_type->tp_as_number) == NULL ||
+	if (op == NULL || (nb = Py_Type(op)->tp_as_number) == NULL ||
 	    nb->nb_int == NULL) {
 		PyErr_SetString(PyExc_TypeError, "an integer is required");
 		return (unsigned long)-1;
@@ -302,7 +301,7 @@ PyInt_AsUnsignedLongLongMask(register PyObject *op)
 	if (op && PyLong_Check(op))
 		return PyLong_AsUnsignedLongLongMask(op);
 
-	if (op == NULL || (nb = op->ob_type->tp_as_number) == NULL ||
+	if (op == NULL || (nb = Py_Type(op)->tp_as_number) == NULL ||
 	    nb->nb_int == NULL) {
 		PyErr_SetString(PyExc_TypeError, "an integer is required");
 		return (unsigned PY_LONG_LONG)-1;
@@ -394,7 +393,7 @@ PyInt_FromUnicode(Py_UNICODE *s, Py_ssize_t length, int base)
 	char *buffer = (char *)PyMem_MALLOC(length+1);
 
 	if (buffer == NULL)
-		return NULL;
+		return PyErr_NoMemory();
 
 	if (PyUnicode_EncodeDecimal(s, length, buffer, NULL)) {
 		PyMem_FREE(buffer);
@@ -1070,8 +1069,9 @@ Convert a string or number to an integer, if possible.  A floating point\n\
 argument will be truncated towards zero (this does not include a string\n\
 representation of a floating point number!)  When converting a string, use\n\
 the optional base.  It is an error to supply a base when converting a\n\
-non-string. If the argument is outside the integer range a long object\n\
-will be returned instead.");
+non-string.  If base is zero, the proper base is guessed based on the\n\
+string content.  If the argument is outside the integer range a\n\
+long object will be returned instead.");
 
 static PyNumberMethods int_as_number = {
 	(binaryfunc)int_add,	/*nb_add*/
@@ -1116,8 +1116,7 @@ static PyNumberMethods int_as_number = {
 };
 
 PyTypeObject PyInt_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"int",
 	sizeof(PyIntObject),
 	0,
@@ -1137,7 +1136,7 @@ PyTypeObject PyInt_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES |
-		Py_TPFLAGS_BASETYPE,		/* tp_flags */
+		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_INT_SUBCLASS,	/* tp_flags */
 	int_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
@@ -1170,7 +1169,7 @@ _PyInt_Init(void)
 			return 0;
 		/* PyObject_New is inlined */
 		v = free_list;
-		free_list = (PyIntObject *)v->ob_type;
+		free_list = (PyIntObject *)Py_Type(v);
 		PyObject_INIT(v, &PyInt_Type);
 		v->ob_ival = ival;
 		small_ints[ival + NSMALLNEGINTS] = v;
@@ -1223,7 +1222,7 @@ PyInt_Fini(void)
 			     ctr++, p++) {
 				if (!PyInt_CheckExact(p) ||
 				    p->ob_refcnt == 0) {
-					p->ob_type = (struct _typeobject *)
+					Py_Type(p) = (struct _typeobject *)
 						free_list;
 					free_list = p;
 				}

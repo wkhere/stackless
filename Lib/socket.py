@@ -24,6 +24,7 @@ inet_ntoa() -- convert 32-bit packed format IP to string (123.45.67.89)
 ssl() -- secure socket layer support (only available if configured)
 socket.getdefaulttimeout() -- get the default timeout value
 socket.setdefaulttimeout() -- set the default timeout value
+create_connection() -- connects to an address, with an optional timeout
 
  [*] not available on all platforms!
 
@@ -45,15 +46,37 @@ the setsockopt() and getsockopt() methods.
 import _socket
 from _socket import *
 
-_have_ssl = False
 try:
     import _ssl
-    from _ssl import *
-    _have_ssl = True
 except ImportError:
+    # no SSL support
     pass
+else:
+    def ssl(sock, keyfile=None, certfile=None):
+        # we do an internal import here because the ssl
+        # module imports the socket module
+        import ssl as _realssl
+        warnings.warn("socket.ssl() is deprecated.  Use ssl.sslsocket() instead.",
+                      DeprecationWarning, stacklevel=2)
+        return _realssl.sslwrap_simple(sock, keyfile, certfile)
 
-import os, sys
+    # we need to import the same constants we used to...
+    from _ssl import \
+         sslerror, \
+         RAND_add, \
+         RAND_egd, \
+         RAND_status, \
+         SSL_ERROR_ZERO_RETURN, \
+         SSL_ERROR_WANT_READ, \
+         SSL_ERROR_WANT_WRITE, \
+         SSL_ERROR_WANT_X509_LOOKUP, \
+         SSL_ERROR_SYSCALL, \
+         SSL_ERROR_SSL, \
+         SSL_ERROR_WANT_CONNECT, \
+         SSL_ERROR_EOF, \
+         SSL_ERROR_INVALID_ERROR_CODE
+
+import os, sys, warnings
 
 try:
     from errno import EBADF
@@ -62,16 +85,9 @@ except ImportError:
 
 __all__ = ["getfqdn"]
 __all__.extend(os._get_exports_list(_socket))
-if _have_ssl:
-    __all__.extend(os._get_exports_list(_ssl))
+
 
 _realsocket = socket
-if _have_ssl:
-    _realssl = ssl
-    def ssl(sock, keyfile=None, certfile=None):
-        if hasattr(sock, "_sock"):
-            sock = sock._sock
-        return _realssl(sock, keyfile, certfile)
 
 # WSA error codes
 if sys.platform.lower().startswith("win"):
@@ -139,12 +155,14 @@ class _closedsocket(object):
     __slots__ = []
     def _dummy(*args):
         raise error(EBADF, 'Bad file descriptor')
-    def close(self):
-        pass
     # All _delegate_methods must also be initialized here.
     send = recv = recv_into = sendto = recvfrom = recvfrom_into = _dummy
     __getattr__ = _dummy
 
+# Wrapper around platform socket objects. This implements
+# a platform-independent dup() functionality. The
+# implementation currently relies on reference counting
+# to close the underlying socket object.
 class _socketobject(object):
 
     __doc__ = _realsocket.__doc__
@@ -159,7 +177,6 @@ class _socketobject(object):
             setattr(self, method, getattr(_sock, method))
 
     def close(self):
-        self._sock.close()
         self._sock = _closedsocket()
         dummy = self._sock._dummy
         for method in _delegate_methods:
@@ -204,9 +221,10 @@ class _fileobject(object):
 
     __slots__ = ["mode", "bufsize", "softspace",
                  # "closed" is a property, see below
-                 "_sock", "_rbufsize", "_wbufsize", "_rbuf", "_wbuf"]
+                 "_sock", "_rbufsize", "_wbufsize", "_rbuf", "_wbuf",
+                 "_close"]
 
-    def __init__(self, sock, mode='rb', bufsize=-1):
+    def __init__(self, sock, mode='rb', bufsize=-1, close=False):
         self._sock = sock
         self.mode = mode # Not actually used in this version
         if bufsize < 0:
@@ -222,6 +240,7 @@ class _fileobject(object):
         self._wbufsize = bufsize
         self._rbuf = "" # A string
         self._wbuf = [] # A list of strings
+        self._close = close
 
     def _getclosed(self):
         return self._sock is None
@@ -232,6 +251,8 @@ class _fileobject(object):
             if self._sock:
                 self.flush()
         finally:
+            if self._close:
+                self._sock.close()
             self._sock = None
 
     def __del__(self):
@@ -411,3 +432,31 @@ class _fileobject(object):
         if not line:
             raise StopIteration
         return line
+
+
+def create_connection(address, timeout=None):
+    """Connect to address (host, port) with an optional timeout.
+
+    Provides access to socketobject timeout for higher-level
+    protocols.  Passing a timeout will set the timeout on the
+    socket instance (if not present, or passed as None, the
+    default global timeout setting will be used).
+    """
+
+    msg = "getaddrinfo returns an empty list"
+    host, port = address
+    for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+        af, socktype, proto, canonname, sa = res
+        sock = None
+        try:
+            sock = socket(af, socktype, proto)
+            if timeout is not None:
+                sock.settimeout(timeout)
+            sock.connect(sa)
+            return sock
+
+        except error, msg:
+            if sock is not None:
+                sock.close()
+
+    raise error, msg

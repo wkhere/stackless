@@ -1,7 +1,7 @@
 import sys
 sys.path = ['.'] + sys.path
 
-from test.test_support import verbose, run_unittest
+from test.test_support import verbose, run_unittest, catch_warning
 import re
 from re import Scanner
 import sys, os, traceback
@@ -414,6 +414,12 @@ class ReTests(unittest.TestCase):
         self.pickle_test(pickle)
         import cPickle
         self.pickle_test(cPickle)
+        # old pickles expect the _compile() reconstructor in sre module
+        import warnings
+        with catch_warning():
+            warnings.filterwarnings("ignore", "The sre module is deprecated",
+                                    DeprecationWarning)
+            from sre import _compile
 
     def pickle_test(self, pickle):
         oldpat = re.compile('a(?:b|(c|e){1,2}?|d)+?(.)')
@@ -595,6 +601,13 @@ class ReTests(unittest.TestCase):
         self.assertEqual(iter.next().span(), (4, 4))
         self.assertRaises(StopIteration, iter.next)
 
+    def test_empty_array(self):
+        # SF buf 1647541
+        import array
+        for typecode in 'cbBuhHiIlLfd':
+            a = array.array(typecode)
+            self.assertEqual(re.compile("bla").match(a), None)
+            self.assertEqual(re.compile("").match(a).groups(), ())
 
 def run_re_tests():
     from test.re_tests import benchmarks, tests, SUCCEED, FAIL, SYNTAX_ERROR

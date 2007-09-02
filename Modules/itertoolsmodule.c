@@ -59,7 +59,7 @@ groupby_dealloc(groupbyobject *gbo)
 	Py_XDECREF(gbo->tgtkey);
 	Py_XDECREF(gbo->currkey);
 	Py_XDECREF(gbo->currvalue);
-	gbo->ob_type->tp_free(gbo);
+	Py_Type(gbo)->tp_free(gbo);
 }
 
 static int
@@ -139,8 +139,7 @@ PyDoc_STRVAR(groupby_doc,
 (key, sub-iterator) grouped by each value of key(value).\n");
 
 static PyTypeObject groupby_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.groupby",		/* tp_name */
 	sizeof(groupbyobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -261,8 +260,7 @@ _grouper_next(_grouperobject *igo)
 }
 
 static PyTypeObject _grouper_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools._grouper",		/* tp_name */
 	sizeof(_grouperobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -415,8 +413,7 @@ teedataobject_dealloc(teedataobject *tdo)
 PyDoc_STRVAR(teedataobject_doc, "Data container common to multiple tee objects.");
 
 static PyTypeObject teedataobject_type = {
-	PyObject_HEAD_INIT(0)	/* Must fill in type value later */
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(0, 0)	/* Must fill in type value later */
 	"itertools.tee_dataobject",		/* tp_name */
 	sizeof(teedataobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */
@@ -572,8 +569,7 @@ static PyMethodDef tee_methods[] = {
 };
 
 static PyTypeObject tee_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.tee",		/* tp_name */
 	sizeof(teeobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -681,7 +677,7 @@ cycle_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *saved;
 	cycleobject *lz;
 
-	if (!_PyArg_NoKeywords("cycle()", kwds))
+	if (type == &cycle_type && !_PyArg_NoKeywords("cycle()", kwds))
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "cycle", 1, 1, &iterable))
@@ -718,7 +714,7 @@ cycle_dealloc(cycleobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->saved);
 	Py_XDECREF(lz->it);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -768,8 +764,7 @@ Return elements from the iterable until it is exhausted.\n\
 Then repeat the sequence indefinitely.");
 
 static PyTypeObject cycle_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.cycle",		/* tp_name */
 	sizeof(cycleobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -831,7 +826,7 @@ dropwhile_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *it;
 	dropwhileobject *lz;
 
-	if (!_PyArg_NoKeywords("dropwhile()", kwds))
+	if (type == &dropwhile_type && !_PyArg_NoKeywords("dropwhile()", kwds))
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "dropwhile", 2, 2, &func, &seq))
@@ -862,7 +857,7 @@ dropwhile_dealloc(dropwhileobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->func);
 	Py_XDECREF(lz->it);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -882,7 +877,7 @@ dropwhile_next(dropwhileobject *lz)
 	PyObject *(*iternext)(PyObject *);
 
 	assert(PyIter_Check(it));
-	iternext = *it->ob_type->tp_iternext;
+	iternext = *Py_Type(it)->tp_iternext;
 	for (;;) {
 		item = iternext(it);
 		if (item == NULL)
@@ -912,8 +907,7 @@ Drop items from the iterable while predicate(item) is true.\n\
 Afterwards, return every element until the iterable is exhausted.");
 
 static PyTypeObject dropwhile_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.dropwhile",		/* tp_name */
 	sizeof(dropwhileobject),	/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -975,7 +969,7 @@ takewhile_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *it;
 	takewhileobject *lz;
 
-	if (!_PyArg_NoKeywords("takewhile()", kwds))
+	if (type == &takewhile_type && !_PyArg_NoKeywords("takewhile()", kwds))
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "takewhile", 2, 2, &func, &seq))
@@ -1006,7 +1000,7 @@ takewhile_dealloc(takewhileobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->func);
 	Py_XDECREF(lz->it);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -1028,7 +1022,7 @@ takewhile_next(takewhileobject *lz)
 		return NULL;
 
 	assert(PyIter_Check(it));
-	item = (*it->ob_type->tp_iternext)(it);
+	item = (*Py_Type(it)->tp_iternext)(it);
 	if (item == NULL)
 		return NULL;
 
@@ -1053,8 +1047,7 @@ Return successive entries from an iterable as long as the \n\
 predicate evaluates to true for each entry.");
 
 static PyTypeObject takewhile_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.takewhile",		/* tp_name */
 	sizeof(takewhileobject),	/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1120,7 +1113,7 @@ islice_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	Py_ssize_t numargs;
 	isliceobject *lz;
 
-	if (!_PyArg_NoKeywords("islice()", kwds))
+	if (type == &islice_type && !_PyArg_NoKeywords("islice()", kwds))
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "islice", 2, 4, &seq, &a1, &a2, &a3))
@@ -1197,7 +1190,7 @@ islice_dealloc(isliceobject *lz)
 {
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->it);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -1216,7 +1209,7 @@ islice_next(isliceobject *lz)
 	PyObject *(*iternext)(PyObject *);
 
 	assert(PyIter_Check(it));
-	iternext = *it->ob_type->tp_iternext;
+	iternext = *Py_Type(it)->tp_iternext;
 	while (lz->cnt < lz->next) {
 		item = iternext(it);
 		if (item == NULL)
@@ -1249,8 +1242,7 @@ skipped between successive calls.  Works like a slice() on a list\n\
 but returns an iterator.");
 
 static PyTypeObject islice_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.islice",		/* tp_name */
 	sizeof(isliceobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1311,7 +1303,7 @@ starmap_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *it;
 	starmapobject *lz;
 
-	if (!_PyArg_NoKeywords("starmap()", kwds))
+	if (type == &starmap_type && !_PyArg_NoKeywords("starmap()", kwds))
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "starmap", 2, 2, &func, &seq))
@@ -1341,7 +1333,7 @@ starmap_dealloc(starmapobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->func);
 	Py_XDECREF(lz->it);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -1360,7 +1352,7 @@ starmap_next(starmapobject *lz)
 	PyObject *it = lz->it;
 
 	assert(PyIter_Check(it));
-	args = (*it->ob_type->tp_iternext)(it);
+	args = (*Py_Type(it)->tp_iternext)(it);
 	if (args == NULL)
 		return NULL;
 	if (!PyTuple_CheckExact(args)) {
@@ -1381,8 +1373,7 @@ Return an iterator whose values are returned from the function evaluated\n\
 with a argument tuple taken from the given sequence.");
 
 static PyTypeObject starmap_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.starmap",		/* tp_name */
 	sizeof(starmapobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1443,7 +1434,7 @@ imap_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	imapobject *lz;
 	Py_ssize_t numargs, i;
 
-	if (!_PyArg_NoKeywords("imap()", kwds))
+	if (type == &imap_type && !_PyArg_NoKeywords("imap()", kwds))
 		return NULL;
 
 	numargs = PyTuple_Size(args);
@@ -1487,7 +1478,7 @@ imap_dealloc(imapobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->iters);
 	Py_XDECREF(lz->func);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -1561,8 +1552,7 @@ iterable is exhausted instead of filling in None for shorter\n\
 iterables.");
 
 static PyTypeObject imap_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.imap",		/* tp_name */
 	sizeof(imapobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1625,7 +1615,7 @@ chain_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	Py_ssize_t i;
 	PyObject *ittuple;
 
-	if (!_PyArg_NoKeywords("chain()", kwds))
+	if (type == &chain_type && !_PyArg_NoKeywords("chain()", kwds))
 		return NULL;
 
 	/* obtain iterators */
@@ -1666,7 +1656,7 @@ chain_dealloc(chainobject *lz)
 {
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->ittuple);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -1706,8 +1696,7 @@ first iterable until it is exhausted, then elements from the next\n\
 iterable, until all of the iterables are exhausted.");
 
 static PyTypeObject chain_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.chain",		/* tp_name */
 	sizeof(chainobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1768,7 +1757,7 @@ ifilter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *it;
 	ifilterobject *lz;
 
-	if (!_PyArg_NoKeywords("ifilter()", kwds))
+	if (type == &ifilter_type && !_PyArg_NoKeywords("ifilter()", kwds))
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "ifilter", 2, 2, &func, &seq))
@@ -1798,7 +1787,7 @@ ifilter_dealloc(ifilterobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->func);
 	Py_XDECREF(lz->it);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -1818,7 +1807,7 @@ ifilter_next(ifilterobject *lz)
 	PyObject *(*iternext)(PyObject *);
 
 	assert(PyIter_Check(it));
-	iternext = *it->ob_type->tp_iternext;
+	iternext = *Py_Type(it)->tp_iternext;
 	for (;;) {
 		item = iternext(it);
 		if (item == NULL)
@@ -1850,8 +1839,7 @@ Return those items of sequence for which function(item) is true.\n\
 If function is None, return the items that are true.");
 
 static PyTypeObject ifilter_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.ifilter",		/* tp_name */
 	sizeof(ifilterobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1912,7 +1900,8 @@ ifilterfalse_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *it;
 	ifilterfalseobject *lz;
 
-	if (!_PyArg_NoKeywords("ifilterfalse()", kwds))
+	if (type == &ifilterfalse_type &&
+	    !_PyArg_NoKeywords("ifilterfalse()", kwds))
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "ifilterfalse", 2, 2, &func, &seq))
@@ -1942,7 +1931,7 @@ ifilterfalse_dealloc(ifilterfalseobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->func);
 	Py_XDECREF(lz->it);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -1962,7 +1951,7 @@ ifilterfalse_next(ifilterfalseobject *lz)
 	PyObject *(*iternext)(PyObject *);
 
 	assert(PyIter_Check(it));
-	iternext = *it->ob_type->tp_iternext;
+	iternext = *Py_Type(it)->tp_iternext;
 	for (;;) {
 		item = iternext(it);
 		if (item == NULL)
@@ -1994,8 +1983,7 @@ Return those items of sequence for which function(item) is false.\n\
 If function is None, return the items that are false.");
 
 static PyTypeObject ifilterfalse_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.ifilterfalse",	/* tp_name */
 	sizeof(ifilterfalseobject),	/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -2054,7 +2042,7 @@ count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	countobject *lz;
 	Py_ssize_t cnt = 0;
 
-	if (!_PyArg_NoKeywords("count()", kwds))
+	if (type == &count_type && !_PyArg_NoKeywords("count()", kwds))
 		return NULL;
 
 	if (!PyArg_ParseTuple(args, "|n:count", &cnt))
@@ -2072,6 +2060,11 @@ count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject *
 count_next(countobject *lz)
 {
+        if (lz->cnt == PY_SSIZE_T_MAX) {
+                PyErr_SetString(PyExc_OverflowError,
+                        "cannot count beyond PY_SSIZE_T_MAX");                
+                return NULL;         
+        }
 	return PyInt_FromSsize_t(lz->cnt++);
 }
 
@@ -2088,8 +2081,7 @@ Return a count object whose .next() method returns consecutive\n\
 integers starting from zero or, if specified, from firstval.");
 
 static PyTypeObject count_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.count",		/* tp_name */
 	sizeof(countobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -2153,7 +2145,7 @@ izip_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *result;
 	Py_ssize_t tuplesize = PySequence_Length(args);
 
-	if (!_PyArg_NoKeywords("izip()", kwds))
+	if (type == &izip_type && !_PyArg_NoKeywords("izip()", kwds))
 		return NULL;
 
 	/* args must be a tuple */
@@ -2208,7 +2200,7 @@ izip_dealloc(izipobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->ittuple);
 	Py_XDECREF(lz->result);
-	lz->ob_type->tp_free(lz);
+	Py_Type(lz)->tp_free(lz);
 }
 
 static int
@@ -2231,12 +2223,12 @@ izip_next(izipobject *lz)
 
 	if (tuplesize == 0)
 		return NULL;
-	if (result->ob_refcnt == 1) {
+	if (Py_Refcnt(result) == 1) {
 		Py_INCREF(result);
 		for (i=0 ; i < tuplesize ; i++) {
 			it = PyTuple_GET_ITEM(lz->ittuple, i);
 			assert(PyIter_Check(it));
-			item = (*it->ob_type->tp_iternext)(it);
+			item = (*Py_Type(it)->tp_iternext)(it);
 			if (item == NULL) {
 				Py_DECREF(result);
 				return NULL;
@@ -2252,7 +2244,7 @@ izip_next(izipobject *lz)
 		for (i=0 ; i < tuplesize ; i++) {
 			it = PyTuple_GET_ITEM(lz->ittuple, i);
 			assert(PyIter_Check(it));
-			item = (*it->ob_type->tp_iternext)(it);
+			item = (*Py_Type(it)->tp_iternext)(it);
 			if (item == NULL) {
 				Py_DECREF(result);
 				return NULL;
@@ -2274,8 +2266,7 @@ function but consumes less memory by returning an iterator instead of\n\
 a list.");
 
 static PyTypeObject izip_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.izip",		/* tp_name */
 	sizeof(izipobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -2336,7 +2327,7 @@ repeat_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *element;
 	Py_ssize_t cnt = -1;
 
-	if (!_PyArg_NoKeywords("repeat()", kwds))
+	if (type == &repeat_type && !_PyArg_NoKeywords("repeat()", kwds))
 		return NULL;
 
 	if (!PyArg_ParseTuple(args, "O|n:repeat", &element, &cnt))
@@ -2359,7 +2350,7 @@ repeat_dealloc(repeatobject *ro)
 {
 	PyObject_GC_UnTrack(ro);
 	Py_XDECREF(ro->element);
-	ro->ob_type->tp_free(ro);
+	Py_Type(ro)->tp_free(ro);
 }
 
 static int
@@ -2422,8 +2413,7 @@ for the specified number of times.  If not specified, returns the element\n\
 endlessly.");
 
 static PyTypeObject repeat_type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"itertools.repeat",		/* tp_name */
 	sizeof(repeatobject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -2466,6 +2456,233 @@ static PyTypeObject repeat_type = {
 	PyObject_GC_Del,		/* tp_free */
 };
 
+/* iziplongest object ************************************************************/
+
+#include "Python.h"
+
+typedef struct {
+	PyObject_HEAD
+	Py_ssize_t tuplesize;
+	Py_ssize_t numactive;	
+	PyObject *ittuple;		/* tuple of iterators */
+	PyObject *result;
+	PyObject *fillvalue;
+} iziplongestobject;
+
+static PyTypeObject iziplongest_type;
+
+static PyObject *
+izip_longest_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	iziplongestobject *lz;
+	Py_ssize_t i;
+	PyObject *ittuple;  /* tuple of iterators */
+	PyObject *result;
+	PyObject *fillvalue = Py_None;
+	Py_ssize_t tuplesize = PySequence_Length(args);
+
+        if (kwds != NULL && PyDict_CheckExact(kwds) && PyDict_Size(kwds) > 0) {
+                fillvalue = PyDict_GetItemString(kwds, "fillvalue");
+                if (fillvalue == NULL  ||  PyDict_Size(kwds) > 1) {
+                        PyErr_SetString(PyExc_TypeError,
+				"izip_longest() got an unexpected keyword argument");
+                        return NULL;                      
+                }
+        }
+
+	/* args must be a tuple */
+	assert(PyTuple_Check(args));
+
+	/* obtain iterators */
+	ittuple = PyTuple_New(tuplesize);
+	if (ittuple == NULL)
+		return NULL;
+	for (i=0; i < tuplesize; ++i) {
+		PyObject *item = PyTuple_GET_ITEM(args, i);
+		PyObject *it = PyObject_GetIter(item);
+		if (it == NULL) {
+			if (PyErr_ExceptionMatches(PyExc_TypeError))
+				PyErr_Format(PyExc_TypeError,
+				    "izip_longest argument #%zd must support iteration",
+				    i+1);
+			Py_DECREF(ittuple);
+			return NULL;
+		}
+		PyTuple_SET_ITEM(ittuple, i, it);
+	}
+
+	/* create a result holder */
+	result = PyTuple_New(tuplesize);
+	if (result == NULL) {
+		Py_DECREF(ittuple);
+		return NULL;
+	}
+	for (i=0 ; i < tuplesize ; i++) {
+		Py_INCREF(Py_None);
+		PyTuple_SET_ITEM(result, i, Py_None);
+	}
+
+	/* create iziplongestobject structure */
+	lz = (iziplongestobject *)type->tp_alloc(type, 0);
+	if (lz == NULL) {
+		Py_DECREF(ittuple);
+		Py_DECREF(result);
+		return NULL;
+	}
+	lz->ittuple = ittuple;
+	lz->tuplesize = tuplesize;
+	lz->numactive = tuplesize;
+	lz->result = result;
+	Py_INCREF(fillvalue);
+	lz->fillvalue = fillvalue;
+	return (PyObject *)lz;
+}
+
+static void
+izip_longest_dealloc(iziplongestobject *lz)
+{
+	PyObject_GC_UnTrack(lz);
+	Py_XDECREF(lz->ittuple);
+	Py_XDECREF(lz->result);
+	Py_XDECREF(lz->fillvalue);
+	Py_Type(lz)->tp_free(lz);
+}
+
+static int
+izip_longest_traverse(iziplongestobject *lz, visitproc visit, void *arg)
+{
+	Py_VISIT(lz->ittuple);
+	Py_VISIT(lz->result);
+	Py_VISIT(lz->fillvalue);
+	return 0;
+}
+
+static PyObject *
+izip_longest_next(iziplongestobject *lz)
+{
+	Py_ssize_t i;
+	Py_ssize_t tuplesize = lz->tuplesize;
+	PyObject *result = lz->result;
+	PyObject *it;
+	PyObject *item;
+	PyObject *olditem;
+
+	if (tuplesize == 0)
+		return NULL;
+        if (lz->numactive == 0)
+                return NULL;
+	if (Py_Refcnt(result) == 1) {
+		Py_INCREF(result);
+		for (i=0 ; i < tuplesize ; i++) {
+			it = PyTuple_GET_ITEM(lz->ittuple, i);
+                        if (it == NULL) {
+                                Py_INCREF(lz->fillvalue);
+                                item = lz->fillvalue;
+                        } else {
+                                assert(PyIter_Check(it));
+                                item = (*Py_Type(it)->tp_iternext)(it);
+                                if (item == NULL) {
+                                        lz->numactive -= 1;      
+                                        if (lz->numactive == 0) {
+                                                Py_DECREF(result);
+                                                return NULL;
+                                        } else {
+                                                Py_INCREF(lz->fillvalue);
+                                                item = lz->fillvalue;                                        
+                                                PyTuple_SET_ITEM(lz->ittuple, i, NULL);
+                                                Py_DECREF(it);
+                                        }
+                                }
+                        }
+			olditem = PyTuple_GET_ITEM(result, i);
+			PyTuple_SET_ITEM(result, i, item);
+			Py_DECREF(olditem);
+		}
+	} else {
+		result = PyTuple_New(tuplesize);
+		if (result == NULL)
+			return NULL;
+		for (i=0 ; i < tuplesize ; i++) {
+			it = PyTuple_GET_ITEM(lz->ittuple, i);
+                        if (it == NULL) {
+                                Py_INCREF(lz->fillvalue);
+                                item = lz->fillvalue;
+                        } else {
+                                assert(PyIter_Check(it));
+                                item = (*Py_Type(it)->tp_iternext)(it);
+                                if (item == NULL) {
+                                        lz->numactive -= 1;      
+                                        if (lz->numactive == 0) {
+                                                Py_DECREF(result);
+                                                return NULL;
+                                        } else {
+                                                Py_INCREF(lz->fillvalue);
+                                                item = lz->fillvalue;                                        
+                                                PyTuple_SET_ITEM(lz->ittuple, i, NULL);
+                                                Py_DECREF(it);
+                                        }
+                                }
+                        }
+			PyTuple_SET_ITEM(result, i, item);
+		}
+	}
+	return result;
+}
+
+PyDoc_STRVAR(izip_longest_doc,
+"izip_longest(iter1 [,iter2 [...]], [fillvalue=None]) --> izip_longest object\n\
+\n\
+Return an izip_longest object whose .next() method returns a tuple where\n\
+the i-th element comes from the i-th iterable argument.  The .next()\n\
+method continues until the longest iterable in the argument sequence\n\
+is exhausted and then it raises StopIteration.  When the shorter iterables\n\
+are exhausted, the fillvalue is substituted in their place.  The fillvalue\n\
+defaults to None or can be specified by a keyword argument.\n\
+");
+
+static PyTypeObject iziplongest_type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"itertools.izip_longest",	/* tp_name */
+	sizeof(iziplongestobject),	/* tp_basicsize */
+	0,				/* tp_itemsize */
+	/* methods */
+	(destructor)izip_longest_dealloc,	/* tp_dealloc */
+	0,				/* tp_print */
+	0,				/* tp_getattr */
+	0,				/* tp_setattr */
+	0,				/* tp_compare */
+	0,				/* tp_repr */
+	0,				/* tp_as_number */
+	0,				/* tp_as_sequence */
+	0,				/* tp_as_mapping */
+	0,				/* tp_hash */
+	0,				/* tp_call */
+	0,				/* tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro */
+	0,				/* tp_setattro */
+	0,				/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+		Py_TPFLAGS_BASETYPE,	/* tp_flags */
+	izip_longest_doc,			/* tp_doc */
+	(traverseproc)izip_longest_traverse,    /* tp_traverse */
+	0,				/* tp_clear */
+	0,				/* tp_richcompare */
+	0,				/* tp_weaklistoffset */
+	PyObject_SelfIter,		/* tp_iter */
+	(iternextfunc)izip_longest_next,	/* tp_iternext */
+	0,				/* tp_methods */
+	0,				/* tp_members */
+	0,				/* tp_getset */
+	0,				/* tp_base */
+	0,				/* tp_dict */
+	0,				/* tp_descr_get */
+	0,				/* tp_descr_set */
+	0,				/* tp_dictoffset */
+	0,				/* tp_init */
+	0,				/* tp_alloc */
+	izip_longest_new,			/* tp_new */
+	PyObject_GC_Del,		/* tp_free */
+};
 
 /* module level code ********************************************************/
 
@@ -2479,6 +2696,7 @@ repeat(elem [,n]) --> elem, elem, elem, ... endlessly or up to n times\n\
 \n\
 Iterators terminating on the shortest input sequence:\n\
 izip(p, q, ...) --> (p[0], q[0]), (p[1], q[1]), ... \n\
+izip_longest(p, q, ...) --> (p[0], q[0]), (p[1], q[1]), ... \n\
 ifilter(pred, seq) --> elements of seq where pred(elem) is True\n\
 ifilterfalse(pred, seq) --> elements of seq where pred(elem) is False\n\
 islice(seq, [start,] stop [, step]) --> elements from\n\
@@ -2516,12 +2734,13 @@ inititertools(void)
 		&ifilterfalse_type,
 		&count_type,
 		&izip_type,
+		&iziplongest_type,                
 		&repeat_type,
 		&groupby_type,
 		NULL
 	};
 
-	teedataobject_type.ob_type = &PyType_Type;
+	Py_Type(&teedataobject_type) = &PyType_Type;
 	m = Py_InitModule3("itertools", module_methods, module_doc);
 	if (m == NULL)
 		return;

@@ -362,7 +362,7 @@ platform: $(BUILDPYTHON)
 
 # Build the shared modules
 sharedmods: $(BUILDPYTHON)
-	case $$MAKEFLAGS in \
+	@case $$MAKEFLAGS in \
 	*-s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
 	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
 	esac
@@ -409,7 +409,7 @@ $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK): \
 			-compatibility_version $(VERSION) \
 			-current_version $(VERSION); \
         else \
-		libtool -o $(LDLIBRARY) -dynamic $(OTHER_LIBTOOL_OPT) $(LIBRARY) \
+		/usr/bin/libtool -o $(LDLIBRARY) -dynamic $(OTHER_LIBTOOL_OPT) $(LIBRARY) \
 			@LIBTOOL_CRUFT@ ;\
 	fi
 	$(INSTALL) -d -m $(DIRMODE)  \
@@ -473,7 +473,7 @@ Modules/getbuildinfo.o: $(PARSER_OBJS) \
 		$(SIGNAL_OBJS) \
 		$(MODOBJS) \
 		$(srcdir)/Modules/getbuildinfo.c
-	$(CC) -c $(PY_CFLAGS) -DSVNVERSION=\"`LANG=C $(SVNVERSION)`\" -o $@ $(srcdir)/Modules/getbuildinfo.c
+	$(CC) -c $(PY_CFLAGS) -DSVNVERSION=\"`LC_ALL=C $(SVNVERSION)`\" -o $@ $(srcdir)/Modules/getbuildinfo.c
 
 Modules/getpath.o: $(srcdir)/Modules/getpath.c Makefile
 	$(CC) -c $(PY_CFLAGS) -DPYTHONPATH='"$(PYTHONPATH)"' \
@@ -499,6 +499,8 @@ Parser/grammar.o:	$(srcdir)/Parser/grammar.c \
 Parser/metagrammar.o:	$(srcdir)/Parser/metagrammar.c
 
 Parser/tokenizer_pgen.o:	$(srcdir)/Parser/tokenizer.c
+
+Parser/pgenmain.o:	$(srcdir)/Include/parsetok.h
 
 $(AST_H): $(AST_ASDL) $(ASDLGEN_FILES)
 	$(ASDLGEN) -h $(AST_H_DIR) $(AST_ASDL)
@@ -555,6 +557,7 @@ PYTHON_HEADERS= \
 		Include/moduleobject.h \
 		Include/object.h \
 		Include/objimpl.h \
+		Include/parsetok.h \
 		Include/patchlevel.h \
 		Include/pyarena.h \
 		Include/pydebug.h \

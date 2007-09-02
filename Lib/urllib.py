@@ -35,7 +35,7 @@ __all__ = ["urlopen", "URLopener", "FancyURLopener", "urlretrieve",
            "localhost", "thishost", "ftperrors", "basejoin", "unwrap",
            "splittype", "splithost", "splituser", "splitpasswd", "splitport",
            "splitnport", "splitquery", "splitattr", "splitvalue",
-           "splitgophertype", "getproxies"]
+           "getproxies"]
 
 __version__ = '1.17'    # XXX This version is not always updated :-(
 
@@ -90,6 +90,14 @@ def urlretrieve(url, filename=None, reporthook=None, data=None):
 def urlcleanup():
     if _urlopener:
         _urlopener.cleanup()
+
+# check for SSL
+try:
+    import ssl
+except:
+    _have_ssl = False
+else:
+    _have_ssl = True
 
 # exception raised when downloaded size does not match content-length
 class ContentTooShortError(IOError):
@@ -302,13 +310,13 @@ class URLopener:
 
         if proxy_passwd:
             import base64
-            proxy_auth = base64.encodestring(proxy_passwd).strip()
+            proxy_auth = base64.b64encode(proxy_passwd).strip()
         else:
             proxy_auth = None
 
         if user_passwd:
             import base64
-            auth = base64.encodestring(user_passwd).strip()
+            auth = base64.b64encode(user_passwd).strip()
         else:
             auth = None
         h = httplib.HTTP(host)
@@ -327,6 +335,11 @@ class URLopener:
             h.send(data)
         errcode, errmsg, headers = h.getreply()
         fp = h.getfile()
+        if errcode == -1:
+            if fp: fp.close()
+            # something went wrong with the HTTP status line
+            raise IOError, ('http protocol error', 0,
+                            'got a bad status line', None)
         if errcode == 200:
             return addinfourl(fp, headers, "http:" + url)
         else:
@@ -356,9 +369,10 @@ class URLopener:
         fp.close()
         raise IOError, ('http error', errcode, errmsg, headers)
 
-    if hasattr(socket, "ssl"):
+    if _have_ssl:
         def open_https(self, url, data=None):
             """Use HTTPS protocol."""
+
             import httplib
             user_passwd = None
             proxy_passwd = None
@@ -387,12 +401,12 @@ class URLopener:
             if not host: raise IOError, ('https error', 'no host given')
             if proxy_passwd:
                 import base64
-                proxy_auth = base64.encodestring(proxy_passwd).strip()
+                proxy_auth = base64.b64encode(proxy_passwd).strip()
             else:
                 proxy_auth = None
             if user_passwd:
                 import base64
-                auth = base64.encodestring(user_passwd).strip()
+                auth = base64.b64encode(user_passwd).strip()
             else:
                 auth = None
             h = httplib.HTTPS(host, 0,
@@ -405,8 +419,8 @@ class URLopener:
                 h.putheader('Content-Length', '%d' % len(data))
             else:
                 h.putrequest('GET', selector)
-            if proxy_auth: h.putheader('Proxy-Authorization: Basic %s' % proxy_auth)
-            if auth: h.putheader('Authorization: Basic %s' % auth)
+            if proxy_auth: h.putheader('Proxy-Authorization', 'Basic %s' % proxy_auth)
+            if auth: h.putheader('Authorization', 'Basic %s' % auth)
             if realhost: h.putheader('Host', realhost)
             for args in self.addheaders: h.putheader(*args)
             h.endheaders()
@@ -414,6 +428,11 @@ class URLopener:
                 h.send(data)
             errcode, errmsg, headers = h.getreply()
             fp = h.getfile()
+            if errcode == -1:
+                if fp: fp.close()
+                # something went wrong with the HTTP status line
+                raise IOError, ('http protocol error', 0,
+                                'got a bad status line', None)
             if errcode == 200:
                 return addinfourl(fp, headers, "https:" + url)
             else:
@@ -422,24 +441,6 @@ class URLopener:
                 else:
                     return self.http_error(url, fp, errcode, errmsg, headers,
                                            data)
-
-    def open_gopher(self, url):
-        """Use Gopher protocol."""
-        if not isinstance(url, str):
-            raise IOError, ('gopher error', 'proxy support for gopher protocol currently not implemented')
-        import gopherlib
-        host, selector = splithost(url)
-        if not host: raise IOError, ('gopher error', 'no host given')
-        host = unquote(host)
-        type, selector = splitgophertype(selector)
-        selector, query = splitquery(selector)
-        selector = unquote(selector)
-        if query:
-            query = unquote(query)
-            fp = gopherlib.send_query(selector, query, host)
-        else:
-            fp = gopherlib.send_selector(selector, host)
-        return addinfourl(fp, noheaders(), "gopher:" + url)
 
     def open_file(self, url):
         """Use local file or FTP depending on form of URL."""
@@ -452,7 +453,7 @@ class URLopener:
 
     def open_local_file(self, url):
         """Use local file."""
-        import mimetypes, mimetools, email.Utils
+        import mimetypes, mimetools, email.utils
         try:
             from cStringIO import StringIO
         except ImportError:
@@ -464,7 +465,7 @@ class URLopener:
         except OSError, e:
             raise IOError(e.errno, e.strerror, e.filename)
         size = stats.st_size
-        modified = email.Utils.formatdate(stats.st_mtime, usegmt=True)
+        modified = email.utils.formatdate(stats.st_mtime, usegmt=True)
         mtype = mimetypes.guess_type(url)[0]
         headers = mimetools.Message(StringIO(
             'Content-Type: %s\nContent-Length: %d\nLast-modified: %s\n' %
@@ -827,19 +828,20 @@ def noheaders():
 class ftpwrapper:
     """Class used by open_ftp() for cache of open FTP connections."""
 
-    def __init__(self, user, passwd, host, port, dirs):
+    def __init__(self, user, passwd, host, port, dirs, timeout=None):
         self.user = user
         self.passwd = passwd
         self.host = host
         self.port = port
         self.dirs = dirs
+        self.timeout = timeout
         self.init()
 
     def init(self):
         import ftplib
         self.busy = 0
         self.ftp = ftplib.FTP()
-        self.ftp.connect(self.host, self.port)
+        self.ftp.connect(self.host, self.port, self.timeout)
         self.ftp.login(self.user, self.passwd)
         for dir in self.dirs:
             self.ftp.cwd(dir)
@@ -971,7 +973,6 @@ class addinfourl(addbase):
 # splitattr('/path;attr1=value1;attr2=value2;...') ->
 #   '/path', ['attr1=value1', 'attr2=value2', ...]
 # splitvalue('attr=value') --> 'attr', 'value'
-# splitgophertype('/Xselector') --> 'X', 'selector'
 # unquote('abc%20def') -> 'abc def'
 # quote('abc def') -> 'abc%20def')
 
@@ -1130,12 +1131,6 @@ def splitvalue(attr):
     match = _valueprog.match(attr)
     if match: return match.group(1, 2)
     return attr, None
-
-def splitgophertype(selector):
-    """splitgophertype('/Xselector') --> 'X', 'selector'."""
-    if selector[:1] == '/' and selector[1:2]:
-        return selector[1], selector[2:]
-    return None, selector
 
 _hextochr = dict(('%02x' % i, chr(i)) for i in range(256))
 _hextochr.update(('%02X' % i, chr(i)) for i in range(256))
@@ -1471,8 +1466,7 @@ def test(args=[]):
             '/etc/passwd',
             'file:/etc/passwd',
             'file://localhost/etc/passwd',
-            'ftp://ftp.python.org/pub/python/README',
-##          'gopher://gopher.micro.umn.edu/1/',
+            'ftp://ftp.gnu.org/pub/README',
             'http://www.python.org/index.html',
             ]
         if hasattr(URLopener, "open_https"):

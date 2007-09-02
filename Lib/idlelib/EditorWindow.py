@@ -102,8 +102,8 @@ class EditorWindow(object):
             self.top.instance_dict = {}
         self.recent_files_path = os.path.join(idleConf.GetUserCfgDir(),
                 'recent-files.lst')
-        self.vbar = vbar = Scrollbar(top, name='vbar')
         self.text_frame = text_frame = Frame(top)
+        self.vbar = vbar = Scrollbar(text_frame, name='vbar')
         self.width = idleConf.GetOption('main','EditorWindow','width')
         self.text = text = MultiCallCreator(Text)(
                 text_frame, name='text', padx=5, wrap='none',
@@ -819,7 +819,7 @@ class EditorWindow(object):
 
     def close(self):
         reply = self.maybesave()
-        if reply != "cancel":
+        if str(reply) != "cancel":
             self._close()
         return reply
 

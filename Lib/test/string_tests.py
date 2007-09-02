@@ -2,7 +2,7 @@
 Common tests shared by test_str, test_unicode, test_userstring and test_string.
 """
 
-import unittest, string, sys
+import unittest, string, sys, struct
 from test import test_support
 from UserList import UserList
 
@@ -247,8 +247,13 @@ class CommonTest(unittest.TestCase):
         self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs')
         self.checkequal('abc\rab      def\ng       hi', 'abc\rab\tdef\ng\thi', 'expandtabs', 8)
         self.checkequal('abc\r\nab\r\ndef\ng\r\nhi', 'abc\r\nab\r\ndef\ng\r\nhi', 'expandtabs', 4)
+        self.checkequal('  a\n b', ' \ta\n\tb', 'expandtabs', 1)
 
         self.checkraises(TypeError, 'hello', 'expandtabs', 42, 42)
+        # This test is only valid when sizeof(int) == sizeof(void*) == 4.
+        if sys.maxint < (1 << 32) and struct.calcsize('P') == 4:
+            self.checkraises(OverflowError,
+                             '\ta\n\tb', 'expandtabs', sys.maxint)
 
     def test_split(self):
         self.checkequal(['this', 'is', 'the', 'split', 'function'],
@@ -671,7 +676,7 @@ class CommonTest(unittest.TestCase):
 
     def test_replace_overflow(self):
         # Check for overflow checking on 32 bit machines
-        if sys.maxint != 2147483647:
+        if sys.maxint != 2147483647 or struct.calcsize("P") > 4:
             return
         A2_16 = "A" * (2**16)
         self.checkraises(OverflowError, A2_16, "replace", "", A2_16)
@@ -907,7 +912,6 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal(u'abc', 'abc', '__getitem__', slice(0, 1000))
         self.checkequal(u'a', 'abc', '__getitem__', slice(0, 1))
         self.checkequal(u'', 'abc', '__getitem__', slice(0, 0))
-        # FIXME What about negative indices? This is handled differently by [] and __getitem__(slice)
 
         self.checkraises(TypeError, 'abc', '__getitem__', 'def')
 
@@ -921,9 +925,20 @@ class MixinStrUnicodeUserStringTest:
         self.checkequal('', 'abc', '__getslice__', 1000, 1000)
         self.checkequal('', 'abc', '__getslice__', 2000, 1000)
         self.checkequal('', 'abc', '__getslice__', 2, 1)
-        # FIXME What about negative indizes? This is handled differently by [] and __getslice__
 
         self.checkraises(TypeError, 'abc', '__getslice__', 'def')
+
+    def test_extended_getslice(self):
+        # Test extended slicing by comparing with list slicing.
+        s = string.ascii_letters + string.digits
+        indices = (0, None, 1, 3, 41, -1, -2, -37)
+        for start in indices:
+            for stop in indices:
+                # Skip step 0 (invalid)
+                for step in indices[1:]:
+                    L = list(s)[start:stop:step]
+                    self.checkequal(u"".join(L), s, '__getitem__',
+                                    slice(start, stop, step))
 
     def test_mul(self):
         self.checkequal('', 'abc', '__mul__', -1)
@@ -1096,6 +1111,9 @@ class MixinStrStringUserStringTest:
         self.checkequal('Abc', 'abc', 'translate', table)
         self.checkequal('xyz', 'xyz', 'translate', table)
         self.checkequal('yz', 'xyz', 'translate', table, 'x')
+        self.checkequal('yx', 'zyzzx', 'translate', None, 'z')
+        self.checkequal('zyzzx', 'zyzzx', 'translate', None, '')
+        self.checkequal('zyzzx', 'zyzzx', 'translate', None)
         self.checkraises(ValueError, 'xyz', 'translate', 'too short', 'strip')
         self.checkraises(ValueError, 'xyz', 'translate', 'too short')
 

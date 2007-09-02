@@ -188,10 +188,10 @@ static int pcall[PCALL_NUM];
 PyObject *
 PyEval_GetCallStats(PyObject *self)
 {
-	return Py_BuildValue("iiiiiiiiii",
+	return Py_BuildValue("iiiiiiiiiii",
 			     pcall[0], pcall[1], pcall[2], pcall[3],
 			     pcall[4], pcall[5], pcall[6], pcall[7],
-			     pcall[8], pcall[9]);
+			     pcall[8], pcall[9], pcall[10]);
 }
 #else
 #define PCALL(O)
@@ -492,7 +492,6 @@ volatile int _Py_Ticker = 100;
 PyObject *
 PyEval_EvalCode(PyCodeObject *co, PyObject *globals, PyObject *locals)
 {
-	/* XXX raise SystemError if globals is NULL */
 	return PyEval_EvalCodeEx(co,
 			  globals, locals,
 			  (PyObject **)NULL, 0,
@@ -697,7 +696,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #define STACKADJ(n)	{ (void)(BASIC_STACKADJ(n), \
                                lltrace && prtrace(TOP(), "stackadj")); \
                                assert(STACK_LEVEL() <= co->co_stacksize); }
-#define EXT_POP(STACK_POINTER) (lltrace && prtrace(*(STACK_POINTER), "ext_pop"), *--(STACK_POINTER))
+#define EXT_POP(STACK_POINTER) (lltrace && prtrace((STACK_POINTER)[-1], "ext_pop"), *--(STACK_POINTER))
 #else
 #define PUSH(v)		BASIC_PUSH(v)
 #define POP()		BASIC_POP()
@@ -864,7 +863,16 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 	   this wasn't always true before 2.3!  PyFrame_New now sets
 	   f->f_lasti to -1 (i.e. the index *before* the first instruction)
 	   and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
-	   does work.  Promise. */
+	   does work.  Promise. 
+
+	   When the PREDICT() macros are enabled, some opcode pairs follow in
+           direct succession without updating f->f_lasti.  A successful 
+           prediction effectively links the two codes together as if they
+           were a single new opcode; accordingly,f->f_lasti will point to
+           the first code in the pair (for instance, GET_ITER followed by
+           FOR_ITER is effectively a single opcode and f->f_lasti will point
+           at to the beginning of the combined pair.)
+	*/
 	next_instr = first_instr + f->f_lasti + 1;
 	stack_pointer = f->f_stacktop;
 	assert(stack_pointer != NULL);
@@ -1963,12 +1971,10 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 					PUSH(w);
 				}
 			} else if (unpack_iterable(v, oparg,
-						 stack_pointer + oparg))
+						 stack_pointer + oparg)) {
 				stack_pointer += oparg;
-			else {
-				if (PyErr_ExceptionMatches(PyExc_TypeError))
-					PyErr_SetString(PyExc_TypeError,
-						"unpack non-sequence");
+			} else {
+				/* unpack_iterable() raised an exception */
 				why = WHY_EXCEPTION;
 			}
 			Py_DECREF(v);
@@ -2406,8 +2412,9 @@ stackless_iter_return:
 		case SETUP_LOOP:
 		case SETUP_EXCEPT:
 		case SETUP_FINALLY:
-			/* NOTE: If you add any new block-setup opcodes that are not try/except/finally
-			   handlers, you may need to update the PyGen_NeedsFinalizing() function. */
+			/* NOTE: If you add any new block-setup opcodes that are
+		           not try/except/finally handlers, you may need to
+			   update the PyGen_NeedsFinalizing() function. */
 
 			PyFrame_BlockSetup(f, opcode, INSTR_OFFSET() + oparg,
 					   STACK_LEVEL());
@@ -3360,15 +3367,7 @@ do_raise(PyObject *type, PyObject *value, PyObject *tb)
 		Py_DECREF(tmp);
 	}
 
-	if (PyString_CheckExact(type)) {
-		/* Raising builtin string is deprecated but still allowed --
-		 * do nothing.  Raising an instance of a new-style str
-		 * subclass is right out. */
-		if (PyErr_Warn(PyExc_DeprecationWarning,
-			   "raising a string exception is deprecated"))
-			goto raise_error;
-	}
-	else if (PyExceptionClass_Check(type))
+	if (PyExceptionClass_Check(type))
 		PyErr_NormalizeException(&type, &value, &tb);
 
 	else if (PyExceptionInstance_Check(type)) {
@@ -3390,8 +3389,7 @@ do_raise(PyObject *type, PyObject *value, PyObject *tb)
 		/* Not something you can raise.  You get an exception
 		   anyway, just not what you specified :-) */
 		PyErr_Format(PyExc_TypeError,
-			     "exceptions must be classes, instances, or "
-			     "strings (deprecated), not %s",
+			     "exceptions must be classes or instances, not %s",
 			     type->ob_type->tp_name);
 		goto raise_error;
 	}
@@ -3986,7 +3984,7 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
 	}
 	if (argdefs != NULL) {
 		d = &PyTuple_GET_ITEM(argdefs, 0);
-		nd = ((PyTupleObject *)argdefs)->ob_size;
+		nd = Py_Size(argdefs);
 	}
 	STACKLESS_PROPOSE_ALL();
 	return PyEval_EvalCodeEx(co, globals,
@@ -4125,13 +4123,31 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 
 	if (flags & CALL_FLAG_KW) {
 		kwdict = EXT_POP(*pp_stack);
-		if (!(kwdict && PyDict_Check(kwdict))) {
-			PyErr_Format(PyExc_TypeError,
-				     "%s%s argument after ** "
-				     "must be a dictionary",
-				     PyEval_GetFuncName(func),
-				     PyEval_GetFuncDesc(func));
-			goto ext_call_fail;
+		if (!PyDict_Check(kwdict)) {
+			PyObject *d;
+			d = PyDict_New();
+			if (d == NULL)
+				goto ext_call_fail;
+			if (PyDict_Update(d, kwdict) != 0) {
+				Py_DECREF(d);
+				/* PyDict_Update raises attribute
+				 * error (percolated from an attempt
+				 * to get 'keys' attribute) instead of
+				 * a type error if its second argument
+				 * is not a mapping.
+				 */
+				if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+					PyErr_Format(PyExc_TypeError,
+						     "%.200s%.200s argument after ** "
+						     "must be a mapping, not %.200s",
+						     PyEval_GetFuncName(func),
+						     PyEval_GetFuncDesc(func),
+						     kwdict->ob_type->tp_name);
+				}
+				goto ext_call_fail;
+			}
+			Py_DECREF(kwdict);
+			kwdict = d;
 		}
 	}
 	if (flags & CALL_FLAG_VAR) {
@@ -4142,10 +4158,11 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 			if (t == NULL) {
 				if (PyErr_ExceptionMatches(PyExc_TypeError)) {
 					PyErr_Format(PyExc_TypeError,
-						     "%s%s argument after * "
-						     "must be a sequence",
+						     "%.200s%.200s argument after * "
+						     "must be a sequence, not %200s",
 						     PyEval_GetFuncName(func),
-						     PyEval_GetFuncDesc(func));
+						     PyEval_GetFuncDesc(func),
+						     stararg->ob_type->tp_name);
 				}
 				goto ext_call_fail;
 			}
@@ -4262,7 +4279,7 @@ assign_slice(PyObject *u, PyObject *v, PyObject *w, PyObject *x)
 	PyTypeObject *tp = u->ob_type;
 	PySequenceMethods *sq = tp->tp_as_sequence;
 
-	if (sq && sq->sq_slice && ISINDEX(v) && ISINDEX(w)) {
+	if (sq && sq->sq_ass_slice && ISINDEX(v) && ISINDEX(w)) {
 		Py_ssize_t ilow = 0, ihigh = PY_SSIZE_T_MAX;
 		if (!_PyEval_SliceIndex(v, &ilow))
 			return -1;
@@ -4312,6 +4329,35 @@ cmp_outcome(int op, register PyObject *v, register PyObject *w)
 		res = !res;
 		break;
 	case PyCmp_EXC_MATCH:
+		if (PyTuple_Check(w)) {
+			Py_ssize_t i, length;
+			length = PyTuple_Size(w);
+			for (i = 0; i < length; i += 1) {
+				PyObject *exc = PyTuple_GET_ITEM(w, i);
+				if (PyString_Check(exc)) {
+					int ret_val;
+					ret_val = PyErr_WarnEx(
+							PyExc_DeprecationWarning,
+							"catching of string "
+							"exceptions is "
+							"deprecated", 1);
+					if (ret_val == -1)
+						return NULL;
+				}
+			}
+		}
+		else {
+			if (PyString_Check(w)) {
+				int ret_val;
+				ret_val = PyErr_WarnEx(
+						PyExc_DeprecationWarning,
+						"catching of string "
+						"exceptions is deprecated",
+						1);
+				if (ret_val == -1)
+					return NULL;
+			}
+		}
 		res = PyErr_GivenExceptionMatches(v, w);
 		break;
 	default:
@@ -4382,8 +4428,10 @@ import_all_from(PyObject *locals, PyObject *v)
 		value = PyObject_GetAttr(v, name);
 		if (value == NULL)
 			err = -1;
-		else
+		else if (PyDict_CheckExact(locals))
 			err = PyDict_SetItem(locals, name, value);
+		else
+			err = PyObject_SetItem(locals, name, value);
 		Py_DECREF(name);
 		Py_XDECREF(value);
 		if (err != 0)
@@ -4419,7 +4467,8 @@ build_class(PyObject *methods, PyObject *bases, PyObject *name)
 			metaclass = (PyObject *) &PyClass_Type;
 		Py_INCREF(metaclass);
 	}
-	result = PyObject_CallFunctionObjArgs(metaclass, name, bases, methods, NULL);
+	result = PyObject_CallFunctionObjArgs(metaclass, name, bases, methods,
+                                              NULL);
 	Py_DECREF(metaclass);
 	if (result == NULL && PyErr_ExceptionMatches(PyExc_TypeError)) {
 		/* A type error here likely means that the user passed
@@ -4433,7 +4482,8 @@ build_class(PyObject *methods, PyObject *bases, PyObject *name)
 		if (PyString_Check(pvalue)) {
 			PyObject *newmsg;
 			newmsg = PyString_FromFormat(
-				"Error when calling the metaclass bases\n    %s",
+				"Error when calling the metaclass bases\n"
+                                "    %s",
 				PyString_AS_STRING(pvalue));
 			if (newmsg != NULL) {
 				Py_DECREF(pvalue);
@@ -4507,6 +4557,8 @@ exec_statement(PyFrameObject *f, PyObject *prog, PyObject *globals,
 		FILE *fp = PyFile_AsFile(prog);
 		char *name = PyString_AsString(PyFile_Name(prog));
 		PyCompilerFlags cf;
+                if (name == NULL)
+                        return -1;
 		cf.cf_flags = 0;
 		if (PyEval_MergeCompilerFlags(&cf))
 			v = PyRun_FileFlags(fp, name, Py_file_input, globals,

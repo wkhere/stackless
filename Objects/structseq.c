@@ -13,17 +13,17 @@ static char unnamed_fields_key[] = "n_unnamed_fields";
    They are only allowed for indices < n_visible_fields. */
 char *PyStructSequence_UnnamedField = "unnamed field";
 
-#define VISIBLE_SIZE(op) ((op)->ob_size)
+#define VISIBLE_SIZE(op) Py_Size(op)
 #define VISIBLE_SIZE_TP(tp) PyInt_AsLong( \
                       PyDict_GetItemString((tp)->tp_dict, visible_length_key))
 
 #define REAL_SIZE_TP(tp) PyInt_AsLong( \
                       PyDict_GetItemString((tp)->tp_dict, real_length_key))
-#define REAL_SIZE(op) REAL_SIZE_TP((op)->ob_type)
+#define REAL_SIZE(op) REAL_SIZE_TP(Py_Type(op))
 
 #define UNNAMED_FIELDS_TP(tp) PyInt_AsLong( \
                       PyDict_GetItemString((tp)->tp_dict, unnamed_fields_key))
-#define UNNAMED_FIELDS(op) UNNAMED_FIELDS_TP((op)->ob_type)
+#define UNNAMED_FIELDS(op) UNNAMED_FIELDS_TP(Py_Type(op))
 
 
 PyObject *
@@ -32,7 +32,7 @@ PyStructSequence_New(PyTypeObject *type)
 	PyStructSequence *obj;
        
 	obj = PyObject_New(PyStructSequence, type);
-	obj->ob_size = VISIBLE_SIZE_TP(type);
+	Py_Size(obj) = VISIBLE_SIZE_TP(type);
 
 	return (PyObject*) obj;
 }
@@ -87,6 +87,54 @@ structseq_slice(PyStructSequence *obj, Py_ssize_t low, Py_ssize_t high)
 		PyTuple_SET_ITEM(np, i-low, v);
 	}
 	return (PyObject *) np;
+}
+
+static PyObject *
+structseq_subscript(PyStructSequence *self, PyObject *item)
+{
+	if (PyIndex_Check(item)) {
+		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
+		if (i == -1 && PyErr_Occurred())
+			return NULL;
+
+		if (i < 0)
+			i += VISIBLE_SIZE(self);
+
+		if (i < 0 || i >= VISIBLE_SIZE(self)) {
+			PyErr_SetString(PyExc_IndexError,
+				"tuple index out of range");
+			return NULL;
+		}
+		Py_INCREF(self->ob_item[i]);
+		return self->ob_item[i];
+	}
+	else if (PySlice_Check(item)) {
+		Py_ssize_t start, stop, step, slicelen, cur, i;
+		PyObject *result;
+		
+		if (PySlice_GetIndicesEx((PySliceObject *)item,
+					 VISIBLE_SIZE(self), &start, &stop,
+					 &step, &slicelen) < 0) {
+			return NULL;
+		}
+		if (slicelen <= 0)
+			return PyTuple_New(0);
+		result = PyTuple_New(slicelen);
+		if (result == NULL)
+			return NULL;
+		for (cur = start, i = 0; i < slicelen;
+		     cur += step, i++) {
+			PyObject *v = self->ob_item[cur];
+			Py_INCREF(v);
+			PyTuple_SET_ITEM(result, i, v);
+		}
+		return result;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError,
+				"structseq index must be integer");
+		return NULL;
+	}
 }
 
 static PyObject *
@@ -274,12 +322,12 @@ structseq_reduce(PyStructSequence* self)
 	}
 	
 	for (; i < n_fields; i++) {
-		char *n = self->ob_type->tp_members[i-n_unnamed_fields].name;
+		char *n = Py_Type(self)->tp_members[i-n_unnamed_fields].name;
 		PyDict_SetItemString(dict, n,
 				     self->ob_item[i]);
 	}
 
-	result = Py_BuildValue("(O(OO))", self->ob_type, tup, dict);
+	result = Py_BuildValue("(O(OO))", Py_Type(self), tup, dict);
 
 	Py_DECREF(tup);
 	Py_DECREF(dict);
@@ -298,6 +346,11 @@ static PySequenceMethods structseq_as_sequence = {
 	(objobjproc)structseq_contains,	        /* sq_contains */
 };
 
+static PyMappingMethods structseq_as_mapping = {
+	(lenfunc)structseq_length,
+	(binaryfunc)structseq_subscript,
+};
+
 static PyMethodDef structseq_methods[] = {
 	{"__reduce__", (PyCFunction)structseq_reduce, 
 	 METH_NOARGS, NULL},
@@ -305,8 +358,7 @@ static PyMethodDef structseq_methods[] = {
 };
 
 static PyTypeObject _struct_sequence_template = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	NULL,	                     		/* tp_name */
         0,		                        /* tp_basicsize */
 	0,	                      		/* tp_itemsize */
@@ -318,7 +370,7 @@ static PyTypeObject _struct_sequence_template = {
 	(reprfunc)structseq_repr,             	/* tp_repr */
 	0,					/* tp_as_number */
 	&structseq_as_sequence,			/* tp_as_sequence */
-	0,					/* tp_as_mapping */
+	&structseq_as_mapping,			/* tp_as_mapping */
 	structseq_hash,				/* tp_hash */
 	0,              			/* tp_call */
 	0,					/* tp_str */

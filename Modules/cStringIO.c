@@ -289,7 +289,17 @@ IO_truncate(IOobject *self, PyObject *args) {
 	
         if (!IO__opencheck(self)) return NULL;
         if (!PyArg_ParseTuple(args, "|n:truncate", &pos)) return NULL;
-        if (pos < 0) pos = self->pos;
+
+	if (PyTuple_Size(args) == 0) {
+		/* No argument passed, truncate to current position */
+		pos = self->pos;
+	}
+
+        if (pos < 0) {
+		errno = EINVAL;
+		PyErr_SetFromErrno(PyExc_IOError);
+		return NULL;
+	}
 
         if (self->string_size > pos) self->string_size = pos;
         self->pos = self->string_size;
@@ -339,13 +349,17 @@ O_seek(Oobject *self, PyObject *args) {
         }
 
         if (position > self->buf_size) {
+                  char *newbuf;
                   self->buf_size*=2;
                   if (self->buf_size <= position) self->buf_size=position+1;
-		  self->buf = (char*) realloc(self->buf,self->buf_size);
-                  if (!self->buf) {
+		  newbuf = (char*) realloc(self->buf,self->buf_size);
+                  if (!newbuf) {
+                      free(self->buf);
+                      self->buf = 0;
                       self->buf_size=self->pos=0;
                       return PyErr_NoMemory();
                     }
+                  self->buf = newbuf;
           }
         else if (position < 0) position=0;
 
@@ -366,6 +380,7 @@ static int
 O_cwrite(PyObject *self, const char *c, Py_ssize_t  l) {
         Py_ssize_t newl;
         Oobject *oself;
+        char *newbuf;
 
         if (!IO__opencheck(IOOOBJECT(self))) return -1;
         oself = (Oobject *)self;
@@ -377,12 +392,15 @@ O_cwrite(PyObject *self, const char *c, Py_ssize_t  l) {
 		    assert(newl + 1 < INT_MAX);
                     oself->buf_size = (int)(newl+1);
 	    }
-            oself->buf = (char*)realloc(oself->buf, oself->buf_size);
-	    if (!oself->buf) {
+            newbuf = (char*)realloc(oself->buf, oself->buf_size);
+	    if (!newbuf) {
                     PyErr_SetString(PyExc_MemoryError,"out of memory");
+                    free(oself->buf);
+                    oself->buf = 0;
                     oself->buf_size = oself->pos = 0;
                     return -1;
               }
+            oself->buf = newbuf;
           }
 
         memcpy(oself->buf+oself->pos,c,l);
@@ -496,8 +514,7 @@ O_dealloc(Oobject *self) {
 PyDoc_STRVAR(Otype__doc__, "Simple type for output to strings.");
 
 static PyTypeObject Otype = {
-  PyObject_HEAD_INIT(NULL)
-  0,	       			/*ob_size*/
+  PyVarObject_HEAD_INIT(NULL, 0)
   "cStringIO.StringO",   	/*tp_name*/
   sizeof(Oobject),       	/*tp_basicsize*/
   0,	       			/*tp_itemsize*/
@@ -617,8 +634,7 @@ PyDoc_STRVAR(Itype__doc__,
 "Simple type for treating strings as input file streams");
 
 static PyTypeObject Itype = {
-  PyObject_HEAD_INIT(NULL)
-  0,					/*ob_size*/
+  PyVarObject_HEAD_INIT(NULL, 0)
   "cStringIO.StringI",			/*tp_name*/
   sizeof(Iobject),			/*tp_basicsize*/
   0,					/*tp_itemsize*/
@@ -657,8 +673,11 @@ newIobject(PyObject *s) {
   char *buf;
   Py_ssize_t size;
 
-  if (PyObject_AsCharBuffer(s, (const void **)&buf, &size) != 0)
-      return NULL;
+  if (PyObject_AsReadBuffer(s, (const void **)&buf, &size)) {
+    PyErr_Format(PyExc_TypeError, "expected read buffer, %.200s found",
+                 s->ob_type->tp_name);
+    return NULL;
+  }
 
   self = PyObject_New(Iobject, &Itype);
   if (!self) return NULL;
@@ -728,8 +747,8 @@ initcStringIO(void) {
   d = PyModule_GetDict(m);
   
   /* Export C API */
-  Itype.ob_type=&PyType_Type;
-  Otype.ob_type=&PyType_Type;
+  Py_Type(&Itype)=&PyType_Type;
+  Py_Type(&Otype)=&PyType_Type;
   if (PyType_Ready(&Otype) < 0) return;
   if (PyType_Ready(&Itype) < 0) return;
   PyDict_SetItemString(d,"cStringIO_CAPI",

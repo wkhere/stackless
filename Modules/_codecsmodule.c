@@ -10,7 +10,7 @@
 
      register(search_function) -> None
 
-     lookup(encoding) -> (encoder, decoder, stream_reader, stream_writer)
+     lookup(encoding) -> CodecInfo object
 
    The builtin Unicode codecs use the following interface:
 
@@ -45,7 +45,8 @@ PyDoc_STRVAR(register__doc__,
 \n\
 Register a codec search function. Search functions are expected to take\n\
 one argument, the encoding name in all lower case letters, and return\n\
-a tuple of functions (encoder, decoder, stream_reader, stream_writer).");
+a tuple of functions (encoder, decoder, stream_reader, stream_writer)\n\
+(or a CodecInfo object).");
 
 static
 PyObject *codec_register(PyObject *self, PyObject *search_function)
@@ -57,10 +58,10 @@ PyObject *codec_register(PyObject *self, PyObject *search_function)
 }
 
 PyDoc_STRVAR(lookup__doc__,
-"lookup(encoding) -> (encoder, decoder, stream_reader, stream_writer)\n\
+"lookup(encoding) -> CodecInfo\n\
 \n\
 Looks up a codec tuple in the Python codec registry and returns\n\
-a tuple of functions.");
+a tuple of function (or a CodecInfo object).");
 
 static
 PyObject *codec_lookup(PyObject *self, PyObject *args)
@@ -391,6 +392,126 @@ utf_16_ex_decode(PyObject *self,
 }
 
 static PyObject *
+utf_32_decode(PyObject *self,
+	    PyObject *args)
+{
+    const char *data;
+    Py_ssize_t size;
+    const char *errors = NULL;
+    int byteorder = 0;
+    int final = 0;
+    Py_ssize_t consumed;
+    PyObject *decoded;
+
+    if (!PyArg_ParseTuple(args, "t#|zi:utf_32_decode",
+			  &data, &size, &errors, &final))
+	return NULL;
+    if (size < 0) {
+	    PyErr_SetString(PyExc_ValueError, "negative argument");
+	    return 0;
+    }
+    consumed = size; /* This is overwritten unless final is true. */
+    decoded = PyUnicode_DecodeUTF32Stateful(data, size, errors, &byteorder,
+					    final ? NULL : &consumed);
+    if (decoded == NULL)
+	return NULL;
+    return codec_tuple(decoded, consumed);
+}
+
+static PyObject *
+utf_32_le_decode(PyObject *self,
+		 PyObject *args)
+{
+    const char *data;
+    Py_ssize_t size;
+    const char *errors = NULL;
+    int byteorder = -1;
+    int final = 0;
+    Py_ssize_t consumed;
+    PyObject *decoded = NULL;
+
+    if (!PyArg_ParseTuple(args, "t#|zi:utf_32_le_decode",
+			  &data, &size, &errors, &final))
+	return NULL;
+
+    if (size < 0) {
+          PyErr_SetString(PyExc_ValueError, "negative argument");
+          return 0;
+    }
+    consumed = size; /* This is overwritten unless final is true. */
+    decoded = PyUnicode_DecodeUTF32Stateful(data, size, errors,
+	&byteorder, final ? NULL : &consumed);
+    if (decoded == NULL)
+	return NULL;
+    return codec_tuple(decoded, consumed);
+
+}
+
+static PyObject *
+utf_32_be_decode(PyObject *self,
+		 PyObject *args)
+{
+    const char *data;
+    Py_ssize_t size;
+    const char *errors = NULL;
+    int byteorder = 1;
+    int final = 0;
+    Py_ssize_t consumed;
+    PyObject *decoded = NULL;
+
+    if (!PyArg_ParseTuple(args, "t#|zi:utf_32_be_decode",
+			  &data, &size, &errors, &final))
+	return NULL;
+    if (size < 0) {
+          PyErr_SetString(PyExc_ValueError, "negative argument");
+          return 0;
+    }
+    consumed = size; /* This is overwritten unless final is true. */
+    decoded = PyUnicode_DecodeUTF32Stateful(data, size, errors,
+	&byteorder, final ? NULL : &consumed);
+    if (decoded == NULL)
+	return NULL;
+    return codec_tuple(decoded, consumed);
+}
+
+/* This non-standard version also provides access to the byteorder
+   parameter of the builtin UTF-32 codec.
+
+   It returns a tuple (unicode, bytesread, byteorder) with byteorder
+   being the value in effect at the end of data.
+
+*/
+
+static PyObject *
+utf_32_ex_decode(PyObject *self,
+		 PyObject *args)
+{
+    const char *data;
+    Py_ssize_t size;
+    const char *errors = NULL;
+    int byteorder = 0;
+    PyObject *unicode, *tuple;
+    int final = 0;
+    Py_ssize_t consumed;
+
+    if (!PyArg_ParseTuple(args, "t#|zii:utf_32_ex_decode",
+			  &data, &size, &errors, &byteorder, &final))
+	return NULL;
+    if (size < 0) {
+	    PyErr_SetString(PyExc_ValueError, "negative argument");
+	    return 0;
+    }
+    consumed = size; /* This is overwritten unless final is true. */
+    unicode = PyUnicode_DecodeUTF32Stateful(data, size, errors, &byteorder,
+					    final ? NULL : &consumed);
+    if (unicode == NULL)
+	return NULL;
+    tuple = Py_BuildValue("Oni", unicode, consumed, byteorder);
+    Py_DECREF(unicode);
+    return tuple;
+}
+
+static PyObject *
 unicode_escape_decode(PyObject *self,
 		     PyObject *args)
 {
@@ -682,6 +803,83 @@ utf_16_be_encode(PyObject *self,
     return v;
 }
 
+/* This version provides access to the byteorder parameter of the
+   builtin UTF-32 codecs as optional third argument. It defaults to 0
+   which means: use the native byte order and prepend the data with a
+   BOM mark.
+
+*/
+
+static PyObject *
+utf_32_encode(PyObject *self,
+	    PyObject *args)
+{
+    PyObject *str, *v;
+    const char *errors = NULL;
+    int byteorder = 0;
+
+    if (!PyArg_ParseTuple(args, "O|zi:utf_32_encode",
+			  &str, &errors, &byteorder))
+	return NULL;
+
+    str = PyUnicode_FromObject(str);
+    if (str == NULL)
+	return NULL;
+    v = codec_tuple(PyUnicode_EncodeUTF32(PyUnicode_AS_UNICODE(str),
+					  PyUnicode_GET_SIZE(str),
+					  errors,
+					  byteorder),
+		    PyUnicode_GET_SIZE(str));
+    Py_DECREF(str);
+    return v;
+}
+
+static PyObject *
+utf_32_le_encode(PyObject *self,
+		 PyObject *args)
+{
+    PyObject *str, *v;
+    const char *errors = NULL;
+
+    if (!PyArg_ParseTuple(args, "O|z:utf_32_le_encode",
+			  &str, &errors))
+	return NULL;
+
+    str = PyUnicode_FromObject(str);
+    if (str == NULL)
+	return NULL;
+    v = codec_tuple(PyUnicode_EncodeUTF32(PyUnicode_AS_UNICODE(str),
+					     PyUnicode_GET_SIZE(str),
+					     errors,
+					     -1),
+		       PyUnicode_GET_SIZE(str));
+    Py_DECREF(str);
+    return v;
+}
+
+static PyObject *
+utf_32_be_encode(PyObject *self,
+		 PyObject *args)
+{
+    PyObject *str, *v;
+    const char *errors = NULL;
+
+    if (!PyArg_ParseTuple(args, "O|z:utf_32_be_encode",
+			  &str, &errors))
+	return NULL;
+
+    str = PyUnicode_FromObject(str);
+    if (str == NULL)
+	return NULL;
+    v = codec_tuple(PyUnicode_EncodeUTF32(PyUnicode_AS_UNICODE(str),
+					  PyUnicode_GET_SIZE(str),
+					  errors,
+					  +1),
+		    PyUnicode_GET_SIZE(str));
+    Py_DECREF(str);
+    return v;
+}
+
 static PyObject *
 unicode_escape_encode(PyObject *self,
 		     PyObject *args)
@@ -900,6 +1098,13 @@ static PyMethodDef _codecs_functions[] = {
     {"utf_16_le_decode",	utf_16_le_decode,		METH_VARARGS},
     {"utf_16_be_decode",	utf_16_be_decode,		METH_VARARGS},
     {"utf_16_ex_decode",	utf_16_ex_decode,		METH_VARARGS},
+    {"utf_32_encode",		utf_32_encode,			METH_VARARGS},
+    {"utf_32_le_encode",	utf_32_le_encode,		METH_VARARGS},
+    {"utf_32_be_encode",	utf_32_be_encode,		METH_VARARGS},
+    {"utf_32_decode",		utf_32_decode,			METH_VARARGS},
+    {"utf_32_le_decode",	utf_32_le_decode,		METH_VARARGS},
+    {"utf_32_be_decode",	utf_32_be_decode,		METH_VARARGS},
+    {"utf_32_ex_decode",	utf_32_ex_decode,		METH_VARARGS},
     {"unicode_escape_encode",	unicode_escape_encode,		METH_VARARGS},
     {"unicode_escape_decode",	unicode_escape_decode,		METH_VARARGS},
     {"unicode_internal_encode",	unicode_internal_encode,	METH_VARARGS},

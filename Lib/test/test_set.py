@@ -21,6 +21,19 @@ class BadCmp:
     def __cmp__(self, other):
         raise RuntimeError
 
+class ReprWrapper:
+    'Used to test self-referential repr() calls'
+    def __repr__(self):
+        return repr(self.value)
+
+class HashCountingInt(int):
+    'int-like object that counts the number of times __hash__ is called'
+    def __init__(self, *args):
+        self.hash_count = 0
+    def __hash__(self):
+        self.hash_count += 1
+        return int.__hash__(self)
+
 class TestJointOps(unittest.TestCase):
     # Tests common to both set and frozenset
 
@@ -244,6 +257,46 @@ class TestJointOps(unittest.TestCase):
             self.assertRaises(RuntimeError, s.discard, BadCmp())
             self.assertRaises(RuntimeError, s.remove, BadCmp())
 
+    def test_cyclical_repr(self):
+        w = ReprWrapper()
+        s = self.thetype([w])
+        w.value = s
+        name = repr(s).partition('(')[0]    # strip class name from repr string
+        self.assertEqual(repr(s), '%s([%s(...)])' % (name, name))
+
+    def test_cyclical_print(self):
+        w = ReprWrapper()
+        s = self.thetype([w])
+        w.value = s
+        try:
+            fo = open(test_support.TESTFN, "wb")
+            print >> fo, s,
+            fo.close()
+            fo = open(test_support.TESTFN, "rb")
+            self.assertEqual(fo.read(), repr(s))
+        finally:
+            fo.close()
+            os.remove(test_support.TESTFN)
+
+    def test_do_not_rehash_dict_keys(self):
+        n = 10
+        d = dict.fromkeys(map(HashCountingInt, xrange(n)))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        s = self.thetype(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        s.difference(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        if hasattr(s, 'symmetric_difference_update'):
+            s.symmetric_difference_update(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d2 = dict.fromkeys(set(d))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d3 = dict.fromkeys(frozenset(d))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d3 = dict.fromkeys(frozenset(d), 123)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        self.assertEqual(d3, dict.fromkeys(d, 123))
+
 class TestSet(TestJointOps):
     thetype = set
 
@@ -292,6 +345,17 @@ class TestSet(TestJointOps):
         s.remove(self.thetype(self.word))
         self.assert_(self.thetype(self.word) not in s)
         self.assertRaises(KeyError, self.s.remove, self.thetype(self.word))
+
+    def test_remove_keyerror_unpacking(self):
+        # bug:  www.python.org/sf/1576657
+        for v1 in ['Q', (1,)]:
+            try:
+                self.s.remove(v1)
+            except KeyError, e:
+                v2 = e.args[0]
+                self.assertEqual(v1, v2)
+            else:
+                self.fail()
 
     def test_discard(self):
         self.s.discard('a')
@@ -430,6 +494,16 @@ class SetSubclass(set):
 
 class TestSetSubclass(TestSet):
     thetype = SetSubclass
+
+class SetSubclassWithKeywordArgs(set):
+    def __init__(self, iterable=[], newarg=None):
+        set.__init__(self, iterable)
+
+class TestSetSubclassWithKeywordArgs(TestSet):
+
+    def test_keywords_in_subclass(self):
+        'SF bug #1486663 -- this used to erroneously raise a TypeError'
+        SetSubclassWithKeywordArgs(newarg=1)
 
 class TestFrozenSet(TestJointOps):
     thetype = frozenset
@@ -1413,6 +1487,7 @@ def test_main(verbose=None):
     test_classes = (
         TestSet,
         TestSetSubclass,
+        TestSetSubclassWithKeywordArgs,
         TestFrozenSet,
         TestFrozenSetSubclass,
         TestSetOfSets,

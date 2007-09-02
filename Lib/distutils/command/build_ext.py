@@ -185,14 +185,23 @@ class build_ext (Command):
 
         # for extensions under Cygwin and AtheOS Python's library directory must be
         # appended to library_dirs
-        if sys.platform[:6] == 'cygwin' or sys.platform[:6] == 'atheos' or \
-               (sys.platform.startswith('linux') and
-                sysconfig.get_config_var('Py_ENABLE_SHARED')):
-            if string.find(sys.executable, sys.exec_prefix) != -1:
+        if sys.platform[:6] == 'cygwin' or sys.platform[:6] == 'atheos':
+            if sys.executable.startswith(os.path.join(sys.exec_prefix, "bin")):
                 # building third party extensions
                 self.library_dirs.append(os.path.join(sys.prefix, "lib",
                                                       "python" + get_python_version(),
                                                       "config"))
+            else:
+                # building python standard extensions
+                self.library_dirs.append('.')
+
+        # for extensions under Linux with a shared Python library,
+        # Python's library directory must be appended to library_dirs
+        if (sys.platform.startswith('linux') or sys.platform.startswith('gnu')) \
+                and sysconfig.get_config_var('Py_ENABLE_SHARED'):
+            if sys.executable.startswith(os.path.join(sys.exec_prefix, "bin")):
+                # building third party extensions
+                self.library_dirs.append(sysconfig.get_config_var('LIBDIR'))
             else:
                 # building python standard extensions
                 self.library_dirs.append('.')
@@ -524,7 +533,8 @@ class build_ext (Command):
         if self.swig_cpp:
             log.warn("--swig-cpp is deprecated - use --swig-opts=-c++")
 
-        if self.swig_cpp or ('-c++' in self.swig_opts):
+        if self.swig_cpp or ('-c++' in self.swig_opts) or \
+           ('-c++' in extension.swig_opts):
             target_ext = '.cpp'
         else:
             target_ext = '.c'

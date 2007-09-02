@@ -103,7 +103,8 @@ extensions = [
 msvcr71_uuid = "{8666C8DD-D0B4-4B42-928E-A69E32FA5D4D}"
 pythondll_uuid = {
     "24":"{9B81E618-2301-4035-AC77-75D9ABEB7301}",
-    "25":"{2e41b118-38bd-4c1b-a840-6977efd1b911}"
+    "25":"{2e41b118-38bd-4c1b-a840-6977efd1b911}",
+    "26":"{34ebecac-f046-4e1c-b0e3-9bac3cdaacfa}",
     } [major+minor]
 
 # Build the mingw import library, libpythonXY.a
@@ -166,9 +167,11 @@ else:
     testprefix = ''
 
 if msilib.Win64:
-    SystemFolderName = "[SystemFolder64]"
+    SystemFolderName = "[System64Folder]"
+    registry_component = 4|256
 else:
     SystemFolderName = "[SystemFolder]"
+    registry_component = 4
 
 msilib.reset()
 
@@ -191,7 +194,7 @@ def build_database():
                   schema, ProductName="Python "+full_current_version,
                   ProductCode=product_code,
                   ProductVersion=current_version,
-                  Manufacturer=u"Martin v. L\xf6wis")
+                  Manufacturer=u"Python Software Foundation")
     # The default sequencing of the RemoveExistingProducts action causes
     # removal of files that got just installed. Place it after
     # InstallInitialize, so we first uninstall everything, but still roll
@@ -1061,15 +1064,15 @@ def add_registry(db):
     tcldata = []
     if have_tcl:
         tcldata = [
-            ("REGISTRY.tcl", msilib.gen_uuid(), "TARGETDIR", 4, None,
+            ("REGISTRY.tcl", msilib.gen_uuid(), "TARGETDIR", registry_component, None,
              "py.IDLE")]
     add_data(db, "Component",
              # msidbComponentAttributesRegistryKeyPath = 4
-             [("REGISTRY", msilib.gen_uuid(), "TARGETDIR", 4, None,
+             [("REGISTRY", msilib.gen_uuid(), "TARGETDIR", registry_component, None,
                "InstallPath"),
-              ("REGISTRY.doc", msilib.gen_uuid(), "TARGETDIR", 4, None,
+              ("REGISTRY.doc", msilib.gen_uuid(), "TARGETDIR", registry_component, None,
                "Documentation"),
-              ("REGISTRY.def", msilib.gen_uuid(), "TARGETDIR", 4,
+              ("REGISTRY.def", msilib.gen_uuid(), "TARGETDIR", registry_component,
                None, None)] + tcldata)
     # See "FeatureComponents Table".
     # The association between TclTk and pythonw.exe is necessary to make ICE59

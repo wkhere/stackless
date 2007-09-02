@@ -43,7 +43,7 @@ enum_dealloc(enumobject *en)
 	PyObject_GC_UnTrack(en);
 	Py_XDECREF(en->en_sit);
 	Py_XDECREF(en->en_result);
-	en->ob_type->tp_free(en);
+	Py_Type(en)->tp_free(en);
 }
 
 static int
@@ -62,7 +62,13 @@ enum_next(enumobject *en)
 	PyObject *result = en->en_result;
 	PyObject *it = en->en_sit;
 
-	next_item = (*it->ob_type->tp_iternext)(it);
+	if (en->en_index == LONG_MAX) {
+		PyErr_SetString(PyExc_OverflowError,
+			"enumerate() is limited to LONG_MAX items");                
+		return NULL;         
+	}
+
+	next_item = (*Py_Type(it)->tp_iternext)(it);
 	if (next_item == NULL)
 		return NULL;
 
@@ -99,8 +105,7 @@ PyDoc_STRVAR(enum_doc,
 "for obtaining an indexed list: (0, seq[0]), (1, seq[1]), (2, seq[2]), ...");
 
 PyTypeObject PyEnum_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,                              /* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"enumerate",                    /* tp_name */
 	sizeof(enumobject),             /* tp_basicsize */
 	0,                              /* tp_itemsize */
@@ -189,7 +194,7 @@ reversed_dealloc(reversedobject *ro)
 {
 	PyObject_GC_UnTrack(ro);
 	Py_XDECREF(ro->seq);
-	ro->ob_type->tp_free(ro);
+	Py_Type(ro)->tp_free(ro);
 }
 
 static int
@@ -247,8 +252,7 @@ static PyMethodDef reversediter_methods[] = {
 };
 
 PyTypeObject PyReversed_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,                              /* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"reversed",                     /* tp_name */
 	sizeof(reversedobject),         /* tp_basicsize */
 	0,                              /* tp_itemsize */

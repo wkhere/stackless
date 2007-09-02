@@ -1,10 +1,11 @@
-from test.test_support import TESTFN, run_unittest
+from test.test_support import TESTFN, run_unittest, catch_warning
 
 import unittest
 import os
 import random
 import sys
 import py_compile
+import warnings
 
 
 def remove_files(name):
@@ -18,7 +19,7 @@ def remove_files(name):
 
 
 class ImportTest(unittest.TestCase):
-    
+
     def testCaseSensitivity(self):
         # Brief digression to test that import is case-sensitive:  if we got this
         # far, we know for sure that "random" exists.
@@ -56,7 +57,7 @@ class ImportTest(unittest.TestCase):
                     mod = __import__(TESTFN)
                 except ImportError, err:
                     self.fail("import from %s failed: %s" % (ext, err))
-                
+
                 self.assertEquals(mod.a, a,
                     "module loaded (%s) but contents invalid" % mod)
                 self.assertEquals(mod.b, b,
@@ -192,6 +193,16 @@ class ImportTest(unittest.TestCase):
             if TESTFN in sys.modules:
                 del sys.modules[TESTFN]
 
+    def test_infinite_reload(self):
+        # Bug #742342 reports that Python segfaults (infinite recursion in C)
+        #  when faced with self-recursive reload()ing.
+
+        sys.path.insert(0, os.path.dirname(__file__))
+        try:
+            import infinite_reload
+        finally:
+            sys.path.pop(0)
+
     def test_import_name_binding(self):
         # import x.y.z binds x in the current namespace
         import test as x
@@ -204,15 +215,11 @@ class ImportTest(unittest.TestCase):
         self.assert_(y is test.test_support, y.__name__)
 
     def test_import_initless_directory_warning(self):
-        import warnings
-        oldfilters = warnings.filters[:]
-        warnings.simplefilter('error', ImportWarning);
-        try:
+        with catch_warning():
             # Just a random non-package directory we always expect to be
             # somewhere in sys.path...
+            warnings.simplefilter('error', ImportWarning)
             self.assertRaises(ImportWarning, __import__, "site-packages")
-        finally:
-            warnings.filters = oldfilters
 
 def test_main(verbose=None):
     run_unittest(ImportTest)

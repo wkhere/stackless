@@ -670,8 +670,7 @@ multibytecodec_dealloc(MultibyteCodecObject *self)
 }
 
 static PyTypeObject MultibyteCodec_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"MultibyteCodec",		/* tp_name */
 	sizeof(MultibyteCodecObject),	/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -946,12 +945,11 @@ mbiencoder_dealloc(MultibyteIncrementalEncoderObject *self)
 {
 	PyObject_GC_UnTrack(self);
 	ERROR_DECREF(self->errors);
-	self->ob_type->tp_free(self);
+	Py_Type(self)->tp_free(self);
 }
 
 static PyTypeObject MultibyteIncrementalEncoder_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"MultibyteIncrementalEncoder",	/* tp_name */
 	sizeof(MultibyteIncrementalEncoderObject), /* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1147,12 +1145,11 @@ mbidecoder_dealloc(MultibyteIncrementalDecoderObject *self)
 {
 	PyObject_GC_UnTrack(self);
 	ERROR_DECREF(self->errors);
-	self->ob_type->tp_free(self);
+	Py_Type(self)->tp_free(self);
 }
 
 static PyTypeObject MultibyteIncrementalDecoder_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"MultibyteIncrementalDecoder",	/* tp_name */
 	sizeof(MultibyteIncrementalDecoderObject), /* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1214,6 +1211,8 @@ mbstreamreader_iread(MultibyteStreamReaderObject *self,
 	cres = NULL;
 
 	for (;;) {
+		int endoffile;
+
 		if (sizehint < 0)
 			cres = PyObject_CallMethod(self->stream,
 					(char *)method, NULL);
@@ -1229,6 +1228,8 @@ mbstreamreader_iread(MultibyteStreamReaderObject *self,
 					"non-string object");
 			goto errorexit;
 		}
+
+		endoffile = (PyString_GET_SIZE(cres) == 0);
 
 		if (self->pendingsize > 0) {
 			PyObject *ctr;
@@ -1257,7 +1258,7 @@ mbstreamreader_iread(MultibyteStreamReaderObject *self,
 				(MultibyteStatefulDecoderContext *)self, &buf))
 			goto errorexit;
 
-		if (rsize == 0 || sizehint < 0) { /* end of file */
+		if (endoffile || sizehint < 0) {
 			if (buf.inbuf < buf.inbuf_end &&
 			    multibytecodec_decerror(self->codec, &self->state,
 					&buf, self->errors, MBERR_TOOFEW))
@@ -1460,12 +1461,11 @@ mbstreamreader_dealloc(MultibyteStreamReaderObject *self)
 	PyObject_GC_UnTrack(self);
 	ERROR_DECREF(self->errors);
 	Py_DECREF(self->stream);
-	self->ob_type->tp_free(self);
+	Py_Type(self)->tp_free(self);
 }
 
 static PyTypeObject MultibyteStreamReader_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"MultibyteStreamReader",	/* tp_name */
 	sizeof(MultibyteStreamReaderObject), /* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -1663,7 +1663,7 @@ mbstreamwriter_dealloc(MultibyteStreamWriterObject *self)
 	PyObject_GC_UnTrack(self);
 	ERROR_DECREF(self->errors);
 	Py_DECREF(self->stream);
-	self->ob_type->tp_free(self);
+	Py_Type(self)->tp_free(self);
 }
 
 static struct PyMethodDef mbstreamwriter_methods[] = {
@@ -1684,8 +1684,7 @@ static PyMemberDef mbstreamwriter_members[] = {
 };
 
 static PyTypeObject MultibyteStreamWriter_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"MultibyteStreamWriter",	/* tp_name */
 	sizeof(MultibyteStreamWriterObject), /* tp_basicsize */
 	0,				/* tp_itemsize */

@@ -156,11 +156,17 @@ def makedirs(name, mode=0777):
     recursive.
 
     """
+    from errno import EEXIST
     head, tail = path.split(name)
     if not tail:
         head, tail = path.split(head)
     if head and tail and not path.exists(head):
-        makedirs(head, mode)
+        try:
+            makedirs(head, mode)
+        except OSError, e:
+            # be happy if someone already created the path
+            if e.errno != EEXIST:
+                raise
         if tail == curdir:           # xxx/newdir/. exists if xxx/newdir exists
             return
     mkdir(name, mode)
@@ -215,7 +221,7 @@ def renames(old, new):
 
 __all__.extend(["makedirs", "removedirs", "renames"])
 
-def walk(top, topdown=True, onerror=None):
+def walk(top, topdown=True, onerror=None, followlinks=False):
     """Directory tree generator.
 
     For each directory in the directory tree rooted at top (including top
@@ -250,6 +256,10 @@ def walk(top, topdown=True, onerror=None):
     report the error to continue with the walk, or raise the exception
     to abort the walk.  Note that the filename is available as the
     filename attribute of the exception object.
+
+    By default, os.walk does not follow symbolic links to subdirectories on
+    systems that support them.  In order to get this functionality, set the
+    optional argument 'followlinks' to true.
 
     Caution:  if you pass a relative pathname for top, don't change the
     current working directory between resumptions of walk.  walk never
@@ -294,8 +304,8 @@ def walk(top, topdown=True, onerror=None):
         yield top, dirs, nondirs
     for name in dirs:
         path = join(top, name)
-        if not islink(path):
-            for x in walk(path, topdown, onerror):
+        if followlinks or not islink(path):
+            for x in walk(path, topdown, onerror, followlinks):
                 yield x
     if not topdown:
         yield top, dirs, nondirs
@@ -656,9 +666,15 @@ if _exists("fork"):
             is a string it will be passed to the shell (as with os.system()). If
             'bufsize' is specified, it sets the buffer size for the I/O pipes.  The
             file objects (child_stdin, child_stdout) are returned."""
-            import popen2
-            stdout, stdin = popen2.popen2(cmd, bufsize)
-            return stdin, stdout
+            import warnings
+            msg = "os.popen2 is deprecated.  Use the subprocess module."
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
+            import subprocess
+            PIPE = subprocess.PIPE
+            p = subprocess.Popen(cmd, shell=True, bufsize=bufsize,
+                                 stdin=PIPE, stdout=PIPE, close_fds=True)
+            return p.stdin, p.stdout
         __all__.append("popen2")
 
     if not _exists("popen3"):
@@ -669,9 +685,16 @@ if _exists("fork"):
             is a string it will be passed to the shell (as with os.system()). If
             'bufsize' is specified, it sets the buffer size for the I/O pipes.  The
             file objects (child_stdin, child_stdout, child_stderr) are returned."""
-            import popen2
-            stdout, stdin, stderr = popen2.popen3(cmd, bufsize)
-            return stdin, stdout, stderr
+            import warnings
+            msg = "os.popen3 is deprecated.  Use the subprocess module."
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
+            import subprocess
+            PIPE = subprocess.PIPE
+            p = subprocess.Popen(cmd, shell=True, bufsize=bufsize,
+                                 stdin=PIPE, stdout=PIPE, stderr=PIPE,
+                                 close_fds=True)
+            return p.stdin, p.stdout, p.stderr
         __all__.append("popen3")
 
     if not _exists("popen4"):
@@ -682,9 +705,16 @@ if _exists("fork"):
             is a string it will be passed to the shell (as with os.system()). If
             'bufsize' is specified, it sets the buffer size for the I/O pipes.  The
             file objects (child_stdin, child_stdout_stderr) are returned."""
-            import popen2
-            stdout, stdin = popen2.popen4(cmd, bufsize)
-            return stdin, stdout
+            import warnings
+            msg = "os.popen4 is deprecated.  Use the subprocess module."
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
+            import subprocess
+            PIPE = subprocess.PIPE
+            p = subprocess.Popen(cmd, shell=True, bufsize=bufsize,
+                                 stdin=PIPE, stdout=PIPE,
+                                 stderr=subprocess.STDOUT, close_fds=True)
+            return p.stdin, p.stdout
         __all__.append("popen4")
 
 import copy_reg as _copy_reg

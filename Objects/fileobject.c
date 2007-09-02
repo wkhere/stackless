@@ -139,17 +139,16 @@ fill_file_fields(PyFileObject *f, FILE *fp, PyObject *name, char *mode,
    ignore stuff they don't understand... write or append mode with
    universal newline support is expressly forbidden by PEP 278.
    Additionally, remove the 'U' from the mode string as platforms
-   won't know what it is. */
-/* zero return is kewl - one is un-kewl */
-static int
-sanitize_the_mode(char *mode)
+   won't know what it is. Non-zero return signals an exception */
+int
+_PyFile_SanitizeMode(char *mode)
 {
 	char *upos;
 	size_t len = strlen(mode);
 
 	if (!len) {
 		PyErr_SetString(PyExc_ValueError, "empty mode string");
-		return 1;
+		return -1;
 	}
 
 	upos = strchr(mode, 'U');
@@ -160,7 +159,7 @@ sanitize_the_mode(char *mode)
 			PyErr_Format(PyExc_ValueError, "universal newline "
 			             "mode can only be used with modes "
 				     "starting with 'r'");
-			return 1;
+			return -1;
 		}
 
 		if (mode[0] != 'r') {
@@ -175,7 +174,7 @@ sanitize_the_mode(char *mode)
 	} else if (mode[0] != 'r' && mode[0] != 'w' && mode[0] != 'a') {
 		PyErr_Format(PyExc_ValueError, "mode string must begin with "
 	        	    "one of 'r', 'w', 'a' or 'U', not '%.200s'", mode);
-		return 1;
+		return -1;
 	}
 
 	return 0;
@@ -204,7 +203,7 @@ open_the_file(PyFileObject *f, char *name, char *mode)
 	}
 	strcpy(newmode, mode);
 
-	if (sanitize_the_mode(newmode)) {
+	if (_PyFile_SanitizeMode(newmode)) {
 		f = NULL;
 		goto cleanup;
 	}
@@ -354,6 +353,8 @@ PyFile_SetEncoding(PyObject *f, const char *enc)
 {
 	PyFileObject *file = (PyFileObject*)f;
 	PyObject *str = PyString_FromString(enc);
+
+	assert(PyFile_Check(f));
 	if (!str)
 		return 0;
 	Py_DECREF(file->f_encoding);
@@ -405,7 +406,7 @@ file_dealloc(PyFileObject *f)
 	Py_XDECREF(f->f_mode);
 	Py_XDECREF(f->f_encoding);
 	drop_readahead(f);
-	f->ob_type->tp_free((PyObject *)f);
+	Py_Type(f)->tp_free((PyObject *)f);
 }
 
 static PyObject *
@@ -540,7 +541,7 @@ file_seek(PyFileObject *f, PyObject *args)
 	int whence;
 	int ret;
 	Py_off_t offset;
-	PyObject *offobj;
+	PyObject *offobj, *off_index;
 
 	if (f->f_fp == NULL)
 		return err_closed();
@@ -548,12 +549,25 @@ file_seek(PyFileObject *f, PyObject *args)
 	whence = 0;
 	if (!PyArg_ParseTuple(args, "O|i:seek", &offobj, &whence))
 		return NULL;
+	off_index = PyNumber_Index(offobj);
+	if (!off_index) {
+		if (!PyFloat_Check(offobj))
+			return NULL;
+		/* Deprecated in 2.6 */
+		PyErr_Clear();
+		if (PyErr_Warn(PyExc_DeprecationWarning,
+			       "integer argument expected, got float"))
+			return NULL;
+		off_index = offobj;
+		Py_INCREF(offobj);
+	}
 #if !defined(HAVE_LARGEFILE_SUPPORT)
-	offset = PyInt_AsLong(offobj);
+	offset = PyInt_AsLong(off_index);
 #else
-	offset = PyLong_Check(offobj) ?
-		PyLong_AsLongLong(offobj) : PyInt_AsLong(offobj);
+	offset = PyLong_Check(off_index) ?
+		PyLong_AsLongLong(off_index) : PyInt_AsLong(off_index);
 #endif
+	Py_DECREF(off_index);
 	if (PyErr_Occurred())
 		return NULL;
 
@@ -2063,8 +2077,7 @@ PyDoc_STR(
 );
 
 PyTypeObject PyFile_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"file",
 	sizeof(PyFileObject),
 	0,

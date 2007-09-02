@@ -55,8 +55,9 @@ typedef struct {
 PyAPI_DATA(PyTypeObject) PyBaseString_Type;
 PyAPI_DATA(PyTypeObject) PyString_Type;
 
-#define PyString_Check(op) PyObject_TypeCheck(op, &PyString_Type)
-#define PyString_CheckExact(op) ((op)->ob_type == &PyString_Type)
+#define PyString_Check(op) \
+                 PyType_FastSubclass(Py_Type(op), Py_TPFLAGS_STRING_SUBCLASS)
+#define PyString_CheckExact(op) (Py_Type(op) == &PyString_Type)
 
 PyAPI_FUNC(PyObject *) PyString_FromStringAndSize(const char *, Py_ssize_t);
 PyAPI_FUNC(PyObject *) PyString_FromString(const char *);
@@ -88,7 +89,7 @@ PyAPI_FUNC(void) _Py_ReleaseInternedStrings(void);
 
 /* Macro, trading safety for speed */
 #define PyString_AS_STRING(op) (((PyStringObject *)(op))->ob_sval)
-#define PyString_GET_SIZE(op)  (((PyStringObject *)(op))->ob_size)
+#define PyString_GET_SIZE(op)  Py_Size(op)
 
 /* _PyString_Join(sep, x) is like sep.join(x).  sep must be PyStringObject*,
    x must be an iterable object. */

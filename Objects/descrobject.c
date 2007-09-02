@@ -396,8 +396,7 @@ PyTypeObject PyMethodDescr_Type = {
 #else
 static PyTypeObject PyMethodDescr_Type = {
 #endif
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"method_descriptor",
 	sizeof(PyMethodDescrObject),
 	0,
@@ -441,8 +440,7 @@ PyTypeObject PyClassMethodDescr_Type = {
 #else
 static PyTypeObject PyClassMethodDescr_Type = {
 #endif
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"classmethod_descriptor",
 	sizeof(PyMethodDescrObject),
 	0,
@@ -481,8 +479,7 @@ static PyTypeObject PyClassMethodDescr_Type = {
 STACKLESS_DECLARE_METHOD(&PyClassMethodDescr_Type, tp_call)
 
 static PyTypeObject PyMemberDescr_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"member_descriptor",
 	sizeof(PyMemberDescrObject),
 	0,
@@ -519,8 +516,7 @@ static PyTypeObject PyMemberDescr_Type = {
 };
 
 static PyTypeObject PyGetSetDescr_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"getset_descriptor",
 	sizeof(PyGetSetDescrObject),
 	0,
@@ -557,8 +553,7 @@ static PyTypeObject PyGetSetDescr_Type = {
 };
 
 PyTypeObject PyWrapperDescr_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"wrapper_descriptor",
 	sizeof(PyWrapperDescrObject),
 	0,
@@ -852,8 +847,7 @@ proxy_richcompare(proxyobject *v, PyObject *w, int op)
 }
 
 static PyTypeObject proxytype = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"dictproxy",				/* tp_name */
 	sizeof(proxyobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */
@@ -1047,8 +1041,7 @@ PyTypeObject PyMethodWrapper_Type = {
 #else
 static PyTypeObject wrappertype = {
 #endif
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"method-wrapper",			/* tp_name */
 	sizeof(wrapperobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */
@@ -1280,8 +1273,7 @@ property_traverse(PyObject *self, visitproc visit, void *arg)
 }
 
 PyTypeObject PyProperty_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"property",				/* tp_name */
 	sizeof(propertyobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */

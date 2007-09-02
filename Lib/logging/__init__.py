@@ -1,4 +1,4 @@
-# Copyright 2001-2005 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2007 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -21,7 +21,7 @@ comp.lang.python, and influenced by Apache's log4j system.
 Should work under Python versions >= 1.5.2, except that source line
 information is not available unless 'sys._getframe()' is.
 
-Copyright (C) 2001-2004 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2007 Vinay Sajip. All Rights Reserved.
 
 To use, simply 'import logging' and log away!
 """
@@ -41,8 +41,8 @@ except ImportError:
 
 __author__  = "Vinay Sajip <vinay_sajip@red-dove.com>"
 __status__  = "production"
-__version__ = "0.4.9.9"
-__date__    = "06 February 2006"
+__version__ = "0.5.0.2"
+__date__    = "16 February 2007"
 
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
@@ -68,7 +68,7 @@ def currentframe():
     except:
         return sys.exc_traceback.tb_frame.f_back
 
-if hasattr(sys, '_getframe'): currentframe = sys._getframe
+if hasattr(sys, '_getframe'): currentframe = lambda: sys._getframe(3)
 # done filching
 
 # _srcfile is only used in conjunction with sys._getframe().
@@ -243,7 +243,7 @@ class LogRecord:
         try:
             self.filename = os.path.basename(pathname)
             self.module = os.path.splitext(self.filename)[0]
-        except:
+        except (TypeError, ValueError, AttributeError):
             self.filename = pathname
             self.module = "Unknown module"
         self.exc_info = exc_info
@@ -398,7 +398,7 @@ class Formatter:
         traceback.print_exception(ei[0], ei[1], ei[2], None, sio)
         s = sio.getvalue()
         sio.close()
-        if s[-1] == "\n":
+        if s[-1:] == "\n":
             s = s[:-1]
         return s
 
@@ -425,7 +425,7 @@ class Formatter:
             if not record.exc_text:
                 record.exc_text = self.formatException(record.exc_info)
         if record.exc_text:
-            if s[-1] != "\n":
+            if s[-1:] != "\n":
                 s = s + "\n"
             s = s + record.exc_text
         return s
@@ -764,17 +764,15 @@ class FileHandler(StreamHandler):
         """
         Open the specified file and use it as the stream for logging.
         """
-        if codecs is None:
-            encoding = None
-        if encoding is None:
-            stream = open(filename, mode)
-        else:
-            stream = codecs.open(filename, mode, encoding)
-        StreamHandler.__init__(self, stream)
         #keep the absolute path, otherwise derived classes which use this
         #may come a cropper when the current directory changes
+        if codecs is None:
+            encoding = None
         self.baseFilename = os.path.abspath(filename)
         self.mode = mode
+        self.encoding = encoding
+        stream = self._open()
+        StreamHandler.__init__(self, stream)
 
     def close(self):
         """
@@ -783,6 +781,17 @@ class FileHandler(StreamHandler):
         self.flush()
         self.stream.close()
         StreamHandler.close(self)
+
+    def _open(self):
+        """
+        Open the current base file with the (original) mode and encoding.
+        Return the resulting stream.
+        """
+        if self.encoding is None:
+            stream = open(self.baseFilename, self.mode)
+        else:
+            stream = codecs.open(self.baseFilename, self.mode, self.encoding)
+        return stream
 
 #---------------------------------------------------------------------------
 #   Manager classes and functions
@@ -910,9 +919,12 @@ class Manager:
         Ensure that children of the placeholder ph are connected to the
         specified logger.
         """
-        #for c in ph.loggers:
+        name = alogger.name
+        namelen = len(name)
         for c in ph.loggerMap.keys():
-            if string.find(c.parent.name, alogger.name) <> 0:
+            #The if means ... if not c.parent.name.startswith(nm)
+            #if string.find(c.parent.name, nm) <> 0:
+            if c.parent.name[:namelen] != name:
                 alogger.parent = c.parent
                 c.parent = alogger
 
@@ -962,9 +974,7 @@ class Logger(Filterer):
 
         logger.debug("Houston, we have a %s", "thorny problem", exc_info=1)
         """
-        if self.manager.disable >= DEBUG:
-            return
-        if DEBUG >= self.getEffectiveLevel():
+        if self.isEnabledFor(DEBUG):
             apply(self._log, (DEBUG, msg, args), kwargs)
 
     def info(self, msg, *args, **kwargs):
@@ -976,9 +986,7 @@ class Logger(Filterer):
 
         logger.info("Houston, we have a %s", "interesting problem", exc_info=1)
         """
-        if self.manager.disable >= INFO:
-            return
-        if INFO >= self.getEffectiveLevel():
+        if self.isEnabledFor(INFO):
             apply(self._log, (INFO, msg, args), kwargs)
 
     def warning(self, msg, *args, **kwargs):
@@ -990,8 +998,6 @@ class Logger(Filterer):
 
         logger.warning("Houston, we have a %s", "bit of a problem", exc_info=1)
         """
-        if self.manager.disable >= WARNING:
-            return
         if self.isEnabledFor(WARNING):
             apply(self._log, (WARNING, msg, args), kwargs)
 
@@ -1006,8 +1012,6 @@ class Logger(Filterer):
 
         logger.error("Houston, we have a %s", "major problem", exc_info=1)
         """
-        if self.manager.disable >= ERROR:
-            return
         if self.isEnabledFor(ERROR):
             apply(self._log, (ERROR, msg, args), kwargs)
 
@@ -1026,9 +1030,7 @@ class Logger(Filterer):
 
         logger.critical("Houston, we have a %s", "major disaster", exc_info=1)
         """
-        if self.manager.disable >= CRITICAL:
-            return
-        if CRITICAL >= self.getEffectiveLevel():
+        if self.isEnabledFor(CRITICAL):
             apply(self._log, (CRITICAL, msg, args), kwargs)
 
     fatal = critical
@@ -1047,8 +1049,6 @@ class Logger(Filterer):
                 raise TypeError, "level must be an integer"
             else:
                 return
-        if self.manager.disable >= level:
-            return
         if self.isEnabledFor(level):
             apply(self._log, (level, msg, args), kwargs)
 

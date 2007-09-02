@@ -175,7 +175,8 @@ time_clock(PyObject *self, PyObject *unused)
 		if (!QueryPerformanceFrequency(&freq) || freq.QuadPart == 0) {
 			/* Unlikely to happen - this works on all intel
 			   machines at least!  Revert to clock() */
-			return PyFloat_FromDouble(clock());
+			return PyFloat_FromDouble(((double)clock()) /
+						  CLOCKS_PER_SEC);
 		}
 		divisor = (double)freq.QuadPart;
 	}
@@ -659,7 +660,7 @@ void inittimezone(PyObject *m) {
 	time_tzset. In the future, some parts of it can be moved back
 	(for platforms that don't HAVE_WORKING_TZSET, when we know what they
 	are), and the extranious calls to tzset(3) should be removed.
-	I havn't done this yet, as I don't want to change this code as
+	I haven't done this yet, as I don't want to change this code as
 	little as possible when introducing the time.tzset and time.tzsetwall
 	methods. This should simply be a method of doing the following once,
 	at the top of this function and removing the call to tzset() from

@@ -991,6 +991,8 @@ svnversion_init(void)
 
 	br_start = python + 11;
 	br_end = strchr(br_start, '/');
+	assert(br_end);
+
 	/* Works even for trunk,
 	   as we are in trunk/Python/sysmodule.c */
 	br_end2 = strchr(br_end+1, '/');
@@ -1021,6 +1023,8 @@ svnversion_init(void)
 		svn_revision = svnversion;
 	else if (istag) {
 		len = strlen(_patchlevel_revision);
+		assert(len >= 13);
+		assert(len < (sizeof(patchlevel_revision) + 13));
 		strncpy(patchlevel_revision, _patchlevel_revision + 11,
 			len - 13);
 		patchlevel_revision[len - 13] = '\0';
@@ -1091,17 +1095,17 @@ _PySys_Init(void)
 	if (PyErr_Occurred())
 		return NULL;
 #ifdef MS_WINDOWS
-	if(isatty(_fileno(stdin))){
+	if(isatty(_fileno(stdin)) && PyFile_Check(sysin)) {
 		sprintf(buf, "cp%d", GetConsoleCP());
 		if (!PyFile_SetEncoding(sysin, buf))
 			return NULL;
 	}
-	if(isatty(_fileno(stdout))) {
+	if(isatty(_fileno(stdout)) && PyFile_Check(sysout)) {
 		sprintf(buf, "cp%d", GetConsoleOutputCP());
 		if (!PyFile_SetEncoding(sysout, buf))
 			return NULL;
 	}
-	if(isatty(_fileno(stderr))) {
+	if(isatty(_fileno(stderr)) && PyFile_Check(syserr)) {
 		sprintf(buf, "cp%d", GetConsoleOutputCP());
 		if (!PyFile_SetEncoding(syserr, buf))
 			return NULL;

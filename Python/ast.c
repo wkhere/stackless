@@ -25,7 +25,8 @@ static asdl_seq *seq_for_testlist(struct compiling *, const node *);
 static expr_ty ast_for_expr(struct compiling *, const node *);
 static stmt_ty ast_for_stmt(struct compiling *, const node *);
 static asdl_seq *ast_for_suite(struct compiling *, const node *);
-static asdl_seq *ast_for_exprlist(struct compiling *, const node *, expr_context_ty);
+static asdl_seq *ast_for_exprlist(struct compiling *, const node *,
+                                  expr_context_ty);
 static expr_ty ast_for_testlist(struct compiling *, const node *);
 static expr_ty ast_for_testlist_gexp(struct compiling *, const node *);
 
@@ -186,8 +187,8 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
     if (flags && flags->cf_flags & PyCF_SOURCE_IS_UTF8) {
         c.c_encoding = "utf-8";
         if (TYPE(n) == encoding_decl) {
-                ast_error(n, "encoding declaration in Unicode string");
-                goto error;
+            ast_error(n, "encoding declaration in Unicode string");
+            goto error;
         }
     } else if (TYPE(n) == encoding_decl) {
         c.c_encoding = STR(n);
@@ -202,7 +203,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
         case file_input:
             stmts = asdl_seq_new(num_stmts(n), arena);
             if (!stmts)
-                    return NULL;
+                return NULL;
             for (i = 0; i < NCH(n) - 1; i++) {
                 ch = CHILD(n, i);
                 if (TYPE(ch) == NEWLINE)
@@ -243,6 +244,8 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
                     goto error;
                 asdl_seq_SET(stmts, 0, Pass(n->n_lineno, n->n_col_offset,
                                             arena));
+                if (!asdl_seq_GET(stmts, 0))
+                    goto error;
                 return Interactive(stmts, arena);
             }
             else {
@@ -273,6 +276,8 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
                 return Interactive(stmts, arena);
             }
         default:
+            PyErr_Format(PyExc_SystemError,
+                         "invalid node %d for PyAST_FromNode", TYPE(n));
             goto error;
     }
  error:
@@ -342,8 +347,8 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
     switch (e->kind) {
         case Attribute_kind:
             if (ctx == Store &&
-                    !strcmp(PyString_AS_STRING(e->v.Attribute.attr), "None")) {
-                    return ast_error(n, "assignment to None");
+                !strcmp(PyString_AS_STRING(e->v.Attribute.attr), "None")) {
+                return ast_error(n, "assignment to None");
             }
             e->v.Attribute.ctx = ctx;
             break;
@@ -528,11 +533,11 @@ seq_for_testlist(struct compiling *c, const node *n)
     asdl_seq *seq;
     expr_ty expression;
     int i;
-    assert(TYPE(n) == testlist
-           || TYPE(n) == listmaker
-           || TYPE(n) == testlist_gexp
-           || TYPE(n) == testlist_safe
-           );
+    assert(TYPE(n) == testlist ||
+           TYPE(n) == listmaker ||
+           TYPE(n) == testlist_gexp ||
+           TYPE(n) == testlist_safe ||
+           TYPE(n) == testlist1);
 
     seq = asdl_seq_new((NCH(n) + 1) / 2, c->c_arena);
     if (!seq)
@@ -572,16 +577,16 @@ set_name:
         /* fpdef_node is either a NAME or an fplist */
         child = CHILD(fpdef_node, 0);
         if (TYPE(child) == NAME) {
-                if (!strcmp(STR(child), "None")) {
-                        ast_error(child, "assignment to None");
-                        return NULL;
-                    }   
+            if (!strcmp(STR(child), "None")) {
+                ast_error(child, "assignment to None");
+                return NULL;
+            }   
             arg = Name(NEW_IDENTIFIER(child), Store, LINENO(child),
                        child->n_col_offset, c->c_arena);
-            }
+        }
         else {
             assert(TYPE(fpdef_node) == fpdef);
-            /* fpdef_node[0] is not a name, so it must be a '(', get CHILD[1] */
+            /* fpdef_node[0] is not a name, so it must be '(', get CHILD[1] */
             child = CHILD(fpdef_node, 1);
             assert(TYPE(child) == fplist);
             /* NCH == 1 means we have (x), we need to elide the extra parens */
@@ -655,7 +660,7 @@ ast_for_arguments(struct compiling *c, const node *n)
                 if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
                     expr_ty expression = ast_for_expr(c, CHILD(n, i + 2));
                     if (!expression)
-                            goto error;
+                        goto error;
                     assert(defaults != NULL);
                     asdl_seq_SET(defaults, j++, expression);
                     i += 2;
@@ -672,6 +677,8 @@ ast_for_arguments(struct compiling *c, const node *n)
                     if (NCH(ch) != 1) {
                         /* We have complex arguments, setup for unpacking. */
                         asdl_seq_SET(args, k++, compiler_complex_args(c, ch));
+                        if (!asdl_seq_GET(args, k-1))
+                                goto error;
                     } else {
                         /* def foo((x)): setup for checking NAME below. */
                         /* Loop because there can be many parens and tuple
@@ -684,8 +691,8 @@ ast_for_arguments(struct compiling *c, const node *n)
                 if (TYPE(CHILD(ch, 0)) == NAME) {
                     expr_ty name;
                     if (!strcmp(STR(CHILD(ch, 0)), "None")) {
-                            ast_error(CHILD(ch, 0), "assignment to None");
-                            goto error;
+                        ast_error(CHILD(ch, 0), "assignment to None");
+                        goto error;
                     }
                     name = Name(NEW_IDENTIFIER(CHILD(ch, 0)),
                                 Param, LINENO(ch), ch->n_col_offset,
@@ -699,16 +706,16 @@ ast_for_arguments(struct compiling *c, const node *n)
                 break;
             case STAR:
                 if (!strcmp(STR(CHILD(n, i+1)), "None")) {
-                        ast_error(CHILD(n, i+1), "assignment to None");
-                        goto error;
+                    ast_error(CHILD(n, i+1), "assignment to None");
+                    goto error;
                 }
                 vararg = NEW_IDENTIFIER(CHILD(n, i+1));
                 i += 3;
                 break;
             case DOUBLESTAR:
                 if (!strcmp(STR(CHILD(n, i+1)), "None")) {
-                        ast_error(CHILD(n, i+1), "assignment to None");
-                        goto error;
+                    ast_error(CHILD(n, i+1), "assignment to None");
+                    goto error;
                 }
                 kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
                 i += 3;
@@ -1005,9 +1012,9 @@ ast_for_listcomp(struct compiling *c, const node *n)
         asdl_seq *t;
         expr_ty expression;
         node *for_ch;
-
+        
         REQ(ch, list_for);
-
+        
         for_ch = CHILD(ch, 1);
         t = ast_for_exprlist(c, for_ch, Store);
         if (!t)
@@ -1015,9 +1022,10 @@ ast_for_listcomp(struct compiling *c, const node *n)
         expression = ast_for_testlist(c, CHILD(ch, 3));
         if (!expression)
             return NULL;
-
+        
         /* Check the # of children rather than the length of t, since
-           [x for x, in ... ] has 1 element in t, but still requires a Tuple. */
+           [x for x, in ... ] has 1 element in t, but still requires a Tuple.
+        */
         if (NCH(for_ch) == 1)
             lc = comprehension((expr_ty)asdl_seq_GET(t, 0), expression, NULL,
                                c->c_arena);
@@ -1031,6 +1039,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
         if (NCH(ch) == 5) {
             int j, n_ifs;
             asdl_seq *ifs;
+            expr_ty list_for_expr;
 
             ch = CHILD(ch, 4);
             n_ifs = count_list_ifs(ch);
@@ -1042,27 +1051,30 @@ ast_for_listcomp(struct compiling *c, const node *n)
                 return NULL;
 
             for (j = 0; j < n_ifs; j++) {
-            REQ(ch, list_iter);
-                    ch = CHILD(ch, 0);
-                    REQ(ch, list_if);
-
-                asdl_seq_SET(ifs, j, ast_for_expr(c, CHILD(ch, 1)));
+                REQ(ch, list_iter);
+                ch = CHILD(ch, 0);
+                REQ(ch, list_if);
+                
+                list_for_expr = ast_for_expr(c, CHILD(ch, 1));
+                if (!list_for_expr)
+                    return NULL;
+                
+                asdl_seq_SET(ifs, j, list_for_expr);
                 if (NCH(ch) == 3)
                     ch = CHILD(ch, 2);
-                }
-                /* on exit, must guarantee that ch is a list_for */
-                if (TYPE(ch) == list_iter)
-                        ch = CHILD(ch, 0);
-            lc->ifs = ifs;
             }
-            asdl_seq_SET(listcomps, i, lc);
+            /* on exit, must guarantee that ch is a list_for */
+            if (TYPE(ch) == list_iter)
+                ch = CHILD(ch, 0);
+            lc->ifs = ifs;
+        }
+        asdl_seq_SET(listcomps, i, lc);
     }
 
     return ListComp(elt, listcomps, LINENO(n), n->n_col_offset, c->c_arena);
 }
 
-/*
-   Count the number of 'for' loops in a generator expression.
+/* Count the number of 'for' loops in a generator expression.
 
    Helper for ast_for_genexp().
 */
@@ -1070,34 +1082,34 @@ ast_for_listcomp(struct compiling *c, const node *n)
 static int
 count_gen_fors(const node *n)
 {
-        int n_fors = 0;
-        node *ch = CHILD(n, 1);
+    int n_fors = 0;
+    node *ch = CHILD(n, 1);
 
  count_gen_for:
-        n_fors++;
-        REQ(ch, gen_for);
-        if (NCH(ch) == 5)
-                ch = CHILD(ch, 4);
-        else
-                return n_fors;
+    n_fors++;
+    REQ(ch, gen_for);
+    if (NCH(ch) == 5)
+        ch = CHILD(ch, 4);
+    else
+        return n_fors;
  count_gen_iter:
-        REQ(ch, gen_iter);
-        ch = CHILD(ch, 0);
-        if (TYPE(ch) == gen_for)
-                goto count_gen_for;
-        else if (TYPE(ch) == gen_if) {
-                if (NCH(ch) == 3) {
-                        ch = CHILD(ch, 2);
-                        goto count_gen_iter;
-                }
-                else
-                    return n_fors;
+    REQ(ch, gen_iter);
+    ch = CHILD(ch, 0);
+    if (TYPE(ch) == gen_for)
+        goto count_gen_for;
+    else if (TYPE(ch) == gen_if) {
+        if (NCH(ch) == 3) {
+            ch = CHILD(ch, 2);
+            goto count_gen_iter;
         }
-
-        /* Should never be reached */
-        PyErr_SetString(PyExc_SystemError,
-                        "logic error in count_gen_fors");
-        return -1;
+        else
+            return n_fors;
+    }
+    
+    /* Should never be reached */
+    PyErr_SetString(PyExc_SystemError,
+                    "logic error in count_gen_fors");
+    return -1;
 }
 
 /* Count the number of 'if' statements in a generator expression.
@@ -1108,19 +1120,19 @@ count_gen_fors(const node *n)
 static int
 count_gen_ifs(const node *n)
 {
-        int n_ifs = 0;
+    int n_ifs = 0;
 
-        while (1) {
-                REQ(n, gen_iter);
-                if (TYPE(CHILD(n, 0)) == gen_for)
-                        return n_ifs;
-                n = CHILD(n, 0);
-                REQ(n, gen_if);
-                n_ifs++;
-                if (NCH(n) == 2)
-                        return n_ifs;
-                n = CHILD(n, 2);
-        }
+    while (1) {
+        REQ(n, gen_iter);
+        if (TYPE(CHILD(n, 0)) == gen_for)
+            return n_ifs;
+        n = CHILD(n, 0);
+        REQ(n, gen_if);
+        n_ifs++;
+        if (NCH(n) == 2)
+            return n_ifs;
+        n = CHILD(n, 2);
+    }
 }
 
 /* TODO(jhylton): Combine with list comprehension code? */
@@ -1227,12 +1239,30 @@ ast_for_atom(struct compiling *c, const node *n)
     case NAME:
         /* All names start in Load context, but may later be
            changed. */
-        return Name(NEW_IDENTIFIER(ch), Load, LINENO(n), n->n_col_offset, c->c_arena);
+        return Name(NEW_IDENTIFIER(ch), Load, LINENO(n), n->n_col_offset,
+                    c->c_arena);
     case STRING: {
         PyObject *str = parsestrplus(c, n);
-        if (!str)
+        if (!str) {
+            if (PyErr_ExceptionMatches(PyExc_UnicodeError)){
+                PyObject *type, *value, *tback, *errstr;
+                PyErr_Fetch(&type, &value, &tback);
+                errstr = ((PyUnicodeErrorObject *)value)->reason;
+                if (errstr) {
+                    char *s = "";
+                    char buf[128];
+                    s = PyString_AsString(errstr);
+                    PyOS_snprintf(buf, sizeof(buf), "(unicode error) %s", s);
+                    ast_error(n, buf);
+                } else {
+                    ast_error(n, "(unicode error) unknown error");
+                }
+                Py_DECREF(type);
+                Py_DECREF(value);
+                Py_XDECREF(tback);
+            }
             return NULL;
-
+        }
         PyArena_AddPyObject(c->c_arena, str);
         return Str(str, LINENO(n), n->n_col_offset, c->c_arena);
     }
@@ -1531,14 +1561,14 @@ ast_for_factor(struct compiling *c, const node *n)
        (sys.maxint - 1).  In that case, we want a PyIntObject, not a
        PyLongObject.
     */
-    if (TYPE(CHILD(n, 0)) == MINUS
-        && NCH(n) == 2
-        && TYPE((pfactor = CHILD(n, 1))) == factor
-        && NCH(pfactor) == 1
-        && TYPE((ppower = CHILD(pfactor, 0))) == power
-        && NCH(ppower) == 1
-        && TYPE((patom = CHILD(ppower, 0))) == atom
-        && TYPE((pnum = CHILD(patom, 0))) == NUMBER) {
+    if (TYPE(CHILD(n, 0)) == MINUS &&
+        NCH(n) == 2 &&
+        TYPE((pfactor = CHILD(n, 1))) == factor &&
+        NCH(pfactor) == 1 &&
+        TYPE((ppower = CHILD(pfactor, 0))) == power &&
+        NCH(ppower) == 1 &&
+        TYPE((patom = CHILD(ppower, 0))) == atom &&
+        TYPE((pnum = CHILD(patom, 0))) == NUMBER) {
         char *s = PyObject_MALLOC(strlen(STR(pnum)) + 2);
         if (s == NULL)
             return NULL;
@@ -1848,13 +1878,18 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                  * then is very confusing.
                  */
                 if (e->kind == Lambda_kind) {
-                  ast_error(CHILD(ch, 0), "lambda cannot contain assignment");
-                  return NULL;
+                    ast_error(CHILD(ch, 0),
+                              "lambda cannot contain assignment");
+                    return NULL;
                 } else if (e->kind != Name_kind) {
-                  ast_error(CHILD(ch, 0), "keyword can't be an expression");
-                  return NULL;
+                    ast_error(CHILD(ch, 0), "keyword can't be an expression");
+                    return NULL;
                 }
                 key = e->v.Name.id;
+                if (!strcmp(PyString_AS_STRING(key), "None")) {
+                    ast_error(CHILD(ch, 0), "assignment to None");
+                    return NULL;
+                }
                 e = ast_for_expr(c, CHILD(ch, 2));
                 if (!e)
                     return NULL;
@@ -1874,7 +1909,8 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
         }
     }
 
-    return Call(func, args, keywords, vararg, kwarg, func->lineno, func->col_offset, c->c_arena);
+    return Call(func, args, keywords, vararg, kwarg, func->lineno,
+                func->col_offset, c->c_arena);
 }
 
 static expr_ty
@@ -1990,7 +2026,8 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
                           "assignment");
                 return NULL;
         }
-        set_context(expr1, Store, ch);
+        if(!set_context(expr1, Store, ch))
+            return NULL;
 
         ch = CHILD(n, 2);
         if (TYPE(ch) == testlist)
@@ -2004,7 +2041,8 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
         if (!newoperator)
             return NULL;
 
-        return AugAssign(expr1, newoperator, expr2, LINENO(n), n->n_col_offset, c->c_arena);
+        return AugAssign(expr1, newoperator, expr2, LINENO(n), n->n_col_offset,
+                         c->c_arena);
     }
     else {
         int i;
@@ -2028,10 +2066,10 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 
             /* set context to assign */
             if (!e) 
-              return NULL;
+                return NULL;
 
             if (!set_context(e, Store, CHILD(n, i)))
-              return NULL;
+                return NULL;
 
             asdl_seq_SET(targets, i / 2, e);
         }
@@ -2042,7 +2080,8 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
             expression = ast_for_expr(c, value);
         if (!expression)
             return NULL;
-        return Assign(targets, expression, LINENO(n), n->n_col_offset, c->c_arena);
+        return Assign(targets, expression, LINENO(n), n->n_col_offset,
+                      c->c_arena);
     }
 }
 
@@ -2149,16 +2188,19 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
                 expr_ty expression = ast_for_testlist(c, CHILD(ch, 1));
                 if (!expression)
                     return NULL;
-                return Return(expression, LINENO(n), n->n_col_offset, c->c_arena);
+                return Return(expression, LINENO(n), n->n_col_offset,
+                              c->c_arena);
             }
         case raise_stmt:
             if (NCH(ch) == 1)
-                return Raise(NULL, NULL, NULL, LINENO(n), n->n_col_offset, c->c_arena);
+                return Raise(NULL, NULL, NULL, LINENO(n), n->n_col_offset,
+                             c->c_arena);
             else if (NCH(ch) == 2) {
                 expr_ty expression = ast_for_expr(c, CHILD(ch, 1));
                 if (!expression)
                     return NULL;
-                return Raise(expression, NULL, NULL, LINENO(n), n->n_col_offset, c->c_arena);
+                return Raise(expression, NULL, NULL, LINENO(n),
+                             n->n_col_offset, c->c_arena);
             }
             else if (NCH(ch) == 4) {
                 expr_ty expr1, expr2;
@@ -2170,7 +2212,8 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
                 if (!expr2)
                     return NULL;
 
-                return Raise(expr1, expr2, NULL, LINENO(n), n->n_col_offset, c->c_arena);
+                return Raise(expr1, expr2, NULL, LINENO(n), n->n_col_offset,
+                             c->c_arena);
             }
             else if (NCH(ch) == 6) {
                 expr_ty expr1, expr2, expr3;
@@ -2185,7 +2228,8 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
                 if (!expr3)
                     return NULL;
                     
-                return Raise(expr1, expr2, expr3, LINENO(n), n->n_col_offset, c->c_arena);
+                return Raise(expr1, expr2, expr3, LINENO(n), n->n_col_offset,
+                             c->c_arena);
             }
         default:
             PyErr_Format(PyExc_SystemError,
@@ -2299,7 +2343,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
         REQ(n, dotted_as_names);
         aliases = asdl_seq_new((NCH(n) + 1) / 2, c->c_arena);
         if (!aliases)
-                return NULL;
+            return NULL;
         for (i = 0; i < NCH(n); i += 2) {
             alias_ty import_alias = alias_for_import_name(c, CHILD(n, i));
             if (!import_alias)
@@ -2438,7 +2482,8 @@ ast_for_exec_stmt(struct compiling *c, const node *n)
             return NULL;
     }
 
-    return Exec(expr1, globals, locals, LINENO(n), n->n_col_offset, c->c_arena);
+    return Exec(expr1, globals, locals, LINENO(n), n->n_col_offset,
+                c->c_arena);
 }
 
 static stmt_ty
@@ -2450,7 +2495,8 @@ ast_for_assert_stmt(struct compiling *c, const node *n)
         expr_ty expression = ast_for_expr(c, CHILD(n, 1));
         if (!expression)
             return NULL;
-        return Assert(expression, NULL, LINENO(n), n->n_col_offset, c->c_arena);
+        return Assert(expression, NULL, LINENO(n), n->n_col_offset,
+                      c->c_arena);
     }
     else if (NCH(n) == 4) {
         expr_ty expr1, expr2;
@@ -2557,7 +2603,8 @@ ast_for_if_stmt(struct compiling *c, const node *n)
         if (!suite_seq)
             return NULL;
             
-        return If(expression, suite_seq, NULL, LINENO(n), n->n_col_offset, c->c_arena);
+        return If(expression, suite_seq, NULL, LINENO(n), n->n_col_offset,
+                  c->c_arena);
     }
 
     s = STR(CHILD(n, 4));
@@ -2579,10 +2626,13 @@ ast_for_if_stmt(struct compiling *c, const node *n)
         if (!seq2)
             return NULL;
 
-        return If(expression, seq1, seq2, LINENO(n), n->n_col_offset, c->c_arena);
+        return If(expression, seq1, seq2, LINENO(n), n->n_col_offset,
+                  c->c_arena);
     }
     else if (s[2] == 'i') {
         int i, n_elif, has_else = 0;
+        expr_ty expression;
+        asdl_seq *suite_seq;
         asdl_seq *orelse = NULL;
         n_elif = NCH(n) - 4;
         /* must reference the child n_elif+1 since 'else' token is third,
@@ -2595,8 +2645,7 @@ ast_for_if_stmt(struct compiling *c, const node *n)
         n_elif /= 4;
 
         if (has_else) {
-            expr_ty expression;
-            asdl_seq *seq1, *seq2;
+            asdl_seq *suite_seq2;
 
             orelse = asdl_seq_new(1, c->c_arena);
             if (!orelse)
@@ -2604,24 +2653,24 @@ ast_for_if_stmt(struct compiling *c, const node *n)
             expression = ast_for_expr(c, CHILD(n, NCH(n) - 6));
             if (!expression)
                 return NULL;
-            seq1 = ast_for_suite(c, CHILD(n, NCH(n) - 4));
-            if (!seq1)
+            suite_seq = ast_for_suite(c, CHILD(n, NCH(n) - 4));
+            if (!suite_seq)
                 return NULL;
-            seq2 = ast_for_suite(c, CHILD(n, NCH(n) - 1));
-            if (!seq2)
+            suite_seq2 = ast_for_suite(c, CHILD(n, NCH(n) - 1));
+            if (!suite_seq2)
                 return NULL;
 
-            asdl_seq_SET(orelse, 0, If(expression, seq1, seq2, 
-                                       LINENO(CHILD(n, NCH(n) - 6)), CHILD(n, NCH(n) - 6)->n_col_offset,
-                                       c->c_arena));
+            asdl_seq_SET(orelse, 0, 
+                         If(expression, suite_seq, suite_seq2, 
+                            LINENO(CHILD(n, NCH(n) - 6)),
+                            CHILD(n, NCH(n) - 6)->n_col_offset,
+                            c->c_arena));
             /* the just-created orelse handled the last elif */
             n_elif--;
         }
 
         for (i = 0; i < n_elif; i++) {
             int off = 5 + (n_elif - i - 1) * 4;
-            expr_ty expression;
-            asdl_seq *suite_seq;
             asdl_seq *newobj = asdl_seq_new(1, c->c_arena);
             if (!newobj)
                 return NULL;
@@ -2634,12 +2683,18 @@ ast_for_if_stmt(struct compiling *c, const node *n)
 
             asdl_seq_SET(newobj, 0,
                          If(expression, suite_seq, orelse, 
-                            LINENO(CHILD(n, off)), CHILD(n, off)->n_col_offset, c->c_arena));
+                            LINENO(CHILD(n, off)),
+                            CHILD(n, off)->n_col_offset, c->c_arena));
             orelse = newobj;
         }
-        return If(ast_for_expr(c, CHILD(n, 1)),
-                  ast_for_suite(c, CHILD(n, 3)),
-                  orelse, LINENO(n), n->n_col_offset, c->c_arena);
+        expression = ast_for_expr(c, CHILD(n, 1));
+        if (!expression)
+            return NULL;
+        suite_seq = ast_for_suite(c, CHILD(n, 3));
+        if (!suite_seq)
+            return NULL;
+        return If(expression, suite_seq, orelse,
+                  LINENO(n), n->n_col_offset, c->c_arena);
     }
 
     PyErr_Format(PyExc_SystemError,
@@ -2663,7 +2718,8 @@ ast_for_while_stmt(struct compiling *c, const node *n)
         suite_seq = ast_for_suite(c, CHILD(n, 3));
         if (!suite_seq)
             return NULL;
-        return While(expression, suite_seq, NULL, LINENO(n), n->n_col_offset, c->c_arena);
+        return While(expression, suite_seq, NULL, LINENO(n), n->n_col_offset,
+                     c->c_arena);
     }
     else if (NCH(n) == 7) {
         expr_ty expression;
@@ -2679,7 +2735,8 @@ ast_for_while_stmt(struct compiling *c, const node *n)
         if (!seq2)
             return NULL;
 
-        return While(expression, seq1, seq2, LINENO(n), n->n_col_offset, c->c_arena);
+        return While(expression, seq1, seq2, LINENO(n), n->n_col_offset,
+                     c->c_arena);
     }
 
     PyErr_Format(PyExc_SystemError,
@@ -2729,7 +2786,7 @@ ast_for_for_stmt(struct compiling *c, const node *n)
 static excepthandler_ty
 ast_for_except_clause(struct compiling *c, const node *exc, node *body)
 {
-    /* except_clause: 'except' [test [',' test]] */
+    /* except_clause: 'except' [test [(',' | 'as') test]] */
     REQ(exc, except_clause);
     REQ(body, suite);
 
@@ -2875,6 +2932,8 @@ ast_for_with_stmt(struct compiling *c, const node *n)
 
     assert(TYPE(n) == with_stmt);
     context_expr = ast_for_expr(c, CHILD(n, 1));
+    if (!context_expr)
+        return NULL;
     if (TYPE(CHILD(n, 2)) == with_var) {
         optional_vars = ast_for_with_var(c, CHILD(n, 2));
 
@@ -3084,6 +3143,7 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
 #endif
 }
 
+#ifdef Py_USING_UNICODE
 static PyObject *
 decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
 {
@@ -3145,6 +3205,7 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
         Py_XDECREF(u);
         return v;
 }
+#endif
 
 /* s is a Python string literal, including the bracketing quote characters,
  * and r &/or u prefixes (if any), and embedded escape sequences (if any).

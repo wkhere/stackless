@@ -396,6 +396,12 @@ class TestVariousIteratorArgs(unittest.TestCase):
         d.pop()
         self.assertRaises(RuntimeError, it.next)
 
+    def test_runtime_error_on_empty_deque(self):
+        d = deque()
+        it = iter(d)
+        d.append(10)
+        self.assertRaises(RuntimeError, it.next)
+
 class Deque(deque):
     pass
 
@@ -479,6 +485,16 @@ class TestSubclass(unittest.TestCase):
         d2 = X([4,5,6])
         d1 == d2   # not clear if this is supposed to be True or False,
                    # but it used to give a SystemError
+
+
+class SubclassWithKwargs(deque):
+    def __init__(self, newarg=1):
+        deque.__init__(self)
+
+class TestSubclassWithKwargs(unittest.TestCase):
+    def test_subclass_with_kwargs(self):
+        # SF bug #1486663 -- this used to erroneously raise a TypeError
+        SubclassWithKwargs(newarg=1)
 
 #==============================================================================
 
@@ -593,6 +609,7 @@ def test_main(verbose=None):
         TestBasic,
         TestVariousIteratorArgs,
         TestSubclass,
+        TestSubclassWithKwargs,
     )
 
     test_support.run_unittest(*test_classes)

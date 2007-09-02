@@ -262,12 +262,12 @@ typedef struct {
 	Tcl_ObjType *StringType;
 } TkappObject;
 
-#define Tkapp_Check(v) ((v)->ob_type == &Tkapp_Type)
+#define Tkapp_Check(v) (Py_Type(v) == &Tkapp_Type)
 #define Tkapp_Interp(v) (((TkappObject *) (v))->interp)
 #define Tkapp_Result(v) Tcl_GetStringResult(Tkapp_Interp(v))
 
 #define DEBUG_REFCNT(v) (printf("DEBUG: id=%p, refcnt=%i\n", \
-(void *) v, ((PyObject *) v)->ob_refcnt))
+(void *) v, Py_Refcnt(v)))
 
 
 
@@ -1285,6 +1285,12 @@ Tkapp_Call(PyObject *selfptr, PyObject *args)
 	/* Could add TCL_EVAL_GLOBAL if wrapped by GlobalCall... */
 	int flags = TCL_EVAL_DIRECT;
 
+	/* If args is a single tuple, replace with contents of tuple */
+	if (1 == PyTuple_Size(args)){
+		PyObject* item = PyTuple_GetItem(args, 0);
+		if (PyTuple_Check(item))
+			args = item;
+	}
 #ifdef WITH_THREAD
 	if (self->threaded && self->thread_id != Tcl_GetCurrentThread()) {
 		/* We cannot call the command directly. Instead, we must
@@ -2022,7 +2028,9 @@ PythonCmd(ClientData clientData, Tcl_Interp *interp, int argc, char *argv[])
 
 	s = AsString(res, tmp);
 	if (s == NULL) {
-		rv = PythonCmd_Error(interp);
+		Py_DECREF(res);
+		Py_DECREF(tmp);
+		return PythonCmd_Error(interp);
 	}
 	else {
 		Tcl_SetResult(Tkapp_Interp(self), s, TCL_VOLATILE);
@@ -2414,8 +2422,7 @@ Tktt_GetAttr(PyObject *self, char *name)
 
 static PyTypeObject Tktt_Type =
 {
-	PyObject_HEAD_INIT(NULL)
-	0,				     /*ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"tktimertoken",			     /*tp_name */
 	sizeof(TkttObject),		     /*tp_basicsize */
 	0,				     /*tp_itemsize */
@@ -2698,8 +2705,8 @@ static PyMethodDef Tkapp_methods[] =
 {
 	{"willdispatch",       Tkapp_WillDispatch, METH_NOARGS},
 	{"wantobjects",	       Tkapp_WantObjects, METH_VARARGS},
-	{"call", 	       Tkapp_Call, METH_OLDARGS},
-	{"globalcall", 	       Tkapp_GlobalCall, METH_OLDARGS},
+	{"call", 	       Tkapp_Call, METH_VARARGS},
+	{"globalcall", 	       Tkapp_GlobalCall, METH_VARARGS},
 	{"eval", 	       Tkapp_Eval, METH_VARARGS},
 	{"globaleval", 	       Tkapp_GlobalEval, METH_VARARGS},
 	{"evalfile", 	       Tkapp_EvalFile, METH_VARARGS},
@@ -2720,7 +2727,7 @@ static PyMethodDef Tkapp_methods[] =
 	{"exprboolean",        Tkapp_ExprBoolean, METH_VARARGS},
 	{"splitlist", 	       Tkapp_SplitList, METH_VARARGS},
 	{"split", 	       Tkapp_Split, METH_VARARGS},
-	{"merge", 	       Tkapp_Merge, METH_OLDARGS},
+	{"merge", 	       Tkapp_Merge, METH_VARARGS},
 	{"createcommand",      Tkapp_CreateCommand, METH_VARARGS},
 	{"deletecommand",      Tkapp_DeleteCommand, METH_VARARGS},
 #ifdef HAVE_CREATEFILEHANDLER
@@ -2759,8 +2766,7 @@ Tkapp_GetAttr(PyObject *self, char *name)
 
 static PyTypeObject Tkapp_Type =
 {
-	PyObject_HEAD_INIT(NULL)
-	0,				     /*ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"tkapp",			     /*tp_name */
 	sizeof(TkappObject),		     /*tp_basicsize */
 	0,				     /*tp_itemsize */
@@ -3099,7 +3105,7 @@ init_tkinter(void)
 {
 	PyObject *m, *d;
 
-	Tkapp_Type.ob_type = &PyType_Type;
+	Py_Type(&Tkapp_Type) = &PyType_Type;
 
 #ifdef WITH_THREAD
 	tcl_lock = PyThread_allocate_lock();
@@ -3127,10 +3133,10 @@ init_tkinter(void)
 
 	PyDict_SetItemString(d, "TkappType", (PyObject *)&Tkapp_Type);
 
-	Tktt_Type.ob_type = &PyType_Type;
+	Py_Type(&Tktt_Type) = &PyType_Type;
 	PyDict_SetItemString(d, "TkttType", (PyObject *)&Tktt_Type);
 
-	PyTclObject_Type.ob_type = &PyType_Type;
+	Py_Type(&PyTclObject_Type) = &PyType_Type;
 	PyDict_SetItemString(d, "Tcl_Obj", (PyObject *)&PyTclObject_Type);
 
 #ifdef TK_AQUA

@@ -12,8 +12,8 @@ Usage: see USAGE variable in the script.
 import platform, os, sys, getopt, textwrap, shutil, urllib2, stat, time, pwd
 import grp
 
-INCLUDE_TIMESTAMP=1
-VERBOSE=1
+INCLUDE_TIMESTAMP = 1
+VERBOSE = 1
 
 from plistlib import Plist
 
@@ -33,7 +33,7 @@ except ImportError:
 
 def shellQuote(value):
     """
-    Return the string value in a form that can savely be inserted into
+    Return the string value in a form that can safely be inserted into
     a shell command.
     """
     return "'%s'"%(value.replace("'", "'\"'\"'"))
@@ -56,28 +56,28 @@ def getFullVersion():
 
     raise RuntimeError, "Cannot find full version??"
 
-# The directory we'll use to create the build, will be erased and recreated
-WORKDIR="/tmp/_py"
+# The directory we'll use to create the build (will be erased and recreated)
+WORKDIR = "/tmp/_py"
 
-# The directory we'll use to store third-party sources, set this to something
+# The directory we'll use to store third-party sources. Set this to something
 # else if you don't want to re-fetch required libraries every time.
-DEPSRC=os.path.join(WORKDIR, 'third-party')
-DEPSRC=os.path.expanduser('~/Universal/other-sources')
+DEPSRC = os.path.join(WORKDIR, 'third-party')
+DEPSRC = os.path.expanduser('~/Universal/other-sources')
 
 # Location of the preferred SDK
-SDKPATH="/Developer/SDKs/MacOSX10.4u.sdk"
-#SDKPATH="/"
+SDKPATH = "/Developer/SDKs/MacOSX10.4u.sdk"
+#SDKPATH = "/"
 
-ARCHLIST=('i386', 'ppc',)
+ARCHLIST = ('i386', 'ppc',)
 
 # Source directory (asume we're in Mac/BuildScript)
-SRCDIR=os.path.dirname(
+SRCDIR = os.path.dirname(
         os.path.dirname(
             os.path.dirname(
                 os.path.abspath(__file__
         ))))
 
-USAGE=textwrap.dedent("""\
+USAGE = textwrap.dedent("""\
     Usage: build_python [options]
 
     Options:
@@ -92,7 +92,7 @@ USAGE=textwrap.dedent("""\
 
 # Instructions for building libraries that are necessary for building a
 # batteries included python.
-LIBRARY_RECIPES=[
+LIBRARY_RECIPES = [
     dict(
         name="Bzip2 1.0.3",
         url="http://www.bzip.org/1.0.3/bzip2-1.0.3.tar.gz",
@@ -184,7 +184,7 @@ LIBRARY_RECIPES=[
 
 
 # Instructions for building packages inside the .mpkg.
-PKG_RECIPES=[
+PKG_RECIPES = [
     dict(
         name="PythonFramework",
         long_name="Python Framework",
@@ -201,7 +201,7 @@ PKG_RECIPES=[
         long_name="GUI Applications",
         source="/Applications/MacPython %(VER)s",
         readme="""\
-            This package installs IDLE (an interactive Python IDLE),
+            This package installs IDLE (an interactive Python IDE),
             Python Launcher and Build Applet (create application bundles
             from python scripts).
 
@@ -257,8 +257,7 @@ PKG_RECIPES=[
         readme="""\
             This package updates the system python installation on
             Mac OS X 10.3 to ensure that you can build new python extensions
-            using that copy of python after installing this version of
-            python.
+            using that copy of python after installing this version.
             """,
         postflight="../Tools/fixapplepython23.py",
         topdir="/Library/Frameworks/Python.framework",
@@ -324,7 +323,7 @@ def checkEnvironment():
 
 
 
-def parseOptions(args = None):
+def parseOptions(args=None):
     """
     Parse arguments and update global settings.
     """
@@ -637,15 +636,15 @@ def buildPython():
     print "Running make"
     runCommand("make")
 
-    print "Runing make frameworkinstall"
+    print "Running make frameworkinstall"
     runCommand("make frameworkinstall DESTDIR=%s"%(
         shellQuote(rootDir)))
 
-    print "Runing make frameworkinstallextras"
+    print "Running make frameworkinstallextras"
     runCommand("make frameworkinstallextras DESTDIR=%s"%(
         shellQuote(rootDir)))
 
-    print "Copy required shared libraries"
+    print "Copying required shared libraries"
     if os.path.exists(os.path.join(WORKDIR, 'libraries', 'Library')):
         runCommand("mv %s/* %s"%(
             shellQuote(os.path.join(
@@ -664,7 +663,7 @@ def buildPython():
         for dn in dirnames:
             os.chmod(os.path.join(dirpath, dn), 0775)
             os.chown(os.path.join(dirpath, dn), -1, gid)
-            
+
 
         for fn in filenames:
             if os.path.islink(fn):
@@ -735,8 +734,8 @@ def patchScript(inPath, outPath):
 def packageFromRecipe(targetDir, recipe):
     curdir = os.getcwd()
     try:
-        # The major version (such as 2.5) is included in the pacakge name
-        # because haveing two version of python installed at the same time is
+        # The major version (such as 2.5) is included in the package name
+        # because having two version of python installed at the same time is
         # common.
         pkgname = '%s-%s'%(recipe['name'], getVersion())
         srcdir  = recipe.get('source')
@@ -910,7 +909,7 @@ def installSize(clear=False, _saved=[]):
 
 def buildDMG():
     """
-    Create DMG containing the rootDir
+    Create DMG containing the rootDir.
     """
     outdir = os.path.join(WORKDIR, 'diskimage')
     if os.path.exists(outdir):

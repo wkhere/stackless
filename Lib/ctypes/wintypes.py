@@ -34,8 +34,14 @@ LPCOLESTR = LPOLESTR = OLESTR = c_wchar_p
 LPCWSTR = LPWSTR = c_wchar_p
 LPCSTR = LPSTR = c_char_p
 
-WPARAM = c_uint
-LPARAM = c_long
+# WPARAM is defined as UINT_PTR (unsigned type)
+# LPARAM is defined as LONG_PTR (signed type)
+if sizeof(c_long) == sizeof(c_void_p):
+    WPARAM = c_ulong
+    LPARAM = c_long
+elif sizeof(c_longlong) == sizeof(c_void_p):
+    WPARAM = c_ulonglong
+    LPARAM = c_longlong
 
 ATOM = WORD
 LANGID = WORD
@@ -48,7 +54,7 @@ LCID = DWORD
 
 ################################################################
 # HANDLE types
-HANDLE = c_ulong # in the header files: void *
+HANDLE = c_void_p # in the header files: void *
 
 HACCEL = HANDLE
 HBITMAP = HANDLE
@@ -141,7 +147,7 @@ class WIN32_FIND_DATAA(Structure):
                 ("dwReserved0", DWORD),
                 ("dwReserved1", DWORD),
                 ("cFileName", c_char * MAX_PATH),
-                ("cAlternameFileName", c_char * 14)]
+                ("cAlternateFileName", c_char * 14)]
 
 class WIN32_FIND_DATAW(Structure):
     _fields_ = [("dwFileAttributes", DWORD),
@@ -153,7 +159,7 @@ class WIN32_FIND_DATAW(Structure):
                 ("dwReserved0", DWORD),
                 ("dwReserved1", DWORD),
                 ("cFileName", c_wchar * MAX_PATH),
-                ("cAlternameFileName", c_wchar * 14)]
+                ("cAlternateFileName", c_wchar * 14)]
 
 __all__ = ['ATOM', 'BOOL', 'BOOLEAN', 'BYTE', 'COLORREF', 'DOUBLE',
            'DWORD', 'FILETIME', 'HACCEL', 'HANDLE', 'HBITMAP', 'HBRUSH',

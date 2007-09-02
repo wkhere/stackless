@@ -1,7 +1,8 @@
-This is Python version 2.5 rc 1
-===============================
+This is Python version 2.6 alpha 0
+==================================
 
-Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation.
+Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007 
+Python Software Foundation.
 All rights reserved.
 
 Copyright (c) 2000 BeOpen.com.
@@ -223,6 +224,11 @@ old K&R-C-only compilers is no longer possible.  ANSI C compilers are
 available for all modern systems, either in the form of updated
 compilers from the vendor, or one of the free compilers (gcc).
 
+If "make install" fails mysteriously during the "compiling the library"
+step, make sure that you don't have any of the PYTHONPATH or PYTHONHOME
+environment variables set, as they may interfere with the newly built
+executable which is compiling the library.
+
 Unsupported systems
 -------------------
 
@@ -288,7 +294,7 @@ Unix platforms: If your vendor still ships (and you still use) Berkeley DB
 
 XXX I think this next bit is out of date:
 
-64-bit platforms: The modules audioop, imageop and rgbimg don't work.
+64-bit platforms: The modules audioop, and imageop don't work.
         The setup.py script disables them on 64-bit installations.
         Don't try to enable them in the Modules/Setup file.  They
         contain code that is quite wordsize sensitive.  (If you have a
@@ -460,9 +466,9 @@ QNX:    Chris Herborth (chrish@qnx.com) writes:
                 array, audioop, binascii, cPickle, cStringIO, cmath,
                 crypt, curses, errno, fcntl, gdbm, grp, imageop,
                 _locale, math, md5, new, operator, parser, pcre,
-                posix, pwd, readline, regex, reop, rgbimg, rotor,
+                posix, pwd, readline, regex, reop,
                 select, signal, socket, soundex, strop, struct,
-                syslog, termios, time, timing, zlib, audioop, imageop, rgbimg
+                syslog, termios, time, timing, zlib, audioop, imageop
 
         3) make SHELL=/usr/local/bin/bash
 
@@ -564,9 +570,9 @@ Reliant UNIX: The thread support does not compile on Reliant UNIX, and
 MacOSX: The tests will crash on both 10.1 and 10.2 with SEGV in
         test_re and test_sre due to the small default stack size.  If
         you set the stack size to 2048 before doing a "make test" the
-        failure can be avoided.  If you're using the tcsh (the default
-        on OSX), or csh shells use "limit stacksize 2048" and for the
-        bash shell, use "ulimit -s 2048".
+        failure can be avoided.  If you're using the tcsh or csh shells,
+        use "limit stacksize 2048" and for the bash shell (the default
+        as of OSX 10.3), use "ulimit -s 2048".
 
         On naked Darwin you may want to add the configure option
         "--disable-toolbox-glue" to disable the glue code for the Carbon
@@ -663,7 +669,11 @@ Cygwin: With recent (relative to the time of writing, 2001-12-19)
         News regarding these platforms with more recent Cygwin
         versions would be appreciated!
 
-AtheOS: From Octavian Cerna <tavy at ylabs.com>:
+AtheOS: Official support has been stopped as of Python 2.6.  All code will be
+        removed in Python 2.7 unless a maintainer steps forward for this
+        platform.
+
+        From Octavian Cerna <tavy at ylabs.com>:
 
         Before building:
 
@@ -1231,7 +1241,6 @@ Distribution structure
 Most subdirectories have their own README files.  Most files have
 comments.
 
-BeOS/           Files specific to the BeOS port
 Demo/           Demonstration scripts, modules and programs
 Doc/            Documentation sources (LaTeX)
 Grammar/        Input for the parser generator
@@ -1248,6 +1257,7 @@ PCbuild/        Build directory for Microsoft Visual C++
 Parser/         The parser and tokenizer and their input handling
 Python/         The byte-compiler and interpreter
 README          The file you're reading now
+RISCOS/         Files specific to RISC OS port
 Tools/          Some useful programs written in Python
 pyconfig.h.in   Source from which pyconfig.h is created (GNU autoheader output)
 configure       Configuration shell script (GNU autoconf output)
@@ -1268,6 +1278,7 @@ config.status   Status from last run of the configure script
 getbuildinfo.o  Object file from Modules/getbuildinfo.c
 libpython<version>.a    The library archive
 python          The executable interpreter
+reflog.txt      Output from running the regression suite with the -R flag 
 tags, TAGS      Tags files for vi and Emacs
 
 

@@ -153,12 +153,12 @@ Pdata_dealloc(Pdata *self)
 }
 
 static PyTypeObject PdataType = {
-	PyObject_HEAD_INIT(NULL) 0, "cPickle.Pdata", sizeof(Pdata), 0,
+	PyVarObject_HEAD_INIT(NULL, 0) "cPickle.Pdata", sizeof(Pdata), 0,
 	(destructor)Pdata_dealloc,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0L,0L,0L,0L, ""
 };
 
-#define Pdata_Check(O) ((O)->ob_type == &PdataType)
+#define Pdata_Check(O) (Py_Type(O) == &PdataType)
 
 static PyObject *
 Pdata_New(void)
@@ -318,7 +318,7 @@ Pdata_popList(Pdata *self, int start)
 }
 
 #define FREE_ARG_TUP(self) {                        \
-    if (self->arg->ob_refcnt > 1) {                 \
+    if (Py_Refcnt(self->arg) > 1) {                 \
       Py_DECREF(self->arg);                         \
       self->arg=NULL;                               \
     }                                               \
@@ -538,11 +538,12 @@ read_file(Unpicklerobject *self, char **s, Py_ssize_t n)
 		self->buf_size = size;
 	}
 	else if (n > self->buf_size) {
-		self->buf = (char *)realloc(self->buf, n);
-		if (!self->buf)  {
+		char *newbuf = (char *)realloc(self->buf, n);
+		if (!newbuf)  {
 			PyErr_NoMemory();
 			return -1;
 		}
+		self->buf = newbuf;
 		self->buf_size = n;
 	}
 
@@ -581,6 +582,7 @@ readline_file(Unpicklerobject *self, char **s)
 	i = 0;
 	while (1) {
 		int bigger;
+		char *newbuf;
 		for (; i < (self->buf_size - 1); i++) {
 			if (feof(self->fp) ||
 			    (self->buf[i] = getc(self->fp)) == '\n') {
@@ -594,11 +596,12 @@ readline_file(Unpicklerobject *self, char **s)
 			PyErr_NoMemory();
 			return -1;
 		}
-		self->buf = (char *)realloc(self->buf, bigger);
-		if (!self->buf)  {
+		newbuf = (char *)realloc(self->buf, bigger);
+		if (!newbuf)  {
 			PyErr_NoMemory();
 			return -1;
 		}
+		self->buf = newbuf;
 		self->buf_size = bigger;
 	}
 }
@@ -754,7 +757,7 @@ get(Picklerobject *self, PyObject *id)
 static int
 put(Picklerobject *self, PyObject *ob)
 {
-	if (ob->ob_refcnt < 2 || self->fast)
+	if (Py_Refcnt(ob) < 2 || self->fast)
 		return 0;
 
 	return put2(self, ob);
@@ -918,7 +921,7 @@ fast_save_enter(Picklerobject *self, PyObject *obj)
 			PyErr_Format(PyExc_ValueError,
 				     "fast mode: can't pickle cyclic objects "
 				     "including object type %s at %p",
-				     obj->ob_type->tp_name, obj);
+				     Py_Type(obj)->tp_name, obj);
 			self->fast_container = -1;
 			return 0;
 		}
@@ -2332,7 +2335,7 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 		goto finally;
 	}
 
-	type = args->ob_type;
+	type = Py_Type(args);
 
 	switch (type->tp_name[0]) {
 	case 'b':
@@ -2384,7 +2387,7 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 #endif
 	}
 
-	if (args->ob_refcnt > 1) {
+	if (Py_Refcnt(args) > 1) {
 		if (!( py_ob_id = PyLong_FromVoidPtr(args)))
 			goto finally;
 
@@ -2943,7 +2946,7 @@ Pickler_dealloc(Picklerobject *self)
 #ifdef STACKLESS
 	Py_XDECREF(self->module_dict_ids);
 #endif
-	self->ob_type->tp_free((PyObject *)self);
+	Py_Type(self)->tp_free((PyObject *)self);
 }
 
 static int
@@ -3106,8 +3109,7 @@ PyDoc_STRVAR(Picklertype__doc__,
 "Objects that know how to pickle objects\n");
 
 static PyTypeObject Picklertype = {
-    PyObject_HEAD_INIT(NULL)
-    0,                            /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "cPickle.Pickler",            /*tp_name*/
     sizeof(Picklerobject),              /*tp_basicsize*/
     0,
@@ -4437,17 +4439,19 @@ load_mark(Unpicklerobject *self)
 	*/
 
 	if ((self->num_marks + 1) >= self->marks_size) {
+		int *marks;
 		s=self->marks_size+20;
 		if (s <= self->num_marks) s=self->num_marks + 1;
 		if (self->marks == NULL)
-			self->marks=(int *)malloc(s * sizeof(int));
+			marks=(int *)malloc(s * sizeof(int));
 		else
-			self->marks=(int *)realloc(self->marks,
+			marks=(int *)realloc(self->marks,
 						   s * sizeof(int));
-		if (! self->marks) {
+		if (!marks) {
 			PyErr_NoMemory();
 			return -1;
 		}
+		self->marks = marks;
 		self->marks_size = s;
 	}
 
@@ -5321,7 +5325,7 @@ Unpickler_dealloc(Unpicklerobject *self)
 		free(self->buf);
 	}
 
-	self->ob_type->tp_free((PyObject *)self);
+	Py_Type(self)->tp_free((PyObject *)self);
 }
 
 static int
@@ -5550,8 +5554,7 @@ PyDoc_STRVAR(Unpicklertype__doc__,
 "Objects that know how to unpickle");
 
 static PyTypeObject Unpicklertype = {
-    PyObject_HEAD_INIT(NULL)
-    0,                          	 /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "cPickle.Unpickler", 	         /*tp_name*/
     sizeof(Unpicklerobject),             /*tp_basicsize*/
     0,
@@ -5775,9 +5778,9 @@ initcPickle(void)
 	PyObject *format_version;
 	PyObject *compatible_formats;
 
-	Picklertype.ob_type = &PyType_Type;
-	Unpicklertype.ob_type = &PyType_Type;
-	PdataType.ob_type = &PyType_Type;
+	Py_Type(&Picklertype) = &PyType_Type;
+	Py_Type(&Unpicklertype) = &PyType_Type;
+	Py_Type(&PdataType) = &PyType_Type;
 
 	/* Initialize some pieces. We need to do this before module creation,
 	 * so we're forced to use a temporary dictionary. :(

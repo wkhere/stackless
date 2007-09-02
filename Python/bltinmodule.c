@@ -146,6 +146,11 @@ builtin_apply(PyObject *self, PyObject *args)
 	PyObject *func, *alist = NULL, *kwdict = NULL;
 	PyObject *t = NULL, *retval = NULL;
 
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "apply() not supported in 3.x") < 0)
+		return NULL;
+
 	if (!PyArg_UnpackTuple(args, "apply", 1, 3, &func, &alist, &kwdict))
 		return NULL;
 	if (alist != NULL) {
@@ -188,6 +193,10 @@ Deprecated since release 2.3. Instead, use the extended call syntax:\n\
 static PyObject *
 builtin_callable(PyObject *self, PyObject *v)
 {
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "callable() not supported in 3.x") < 0)
+		return NULL;
 	return PyBool_FromLong((long)PyCallable_Check(v));
 }
 
@@ -386,6 +395,11 @@ builtin_coerce(PyObject *self, PyObject *args)
 	PyObject *v, *w;
 	PyObject *res;
 
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "coerce() not supported in 3.x") < 0)
+		return NULL;
+
 	if (!PyArg_UnpackTuple(args, "coerce", 2, 2, &v, &w))
 		return NULL;
 	if (PyNumber_Coerce(&v, &w) < 0)
@@ -404,7 +418,7 @@ a common type, using the same rules as used by arithmetic operations.\n\
 If coercion is not possible, raise TypeError.");
 
 static PyObject *
-builtin_compile(PyObject *self, PyObject *args)
+builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	char *str;
 	char *filename;
@@ -415,9 +429,12 @@ builtin_compile(PyObject *self, PyObject *args)
 	PyCompilerFlags cf;
 	PyObject *result = NULL, *cmd, *tmp = NULL;
 	Py_ssize_t length;
+	static char *kwlist[] = {"source", "filename", "mode", "flags",
+				 "dont_inherit", NULL};
 
-	if (!PyArg_ParseTuple(args, "Oss|ii:compile", &cmd, &filename,
-			      &startstr, &supplied_flags, &dont_inherit))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oss|ii:compile",
+					 kwlist, &cmd, &filename, &startstr,
+					 &supplied_flags, &dont_inherit))
 		return NULL;
 
 	cf.cf_flags = supplied_flags;
@@ -497,15 +514,16 @@ builtin_dir(PyObject *self, PyObject *args)
 PyDoc_STRVAR(dir_doc,
 "dir([object]) -> list of strings\n"
 "\n"
-"Return an alphabetized list of names comprising (some of) the attributes\n"
-"of the given object, and of attributes reachable from it:\n"
-"\n"
-"No argument:  the names in the current scope.\n"
-"Module object:  the module attributes.\n"
-"Type or class object:  its attributes, and recursively the attributes of\n"
-"    its bases.\n"
-"Otherwise:  its attributes, its class's attributes, and recursively the\n"
-"    attributes of its class's base classes.");
+"If called without an argument, return the names in the current scope.\n"
+"Else, return an alphabetized list of names comprising (some of) the attributes\n"
+"of the given object, and of attributes reachable from it.\n"
+"If the object supplies a method named __dir__, it will be used; otherwise\n"
+"the default dir() logic is used and returns:\n"
+"  for a module object: the module's attributes.\n"
+"  for a class object:  its attributes, and recursively the attributes\n"
+"    of its bases.\n"
+"  for any other object: its attributes, its class's attributes, and\n"
+"    recursively the attributes of its class's base classes.");
 
 static PyObject *
 builtin_divmod(PyObject *self, PyObject *args)
@@ -628,6 +646,11 @@ builtin_execfile(PyObject *self, PyObject *args)
 	FILE* fp = NULL;
 	PyCompilerFlags cf;
 	int exists;
+
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "execfile() not supported in 3.x") < 0)
+		return NULL;
 
 	if (!PyArg_ParseTuple(args, "s|O!O:execfile",
 			&filename,
@@ -1800,6 +1823,11 @@ builtin_reduce(PyObject *self, PyObject *args)
 {
 	PyObject *seq, *func, *result = NULL, *it;
 
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "reduce() not supported in 3.x") < 0)
+		return NULL;
+
 	if (!PyArg_UnpackTuple(args, "reduce", 2, 3, &func, &seq, &result))
 		return NULL;
 	if (result != NULL)
@@ -1872,6 +1900,11 @@ sequence is empty.");
 static PyObject *
 builtin_reload(PyObject *self, PyObject *v)
 {
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "reload() not supported in 3.x") < 0)
+		return NULL;
+
 	return PyImport_ReloadModule(v);
 }
 
@@ -2245,7 +2278,7 @@ static PyMethodDef builtin_methods[] = {
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
  	{"cmp",		builtin_cmp,        METH_VARARGS, cmp_doc},
  	{"coerce",	builtin_coerce,     METH_VARARGS, coerce_doc},
- 	{"compile",	builtin_compile,    METH_VARARGS, compile_doc},
+ 	{"compile",	(PyCFunction)builtin_compile,    METH_VARARGS | METH_KEYWORDS, compile_doc},
  	{"delattr",	builtin_delattr,    METH_VARARGS, delattr_doc},
  	{"dir",		builtin_dir,        METH_VARARGS, dir_doc},
  	{"divmod",	builtin_divmod,     METH_VARARGS, divmod_doc},

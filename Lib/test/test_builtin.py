@@ -107,9 +107,12 @@ class BuiltinTest(unittest.TestCase):
         __import__('sys')
         __import__('time')
         __import__('string')
+        __import__(name='sys')
+        __import__(name='time', level=0)
         self.assertRaises(ImportError, __import__, 'spamspam')
         self.assertRaises(TypeError, __import__, 1, 2, 3, 4)
         self.assertRaises(ValueError, __import__, '')
+        self.assertRaises(TypeError, __import__, 'sys', name='sys')
 
     def test_abs(self):
         # int
@@ -243,14 +246,20 @@ class BuiltinTest(unittest.TestCase):
         compile('print 1\n', '', 'exec')
         bom = '\xef\xbb\xbf'
         compile(bom + 'print 1\n', '', 'exec')
+        compile(source='pass', filename='?', mode='exec')
+        compile(dont_inherit=0, filename='tmp', source='0', mode='eval')
+        compile('pass', '?', dont_inherit=1, mode='exec')
         self.assertRaises(TypeError, compile)
         self.assertRaises(ValueError, compile, 'print 42\n', '<string>', 'badmode')
         self.assertRaises(ValueError, compile, 'print 42\n', '<string>', 'single', 0xff)
         self.assertRaises(TypeError, compile, chr(0), 'f', 'exec')
+        self.assertRaises(TypeError, compile, 'pass', '?', 'exec',
+                          mode='eval', source='0', filename='tmp')
         if have_unicode:
             compile(unicode('print u"\xc3\xa5"\n', 'utf8'), '', 'exec')
             self.assertRaises(TypeError, compile, unichr(0), 'f', 'exec')
             self.assertRaises(ValueError, compile, unicode('a = 1'), 'f', 'bad')
+
 
     def test_delattr(self):
         import sys
@@ -259,11 +268,66 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, delattr)
 
     def test_dir(self):
-        x = 1
-        self.assert_('x' in dir())
-        import sys
-        self.assert_('modules' in dir(sys))
+        # dir(wrong number of arguments)
         self.assertRaises(TypeError, dir, 42, 42)
+
+        # dir() - local scope
+        local_var = 1
+        self.assert_('local_var' in dir())
+
+        # dir(module)
+        import sys
+        self.assert_('exit' in dir(sys))
+
+        # dir(module_with_invalid__dict__)
+        import types
+        class Foo(types.ModuleType):
+            __dict__ = 8
+        f = Foo("foo")
+        self.assertRaises(TypeError, dir, f)
+
+        # dir(type)
+        self.assert_("strip" in dir(str))
+        self.assert_("__mro__" not in dir(str))
+
+        # dir(obj)
+        class Foo(object):
+            def __init__(self):
+                self.x = 7
+                self.y = 8
+                self.z = 9
+        f = Foo()
+        self.assert_("y" in dir(f))
+
+        # dir(obj_no__dict__)
+        class Foo(object):
+            __slots__ = []
+        f = Foo()
+        self.assert_("__repr__" in dir(f))
+
+        # dir(obj_no__class__with__dict__)
+        # (an ugly trick to cause getattr(f, "__class__") to fail)
+        class Foo(object):
+            __slots__ = ["__class__", "__dict__"]
+            def __init__(self):
+                self.bar = "wow"
+        f = Foo()
+        self.assert_("__repr__" not in dir(f))
+        self.assert_("bar" in dir(f))
+
+        # dir(obj_using __dir__)
+        class Foo(object):
+            def __dir__(self):
+                return ["kan", "ga", "roo"]
+        f = Foo()
+        self.assert_(dir(f) == ["ga", "kan", "roo"])
+
+        # dir(obj__dir__not_list)
+        class Foo(object):
+            def __dir__(self):
+                return 7
+        f = Foo()
+        self.assertRaises(TypeError, dir, f)
 
     def test_divmod(self):
         self.assertEqual(divmod(12, 7), (1, 5))
@@ -1016,6 +1080,11 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, long, '123\0')
         self.assertRaises(ValueError, long, '53', 40)
         self.assertRaises(TypeError, long, 1, 12)
+
+        # SF patch #1638879: embedded NULs were not detected with
+        # explicit base
+        self.assertRaises(ValueError, long, '123\0', 10)
+        self.assertRaises(ValueError, long, '123\x00 245', 20)
 
         self.assertEqual(long('100000000000000000000000000000000', 2),
                          4294967296)

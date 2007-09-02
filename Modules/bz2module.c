@@ -41,7 +41,7 @@ typedef fpos_t Py_off_t;
 #define MODE_READ_EOF 2
 #define MODE_WRITE    3
 
-#define BZ2FileObject_Check(v)	((v)->ob_type == &BZ2File_Type)
+#define BZ2FileObject_Check(v)	(Py_Type(v) == &BZ2File_Type)
 
 
 #ifdef BZ_CONFIG_ERROR
@@ -996,7 +996,7 @@ BZ2File_seek(BZ2FileObject *self, PyObject *args)
 	char small_buffer[SMALLCHUNK];
 	char *buffer = small_buffer;
 	size_t buffersize = SMALLCHUNK;
-	int bytesread = 0;
+	Py_off_t bytesread = 0;
 	size_t readsize;
 	int chunksize;
 	int bzerror;
@@ -1418,7 +1418,7 @@ BZ2File_dealloc(BZ2FileObject *self)
 	}
 	Util_DropReadAhead(self);
 	Py_XDECREF(self->file);
-	self->ob_type->tp_free((PyObject *)self);
+	Py_Type(self)->tp_free((PyObject *)self);
 }
 
 /* This is a hacked version of Python's fileobject.c:file_getiter(). */
@@ -1480,8 +1480,7 @@ newlines are available only when reading.\n\
 ;
 
 static PyTypeObject BZ2File_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,			/*ob_size*/
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"bz2.BZ2File",		/*tp_name*/
 	sizeof(BZ2FileObject),	/*tp_basicsize*/
 	0,			/*tp_itemsize*/
@@ -1579,6 +1578,8 @@ BZ2Comp_compress(BZ2CompObject *self, PyObject *args)
 			Util_CatchBZ2Error(bzerror);
 			goto error;
 		}
+		if (bzs->avail_in == 0)
+			break; /* no more input data */
 		if (bzs->avail_out == 0) {
 			bufsize = Util_NewBufferSize(bufsize);
 			if (_PyString_Resize(&ret, bufsize) < 0) {
@@ -1588,8 +1589,6 @@ BZ2Comp_compress(BZ2CompObject *self, PyObject *args)
 			bzs->next_out = BUF(ret) + (BZS_TOTAL_OUT(bzs)
 						    - totalout);
 			bzs->avail_out = bufsize - (bzs->next_out - BUF(ret));
-		} else if (bzs->avail_in == 0) {
-			break;
 		}
 	}
 
@@ -1735,7 +1734,7 @@ BZ2Comp_dealloc(BZ2CompObject *self)
 		PyThread_free_lock(self->lock);
 #endif
 	BZ2_bzCompressEnd(&self->bzs);
-	self->ob_type->tp_free((PyObject *)self);
+	Py_Type(self)->tp_free((PyObject *)self);
 }
 
 
@@ -1752,8 +1751,7 @@ must be a number between 1 and 9.\n\
 ");
 
 static PyTypeObject BZ2Comp_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,			/*ob_size*/
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"bz2.BZ2Compressor",	/*tp_name*/
 	sizeof(BZ2CompObject),	/*tp_basicsize*/
 	0,			/*tp_itemsize*/
@@ -1871,6 +1869,8 @@ BZ2Decomp_decompress(BZ2DecompObject *self, PyObject *args)
 			Util_CatchBZ2Error(bzerror);
 			goto error;
 		}
+		if (bzs->avail_in == 0)
+			break; /* no more input data */
 		if (bzs->avail_out == 0) {
 			bufsize = Util_NewBufferSize(bufsize);
 			if (_PyString_Resize(&ret, bufsize) < 0) {
@@ -1881,8 +1881,6 @@ BZ2Decomp_decompress(BZ2DecompObject *self, PyObject *args)
 			bzs->next_out = BUF(ret) + (BZS_TOTAL_OUT(bzs)
 						    - totalout);
 			bzs->avail_out = bufsize - (bzs->next_out - BUF(ret));
-		} else if (bzs->avail_in == 0) {
-			break;
 		}
 	}
 
@@ -1958,7 +1956,7 @@ BZ2Decomp_dealloc(BZ2DecompObject *self)
 #endif
 	Py_XDECREF(self->unused_data);
 	BZ2_bzDecompressEnd(&self->bzs);
-	self->ob_type->tp_free((PyObject *)self);
+	Py_Type(self)->tp_free((PyObject *)self);
 }
 
 
@@ -1974,8 +1972,7 @@ decompress() function instead.\n\
 ");
 
 static PyTypeObject BZ2Decomp_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,			/*ob_size*/
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"bz2.BZ2Decompressor",	/*tp_name*/
 	sizeof(BZ2DecompObject), /*tp_basicsize*/
 	0,			/*tp_itemsize*/
@@ -2160,6 +2157,13 @@ bz2_decompress(PyObject *self, PyObject *args)
 			Py_DECREF(ret);
 			return NULL;
 		}
+		if (bzs->avail_in == 0) {
+			BZ2_bzDecompressEnd(bzs);
+			PyErr_SetString(PyExc_ValueError,
+					"couldn't find end of stream");
+			Py_DECREF(ret);
+			return NULL;
+		}
 		if (bzs->avail_out == 0) {
 			bufsize = Util_NewBufferSize(bufsize);
 			if (_PyString_Resize(&ret, bufsize) < 0) {
@@ -2169,12 +2173,6 @@ bz2_decompress(PyObject *self, PyObject *args)
 			}
 			bzs->next_out = BUF(ret) + BZS_TOTAL_OUT(bzs);
 			bzs->avail_out = bufsize - (bzs->next_out - BUF(ret));
-		} else if (bzs->avail_in == 0) {
-			BZ2_bzDecompressEnd(bzs);
-			PyErr_SetString(PyExc_ValueError,
-					"couldn't find end of stream");
-			Py_DECREF(ret);
-			return NULL;
 		}
 	}
 
@@ -2208,9 +2206,9 @@ initbz2(void)
 {
 	PyObject *m;
 
-	BZ2File_Type.ob_type = &PyType_Type;
-	BZ2Comp_Type.ob_type = &PyType_Type;
-	BZ2Decomp_Type.ob_type = &PyType_Type;
+	Py_Type(&BZ2File_Type) = &PyType_Type;
+	Py_Type(&BZ2Comp_Type) = &PyType_Type;
+	Py_Type(&BZ2Decomp_Type) = &PyType_Type;
 
 	m = Py_InitModule3("bz2", bz2_methods, bz2__doc__);
 	if (m == NULL)

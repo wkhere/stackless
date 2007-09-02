@@ -4,7 +4,7 @@ dnl Process this file with autoconf 2.0 or later to make a configure script.
 m4_define(PYTHON_VERSION, 2.6)
 
 AC_REVISION($Revision$)
-AC_PREREQ(2.59)
+AC_PREREQ(2.61)
 AC_INIT(python, PYTHON_VERSION, http://www.python.org/python-bugs)
 AC_CONFIG_SRCDIR([Include/object.h])
 AC_CONFIG_HEADER(pyconfig.h)
@@ -49,6 +49,10 @@ AC_DEFINE(_NETBSD_SOURCE, 1, [Define on NetBSD to activate all library features]
 # certain features on FreeBSD, so we need __BSD_VISIBLE to re-enable
 # them.
 AC_DEFINE(__BSD_VISIBLE, 1, [Define on FreeBSD to activate all library features])
+
+# OpenBSD undoes our definition of __BSD_VISIBLE if _XOPEN_SOURCE is
+# also defined. This can be overridden by defining _BSD_SOURCE
+AC_DEFINE(_BSD_SOURCE, 1, [Define on OpenBSD to activate all library features])
 
 # The later defininition of _XOPEN_SOURCE and _POSIX_C_SOURCE disables
 # u_int on Irix 5.3. Defining _BSD_TYPES brings it back.
@@ -218,6 +222,11 @@ case $ac_sys_system/$ac_sys_release in
   # even though select is a POSIX function. Reported by J. Ribbens.
   # Reconfirmed for OpenBSD 3.3 by Zachary Hamm, for 3.4 by Jason Ish.
   OpenBSD/2.* | OpenBSD/3.@<:@0123456789@:>@ | OpenBSD/4.@<:@0@:>@) 
+    define_xopen_source=no;;
+  # Defining _XOPEN_SOURCE on NetBSD version prior to the introduction of
+  # _NETBSD_SOURCE disables certain features (eg. setgroups). Reported by
+  # Marc Recht
+  NetBSD/1.5 | NetBSD/1.5.* | NetBSD/1.6 | NetBSD/1.6.* | NetBSD/1.6[A-S])
     define_xopen_source=no;;
   # On Solaris 2.6, sys/wait.h is inconsistent in the usage
   # of union __?sigval. Reported by Stuart Bishop.
@@ -461,7 +470,7 @@ AC_AIX
 
 # Check for unsupported systems
 case $ac_sys_system/$ac_sys_release in
-Linux*/1*)
+atheos*|Linux*/1*)
    echo This system \($ac_sys_system/$ac_sys_release\) is no longer supported.
    echo See README for details.
    exit 1;;
@@ -907,6 +916,22 @@ else
   fi
 fi
 
+# Check whether GCC supports PyArg_ParseTuple format
+if test "$GCC" = "yes"
+then
+  AC_MSG_CHECKING(whether gcc supports ParseTuple __format__)
+  save_CFLAGS=$CFLAGS
+  CFLAGS="$CFLAGS -Werror"
+  AC_TRY_COMPILE([
+    void f(char*,...)__attribute((format(PyArg_ParseTuple, 1, 2)));
+  ],,
+  AC_DEFINE(HAVE_ATTRIBUTE_FORMAT_PARSETUPLE, 1, [Define if GCC supports __attribute__((format(PyArg_ParseTuple, 2, 3)))])
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+  )
+  CFLAGS=$save_CFLAGS
+fi
+
 # On some compilers, pthreads are available without further options
 # (e.g. MacOS X). On some of these systems, the compiler will not
 # complain if unaccepted options are passed (e.g. gcc on Mac OS X).
@@ -1212,6 +1237,17 @@ AC_TRY_COMPILE([], [long long x; x = (long long)0;], [
 AC_MSG_RESULT($have_long_long)
 if test "$have_long_long" = yes ; then
 AC_CHECK_SIZEOF(long long, 8)
+fi
+
+AC_MSG_CHECKING(for _Bool support)
+have_c99_bool=no
+AC_TRY_COMPILE([], [_Bool x; x = (_Bool)0;], [
+  AC_DEFINE(HAVE_C99_BOOL, 1, [Define this if you have the type _Bool.]) 
+  have_c99_bool=yes
+])
+AC_MSG_RESULT($have_c99_bool)
+if test "$have_c99_bool" = yes ; then
+AC_CHECK_SIZEOF(_Bool, 1)
 fi
 
 AC_CHECK_TYPES(uintptr_t, 
@@ -1556,9 +1592,11 @@ if test -z "$CCSHARED"
 then
 	case $ac_sys_system/$ac_sys_release in
 	SunOS*) if test "$GCC" = yes;
-	        then CCSHARED="-fPIC";
-		else CCSHARED="-xcode=pic32";
-	        fi;;
+		then CCSHARED="-fPIC";
+		elif test `uname -p` = sparc;
+		then CCSHARED="-xcode=pic32";
+		else CCSHARED="-Kpic";
+		fi;;
 	hp*|HP*) if test "$GCC" = yes;
 		 then CCSHARED="-fPIC";
 		 else CCSHARED="+z";
@@ -2267,11 +2305,11 @@ fi
 AC_MSG_RESULT(MACHDEP_OBJS)
 
 # checks for library functions
-AC_CHECK_FUNCS(alarm bind_textdomain_codeset chown clock confstr ctermid \
- execv fork fpathconf ftime ftruncate \
+AC_CHECK_FUNCS(alarm bind_textdomain_codeset chflags chown clock confstr \
+ ctermid execv fork fpathconf ftime ftruncate \
  gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
  getpriority getpwent getspnam getspent getsid getwd \
- kill killpg lchown lstat mkfifo mknod mktime \
+ kill killpg lchflags lchown lstat mkfifo mknod mktime \
  mremap nice pathconf pause plock poll pthread_init \
  putenv readlink realpath \
  select setegid seteuid setgid \
@@ -3355,8 +3393,27 @@ AC_TRY_COMPILE([#include <curses.h>], void *x=resizeterm,
   AC_MSG_RESULT(no)
 )
 
-AC_CHECK_FILE(/dev/ptmx, AC_DEFINE(HAVE_DEV_PTMX, 1, [Define if we have /dev/ptmx.]))
-AC_CHECK_FILE(/dev/ptc, AC_DEFINE(HAVE_DEV_PTC, 1, [Define if we have /dev/ptc.]))
+AC_MSG_CHECKING(for /dev/ptmx)
+
+if test -r /dev/ptmx
+then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_DEV_PTMX, 1,
+  [Define if we have /dev/ptmx.])
+else
+  AC_MSG_RESULT(no)
+fi
+
+AC_MSG_CHECKING(for /dev/ptc)
+
+if test -r /dev/ptc
+then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_DEV_PTC, 1,
+  [Define if we have /dev/ptc.])
+else
+  AC_MSG_RESULT(no)
+fi
 
 AC_MSG_CHECKING(for %zd printf() format support)
 AC_TRY_RUN([#include <stdio.h>
@@ -3449,4 +3506,16 @@ echo "creating Makefile"
 $SHELL $srcdir/Modules/makesetup -c $srcdir/Modules/config.c.in \
 			-s Modules Modules/Setup.config \
 			Modules/Setup.local Modules/Setup
+
+case $ac_sys_system in
+BeOS)
+        AC_MSG_WARN([
+
+  Support for BeOS is deprecated as of Python 2.6.
+  See PEP 11 for the gory details.
+  ])
+  ;;
+*) ;;
+esac
+
 mv config.c Modules

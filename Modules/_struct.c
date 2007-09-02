@@ -72,7 +72,7 @@ typedef struct {
 
 
 #define PyStruct_Check(op) PyObject_TypeCheck(op, &PyStructType)
-#define PyStruct_CheckExact(op) ((op)->ob_type == &PyStructType)
+#define PyStruct_CheckExact(op) (Py_Type(op) == &PyStructType)
 
 
 /* Exception */
@@ -104,6 +104,15 @@ typedef struct { char c; PY_LONG_LONG x; } s_long_long;
 #define LONG_LONG_ALIGN (sizeof(s_long_long) - sizeof(PY_LONG_LONG))
 #endif
 
+#ifdef HAVE_C99_BOOL
+#define BOOL_TYPE _Bool
+typedef struct { char c; _Bool x; } s_bool;
+#define BOOL_ALIGN (sizeof(s_bool) - sizeof(BOOL_TYPE))
+#else
+#define BOOL_TYPE char
+#define BOOL_ALIGN 0
+#endif
+
 #define STRINGIFY(x)    #x
 
 #ifdef __powerc
@@ -124,7 +133,7 @@ get_pylong(PyObject *v)
 		Py_INCREF(v);
 		return v;
 	}
-	m = v->ob_type->tp_as_number;
+	m = Py_Type(v)->tp_as_number;
 	if (m != NULL && m->nb_long != NULL) {
 		v = m->nb_long(v);
 		if (v == NULL)
@@ -536,6 +545,15 @@ nu_ulonglong(const char *p, const formatdef *f)
 #endif
 
 static PyObject *
+nu_bool(const char *p, const formatdef *f)
+{
+	BOOL_TYPE x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyBool_FromLong(x != 0);
+}
+
+
+static PyObject *
 nu_float(const char *p, const formatdef *f)
 {
 	float x;
@@ -711,6 +729,16 @@ np_ulonglong(char *p, PyObject *v, const formatdef *f)
 }
 #endif
 
+
+static int
+np_bool(char *p, PyObject *v, const formatdef *f)
+{
+	BOOL_TYPE y; 
+	y = PyObject_IsTrue(v);
+	memcpy(p, (char *)&y, sizeof y);
+	return 0;
+}
+
 static int
 np_float(char *p, PyObject *v, const formatdef *f)
 {
@@ -771,6 +799,7 @@ static formatdef native_table[] = {
 	{'q',	sizeof(PY_LONG_LONG), LONG_LONG_ALIGN, nu_longlong, np_longlong},
 	{'Q',	sizeof(PY_LONG_LONG), LONG_LONG_ALIGN, nu_ulonglong,np_ulonglong},
 #endif
+	{'t',	sizeof(BOOL_TYPE),	BOOL_ALIGN,	nu_bool,	np_bool},
 	{'f',	sizeof(float),	FLOAT_ALIGN,	nu_float,	np_float},
 	{'d',	sizeof(double),	DOUBLE_ALIGN,	nu_double,	np_double},
 	{'P',	sizeof(void *),	VOID_P_ALIGN,	nu_void_p,	np_void_p},
@@ -820,7 +849,7 @@ bu_longlong(const char *p, const formatdef *f)
 	} while (--i > 0);
 	/* Extend the sign bit. */
 	if (SIZEOF_LONG_LONG > f->size)
-		x |= -(x & (1L << ((8 * f->size) - 1)));
+		x |= -(x & ((PY_LONG_LONG)1 << ((8 * f->size) - 1)));
 	if (x >= LONG_MIN && x <= LONG_MAX)
 		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, PY_LONG_LONG, long));
 	return PyLong_FromLongLong(x);
@@ -863,6 +892,14 @@ static PyObject *
 bu_double(const char *p, const formatdef *f)
 {
 	return unpack_double(p, 0);
+}
+
+static PyObject *
+bu_bool(const char *p, const formatdef *f)
+{
+	char x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyBool_FromLong(x != 0);
 }
 
 static int
@@ -969,6 +1006,15 @@ bp_double(char *p, PyObject *v, const formatdef *f)
 	return _PyFloat_Pack8(x, (unsigned char *)p, 0);
 }
 
+static int
+bp_bool(char *p, PyObject *v, const formatdef *f)
+{
+	char y; 
+	y = PyObject_IsTrue(v);
+	memcpy(p, (char *)&y, sizeof y);
+	return 0;
+}
+
 static formatdef bigendian_table[] = {
 	{'x',	1,		0,		NULL},
 #ifdef PY_STRUCT_OVERFLOW_MASKING
@@ -990,6 +1036,7 @@ static formatdef bigendian_table[] = {
 	{'L',	4,		0,		bu_uint,	bp_uint},
 	{'q',	8,		0,		bu_longlong,	bp_longlong},
 	{'Q',	8,		0,		bu_ulonglong,	bp_ulonglong},
+	{'t',	1,		0,		bu_bool,	bp_bool},
 	{'f',	4,		0,		bu_float,	bp_float},
 	{'d',	8,		0,		bu_double,	bp_double},
 	{0}
@@ -1038,7 +1085,7 @@ lu_longlong(const char *p, const formatdef *f)
 	} while (i > 0);
 	/* Extend the sign bit. */
 	if (SIZEOF_LONG_LONG > f->size)
-		x |= -(x & (1L << ((8 * f->size) - 1)));
+		x |= -(x & ((PY_LONG_LONG)1 << ((8 * f->size) - 1)));
 	if (x >= LONG_MIN && x <= LONG_MAX)
 		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, PY_LONG_LONG, long));
 	return PyLong_FromLongLong(x);
@@ -1208,6 +1255,8 @@ static formatdef lilendian_table[] = {
 	{'L',	4,		0,		lu_uint,	lp_uint},
 	{'q',	8,		0,		lu_longlong,	lp_longlong},
 	{'Q',	8,		0,		lu_ulonglong,	lp_ulonglong},
+	{'t',	1,		0,		bu_bool,	bp_bool}, /* Std rep not endian dep,
+		but potentially different from native rep -- reuse bx_bool funcs. */
 	{'f',	4,		0,		lu_float,	lp_float},
 	{'d',	8,		0,		lu_double,	lp_double},
 	{0}
@@ -1438,7 +1487,7 @@ s_dealloc(PyStructObject *s)
 		PyMem_FREE(s->s_codes);
 	}
 	Py_XDECREF(s->s_format);
-	s->ob_type->tp_free((PyObject *)s);
+	Py_Type(s)->tp_free((PyObject *)s);
 }
 
 static PyObject *
@@ -1485,17 +1534,35 @@ strings.");
 static PyObject *
 s_unpack(PyObject *self, PyObject *inputstr)
 {
+	char *start;
+	Py_ssize_t len;
+	PyObject *args=NULL, *result;
 	PyStructObject *soself = (PyStructObject *)self;
 	assert(PyStruct_Check(self));
 	assert(soself->s_codes != NULL);
-	if (inputstr == NULL || !PyString_Check(inputstr) ||
-		PyString_GET_SIZE(inputstr) != soself->s_size) {
-		PyErr_Format(StructError,
-			"unpack requires a string argument of length %zd",
-			soself->s_size);
-		return NULL;
+	if (inputstr == NULL)
+		goto fail;
+	if (PyString_Check(inputstr) &&
+		PyString_GET_SIZE(inputstr) == soself->s_size) {
+			return s_unpack_internal(soself, PyString_AS_STRING(inputstr));
 	}
-	return s_unpack_internal(soself, PyString_AS_STRING(inputstr));
+	args = PyTuple_Pack(1, inputstr);
+	if (args == NULL)
+		return NULL;
+	if (!PyArg_ParseTuple(args, "s#:unpack", &start, &len))
+		goto fail;
+	if (soself->s_size != len)
+		goto fail;
+	result = s_unpack_internal(soself, start);
+	Py_DECREF(args);
+	return result;
+
+fail:
+	Py_XDECREF(args);
+	PyErr_Format(StructError,
+		"unpack requires a string argument of length %zd",
+		soself->s_size);
+	return NULL;
 }
 
 PyDoc_STRVAR(s_unpack_from__doc__,
@@ -1722,7 +1789,7 @@ static struct PyMethodDef s_methods[] = {
 	{"pack",	s_pack,		METH_VARARGS, s_pack__doc__},
 	{"pack_into",	s_pack_into,	METH_VARARGS, s_pack_into__doc__},
 	{"unpack",	s_unpack,       METH_O, s_unpack__doc__},
-	{"unpack_from",	(PyCFunction)s_unpack_from, METH_KEYWORDS,
+	{"unpack_from",	(PyCFunction)s_unpack_from, METH_VARARGS|METH_KEYWORDS,
 			s_unpack_from__doc__},
 	{NULL,	 NULL}		/* sentinel */
 };
@@ -1739,8 +1806,7 @@ static PyGetSetDef s_getsetlist[] = {
 
 static
 PyTypeObject PyStructType = {
-	PyObject_HEAD_INIT(NULL)
-	0,
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"Struct",
 	sizeof(PyStructObject),
 	0,
@@ -1790,7 +1856,7 @@ init_struct(void)
 	if (m == NULL)
 		return;
 
-	PyStructType.ob_type = &PyType_Type;
+	Py_Type(&PyStructType) = &PyType_Type;
 	if (PyType_Ready(&PyStructType) < 0)
 		return;
 

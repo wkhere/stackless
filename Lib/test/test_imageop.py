@@ -7,23 +7,16 @@
 
 from test.test_support import verbose, unlink
 
-import imageop, uu, os
+import imageop, uu, os, imgfile
 
 import warnings
-warnings.filterwarnings("ignore",
-                        "the rgbimg module is deprecated",
-                        DeprecationWarning,
-                        ".*test_imageop")
 
-def main(use_rgbimg=1):
+def main():
 
     # Create binary test files
     uu.decode(get_qualified_path('testrgb'+os.extsep+'uue'), 'test'+os.extsep+'rgb')
 
-    if use_rgbimg:
-        image, width, height = getrgbimage('test'+os.extsep+'rgb')
-    else:
-        image, width, height = getimage('test'+os.extsep+'rgb')
+    image, width, height = getimage('test'+os.extsep+'rgb')
 
     # Return the selected part of image, which should by width by height
     # in size and consist of pixels of psize bytes.
@@ -122,30 +115,10 @@ def main(use_rgbimg=1):
     # Cleanup
     unlink('test'+os.extsep+'rgb')
 
-def getrgbimage(name):
-    """return a tuple consisting of image (in 'imgfile' format but
-    using rgbimg instead) width and height"""
-
-    import rgbimg
-
-    try:
-        sizes = rgbimg.sizeofimage(name)
-    except rgbimg.error:
-        name = get_qualified_path(name)
-        sizes = rgbimg.sizeofimage(name)
-    if verbose:
-        print 'rgbimg opening test image: %s, sizes: %s' % (name, str(sizes))
-
-    image = rgbimg.longimagedata(name)
-    return (image, sizes[0], sizes[1])
-
 def getimage(name):
     """return a tuple consisting of
        image (in 'imgfile' format) width and height
     """
-
-    import imgfile
-
     try:
         sizes = imgfile.getsizes(name)
     except imgfile.error:
@@ -172,6 +145,4 @@ def get_qualified_path(name):
             return fullname
     return name
 
-# rgbimg (unlike imgfile) is portable to platforms other than SGI.
-# So we prefer to use it.
-main(use_rgbimg=1)
+main()

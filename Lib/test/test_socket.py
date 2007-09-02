@@ -75,7 +75,7 @@ class ThreadableTest:
 
     Note, the server setup function cannot call any blocking
     functions that rely on the client thread during setup,
-    unless serverExplicityReady() is called just before
+    unless serverExplicitReady() is called just before
     the blocking call (such as in setting up a client/server
     connection and performing the accept() in setUp().
     """
@@ -309,6 +309,20 @@ class GeneralModuleTests(unittest.TestCase):
             swapped = func(mask)
             self.assertEqual(swapped & mask, mask)
             self.assertRaises(OverflowError, func, 1L<<34)
+
+    def testNtoHErrors(self):
+        good_values = [ 1, 2, 3, 1L, 2L, 3L ]
+        bad_values = [ -1, -2, -3, -1L, -2L, -3L ]
+        for k in good_values:
+            socket.ntohl(k)
+            socket.ntohs(k)
+            socket.htonl(k)
+            socket.htons(k)
+        for k in bad_values:
+            self.assertRaises(OverflowError, socket.ntohl, k)
+            self.assertRaises(OverflowError, socket.ntohs, k)
+            self.assertRaises(OverflowError, socket.htonl, k)
+            self.assertRaises(OverflowError, socket.htons, k)
 
     def testGetServBy(self):
         eq = self.assertEqual
@@ -583,6 +597,13 @@ class BasicUDPTest(ThreadedUDPSocketTest):
     def _testRecvFrom(self):
         self.cli.sendto(MSG, 0, (HOST, PORT))
 
+    def testRecvFromNegative(self):
+        # Negative lengths passed to recvfrom should give ValueError.
+        self.assertRaises(ValueError, self.serv.recvfrom, -1)
+
+    def _testRecvFromNegative(self):
+        self.cli.sendto(MSG, 0, (HOST, PORT))
+
 class TCPCloserTest(ThreadedTCPSocketTest):
 
     def testClose(self):
@@ -795,6 +816,123 @@ class SmallBufferedFileObjectClassTestCase(FileObjectClassTestCase):
 
     bufsize = 2 # Exercise the buffering code
 
+
+class NetworkConnectionTest(object):
+    """Prove network connection."""
+    def clientSetUp(self):
+        self.cli = socket.create_connection((HOST, PORT))
+        self.serv_conn = self.cli
+
+class BasicTCPTest2(NetworkConnectionTest, BasicTCPTest):
+    """Tests that NetworkConnection does not break existing TCP functionality.
+    """
+
+class NetworkConnectionNoServer(unittest.TestCase):
+    def testWithoutServer(self):
+        self.failUnlessRaises(socket.error, lambda: socket.create_connection((HOST, PORT)))
+
+class NetworkConnectionAttributesTest(SocketTCPTest, ThreadableTest):
+
+    def __init__(self, methodName='runTest'):
+        SocketTCPTest.__init__(self, methodName=methodName)
+        ThreadableTest.__init__(self)
+
+    def clientSetUp(self):
+        pass
+
+    def clientTearDown(self):
+        self.cli.close()
+        self.cli = None
+        ThreadableTest.clientTearDown(self)
+
+    def _justAccept(self):
+        conn, addr = self.serv.accept()
+
+    testFamily = _justAccept
+    def _testFamily(self):
+        self.cli = socket.create_connection((HOST, PORT), timeout=30)
+        self.assertEqual(self.cli.family, 2)
+
+    testTimeoutDefault = _justAccept
+    def _testTimeoutDefault(self):
+        self.cli = socket.create_connection((HOST, PORT))
+        self.assertTrue(self.cli.gettimeout() is None)
+
+    testTimeoutValueNamed = _justAccept
+    def _testTimeoutValueNamed(self):
+        self.cli = socket.create_connection((HOST, PORT), timeout=30)
+        self.assertEqual(self.cli.gettimeout(), 30)
+
+    testTimeoutValueNonamed = _justAccept
+    def _testTimeoutValueNonamed(self):
+        self.cli = socket.create_connection((HOST, PORT), 30)
+        self.assertEqual(self.cli.gettimeout(), 30)
+
+    testTimeoutNone = _justAccept
+    def _testTimeoutNone(self):
+        previous = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(30)
+        try:
+            self.cli = socket.create_connection((HOST, PORT), timeout=None)
+        finally:
+            socket.setdefaulttimeout(previous)
+        self.assertEqual(self.cli.gettimeout(), 30)
+
+
+class NetworkConnectionBehaviourTest(SocketTCPTest, ThreadableTest):
+
+    def __init__(self, methodName='runTest'):
+        SocketTCPTest.__init__(self, methodName=methodName)
+        ThreadableTest.__init__(self)
+
+    def clientSetUp(self):
+        pass
+
+    def clientTearDown(self):
+        self.cli.close()
+        self.cli = None
+        ThreadableTest.clientTearDown(self)
+
+    def testInsideTimeout(self):
+        conn, addr = self.serv.accept()
+        time.sleep(3)
+        conn.send("done!")
+    testOutsideTimeout = testInsideTimeout
+
+    def _testInsideTimeout(self):
+        self.cli = sock = socket.create_connection((HOST, PORT))
+        data = sock.recv(5)
+        self.assertEqual(data, "done!")
+
+    def _testOutsideTimeout(self):
+        self.cli = sock = socket.create_connection((HOST, PORT), timeout=1)
+        self.failUnlessRaises(socket.timeout, lambda: sock.recv(5))
+
+
+class Urllib2FileobjectTest(unittest.TestCase):
+
+    # urllib2.HTTPHandler has "borrowed" socket._fileobject, and requires that
+    # it close the socket if the close c'tor argument is true
+
+    def testClose(self):
+        class MockSocket:
+            closed = False
+            def flush(self): pass
+            def close(self): self.closed = True
+
+        # must not close unless we request it: the original use of _fileobject
+        # by module socket requires that the underlying socket not be closed until
+        # the _socketobject that created the _fileobject is closed
+        s = MockSocket()
+        f = socket._fileobject(s)
+        f.close()
+        self.assert_(not s.closed)
+
+        s = MockSocket()
+        f = socket._fileobject(s, close=True)
+        f.close()
+        self.assert_(s.closed)
+
 class TCPTimeoutTest(SocketTCPTest):
 
     def testTCPTimeout(self):
@@ -938,7 +1076,7 @@ class BufferIOTest(SocketConnectedTest):
 
 def test_main():
     tests = [GeneralModuleTests, BasicTCPTest, TCPCloserTest, TCPTimeoutTest,
-             TestExceptions, BufferIOTest]
+             TestExceptions, BufferIOTest, BasicTCPTest2]
     if sys.platform != 'mac':
         tests.extend([ BasicUDPTest, UDPTimeoutTest ])
 
@@ -947,7 +1085,11 @@ def test_main():
         FileObjectClassTestCase,
         UnbufferedFileObjectClassTestCase,
         LineBufferedFileObjectClassTestCase,
-        SmallBufferedFileObjectClassTestCase
+        SmallBufferedFileObjectClassTestCase,
+        Urllib2FileobjectTest,
+        NetworkConnectionNoServer,
+        NetworkConnectionAttributesTest,
+        NetworkConnectionBehaviourTest,
     ])
     if hasattr(socket, "socketpair"):
         tests.append(BasicSocketPairTest)

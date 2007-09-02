@@ -126,11 +126,11 @@ Believe me, real good tape sorts were quite spectacular to watch!
 From all times, sorting has always been a Great Art! :-)
 """
 
-__all__ = ['heappush', 'heappop', 'heapify', 'heapreplace', 'nlargest',
-           'nsmallest']
+__all__ = ['heappush', 'heappop', 'heapify', 'heapreplace', 'merge',
+           'nlargest', 'nsmallest']
 
 from itertools import islice, repeat, count, imap, izip, tee
-from operator import itemgetter
+from operator import itemgetter, neg
 import bisect
 
 def heappush(heap, item):
@@ -308,6 +308,41 @@ try:
 except ImportError:
     pass
 
+def merge(*iterables):
+    '''Merge multiple sorted inputs into a single sorted output.
+
+    Similar to sorted(itertools.chain(*iterables)) but returns a generator,
+    does not pull the data into memory all at once, and assumes that each of
+    the input streams is already sorted (smallest to largest).
+
+    >>> list(merge([1,3,5,7], [0,2,4,8], [5,10,15,20], [], [25]))
+    [0, 1, 2, 3, 4, 5, 5, 7, 8, 10, 15, 20, 25]
+
+    '''
+    _heappop, _heapreplace, _StopIteration = heappop, heapreplace, StopIteration
+
+    h = []
+    h_append = h.append
+    for itnum, it in enumerate(map(iter, iterables)):
+        try:
+            next = it.next
+            h_append([next(), itnum, next])
+        except _StopIteration:
+            pass
+    heapify(h)
+
+    while 1:
+        try:
+            while 1:
+                v, itnum, next = s = h[0]   # raises IndexError when h is empty
+                yield v
+                s[0] = next()               # raises StopIteration when exhausted
+                _heapreplace(h, s)          # restore heap condition
+        except _StopIteration:
+            _heappop(h)                     # remove empty iterator
+        except IndexError:
+            return
+
 # Extend the implementations of nsmallest and nlargest to use a key= argument
 _nsmallest = nsmallest
 def nsmallest(n, iterable, key=None):
@@ -315,8 +350,6 @@ def nsmallest(n, iterable, key=None):
 
     Equivalent to:  sorted(iterable, key=key)[:n]
     """
-    if key is None:
-        return _nsmallest(n, iterable)
     in1, in2 = tee(iterable)
     it = izip(imap(key, in1), count(), in2)                 # decorate
     result = _nsmallest(n, it)
@@ -328,10 +361,8 @@ def nlargest(n, iterable, key=None):
 
     Equivalent to:  sorted(iterable, key=key, reverse=True)[:n]
     """
-    if key is None:
-        return _nlargest(n, iterable)
     in1, in2 = tee(iterable)
-    it = izip(imap(key, in1), count(), in2)                 # decorate
+    it = izip(imap(key, in1), imap(neg, count()), in2)      # decorate
     result = _nlargest(n, it)
     return map(itemgetter(2), result)                       # undecorate
 
@@ -345,3 +376,6 @@ if __name__ == "__main__":
     while heap:
         sort.append(heappop(heap))
     print sort
+
+    import doctest
+    doctest.testmod()

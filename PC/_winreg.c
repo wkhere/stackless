@@ -12,10 +12,10 @@
 
 */
 
-#include "windows.h"
 #include "Python.h"
 #include "structmember.h"
 #include "malloc.h" /* for alloca */
+#include "windows.h"
 
 static BOOL PyHKEY_AsHKEY(PyObject *ob, HKEY *pRes, BOOL bNoneOK);
 static PyObject *PyHKEY_FromHKEY(HKEY h);
@@ -460,8 +460,7 @@ static PyObject *PyHKEY_getattr(PyObject *self, const char *name);
 /* The type itself */
 PyTypeObject PyHKEY_Type =
 {
-	PyObject_HEAD_INIT(0) /* fill in type at module init */
-	0,
+	PyVarObject_HEAD_INIT(0, 0) /* fill in type at module init */
 	"PyHKEY",
 	sizeof(PyHKEYObject),
 	0,
@@ -699,7 +698,7 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
 		case REG_DWORD:
 			if (value != Py_None && !PyInt_Check(value))
 				return FALSE;
-			*retDataBuf = (BYTE *)PyMem_NEW(DWORD, sizeof(DWORD));
+			*retDataBuf = (BYTE *)PyMem_NEW(DWORD, 1);
 			if (*retDataBuf==NULL){
 				PyErr_NoMemory();
 				return FALSE;

@@ -166,7 +166,7 @@ wait()
 communicate(input=None)
     Interact with process: Send data to stdin.  Read data from stdout
     and stderr, until end-of-file is reached.  Wait for process to
-    terminate.  The optional stdin argument should be a string to be
+    terminate.  The optional input argument should be a string to be
     sent to the child process, or None, if no data should be sent to
     the child.
 
@@ -340,7 +340,7 @@ p = Popen(["mycmd", "myarg"], bufsize=bufsize,
           stdin=PIPE, stdout=PIPE, close_fds=True)
 (child_stdout, child_stdin) = (p.stdout, p.stdin)
 
-The popen2.Popen3 and popen3.Popen4 basically works as subprocess.Popen,
+The popen2.Popen3 and popen2.Popen4 basically works as subprocess.Popen,
 except that:
 
 * subprocess.Popen raises an exception if the execution fails
@@ -348,8 +348,6 @@ except that:
 * stdin=PIPE and stdout=PIPE must be specified.
 * popen2 closes all filedescriptors by default, but you have to specify
   close_fds=True with subprocess.Popen.
-
-
 """
 
 import sys
@@ -499,7 +497,7 @@ def list2cmdline(seq):
         if result:
             result.append(' ')
 
-        needquote = (" " in arg) or ("\t" in arg)
+        needquote = (" " in arg) or ("\t" in arg) or arg == ""
         if needquote:
             result.append('"')
 
@@ -547,9 +545,10 @@ class Popen(object):
             if preexec_fn is not None:
                 raise ValueError("preexec_fn is not supported on Windows "
                                  "platforms")
-            if close_fds:
+            if close_fds and (stdin is not None or stdout is not None or
+                              stderr is not None):
                 raise ValueError("close_fds is not supported on Windows "
-                                 "platforms")
+                                 "platforms if you redirect stdin/stdout/stderr")
         else:
             # POSIX
             if startupinfo is not None:
@@ -592,14 +591,30 @@ class Popen(object):
                             c2pread, c2pwrite,
                             errread, errwrite)
 
-        if p2cwrite:
+        # On Windows, you cannot just redirect one or two handles: You
+        # either have to redirect all three or none. If the subprocess
+        # user has only redirected one or two handles, we are
+        # automatically creating PIPEs for the rest. We should close
+        # these after the process is started. See bug #1124861.
+        if mswindows:
+            if stdin is None and p2cwrite is not None:
+                os.close(p2cwrite)
+                p2cwrite = None
+            if stdout is None and c2pread is not None:
+                os.close(c2pread)
+                c2pread = None
+            if stderr is None and errread is not None:
+                os.close(errread)
+                errread = None
+
+        if p2cwrite is not None:
             self.stdin = os.fdopen(p2cwrite, 'wb', bufsize)
-        if c2pread:
+        if c2pread is not None:
             if universal_newlines:
                 self.stdout = os.fdopen(c2pread, 'rU', bufsize)
             else:
                 self.stdout = os.fdopen(c2pread, 'rb', bufsize)
-        if errread:
+        if errread is not None:
             if universal_newlines:
                 self.stderr = os.fdopen(errread, 'rU', bufsize)
             else:
@@ -612,7 +627,7 @@ class Popen(object):
         return data
 
 
-    def __del__(self):
+    def __del__(self, sys=sys):
         if not self._child_created:
             # We didn't get to successfully create a child process.
             return
@@ -668,7 +683,9 @@ class Popen(object):
 
             if stdin is None:
                 p2cread = GetStdHandle(STD_INPUT_HANDLE)
-            elif stdin == PIPE:
+            if p2cread is not None:
+                pass
+            elif stdin is None or stdin == PIPE:
                 p2cread, p2cwrite = CreatePipe(None, 0)
                 # Detach and turn into fd
                 p2cwrite = p2cwrite.Detach()
@@ -682,7 +699,9 @@ class Popen(object):
 
             if stdout is None:
                 c2pwrite = GetStdHandle(STD_OUTPUT_HANDLE)
-            elif stdout == PIPE:
+            if c2pwrite is not None:
+                pass
+            elif stdout is None or stdout == PIPE:
                 c2pread, c2pwrite = CreatePipe(None, 0)
                 # Detach and turn into fd
                 c2pread = c2pread.Detach()
@@ -696,7 +715,9 @@ class Popen(object):
 
             if stderr is None:
                 errwrite = GetStdHandle(STD_ERROR_HANDLE)
-            elif stderr == PIPE:
+            if errwrite is not None:
+                pass
+            elif stderr is None or stderr == PIPE:
                 errread, errwrite = CreatePipe(None, 0)
                 # Detach and turn into fd
                 errread = errread.Detach()
@@ -784,9 +805,7 @@ class Popen(object):
                 hp, ht, pid, tid = CreateProcess(executable, args,
                                          # no special security
                                          None, None,
-                                         # must inherit handles to pass std
-                                         # handles
-                                         1,
+                                         int(not close_fds),
                                          creationflags,
                                          env,
                                          cwd,
@@ -965,6 +984,8 @@ class Popen(object):
 
             if isinstance(args, types.StringTypes):
                 args = [args]
+            else:
+                args = list(args)
 
             if shell:
                 args = ["/bin/sh", "-c"] + args
@@ -984,26 +1005,30 @@ class Popen(object):
                 # Child
                 try:
                     # Close parent's pipe ends
-                    if p2cwrite:
+                    if p2cwrite is not None:
                         os.close(p2cwrite)
-                    if c2pread:
+                    if c2pread is not None:
                         os.close(c2pread)
-                    if errread:
+                    if errread is not None:
                         os.close(errread)
                     os.close(errpipe_read)
 
                     # Dup fds for child
-                    if p2cread:
+                    if p2cread is not None:
                         os.dup2(p2cread, 0)
-                    if c2pwrite:
+                    if c2pwrite is not None:
                         os.dup2(c2pwrite, 1)
-                    if errwrite:
+                    if errwrite is not None:
                         os.dup2(errwrite, 2)
 
                     # Close pipe fds.  Make sure we don't close the same
                     # fd more than once, or standard fds.
-                    for fd in set((p2cread, c2pwrite, errwrite))-set((0,1,2)):
-                        if fd: os.close(fd)
+                    if p2cread is not None and p2cread not in (0,):
+                        os.close(p2cread)
+                    if c2pwrite is not None and c2pwrite not in (p2cread, 1):
+                        os.close(c2pwrite)
+                    if errwrite is not None and errwrite not in (p2cread, c2pwrite, 2):
+                        os.close(errwrite)
 
                     # Close all other fds, if asked for
                     if close_fds:
@@ -1035,11 +1060,11 @@ class Popen(object):
 
             # Parent
             os.close(errpipe_write)
-            if p2cread and p2cwrite:
+            if p2cread is not None and p2cwrite is not None:
                 os.close(p2cread)
-            if c2pwrite and c2pread:
+            if c2pwrite is not None and c2pread is not None:
                 os.close(c2pwrite)
-            if errwrite and errread:
+            if errwrite is not None and errread is not None:
                 os.close(errwrite)
 
             # Wait for exec to fail or succeed; possibly raising exception
@@ -1105,6 +1130,7 @@ class Popen(object):
                 read_set.append(self.stderr)
                 stderr = []
 
+            input_offset = 0
             while read_set or write_set:
                 rlist, wlist, xlist = select.select(read_set, write_set, [])
 
@@ -1112,9 +1138,9 @@ class Popen(object):
                     # When select has indicated that the file is writable,
                     # we can write up to PIPE_BUF bytes without risk
                     # blocking.  POSIX defines PIPE_BUF >= 512
-                    bytes_written = os.write(self.stdin.fileno(), input[:512])
-                    input = input[bytes_written:]
-                    if not input:
+                    bytes_written = os.write(self.stdin.fileno(), buffer(input, input_offset, 512))
+                    input_offset += bytes_written
+                    if input_offset >= len(input):
                         self.stdin.close()
                         write_set.remove(self.stdin)
 

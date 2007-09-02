@@ -32,6 +32,11 @@ MS_CORE_DLL.
 #define MS_WINCE
 #endif
 
+/* Deprecated USE_DL_EXPORT macro - please use Py_BUILD_CORE */
+#ifdef USE_DL_EXPORT
+#	define Py_BUILD_CORE
+#endif /* USE_DL_EXPORT */
+
 /* Visual Studio 2005 introduces deprecation warnings for
    "insecure" and POSIX functions. The insecure functions should
    be replaced by *_s versions (according to Microsoft); the
@@ -39,8 +44,12 @@ MS_CORE_DLL.
    would be ISO C conforming). Neither renaming is feasible, so
    we just silence the warnings. */
 
+#ifndef _CRT_SECURE_NO_DEPRECATE
 #define _CRT_SECURE_NO_DEPRECATE 1
+#endif
+#ifndef _CRT_NONSTDC_NO_DEPRECATE
 #define _CRT_NONSTDC_NO_DEPRECATE 1
+#endif
 
 /* Windows CE does not have these */
 #ifndef MS_WINCE
@@ -124,6 +133,8 @@ MS_CORE_DLL.
    defined on Win32 *and* Win64. Win32 only code must therefore be
    guarded as follows:
    	#if defined(MS_WIN32) && !defined(MS_WIN64)
+   Some modules are disabled on Itanium processors, therefore we
+   have MS_WINI64 set for those targets, otherwise MS_WINX64
 */
 #ifdef _WIN64
 #define MS_WIN64
@@ -131,16 +142,41 @@ MS_CORE_DLL.
 
 /* set the COMPILER */
 #ifdef MS_WIN64
-#ifdef _M_IX86
-#define COMPILER _Py_PASTE_VERSION("64 bit (Intel)")
-#elif defined(_M_IA64)
+#if defined(_M_IA64)
 #define COMPILER _Py_PASTE_VERSION("64 bit (Itanium)")
-#elif defined(_M_AMD64)
+#define MS_WINI64
+#elif defined(_M_X64) || defined(_M_AMD64)
 #define COMPILER _Py_PASTE_VERSION("64 bit (AMD64)")
+#define MS_WINX64
 #else
 #define COMPILER _Py_PASTE_VERSION("64 bit (Unknown)")
 #endif
 #endif /* MS_WIN64 */
+
+/* set the version macros for the windows headers */
+#ifdef MS_WINX64
+/* 64 bit only runs on XP or greater */
+#define Py_WINVER 0x0501
+#else
+/* NT 4.0 or greater required otherwise */
+#define Py_WINVER 0x0400
+#endif
+
+/* We only set these values when building Python - we don't want to force
+   these values on extensions, as that will affect the prototypes and
+   structures exposed in the Windows headers. Even when building Python, we
+   allow a single source file to override this - they may need access to
+   structures etc so it can optionally use new Windows features if it
+   determines at runtime they are available.
+*/
+#ifdef Py_BUILD_CORE
+#ifndef WINVER
+#define WINVER Py_WINVER
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT Py_WINVER
+#endif
+#endif
 
 /* _W64 is not defined for VC6 or eVC4 */
 #ifndef _W64
@@ -230,6 +266,9 @@ typedef int pid_t;
 #define COMPILER "[gcc]"
 #define hypot _hypot
 #define PY_LONG_LONG long long
+#define PY_LLONG_MIN LLONG_MIN
+#define PY_LLONG_MAX LLONG_MAX
+#define PY_ULLONG_MAX ULLONG_MAX
 #endif /* GNUC */
 
 /* ------------------------------------------------------------------------*/
@@ -255,6 +294,9 @@ typedef int pid_t;
 #define HAVE_LONG_LONG 1
 #ifndef PY_LONG_LONG
 #	define PY_LONG_LONG __int64
+#	define PY_LLONG_MAX _I64_MAX
+#	define PY_LLONG_MIN _I64_MIN
+#	define PY_ULLONG_MAX _UI64_MAX
 #endif
 
 /* For Windows the Python core is in a DLL by default.  Test
@@ -263,11 +305,6 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 #	define Py_ENABLE_SHARED 1 /* standard symbol for shared library */
 #	define MS_COREDLL	/* deprecated old symbol */
 #endif /* !MS_NO_COREDLL && ... */
-
-/* Deprecated USE_DL_EXPORT macro - please use Py_BUILD_CORE */
-#ifdef USE_DL_EXPORT
-#	define Py_BUILD_CORE
-#endif /* USE_DL_EXPORT */
 
 /*  All windows compilers that use this header support __declspec */
 #define HAVE_DECLSPEC_DLL
@@ -474,22 +511,13 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* Define if you want to have a Unicode type. */
 #define Py_USING_UNICODE
 
-/* Define as the integral type used for Unicode representation. */
-#define PY_UNICODE_TYPE unsigned short
-
 /* Define as the size of the unicode type. */
-#define Py_UNICODE_SIZE SIZEOF_SHORT
-
-/* Define if you have a useable wchar_t type defined in wchar.h; useable
-   means wchar_t must be 16-bit unsigned type. (see
-   Include/unicodeobject.h). */
-#if Py_UNICODE_SIZE == 2
-#define HAVE_USABLE_WCHAR_T
+/* This is enough for unicodeobject.h to do the "right thing" on Windows. */
+#define Py_UNICODE_SIZE 2
 
 /* Define to indicate that the Python Unicode representation can be passed
    as-is to Win32 Wide API.  */
 #define Py_WIN_WIDE_FILENAMES
-#endif
 
 /* Use Python's own small-block memory-allocator. */
 #define WITH_PYMALLOC 1

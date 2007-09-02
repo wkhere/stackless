@@ -50,7 +50,7 @@ int
 StgDict_clone(StgDictObject *dst, StgDictObject *src)
 {
 	char *d, *s;
-	int size;
+	Py_ssize_t size;
 
 	StgDict_clear(dst);
 	PyMem_Free(dst->ffi_type_pointer.elements);
@@ -72,8 +72,10 @@ StgDict_clone(StgDictObject *dst, StgDictObject *src)
 		return 0;
 	size = sizeof(ffi_type *) * (src->length + 1);
 	dst->ffi_type_pointer.elements = PyMem_Malloc(size);
-	if (dst->ffi_type_pointer.elements == NULL)
+	if (dst->ffi_type_pointer.elements == NULL) {
+		PyErr_NoMemory();
 		return -1;
+	}
 	memcpy(dst->ffi_type_pointer.elements,
 	       src->ffi_type_pointer.elements,
 	       size);
@@ -81,8 +83,7 @@ StgDict_clone(StgDictObject *dst, StgDictObject *src)
 }
 
 PyTypeObject StgDict_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"StgDict",
 	sizeof(StgDictObject),
 	0,
@@ -190,7 +191,7 @@ MakeFields(PyObject *type, CFieldObject *descr,
 			Py_DECREF(fieldlist);
 			return -1;
 		}
-		if (fdescr->ob_type != &CField_Type) {
+		if (Py_Type(fdescr) != &CField_Type) {
 			PyErr_SetString(PyExc_TypeError, "unexpected type");
 			Py_DECREF(fdescr);
 			Py_DECREF(fieldlist);
@@ -213,7 +214,7 @@ MakeFields(PyObject *type, CFieldObject *descr,
 			Py_DECREF(fieldlist);
 			return -1;
 		}
-		assert(new_descr->ob_type == &CField_Type);
+		assert(Py_Type(new_descr) == &CField_Type);
  		new_descr->size = fdescr->size;
  		new_descr->offset = fdescr->offset + offset;
  		new_descr->index = fdescr->index + index;
@@ -261,7 +262,7 @@ MakeAnonFields(PyObject *type)
 			Py_DECREF(anon_names);
 			return -1;
 		}
-		assert(descr->ob_type == &CField_Type);
+		assert(Py_Type(descr) == &CField_Type);
 		descr->anonymous = 1;
 
 		/* descr is in the field descriptor. */
@@ -287,13 +288,13 @@ int
 StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 {
 	StgDictObject *stgdict, *basedict;
-	int len, offset, size, align, i;
-	int union_size, total_align;
-	int field_size = 0;
+	Py_ssize_t len, offset, size, align, i;
+	Py_ssize_t union_size, total_align;
+	Py_ssize_t field_size = 0;
 	int bitofs;
 	PyObject *isPacked;
 	int pack = 0;
-	int ffi_ofs;
+	Py_ssize_t ffi_ofs;
 	int big_endian;
 
 	/* HACK Alert: I cannot be bothered to fix ctypes.com, so there has to
@@ -339,14 +340,14 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 	stgdict = PyType_stgdict(type);
 	if (!stgdict)
 		return -1;
+	/* If this structure/union is already marked final we cannot assign
+	   _fields_ anymore. */
+
 	if (stgdict->flags & DICTFLAG_FINAL) {/* is final ? */
 		PyErr_SetString(PyExc_AttributeError,
 				"_fields_ is final");
 		return -1;
 	}
-	/* XXX This should probably be moved to a point when all this
-	   stuff is sucessfully finished. */
-	stgdict->flags |= DICTFLAG_FINAL;	/* set final */
 
 	if (stgdict->ffi_type_pointer.elements)
 		PyMem_Free(stgdict->ffi_type_pointer.elements);
@@ -359,6 +360,10 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		total_align = align ? align : 1;
 		stgdict->ffi_type_pointer.type = FFI_TYPE_STRUCT;
 		stgdict->ffi_type_pointer.elements = PyMem_Malloc(sizeof(ffi_type *) * (basedict->length + len + 1));
+		if (stgdict->ffi_type_pointer.elements == NULL) {
+			PyErr_NoMemory();
+			return -1;
+		}
 		memset(stgdict->ffi_type_pointer.elements, 0,
 		       sizeof(ffi_type *) * (basedict->length + len + 1));
 		memcpy(stgdict->ffi_type_pointer.elements,
@@ -373,6 +378,10 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		total_align = 1;
 		stgdict->ffi_type_pointer.type = FFI_TYPE_STRUCT;
 		stgdict->ffi_type_pointer.elements = PyMem_Malloc(sizeof(ffi_type *) * (len + 1));
+		if (stgdict->ffi_type_pointer.elements == NULL) {
+			PyErr_NoMemory();
+			return -1;
+		}
 		memset(stgdict->ffi_type_pointer.elements, 0,
 		       sizeof(ffi_type *) * (len + 1));
 		ffi_ofs = 0;
@@ -396,7 +405,11 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		if (dict == NULL) {
 			Py_DECREF(pair);
 			PyErr_Format(PyExc_TypeError,
+#if (PY_VERSION_HEX < 0x02050000)
 				     "second item in _fields_ tuple (index %d) must be a C type",
+#else
+				     "second item in _fields_ tuple (index %zd) must be a C type",
+#endif
 				     i);
 			return -1;
 		}
@@ -455,13 +468,11 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 
 		if (!prop) {
 			Py_DECREF(pair);
-			Py_DECREF((PyObject *)stgdict);
 			return -1;
 		}
 		if (-1 == PyDict_SetItem(realdict, name, prop)) {
 			Py_DECREF(prop);
 			Py_DECREF(pair);
-			Py_DECREF((PyObject *)stgdict);
 			return -1;
 		}
 		Py_DECREF(pair);
@@ -474,11 +485,23 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 	/* Adjust the size according to the alignment requirements */
 	size = ((size + total_align - 1) / total_align) * total_align;
 
-	stgdict->ffi_type_pointer.alignment = total_align;
+	stgdict->ffi_type_pointer.alignment = Py_SAFE_DOWNCAST(total_align,
+							       Py_ssize_t,
+							       unsigned short);
 	stgdict->ffi_type_pointer.size = size;
 
 	stgdict->size = size;
 	stgdict->align = total_align;
 	stgdict->length = len;	/* ADD ffi_ofs? */
+
+	/* We did check that this flag was NOT set above, it must not
+	   have been set until now. */
+	if (stgdict->flags & DICTFLAG_FINAL) {
+		PyErr_SetString(PyExc_AttributeError,
+				"Structure or union cannot contain itself");
+		return -1;
+	}
+	stgdict->flags |= DICTFLAG_FINAL;
+
 	return MakeAnonFields(type);
 }

@@ -64,6 +64,27 @@ class AuthTests(unittest.TestCase):
 #                          urllib2.urlopen, "http://evil:thing@example.com")
 
 
+class CloseSocketTest(unittest.TestCase):
+
+    def test_close(self):
+        import socket, httplib, gc
+
+        # calling .close() on urllib2's response objects should close the
+        # underlying socket
+
+        # delve deep into response to fetch socket._socketobject
+        response = urllib2.urlopen("http://www.python.org/")
+        abused_fileobject = response.fp
+        self.assert_(abused_fileobject.__class__ is socket._fileobject)
+        httpresponse = abused_fileobject._sock
+        self.assert_(httpresponse.__class__ is httplib.HTTPResponse)
+        fileobject = httpresponse.fp
+        self.assert_(fileobject.__class__ is socket._fileobject)
+
+        self.assert_(not fileobject.closed)
+        response.close()
+        self.assert_(fileobject.closed)
+
 class urlopenNetworkTests(unittest.TestCase):
     """Tests urllib2.urlopen using the network.
 
@@ -152,19 +173,6 @@ class OtherNetworkTests(unittest.TestCase):
             ]
         self._test_urls(urls, self._extra_handlers())
 
-    def test_gopher(self):
-        import warnings
-        warnings.filterwarnings("ignore",
-                                "the gopherlib module is deprecated",
-                                DeprecationWarning,
-                                "urllib2$")
-        urls = [
-            # Thanks to Fred for finding these!
-            'gopher://gopher.lib.ncsu.edu./11/library/stacks/Alex',
-            'gopher://gopher.vt.edu.:10010/10/33',
-            ]
-        self._test_urls(urls, self._extra_handlers())
-
     def test_file(self):
         TESTFN = test_support.TESTFN
         f = open(TESTFN, 'w')
@@ -243,7 +251,8 @@ class OtherNetworkTests(unittest.TestCase):
                            (expected_err, url, req, err))
                     self.assert_(isinstance(err, expected_err), msg)
             else:
-                buf = f.read()
+                with test_support.transient_internet():
+                    buf = f.read()
                 f.close()
                 debug("read %d bytes" % len(buf))
             debug("******** next url coming up...")
@@ -252,19 +261,65 @@ class OtherNetworkTests(unittest.TestCase):
     def _extra_handlers(self):
         handlers = []
 
-        handlers.append(urllib2.GopherHandler)
-
         cfh = urllib2.CacheFTPHandler()
         cfh.setTimeout(1)
         handlers.append(cfh)
 
         return handlers
 
+class TimeoutTest(unittest.TestCase):
+    def test_http_basic(self):
+        u = urllib2.urlopen("http://www.python.org")
+        self.assertTrue(u.fp._sock.fp._sock.gettimeout() is None)
+
+    def test_http_NoneWithdefault(self):
+        prev = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(60)
+        try:
+            u = urllib2.urlopen("http://www.python.org", timeout=None)
+            self.assertEqual(u.fp._sock.fp._sock.gettimeout(), 60)
+        finally:
+            socket.setdefaulttimeout(prev)
+
+    def test_http_Value(self):
+        u = urllib2.urlopen("http://www.python.org", timeout=120)
+        self.assertEqual(u.fp._sock.fp._sock.gettimeout(), 120)
+
+    def test_http_NoneNodefault(self):
+        u = urllib2.urlopen("http://www.python.org", timeout=None)
+        self.assertTrue(u.fp._sock.fp._sock.gettimeout() is None)
+
+    def test_ftp_basic(self):
+        u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/")
+        self.assertTrue(u.fp.fp._sock.gettimeout() is None)
+
+    def test_ftp_NoneWithdefault(self):
+        prev = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(60)
+        try:
+            u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/", timeout=None)
+            self.assertEqual(u.fp.fp._sock.gettimeout(), 60)
+        finally:
+            socket.setdefaulttimeout(prev)
+
+    def test_ftp_NoneNodefault(self):
+        u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/", timeout=None)
+        self.assertTrue(u.fp.fp._sock.gettimeout() is None)
+
+    def test_ftp_Value(self):
+        u = urllib2.urlopen("ftp://ftp.mirror.nl/pub/mirror/gnu/", timeout=60)
+        self.assertEqual(u.fp.fp._sock.gettimeout(), 60)
+
 
 def test_main():
     test_support.requires("network")
-    test_support.run_unittest(URLTimeoutTest, urlopenNetworkTests,
-                              AuthTests, OtherNetworkTests)
+    test_support.run_unittest(URLTimeoutTest,
+                              urlopenNetworkTests,
+                              AuthTests,
+                              OtherNetworkTests,
+                              CloseSocketTest,
+                              TimeoutTest,
+                              )
 
 if __name__ == "__main__":
     test_main()

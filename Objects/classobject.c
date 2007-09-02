@@ -1319,15 +1319,17 @@ instance_contains(PyInstanceObject *inst, PyObject *member)
 
 	/* Couldn't find __contains__. */
 	if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+		Py_ssize_t rc;
 		/* Assume the failure was simply due to that there is no
 		 * __contains__ attribute, and try iterating instead.
 		 */
 		PyErr_Clear();
-		return _PySequence_IterSearch((PyObject *)inst, member,
-					      PY_ITERSEARCH_CONTAINS) > 0;
+		rc = _PySequence_IterSearch((PyObject *)inst, member,
+					    PY_ITERSEARCH_CONTAINS);
+		if (rc >= 0)
+			return rc > 0;
 	}
-	else
-		return -1;
+	return -1;
 }
 
 static PySequenceMethods
@@ -1536,6 +1538,18 @@ static PyObject *funcname(PyInstanceObject *self) { \
 	if (o == NULL) { o = PyString_InternFromString(methodname); \
 			 if (o == NULL) return NULL; } \
 	return generic_unary_op(self, o); \
+}
+
+/* unary function with a fallback */
+#define UNARY_FB(funcname, methodname, funcname_fb) \
+static PyObject *funcname(PyInstanceObject *self) { \
+	static PyObject *o; \
+	if (o == NULL) { o = PyString_InternFromString(methodname); \
+			 if (o == NULL) return NULL; } \
+	if (PyObject_HasAttr((PyObject*)self, o)) \
+		return generic_unary_op(self, o); \
+	else \
+		return funcname_fb(self); \
 }
 
 #define BINARY(f, m, n) \
@@ -1776,7 +1790,7 @@ instance_index(PyInstanceObject *self)
 
 UNARY(instance_invert, "__invert__")
 UNARY(instance_int, "__int__")
-UNARY(instance_long, "__long__")
+UNARY_FB(instance_long, "__long__", instance_int)
 UNARY(instance_float, "__float__")
 UNARY(instance_oct, "__oct__")
 UNARY(instance_hex, "__hex__")

@@ -3,6 +3,7 @@
 See http://www.zope.org/Members/fdrake/DateTimeWiki/TestCases
 """
 
+import os
 import sys
 import pickle
 import cPickle
@@ -127,7 +128,7 @@ class TestTZInfo(unittest.TestCase):
 # Base clase for testing a particular aspect of timedelta, time, date and
 # datetime comparisons.
 
-class HarmlessMixedComparison(unittest.TestCase):
+class HarmlessMixedComparison:
     # Test that __eq__ and __ne__ don't complain for mixed-type comparisons.
 
     # Subclasses must define 'theclass', and theclass(1, 1, 1) must be a
@@ -166,7 +167,7 @@ class HarmlessMixedComparison(unittest.TestCase):
 #############################################################################
 # timedelta tests
 
-class TestTimeDelta(HarmlessMixedComparison):
+class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
 
     theclass = timedelta
 
@@ -513,7 +514,7 @@ class TestDateOnly(unittest.TestCase):
 class SubclassDate(date):
     sub_var = 1
 
-class TestDate(HarmlessMixedComparison):
+class TestDate(HarmlessMixedComparison, unittest.TestCase):
     # Tests here should pass for both dates and datetimes, except for a
     # few tests that TestDateTime overrides.
 
@@ -988,7 +989,7 @@ class TestDate(HarmlessMixedComparison):
         self.failUnless(self.theclass.min)
         self.failUnless(self.theclass.max)
 
-    def test_srftime_out_of_range(self):
+    def test_strftime_out_of_range(self):
         # For nasty technical reasons, we can't handle years before 1900.
         cls = self.theclass
         self.assertEqual(cls(1900, 1, 1).strftime("%Y"), "1900")
@@ -1425,6 +1426,21 @@ class TestDateTime(TestDate):
             self.assertRaises(ValueError, self.theclass.utcfromtimestamp,
                               insane)
 
+    def test_negative_float_fromtimestamp(self):
+        # Windows doesn't accept negative timestamps
+        if os.name == "nt":
+            return
+        # The result is tz-dependent; at least test that this doesn't
+        # fail (like it did before bug 1646728 was fixed).
+        self.theclass.fromtimestamp(-1.05)
+
+    def test_negative_float_utcfromtimestamp(self):
+        # Windows doesn't accept negative timestamps
+        if os.name == "nt":
+            return
+        d = self.theclass.utcfromtimestamp(-1.05)
+        self.assertEquals(d, self.theclass(1969, 12, 31, 23, 59, 58, 950000))
+
     def test_utcnow(self):
         import time
 
@@ -1580,7 +1596,7 @@ class TestDateTime(TestDate):
 class SubclassTime(time):
     sub_var = 1
 
-class TestTime(HarmlessMixedComparison):
+class TestTime(HarmlessMixedComparison, unittest.TestCase):
 
     theclass = time
 
@@ -1740,6 +1756,11 @@ class TestTime(HarmlessMixedComparison):
         self.assertEqual(t.isoformat(), "00:00:00.100000")
         self.assertEqual(t.isoformat(), str(t))
 
+    def test_1653736(self):
+        # verify it doesn't accept extra keyword arguments
+        t = self.theclass(second=1)
+        self.assertRaises(TypeError, t.isoformat, foo=3)
+
     def test_strftime(self):
         t = self.theclass(1, 2, 3, 4)
         self.assertEqual(t.strftime('%H %M %S'), "01 02 03")
@@ -1858,7 +1879,7 @@ class TestTime(HarmlessMixedComparison):
 # A mixin for classes with a tzinfo= argument.  Subclasses must define
 # theclass as a class atribute, and theclass(1, 1, 1, tzinfo=whatever)
 # must be legit (which is true for time and datetime).
-class TZInfoBase(unittest.TestCase):
+class TZInfoBase:
 
     def test_argument_passing(self):
         cls = self.theclass
@@ -2018,7 +2039,7 @@ class TZInfoBase(unittest.TestCase):
 
 
 # Testing time objects with a non-None tzinfo.
-class TestTimeTZ(TestTime, TZInfoBase):
+class TestTimeTZ(TestTime, TZInfoBase, unittest.TestCase):
     theclass = time
 
     def test_empty(self):
@@ -2266,7 +2287,7 @@ class TestTimeTZ(TestTime, TZInfoBase):
 
 # Testing datetime objects with a non-None tzinfo.
 
-class TestDateTimeTZ(TestDateTime, TZInfoBase):
+class TestDateTimeTZ(TestDateTime, TZInfoBase, unittest.TestCase):
     theclass = datetime
 
     def test_trivial(self):
@@ -3227,45 +3248,8 @@ class Oddballs(unittest.TestCase):
         self.assertEqual(as_datetime, datetime_sc)
         self.assertEqual(datetime_sc, as_datetime)
 
-def test_suite():
-    allsuites = [unittest.makeSuite(klass, 'test')
-                 for klass in (TestModule,
-                               TestTZInfo,
-                               TestTimeDelta,
-                               TestDateOnly,
-                               TestDate,
-                               TestDateTime,
-                               TestTime,
-                               TestTimeTZ,
-                               TestDateTimeTZ,
-                               TestTimezoneConversions,
-                               Oddballs,
-                              )
-                ]
-    return unittest.TestSuite(allsuites)
-
 def test_main():
-    import gc
-    import sys
-
-    thesuite = test_suite()
-    lastrc = None
-    while True:
-        test_support.run_suite(thesuite)
-        if 1:       # change to 0, under a debug build, for some leak detection
-            break
-        gc.collect()
-        if gc.garbage:
-            raise SystemError("gc.garbage not empty after test run: %r" %
-                              gc.garbage)
-        if hasattr(sys, 'gettotalrefcount'):
-            thisrc = sys.gettotalrefcount()
-            print >> sys.stderr, '*' * 10, 'total refs:', thisrc,
-            if lastrc:
-                print >> sys.stderr, 'delta:', thisrc - lastrc
-            else:
-                print >> sys.stderr
-            lastrc = thisrc
+    test_support.run_unittest(__name__)
 
 if __name__ == "__main__":
     test_main()

@@ -14,6 +14,7 @@ class MemFunctionsTest(unittest.TestCase):
         self.failUnlessEqual(string_at(result), "Hello, World")
         self.failUnlessEqual(string_at(result, 5), "Hello")
         self.failUnlessEqual(string_at(result, 16), "Hello, World\0\0\0\0")
+        self.failUnlessEqual(string_at(result, 0), "")
 
     def test_memset(self):
         a = create_string_buffer(1000000)
@@ -29,6 +30,14 @@ class MemFunctionsTest(unittest.TestCase):
         self.failUnlessEqual(cast(a, c_char_p).value, "abcdef")
         self.failUnlessEqual(cast(a, POINTER(c_byte))[:7],
                              [97, 98, 99, 100, 101, 102, 0])
+        self.failUnlessEqual(cast(a, POINTER(c_byte))[:7:],
+                             [97, 98, 99, 100, 101, 102, 0])
+        self.failUnlessEqual(cast(a, POINTER(c_byte))[6:-1:-1],
+                             [0, 102, 101, 100, 99, 98, 97])
+        self.failUnlessEqual(cast(a, POINTER(c_byte))[:7:2],
+                             [97, 99, 101, 0])
+        self.failUnlessEqual(cast(a, POINTER(c_byte))[:7:7],
+                             [97])
 
     def test_string_at(self):
         s = string_at("foo bar")
@@ -54,6 +63,7 @@ class MemFunctionsTest(unittest.TestCase):
             self.failUnlessEqual(wstring_at(a), "Hello, World")
             self.failUnlessEqual(wstring_at(a, 5), "Hello")
             self.failUnlessEqual(wstring_at(a, 16), "Hello, World\0\0\0\0")
+            self.failUnlessEqual(wstring_at(a, 0), "")
 
 if __name__ == "__main__":
     unittest.main()

@@ -263,7 +263,6 @@ extern int lstat(const char *, struct stat *);
 #include <process.h>
 #endif
 #include "osdefs.h"
-#define _WIN32_WINNT 0x0400	  /* Needed for CryptoAPI on some systems */
 #include <windows.h>
 #include <shellapi.h>	/* for ShellExecute() */
 #define popen	_popen
@@ -844,14 +843,48 @@ check_gfax()
 	*(FARPROC*)&gfaxw = GetProcAddress(hKernel32, "GetFileAttributesExW");
 }
 
+static BOOL
+attributes_from_dir(LPCSTR pszFile, LPWIN32_FILE_ATTRIBUTE_DATA pfad)
+{
+	HANDLE hFindFile;
+	WIN32_FIND_DATAA FileData;
+	hFindFile = FindFirstFileA(pszFile, &FileData);
+	if (hFindFile == INVALID_HANDLE_VALUE)
+		return FALSE;
+	FindClose(hFindFile);
+	pfad->dwFileAttributes = FileData.dwFileAttributes;
+	pfad->ftCreationTime   = FileData.ftCreationTime;
+	pfad->ftLastAccessTime = FileData.ftLastAccessTime;
+	pfad->ftLastWriteTime  = FileData.ftLastWriteTime;
+	pfad->nFileSizeHigh    = FileData.nFileSizeHigh;
+	pfad->nFileSizeLow     = FileData.nFileSizeLow;
+	return TRUE;
+}
+
+static BOOL
+attributes_from_dir_w(LPCWSTR pszFile, LPWIN32_FILE_ATTRIBUTE_DATA pfad)
+{
+	HANDLE hFindFile;
+	WIN32_FIND_DATAW FileData;
+	hFindFile = FindFirstFileW(pszFile, &FileData);
+	if (hFindFile == INVALID_HANDLE_VALUE)
+		return FALSE;
+	FindClose(hFindFile);
+	pfad->dwFileAttributes = FileData.dwFileAttributes;
+	pfad->ftCreationTime   = FileData.ftCreationTime;
+	pfad->ftLastAccessTime = FileData.ftLastAccessTime;
+	pfad->ftLastWriteTime  = FileData.ftLastWriteTime;
+	pfad->nFileSizeHigh    = FileData.nFileSizeHigh;
+	pfad->nFileSizeLow     = FileData.nFileSizeLow;
+	return TRUE;
+}
+
 static BOOL WINAPI
 Py_GetFileAttributesExA(LPCSTR pszFile, 
 		       GET_FILEEX_INFO_LEVELS level,
                        LPVOID pv)
 {
 	BOOL result;
-	HANDLE hFindFile;
-	WIN32_FIND_DATAA FileData;
 	LPWIN32_FILE_ATTRIBUTE_DATA pfad = pv;
 	/* First try to use the system's implementation, if that is
 	   available and either succeeds to gives an error other than
@@ -873,17 +906,7 @@ Py_GetFileAttributesExA(LPCSTR pszFile,
 	   accept). */
 	if (GetFileAttributesA(pszFile) == 0xFFFFFFFF)
 		return FALSE;
-	hFindFile = FindFirstFileA(pszFile, &FileData);
-	if (hFindFile == INVALID_HANDLE_VALUE)
-		return FALSE;
-	FindClose(hFindFile);
-	pfad->dwFileAttributes = FileData.dwFileAttributes;
-	pfad->ftCreationTime   = FileData.ftCreationTime;
-	pfad->ftLastAccessTime = FileData.ftLastAccessTime;
-	pfad->ftLastWriteTime  = FileData.ftLastWriteTime;
-	pfad->nFileSizeHigh    = FileData.nFileSizeHigh;
-	pfad->nFileSizeLow     = FileData.nFileSizeLow;
-	return TRUE;
+	return attributes_from_dir(pszFile, pfad);
 }
 
 static BOOL WINAPI
@@ -892,8 +915,6 @@ Py_GetFileAttributesExW(LPCWSTR pszFile,
                        LPVOID pv)
 {
 	BOOL result;
-	HANDLE hFindFile;
-	WIN32_FIND_DATAW FileData;
 	LPWIN32_FILE_ATTRIBUTE_DATA pfad = pv;
 	/* First try to use the system's implementation, if that is
 	   available and either succeeds to gives an error other than
@@ -915,17 +936,7 @@ Py_GetFileAttributesExW(LPCWSTR pszFile,
 	   accept). */
 	if (GetFileAttributesW(pszFile) == 0xFFFFFFFF)
 		return FALSE;
-	hFindFile = FindFirstFileW(pszFile, &FileData);
-	if (hFindFile == INVALID_HANDLE_VALUE)
-		return FALSE;
-	FindClose(hFindFile);
-	pfad->dwFileAttributes = FileData.dwFileAttributes;
-	pfad->ftCreationTime   = FileData.ftCreationTime;
-	pfad->ftLastAccessTime = FileData.ftLastAccessTime;
-	pfad->ftLastWriteTime  = FileData.ftLastWriteTime;
-	pfad->nFileSizeHigh    = FileData.nFileSizeHigh;
-	pfad->nFileSizeLow     = FileData.nFileSizeLow;
-	return TRUE;
+	return attributes_from_dir_w(pszFile, pfad);
 }
 
 static int 
@@ -936,10 +947,20 @@ win32_stat(const char* path, struct win32_stat *result)
 	char *dot;
 	/* XXX not supported on Win95 and NT 3.x */
 	if (!Py_GetFileAttributesExA(path, GetFileExInfoStandard, &info)) {
-		/* Protocol violation: we explicitly clear errno, instead of
-		   setting it to a POSIX error. Callers should use GetLastError. */
-		errno = 0;
-		return -1;
+		if (GetLastError() != ERROR_SHARING_VIOLATION) {
+			/* Protocol violation: we explicitly clear errno, instead of
+			   setting it to a POSIX error. Callers should use GetLastError. */
+			errno = 0;
+			return -1;
+		} else {
+			/* Could not get attributes on open file. Fall back to
+			   reading the directory. */
+			if (!attributes_from_dir(path, &info)) {
+				/* Very strange. This should not fail now */
+				errno = 0;
+				return -1;
+			}
+		}
 	}
 	code = attribute_data_to_stat(&info, result);
 	if (code != 0)
@@ -964,10 +985,20 @@ win32_wstat(const wchar_t* path, struct win32_stat *result)
 	WIN32_FILE_ATTRIBUTE_DATA info;
 	/* XXX not supported on Win95 and NT 3.x */
 	if (!Py_GetFileAttributesExW(path, GetFileExInfoStandard, &info)) {
-		/* Protocol violation: we explicitly clear errno, instead of
-		   setting it to a POSIX error. Callers should use GetLastError. */
-		errno = 0;
-		return -1;
+		if (GetLastError() != ERROR_SHARING_VIOLATION) {
+			/* Protocol violation: we explicitly clear errno, instead of
+			   setting it to a POSIX error. Callers should use GetLastError. */
+			errno = 0;
+			return -1;
+		} else {
+			/* Could not get attributes on open file. Fall back to
+			   reading the directory. */
+			if (!attributes_from_dir_w(path, &info)) {
+				/* Very strange. This should not fail now */
+				errno = 0;
+				return -1;
+			}
+		}
 	}
 	code = attribute_data_to_stat(&info, result);
 	if (code < 0)
@@ -1462,7 +1493,7 @@ posix_do_stat(PyObject *self, PyObject *args,
 /* POSIX methods */
 
 PyDoc_STRVAR(posix_access__doc__,
-"access(path, mode) -> 1 if granted, 0 otherwise\n\n\
+"access(path, mode) -> True if granted, False otherwise\n\n\
 Use the real uid/gid to test for access to a path.  Note that most\n\
 operations will use the effective uid/gid, therefore this routine can\n\
 be used in a suid/sgid environment to test if the invoking user has the\n\
@@ -1691,6 +1722,57 @@ posix_chmod(PyObject *self, PyObject *args)
 #endif
 }
 
+
+#ifdef HAVE_CHFLAGS
+PyDoc_STRVAR(posix_chflags__doc__,
+"chflags(path, flags)\n\n\
+Set file flags.");
+
+static PyObject *
+posix_chflags(PyObject *self, PyObject *args)
+{
+	char *path;
+	unsigned long flags;
+	int res;
+	if (!PyArg_ParseTuple(args, "etk:chflags",
+			      Py_FileSystemDefaultEncoding, &path, &flags))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = chflags(path, flags);
+	Py_END_ALLOW_THREADS
+	if (res < 0)
+		return posix_error_with_allocated_filename(path);
+	PyMem_Free(path);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+#endif /* HAVE_CHFLAGS */
+
+#ifdef HAVE_LCHFLAGS
+PyDoc_STRVAR(posix_lchflags__doc__,
+"lchflags(path, flags)\n\n\
+Set file flags.\n\
+This function will not follow symbolic links.");
+
+static PyObject *
+posix_lchflags(PyObject *self, PyObject *args)
+{
+	char *path;
+	unsigned long flags;
+	int res;
+	if (!PyArg_ParseTuple(args, "etk:lchflags",
+			      Py_FileSystemDefaultEncoding, &path, &flags))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = lchflags(path, flags);
+	Py_END_ALLOW_THREADS
+	if (res < 0)
+		return posix_error_with_allocated_filename(path);
+	PyMem_Free(path);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+#endif /* HAVE_LCHFLAGS */
 
 #ifdef HAVE_CHROOT
 PyDoc_STRVAR(posix_chroot__doc__,
@@ -2511,7 +2593,7 @@ extract_time(PyObject *t, long* sec, long* usec)
 	long intval;
 	if (PyFloat_Check(t)) {
 		double tval = PyFloat_AsDouble(t);
-		PyObject *intobj = t->ob_type->tp_as_number->nb_int(t);
+		PyObject *intobj = Py_Type(t)->tp_as_number->nb_int(t);
 		if (!intobj)
 			return -1;
 		intval = PyInt_AsLong(intobj);
@@ -4758,18 +4840,19 @@ _PyPopenCreateProcess(char *cmdstring,
 			        (sizeof(modulepath)/sizeof(modulepath[0]))
 			               -strlen(modulepath));
 			if (stat(modulepath, &statinfo) != 0) {
+				size_t mplen = sizeof(modulepath)/sizeof(modulepath[0]);
 				/* Eeek - file-not-found - possibly an embedding
 				   situation - see if we can locate it in sys.prefix
 				*/
 				strncpy(modulepath,
 				        Py_GetExecPrefix(),
-				        sizeof(modulepath)/sizeof(modulepath[0]));
+				        mplen);
+				modulepath[mplen-1] = '\0';
 				if (modulepath[strlen(modulepath)-1] != '\\')
 					strcat(modulepath, "\\");
 				strncat(modulepath,
 				        szConsoleSpawn,
-				        (sizeof(modulepath)/sizeof(modulepath[0]))
-				               -strlen(modulepath));
+				        mplen-strlen(modulepath));
 				/* No where else to look - raise an easily identifiable
 				   error, rather than leaving Windows to report
 				   "file not found" - as the user is probably blissfully
@@ -5687,17 +5770,57 @@ Return a string representing the path to which the symbolic link points.");
 static PyObject *
 posix_readlink(PyObject *self, PyObject *args)
 {
+	PyObject* v;
 	char buf[MAXPATHLEN];
 	char *path;
 	int n;
-	if (!PyArg_ParseTuple(args, "s:readlink", &path))
+#ifdef Py_USING_UNICODE
+	int arg_is_unicode = 0;
+#endif
+
+	if (!PyArg_ParseTuple(args, "et:readlink", 
+				Py_FileSystemDefaultEncoding, &path))
 		return NULL;
+#ifdef Py_USING_UNICODE
+	v = PySequence_GetItem(args, 0);
+	if (v == NULL) {
+		PyMem_Free(path);
+		return NULL;
+	}
+
+	if (PyUnicode_Check(v)) {
+		arg_is_unicode = 1;
+	}
+	Py_DECREF(v);
+#endif
+
 	Py_BEGIN_ALLOW_THREADS
 	n = readlink(path, buf, (int) sizeof buf);
 	Py_END_ALLOW_THREADS
 	if (n < 0)
-		return posix_error_with_filename(path);
-	return PyString_FromStringAndSize(buf, n);
+		return posix_error_with_allocated_filename(path);
+
+	PyMem_Free(path);
+	v = PyString_FromStringAndSize(buf, n);
+#ifdef Py_USING_UNICODE
+	if (arg_is_unicode) {
+		PyObject *w;
+
+		w = PyUnicode_FromEncodedObject(v,
+				Py_FileSystemDefaultEncoding,
+				"strict");
+		if (w != NULL) {
+			Py_DECREF(v);
+			v = w;
+		}
+		else {
+			/* fall back to the original byte string, as
+			   discussed in patch #683592 */
+			PyErr_Clear();
+		}
+	}
+#endif
+	return v;
 }
 #endif /* HAVE_READLINK */
 
@@ -6139,16 +6262,23 @@ static PyObject *
 posix_fdopen(PyObject *self, PyObject *args)
 {
 	int fd;
-	char *mode = "r";
+	char *orgmode = "r";
 	int bufsize = -1;
 	FILE *fp;
 	PyObject *f;
-	if (!PyArg_ParseTuple(args, "i|si", &fd, &mode, &bufsize))
+	char *mode;
+	if (!PyArg_ParseTuple(args, "i|si", &fd, &orgmode, &bufsize))
 		return NULL;
 
-	if (mode[0] != 'r' && mode[0] != 'w' && mode[0] != 'a') {
-		PyErr_Format(PyExc_ValueError,
-			     "invalid file mode '%s'", mode);
+	/* Sanitize mode.  See fileobject.c */
+	mode = PyMem_MALLOC(strlen(orgmode)+3);
+	if (!mode) {
+		PyErr_NoMemory();
+		return NULL;
+	}
+	strcpy(mode, orgmode);
+	if (_PyFile_SanitizeMode(mode)) {
+		PyMem_FREE(mode);
 		return NULL;
 	}
 	Py_BEGIN_ALLOW_THREADS
@@ -6170,9 +6300,10 @@ posix_fdopen(PyObject *self, PyObject *args)
 	fp = fdopen(fd, mode);
 #endif
 	Py_END_ALLOW_THREADS
+	PyMem_FREE(mode);
 	if (fp == NULL)
 		return posix_error();
-	f = PyFile_FromFile(fp, "<fdopen>", mode, fclose);
+	f = PyFile_FromFile(fp, "<fdopen>", orgmode, fclose);
 	if (f != NULL)
 		PyFile_SetBufSize(f, bufsize);
 	return f;
@@ -8045,10 +8176,16 @@ static PyMethodDef posix_methods[] = {
 	{"ttyname",	posix_ttyname, METH_VARARGS, posix_ttyname__doc__},
 #endif
 	{"chdir",	posix_chdir, METH_VARARGS, posix_chdir__doc__},
+#ifdef HAVE_CHFLAGS
+	{"chflags",	posix_chflags, METH_VARARGS, posix_chflags__doc__},
+#endif /* HAVE_CHFLAGS */
 	{"chmod",	posix_chmod, METH_VARARGS, posix_chmod__doc__},
 #ifdef HAVE_CHOWN
 	{"chown",	posix_chown, METH_VARARGS, posix_chown__doc__},
 #endif /* HAVE_CHOWN */
+#ifdef HAVE_LCHFLAGS
+	{"lchflags",	posix_lchflags, METH_VARARGS, posix_lchflags__doc__},
+#endif /* HAVE_LCHFLAGS */
 #ifdef HAVE_LCHOWN
 	{"lchown",	posix_lchown, METH_VARARGS, posix_lchown__doc__},
 #endif /* HAVE_LCHOWN */

@@ -1,4 +1,4 @@
-# Copyright 2001-2005 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2007 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -22,12 +22,13 @@ Apache's log4j system.
 Should work under Python versions >= 1.5.2, except that source line
 information is not available unless 'sys._getframe()' is.
 
-Copyright (C) 2001-2004 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2007 Vinay Sajip. All Rights Reserved.
 
 To use, simply 'import logging' and log away!
 """
 
 import sys, logging, socket, types, os, string, cPickle, struct, time, glob
+from stat import ST_DEV, ST_INO
 
 try:
     import codecs
@@ -130,10 +131,8 @@ class RotatingFileHandler(BaseRotatingHandler):
                 os.remove(dfn)
             os.rename(self.baseFilename, dfn)
             #print "%s -> %s" % (self.baseFilename, dfn)
-        if self.encoding:
-            self.stream = codecs.open(self.baseFilename, 'w', self.encoding)
-        else:
-            self.stream = open(self.baseFilename, 'w')
+        self.mode = 'w'
+        self.stream = self._open()
 
     def shouldRollover(self, record):
         """
@@ -276,11 +275,57 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
                 s.sort()
                 os.remove(s[0])
         #print "%s -> %s" % (self.baseFilename, dfn)
-        if self.encoding:
-            self.stream = codecs.open(self.baseFilename, 'w', self.encoding)
-        else:
-            self.stream = open(self.baseFilename, 'w')
+        self.mode = 'w'
+        self.stream = self._open()
         self.rolloverAt = self.rolloverAt + self.interval
+
+class WatchedFileHandler(logging.FileHandler):
+    """
+    A handler for logging to a file, which watches the file
+    to see if it has changed while in use. This can happen because of
+    usage of programs such as newsyslog and logrotate which perform
+    log file rotation. This handler, intended for use under Unix,
+    watches the file to see if it has changed since the last emit.
+    (A file has changed if its device or inode have changed.)
+    If it has changed, the old file stream is closed, and the file
+    opened to get a new stream.
+
+    This handler is not appropriate for use under Windows, because
+    under Windows open files cannot be moved or renamed - logging
+    opens the files with exclusive locks - and so there is no need
+    for such a handler. Furthermore, ST_INO is not supported under
+    Windows; stat always returns zero for this value.
+
+    This handler is based on a suggestion and patch by Chad J.
+    Schroeder.
+    """
+    def __init__(self, filename, mode='a', encoding=None):
+        logging.FileHandler.__init__(self, filename, mode, encoding)
+        stat = os.stat(self.baseFilename)
+        self.dev, self.ino = stat[ST_DEV], stat[ST_INO]
+
+    def emit(self, record):
+        """
+        Emit a record.
+
+        First check if the underlying file has changed, and if it
+        has, close the old stream and reopen the file to get the
+        current stream.
+        """
+        if not os.path.exists(self.baseFilename):
+            stat = None
+            changed = 1
+        else:
+            stat = os.stat(self.baseFilename)
+            changed = (stat[ST_DEV] != self.dev) or (stat[ST_INO] != self.ino)
+        if changed:
+            self.stream.flush()
+            self.stream.close()
+            self.stream = self._open()
+            if stat is None:
+                stat = os.stat(self.baseFilename)
+            self.dev, self.ino = stat[ST_DEV], stat[ST_INO]
+        logging.FileHandler.emit(self, record)
 
 class SocketHandler(logging.Handler):
     """
@@ -316,12 +361,14 @@ class SocketHandler(logging.Handler):
         self.retryMax = 30.0
         self.retryFactor = 2.0
 
-    def makeSocket(self):
+    def makeSocket(self, timeout=1):
         """
         A factory method which allows subclasses to define the precise
         type of socket they want.
         """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if hasattr(s, 'settimeout'):
+            s.settimeout(timeout)
         s.connect((self.host, self.port))
         return s
 
@@ -343,7 +390,7 @@ class SocketHandler(logging.Handler):
             try:
                 self.sock = self.makeSocket()
                 self.retryTime = None # next time, no delay before trying
-            except:
+            except socket.error:
                 #Creation failed, so set the retry time and return.
                 if self.retryTime is None:
                     self.retryPeriod = self.retryStart
@@ -578,7 +625,8 @@ class SysLogHandler(logging.Handler):
         """
         Initialize a handler.
 
-        If address is specified as a string, UNIX socket is used.
+        If address is specified as a string, a UNIX socket is used. To log to a
+        local syslogd, "SysLogHandler(address="/dev/log")" can be used.
         If facility is not specified, LOG_USER is used.
         """
         logging.Handler.__init__(self)
@@ -586,11 +634,11 @@ class SysLogHandler(logging.Handler):
         self.address = address
         self.facility = facility
         if type(address) == types.StringType:
-            self._connect_unixsocket(address)
             self.unixsocket = 1
+            self._connect_unixsocket(address)
         else:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.unixsocket = 0
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.formatter = None
 
@@ -675,22 +723,25 @@ class SMTPHandler(logging.Handler):
     """
     A handler class which sends an SMTP email for each logging event.
     """
-    def __init__(self, mailhost, fromaddr, toaddrs, subject):
+    def __init__(self, mailhost, fromaddr, toaddrs, subject, credentials=None):
         """
         Initialize the handler.
 
         Initialize the instance with the from and to addresses and subject
         line of the email. To specify a non-standard SMTP port, use the
-        (host, port) tuple format for the mailhost argument.
+        (host, port) tuple format for the mailhost argument. To specify
+        authentication credentials, supply a (username, password) tuple
+        for the credentials argument.
         """
         logging.Handler.__init__(self)
         if type(mailhost) == types.TupleType:
-            host, port = mailhost
-            self.mailhost = host
-            self.mailport = port
+            self.mailhost, self.mailport = mailhost
         else:
-            self.mailhost = mailhost
-            self.mailport = None
+            self.mailhost, self.mailport = mailhost, None
+        if type(credentials) == types.TupleType:
+            self.username, self.password = credentials
+        else:
+            self.username = None
         self.fromaddr = fromaddr
         if type(toaddrs) == types.StringType:
             toaddrs = [toaddrs]
@@ -733,8 +784,8 @@ class SMTPHandler(logging.Handler):
         try:
             import smtplib
             try:
-                from email.Utils import formatdate
-            except:
+                from email.utils import formatdate
+            except ImportError:
                 formatdate = self.date_time
             port = self.mailport
             if not port:
@@ -746,6 +797,8 @@ class SMTPHandler(logging.Handler):
                             string.join(self.toaddrs, ","),
                             self.getSubject(record),
                             formatdate(), msg)
+            if self.username:
+                smtp.login(self.username, self.password)
             smtp.sendmail(self.fromaddr, self.toaddrs, msg)
             smtp.quit()
         except (KeyboardInterrupt, SystemExit):

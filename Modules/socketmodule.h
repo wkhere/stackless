@@ -46,6 +46,7 @@
 #include <bluetooth/rfcomm.h>
 #include <bluetooth/l2cap.h>
 #include <bluetooth/sco.h>
+#include <bluetooth/hci.h>
 #endif
 
 #ifdef HAVE_BLUETOOTH_H
@@ -98,6 +99,7 @@ typedef union sock_addr {
 	struct sockaddr_l2 bt_l2;
 	struct sockaddr_rc bt_rc;
 	struct sockaddr_sco bt_sco;
+	struct sockaddr_hci bt_hci;
 #endif
 #ifdef HAVE_NETPACKET_PACKET_H
 	struct sockaddr_ll ll;
@@ -114,7 +116,6 @@ typedef struct {
 	int sock_family;	/* Address family, e.g., AF_INET */
 	int sock_type;		/* Socket type, e.g., SOCK_STREAM */
 	int sock_proto;		/* Protocol type, usually 0 */
-	sock_addr_t sock_addr;	/* Socket address */
 	PyObject *(*errorhandler)(void); /* Error handler; checks
 					    errno, returns NULL and
 					    sets a Python exception */

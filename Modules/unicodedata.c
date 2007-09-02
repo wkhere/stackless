@@ -75,7 +75,7 @@ static PyMemberDef DB_members[] = {
         {NULL}
 };
 
-// forward declaration
+/* forward declaration */
 static PyTypeObject UCD_Type;
 
 static PyObject*
@@ -1077,8 +1077,7 @@ static PyObject *
 unicodedata_lookup(PyObject* self, PyObject* args)
 {
     Py_UCS4 code;
-    Py_UNICODE str[1];
-    char errbuf[256];
+    Py_UNICODE str[2];
 
     char* name;
     int namelen;
@@ -1086,24 +1085,20 @@ unicodedata_lookup(PyObject* self, PyObject* args)
         return NULL;
 
     if (!_getcode(self, name, namelen, &code)) {
-	/* XXX(nnorwitz): why are we allocating for the error msg?
-		Why not always use snprintf? */
-        char fmt[] = "undefined character name '%s'";
-        char *buf = PyMem_MALLOC(sizeof(fmt) + namelen);
-        if (buf)
-            sprintf(buf, fmt, name);
-        else {
-            buf = errbuf;
-            PyOS_snprintf(buf, sizeof(errbuf), fmt, name);
-        }
-        PyErr_SetString(PyExc_KeyError, buf);
-        if (buf != errbuf)
-        	PyMem_FREE(buf);
+        PyErr_Format(PyExc_KeyError, "undefined character name '%s'",
+                     name);
         return NULL;
     }
 
+#ifndef Py_UNICODE_WIDE
+    if (code >= 0x10000) {
+        str[0] = 0xd800 + ((code - 0x10000) >> 10);
+        str[1] = 0xdc00 + ((code - 0x10000) & 0x3ff);
+        return PyUnicode_FromUnicode(str, 2);
+    }
+#endif
     str[0] = (Py_UNICODE) code;
-    return PyUnicode_FromUnicode(str, 1);
+    return PyUnicode_FromUnicode(str, 1);    
 }
 
 /* XXX Add doc strings. */
@@ -1134,8 +1129,7 @@ static PyMethodDef unicodedata_functions[] = {
 static PyTypeObject UCD_Type = {
 	/* The ob_type field must be initialized in the module init function
 	 * to be portable to Windows without using C++. */
-	PyObject_HEAD_INIT(NULL)
-	0,			/*ob_size*/
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"unicodedata.UCD",		/*tp_name*/
 	sizeof(PreviousDBVersion),	/*tp_basicsize*/
 	0,			/*tp_itemsize*/
@@ -1193,7 +1187,7 @@ initunicodedata(void)
 {
     PyObject *m, *v;
 
-    UCD_Type.ob_type = &PyType_Type;
+    Py_Type(&UCD_Type) = &PyType_Type;
 
     m = Py_InitModule3(
         "unicodedata", unicodedata_functions, unicodedata_docstring);

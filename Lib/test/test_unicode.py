@@ -6,7 +6,7 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
 
 """#"
-import unittest, sys, string, codecs, new
+import unittest, sys, struct, codecs, new
 from test import test_support, string_tests
 
 # Error handling (bad decoder return)
@@ -55,9 +55,9 @@ class UnicodeTest(
     def test_literals(self):
         self.assertEqual(u'\xff', u'\u00ff')
         self.assertEqual(u'\uffff', u'\U0000ffff')
-        self.assertRaises(UnicodeError, eval, 'u\'\\Ufffffffe\'')
-        self.assertRaises(UnicodeError, eval, 'u\'\\Uffffffff\'')
-        self.assertRaises(UnicodeError, eval, 'u\'\\U%08x\'' % 0x110000)
+        self.assertRaises(SyntaxError, eval, 'u\'\\Ufffffffe\'')
+        self.assertRaises(SyntaxError, eval, 'u\'\\Uffffffff\'')
+        self.assertRaises(SyntaxError, eval, 'u\'\\U%08x\'' % 0x110000)
 
     def test_repr(self):
         if not sys.platform.startswith('java'):
@@ -817,12 +817,17 @@ class UnicodeTest(
         self.assertEqual(repr(s1()), '\\n')
         self.assertEqual(repr(s2()), '\\n')
 
-
-
+    def test_expandtabs_overflows_gracefully(self):
+        # This test only affects 32-bit platforms because expandtabs can only take
+        # an int as the max value, not a 64-bit C long.  If expandtabs is changed
+        # to take a 64-bit long, this test should apply to all platforms.
+        if sys.maxint > (1 << 32) or struct.calcsize('P') != 4:
+            return
+        self.assertRaises(OverflowError, u't\tt\t'.expandtabs, sys.maxint)
 
 
 def test_main():
-    test_support.run_unittest(UnicodeTest)
+    test_support.run_unittest(__name__)
 
 if __name__ == "__main__":
     test_main()

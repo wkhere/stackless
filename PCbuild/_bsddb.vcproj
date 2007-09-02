@@ -132,7 +132,7 @@
 			ATLMinimizesCRunTimeLibraryUsage="FALSE">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions=" /USECL:MS_ITANIUM"
+				AdditionalOptions=" /USECL:MS_ITANIUM /GS-"
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..\Include;..\PC;..\Stackless;&quot;..\..\db-4.4.20\build_win32&quot;"
@@ -215,7 +215,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions=" /MACHINE:AMD64 /USELINK:MS_SDK"
-				AdditionalDependencies="..\..\db-4.4.20\build_win32\Release_AMD64\libdb44s.lib"
+				AdditionalDependencies="..\..\db-4.4.20\build_win32\Release_AMD64\libdb44s.lib bufferoverflowU.lib"
 				OutputFile="./_bsddb.pyd"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"

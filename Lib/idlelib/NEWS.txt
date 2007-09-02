@@ -3,12 +3,39 @@ What's New in IDLE 2.6a1?
 
 *Release date: XX-XXX-200X*
 
+- Corrected some bugs in AutoComplete.  Also, Page Up/Down in ACW implemented;
+  mouse and cursor selection in ACWindow implemented; double Tab inserts
+  current selection and closes ACW (similar to double-click and Return); scroll
+  wheel now works in ACW.  Added AutoComplete instructions to IDLE Help.
+
+- AutoCompleteWindow moved below input line, will move above if there
+  isn't enough space.  Patch 1621265 Tal Einat
+
+- Calltips now 'handle' tuples in the argument list (display '<tuple>' :)
+  Suggested solution by Christos Georgiou, Bug 791968.
+
+- Add 'raw' support to configHandler. Patch 1650174 Tal Einat.
+
+- Avoid hang when encountering a duplicate in a completion list. Bug 1571112.
+
+- Patch #1362975: Rework CodeContext indentation algorithm to
+  avoid hard-coding pixel widths.
+
+- Bug #813342: Start the IDLE subprocess with -Qnew if the parent
+  is started with that option.
+
 - Some syntax errors were being caught by tokenize during the tabnanny
   check, resulting in obscure error messages.  Do the syntax check
   first.  Bug 1562716, 1562719
 
 - IDLE's version number takes a big jump to match the version number of
   the Python release of which it's a part.
+
+
+What's New in IDLE 1.2?
+=======================
+
+*Release date: 19-SEP-2006*
 
 
 What's New in IDLE 1.2c1?
@@ -40,6 +67,13 @@ What's New in IDLE 1.2b3?
 =========================
 
 *Release date: 03-AUG-2006*
+
+- Bug #1525817: Don't truncate short lines in IDLE's tool tips.
+
+- Bug #1517990: IDLE keybindings on MacOS X now work correctly
+
+- Bug #1517996: IDLE now longer shows the default Tk menu when a
+  path browser, class browser or debugger is the frontmost window on MacOS X
 
 - EditorWindow.test() was failing.  Bug 1417598
 
@@ -76,6 +110,8 @@ What's New in IDLE 1.2a1?
 =========================
 
 *Release date: 05-APR-2006*
+
+- Patch #1162825: Support non-ASCII characters in IDLE window titles.
 
 - Source file f.flush() after writing; trying to avoid lossage if user
   kills GUI.

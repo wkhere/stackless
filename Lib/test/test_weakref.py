@@ -6,6 +6,8 @@ import weakref
 
 from test import test_support
 
+# Used in ReferencesTestCase.test_ref_created_during_del() .
+ref_from_del = None
 
 class C:
     def method(self):
@@ -189,7 +191,7 @@ class ReferencesTestCase(TestBase):
     # None as the value for the callback, where either means "no
     # callback".  The "no callback" ref and proxy objects are supposed
     # to be shared so long as they exist by all callers so long as
-    # they are active.  In Python 2.3.3 and earlier, this guaranttee
+    # they are active.  In Python 2.3.3 and earlier, this guarantee
     # was not honored, and was broken in different ways for
     # PyWeakref_NewRef() and PyWeakref_NewProxy().  (Two tests.)
 
@@ -629,6 +631,18 @@ class ReferencesTestCase(TestBase):
 
         finally:
             gc.set_threshold(*thresholds)
+
+    def test_ref_created_during_del(self):
+        # Bug #1377858
+        # A weakref created in an object's __del__() would crash the
+        # interpreter when the weakref was cleaned up since it would refer to
+        # non-existent memory.  This test should not segfault the interpreter.
+        class Target(object):
+            def __del__(self):
+                global ref_from_del
+                ref_from_del = weakref.ref(self)
+
+        w = Target()
 
 
 class SubclassableWeakrefTestCase(unittest.TestCase):

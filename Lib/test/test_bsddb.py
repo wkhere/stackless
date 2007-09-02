@@ -127,6 +127,22 @@ class TestBSDDB(unittest.TestCase):
             items.append(self.f.previous())
         self.assertSetEquals(items, self.d.items())
 
+    def test_first_while_deleting(self):
+        # Test for bug 1725856
+        self.assert_(len(self.d) >= 2, "test requires >=2 items")
+        for _ in self.d:
+            key = self.f.first()[0]
+            del self.f[key]
+        self.assertEqual([], self.f.items(), "expected empty db after test")
+
+    def test_last_while_deleting(self):
+        # Test for bug 1725856's evil twin
+        self.assert_(len(self.d) >= 2, "test requires >=2 items")
+        for _ in self.d:
+            key = self.f.last()[0]
+            del self.f[key]
+        self.assertEqual([], self.f.items(), "expected empty db after test")
+
     def test_set_location(self):
         self.assertEqual(self.f.set_location('e'), ('e', self.d['e']))
 
@@ -205,7 +221,7 @@ class TestBSDDB(unittest.TestCase):
         # create iterator
         i = self.f.iteritems()
         nc2 = len(self.f._cursor_refs)
-        # use the iterator (should run to the first yeild, creating the cursor)
+        # use the iterator (should run to the first yield, creating the cursor)
         k, v = i.next()
         nc3 = len(self.f._cursor_refs)
         # destroy the iterator; this should cause the weakref callback

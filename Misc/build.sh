@@ -47,6 +47,7 @@ DIR=`dirname $DIR`
 FAILURE_SUBJECT="Python Regression Test Failures"
 #FAILURE_MAILTO="YOUR_ACCOUNT@gmail.com"
 FAILURE_MAILTO="python-checkins@python.org"
+#FAILURE_CC="optional--uncomment and set to desired address"
 
 REMOTE_SYSTEM="neal@dinsdale.python.org"
 REMOTE_DIR="/data/ftp.python.org/pub/docs.python.org/dev/"
@@ -66,7 +67,7 @@ REFLOG="build/reflog.txt.out"
 # Note: test_XXX (none currently) really leak, but are disabled
 # so we don't send spam.  Any test which really leaks should only 
 # be listed here if there are also test cases under Lib/test/leakers.
-LEAKY_TESTS="test_(XXX)"  # Currently no tests should report spurious leaks.
+LEAKY_TESTS="test_(cmd_line|popen2|socket|urllib2_localnet)"
 
 # Skip these tests altogether when looking for leaks.  These tests
 # do not need to be stored above in LEAKY_TESTS too.
@@ -91,7 +92,12 @@ update_status() {
 
 mail_on_failure() {
     if [ "$NUM_FAILURES" != "0" ]; then
-        mutt -s "$FAILURE_SUBJECT $1 ($NUM_FAILURES)" $FAILURE_MAILTO < $2
+        dest=$FAILURE_MAILTO
+        # FAILURE_CC is optional.
+        if [ "$FAILURE_CC" != "" ]; then
+            dest="$dest -c $FAILURE_CC"
+        fi
+        mutt -s "$FAILURE_SUBJECT $1 ($NUM_FAILURES)" $dest < $2
     fi
 }
 
@@ -186,7 +192,7 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             ## ensure that the reflog exists so the grep doesn't fail
             touch $REFLOG
             $PYTHON $REGRTEST_ARGS -R 4:3:$REFLOG -u network $LEAKY_SKIPS >& build/$F
-            NUM_FAILURES=`egrep -vc "$LEAKY_TESTS" $REFLOG`
+            NUM_FAILURES=`egrep -vc "($LEAKY_TESTS|sum=0)" $REFLOG`
             update_status "Testing refleaks ($NUM_FAILURES failures)" "$F" $start
             mail_on_failure "refleak" $REFLOG
 
@@ -208,8 +214,24 @@ fi
 cd $DIR/Doc
 F="make-doc.out"
 start=`current_time`
-make >& ../build/$F
-err=$?
+# XXX(nnorwitz): For now, keep the code that checks for a conflicted file until
+# after the first release of 2.6a1 or 3.0a1.  At that point, it will be clear
+# if there will be a similar problem with the new doc system.
+
+# Doc/commontex/boilerplate.tex is expected to always have an outstanding
+# modification for the date.  When a release is cut, a conflict occurs.
+# This allows us to detect this problem and not try to build the docs
+# which will definitely fail with a conflict. 
+#CONFLICTED_FILE=commontex/boilerplate.tex
+#conflict_count=`grep -c "<<<" $CONFLICTED_FILE`
+conflict_count=0
+if [ $conflict_count != 0 ]; then
+    echo "Conflict detected in $CONFLICTED_FILE.  Doc build skipped." > ../build/$F
+    err=1
+else
+    make update html >& ../build/$F
+    err=$?
+fi
 update_status "Making doc" "$F" $start
 if [ $err != 0 ]; then
     NUM_FAILURES=1
@@ -221,7 +243,6 @@ echo "</body>" >> $RESULT_FILE
 echo "</html>" >> $RESULT_FILE
 
 ## copy results
-rsync $RSYNC_OPTS html/* $REMOTE_SYSTEM:$REMOTE_DIR
+rsync $RSYNC_OPTS build/html/* $REMOTE_SYSTEM:$REMOTE_DIR
 cd ../build
 rsync $RSYNC_OPTS index.html *.out $REMOTE_SYSTEM:$REMOTE_DIR/results/
-

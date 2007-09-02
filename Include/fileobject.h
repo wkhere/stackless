@@ -30,7 +30,7 @@ typedef struct {
 PyAPI_DATA(PyTypeObject) PyFile_Type;
 
 #define PyFile_Check(op) PyObject_TypeCheck(op, &PyFile_Type)
-#define PyFile_CheckExact(op) ((op)->ob_type == &PyFile_Type)
+#define PyFile_CheckExact(op) (Py_Type(op) == &PyFile_Type)
 
 PyAPI_FUNC(PyObject *) PyFile_FromString(char *, char *);
 PyAPI_FUNC(void) PyFile_SetBufSize(PyObject *, int);
@@ -56,6 +56,11 @@ PyAPI_DATA(const char *) Py_FileSystemDefaultEncoding;
 #define PY_STDIOTEXTMODE "b"
 char *Py_UniversalNewlineFgets(char *, int, FILE*, PyObject *);
 size_t Py_UniversalNewlineFread(char *, size_t, FILE *, PyObject *);
+
+/* A routine to do sanity checking on the file mode string.  returns
+   non-zero on if an exception occurred
+*/
+int _PyFile_SanitizeMode(char *mode);
 
 #ifdef __cplusplus
 }

@@ -288,9 +288,10 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
        */
 
+       /* Declared elsewhere
+
      PyAPI_FUNC(int) PyCallable_Check(PyObject *o);
 
-       /*
 	 Determine if the object, o, is callable.  Return 1 if the
 	 object is callable and 0 otherwise.
 
@@ -1063,7 +1064,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        */
 
 #define PySequence_ITEM(o, i)\
-	( o->ob_type->tp_as_sequence->sq_item(o, i) )
+	( Py_Type(o)->tp_as_sequence->sq_item(o, i) )
        /* Assume tp_as_sequence and sq_item exist and that i does not
 	  need to be corrected for a negative index
        */     

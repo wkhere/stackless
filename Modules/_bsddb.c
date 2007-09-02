@@ -98,7 +98,7 @@
 #error "eek! DBVER can't handle minor versions > 9"
 #endif
 
-#define PY_BSDDB_VERSION "4.4.6"
+#define PY_BSDDB_VERSION "4.5.0"
 static char *rcs_id = "$Id$";
 
 
@@ -300,13 +300,13 @@ staticforward PyTypeObject DBSequence_Type;
 
 staticforward PyTypeObject DB_Type, DBCursor_Type, DBEnv_Type, DBTxn_Type, DBLock_Type;
 
-#define DBObject_Check(v)           ((v)->ob_type == &DB_Type)
-#define DBCursorObject_Check(v)     ((v)->ob_type == &DBCursor_Type)
-#define DBEnvObject_Check(v)        ((v)->ob_type == &DBEnv_Type)
-#define DBTxnObject_Check(v)        ((v)->ob_type == &DBTxn_Type)
-#define DBLockObject_Check(v)       ((v)->ob_type == &DBLock_Type)
+#define DBObject_Check(v)           (Py_Type(v) == &DB_Type)
+#define DBCursorObject_Check(v)     (Py_Type(v) == &DBCursor_Type)
+#define DBEnvObject_Check(v)        (Py_Type(v) == &DBEnv_Type)
+#define DBTxnObject_Check(v)        (Py_Type(v) == &DBTxn_Type)
+#define DBLockObject_Check(v)       (Py_Type(v) == &DBLock_Type)
 #if (DBVER >= 43)
-#define DBSequenceObject_Check(v)   ((v)->ob_type == &DBSequence_Type)
+#define DBSequenceObject_Check(v)   (Py_Type(v) == &DBSequence_Type)
 #endif
 
 
@@ -461,7 +461,7 @@ make_key_dbt(DBObject* self, PyObject* keyobj, DBT* key, int* pflags)
     else {
         PyErr_Format(PyExc_TypeError,
                      "String or Integer object expected for key, %s found",
-                     keyobj->ob_type->tp_name);
+                     Py_Type(keyobj)->tp_name);
         return 0;
     }
 
@@ -616,7 +616,7 @@ static int makeDBError(int err)
 static void makeTypeError(char* expected, PyObject* found)
 {
     PyErr_Format(PyExc_TypeError, "Expected %s argument, %s found.",
-                 expected, found->ob_type->tp_name);
+                 expected, Py_Type(found)->tp_name);
 }
 
 
@@ -749,6 +749,24 @@ static void _addIntToDict(PyObject* dict, char *name, int value)
 
     Py_XDECREF(v);
 }
+
+/* The same, when the value is a time_t */
+static void _addTimeTToDict(PyObject* dict, char *name, time_t value)
+{
+    PyObject* v;
+	/* if the value fits in regular int, use that. */
+#ifdef HAVE_LONG_LONG
+	if (sizeof(time_t) > sizeof(long))
+		v = PyLong_FromLongLong((PY_LONG_LONG) value);
+	else
+#endif
+		v = PyInt_FromLong((long) value);
+    if (!v || PyDict_SetItemString(dict, name, v))
+        PyErr_Clear();
+
+    Py_XDECREF(v);
+}
+
 #if (DBVER >= 43)
 /* add an db_seq_t to a dictionary using the given name as a key */
 static void _addDb_seq_tToDict(PyObject* dict, char *name, db_seq_t value)
@@ -1695,6 +1713,7 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
     PyObject* dataobj;
     PyObject* retval = NULL;
     DBT key, data;
+    void *orig_data;
     DB_TXN *txn = NULL;
     static char* kwnames[] = { "key", "data", "txn", "flags", NULL };
 
@@ -1714,13 +1733,12 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
     }
 
     flags |= DB_GET_BOTH;
+    orig_data = data.data;
 
     if (CHECK_DBFLAG(self, DB_THREAD)) {
         /* Tell BerkeleyDB to malloc the return value (thread safe) */
+        /* XXX(nnorwitz): At least 4.4.20 and 4.5.20 require this flag. */
         data.flags = DB_DBT_MALLOC;
-        /* TODO: Is this flag needed?  We're passing a data object that should
-                 match what's in the DB, so there should be no need to malloc.
-                 We run the risk of freeing something twice!  Check this. */
     }
 
     MYDB_BEGIN_ALLOW_THREADS;
@@ -1734,8 +1752,13 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
         retval = Py_None;
     }
     else if (!err) {
+        /* XXX(nnorwitz): can we do: retval = dataobj; Py_INCREF(retval); */
         retval = PyString_FromStringAndSize((char*)data.data, data.size);
-        FREE_DBT(data); /* Only if retrieval was successful */
+
+        /* Even though the flags require DB_DBT_MALLOC, data is not always
+           allocated.  4.4: allocated, 4.5: *not* allocated. :-( */
+        if (data.data != orig_data)
+            FREE_DBT(data);
     }
 
     FREE_DBT(key);
@@ -1779,9 +1802,7 @@ DB_get_type(DBObject* self, PyObject* args)
         return NULL;
     CHECK_DB_NOT_CLOSED(self);
 
-    MYDB_BEGIN_ALLOW_THREADS;
     type = _DB_get_type(self);
-    MYDB_END_ALLOW_THREADS;
     if (type == -1)
         return NULL;
     return PyInt_FromLong(type);
@@ -4129,6 +4150,7 @@ DBEnv_set_lk_detect(DBEnvObject* self, PyObject* args)
 }
 
 
+#if (DBVER < 45)
 static PyObject*
 DBEnv_set_lk_max(DBEnvObject* self, PyObject* args)
 {
@@ -4144,6 +4166,7 @@ DBEnv_set_lk_max(DBEnvObject* self, PyObject* args)
     RETURN_IF_ERR();
     RETURN_NONE();
 }
+#endif
 
 
 #if (DBVER >= 32)
@@ -4633,8 +4656,9 @@ DBEnv_txn_stat(DBEnvObject* self, PyObject* args)
     }
 
 #define MAKE_ENTRY(name)  _addIntToDict(d, #name, sp->st_##name)
+#define MAKE_TIME_T_ENTRY(name)_addTimeTToDict(d, #name, sp->st_##name)
 
-    MAKE_ENTRY(time_ckp);
+    MAKE_TIME_T_ENTRY(time_ckp);
     MAKE_ENTRY(last_txnid);
     MAKE_ENTRY(maxtxns);
     MAKE_ENTRY(nactive);
@@ -4647,6 +4671,7 @@ DBEnv_txn_stat(DBEnvObject* self, PyObject* args)
     MAKE_ENTRY(region_nowait);
 
 #undef MAKE_ENTRY
+#undef MAKE_TIME_T_ENTRY
     free(sp);
     return d;
 }
@@ -5233,7 +5258,9 @@ static PyMethodDef DBEnv_methods[] = {
     {"set_lg_regionmax",(PyCFunction)DBEnv_set_lg_regionmax, METH_VARARGS},
 #endif
     {"set_lk_detect",   (PyCFunction)DBEnv_set_lk_detect,    METH_VARARGS},
+#if (DBVER < 45)
     {"set_lk_max",      (PyCFunction)DBEnv_set_lk_max,       METH_VARARGS},
+#endif
 #if (DBVER >= 32)
     {"set_lk_max_locks", (PyCFunction)DBEnv_set_lk_max_locks, METH_VARARGS},
     {"set_lk_max_lockers", (PyCFunction)DBEnv_set_lk_max_lockers, METH_VARARGS},
@@ -5639,13 +5666,13 @@ DL_EXPORT(void) init_bsddb(void)
 
     /* Initialize the type of the new type objects here; doing it here
        is required for portability to Windows without requiring C++. */
-    DB_Type.ob_type = &PyType_Type;
-    DBCursor_Type.ob_type = &PyType_Type;
-    DBEnv_Type.ob_type = &PyType_Type;
-    DBTxn_Type.ob_type = &PyType_Type;
-    DBLock_Type.ob_type = &PyType_Type;
+    Py_Type(&DB_Type) = &PyType_Type;
+    Py_Type(&DBCursor_Type) = &PyType_Type;
+    Py_Type(&DBEnv_Type) = &PyType_Type;
+    Py_Type(&DBTxn_Type) = &PyType_Type;
+    Py_Type(&DBLock_Type) = &PyType_Type;
 #if (DBVER >= 43)    
-    DBSequence_Type.ob_type = &PyType_Type;
+    Py_Type(&DBSequence_Type) = &PyType_Type;
 #endif    
 
 
@@ -5835,7 +5862,9 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_AFTER);
     ADD_INT(d, DB_APPEND);
     ADD_INT(d, DB_BEFORE);
+#if (DBVER < 45)
     ADD_INT(d, DB_CACHED_COUNTS);
+#endif
 #if (DBVER >= 41)
     _addIntToDict(d, "DB_CHECKPOINT", 0);
 #else
@@ -5870,7 +5899,9 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_POSITION);
     ADD_INT(d, DB_PREV);
     ADD_INT(d, DB_PREV_NODUP);
+#if (DBVER < 45)
     ADD_INT(d, DB_RECORDCOUNT);
+#endif
     ADD_INT(d, DB_SET);
     ADD_INT(d, DB_SET_RANGE);
     ADD_INT(d, DB_SET_RECNO);

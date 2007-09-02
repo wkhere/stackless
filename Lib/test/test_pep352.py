@@ -2,9 +2,16 @@ import unittest
 import __builtin__
 import exceptions
 import warnings
-from test.test_support import run_unittest
+from test.test_support import run_unittest, catch_warning
 import os
 from platform import system as platform_system
+
+def ignore_message_warning():
+    """Ignore the DeprecationWarning for BaseException.message."""
+    warnings.resetwarnings()
+    warnings.filterwarnings("ignore", "BaseException.message",
+                            DeprecationWarning)
+
 
 class ExceptionClassTests(unittest.TestCase):
 
@@ -15,9 +22,13 @@ class ExceptionClassTests(unittest.TestCase):
         self.failUnless(issubclass(Exception, object))
 
     def verify_instance_interface(self, ins):
-        for attr in ("args", "message", "__str__", "__repr__", "__getitem__"):
-            self.failUnless(hasattr(ins, attr), "%s missing %s attribute" %
-                    (ins.__class__.__name__, attr))
+        with catch_warning():
+            ignore_message_warning()
+            for attr in ("args", "message", "__str__", "__repr__",
+                            "__getitem__"):
+                self.failUnless(hasattr(ins, attr),
+                        "%s missing %s attribute" %
+                            (ins.__class__.__name__, attr))
 
     def test_inheritance(self):
         # Make sure the inheritance hierarchy matches the documentation
@@ -84,42 +95,99 @@ class ExceptionClassTests(unittest.TestCase):
         # Make sure interface works properly when given a single argument
         arg = "spam"
         exc = Exception(arg)
-        results = ([len(exc.args), 1], [exc.args[0], arg], [exc.message, arg],
-                [str(exc), str(arg)], [unicode(exc), unicode(arg)],
-            [repr(exc), exc.__class__.__name__ + repr(exc.args)], [exc[0], arg])
-        self.interface_test_driver(results)
+        with catch_warning():
+            ignore_message_warning()
+            results = ([len(exc.args), 1], [exc.args[0], arg],
+                    [exc.message, arg],
+                    [str(exc), str(arg)], [unicode(exc), unicode(arg)],
+                [repr(exc), exc.__class__.__name__ + repr(exc.args)], [exc[0],
+                arg])
+            self.interface_test_driver(results)
 
     def test_interface_multi_arg(self):
         # Make sure interface correct when multiple arguments given
         arg_count = 3
         args = tuple(range(arg_count))
         exc = Exception(*args)
-        results = ([len(exc.args), arg_count], [exc.args, args],
-                [exc.message, ''], [str(exc), str(args)],
-                [unicode(exc), unicode(args)],
-                [repr(exc), exc.__class__.__name__ + repr(exc.args)],
-                [exc[-1], args[-1]])
-        self.interface_test_driver(results)
+        with catch_warning():
+            ignore_message_warning()
+            results = ([len(exc.args), arg_count], [exc.args, args],
+                    [exc.message, ''], [str(exc), str(args)],
+                    [unicode(exc), unicode(args)],
+                    [repr(exc), exc.__class__.__name__ + repr(exc.args)],
+                    [exc[-1], args[-1]])
+            self.interface_test_driver(results)
 
     def test_interface_no_arg(self):
         # Make sure that with no args that interface is correct
         exc = Exception()
-        results = ([len(exc.args), 0], [exc.args, tuple()], [exc.message, ''],
-                [str(exc), ''], [unicode(exc), u''],
-                [repr(exc), exc.__class__.__name__ + '()'], [True, True])
-        self.interface_test_driver(results)
+        with catch_warning():
+            ignore_message_warning()
+            results = ([len(exc.args), 0], [exc.args, tuple()],
+                    [exc.message, ''],
+                    [str(exc), ''], [unicode(exc), u''],
+                    [repr(exc), exc.__class__.__name__ + '()'], [True, True])
+            self.interface_test_driver(results)
+
+
+    def test_message_deprecation(self):
+        # As of Python 2.6, BaseException.message is deprecated.
+        with catch_warning():
+            warnings.resetwarnings()
+            warnings.filterwarnings('error')
+
+            try:
+                BaseException().message
+            except DeprecationWarning:
+                pass
+            else:
+                self.fail("BaseException.message not deprecated")
+
+            exc = BaseException()
+            try:
+                exc.message = ''
+            except DeprecationWarning:
+                pass
+            else:
+                self.fail("BaseException.message assignment not deprecated")
 
 class UsageTests(unittest.TestCase):
 
     """Test usage of exceptions"""
 
-    def setUp(self):
-        self._filters = warnings.filters[:]
+    def raise_fails(self, object_):
+        """Make sure that raising 'object_' triggers a TypeError."""
+        try:
+            raise object_
+        except TypeError:
+            return  # What is expected.
+        self.fail("TypeError expected for raising %s" % type(object_))
 
-    def tearDown(self):
-        warnings.filters = self._filters[:]
+    def catch_fails(self, object_):
+        """Catching 'object_' should raise a TypeError."""
+        try:
+            try:
+                raise StandardError
+            except object_:
+                pass
+        except TypeError:
+            pass
+        except StandardError:
+            self.fail("TypeError expected when catching %s" % type(object_))
+
+        try:
+            try:
+                raise StandardError
+            except (object_,):
+                pass
+        except TypeError:
+            return
+        except StandardError:
+            self.fail("TypeError expected when catching %s as specified in a "
+                        "tuple" % type(object_))
 
     def test_raise_classic(self):
+        # Raising a classic class is okay (for now).
         class ClassicClass:
             pass
         try:
@@ -136,42 +204,48 @@ class UsageTests(unittest.TestCase):
             self.fail("unable to raise class class instance")
 
     def test_raise_new_style_non_exception(self):
+        # You cannot raise a new-style class that does not inherit from
+        # BaseException; the ability was not possible until BaseException's
+        # introduction so no need to support new-style objects that do not
+        # inherit from it.
         class NewStyleClass(object):
             pass
-        try:
-            raise NewStyleClass
-        except TypeError:
-            pass
-        except:
-            self.fail("unable to raise new-style class")
-        try:
-            raise NewStyleClass()
-        except TypeError:
-            pass
-        except:
-            self.fail("unable to raise new-style class instance")
+        self.raise_fails(NewStyleClass)
+        self.raise_fails(NewStyleClass())
 
     def test_raise_string(self):
-        warnings.resetwarnings()
-        warnings.filterwarnings("error")
-        try:
-            raise "spam"
-        except DeprecationWarning:
-            pass
-        except:
-            self.fail("raising a string did not cause a DeprecationWarning")
+        # Raising a string raises TypeError.
+        self.raise_fails("spam")
 
     def test_catch_string(self):
-        # Test will be pertinent when catching exceptions raises a
-        #   DeprecationWarning
-        warnings.filterwarnings("ignore", "raising")
-        str_exc = "spam"
-        try:
-            raise str_exc
-        except str_exc:
-            pass
-        except:
-            self.fail("catching a string exception failed")
+        # Catching a string should trigger a DeprecationWarning.
+        with catch_warning():
+            warnings.resetwarnings()
+            warnings.filterwarnings("error")
+            str_exc = "spam"
+            try:
+                try:
+                    raise StandardError
+                except str_exc:
+                    pass
+            except DeprecationWarning:
+                pass
+            except StandardError:
+                self.fail("catching a string exception did not raise "
+                            "DeprecationWarning")
+            # Make sure that even if the string exception is listed in a tuple
+            # that a warning is raised.
+            try:
+                try:
+                    raise StandardError
+                except (AssertionError, str_exc):
+                    pass
+            except DeprecationWarning:
+                pass
+            except StandardError:
+                self.fail("catching a string exception specified in a tuple did "
+                            "not raise DeprecationWarning")
+
 
 def test_main():
     run_unittest(ExceptionClassTests, UsageTests)

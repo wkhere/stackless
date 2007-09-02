@@ -23,8 +23,7 @@ ellipsis_repr(PyObject *op)
 }
 
 static PyTypeObject PyEllipsis_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"ellipsis",			/* tp_name */
 	0,				/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -47,7 +46,8 @@ static PyTypeObject PyEllipsis_Type = {
 };
 
 PyObject _Py_EllipsisObject = {
-	PyObject_HEAD_INIT(&PyEllipsis_Type)
+	_PyObject_EXTRA_INIT
+	1, &PyEllipsis_Type
 };
 
 
@@ -274,9 +274,19 @@ indices, and the stride length of the extended slice described by\n\
 S. Out of bounds indices are clipped in a manner consistent with the\n\
 handling of normal slices.");
 
+static PyObject *
+slice_reduce(PySliceObject* self)
+{
+	return Py_BuildValue("O(OOO)", Py_Type(self), self->start, self->stop, self->step);
+}
+
+PyDoc_STRVAR(reduce_doc, "Return state information for pickling.");
+
 static PyMethodDef slice_methods[] = {
 	{"indices",	(PyCFunction)slice_indices,
 	 METH_O,	slice_indices_doc},
+	{"__reduce__",	(PyCFunction)slice_reduce,
+	 METH_NOARGS,	reduce_doc},
 	{NULL, NULL}
 };
 
@@ -309,8 +319,7 @@ slice_hash(PySliceObject *v)
 }
 
 PyTypeObject PySlice_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,			/* Number of items for varobject */
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"slice",		/* Name of this type */
 	sizeof(PySliceObject),	/* Basic object size */
 	0,			/* Item size for varobject */

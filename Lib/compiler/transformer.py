@@ -930,7 +930,7 @@ class Transformer:
         for i in range(3, len(nodelist), 3):
             node = nodelist[i]
             if node[0] == symbol.except_clause:
-                # except_clause: 'except' [expr [',' expr]] */
+                # except_clause: 'except' [expr [(',' | 'as') expr]] */
                 if len(node) > 2:
                     expr1 = self.com_node(node[2])
                     if len(node) > 4:
@@ -960,7 +960,7 @@ class Transformer:
         if nodelist[2][0] == token.COLON:
             var = None
         else:
-            var = self.com_node(nodelist[2])
+            var = self.com_assign(nodelist[2][2], OP_ASSIGN)
         return With(expr, var, body, lineno=nodelist[0][2])
 
     def com_with_var(self, nodelist):
