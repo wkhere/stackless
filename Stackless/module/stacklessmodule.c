@@ -285,7 +285,7 @@ get_thread_info(PyObject *self, PyObject *args)
 	PyInterpreterState *interp = ts->interp;
 	long id = 0;
 
-	if (!PyArg_ParseTuple(args, "|i:get_thread_info", &id))
+	if (!PyArg_ParseTuple(args, "|l:get_thread_info", &id))
 		return NULL;
 	for (ts = interp->tstate_head; id && ts != NULL; ts = ts->next) {
 		if (ts->thread_id == id)
