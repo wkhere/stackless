@@ -1029,6 +1029,15 @@ PyObject *_CallProc(PPROC pProc,
 	return retval;
 }
 
+static int
+_parse_voidp(PyObject *obj, void **address)
+{
+	*address = PyLong_AsVoidPtr(obj);
+	if (*address == NULL)
+		return 0;
+	return 1;
+}
+
 #ifdef MS_WIN32
 
 #ifdef _UNICODE
@@ -1111,10 +1120,10 @@ static char free_library_doc[] =
 Free the handle of an executable previously loaded by LoadLibrary.\n";
 static PyObject *free_library(PyObject *self, PyObject *args)
 {
-	HMODULE hMod;
-	if (!PyArg_ParseTuple(args, "i:FreeLibrary", &hMod))
+	void *hMod;
+	if (!PyArg_ParseTuple(args, "O&:FreeLibrary", &_parse_voidp, &hMod))
 		return NULL;
-	if (!FreeLibrary(hMod))
+	if (!FreeLibrary((HMODULE)hMod))
 		return PyErr_SetFromWindowsErr(GetLastError());
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -1233,9 +1242,9 @@ static PyObject *py_dl_open(PyObject *self, PyObject *args)
 
 static PyObject *py_dl_close(PyObject *self, PyObject *args)
 {
-	void * handle;
+	void *handle;
 
-	if (!PyArg_ParseTuple(args, "i:dlclose", &handle))
+	if (!PyArg_ParseTuple(args, "O&:dlclose", &_parse_voidp, &handle))
 		return NULL;
 	if (dlclose(handle)) {
 		PyErr_SetString(PyExc_OSError,
@@ -1252,7 +1261,8 @@ static PyObject *py_dl_sym(PyObject *self, PyObject *args)
 	void *handle;
 	void *ptr;
 
-	if (!PyArg_ParseTuple(args, "is:dlsym", &handle, &name))
+	if (!PyArg_ParseTuple(args, "O&s:dlsym",
+			      &_parse_voidp, &handle, &name))
 		return NULL;
 	ptr = ctypes_dlsym(handle, name);
 	if (!ptr) {
@@ -1260,7 +1270,7 @@ static PyObject *py_dl_sym(PyObject *self, PyObject *args)
 				       ctypes_dlerror());
 		return NULL;
 	}
-	return Py_BuildValue("i", ptr);
+	return PyLong_FromVoidPtr(ptr);
 }
 #endif
 
@@ -1272,13 +1282,13 @@ static PyObject *py_dl_sym(PyObject *self, PyObject *args)
 static PyObject *
 call_function(PyObject *self, PyObject *args)
 {
-	PPROC func;
+	void *func;
 	PyObject *arguments;
 	PyObject *result;
 
 	if (!PyArg_ParseTuple(args,
-			      "iO!",
-			      &func,
+			      "O&O!",
+			      &_parse_voidp, &func,
 			      &PyTuple_Type, &arguments))
 		return NULL;
 
@@ -1303,13 +1313,13 @@ call_function(PyObject *self, PyObject *args)
 static PyObject *
 call_cdeclfunction(PyObject *self, PyObject *args)
 {
-	PPROC func;
+	void *func;
 	PyObject *arguments;
 	PyObject *result;
 
 	if (!PyArg_ParseTuple(args,
-			      "iO!",
-			      &func,
+			      "O&O!",
+			      &_parse_voidp, &func,
 			      &PyTuple_Type, &arguments))
 		return NULL;
 

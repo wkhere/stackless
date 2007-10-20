@@ -425,7 +425,19 @@ make_key_dbt(DBObject* self, PyObject* keyobj, DBT* key, int* pflags)
             return 0;
         }
 
-        key->data = PyString_AS_STRING(keyobj);
+        /*
+         * NOTE(gps): I don't like doing a data copy here, it seems
+         * wasteful.  But without a clean way to tell FREE_DBT if it
+         * should free key->data or not we have to.  Other places in
+         * the code check for DB_THREAD and forceably set DBT_MALLOC
+         * when we otherwise would leave flags 0 to indicate that.
+         */
+        key->data = strdup(PyString_AS_STRING(keyobj));
+        if (key->data == NULL) {
+            PyErr_SetString(PyExc_MemoryError, "Key memory allocation failed");
+            return 0;
+        }
+        key->flags = DB_DBT_REALLOC;
         key->size = PyString_GET_SIZE(keyobj);
     }
 
@@ -1695,6 +1707,7 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
     PyObject* dataobj;
     PyObject* retval = NULL;
     DBT key, data;
+    void *orig_data;
     DB_TXN *txn = NULL;
     static char* kwnames[] = { "key", "data", "txn", "flags", NULL };
 
@@ -1714,13 +1727,12 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
     }
 
     flags |= DB_GET_BOTH;
+    orig_data = data.data;
 
     if (CHECK_DBFLAG(self, DB_THREAD)) {
         /* Tell BerkeleyDB to malloc the return value (thread safe) */
+        /* XXX(nnorwitz): At least 4.4.20 and 4.5.20 require this flag. */
         data.flags = DB_DBT_MALLOC;
-        /* TODO: Is this flag needed?  We're passing a data object that should
-                 match what's in the DB, so there should be no need to malloc.
-                 We run the risk of freeing something twice!  Check this. */
     }
 
     MYDB_BEGIN_ALLOW_THREADS;
@@ -1734,8 +1746,13 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
         retval = Py_None;
     }
     else if (!err) {
+        /* XXX(nnorwitz): can we do: retval = dataobj; Py_INCREF(retval); */
         retval = PyString_FromStringAndSize((char*)data.data, data.size);
-        FREE_DBT(data); /* Only if retrieval was successful */
+
+        /* Even though the flags require DB_DBT_MALLOC, data is not always
+           allocated.  4.4: allocated, 4.5: *not* allocated. :-( */
+        if (data.data != orig_data)
+            FREE_DBT(data);
     }
 
     FREE_DBT(key);
@@ -4878,14 +4895,20 @@ DBSequence_get_key(DBSequenceObject* self, PyObject* args)
 {
     int err;
     DBT key;
+    PyObject *retval;
+    key.flags = DB_DBT_MALLOC;
     CHECK_SEQUENCE_NOT_CLOSED(self)
     MYDB_BEGIN_ALLOW_THREADS
     err = self->sequence->get_key(self->sequence, &key);
     MYDB_END_ALLOW_THREADS
 
+    if (!err)
+        retval = PyString_FromStringAndSize(key.data, key.size); 
+
+    FREE_DBT(key);
     RETURN_IF_ERR();
 
-    return PyString_FromStringAndSize(key.data, key.size);
+    return retval;
 }
 
 static PyObject*
