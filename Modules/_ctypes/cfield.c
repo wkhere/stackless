@@ -989,6 +989,29 @@ Q_get_sw(void *ptr, Py_ssize_t size)
  */
 
 
+static PyObject *
+D_set(void *ptr, PyObject *value, Py_ssize_t size)
+{
+	long double x;
+
+	x = PyFloat_AsDouble(value);
+	if (x == -1 && PyErr_Occurred()) {
+		PyErr_Format(PyExc_TypeError,
+			     " float expected instead of %s instance",
+			     value->ob_type->tp_name);
+		return NULL;
+	}
+	memcpy(ptr, &x, sizeof(long double));
+	_RET(value);
+}
+
+static PyObject *
+D_get(void *ptr, Py_ssize_t size)
+{
+	long double val;
+	memcpy(&val, ptr, sizeof(long double));
+	return PyFloat_FromDouble(val);
+}
 
 static PyObject *
 d_set(void *ptr, PyObject *value, Py_ssize_t size)
@@ -1584,6 +1607,7 @@ static struct fielddesc formattable[] = {
 	{ 'B', B_set, B_get, &ffi_type_uchar},
 	{ 'c', c_set, c_get, &ffi_type_schar},
 	{ 'd', d_set, d_get, &ffi_type_double, d_set_sw, d_get_sw},
+	{ 'D', D_set, D_get, &ffi_type_longdouble},
 	{ 'f', f_set, f_get, &ffi_type_float, f_set_sw, f_get_sw},
 	{ 'h', h_set, h_get, &ffi_type_sshort, h_set_sw, h_get_sw},
 	{ 'H', H_set, H_get, &ffi_type_ushort, H_set_sw, H_get_sw},
@@ -1592,17 +1616,21 @@ static struct fielddesc formattable[] = {
 /* XXX Hm, sizeof(int) == sizeof(long) doesn't hold on every platform */
 /* As soon as we can get rid of the type codes, this is no longer a problem */
 #if SIZEOF_LONG == 4
-	{ 'l', l_set, l_get, &ffi_type_sint, l_set_sw, l_get_sw},
-	{ 'L', L_set, L_get, &ffi_type_uint, L_set_sw, L_get_sw},
+	{ 'l', l_set, l_get, &ffi_type_sint32, l_set_sw, l_get_sw},
+	{ 'L', L_set, L_get, &ffi_type_uint32, L_set_sw, L_get_sw},
 #elif SIZEOF_LONG == 8
-	{ 'l', l_set, l_get, &ffi_type_slong, l_set_sw, l_get_sw},
-	{ 'L', L_set, L_get, &ffi_type_ulong, L_set_sw, L_get_sw},
+	{ 'l', l_set, l_get, &ffi_type_sint64, l_set_sw, l_get_sw},
+	{ 'L', L_set, L_get, &ffi_type_uint64, L_set_sw, L_get_sw},
 #else
 # error
 #endif
 #ifdef HAVE_LONG_LONG
-	{ 'q', q_set, q_get, &ffi_type_slong, q_set_sw, q_get_sw},
-	{ 'Q', Q_set, Q_get, &ffi_type_ulong, Q_set_sw, Q_get_sw},
+#if SIZEOF_LONG_LONG == 8
+	{ 'q', q_set, q_get, &ffi_type_sint64, q_set_sw, q_get_sw},
+	{ 'Q', Q_set, Q_get, &ffi_type_uint64, Q_set_sw, Q_get_sw},
+#else
+# error
+#endif
 #endif
 	{ 'P', P_set, P_get, &ffi_type_pointer},
 	{ 'z', z_set, z_get, &ffi_type_pointer},
@@ -1666,6 +1694,7 @@ typedef struct { char c; int x; } s_int;
 typedef struct { char c; long x; } s_long;
 typedef struct { char c; float x; } s_float;
 typedef struct { char c; double x; } s_double;
+typedef struct { char c; long double x; } s_long_double;
 typedef struct { char c; char *x; } s_char_p;
 typedef struct { char c; void *x; } s_void_p;
 
@@ -1677,6 +1706,8 @@ typedef struct { char c; void *x; } s_void_p;
 */
 #define FLOAT_ALIGN (sizeof(s_float) - sizeof(float))
 #define DOUBLE_ALIGN (sizeof(s_double) - sizeof(double))
+#define LONGDOUBLE_ALIGN (sizeof(s_long_double) - sizeof(long double))
+
 /* #define CHAR_P_ALIGN (sizeof(s_char_p) - sizeof(char*)) */
 #define VOID_P_ALIGN (sizeof(s_void_p) - sizeof(void*))
 
@@ -1722,6 +1753,8 @@ ffi_type ffi_type_sint64 = { 8, LONG_LONG_ALIGN, FFI_TYPE_SINT64 };
 
 ffi_type ffi_type_float = { sizeof(float), FLOAT_ALIGN, FFI_TYPE_FLOAT };
 ffi_type ffi_type_double = { sizeof(double), DOUBLE_ALIGN, FFI_TYPE_DOUBLE };
+ffi_type ffi_type_longdouble = { sizeof(long double), LONGDOUBLE_ALIGN,
+				 FFI_TYPE_LONGDOUBLE };
 
 /* ffi_type ffi_type_longdouble */
 

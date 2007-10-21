@@ -997,8 +997,13 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 		ts->st.nesting_level = 0;
 	}
 
-	/* update what's not yet updated */
-	assert(ts->recursion_depth == 0);
+	/* update what's not yet updated
+	Normal tasklets when created have no recursion depth yet, but the main
+	tasklet is initialized in the middle of an existing indeterminate call
+	stack.  Therefore it is not guaranteed that there is not a pre-existing
+	recursion depth from before its initialization.
+	*/
+	assert(ts->recursion_depth == 0 || ts->st.main == NULL && ts->st.current == NULL && prev == next);
 	prev->recursion_depth = 0;
 	assert(ts->frame == NULL);
 	prev->f.frame = NULL;

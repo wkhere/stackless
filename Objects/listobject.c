@@ -282,19 +282,28 @@ list_print(PyListObject *op, FILE *fp, int flags)
 	if (rc != 0) {
 		if (rc < 0)
 			return rc;
+		Py_BEGIN_ALLOW_THREADS
 		fprintf(fp, "[...]");
+		Py_END_ALLOW_THREADS
 		return 0;
 	}
+	Py_BEGIN_ALLOW_THREADS
 	fprintf(fp, "[");
+	Py_END_ALLOW_THREADS
 	for (i = 0; i < Py_Size(op); i++) {
-		if (i > 0)
+		if (i > 0) {
+			Py_BEGIN_ALLOW_THREADS
 			fprintf(fp, ", ");
+			Py_END_ALLOW_THREADS
+		}
 		if (PyObject_Print(op->ob_item[i], fp, 0) != 0) {
 			Py_ReprLeave((PyObject *)op);
 			return -1;
 		}
 	}
+	Py_BEGIN_ALLOW_THREADS
 	fprintf(fp, "]");
+	Py_END_ALLOW_THREADS
 	Py_ReprLeave((PyObject *)op);
 	return 0;
 }
@@ -324,7 +333,10 @@ list_repr(PyListObject *v)
 	   so must refetch the list size on each iteration. */
 	for (i = 0; i < Py_Size(v); ++i) {
 		int status;
+		if (Py_EnterRecursiveCall(" while getting the repr of a list"))
+			goto Done;
 		s = PyObject_Repr(v->ob_item[i]);
+		Py_LeaveRecursiveCall();
 		if (s == NULL)
 			goto Done;
 		status = PyList_Append(pieces, s);
@@ -487,10 +499,10 @@ list_repeat(PyListObject *a, Py_ssize_t n)
 	if (n < 0)
 		n = 0;
 	size = Py_Size(a) * n;
-	if (size == 0)
-              return PyList_New(0);
 	if (n && size/n != Py_Size(a))
 		return PyErr_NoMemory();
+	if (size == 0)
+              return PyList_New(0);
 	np = (PyListObject *) PyList_New(size);
 	if (np == NULL)
 		return NULL;
@@ -657,7 +669,7 @@ static PyObject *
 list_inplace_repeat(PyListObject *self, Py_ssize_t n)
 {
 	PyObject **items;
-	Py_ssize_t size, i, j, p;
+	Py_ssize_t size, i, j, p, newsize;
 
 
 	size = PyList_GET_SIZE(self);
@@ -672,7 +684,10 @@ list_inplace_repeat(PyListObject *self, Py_ssize_t n)
 		return (PyObject *)self;
 	}
 
-	if (list_resize(self, size*n) == -1)
+	newsize = size * n;
+	if (newsize/n != size)
+		return PyErr_NoMemory();
+	if (list_resize(self, newsize) == -1)
 		return NULL;
 
 	p = size;

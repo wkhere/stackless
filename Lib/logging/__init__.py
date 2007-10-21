@@ -41,8 +41,8 @@ except ImportError:
 
 __author__  = "Vinay Sajip <vinay_sajip@red-dove.com>"
 __status__  = "production"
-__version__ = "0.5.0.2"
-__date__    = "16 February 2007"
+__version__ = "0.5.0.3"
+__date__    = "26 September 2007"
 
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
@@ -234,7 +234,9 @@ class LogRecord:
         # 'Value is %d' instead of 'Value is 0'.
         # For the use case of passing a dictionary, this should not be a
         # problem.
-        if args and (len(args) == 1) and args[0] and (type(args[0]) == types.DictType):
+        if args and len(args) == 1 and (
+                                        type(args[0]) == types.DictType
+                                       ) and args[0]:
             args = args[0]
         self.args = args
         self.levelname = getLevelName(level)
@@ -728,7 +730,8 @@ class StreamHandler(Handler):
         """
         Flushes the stream.
         """
-        self.stream.flush()
+        if self.stream:
+            self.stream.flush()
 
     def emit(self, record):
         """
@@ -778,9 +781,11 @@ class FileHandler(StreamHandler):
         """
         Closes the stream.
         """
-        self.flush()
-        self.stream.close()
-        StreamHandler.close(self)
+        if self.stream:
+            self.flush()
+            self.stream.close()
+            StreamHandler.close(self)
+            self.stream = None
 
     def _open(self):
         """
@@ -1244,7 +1249,7 @@ def basicConfig(**kwargs):
         hdlr.setFormatter(fmt)
         root.addHandler(hdlr)
         level = kwargs.get("level")
-        if level:
+        if level is not None:
             root.setLevel(level)
 
 #---------------------------------------------------------------------------

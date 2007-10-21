@@ -1,22 +1,31 @@
 import unittest
 from test import test_support
-from collections import NamedTuple
+from collections import named_tuple
 
 class TestNamedTuple(unittest.TestCase):
 
     def test_factory(self):
-        Point = NamedTuple('Point', 'x y')
+        Point = named_tuple('Point', 'x y')
         self.assertEqual(Point.__name__, 'Point')
         self.assertEqual(Point.__doc__, 'Point(x, y)')
         self.assertEqual(Point.__slots__, ())
         self.assertEqual(Point.__module__, __name__)
         self.assertEqual(Point.__getitem__, tuple.__getitem__)
-        self.assertRaises(ValueError, NamedTuple, 'abc%', 'def ghi')
-        self.assertRaises(ValueError, NamedTuple, 'abc', 'def g%hi')
-        NamedTuple('Point0', 'x1 y2')   # Verify that numbers are allowed in names
+
+        self.assertRaises(ValueError, named_tuple, 'abc%', 'efg ghi')       # type has non-alpha char
+        self.assertRaises(ValueError, named_tuple, 'class', 'efg ghi')      # type has keyword
+        self.assertRaises(ValueError, named_tuple, '9abc', 'efg ghi')       # type starts with digit
+
+        self.assertRaises(ValueError, named_tuple, 'abc', 'efg g%hi')       # field with non-alpha char
+        self.assertRaises(ValueError, named_tuple, 'abc', 'abc class')      # field has keyword
+        self.assertRaises(ValueError, named_tuple, 'abc', '8efg 9ghi')      # field starts with digit
+        self.assertRaises(ValueError, named_tuple, 'abc', '__efg__ ghi')    # field with double underscores
+        self.assertRaises(ValueError, named_tuple, 'abc', 'efg efg ghi')    # duplicate field
+
+        named_tuple('Point0', 'x1 y2')   # Verify that numbers are allowed in names
 
     def test_instance(self):
-        Point = NamedTuple('Point', 'x y')
+        Point = named_tuple('Point', 'x y')
         p = Point(11, 22)
         self.assertEqual(p, Point(x=11, y=22))
         self.assertEqual(p, Point(11, y=22))
@@ -30,9 +39,22 @@ class TestNamedTuple(unittest.TestCase):
         self.assertEqual(repr(p), 'Point(x=11, y=22)')
         self.assert_('__dict__' not in dir(p))                              # verify instance has no dict
         self.assert_('__weakref__' not in dir(p))
+        self.assertEqual(p.__fields__, ('x', 'y'))                          # test __fields__ attribute
+        self.assertEqual(p.__replace__('x', 1), (1, 22))                    # test __replace__ method
+        self.assertEqual(p.__asdict__(), dict(x=11, y=22))                  # test __dict__ method
+
+        # verify that field string can have commas
+        Point = named_tuple('Point', 'x, y')
+        p = Point(x=11, y=22)
+        self.assertEqual(repr(p), 'Point(x=11, y=22)')
+
+        # verify that fieldspec can be a non-string sequence
+        Point = named_tuple('Point', ('x', 'y'))
+        p = Point(x=11, y=22)
+        self.assertEqual(repr(p), 'Point(x=11, y=22)')
 
     def test_tupleness(self):
-        Point = NamedTuple('Point', 'x y')
+        Point = named_tuple('Point', 'x y')
         p = Point(11, 22)
 
         self.assert_(isinstance(p, tuple))
@@ -50,6 +72,11 @@ class TestNamedTuple(unittest.TestCase):
         self.assertEqual(p.y, y)
         self.assertRaises(AttributeError, eval, 'p.z', locals())
 
+    def test_odd_sizes(self):
+        Zero = named_tuple('Zero', '')
+        self.assertEqual(Zero(), ())
+        Dot = named_tuple('Dot', 'd')
+        self.assertEqual(Dot(1), (1,))
 
 def test_main(verbose=None):
     import collections as CollectionsModule

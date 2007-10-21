@@ -545,17 +545,18 @@ available.  They are listed here in alphabetical order.
 
 .. function:: int([x[, radix]])
 
-   Convert a string or number to a plain integer.  If the argument is a string, it
-   must contain a possibly signed decimal number representable as a Python integer,
-   possibly embedded in whitespace. The *radix* parameter gives the base for the
-   conversion and may be any integer in the range [2, 36], or zero.  If *radix* is
-   zero, the proper radix is guessed based on the contents of string; the
-   interpretation is the same as for integer literals.  If *radix* is specified and
-   *x* is not a string, :exc:`TypeError` is raised. Otherwise, the argument may be
-   a plain or long integer or a floating point number.  Conversion of floating
-   point numbers to integers truncates (towards zero). If the argument is outside
-   the integer range a long object will be returned instead.  If no arguments are
-   given, returns ``0``.
+   Convert a string or number to a plain integer.  If the argument is a string,
+   it must contain a possibly signed decimal number representable as a Python
+   integer, possibly embedded in whitespace.  The *radix* parameter gives the
+   base for the conversion (which is 10 by default) and may be any integer in
+   the range [2, 36], or zero.  If *radix* is zero, the proper radix is guessed
+   based on the contents of string; the interpretation is the same as for
+   integer literals.  If *radix* is specified and *x* is not a string,
+   :exc:`TypeError` is raised. Otherwise, the argument may be a plain or long
+   integer or a floating point number.  Conversion of floating point numbers to
+   integers truncates (towards zero).  If the argument is outside the integer
+   range a long object will be returned instead.  If no arguments are given,
+   returns ``0``.
 
    The integer type is described in :ref:`typesnumeric`.
 
@@ -765,7 +766,8 @@ available.  They are listed here in alphabetical order.
    Python enforces that the mode, after stripping ``'U'``, begins with ``'r'``,
    ``'w'`` or ``'a'``.
 
-   See also the :mod:`fileinput` module.
+   See also the :mod:`fileinput` module, the :mod:`os` module, and the
+   :mod:`os.path` module.
 
    .. versionchanged:: 2.5
       Restriction on first letter of mode string introduced.
@@ -1290,12 +1292,11 @@ bypass these functions without concerns about missing something important.
    present, it must be a dictionary whose keys are strings.  It specifies keyword
    arguments to be added to the end of the argument list. Calling :func:`apply` is
    different from just calling ``function(args)``, since in that case there is
-   always exactly one argument.  The use of :func:`apply` is equivalent to
-   ``function(*args, **keywords)``. Use of :func:`apply` is not necessary since the
-   "extended call syntax," as used in the last example, is completely equivalent.
+   always exactly one argument.  The use of :func:`apply` is exactly equivalent to
+   ``function(*args, **keywords)``.
 
    .. deprecated:: 2.3
-      Use the extended call syntax instead, as described above.
+      Use the extended call syntax with ``*args`` and ``**keywords`` instead.
 
 
 .. function:: buffer(object[, offset[, size]])

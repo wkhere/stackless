@@ -279,14 +279,18 @@ internal_print(PyObject *op, FILE *fp, int flags, int nesting)
 #endif
 	clearerr(fp); /* Clear any previous error condition */
 	if (op == NULL) {
+		Py_BEGIN_ALLOW_THREADS
 		fprintf(fp, "<nil>");
+		Py_END_ALLOW_THREADS
 	}
 	else {
 		if (op->ob_refcnt <= 0)
 			/* XXX(twouters) cast refcount to long until %zd is
 			   universally available */
+			Py_BEGIN_ALLOW_THREADS
 			fprintf(fp, "<refcnt %ld at %p>",
 				(long)op->ob_refcnt, op);
+			Py_END_ALLOW_THREADS
 		else if (Py_Type(op)->tp_print == NULL) {
 			PyObject *s;
 			if (flags & Py_PRINT_RAW)
@@ -404,7 +408,12 @@ _PyObject_Str(PyObject *v)
 	if (Py_Type(v)->tp_str == NULL)
 		return PyObject_Repr(v);
 
+	/* It is possible for a type to have a tp_str representation that loops
+	   infinitely. */
+	if (Py_EnterRecursiveCall(" while getting the str of an object"))
+		return NULL;
 	res = (*Py_Type(v)->tp_str)(v);
+	Py_LeaveRecursiveCall();
 	if (res == NULL)
 		return NULL;
 	type_ok = PyString_Check(res);

@@ -41,10 +41,7 @@ class ConnectedTests(unittest.TestCase):
 
         # A service which issues a welcome banner (without need to write
         # anything).
-        # XXX ("gmail.org", 995) has been unreliable so far, from time to
-        # XXX time non-responsive for hours on end (& across all buildbot
-        # XXX slaves, so that's not just a local thing).
-        ADDR = "gmail.org", 995
+        ADDR = "pop.gmail.com", 995
 
         s = socket.socket()
         s.settimeout(30.0)
@@ -113,9 +110,9 @@ class BasicTests(unittest.TestCase):
         import os, httplib, ssl
         with test_support.transient_internet():
             s = socket.socket(socket.AF_INET)
-            s.connect(("www.sf.net", 443))
+            s.connect(("svn.python.org", 443))
             fd = s._sock.fileno()
-            sock = ssl.sslsocket(s)
+            sock = ssl.wrap_socket(s)
             s = None
             sock.close()
             try:

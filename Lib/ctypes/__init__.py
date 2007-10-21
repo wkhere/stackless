@@ -24,19 +24,12 @@ if _os.name in ("nt", "ce"):
 
 DEFAULT_MODE = RTLD_LOCAL
 if _os.name == "posix" and _sys.platform == "darwin":
-    import gestalt
-
-    # gestalt.gestalt("sysv") returns the version number of the
-    # currently active system file as BCD.
-    # On OS X 10.4.6 -> 0x1046
-    # On OS X 10.2.8 -> 0x1028
-    # See also http://www.rgaros.nl/gestalt/
-    #
     # On OS X 10.3, we use RTLD_GLOBAL as default mode
     # because RTLD_LOCAL does not work at least on some
-    # libraries.
+    # libraries.  OS X 10.3 is Darwin 7, so we check for
+    # that.
 
-    if gestalt.gestalt("sysv") < 0x1040:
+    if int(_os.uname()[2].split('.')[0]) < 8:
         DEFAULT_MODE = RTLD_GLOBAL
 
 from _ctypes import FUNCFLAG_CDECL as _FUNCFLAG_CDECL, \
@@ -190,6 +183,11 @@ _check_size(c_float)
 class c_double(_SimpleCData):
     _type_ = "d"
 _check_size(c_double)
+
+class c_longdouble(_SimpleCData):
+    _type_ = "D"
+if sizeof(c_longdouble) == sizeof(c_double):
+    c_longdouble = c_double
 
 if _calcsize("l") == _calcsize("q"):
     # if long and long long have the same size, make c_longlong an alias for c_long
@@ -540,3 +538,9 @@ for kind in [c_ushort, c_uint, c_ulong, c_ulonglong]:
     elif sizeof(kind) == 4: c_uint32 = kind
     elif sizeof(kind) == 8: c_uint64 = kind
 del(kind)
+
+# XXX for whatever reasons, creating the first instance of a callback
+# function is needed for the unittests on Win64 to succeed.  This MAY
+# be a compiler bug, since the problem occurs only when _ctypes is
+# compiled with the MS SDK compiler.  Or an uninitialized variable?
+CFUNCTYPE(c_int)(lambda: None)

@@ -34,7 +34,7 @@ def makeSuite(target):
     return suite
 
 
-if __name__ == '__main__':
+def main():
     hold = stackless.enable_softswitch(True)
     try:
         target = int(sys.argv[1])
@@ -56,3 +56,5 @@ if __name__ == '__main__':
     finally:
         stackless.enable_softswitch(hold)
         
+if __name__ == '__main__':
+    main()

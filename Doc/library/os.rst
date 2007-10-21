@@ -8,9 +8,10 @@
 
 This module provides a more portable way of using operating system dependent
 functionality than importing a operating system dependent built-in module like
-:mod:`posix` or :mod:`nt`. (If you just want to read or write a file see
-:func:`open`, and if you want to manipulate paths, see the :mod:`os.path`
-module.)
+:mod:`posix` or :mod:`nt`. If you just want to read or write a file see
+:func:`open`, if you want to manipulate paths, see the :mod:`os.path`
+module, and if you want to read all the lines in all the files on the
+command line see the :mod:`fileinput` module.
 
 This module searches for an operating system dependent built-in module like
 :mod:`mac` or :mod:`posix` and exports the same functions and data as found
@@ -114,9 +115,13 @@ process and user.
    passed to the appropriate process-creation functions to cause  child processes
    to use a modified environment.
 
-   If the platform supports the :func:`unsetenv` function, you can  delete items in
+   If the platform supports the :func:`unsetenv` function, you can delete items in
    this mapping to unset environment variables. :func:`unsetenv` will be called
-   automatically when an item is deleted from ``os.environ``.
+   automatically when an item is deleted from ``os.environ``, and when
+   :meth:`os.environ.clear` is called.
+
+   .. versionchanged:: 2.6
+      Also unset environment variables when calling :meth:`os.environ.clear`.
 
 
 .. function:: chdir(path)

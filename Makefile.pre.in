@@ -61,7 +61,7 @@ CFLAGS=		$(BASECFLAGS) $(OPT) $(EXTRA_CFLAGS)
 # Both CPPFLAGS and LDFLAGS need to contain the shell's value for setup.py to
 # be able to build extension modules using the directories specified in the
 # environment variables
-CPPFLAGS=	-I. -I$(srcdir)/Include -I$(srcdir)/Stackless @CPPFLAGS@
+CPPFLAGS=	-I. -IInclude -I$(srcdir)/Include -I$(srcdir)/Stackless @CPPFLAGS@
 LDFLAGS=	@LDFLAGS@
 LDLAST=		@LDLAST@
 SGI_ABI=	@SGI_ABI@
@@ -82,6 +82,9 @@ prefix=		@prefix@
 
 # Install prefix for architecture-dependent files
 exec_prefix=	@exec_prefix@
+
+# Install prefix for data files
+datarootdir=    @datarootdir@
 
 # Expanded directories
 BINDIR=		$(exec_prefix)/bin
@@ -348,7 +351,8 @@ LIBRARY_OBJS=	\
 # Rules
 
 # Default target
-all:		$(BUILDPYTHON) oldsharedmods sharedmods
+all:		build_all
+build_all:	$(BUILDPYTHON) oldsharedmods sharedmods
 
 # Build the interpreter
 $(BUILDPYTHON):	Modules/python.o $(LIBRARY) $(LDLIBRARY)
@@ -488,6 +492,7 @@ Modules/python.o: $(srcdir)/Modules/python.c
 
 
 $(GRAMMAR_H) $(GRAMMAR_C): $(PGEN) $(GRAMMAR_INPUT)
+		-@$(INSTALL) -d Include
 		-$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
 
 $(PGEN):	$(PGENOBJS)
@@ -643,7 +648,11 @@ testuniversal:	all platform
 
 
 # Like testall, but with a single pass only
+# run an optional script to include some information about the build environment
 buildbottest:	all platform
+		-@if which pybuildbot.identify >/dev/null 2>&1; then \
+			pybuildbot.identify "CC='$(CC)'" "CXX='$(CXX)'"; \
+		fi
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall -rw
 
 QUICKTESTOPTS=	$(TESTOPTS) -x test_thread test_signal test_strftime \
@@ -697,7 +706,8 @@ bininstall:	altbininstall
 	else true; \
 	fi
 	(cd $(DESTDIR)$(BINDIR); $(LN) python$(VERSION)$(EXE) $(PYTHON))
-	(cd $(DESTDIR)$(BINDIR); $(LN) -sf python$(VERSION)-config python-config)
+	-rm -f $(DESTDIR)$(BINDIR)/python-config
+	(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(VERSION)-config python-config)
 
 # Install the interpreter with $(VERSION) affixed
 # This goes into $(exec_prefix)
@@ -762,7 +772,7 @@ LIBSUBDIRS=	lib-tk site-packages test test/output test/data \
 		distutils distutils/command distutils/tests $(XMLLIBSUBDIRS) \
 		setuptools setuptools/command setuptools/tests setuptools.egg-info \
 		curses $(MACHDEPS)
-libinstall:	$(BUILDPYTHON) $(srcdir)/Lib/$(PLATDIR)
+libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 	@for i in $(SCRIPTDIR) $(LIBDEST); \
 	do \
 		if test ! -d $(DESTDIR)$$i; then \
@@ -1136,7 +1146,7 @@ funny:
 Python/thread.o: @THREADHEADERS@
 
 # Declare targets that aren't real files
-.PHONY: all sharedmods oldsharedmods test quicktest memtest
+.PHONY: all build_all sharedmods oldsharedmods test quicktest memtest
 .PHONY: install altinstall oldsharedinstall bininstall altbininstall
 .PHONY: maninstall libinstall inclinstall libainstall sharedinstall
 .PHONY: frameworkinstall frameworkinstallframework frameworkinstallstructure

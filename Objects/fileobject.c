@@ -718,6 +718,7 @@ file_tell(PyFileObject *f)
 		int c;
 		c = GETC(f->f_fp);
 		if (c == '\n') {
+			f->f_newlinetypes |= NEWLINE_CRLF;
 			pos++;
 			f->f_skipnextlf = 0;
 		} else if (c != EOF) ungetc(c, f->f_fp);
@@ -2241,7 +2242,9 @@ PyFile_WriteString(const char *s, PyObject *f)
 			err_closed();
 			return -1;
 		}
+		Py_BEGIN_ALLOW_THREADS
 		fputs(s, fp);
+		Py_END_ALLOW_THREADS
 		return 0;
 	}
 	else if (!PyErr_Occurred()) {

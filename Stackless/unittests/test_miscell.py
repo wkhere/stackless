@@ -26,6 +26,8 @@ class TestWatchdog(unittest.TestCase):
         self.assertEquals(t.recursion_depth, 0)
         # allow hard switching
         t.set_ignore_nesting(1)
+
+        softSwitching = stackless.enable_softswitch(0); stackless.enable_softswitch(softSwitching)
         
         # Run a little
         res = stackless.run(10)
@@ -33,7 +35,7 @@ class TestWatchdog(unittest.TestCase):
         self.assert_(t.alive)
         self.assert_(t.paused)
         self.failIf(t.scheduled)
-        self.assertEquals(t.recursion_depth, 1)
+        self.assertEquals(t.recursion_depth, softSwitching and 1 or 2)
 
         # Push back onto queue
         t.insert()
@@ -72,6 +74,8 @@ class TestWatchdog(unittest.TestCase):
         self.assert_(t.scheduled)
         self.assertEquals(t.recursion_depth, 0)
 
+        softSwitching = stackless.enable_softswitch(0); stackless.enable_softswitch(softSwitching)
+
         # Run a little
         res = stackless.run(100)
         
@@ -79,8 +83,7 @@ class TestWatchdog(unittest.TestCase):
         self.assert_(t.alive)
         self.assert_(t.paused)
         self.failIf(t.scheduled)
-        self.assertEquals(t.recursion_depth, 1)
-        
+        self.assertEquals(t.recursion_depth, softSwitching and 1 or 2)        
         
         # Now save & load
         dumped = pickle.dumps(t)
