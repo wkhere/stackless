@@ -340,8 +340,10 @@ void slp_kill_tasks_with_stacks(PyThreadState *ts)
 		 * leaving it to run next.
 		 */
 		if (!t->flags.blocked && t != cs->tstate->st.main) {
-			chain = &t;
-			SLP_CHAIN_REMOVE(PyTaskletObject, chain, task, next, prev)
+			if (t->next && t->prev) { /* it may have been removed() */
+				chain = &t;
+				SLP_CHAIN_REMOVE(PyTaskletObject, chain, task, next, prev)
+			}
 			chain = &cs->tstate->st.main;
 			task = cs->task;
 			SLP_CHAIN_INSERT(PyTaskletObject, chain, task, next, prev);
@@ -349,6 +351,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *ts)
 			t = cs->task;
 		}
 
+		Py_INCREF(t); /* because the following steals a reference */
 		PyTasklet_Kill(t);
 		PyErr_Clear();
 
