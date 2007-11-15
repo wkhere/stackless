@@ -291,6 +291,15 @@ class TestConcretePickledTasklets(TestPickledTasklets):
 
         pickle.dumps(t1)
 
+    def testSubmoduleImporting(self):
+        # When a submodule was pickled, it would unpickle as the
+        # module instead.
+        import xml.sax
+        m1 = xml.sax
+        m2 = pickle.loads(pickle.dumps(m1))
+        self.assertEquals(m1, m2)
+
+
 if __name__ == '__main__':
     if not sys.argv[1:]:
         sys.argv.append('-v')

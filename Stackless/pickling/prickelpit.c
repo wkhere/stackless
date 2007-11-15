@@ -1183,7 +1183,7 @@ module_reduce(PyObject * m)
 		if (import == NULL)
 			return NULL;
 	}
-	return Py_BuildValue("(O(s))", import, name);
+	return Py_BuildValue("(O(s()()(s)))", import, name, "");
 	/* would be shorter, but the search result is quite arbitrary:
 		tup = PyObject_GetAttrString(m, "__name__");
 	 */
