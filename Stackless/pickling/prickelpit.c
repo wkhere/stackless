@@ -633,7 +633,7 @@ static int init_celltype(void)
 
  ******************************************************/
 
-#define functuplefmt "OOOOO"
+#define functuplefmt "OOOOOO"
 
 static PyTypeObject wrap_PyFunction_Type;
 
@@ -643,11 +643,14 @@ func_reduce(PyFunctionObject * func)
 	PyObject *tup = Py_BuildValue(
 	    "(O()(" functuplefmt "))",
 	    &wrap_PyFunction_Type,
+		/* Standard function constructor arguments. */
 	    func->func_code != NULL ? func->func_code : Py_None,
 	    func->func_globals != NULL ? func->func_globals : Py_None,
 	    func->func_name != NULL ? func->func_name : Py_None,
 	    func->func_defaults != NULL ? func->func_defaults : Py_None,
-	    func->func_closure != NULL ? func->func_closure : Py_None
+	    func->func_closure != NULL ? func->func_closure : Py_None,
+		/* Additional data we need to preserve. */
+		func->func_module != NULL ? func->func_module : Py_None
 	);
         return tup;
 }
@@ -679,7 +682,7 @@ func_setstate(PyObject *self, PyObject *args)
 	if (is_wrong_type(self->ob_type)) return NULL;
 	self->ob_type = self->ob_type->tp_base;
 	fu = (PyFunctionObject *)
-	     self->ob_type->tp_new(self->ob_type, args, NULL);
+	     self->ob_type->tp_new(self->ob_type, PyTuple_GetSlice(args, 0, 5), NULL);
 	if (fu != NULL) {
 		PyFunctionObject *target = (PyFunctionObject *) self;
 		COPY(fu, target, func_code);
@@ -687,6 +690,10 @@ func_setstate(PyObject *self, PyObject *args)
 		COPY(fu, target, func_name);
 		COPY(fu, target, func_defaults);
 		COPY(fu, target, func_closure);
+
+		Py_XINCREF(PyTuple_GetItem(args, 5));
+        target->func_module = PyTuple_GetItem(args, 5);
+
 		Py_DECREF(fu);
 		Py_INCREF(self);
 		return self;
