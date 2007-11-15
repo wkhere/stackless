@@ -299,6 +299,12 @@ class TestConcretePickledTasklets(TestPickledTasklets):
         m2 = pickle.loads(pickle.dumps(m1))
         self.assertEquals(m1, m2)
 
+    def testFunctionModulePreservation(self):
+        # The 'module' name on the function was not being preserved.
+        f1 = lambda: None
+        f2 = pickle.loads(pickle.dumps(f1))
+        self.assertEquals(f1.__module__, f2.__module__)
+
 
 if __name__ == '__main__':
     if not sys.argv[1:]:
