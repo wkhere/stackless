@@ -429,8 +429,9 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
 		TASKLET_SWAPVAL(source, target);
 
 		if (interthread) {
-			/* interthread, always keep target! */
-			slp_current_insert(target);
+			;
+			/* interthread, always keep target! 
+			slp_current_insert(target);*/
 		}
 		else {
 			if (self->flags.schedule_all) {
@@ -466,8 +467,12 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
 		target = ts->st.current;
 	}
 	retval = slp_schedule_task(source, target, stackless);
-	if (interthread)
+	if (interthread) {
+		if (cando) {
+			Py_DECREF(target);
+		}
 		NOTIFY_CHANNEL(self, source, dir, cando, NULL);
+	}
 	return retval;
 }
 
