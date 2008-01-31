@@ -12,6 +12,50 @@ What's New in Python 2.5.2c1?
 Core and builtins
 -----------------
 
+- Issue #1920: "while 0" statements were completely removed by the compiler,
+  even in the presence of an "else" clause, which is supposed to be run when 
+  the condition is false. Now the compiler correctly emits bytecode for the
+  "else" suite.
+
+- A few crashers fixed: weakref_in_del.py (issue #1377858);
+  loosing_dict_ref.py (issue #1303614, test67.py);
+  borrowed_ref_[34].py (not in tracker).
+
+- Fix for #1303614 and #1174712 backported from the trunk:
+  __dict__ descriptor abuse for subclasses of built-in types;
+  subclassing from both ModuleType and another built-in types.
+
+- Bug #1915: Python compiles with --enable-unicode=no again. However
+  several extension methods and modules do not work without unicode
+  support.
+
+- Issue #1678380: distinction between 0.0 and -0.0 was lost during constant
+  folding optimization.  This was a regression from Python 2.4.
+
+- Issue #1882: when compiling code from a string, encoding cookies in the
+  second line of code were not always recognized correctly.
+
+- Bug #1517: Possible segfault in lookup().
+
+- Issue #1638: %zd configure test fails on Linux.
+
+- Issue #1553: An erroneous __length_hint__ can make list() raise a
+  SystemError.
+
+- Issue #1521: On 64bit platforms, using PyArgs_ParseTuple with the t# of w#
+  format code incorrectly truncated the length to an int, even when
+  PY_SSIZE_T_CLEAN is set.  The str.decode method used to return incorrect
+  results with huge strings.
+
+- Issue #1445: Fix a SystemError when accessing the ``cell_contents`` 
+  attribute of an empty cell object.
+
+- Issue #1265: Fix a problem with sys.settrace, if the tracing function uses a
+  generator expression when at the same time the executed code is closing a
+  paused generator.
+
+- Issue 1704621: Fix segfaults in list_repeat() and list_inplace_repeat().
+
 - Issue #1147: Generators were not raising a DeprecationWarning when a string
   was passed into throw().
 
@@ -28,9 +72,62 @@ Core and builtins
 
 - Bug #1733488: Fix compilation of bufferobject.c on AIX.
 
+- Fix Issue #1703448: A joined thread could show up in the
+  threading.enumerate() list after the join() for a brief period until
+  it actually exited.
+
 
 Library
 -------
+
+- The ctypes int types did not accept objects implementing
+  __int__() in the constructor.
+
+- #1189216: Fix the zipfile module to work on archives with headers
+  past the 2**31 byte boundary.
+
+- Issue #1336: fix a race condition in subprocess.Popen if the garbage
+  collector kicked in at the wrong time that would cause the process
+  to hang when the child wrote to stderr.
+
+- Bug #1687: Fixed plistlib.py restricts <integer> to Python int when writing.
+
+- Issue #1182: many arithmetic bugs in the decimal module have been
+  fixed, and the decimal module has been updated to comply with the
+  latest IBM Decimal Arithmetic specification (version 1.66) and
+  testsuite (version 2.57).  (Backported from Python 2.6a0.)
+
+- Patch #1637: fix urlparse for URLs like 'http://x.com?arg=/foo'.
+
+- Issue #1735: TarFile.extractall() now correctly sets directory permissions
+  and times.
+
+- Bug #1713: posixpath.ismount() claims symlink to a mountpoint is a mountpoint.
+
+- Issue #1700: Regular expression inline flags incorrectly handle certain
+  unicode characters.
+
+- Change ctypes version number to 1.0.3 (when Python 2.5.2 is released,
+  ctypes 1.0.3 will be also be released).
+
+- Issue #1695: Fixed typo in the docstrings for time.localtime() and gmtime().
+
+- Issue #1642: Fix segfault in ctypes when trying to delete attributes.
+
+- os.access now returns True on Windows for any existing directory.
+
+- Issue #1531: tarfile.py: Read fileobj from the current offset, do not
+  seek to the start.
+
+- Issue 1429818: patch for trace and doctest modules so they play nicely
+  together.
+
+- doctest mis-used __loader__.get_data(), assuming universal newlines was used.
+
+- Issue #1705170: contextlib.contextmanager was still swallowing
+  StopIteration in some cases. This should no longer happen.
+
+- Bug #1307: Fix smtpd so it doesn't raise an exception when there is no arg.
 
 - ctypes will now work correctly on 32-bit systems when Python is
   configured with --with-system-ffi.
@@ -104,9 +201,27 @@ Library
 - Bug #1693258: IDLE would show two "Preferences" menu's with some versions
   of Tcl/Tk
 
+- Issue1385: The hmac module now computes the correct hmac when using hashes
+  with a block size other than 64 bytes (such as sha384 and sha512).
+
+- Issue829951: In the smtplib module, SMTP.starttls() now complies with 
+  RFC 3207 and forgets any knowledge obtained from the server not obtained
+  from the TLS negotiation itself.  Patch contributed by Bill Fenner.
+
 
 Extension Modules
 -----------------
+
+- #1940: make it possible to use curses.filter() before curses.initscr()
+  as the documentation says.
+
+- Fix a potential 'SystemError: NULL result without error' in _ctypes.
+
+- Bug #1301: Bad assert in _tkinter fixed.
+
+- Patch #1114: fix curses module compilation on 64-bit AIX, & possibly
+  other 64-bit LP64 platforms where attr_t is not the same size as a long.  
+  (Contributed by Luke Mewburn.)
 
 - Bug #1649098: Avoid declaration of zero-sized array declaration in
   structure.
@@ -118,16 +233,17 @@ Extension Modules
 - Bug #1233: fix bsddb.dbshelve.DBShelf append method to work as
   intended for RECNO databases.
 
-- Fix bsddb.dbtables: Don't randomly corrupt newly inserted rows by
-  picking a rowid string with null bytes in it.  Such rows could not
-  later be deleted, modified or individually selected.
-
 - Bug #1726026: Correct the field names of WIN32_FIND_DATAA and
   WIN32_FIND_DATAW structures in the ctypes.wintypes module.
 
 - Added support for linking the bsddb module against BerkeleyDB 4.6.x.
 
 - Fix libffi configure for hppa*-*-linux* | parisc*-*-linux*.
+
+- Build using system ffi library on arm*-linux*.
+
+- Bug #1372: zlibmodule.c: int overflow in PyZlib_decompress
+
 
 Documentation
 -------------
@@ -140,6 +256,15 @@ Documentation
 
 Build
 -----
+
+- Bug #1699: Define _BSD_SOURCE only on OpenBSD.
+
+- Bug #1608: use -fwrapv when GCC supports it.  This is important,
+  newer GCC versions may optimize away overflow buffer overflow checks
+  without this option!
+
+- Allow simultaneous installation of 32-bit and 64-bit versions
+  on 64-bit Windows systems.
 
 - Patch #786737: Allow building in a tree of symlinks pointing to
   a readonly source.
@@ -308,7 +433,9 @@ Core and builtins
 Extension Modules
 -----------------
 
-- Bug #1563759: struct.unpack doens't support buffer protocol objects
+- Patch #1643738: Problem with signals in a single-threaded application.
+
+- Bug #1563759: struct.unpack doens't support buffer protocol objects.
 
 - Bug #1686475: Support stat'ing open files on Windows again.
 
@@ -332,6 +459,9 @@ Extension Modules
 - Patch #1657276: Make NETLINK_DNRTMSG conditional.
 
 - Bug #1653736: Fix signature of time_isoformat.
+
+- Issue #1698398 Zipfile.printdir() crashed because the format string
+  expected a tuple type of length six instead of time.struct_time object.
 
 - operator.count() now raises an OverflowError when the count reaches sys.maxint.
 

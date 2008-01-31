@@ -1,7 +1,7 @@
 import os
 import resource
 
-from test.test_support import TESTFN
+from test.test_support import TESTFN, unlink
 
 # This test is checking a few specific problem spots.  RLIMIT_FSIZE
 # should be RLIM_INFINITY, which will be a really big number on a
@@ -33,16 +33,26 @@ try:
         limit_set = 0
     f = open(TESTFN, "wb")
     f.write("X" * 1024)
+    f.flush()
     try:
         f.write("Y")
         f.flush()
+        # On some systems (e.g., Ubuntu on hppa) the flush()
+        # doesn't always cause the exception, but the close()
+        # does eventually.  Try flushing several times in an attempt
+        # to ensure the file is really synced and the exception raised.
+        for i in range(5):
+            time.sleep(.1)
+            f.flush()
+        f.close()
     except IOError:
         if not limit_set:
             raise
     f.close()
-    os.unlink(TESTFN)
 finally:
-    resource.setrlimit(resource.RLIMIT_FSIZE, (cur, max))
+    if limit_set:
+        resource.setrlimit(resource.RLIMIT_FSIZE, (cur, max))
+    unlink(TESTFN)
 
 # And be sure that setrlimit is checking for really large values
 too_big = 10L**50

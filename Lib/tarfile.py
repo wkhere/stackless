@@ -1065,7 +1065,8 @@ class TarFile(object):
         self.closed = False
         self.members = []       # list of members as TarInfo objects
         self._loaded = False    # flag if all members have been read
-        self.offset = 0L        # current position in the archive file
+        self.offset = self.fileobj.tell()
+                                # current position in the archive file
         self.inodes = {}        # dictionary caching the inodes of
                                 # archive members already added
 
@@ -1524,11 +1525,11 @@ class TarFile(object):
 
         # Set correct owner, mtime and filemode on directories.
         for tarinfo in directories:
-            path = os.path.join(path, tarinfo.name)
+            dirpath = os.path.join(path, tarinfo.name)
             try:
-                self.chown(tarinfo, path)
-                self.utime(tarinfo, path)
-                self.chmod(tarinfo, path)
+                self.chown(tarinfo, dirpath)
+                self.utime(tarinfo, dirpath)
+                self.chmod(tarinfo, dirpath)
             except ExtractError, e:
                 if self.errorlevel > 1:
                     raise

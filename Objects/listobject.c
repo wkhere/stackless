@@ -487,10 +487,10 @@ list_repeat(PyListObject *a, Py_ssize_t n)
 	if (n < 0)
 		n = 0;
 	size = a->ob_size * n;
-	if (size == 0)
-              return PyList_New(0);
 	if (n && size/n != a->ob_size)
 		return PyErr_NoMemory();
+	if (size == 0)
+		return PyList_New(0);
 	np = (PyListObject *) PyList_New(size);
 	if (np == NULL)
 		return NULL;
@@ -661,7 +661,7 @@ list_inplace_repeat(PyListObject *self, Py_ssize_t n)
 
 
 	size = PyList_GET_SIZE(self);
-	if (size == 0) {
+	if (size == 0 || n == 1) {
 		Py_INCREF(self);
 		return (PyObject *)self;
 	}
@@ -670,6 +670,10 @@ list_inplace_repeat(PyListObject *self, Py_ssize_t n)
 		(void)list_clear(self);
 		Py_INCREF(self);
 		return (PyObject *)self;
+	}
+
+	if (size > PY_SSIZE_T_MAX / n) {
+		return PyErr_NoMemory();
 	}
 
 	if (list_resize(self, size*n) == -1)
@@ -781,8 +785,9 @@ listextend(PyListObject *self, PyObject *b)
 	/* Guess a result list size. */
 	n = _PyObject_LengthHint(b);
 	if (n < 0) {
-		if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
-		    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+		if (PyErr_Occurred()
+		    && !PyErr_ExceptionMatches(PyExc_TypeError)
+		    && !PyErr_ExceptionMatches(PyExc_AttributeError)) {
 			Py_DECREF(it);
 			return NULL;
 		}
@@ -2927,4 +2932,3 @@ listreviter_len(listreviterobject *it)
 		return 0;
 	return len;
 }
-
