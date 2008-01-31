@@ -367,8 +367,14 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 {
 	PyThreadState *ts = PyThreadState_Get();
 
-	if (ts->st.main == NULL)
-		initialize_main_and_current();
+	if (ts->st.main == NULL) {
+		if (initialize_main_and_current()) {
+			PyObject *s = PyString_FromString("tasklet cleanup");
+			PyErr_WriteUnraisable(s);
+			Py_XDECREF(s);
+			return;
+		}
+	}
 	slp_kill_tasks_with_stacks(allthreads ? NULL : ts);
 }
 
