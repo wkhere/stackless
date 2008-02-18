@@ -7,10 +7,17 @@ Python News
 What's New in Python 2.5.2c1?
 =============================
 
-*Release date: XX-XXX-XXXX*
+*Release date: 14-Feb-2008*
 
 Core and builtins
 -----------------
+
+- Added checks for integer overflows, contributed by Google. Some are
+  only available if asserts are left in the code, in cases where they
+  can't be triggered from Python code.
+
+- Issue #2045: Fix an infinite recursion triggered when printing a subclass of
+  collections.defaultdict, if its default_factory is set to a bound method.
 
 - Issue #1920: "while 0" statements were completely removed by the compiler,
   even in the presence of an "else" clause, which is supposed to be run when 
@@ -79,6 +86,25 @@ Core and builtins
 
 Library
 -------
+
+- Patch #1966: Break infinite loop in httplib when the servers
+  implements the chunked encoding incorrectly.
+
+- tarfile.py: Fix reading of xstar archives.
+
+- #2021: Allow tempfile.NamedTemporaryFile to be used in with statements
+  by correctly supporting the context management protocol.
+
+- Fixed _ctypes.COMError so that it must be called with exactly three
+  arguments, instances now have the hresult, text, and details
+  instance variables.
+
+- #1507247, #2004: tarfile.py: Use mode 0700 for temporary directories and
+  default permissions for missing directories.
+
+- #175006: The debugger used to skip the condition of a "while" statement
+  after the first iteration. Now it correctly steps on the expression, and
+  breakpoints on the "while" statement are honored on each loop.
 
 - The ctypes int types did not accept objects implementing
   __int__() in the constructor.
@@ -212,6 +238,10 @@ Library
 Extension Modules
 -----------------
 
+- Patch #1736: Fix file name handling of _msi.FCICreate.
+
+- Backport r59862 (issue #712900): make long regexp matches interruptable.
+
 - #1940: make it possible to use curses.filter() before curses.initscr()
   as the documentation says.
 
@@ -244,6 +274,9 @@ Extension Modules
 
 - Bug #1372: zlibmodule.c: int overflow in PyZlib_decompress
 
+- bsddb module: Fix memory leak when using database cursors on
+  databases without a DBEnv.
+
 
 Documentation
 -------------
@@ -256,6 +289,11 @@ Documentation
 
 Build
 -----
+
+- Have the search path for building extensions follow the declared order in
+  $CPPFLAGS and $LDFLAGS.
+
+- Bug #1234: Fixed semaphore errors on AIX 5.2
 
 - Bug #1699: Define _BSD_SOURCE only on OpenBSD.
 
