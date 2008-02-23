@@ -4,6 +4,21 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.5.2?
+=============================
+
+*Release date: 21-Feb-2008*
+
+Extension Modules
+-----------------
+
+- Fix deallocation of array objects when allocation ran out of memory.
+  Remove array test case that was incorrect on 64-bit systems.
+
+- Bug #2137: Remove test_struct.test_crasher, which was meaningful
+  only on 32-bit systems.
+
+
 What's New in Python 2.5.2c1?
 =============================
 
