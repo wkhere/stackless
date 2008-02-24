@@ -164,6 +164,12 @@ mingw_lib = os.path.join(srcdir, "PCBuild", "libpython%s%s.a" % (major, minor))
 
 have_mingw = build_mingw_lib(lib_file, def_file, dll_file, mingw_lib)
 
+try:
+    import stackless
+    have_stackless = True
+except ImportError:
+    have_stackless = False
+
 if msilib.pe_type(dll_path) != msilib.pe_type("msisupport.dll"):
     raise SystemError, "msisupport.dll for incorrect architecture"
 
@@ -204,11 +210,11 @@ def build_database():
     # schema represents the installer 2.0 database schema.
     # sequence is the set of standard sequences
     # (ui/execute, admin/advt/install)
-    db = msilib.init_database("python-%s%s.msi" % (full_current_version, msilib.arch_ext),
-                  schema, ProductName="Python "+full_current_version+productsuffix,
+    db = msilib.init_database("python-%s%s-stackless.msi" % (full_current_version, msilib.arch_ext),
+                  schema, ProductName="Python "+full_current_version+productsuffix+" (Stackless)",
                   ProductCode=product_code,
                   ProductVersion=current_version,
-                  Manufacturer=u"Python Software Foundation")
+                  Manufacturer=u"Richard Tew")
     # The default sequencing of the RemoveExistingProducts action causes
     # removal of files that got just installed. Place it after
     # InstallInitialize, so we first uninstall everything, but still roll
@@ -1029,6 +1035,18 @@ def add_files(db):
     lib = PyDirectory(db, cab, root, "include", "include", "INCLUDE|include")
     lib.glob("*.h")
     lib.add_file("pyconfig.h", src="../PC/pyconfig.h")
+    # Add the Stackless headers in a sub-directory.
+    if have_stackless:
+        slp = "Stackless"
+        lib = PyDirectory(db, cab, lib, os.path.join("..", slp), slp, "%s|%s" % (lib.make_short(slp), slp))
+        lib.glob("*.h")
+        for f in os.listdir(lib.absolute):
+            slpsubdir = os.path.join(lib.absolute, f)
+            if os.path.isdir(slpsubdir):
+                if f not in ("core", "module", "pickling", "platf"):
+                    continue
+                sublib = PyDirectory(db, cab, lib, f, f, "%s|%s" % (parent.make_short(f), f))
+                sublib.glob("*.h")
     # Add import libraries
     lib = PyDirectory(db, cab, root, "PCBuild", "libs", "LIBS|libs")
     for f in dlls:
