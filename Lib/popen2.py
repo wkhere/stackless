@@ -32,8 +32,8 @@ def _cleanup():
                 pass
 
 class Popen3:
-    """Class representing a child process.  Normally instances are created
-    by the factory functions popen2() and popen3()."""
+    """Class representing a child process.  Normally, instances are created
+    internally by the functions popen2() and popen3()."""
 
     sts = -1                    # Child not completed yet
 
@@ -82,11 +82,7 @@ class Popen3:
     def _run_child(self, cmd):
         if isinstance(cmd, basestring):
             cmd = ['/bin/sh', '-c', cmd]
-        for i in xrange(3, MAXFD):
-            try:
-                os.close(i)
-            except OSError:
-                pass
+        os.closerange(3, MAXFD)
         try:
             os.execvp(cmd[0], cmd)
         finally:

@@ -3,12 +3,10 @@
 
 """Unit tests for abc.py."""
 
-import sys
 import unittest
 from test import test_support
 
 import abc
-__metaclass__ = type
 
 
 class TestABC(unittest.TestCase):
@@ -59,10 +57,18 @@ class TestABC(unittest.TestCase):
             self.assertEqual(F.__abstractmethods__, set(["bar"]))
             self.assertRaises(TypeError, F)  # because bar is abstract now
 
+    def test_subclass_oldstyle_class(self):
+        class A:
+            __metaclass__ = abc.ABCMeta
+        class OldstyleClass:
+            pass
+        self.assertFalse(issubclass(OldstyleClass, A))
+        self.assertFalse(issubclass(A, OldstyleClass))
+
     def test_registration_basics(self):
         class A:
             __metaclass__ = abc.ABCMeta
-        class B:
+        class B(object):
             pass
         b = B()
         self.assertEqual(issubclass(B, A), False)
@@ -75,6 +81,16 @@ class TestABC(unittest.TestCase):
         c = C()
         self.assertEqual(issubclass(C, A), True)
         self.assertEqual(isinstance(c, A), True)
+
+    def test_isinstance_invalidation(self):
+        class A:
+            __metaclass__ = abc.ABCMeta
+        class B(object):
+            pass
+        b = B()
+        self.assertEqual(isinstance(b, A), False)
+        A.register(B)
+        self.assertEqual(isinstance(b, A), True)
 
     def test_registration_builtins(self):
         class A:
@@ -95,7 +111,7 @@ class TestABC(unittest.TestCase):
         class A1(A):
             pass
         self.assertRaises(RuntimeError, A1.register, A)  # cycles not allowed
-        class B:
+        class B(object):
             pass
         A1.register(B)  # ok
         A1.register(B)  # should pass silently
@@ -132,6 +148,20 @@ class TestABC(unittest.TestCase):
             pass
         self.failUnless(issubclass(MyInt, A))
         self.failUnless(isinstance(42, A))
+
+    def test_all_new_methods_are_called(self):
+        class A:
+            __metaclass__ = abc.ABCMeta
+        class B(object):
+            counter = 0
+            def __new__(cls):
+                B.counter += 1
+                return super(B, cls).__new__(cls)
+        class C(A, B):
+            pass
+        self.assertEqual(B.counter, 0)
+        C()
+        self.assertEqual(B.counter, 1)
 
 
 def test_main():

@@ -4,6 +4,7 @@ TestCases for python DB Btree key comparison function.
 
 import sys, os, re
 import test_all
+import tempfile
 from cStringIO import StringIO
 
 import unittest
@@ -51,7 +52,7 @@ class AbstractBtreeKeyCompareTestCase (unittest.TestCase):
 
     def setUp (self):
         self.filename = self.__class__.__name__ + '.db'
-        homeDir = os.path.join (os.path.dirname (sys.argv[0]), 'db_home')
+        homeDir = os.path.join (tempfile.gettempdir(), 'db_home%d'%os.getpid())
         self.homeDir = homeDir
         try:
             os.mkdir (homeDir)
@@ -69,8 +70,8 @@ class AbstractBtreeKeyCompareTestCase (unittest.TestCase):
         if self.env is not None:
             self.env.close ()
             self.env = None
-        import glob
-        map (os.remove, glob.glob (os.path.join (self.homeDir, '*')))
+        from test import test_support
+        test_support.rmtree(self.homeDir)
 
     def addDataToDB (self, data):
         i = 0

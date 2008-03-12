@@ -196,8 +196,19 @@ Available Functions
 
    *module_globals*, if supplied, should be the global namespace in use by the code
    for which the warning is issued.  (This argument is used to support displaying
-   source for modules found in zipfiles or other non-filesystem import sources, and
-   was added in Python 2.5.)
+   source for modules found in zipfiles or other non-filesystem import
+   sources).
+
+   .. versionchanged:: 2.5
+      Added the `module_globals` parameter.
+
+
+.. function:: warnpy3k(message[, category[, stacklevel]])
+
+   Issue a warning related to Python 3.x deprecation. Warnings are only shown 
+   when Python is started with the -3 option. Like :func:`warn` *message* must
+   be a string and *category* a subclass of :exc:`Warning`. :func:`warnpy3k`
+   is using :exc:`DeprecationWarning` as default warning class.
 
 
 .. function:: showwarning(message, category, filename, lineno[, file])

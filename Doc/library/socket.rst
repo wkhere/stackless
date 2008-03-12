@@ -23,7 +23,7 @@ PS1:7 and PS1:8).  The platform-specific reference material for the various
 socket-related system calls are also a valuable source of information on the
 details of socket semantics.  For Unix, refer to the manual pages; for Windows,
 see the WinSock (or Winsock 2) specification. For IPv6-ready APIs, readers may
-want to refer to :rfc:`2553` titled Basic Socket Interface Extensions for IPv6.
+want to refer to :rfc:`3493` titled Basic Socket Interface Extensions for IPv6.
 
 .. index:: object: socket
 
@@ -65,6 +65,27 @@ numeric address in *host* portion.
 
 .. versionadded:: 2.5
    AF_NETLINK sockets are represented as  pairs ``pid, groups``.
+
+.. versionadded:: 2.6
+   Linux-only support for TIPC is also available using the :const:`AF_TIPC`
+   address family. TIPC is an open, non-IP based networked protocol designed
+   for use in clustered computer environments.  Addresses are represented by a
+   tuple, and the fields depend on the address type. The general tuple form is
+   ``(addr_type, v1, v2, v3 [, scope])``, where:
+
+     - *addr_type* is one of TIPC_ADDR_NAMESEQ, TIPC_ADDR_NAME, or
+       TIPC_ADDR_ID.
+     - *scope* is one of TIPC_ZONE_SCOPE, TIPC_CLUSTER_SCOPE, and
+       TIPC_NODE_SCOPE.
+     - If *addr_type* is TIPC_ADDR_NAME, then *v1* is the server type, *v2* is
+       the port identifier, and *v3* should be 0.
+
+       If *addr_type* is TIPC_ADDR_NAMESEQ, then *v1* is the server type, *v2*
+       is the lower port number, and *v3* is the upper port number.
+
+       If *addr_type* is TIPC_ADDR_ID, then *v1* is the node, *v2* is the
+       reference, and *v3* should be set to 0.
+
 
 All errors raise exceptions.  The normal exceptions for invalid argument types
 and out-of-memory conditions can be raised; errors related to socket or address
@@ -161,6 +182,20 @@ The module :mod:`socket` exports the following constants and functions:
    in the Unix header files are defined; for a few symbols, default values are
    provided.
 
+.. data:: SIO_*
+          RCVALL_*
+          
+   Constants for Windows' WSAIoctl(). The constants are used as arguments to the
+   :meth:`ioctl` method of socket objects.
+   
+   .. versionadded:: 2.6
+
+.. data:: TIPC_*
+
+   TIPC related constants, matching the ones exported by the C socket API. See
+   the TIPC documentation for more information.
+
+   .. versionadded:: 2.6
 
 .. data:: has_ipv6
 
@@ -550,6 +585,16 @@ correspond to Unix system calls applicable to sockets.
    contents of the buffer (see the optional built-in module :mod:`struct` for a way
    to decode C structures encoded as strings).
 
+   
+.. method:: socket.ioctl(control, option)
+
+   :platform: Windows 
+   
+   The :meth:`ioctl` method is a limited interface to the WSAIoctl system
+   interface. Please refer to the MSDN documentation for more information.
+   
+   .. versionadded:: 2.6
+
 
 .. method:: socket.listen(backlog)
 
@@ -568,7 +613,7 @@ correspond to Unix system calls applicable to sockets.
    file object and socket object may be closed or garbage-collected independently.
    The socket must be in blocking mode (it can not have a timeout). The optional
    *mode* and *bufsize* arguments are interpreted the same way as by the built-in
-   :func:`file` function; see :ref:`built-in-funcs` for more information.
+   :func:`file` function.
 
 
 .. method:: socket.recv(bufsize[, flags])
@@ -861,3 +906,28 @@ sends traffic to the first one connected successfully. ::
    s.close()
    print 'Received', repr(data)
 
+   
+The last example shows how to write a very simple network sniffer with raw
+sockets on Windows. The example requires administrator priviliges to modify
+the interface::
+
+   import socket
+
+   # the public network interface
+   HOST = socket.gethostbyname(socket.gethostname())
+   
+   # create a raw socket and bind it to the public interface
+   s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
+   s.bind((HOST, 0))
+   
+   # Include IP headers
+   s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+   
+   # receive all packages
+   s.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+   
+   # receive a package
+   print s.recvfrom(65565)
+   
+   # disabled promiscuous mode
+   s.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)

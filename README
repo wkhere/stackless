@@ -1,7 +1,7 @@
-This is Python version 2.6 alpha 0
+This is Python version 2.6 alpha 1
 ==================================
 
-Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007 
+Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
 Python Software Foundation.
 All rights reserved.
 
@@ -124,20 +124,20 @@ Bug reports
 -----------
 
 To report or search for bugs, please use the Python Bug
-Tracker at http://sourceforge.net/bugs/?group_id=5470.
+Tracker at http://bugs.python.org.
 
 
 Patches and contributions
 -------------------------
 
 To submit a patch or other contribution, please use the Python Patch
-Manager at http://sourceforge.net/patch/?group_id=5470.  Guidelines
-for patch submission may be found at http://www.python.org/patches/.
+Manager at http://bugs.python.org.  Guidelines
+for patch submission may be found at http://www.python.org/dev/patches/.
 
 If you have a proposal to change Python, it's best to submit a Python
 Enhancement Proposal (PEP) first.  All current PEPs, as well as
 guidelines for submitting a new PEP, are listed at
-http://www.python.org/peps/.
+http://www.python.org/dev/peps/.
 
 
 Questions
@@ -597,12 +597,12 @@ MacOSX: The tests will crash on both 10.1 and 10.2 with SEGV in
         want to use any Aqua-based GUI toolkit (whether Tkinter, wxPython,
         Carbon, Cocoa or anything else).
 
-	You may also want to try the configure option "--enable-universalsdk"
-	which builds Python as a universal binary with support for the 
-	i386 and PPC architetures. This requires Xcode 2.1 or later to build.
+        You may also want to try the configure option "--enable-universalsdk"
+        which builds Python as a universal binary with support for the 
+        i386 and PPC architetures. This requires Xcode 2.1 or later to build.
 
-        See Mac/OSX/README for more information on framework and 
-	universal builds.
+        See Mac/README for more information on framework and 
+        universal builds.
 
 Cygwin: With recent (relative to the time of writing, 2001-12-19)
         Cygwin installations, there are problems with the interaction
@@ -1117,7 +1117,7 @@ Modules/getpath.o.
 --with-tsc: Profile using the Pentium timestamping counter (TSC).
 
 --with-system-ffi:  Build the _ctypes extension module using an ffi
-	library installed on the system.
+        library installed on the system.
 
 
 Building for multiple architectures (using the VPATH feature)
@@ -1156,6 +1156,9 @@ makesetup script supports multiple input files, so if you want to be
 fancy you can change the rules to create an empty Setup.local if it
 doesn't exist and run it with arguments $(srcdir)/Setup Setup.local;
 however this assumes that you only need to add modules.)
+
+Also note that you can't use a workspace for VPATH and non VPATH builds. The
+object files left behind by one version confuses the other.
 
 
 Building on non-UNIX systems
@@ -1242,7 +1245,7 @@ Most subdirectories have their own README files.  Most files have
 comments.
 
 Demo/           Demonstration scripts, modules and programs
-Doc/            Documentation sources (LaTeX)
+Doc/            Documentation sources (reStructuredText)
 Grammar/        Input for the parser generator
 Include/        Public header files
 LICENSE         Licensing information

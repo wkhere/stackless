@@ -30,7 +30,7 @@ available.  They are listed here in alphabetical order.
    :func:`__import__` function.
 
    For example, the statement ``import spam`` results in the following call:
-   ``__import__('spam',`` ``globals(),`` ``locals(), [], -1)``; the statement
+   ``__import__('spam', globals(), locals(), [], -1)``; the statement
    ``from spam.ham import eggs`` results in ``__import__('spam.ham', globals(),
    locals(), ['eggs'], -1)``.  Note that even though ``locals()`` and ``['eggs']``
    are passed in as arguments, the :func:`__import__` function does not set the
@@ -43,7 +43,7 @@ available.  They are listed here in alphabetical order.
    top-level package (the name up till the first dot) is returned, *not* the
    module named by *name*.  However, when a non-empty *fromlist* argument is
    given, the module named by *name* is returned.  This is done for
-   compatibility with the bytecode generated for the different kinds of import
+   compatibility with the :term:`bytecode` generated for the different kinds of import
    statement; when using ``import spam.ham.eggs``, the top-level package
    :mod:`spam` must be placed in the importing namespace, but when using ``from
    spam.ham import eggs``, the ``spam.ham`` subpackage must be used to find the
@@ -161,8 +161,8 @@ available.  They are listed here in alphabetical order.
           @classmethod
           def f(cls, arg1, arg2, ...): ...
 
-   The ``@classmethod`` form is a function decorator -- see the description of
-   function definitions in :ref:`function` for details.
+   The ``@classmethod`` form is a function :term:`decorator` -- see the description
+   of function definitions in :ref:`function` for details.
 
    It can be called either on the class (such as ``C.f()``) or on an instance (such
    as ``C().f()``).  The instance is ignored except for its class. If a class
@@ -216,10 +216,13 @@ available.  They are listed here in alphabetical order.
    the *flags* argument is it -- the future statements in effect around the call to
    compile are ignored.
 
-   Future statements are specified by bits which can be bitwise or-ed together to
+   Future statements are specified by bits which can be bitwise ORed together to
    specify multiple statements.  The bitfield required to specify a given feature
    can be found as the :attr:`compiler_flag` attribute on the :class:`_Feature`
    instance in the :mod:`__future__` module.
+
+   This function raises :exc:`SyntaxError` if the compiled source is invalid,
+   and :exc:`TypeError` if the source contains null bytes.
 
 
 .. function:: complex([real[, imag]])
@@ -302,7 +305,8 @@ available.  They are listed here in alphabetical order.
       Because :func:`dir` is supplied primarily as a convenience for use at an
       interactive prompt, it tries to supply an interesting set of names more than it
       tries to supply a rigorously or consistently defined set of names, and its
-      detailed behavior may change across releases.
+      detailed behavior may change across releases.  For example, metaclass attributes
+      are not in the result list when the argument is a class.
 
 
 .. function:: divmod(a, b)
@@ -322,7 +326,7 @@ available.  They are listed here in alphabetical order.
 
 .. function:: enumerate(iterable)
 
-   Return an enumerate object. *iterable* must be a sequence, an iterator, or some
+   Return an enumerate object. *iterable* must be a sequence, an :term:`iterator`, or some
    other object which supports iteration.  The :meth:`next` method of the iterator
    returned by :func:`enumerate` returns a tuple containing a count (from zero) and
    the corresponding value obtained from iterating over *iterable*.
@@ -350,13 +354,13 @@ available.  They are listed here in alphabetical order.
 
    The *expression* argument is parsed and evaluated as a Python expression
    (technically speaking, a condition list) using the *globals* and *locals*
-   dictionaries as global and local name space.  If the *globals* dictionary is
+   dictionaries as global and local namespace.  If the *globals* dictionary is
    present and lacks '__builtins__', the current globals are copied into *globals*
    before *expression* is parsed.  This means that *expression* normally has full
    access to the standard :mod:`__builtin__` module and restricted environments are
    propagated.  If the *locals* dictionary is omitted it defaults to the *globals*
    dictionary.  If both dictionaries are omitted, the expression is executed in the
-   environment where :keyword:`eval` is called.  The return value is the result of
+   environment where :func:`eval` is called.  The return value is the result of
    the evaluated expression. Syntax errors are reported as exceptions.  Example::
 
       >>> x = 1
@@ -420,7 +424,7 @@ available.  They are listed here in alphabetical order.
 
    Construct a list from those elements of *iterable* for which *function* returns
    true.  *iterable* may be either a sequence, a container which supports
-   iteration, or an iterator,  If *iterable* is a string or a tuple, the result
+   iteration, or an iterator.  If *iterable* is a string or a tuple, the result
    also has that type; otherwise it is always a list.  If *function* is ``None``,
    the identity function is assumed, that is, all elements of *iterable* that are
    false are removed.
@@ -434,7 +438,8 @@ available.  They are listed here in alphabetical order.
 
    Convert a string or a number to floating point.  If the argument is a string, it
    must contain a possibly signed decimal or floating point number, possibly
-   embedded in whitespace. Otherwise, the argument may be a plain or long integer
+   embedded in whitespace. The argument may also be [+|-]nan or [+|-]inf.
+   Otherwise, the argument may be a plain or long integer
    or a floating point number, and a floating point number with the same value
    (within Python's floating point precision) is returned.  If no argument is
    given, returns ``0.0``.
@@ -446,9 +451,10 @@ available.  They are listed here in alphabetical order.
          single: Infinity
 
       When passing in a string, values for NaN and Infinity may be returned, depending
-      on the underlying C library.  The specific set of strings accepted which cause
-      these values to be returned depends entirely on the C library and is known to
-      vary.
+      on the underlying C library.  Float accepts the strings nan, inf and -inf for
+      NaN and positive or negative infinity. The case and a leading + are ignored as
+      well as a leading - is ignored for NaN. Float always represents NaN and infinity
+      as nan, inf or -inf.
 
    The float type is described in :ref:`typesnumeric`.
 
@@ -504,6 +510,8 @@ available.  They are listed here in alphabetical order.
    as the name of a module, function, class, method, keyword, or documentation
    topic, and a help page is printed on the console.  If the argument is any other
    kind of object, a help page on the object is generated.
+
+   This function is added to the built-in namespace by the :mod:`site` module.
 
    .. versionadded:: 2.2
 
@@ -590,7 +598,7 @@ available.  They are listed here in alphabetical order.
 
 .. function:: iter(o[, sentinel])
 
-   Return an iterator object.  The first argument is interpreted very differently
+   Return an :term:`iterator` object.  The first argument is interpreted very differently
    depending on the presence of the second argument. Without a second argument, *o*
    must be a collection object which supports the iteration protocol (the
    :meth:`__iter__` method), or it must support the sequence protocol (the
@@ -633,7 +641,7 @@ available.  They are listed here in alphabetical order.
       The contents of this dictionary should not be modified; changes may not affect
       the values of local variables used by the interpreter.
 
-   Free variables are returned by *locals* when it is called in a function block.
+   Free variables are returned by :func:`locals` when it is called in a function block.
    Modifications of free variables may not affect the values used by the
    interpreter.  Free variables are not returned in class blocks.
 
@@ -728,7 +736,9 @@ available.  They are listed here in alphabetical order.
    writing (truncating the file if it already exists), and ``'a'`` for appending
    (which on *some* Unix systems means that *all* writes append to the end of the
    file regardless of the current seek position).  If *mode* is omitted, it
-   defaults to ``'r'``.  When opening a binary file, you should append ``'b'`` to
+   defaults to ``'r'``.  The default is to use text mode, which may convert
+   ``'\n'`` characters to a platform-specific representation on writing and back
+   on reading.  Thus, when opening a binary file, you should append ``'b'`` to
    the *mode* value to open the file in binary mode, which will improve
    portability.  (Appending ``'b'`` is useful even on systems that don't treat
    binary and text files differently, where it serves as documentation.)  See below
@@ -766,8 +776,9 @@ available.  They are listed here in alphabetical order.
    Python enforces that the mode, after stripping ``'U'``, begins with ``'r'``,
    ``'w'`` or ``'a'``.
 
-   See also the :mod:`fileinput` module, the :mod:`os` module, and the
-   :mod:`os.path` module.
+   Python provides many file handling modules including
+   :mod:`fileinput`, :mod:`os`, :mod:`os.path`, :mod:`tempfile`, and
+   :mod:`shutil`.
 
    .. versionchanged:: 2.5
       Restriction on first letter of mode string introduced.
@@ -808,8 +819,8 @@ available.  They are listed here in alphabetical order.
 
 .. function:: property([fget[, fset[, fdel[, doc]]]])
 
-   Return a property attribute for new-style classes (classes that derive from
-   :class:`object`).
+   Return a property attribute for :term:`new-style class`\es (classes that
+   derive from :class:`object`).
 
    *fget* is a function for getting an attribute value, likewise *fset* is a
    function for setting, and *fdel* a function for del'ing, an attribute.  Typical
@@ -824,7 +835,7 @@ available.  They are listed here in alphabetical order.
 
    If given, *doc* will be the docstring of the property attribute. Otherwise, the
    property will copy *fget*'s docstring (if it exists).  This makes it possible to
-   create read-only properties easily using :func:`property` as a decorator::
+   create read-only properties easily using :func:`property` as a :term:`decorator`::
 
       class Parrot(object):
           def __init__(self):
@@ -973,11 +984,15 @@ available.  They are listed here in alphabetical order.
 
 .. function:: reversed(seq)
 
-   Return a reverse iterator.  *seq* must be an object which supports the sequence
-   protocol (the :meth:`__len__` method and the :meth:`__getitem__` method with
-   integer arguments starting at ``0``).
+   Return a reverse :term:`iterator`.  *seq* must be an object which has
+   a :meth:`__reversed__` method or supports the sequence protocol (the
+   :meth:`__len__` method and the :meth:`__getitem__` method with integer
+   arguments starting at ``0``).
 
    .. versionadded:: 2.4
+
+   .. versionchanged:: 2.6
+      Added the possibility to write a custom :meth:`__reversed__` method.
 
 
 .. function:: round(x[, n])
@@ -1014,7 +1029,7 @@ available.  They are listed here in alphabetical order.
 
    .. index:: single: Numerical Python
 
-   Return a slice object representing the set of indices specified by
+   Return a :term:`slice` object representing the set of indices specified by
    ``range(start, stop, step)``.  The *start* and *step* arguments default to
    ``None``.  Slice objects have read-only data attributes :attr:`start`,
    :attr:`stop` and :attr:`step` which merely return the argument values (or their
@@ -1035,10 +1050,11 @@ available.  They are listed here in alphabetical order.
    *cmp* specifies a custom comparison function of two arguments (iterable
    elements) which should return a negative, zero or positive number depending on
    whether the first argument is considered smaller than, equal to, or larger than
-   the second argument: ``cmp=lambda x,y: cmp(x.lower(), y.lower())``
+   the second argument: ``cmp=lambda x,y: cmp(x.lower(), y.lower())``.  The default
+   value is ``None``.
 
    *key* specifies a function of one argument that is used to extract a comparison
-   key from each list element: ``key=str.lower``
+   key from each list element: ``key=str.lower``.  The default value is ``None``.
 
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
@@ -1062,8 +1078,8 @@ available.  They are listed here in alphabetical order.
           @staticmethod
           def f(arg1, arg2, ...): ...
 
-   The ``@staticmethod`` form is a function decorator -- see the description of
-   function definitions in :ref:`function` for details.
+   The ``@staticmethod`` form is a function :term:`decorator` -- see the
+   description of function definitions in :ref:`function` for details.
 
    It can be called either on the class (such as ``C.f()``) or on an instance (such
    as ``C().f()``).  The instance is ignored except for its class.
@@ -1112,8 +1128,8 @@ available.  They are listed here in alphabetical order.
    Return the superclass of *type*.  If the second argument is omitted the super
    object returned is unbound.  If the second argument is an object,
    ``isinstance(obj, type)`` must be true.  If the second argument is a type,
-   ``issubclass(type2, type)`` must be true. :func:`super` only works for new-style
-   classes.
+   ``issubclass(type2, type)`` must be true. :func:`super` only works for
+   :term:`new-style class`\es.
 
    A typical use for calling a cooperative superclass method is::
 
@@ -1261,13 +1277,17 @@ available.  They are listed here in alphabetical order.
    sequence argument, it returns a list of 1-tuples. With no arguments, it returns
    an empty list.
 
+   The left-to-right evaluation order of the iterables is guaranteed. This
+   makes possible an idiom for clustering a data series into n-length groups
+   using ``zip(*[iter(s)]*n)``.
+
    .. versionadded:: 2.0
 
    .. versionchanged:: 2.4
       Formerly, :func:`zip` required at least one argument and ``zip()`` raised a
       :exc:`TypeError` instead of returning an empty list.
 
-.. % ---------------------------------------------------------------------------
+..  ---------------------------------------------------------------------------
 
 
 .. _non-essential-built-in-funcs:

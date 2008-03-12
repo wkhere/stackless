@@ -109,8 +109,6 @@ Tony Campbell
 Brett Cannon
 Mike Carlton
 Terry Carroll
-Brian Leair
-Luke Kenneth Casson Leighton
 Donn Cave
 Per Cederqvist
 Octavian Cerna
@@ -167,6 +165,7 @@ Yves Dionne
 Daniel Dittmar
 Walter Dörwald
 Jaromir Dolecek
+Ismail Donmez
 Dima Dorfman
 Cesar Douady
 Dean Draayer
@@ -223,6 +222,8 @@ Tadayoshi Funaba
 Gyro Funch
 Peter Funk
 Geoff Furnish
+Ulisses Furquim
+Achim Gaedke
 Lele Gaifax
 Santiago Gala
 Yitzchak Gale
@@ -273,6 +274,7 @@ Shane Hathaway
 Rycharde Hawkes
 Jochen Hayek
 Thomas Heller
+Malte Helmert
 Lance Finn Helsten
 Jonathan Hendry
 James Henstridge
@@ -384,6 +386,7 @@ Piers Lauder
 Ben Laurie
 Simon Law
 Chris Lawrence
+Brian Leair
 Christopher Lee
 Inyeol Lee
 John J. Lee
@@ -391,10 +394,13 @@ Thomas Lee
 Luc Lefebvre
 Kip Lehman
 Joerg Lehmann
+Luke Kenneth Casson Leighton
 Marc-Andre Lemburg
+John Lenton
 Mark Levinson
 William Lewis
 Robert van Liere
+Shawn Ligocki
 Martin Ligr
 Christopher Lindblad
 Eric Lindvall
@@ -457,6 +463,7 @@ James A Morrison
 Sape Mullender
 Sjoerd Mullender
 Michael Muller
+John Nagle
 Takahiro Nakayama
 Travers Naran
 Fredrik Nehr
@@ -503,6 +510,7 @@ Fernando Pérez
 Mark Perrego
 Trevor Perrin
 Tim Peters
+Benjamin Peterson
 Chris Petrilli
 Bjorn Pettersen
 Geoff Philbrick
@@ -516,6 +524,7 @@ Martijn Pieters
 François Pinard
 Zach Pincus
 Michael Piotrowski
+Michael Pomraning
 Iustin Pop
 John Popplewell
 Amrit Prem
@@ -575,12 +584,14 @@ Neil Schemenauer
 David Scherer
 Gregor Schmid
 Ralf Schmitt
+Michael Schneider
 Peter Schneider-Kamp
 Arvin Schnell
 Chad J. Schroeder
 Sam Schulenburg
 Stefan Schwarzer
 Dietmar Schwertberger
+Federico Schwindt
 Barry Scott
 Steven Scott
 Nick Seidenman
@@ -589,6 +600,7 @@ Fred Sells
 Jiwon Seo
 Jerry Seutter
 Denis Severson
+Ian Seyer
 Ha Shao
 Bruce Sherwood
 Pete Shinners
@@ -658,6 +670,7 @@ Anthony Tuininga
 Christopher Tur Lesniewski-Laas
 Stephen Turner
 Bill Tutt
+Eren Türkay
 Doobee R. Tzeck
 Lionel Ulmer
 Roger Upole
@@ -686,10 +699,13 @@ Bob Watson
 Aaron Watters
 Henrik Weber
 Corran Webster
+Stefan Wehr
 Zack Weinberg
 Edward Welbourne
 Cliff Wells
 Rickard Westman
+Jeff Wheeler
+Christopher White
 Mats Wichmann
 Truida Wiedijk
 Felix Wiemann

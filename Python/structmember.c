@@ -61,6 +61,9 @@ PyMember_GetOne(const char *addr, PyMemberDef *l)
 	}
 	addr += l->offset;
 	switch (l->type) {
+	case T_BOOL:
+		v = PyBool_FromLong(*(char*)addr);
+		break;
 	case T_BYTE:
 		v = PyInt_FromLong(*(char*)addr);
 		break;
@@ -172,7 +175,7 @@ PyMember_SetOne(char *addr, PyMemberDef *l, PyObject *v)
 		PyErr_SetString(PyExc_TypeError, "readonly attribute");
 		return -1;
 	}
-	if ((l->flags & WRITE_RESTRICTED) && PyEval_GetRestricted()) {
+	if ((l->flags & PY_WRITE_RESTRICTED) && PyEval_GetRestricted()) {
 		PyErr_SetString(PyExc_RuntimeError, "restricted attribute");
 		return -1;
 	}
@@ -183,6 +186,18 @@ PyMember_SetOne(char *addr, PyMemberDef *l, PyObject *v)
 	}
 	addr += l->offset;
 	switch (l->type) {
+	case T_BOOL:{
+		if (!PyBool_Check(v)) {
+			PyErr_SetString(PyExc_TypeError,
+					"attribute value type must be bool");
+			return -1;
+		}
+		if (v == Py_True)
+			*(char*)addr = (char) 1;
+		else
+			*(char*)addr = (char) 0;
+		break;
+		}
 	case T_BYTE:{
 		long long_val = PyInt_AsLong(v);
 		if ((long_val == -1) && PyErr_Occurred())

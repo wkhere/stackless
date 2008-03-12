@@ -14,7 +14,6 @@ import os
 import posixpath
 import BaseHTTPServer
 import urllib
-import urlparse
 import cgi
 import shutil
 import mimetypes
@@ -113,8 +112,9 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         list.sort(key=lambda a: a.lower())
         f = StringIO()
         displaypath = cgi.escape(urllib.unquote(self.path))
-        f.write("<title>Directory listing for %s</title>\n" % displaypath)
-        f.write("<h2>Directory listing for %s</h2>\n" % displaypath)
+        f.write('<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
+        f.write("<html>\n<title>Directory listing for %s</title>\n" % displaypath)
+        f.write("<body>\n<h2>Directory listing for %s</h2>\n" % displaypath)
         f.write("<hr>\n<ul>\n")
         for name in list:
             fullname = os.path.join(path, name)
@@ -128,7 +128,7 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 # Note: a link to a directory displays with @ and links with /
             f.write('<li><a href="%s">%s</a>\n'
                     % (urllib.quote(linkname), cgi.escape(displayname)))
-        f.write("</ul>\n<hr>\n")
+        f.write("</ul>\n<hr>\n</body>\n</html>\n")
         length = f.tell()
         f.seek(0)
         self.send_response(200)
@@ -146,7 +146,8 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         """
         # abandon query parameters
-        path = urlparse.urlparse(path)[2]
+        path = path.split('?',1)[0]
+        path = path.split('#',1)[0]
         path = posixpath.normpath(urllib.unquote(path))
         words = path.split('/')
         words = filter(None, words)

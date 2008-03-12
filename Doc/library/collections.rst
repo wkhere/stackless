@@ -12,20 +12,132 @@
 
 This module implements high-performance container datatypes.  Currently,
 there are two datatypes, :class:`deque` and :class:`defaultdict`, and
-one datatype factory function, :func:`named_tuple`. Python already
-includes built-in containers, :class:`dict`, :class:`list`,
-:class:`set`, and :class:`tuple`. In addition, the optional :mod:`bsddb`
-module has a :meth:`bsddb.btopen` method that can be used to create in-memory
-or file based ordered dictionaries with string keys.
-
-Future editions of the standard library may include balanced trees and
-ordered dictionaries.
+one datatype factory function, :func:`namedtuple`. 
 
 .. versionchanged:: 2.5
    Added :class:`defaultdict`.
 
 .. versionchanged:: 2.6
-   Added :func:`named_tuple`.
+   Added :func:`namedtuple`.
+
+The specialized containers provided in this module provide alternatives
+to Python's general purpose built-in containers, :class:`dict`, 
+:class:`list`, :class:`set`, and :class:`tuple`.
+
+Besides the containers provided here, the optional :mod:`bsddb`
+module offers the ability to create in-memory or file based ordered 
+dictionaries with string keys using the :meth:`bsddb.btopen` method.
+
+In addition to containers, the collections module provides some ABCs
+(abstract base classes) that can be used to test whether a class 
+provides a particular interface, for example, is it hashable or
+a mapping. 
+
+.. versionchanged:: 2.6
+   Added abstract base classes.
+
+ABCs - abstract base classes
+----------------------------
+
+The collections module offers the following ABCs:
+
+=========================  ====================  ======================  ====================================================
+ABC                        Inherits              Abstract Methods        Mixin Methods
+=========================  ====================  ======================  ====================================================
+:class:`Container`                               ``__contains__``
+:class:`Hashable`                                ``__hash__``
+:class:`Iterable`                                ``__iter__``
+:class:`Iterator`          :class:`Iterable`     ``__next__``            ``__iter__``
+:class:`Sized`          			 ``__len__``
+
+:class:`Mapping`           :class:`Sized`,       ``__getitem__``,        ``__contains__``, ``keys``, ``items``, ``values``,
+                           :class:`Iterable`,    ``__len__``. and        ``get``, ``__eq__``, and ``__ne__``
+                           :class:`Container`    ``__iter__``
+
+:class:`MutableMapping`    :class:`Mapping`      ``__getitem__``         Inherited Mapping methods and
+                                                 ``__setitem__``,        ``pop``, ``popitem``, ``clear``, ``update``,
+                                                 ``__delitem__``,        and ``setdefault``
+						 ``__iter__``, and
+                                                 ``__len__``
+
+:class:`Sequence`          :class:`Sized`,       ``__getitem__``         ``__contains__``. ``__iter__``, ``__reversed__``.
+                           :class:`Iterable`,    and ``__len__``         ``index``, and ``count``
+                           :class:`Container`
+
+:class:`MutableSequnce`    :class:`Sequence`     ``__getitem__``         Inherited Sequence methods and
+                                                 ``__delitem__``,        ``append``, ``reverse``, ``extend``, ``pop``,
+                                                 ``insert``,             ``remove``, and ``__iadd__``
+                                                 and ``__len__``
+
+:class:`Set`               :class:`Sized`,       ``__len__``,            ``__le__``, ``__lt__``, ``__eq__``, ``__ne__``,
+                           :class:`Iterable`,    ``__iter__``, and       ``__gt__``, ``__ge__``, ``__and__``, ``__or__``
+                           :class:`Container`    ``__contains__``        ``__sub__``, ``__xor__``, and ``isdisjoint``
+
+:class:`MutableSet`        :class:`Set`          ``add`` and             Inherited Set methods and
+                                                 ``discard``             ``clear``, ``pop``, ``remove``, ``__ior__``,
+                                                                         ``__iand__``, ``__ixor__``, and ``__isub__``
+=========================  ====================  ======================  ====================================================
+
+These ABCs allow us to ask classes or instances if they provide
+particular functionality, for example::
+
+    size = None
+    if isinstance(myvar, collections.Sized):
+	size = len(myvar)
+
+Several of the ABCs are also useful as mixins that make it easier to develop
+classes supporting container APIs.  For example, to write a class supporting
+the full :class:`Set` API, it only necessary to supply the three underlying
+abstract methods: :meth:`__contains__`, :meth:`__iter__`, and :meth:`__len__`.
+The ABC supplies the remaining methods such as :meth:`__and__` and
+:meth:`isdisjoint` ::
+
+    class ListBasedSet(collections.Set):
+         ''' Alternate set implementation favoring space over speed
+             and not requiring the set elements to be hashable. '''
+         def __init__(self, iterable):
+             self.elements = lst = []
+             for value in iterable:
+                 if value not in lst:
+                     lst.append(value)
+         def __iter__(self):
+             return iter(self.elements)
+         def __contains__(self, value):
+             return value in self.elements
+         def __len__(self):
+             return len(self.elements)
+
+    s1 = ListBasedSet('abcdef')
+    s2 = ListBasedSet('defghi')
+    overlap = s1 & s2            # The __and__() method is supported automatically
+
+Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
+
+(1) 
+   Since some set operations create new sets, the default mixin methods need
+   a way to create new instances from an iterable. The class constructor is 
+   assumed to have a signature in the form ``ClassName(iterable)``.  
+   That assumption is factored-out to a singleinternal classmethod called
+   :meth:`_from_iterable` which calls ``cls(iterable)`` to produce a new set.
+   If the :class:`Set` mixin is being used in a class with a different
+   constructor signature, you will need to override :meth:`from_iterable` 
+   with a classmethod that can construct new instances from 
+   an iterable argument.
+
+(2)
+   To override the comparisons (presumably for speed, as the
+   semantics are fixed), redefine :meth:`__le__` and
+   then the other operations will automatically follow suit.
+
+(3)
+   The :class:`Set` mixin provides a :meth:`_hash` method to compute a hash value
+   for the set; however, :meth:`__hash__` is not defined because not all sets
+   are hashable or immutable.  To add set hashabilty using mixins,
+   inherit from both :meth:`Set` and :meth:`Hashable`, then define
+   ``__hash__ = Set._hash``.
+
+(For more about ABCs, see the :mod:`abc` module and :pep:`3119`.)
+
 
 
 .. _deque-objects:
@@ -60,7 +172,7 @@ ordered dictionaries.
    where only the most recent activity is of interest.
 
    .. versionchanged:: 2.6
-      Added *maxlen*
+      Added *maxlen* parameter.
 
 Deque objects support the following methods:
 
@@ -348,32 +460,32 @@ Setting the :attr:`default_factory` to :class:`set` makes the
 
 .. _named-tuple-factory:
 
-:func:`named_tuple` Factory Function for Tuples with Named Fields
------------------------------------------------------------------
+:func:`namedtuple` Factory Function for Tuples with Named Fields
+----------------------------------------------------------------
 
 Named tuples assign meaning to each position in a tuple and allow for more readable,
 self-documenting code.  They can be used wherever regular tuples are used, and
 they add the ability to access fields by name instead of position index.
 
-.. function:: named_tuple(typename, fieldnames, [verbose])
+.. function:: namedtuple(typename, fieldnames, [verbose])
 
    Returns a new tuple subclass named *typename*.  The new subclass is used to
-   create tuple-like objects that have fields accessable by attribute lookup as
+   create tuple-like objects that have fields accessible by attribute lookup as
    well as being indexable and iterable.  Instances of the subclass also have a
    helpful docstring (with typename and fieldnames) and a helpful :meth:`__repr__`
    method which lists the tuple contents in a ``name=value`` format.
 
    The *fieldnames* are a single string with each fieldname separated by whitespace
-   and/or commas (for example 'x y' or 'x, y').  Alternatively, the *fieldnames*
-   can be specified as a list of strings (such as ['x', 'y']).
+   and/or commas, for example ``'x y'`` or ``'x, y'``.  Alternatively, *fieldnames*
+   can be a sequence of strings such as ``['x', 'y']``.
 
    Any valid Python identifier may be used for a fieldname except for names
-   starting and ending with double underscores.  Valid identifiers consist of
-   letters, digits, and underscores but do not start with a digit and cannot be
+   starting with an underscore.  Valid identifiers consist of letters, digits,
+   and underscores but do not start with a digit or underscore and cannot be
    a :mod:`keyword` such as *class*, *for*, *return*, *global*, *pass*, *print*,
    or *raise*.
 
-   If *verbose* is true, will print the class definition.
+   If *verbose* is true, the class definition is printed just before being built.
 
    Named tuple instances do not have per-instance dictionaries, so they are
    lightweight and require no more memory than regular tuples.
@@ -382,31 +494,49 @@ they add the ability to access fields by name instead of position index.
 
 Example::
 
-   >>> Point = named_tuple('Point', 'x y', verbose=True)
+   >>> Point = namedtuple('Point', 'x y', verbose=True)
    class Point(tuple):
            'Point(x, y)'
+
            __slots__ = ()
-           __fields__ = ('x', 'y')
+
+           _fields = ('x', 'y')
+
            def __new__(cls, x, y):
                return tuple.__new__(cls, (x, y))
+
+           @classmethod
+           def _make(cls, iterable):
+               'Make a new Point object from a sequence or iterable'
+               result = tuple.__new__(cls, iterable)
+               if len(result) != 2:
+                   raise TypeError('Expected 2 arguments, got %d' % len(result))
+               return result
+
            def __repr__(self):
                return 'Point(x=%r, y=%r)' % self
-           def __asdict__(self):
-               'Return a new dict mapping field names to their values'
-               return dict(zip(('x', 'y'), self))
-           def __replace__(self, field, value):
-               'Return a new Point object replacing one field with a new value'
-               return Point(**dict(zip(('x', 'y'), self) + [(field, value)]))
+
+           def _asdict(t):
+               'Return a new dict which maps field names to their values'
+               return {'x': t[0], 'y': t[1]}
+
+           def _replace(self, **kwds):
+               'Return a new Point object replacing specified fields with new values'
+               result = self._make(map(kwds.pop, ('x', 'y'), self))
+               if kwds:
+                   raise ValueError('Got unexpected field names: %r' % kwds.keys())
+               return result
+
            x = property(itemgetter(0))
            y = property(itemgetter(1))
 
    >>> p = Point(11, y=22)     # instantiate with positional or keyword arguments
-   >>> p[0] + p[1]             # indexable like the regular tuple (11, 22)
+   >>> p[0] + p[1]             # indexable like the plain tuple (11, 22)
    33
    >>> x, y = p                # unpack like a regular tuple
    >>> x, y
    (11, 22)
-   >>> p.x + p.y               # fields also accessable by name
+   >>> p.x + p.y               # fields also accessible by name
    33
    >>> p                       # readable __repr__ with a name=value style
    Point(x=11, y=22)
@@ -414,74 +544,116 @@ Example::
 Named tuples are especially useful for assigning field names to result tuples returned
 by the :mod:`csv` or :mod:`sqlite3` modules::
 
-   EmployeeRecord = named_tuple('EmployeeRecord', 'name, age, title, department, paygrade')
+   EmployeeRecord = namedtuple('EmployeeRecord', 'name, age, title, department, paygrade')
 
-   from itertools import starmap
    import csv
-   for emp in starmap(EmployeeRecord, csv.reader(open("employees.csv", "rb"))):
+   for emp in map(EmployeeRecord._make, csv.reader(open("employees.csv", "rb"))):
        print emp.name, emp.title
 
    import sqlite3
    conn = sqlite3.connect('/companydata')
    cursor = conn.cursor()
    cursor.execute('SELECT name, age, title, department, paygrade FROM employees')
-   for emp in starmap(EmployeeRecord, cursor.fetchall()):
+   for emp in map(EmployeeRecord._make, cursor.fetchall()):
        print emp.name, emp.title
 
-When casting a single record to a named tuple, use the star-operator [#]_ to unpack
-the values::
-
-   >>> t = [11, 22]
-   >>> Point(*t)               # the star-operator unpacks any iterable object
-   Point(x=11, y=22)
-
-When casting a dictionary to a named tuple, use the double-star-operator::
-
-   >>> d = {'x': 11, 'y': 22}
-   >>> Point(**d)
-   Point(x=11, y=22)
-
 In addition to the methods inherited from tuples, named tuples support
-two additonal methods and a read-only attribute.
+three additional methods and one attribute.  To prevent conflicts with
+field names, the method and attribute names start with an underscore.
 
-.. method:: somenamedtuple.__asdict__()
+.. method:: somenamedtuple._make(iterable)
+
+   Class method that makes a new instance from an existing sequence or iterable.
+
+::
+
+      >>> t = [11, 22]
+      >>> Point._make(t)
+      Point(x=11, y=22)
+
+.. method:: somenamedtuple._asdict()
 
    Return a new dict which maps field names to their corresponding values:
 
 ::
 
-      >>> p.__asdict__()
+      >>> p._asdict()
       {'x': 11, 'y': 22}
       
-.. method:: somenamedtuple.__replace__(field, value)
+.. method:: somenamedtuple._replace(kwargs)
 
-   Return a new instance of the named tuple replacing the named *field* with a new *value*:
+   Return a new instance of the named tuple replacing specified fields with new values:
 
 ::
 
       >>> p = Point(x=11, y=22)
-      >>> p.__replace__('x', 33)
+      >>> p._replace(x=33)
       Point(x=33, y=22)
 
-      >>> for recordnum, record in inventory:
-      ...     inventory[recordnum] = record.replace('total', record.price * record.quantity)
+      >>> for partnum, record in inventory.items():
+      ...     inventory[partnum] = record._replace(price=newprices[partnum], timestamp=time.now())
 
-.. attribute:: somenamedtuple.__fields__
+.. attribute:: somenamedtuple._fields
 
-   Return a tuple of strings listing the field names.  This is useful for introspection
+   Tuple of strings listing the field names.  Useful for introspection
    and for creating new named tuple types from existing named tuples.
 
 ::
 
-      >>> p.__fields__                                  # view the field names
+      >>> p._fields            # view the field names
       ('x', 'y')
 
-      >>> Color = named_tuple('Color', 'red green blue')
-      >>> Pixel = named_tuple('Pixel', Point.__fields__ + Color.__fields__)
+      >>> Color = namedtuple('Color', 'red green blue')
+      >>> Pixel = namedtuple('Pixel', Point._fields + Color._fields)
       >>> Pixel(11, 22, 128, 255, 0)
-      Pixel(x=11, y=22, red=128, green=255, blue=0)'
+      Pixel(x=11, y=22, red=128, green=255, blue=0)
+
+To retrieve a field whose name is stored in a string, use the :func:`getattr`
+function::
+
+    >>> getattr(p, 'x')
+    11
+
+To convert a dictionary to a named tuple, use the double-star-operator [#]_::
+
+   >>> d = {'x': 11, 'y': 22}
+   >>> Point(**d)
+   Point(x=11, y=22)
+
+Since a named tuple is a regular Python class, it is easy to add or change
+functionality with a subclass.  Here is how to add a calculated field and
+a fixed-width print format::
+
+    >>> class Point(namedtuple('Point', 'x y')):
+    ...     __slots__ = ()
+    ...     @property
+    ...     def hypot(self):
+    ...         return (self.x ** 2 + self.y ** 2) ** 0.5
+    ...     def __str__(self):
+    ...         return 'Point: x=%6.3f  y=%6.3f  hypot=%6.3f' % (self.x, self.y, self.hypot)
+
+    >>> for p in Point(3, 4), Point(14, 5/7.):
+    ...     print p
+
+    Point: x= 3.000  y= 4.000  hypot= 5.000
+    Point: x=14.000  y= 0.714  hypot=14.018
+
+The subclass shown above sets ``__slots__`` to an empty tuple.  This keeps
+keep memory requirements low by preventing the creation of instance dictionaries.
+
+Subclassing is not useful for adding new, stored fields.  Instead, simply
+create a new named tuple type from the :attr:`_fields` attribute::
+
+    >>> Point3D = namedtuple('Point3D', Point._fields + ('z',))
+
+Default values can be implemented by using :meth:`_replace` to
+customize a prototype instance::
+
+    >>> Account = namedtuple('Account', 'owner balance transaction_count')
+    >>> default_account = Account('<owner name>', 0.0, 0)
+    >>> johns_account = default_account._replace(owner='John')
 
 .. rubric:: Footnotes
 
-.. [#] For information on the star-operator see
+.. [#] For information on the double-star-operator see
    :ref:`tut-unpacking-arguments` and :ref:`calls`.

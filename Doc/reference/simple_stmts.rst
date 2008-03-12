@@ -34,7 +34,9 @@ simple statements is:
 Expression statements
 =====================
 
-.. index:: pair: expression; statement
+.. index::
+   pair: expression; statement
+   pair: expression; list
 
 Expression statements are used (mostly interactively) to compute and write a
 value, or (usually) to call a procedure (a function that returns no meaningful
@@ -44,8 +46,6 @@ expression statement is:
 
 .. productionlist::
    expression_stmt: `expression_list`
-
-.. index:: pair: expression; list
 
 An expression statement evaluates the expression list (which may be a single
 expression).
@@ -141,8 +141,6 @@ Assignment of an object to a single target is recursively defined as follows.
   The name is rebound if it was already bound.  This may cause the reference count
   for the object previously bound to the name to reach zero, causing the object to
   be deallocated and its destructor (if it has one) to be called.
-
-  .. % nested
 
 * If the target is a target list enclosed in parentheses or in square brackets:
   The object must be a sequence with the same number of items as there are targets
@@ -295,16 +293,16 @@ The extended form, ``assert expression1, expression2``, is equivalent to ::
    single: __debug__
    exception: AssertionError
 
-These equivalences assume that ``__debug__`` and :exc:`AssertionError` refer to
+These equivalences assume that :const:`__debug__` and :exc:`AssertionError` refer to
 the built-in variables with those names.  In the current implementation, the
-built-in variable ``__debug__`` is ``True`` under normal circumstances,
+built-in variable :const:`__debug__` is ``True`` under normal circumstances,
 ``False`` when optimization is requested (command line option -O).  The current
 code generator emits no code for an assert statement when optimization is
 requested at compile time.  Note that it is unnecessary to include the source
 code for the expression that failed in the error message; it will be displayed
 as part of the stack trace.
 
-Assignments to ``__debug__`` are illegal.  The value for the built-in variable
+Assignments to :const:`__debug__` are illegal.  The value for the built-in variable
 is determined when the interpreter starts.
 
 
@@ -313,12 +311,12 @@ is determined when the interpreter starts.
 The :keyword:`pass` statement
 =============================
 
-.. index:: statement: pass
+.. index::
+   statement: pass
+   pair: null; operation
 
 .. productionlist::
    pass_stmt: "pass"
-
-.. index:: pair: null; operation
 
 :keyword:`pass` is a null operation --- when it is executed, nothing happens.
 It is useful as a placeholder when a statement is required syntactically, but no
@@ -334,14 +332,13 @@ code needs to be executed, for example::
 The :keyword:`del` statement
 ============================
 
-.. index:: statement: del
+.. index::
+   statement: del
+   pair: deletion; target
+   triple: deletion; target; list
 
 .. productionlist::
    del_stmt: "del" `target_list`
-
-.. index::
-   pair: deletion; target
-   triple: deletion; target; list
 
 Deletion is recursively defined very similar to the way assignment is defined.
 Rather that spelling it out in full details, here are some hints.
@@ -401,8 +398,6 @@ functional to write an empty string to standard output for this reason.)
 .. index::
    single: output
    pair: writing; values
-
-.. index::
    pair: trailing; comma
    pair: newline; suppression
 
@@ -436,14 +431,13 @@ then ``sys.stdout`` is used as the file for output.
 The :keyword:`return` statement
 ===============================
 
-.. index:: statement: return
+.. index::
+   statement: return
+   pair: function; definition
+   pair: class; definition
 
 .. productionlist::
    return_stmt: "return" [`expression_list`]
-
-.. index::
-   pair: function; definition
-   pair: class; definition
 
 :keyword:`return` may only occur syntactically nested in a function definition,
 not within a nested class definition.
@@ -470,16 +464,15 @@ raised.
 The :keyword:`yield` statement
 ==============================
 
-.. index:: statement: yield
-
-.. productionlist::
-   yield_stmt: `yield_expression`
-
 .. index::
+   statement: yield
    single: generator; function
    single: generator; iterator
    single: function; generator
    exception: StopIteration
+
+.. productionlist::
+   yield_stmt: `yield_expression`
 
 The :keyword:`yield` statement is only used when defining a generator function,
 and is only used in the body of the generator function. Using a :keyword:`yield`
@@ -530,14 +523,13 @@ clauses to execute.
 The :keyword:`raise` statement
 ==============================
 
-.. index:: statement: raise
+.. index::
+   statement: raise
+   single: exception
+   pair: raising; exception
 
 .. productionlist::
    raise_stmt: "raise" [`expression` ["," `expression` ["," `expression`]]]
-
-.. index::
-   single: exception
-   pair: raising; exception
 
 If no expressions are present, :keyword:`raise` re-raises the last exception
 that was active in the current scope.  If no exception is active in the current
@@ -580,15 +572,14 @@ and information about handling exceptions is in section :ref:`try`.
 The :keyword:`break` statement
 ==============================
 
-.. index:: statement: break
-
-.. productionlist::
-   break_stmt: "break"
-
 .. index::
+   statement: break
    statement: for
    statement: while
    pair: loop; statement
+
+.. productionlist::
+   break_stmt: "break"
 
 :keyword:`break` may only occur syntactically nested in a :keyword:`for` or
 :keyword:`while` loop, but not nested in a function or class definition within
@@ -616,16 +607,15 @@ really leaving the loop.
 The :keyword:`continue` statement
 =================================
 
-.. index:: statement: continue
-
-.. productionlist::
-   continue_stmt: "continue"
-
 .. index::
+   statement: continue
    statement: for
    statement: while
    pair: loop; statement
    keyword: finally
+
+.. productionlist::
+   continue_stmt: "continue"
 
 :keyword:`continue` may only occur syntactically nested in a :keyword:`for` or
 :keyword:`while` loop, but not nested in a function or class definition or
@@ -634,6 +624,7 @@ cycle of the nearest enclosing loop.
 
 
 .. _import:
+.. _from:
 
 The :keyword:`import` statement
 ===============================
@@ -740,8 +731,6 @@ raise a :exc:`SyntaxError`.
 .. index::
    keyword: from
    statement: from
-
-.. index::
    triple: hierarchical; module; names
    single: packages
    single: __init__.py
@@ -754,8 +743,6 @@ directory on ``sys.path`` that has a file :file:`__init__.py`. [XXX Can't be
 bothered to spell this out right now; see the URL
 http://www.python.org/doc/essays/packages.html for more details, also about how
 the module search works from inside a package.]
-
-.. % 
 
 .. index:: builtin: __import__
 
@@ -843,12 +830,12 @@ after the script is executed.
 The :keyword:`global` statement
 ===============================
 
-.. index:: statement: global
+.. index::
+   statement: global
+   triple: global; name; binding
 
 .. productionlist::
    global_stmt: "global" `identifier` ("," `identifier`)*
-
-.. index:: triple: global; name; binding
 
 The :keyword:`global` statement is a declaration which holds for the entire
 current code block.  It means that the listed identifiers are to be interpreted
@@ -911,7 +898,7 @@ variables.  If two expressions are given, they are used for the global and local
 variables, respectively. If provided, *locals* can be any mapping object.
 
 .. versionchanged:: 2.4
-   formerly *locals* was required to be a dictionary.
+   Formerly, *locals* was required to be a dictionary.
 
 .. index::
    single: __builtins__

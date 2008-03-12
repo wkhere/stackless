@@ -5,7 +5,14 @@
 #include "structmember.h"
 #include "core/stackless_impl.h"
 
+/* Free list for method objects to safe malloc/free overhead
+ * The m_self element is used to chain the objects.
+ */
 static PyCFunctionObject *free_list = NULL;
+static int numfree = 0;
+#ifndef PyCFunction_MAXFREELIST
+#define PyCFunction_MAXFREELIST 256
+#endif
 
 PyObject *
 PyCFunction_NewEx(PyMethodDef *ml, PyObject *self, PyObject *module)
@@ -15,6 +22,7 @@ PyCFunction_NewEx(PyMethodDef *ml, PyObject *self, PyObject *module)
 	if (op != NULL) {
 		free_list = (PyCFunctionObject *)(op->m_self);
 		PyObject_INIT(op, &PyCFunction_Type);
+		numfree--;
 	}
 	else {
 		op = PyObject_GC_New(PyCFunctionObject, &PyCFunction_Type);
@@ -143,8 +151,14 @@ meth_dealloc(PyCFunctionObject *m)
 	_PyObject_GC_UNTRACK(m);
 	Py_XDECREF(m->m_self);
 	Py_XDECREF(m->m_module);
-	m->m_self = (PyObject *)free_list;
-	free_list = m;
+	if (numfree < PyCFunction_MAXFREELIST) {
+		m->m_self = (PyObject *)free_list;
+		free_list = m;
+		numfree++;
+	}
+	else {
+		PyObject_GC_Del(m);
+	}
 }
 
 static PyObject *
@@ -198,7 +212,7 @@ static PyGetSetDef meth_getsets [] = {
 #define OFF(x) offsetof(PyCFunctionObject, x)
 
 static PyMemberDef meth_members[] = {
-	{"__module__",    T_OBJECT,     OFF(m_module), WRITE_RESTRICTED},
+	{"__module__",    T_OBJECT,     OFF(m_module), PY_WRITE_RESTRICTED},
 	{NULL}
 };
 
@@ -359,14 +373,25 @@ Py_FindMethod(PyMethodDef *methods, PyObject *self, const char *name)
 
 /* Clear out the free list */
 
-void
-PyCFunction_Fini(void)
+int
+PyCFunction_ClearFreeList(void)
 {
+	int freelist_size = numfree;
+	
 	while (free_list) {
 		PyCFunctionObject *v = free_list;
 		free_list = (PyCFunctionObject *)(v->m_self);
 		PyObject_GC_Del(v);
+		numfree--;
 	}
+	assert(numfree == 0);
+	return freelist_size;
+}
+
+void
+PyCFunction_Fini(void)
+{
+	(void)PyCFunction_ClearFreeList();
 }
 
 /* PyCFunction_New() is now just a macro that calls PyCFunction_NewEx(),

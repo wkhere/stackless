@@ -1,4 +1,3 @@
-
 :mod:`sqlite3` --- DB-API 2.0 interface for SQLite databases
 ============================================================
 
@@ -71,10 +70,10 @@ may use a different placeholder, such as ``%s`` or ``:1``.) For example::
             ):
        c.execute('insert into stocks values (?,?,?,?,?)', t)
 
-To retrieve data after executing a SELECT statement, you can either  treat the
-cursor as an iterator, call the cursor's :meth:`fetchone` method to retrieve a
-single matching row,  or call :meth:`fetchall` to get a list of the matching
-rows.
+To retrieve data after executing a SELECT statement, you can either treat the
+cursor as an :term:`iterator`, call the cursor's :meth:`fetchone` method to
+retrieve a single matching row, or call :meth:`fetchall` to get a list of the
+matching rows.
 
 This example uses the iterator form::
 
@@ -351,7 +350,7 @@ A :class:`Connection` instance has the following attributes and methods:
    memory overhead. It will probably be better than your own custom
    dictionary-based approach or even a db_row based solution.
 
-   .. % XXX what's a db_row-based solution?
+   .. XXX what's a db_row-based solution?
 
 
 .. attribute:: Connection.text_factory
@@ -389,7 +388,7 @@ A :class:`Cursor` instance has the following attributes and methods:
 
 .. method:: Cursor.execute(sql, [parameters])
 
-   Executes a SQL statement. The SQL statement may be parametrized (i. e.
+   Executes an SQL statement. The SQL statement may be parametrized (i. e.
    placeholders instead of SQL literals). The :mod:`sqlite3` module supports two
    kinds of placeholders: question marks (qmark style) and named placeholders
    (named style).
@@ -410,13 +409,13 @@ A :class:`Cursor` instance has the following attributes and methods:
 
 .. method:: Cursor.executemany(sql, seq_of_parameters)
 
-   Executes a SQL command against all parameter sequences or mappings found in the
-   sequence *sql*. The :mod:`sqlite3` module also allows using an iterator yielding
-   parameters instead of a sequence.
+   Executes an SQL command against all parameter sequences or mappings found in
+   the sequence *sql*.  The :mod:`sqlite3` module also allows using an
+   :term:`iterator` yielding parameters instead of a sequence.
 
    .. literalinclude:: ../includes/sqlite3/executemany_1.py
 
-   Here's a shorter example using a generator:
+   Here's a shorter example using a :term:`generator`:
 
    .. literalinclude:: ../includes/sqlite3/executemany_2.py
 
@@ -432,6 +431,35 @@ A :class:`Cursor` instance has the following attributes and methods:
    Example:
 
    .. literalinclude:: ../includes/sqlite3/executescript.py
+
+
+.. method:: Cursor.fetchone() 
+          
+   Fetches the next row of a query result set, returning a single sequence,
+   or ``None`` when no more data is available.
+
+
+.. method:: Cursor.fetchmany([size=cursor.arraysize])
+          
+   Fetches the next set of rows of a query result, returning a list.  An empty
+   list is returned when no more rows are available.
+   
+   The number of rows to fetch per call is specified by the *size* parameter.
+   If it is not given, the cursor's arraysize determines the number of rows
+   to be fetched. The method should try to fetch as many rows as indicated by
+   the size parameter. If this is not possible due to the specified number of
+   rows not being available, fewer rows may be returned.
+   
+   Note there are performance considerations involved with the *size* parameter.
+   For optimal performance, it is usually best to use the arraysize attribute.
+   If the *size* parameter is used, then it is best for it to retain the same
+   value from one :meth:`fetchmany` call to the next.
+            
+.. method:: Cursor.fetchall() 
+
+   Fetches all (remaining) rows of a query result, returning a list.  Note that
+   the cursor's arraysize attribute can affect the performance of this operation.
+   An empty list is returned when no rows are available.
 
 
 .. attribute:: Cursor.rowcount
@@ -549,7 +577,7 @@ string representation and register the function with :meth:`register_adapter`.
 
 .. note::
 
-   The type/class to adapt must be a new-style class, i. e. it must have
+   The type/class to adapt must be a :term:`new-style class`, i. e. it must have
    :class:`object` as one of its bases.
 
 .. literalinclude:: ../includes/sqlite3/adapter_point_2.py

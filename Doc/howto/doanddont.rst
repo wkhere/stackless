@@ -114,7 +114,7 @@ from module import name1, name2
 This is a "don't" which is much weaker then the previous "don't"s but is still
 something you should not do if you don't have good reasons to do that. The
 reason it is usually bad idea is because you suddenly have an object which lives
-in two seperate namespaces. When the binding in one namespace changes, the
+in two separate namespaces. When the binding in one namespace changes, the
 binding in the other will not, so there will be a discrepancy between them. This
 happens when, for example, one module is reloaded, or changes the definition of
 a function at runtime.
@@ -290,7 +290,7 @@ are often more then is comfortable to put in one line, many people do::
       calculate_number(10, 20) != forbulate(500, 360):
          pass
 
-You should realize that this is dangerous: a stray space after the ``XXX`` would
+You should realize that this is dangerous: a stray space after the ``\`` would
 make this line wrong, and stray spaces are notoriously hard to see in editors.
 In this case, at least it would be a syntax error, but if the code was::
 

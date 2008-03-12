@@ -548,10 +548,9 @@ def runtest_inner(test, generate, verbose, quiet,
                 abstest = 'test.' + test
             the_package = __import__(abstest, globals(), locals(), [])
             the_module = getattr(the_package, test)
-            # Most tests run to completion simply as a side-effect of
-            # being imported.  For the benefit of tests that can't run
-            # that way (like test_threaded_import), explicitly invoke
-            # their test_main() function (if it exists).
+            # Old tests run to completion simply as a side-effect of
+            # being imported.  For tests based on unittest or doctest,
+            # explicitly invoke their test_main() function (if it exists).
             indirect_test = getattr(the_module, "test_main", None)
             if indirect_test is not None:
                 indirect_test()
@@ -649,7 +648,8 @@ def cleanup_test_droppings(testname, verbose):
 
 def dash_R(the_module, test, indirect_test, huntrleaks):
     # This code is hackish and inelegant, but it seems to do the job.
-    import copy_reg
+    import copy_reg, _abcoll
+    from abc import _Abstract
 
     if not hasattr(sys, 'gettotalrefcount'):
         raise Exception("Tracking reference leaks requires a debug build "
@@ -659,6 +659,12 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
     fs = warnings.filters[:]
     ps = copy_reg.dispatch_table.copy()
     pic = sys.path_importer_cache.copy()
+    abcs = {}
+    for abc in [getattr(_abcoll, a) for a in _abcoll.__all__]:
+        if not issubclass(abc, _Abstract):
+            continue
+        for obj in abc.__subclasses__() + [abc]:
+            abcs[obj] = obj._abc_registry.copy()
 
     if indirect_test:
         def run_the_test():
@@ -672,12 +678,12 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
     repcount = nwarmup + ntracked
     print >> sys.stderr, "beginning", repcount, "repetitions"
     print >> sys.stderr, ("1234567890"*(repcount//10 + 1))[:repcount]
-    dash_R_cleanup(fs, ps, pic)
+    dash_R_cleanup(fs, ps, pic, abcs)
     for i in range(repcount):
         rc = sys.gettotalrefcount()
         run_the_test()
         sys.stderr.write('.')
-        dash_R_cleanup(fs, ps, pic)
+        dash_R_cleanup(fs, ps, pic, abcs)
         if i >= nwarmup:
             deltas.append(sys.gettotalrefcount() - rc - 2)
     print >> sys.stderr
@@ -688,11 +694,12 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
         print >> refrep, msg
         refrep.close()
 
-def dash_R_cleanup(fs, ps, pic):
+def dash_R_cleanup(fs, ps, pic, abcs):
     import gc, copy_reg
     import _strptime, linecache, dircache
     import urlparse, urllib, urllib2, mimetypes, doctest
-    import struct, filecmp
+    import struct, filecmp, _abcoll
+    from abc import _Abstract
     from distutils.dir_util import _path_created
 
     # Restore some original values.
@@ -701,6 +708,18 @@ def dash_R_cleanup(fs, ps, pic):
     copy_reg.dispatch_table.update(ps)
     sys.path_importer_cache.clear()
     sys.path_importer_cache.update(pic)
+
+    # clear type cache
+    sys._clear_type_cache()
+
+    # Clear ABC registries, restoring previously saved ABC registries.
+    for abc in [getattr(_abcoll, a) for a in _abcoll.__all__]:
+        if not issubclass(abc, _Abstract):
+            continue
+        for obj in abc.__subclasses__() + [abc]:
+            obj._abc_registry = abcs.get(obj, {}).copy()
+            obj._abc_cache.clear()
+            obj._abc_negative_cache.clear()
 
     # Clear assorted module caches.
     _path_created.clear()
@@ -712,8 +731,8 @@ def dash_R_cleanup(fs, ps, pic):
     dircache.reset()
     linecache.clearcache()
     mimetypes._default_mime_types()
-    struct._cache.clear()
     filecmp._cache.clear()
+    struct._clearcache()
     doctest.master = None
 
     # Collect cyclic trash.
@@ -1104,6 +1123,7 @@ _expectations = {
 _expectations['freebsd5'] = _expectations['freebsd4']
 _expectations['freebsd6'] = _expectations['freebsd4']
 _expectations['freebsd7'] = _expectations['freebsd4']
+_expectations['freebsd8'] = _expectations['freebsd4']
 
 class _ExpectedSkips:
     def __init__(self):

@@ -12,6 +12,11 @@ extern double modf (double, double *);
 #endif /* __STDC__ */
 #endif /* _MSC_VER */
 
+#ifdef _OSF_SOURCE
+/* OSF1 5.1 doesn't make this available with XOPEN_SOURCE_EXTENDED defined */
+extern double copysign(double, double);
+#endif
+
 /* Call is_error when errno != 0, and where x is the result libm
  * returned.  is_error will usually set up an exception and return
  * true (1), but may return false (0) without setting up an exception.
@@ -114,6 +119,16 @@ FUNC1(cos, cos,
       "cos(x)\n\nReturn the cosine of x (measured in radians).")
 FUNC1(cosh, cosh,
       "cosh(x)\n\nReturn the hyperbolic cosine of x.")
+
+#ifdef MS_WINDOWS
+#  define copysign _copysign
+#  define HAVE_COPYSIGN 1
+#endif
+#ifdef HAVE_COPYSIGN
+FUNC2(copysign, copysign,
+      "copysign(x,y)\n\nReturn x with the sign of y.");
+#endif
+
 FUNC1(exp, exp,
       "exp(x)\n\nReturn e raised to the power of x.")
 FUNC1(fabs, fabs,
@@ -138,6 +153,17 @@ FUNC1(tan, tan,
       "tan(x)\n\nReturn the tangent of x (measured in radians).")
 FUNC1(tanh, tanh,
       "tanh(x)\n\nReturn the hyperbolic tangent of x.")
+
+static PyObject *
+math_trunc(PyObject *self, PyObject *number)
+{
+	return PyObject_CallMethod(number, "__trunc__", NULL);
+}
+
+PyDoc_STRVAR(math_trunc_doc,
+"trunc(x:Real) -> Integral\n"
+"\n"
+"Truncates x to the nearest Integral toward 0. Uses the __trunc__ magic method.");
 
 static PyObject *
 math_frexp(PyObject *self, PyObject *arg)
@@ -225,11 +251,11 @@ loghelper(PyObject* arg, double (*func)(double), char *funcname)
 					"math domain error");
 			return NULL;
 		}
-		/* Value is ~= x * 2**(e*SHIFT), so the log ~=
-		   log(x) + log(2) * e * SHIFT.
-		   CAUTION:  e*SHIFT may overflow using int arithmetic,
+		/* Value is ~= x * 2**(e*PyLong_SHIFT), so the log ~=
+		   log(x) + log(2) * e * PyLong_SHIFT.
+		   CAUTION:  e*PyLong_SHIFT may overflow using int arithmetic,
 		   so force use of double. */
-		x = func(x) + (e * (double)SHIFT) * func(2.0);
+		x = func(x) + (e * (double)PyLong_SHIFT) * func(2.0);
 		return PyFloat_FromDouble(x);
 	}
 
@@ -277,9 +303,8 @@ math_log10(PyObject *self, PyObject *arg)
 PyDoc_STRVAR(math_log10_doc,
 "log10(x) -> the base 10 logarithm of x.");
 
-/* XXX(nnorwitz): Should we use the platform M_PI or something more accurate
-   like: 3.14159265358979323846264338327950288 */
-static const double degToRad = 3.141592653589793238462643383 / 180.0;
+static const double degToRad = Py_MATH_PI / 180.0;
+static const double radToDeg = 180.0 / Py_MATH_PI;
 
 static PyObject *
 math_degrees(PyObject *self, PyObject *arg)
@@ -287,7 +312,7 @@ math_degrees(PyObject *self, PyObject *arg)
 	double x = PyFloat_AsDouble(arg);
 	if (x == -1.0 && PyErr_Occurred())
 		return NULL;
-	return PyFloat_FromDouble(x / degToRad);
+	return PyFloat_FromDouble(x * radToDeg);
 }
 
 PyDoc_STRVAR(math_degrees_doc,
@@ -305,12 +330,42 @@ math_radians(PyObject *self, PyObject *arg)
 PyDoc_STRVAR(math_radians_doc,
 "radians(x) -> converts angle x from degrees to radians");
 
+static PyObject *
+math_isnan(PyObject *self, PyObject *arg)
+{
+	double x = PyFloat_AsDouble(arg);
+	if (x == -1.0 && PyErr_Occurred())
+		return NULL;
+	return PyBool_FromLong((long)Py_IS_NAN(x));
+}
+
+PyDoc_STRVAR(math_isnan_doc,
+"isnan(x) -> bool\n\
+Checks if float x is not a number (NaN)");
+
+static PyObject *
+math_isinf(PyObject *self, PyObject *arg)
+{
+	double x = PyFloat_AsDouble(arg);
+	if (x == -1.0 && PyErr_Occurred())
+		return NULL;
+	return PyBool_FromLong((long)Py_IS_INFINITY(x));
+}
+
+PyDoc_STRVAR(math_isinf_doc,
+"isinf(x) -> bool\n\
+Checks if float x is infinite (positive or negative)");
+
+
 static PyMethodDef math_methods[] = {
 	{"acos",	math_acos,	METH_O,		math_acos_doc},
 	{"asin",	math_asin,	METH_O,		math_asin_doc},
 	{"atan",	math_atan,	METH_O,		math_atan_doc},
 	{"atan2",	math_atan2,	METH_VARARGS,	math_atan2_doc},
 	{"ceil",	math_ceil,	METH_O,		math_ceil_doc},
+#ifdef HAVE_COPYSIGN
+	{"copysign",	math_copysign,	METH_VARARGS,	math_copysign_doc},
+#endif
 	{"cos",		math_cos,	METH_O,		math_cos_doc},
 	{"cosh",	math_cosh,	METH_O,		math_cosh_doc},
 	{"degrees",	math_degrees,	METH_O,		math_degrees_doc},
@@ -320,6 +375,8 @@ static PyMethodDef math_methods[] = {
 	{"fmod",	math_fmod,	METH_VARARGS,	math_fmod_doc},
 	{"frexp",	math_frexp,	METH_O,		math_frexp_doc},
 	{"hypot",	math_hypot,	METH_VARARGS,	math_hypot_doc},
+	{"isinf",	math_isinf,	METH_O,		math_isinf_doc},
+	{"isnan",	math_isnan,	METH_O,		math_isnan_doc},
 	{"ldexp",	math_ldexp,	METH_VARARGS,	math_ldexp_doc},
 	{"log",		math_log,	METH_VARARGS,	math_log_doc},
 	{"log10",	math_log10,	METH_O,		math_log10_doc},
@@ -331,6 +388,7 @@ static PyMethodDef math_methods[] = {
 	{"sqrt",	math_sqrt,	METH_O,		math_sqrt_doc},
 	{"tan",		math_tan,	METH_O,		math_tan_doc},
 	{"tanh",	math_tanh,	METH_O,		math_tanh_doc},
+ 	{"trunc",	math_trunc,	METH_O,		math_trunc_doc},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -351,13 +409,13 @@ initmath(void)
 	if (d == NULL)
 		goto finally;
 
-        if (!(v = PyFloat_FromDouble(atan(1.0) * 4.0)))
+        if (!(v = PyFloat_FromDouble(Py_MATH_PI)))
                 goto finally;
 	if (PyDict_SetItemString(d, "pi", v) < 0)
                 goto finally;
 	Py_DECREF(v);
 
-        if (!(v = PyFloat_FromDouble(exp(1.0))))
+        if (!(v = PyFloat_FromDouble(Py_MATH_E)))
                 goto finally;
 	if (PyDict_SetItemString(d, "e", v) < 0)
                 goto finally;

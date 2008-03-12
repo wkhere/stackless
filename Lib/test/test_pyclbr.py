@@ -3,7 +3,7 @@
    Nick Mathewson
 '''
 from test.test_support import run_unittest
-import unittest, sys
+import sys
 from types import ClassType, FunctionType, MethodType, BuiltinFunctionType
 import pyclbr
 from unittest import TestCase
@@ -166,6 +166,7 @@ class PyclbrTest(TestCase):
         cm('cgi', ignore=('log',))      # set with = in module
         cm('mhlib')
         cm('urllib', ignore=('getproxies_registry',
+                             'proxy_bypass_registry',
                              'open_https',
                              'getproxies_internetconfig',)) # not on all platforms
         cm('pickle')

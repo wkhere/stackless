@@ -206,13 +206,21 @@ utility functions:
 .. function:: open(filename, mode[, encoding[, errors[, buffering]]])
 
    Open an encoded file using the given *mode* and return a wrapped version
-   providing transparent encoding/decoding.
+   providing transparent encoding/decoding.  The default file mode is ``'r'``
+   meaning to open the file in read mode.
 
    .. note::
 
       The wrapped version will only accept the object format defined by the codecs,
       i.e. Unicode objects for most built-in codecs.  Output is also codec-dependent
       and will usually be Unicode as well.
+
+   .. note::
+
+      Files are always opened in binary mode, even if no binary mode was
+      specified.  This is done to avoid data loss due to encodings using 8-bit
+      values.  This means that no automatic conversion of ``'\n'`` is done
+      on reading and writing.
 
    *encoding* specifies the encoding which is to be used for the file.
 
@@ -242,8 +250,8 @@ utility functions:
 .. function:: iterencode(iterable, encoding[, errors])
 
    Uses an incremental encoder to iteratively encode the input provided by
-   *iterable*. This function is a generator. *errors* (as well as any other keyword
-   argument) is passed through to the incremental encoder.
+   *iterable*. This function is a :term:`generator`.  *errors* (as well as any
+   other keyword argument) is passed through to the incremental encoder.
 
    .. versionadded:: 2.5
 
@@ -251,8 +259,8 @@ utility functions:
 .. function:: iterdecode(iterable, encoding[, errors])
 
    Uses an incremental decoder to iteratively decode the input provided by
-   *iterable*. This function is a generator. *errors* (as well as any other keyword
-   argument) is passed through to the incremental decoder.
+   *iterable*. This function is a :term:`generator`.  *errors* (as well as any
+   other keyword argument) is passed through to the incremental decoder.
 
    .. versionadded:: 2.5
 
@@ -993,7 +1001,7 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | iso8859_3       | iso-8859-3, latin3, L3         | Esperanto, Maltese             |
 +-----------------+--------------------------------+--------------------------------+
-| iso8859_4       | iso-8859-4, latin4, L4         | Baltic languagues              |
+| iso8859_4       | iso-8859-4, latin4, L4         | Baltic languages               |
 +-----------------+--------------------------------+--------------------------------+
 | iso8859_5       | iso-8859-5, cyrillic           | Bulgarian, Byelorussian,       |
 |                 |                                | Macedonian, Russian, Serbian   |
@@ -1119,9 +1127,9 @@ the table.
 |                    |                           |                | all conversions. Can be   |
 |                    |                           |                | used as the system        |
 |                    |                           |                | encoding if no automatic  |
-|                    |                           |                | coercion between byte and |
-|                    |                           |                | Unicode strings is        |
-|                    |                           |                | desired.                  |
+|                    |                           |                | :term:`coercion` between  |
+|                    |                           |                | byte and Unicode strings  |
+|                    |                           |                | is desired.               |
 +--------------------+---------------------------+----------------+---------------------------+
 | unicode_escape     |                           | Unicode string | Produce a string that is  |
 |                    |                           |                | suitable as Unicode       |

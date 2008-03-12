@@ -105,8 +105,6 @@ transformed name is extremely long (longer than 255 characters), implementation
 defined truncation may happen.  If the class name consists only of underscores,
 no transformation is done.
 
-.. % 
-.. % 
 
 
 .. _atom-literals:
@@ -276,7 +274,7 @@ the corresponding datum.
 .. index:: pair: immutable; object
 
 Restrictions on the types of the key values are listed earlier in section
-:ref:`types`.  (To summarize, the key type should be hashable, which excludes
+:ref:`types`.  (To summarize, the key type should be :term:`hashable`, which excludes
 all mutable objects.)  Clashes between duplicate keys are not detected; the last
 datum (textually rightmost in the display) stored for a given key value
 prevails.
@@ -397,7 +395,7 @@ generator function:
    generator, or raises :exc:`StopIteration` if the generator exits without
    yielding another value. When :meth:`send` is called to start the generator, it
    must be called with :const:`None` as the argument, because there is no
-   :keyword:`yield` expression that could receieve the value.
+   :keyword:`yield` expression that could receive the value.
 
 
 .. method:: generator.throw(type[, value[, traceback]])
@@ -430,9 +428,6 @@ generator functions::
    ...         while True:
    ...             try:
    ...                 value = (yield value)
-   ...             except GeneratorExit:
-   ...                 # never catch GeneratorExit
-   ...                 raise
    ...             except Exception, e:
    ...                 value = e
    ...     finally:
@@ -682,7 +677,7 @@ there were no excess keyword arguments.
 
 If the syntax ``*expression`` appears in the function call, ``expression`` must
 evaluate to a sequence.  Elements from this sequence are treated as if they were
-additional positional arguments; if there are postional arguments *x1*,...,*xN*
+additional positional arguments; if there are positional arguments *x1*,...,*xN*
 , and ``expression`` evaluates to a sequence *y1*,...,*yM*, this is equivalent
 to a call with M+N positional arguments *x1*,...,*xN*,*y1*,...,*yM*.
 
@@ -816,9 +811,9 @@ Unary arithmetic operations
 
 .. index::
    triple: unary; arithmetic; operation
-   triple: unary; bit-wise; operation
+   triple: unary; bitwise; operation
 
-All unary arithmetic (and bit-wise) operations have the same priority:
+All unary arithmetic (and bitwise) operations have the same priority:
 
 .. productionlist::
    u_expr: `power` | "-" `u_expr` | "+" `u_expr` | "~" `u_expr`
@@ -835,8 +830,8 @@ The unary ``+`` (plus) operator yields its numeric argument unchanged.
 
 .. index:: single: inversion
 
-The unary ``~`` (invert) operator yields the bit-wise inversion of its plain or
-long integer argument.  The bit-wise inversion of ``x`` is defined as
+The unary ``~`` (invert) operator yields the bitwise inversion of its plain or
+long integer argument.  The bitwise inversion of ``x`` is defined as
 ``-(x+1)``.  It only applies to integral numbers.
 
 .. index:: exception: TypeError
@@ -949,10 +944,10 @@ Negative shift counts raise a :exc:`ValueError` exception.
 
 .. _bitwise:
 
-Binary bit-wise operations
-==========================
+Binary bitwise operations
+=========================
 
-.. index:: triple: binary; bit-wise; operation
+.. index:: triple: binary; bitwise; operation
 
 Each of the three bitwise operations has a different priority level:
 
@@ -961,20 +956,20 @@ Each of the three bitwise operations has a different priority level:
    xor_expr: `and_expr` | `xor_expr` "^" `and_expr`
    or_expr: `xor_expr` | `or_expr` "|" `xor_expr`
 
-.. index:: pair: bit-wise; and
+.. index:: pair: bitwise; and
 
 The ``&`` operator yields the bitwise AND of its arguments, which must be plain
 or long integers.  The arguments are converted to a common type.
 
 .. index::
-   pair: bit-wise; xor
+   pair: bitwise; xor
    pair: exclusive; or
 
 The ``^`` operator yields the bitwise XOR (exclusive OR) of its arguments, which
 must be plain or long integers.  The arguments are converted to a common type.
 
 .. index::
-   pair: bit-wise; or
+   pair: bitwise; or
    pair: inclusive; or
 
 The ``|`` operator yields the bitwise (inclusive) OR of its arguments, which
@@ -982,6 +977,10 @@ must be plain or long integers.  The arguments are converted to a common type.
 
 
 .. _comparisons:
+.. _is:
+.. _isnot:
+.. _in:
+.. _notin:
 
 Comparisons
 ===========
@@ -1111,6 +1110,9 @@ yields the inverse truth value.
 
 
 .. _booleans:
+.. _and:
+.. _or:
+.. _not:
 
 Boolean operations
 ==================

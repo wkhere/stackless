@@ -53,7 +53,7 @@ int main()
 		   PCbuild\\python.exe which could be a normal instance
 		   of Python running on vanilla Windows.
 		*/
-		if ((strstr(path, "build\\pcbuild\\python_d.exe") != NULL) ||
+		if ((strstr(path, "pcbuild\\python_d.exe") != NULL) ||
 		    (strstr(path, "\\build\\python.exe") != NULL)) {
 			printf("Terminating %s (pid %d)\n", path, pids[i]);
 			if (!TerminateProcess(hProcess, 1)) {

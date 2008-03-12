@@ -1,4 +1,3 @@
-
 :mod:`urllib` --- Open arbitrary resources by URL
 =================================================
 
@@ -17,8 +16,8 @@ built-in function :func:`open`, but accepts Universal Resource Locators (URLs)
 instead of filenames.  Some restrictions apply --- it can only open URLs for
 reading, and no seek operations are available.
 
-It defines the following public functions:
-
+High-level interface
+--------------------
 
 .. function:: urlopen(url[, data[, proxies]])
 
@@ -28,16 +27,17 @@ It defines the following public functions:
    a server somewhere on the network.  If the connection cannot be made the
    :exc:`IOError` exception is raised.  If all went well, a file-like object is
    returned.  This supports the following methods: :meth:`read`, :meth:`readline`,
-   :meth:`readlines`, :meth:`fileno`, :meth:`close`, :meth:`info` and
-   :meth:`geturl`.  It also has proper support for the iterator protocol. One
+   :meth:`readlines`, :meth:`fileno`, :meth:`close`, :meth:`info`, :meth:`getcode` and
+   :meth:`geturl`.  It also has proper support for the :term:`iterator` protocol. One
    caveat: the :meth:`read` method, if the size argument is omitted or negative,
    may not read until the end of the data stream; there is no good way to determine
    that the entire stream from a socket has been read in the general case.
 
-   Except for the :meth:`info` and :meth:`geturl` methods, these methods have the
-   same interface as for file objects --- see section :ref:`bltin-file-objects` in
-   this manual.  (It is not a built-in file object, however, so it can't be used at
-   those few places where a true built-in file object is required.)
+   Except for the :meth:`info`, :meth:`getcode` and :meth:`geturl` methods,
+   these methods have the same interface as for file objects --- see section
+   :ref:`bltin-file-objects` in this manual.  (It is not a built-in file object,
+   however, so it can't be used at those few places where a true built-in file
+   object is required.)
 
    .. index:: module: mimetools
 
@@ -59,6 +59,9 @@ It defines the following public functions:
    the client was redirected to.  The :meth:`geturl` method can be used to get at
    this redirected URL.
 
+   The :meth:`getcode` method returns the HTTP status code that was sent with the
+   response, or ``None`` if the URL is no HTTP URL.
+
    If the *url* uses the :file:`http:` scheme identifier, the optional *data*
    argument may be given to specify a ``POST`` request (normally the request type
    is ``GET``).  The *data* argument must be in standard
@@ -75,6 +78,11 @@ It defines the following public functions:
       % export http_proxy
       % python
       ...
+
+   The :envvar:`no_proxy` environment variable can be used to specify hosts which
+   shouldn't be reached via proxy; if set, it should be a comma-separated list
+   of hostname suffixes, optionally with ``:port`` appended, for example
+   ``cern.ch,ncsa.uiuc.edu,some.host:8080``.
 
    In a Windows environment, if no proxy environment variables are set, proxy
    settings are obtained from the registry's Internet Settings section.
@@ -108,6 +116,10 @@ It defines the following public functions:
 
    .. versionchanged:: 2.3
       Added the *proxies* support.
+
+   .. versionchanged:: 2.6
+      Added :meth:`getcode` to returned object and support for the
+      :envvar:`no_proxy` environment variable.
 
 
 .. function:: urlretrieve(url[, filename[, reporthook[, data]]])
@@ -178,6 +190,9 @@ It defines the following public functions:
    :func:`urlretrieve`.
 
 
+Utility functions
+-----------------
+
 .. function:: quote(string[, safe])
 
    Replace special characters in *string* using the ``%xx`` escape. Letters,
@@ -239,6 +254,9 @@ It defines the following public functions:
    to decode *path*.
 
 
+URL Opener objects
+------------------
+
 .. class:: URLopener([proxies[, **x509]])
 
    Base class for opening and reading URLs.  Unless you need to support opening
@@ -263,6 +281,48 @@ It defines the following public functions:
 
    :class:`URLopener` objects will raise an :exc:`IOError` exception if the server
    returns an error code.
+
+    .. method:: open(fullurl[, data])
+
+       Open *fullurl* using the appropriate protocol.  This method sets up cache and
+       proxy information, then calls the appropriate open method with its input
+       arguments.  If the scheme is not recognized, :meth:`open_unknown` is called.
+       The *data* argument has the same meaning as the *data* argument of
+       :func:`urlopen`.
+
+
+    .. method:: open_unknown(fullurl[, data])
+
+       Overridable interface to open unknown URL types.
+
+
+    .. method:: retrieve(url[, filename[, reporthook[, data]]])
+
+       Retrieves the contents of *url* and places it in *filename*.  The return value
+       is a tuple consisting of a local filename and either a
+       :class:`mimetools.Message` object containing the response headers (for remote
+       URLs) or ``None`` (for local URLs).  The caller must then open and read the
+       contents of *filename*.  If *filename* is not given and the URL refers to a
+       local file, the input filename is returned.  If the URL is non-local and
+       *filename* is not given, the filename is the output of :func:`tempfile.mktemp`
+       with a suffix that matches the suffix of the last path component of the input
+       URL.  If *reporthook* is given, it must be a function accepting three numeric
+       parameters.  It will be called after each chunk of data is read from the
+       network.  *reporthook* is ignored for local URLs.
+
+       If the *url* uses the :file:`http:` scheme identifier, the optional *data*
+       argument may be given to specify a ``POST`` request (normally the request type
+       is ``GET``).  The *data* argument must in standard
+       :mimetype:`application/x-www-form-urlencoded` format; see the :func:`urlencode`
+       function below.
+
+
+    .. attribute:: version
+
+       Variable that specifies the user agent of the opener object.  To get
+       :mod:`urllib` to tell servers that it is a particular user agent, set this in a
+       subclass as a class variable or in the constructor before calling the base
+       constructor.
 
 
 .. class:: FancyURLopener(...)
@@ -293,6 +353,18 @@ It defines the following public functions:
       users for the required information on the controlling terminal.  A subclass may
       override this method to support more appropriate behavior if needed.
 
+    The :class:`FancyURLopener` class offers one additional method that should be
+    overloaded to provide the appropriate behavior:
+
+    .. method:: prompt_user_passwd(host, realm)
+
+       Return information needed to authenticate the user at the given host in the
+       specified security realm.  The return value should be a tuple, ``(user,
+       password)``, which can be used for basic authentication.
+
+       The implementation prompts for this information on the terminal; an application
+       should override this method to use an appropriate interaction model in the local
+       environment.
 
 .. exception:: ContentTooShortError(msg[, content])
 
@@ -303,7 +375,9 @@ It defines the following public functions:
 
    .. versionadded:: 2.5
 
-Restrictions:
+
+:mod:`urllib` Restrictions
+--------------------------
 
   .. index::
      pair: HTTP; protocol
@@ -362,75 +436,6 @@ Restrictions:
 * Although the :mod:`urllib` module contains (undocumented) routines to parse
   and unparse URL strings, the recommended interface for URL manipulation is in
   module :mod:`urlparse`.
-
-
-.. _urlopener-objs:
-
-URLopener Objects
------------------
-
-.. sectionauthor:: Skip Montanaro <skip@mojam.com>
-
-
-:class:`URLopener` and :class:`FancyURLopener` objects have the following
-attributes.
-
-
-.. method:: URLopener.open(fullurl[, data])
-
-   Open *fullurl* using the appropriate protocol.  This method sets up cache and
-   proxy information, then calls the appropriate open method with its input
-   arguments.  If the scheme is not recognized, :meth:`open_unknown` is called.
-   The *data* argument has the same meaning as the *data* argument of
-   :func:`urlopen`.
-
-
-.. method:: URLopener.open_unknown(fullurl[, data])
-
-   Overridable interface to open unknown URL types.
-
-
-.. method:: URLopener.retrieve(url[, filename[, reporthook[, data]]])
-
-   Retrieves the contents of *url* and places it in *filename*.  The return value
-   is a tuple consisting of a local filename and either a
-   :class:`mimetools.Message` object containing the response headers (for remote
-   URLs) or ``None`` (for local URLs).  The caller must then open and read the
-   contents of *filename*.  If *filename* is not given and the URL refers to a
-   local file, the input filename is returned.  If the URL is non-local and
-   *filename* is not given, the filename is the output of :func:`tempfile.mktemp`
-   with a suffix that matches the suffix of the last path component of the input
-   URL.  If *reporthook* is given, it must be a function accepting three numeric
-   parameters.  It will be called after each chunk of data is read from the
-   network.  *reporthook* is ignored for local URLs.
-
-   If the *url* uses the :file:`http:` scheme identifier, the optional *data*
-   argument may be given to specify a ``POST`` request (normally the request type
-   is ``GET``).  The *data* argument must in standard
-   :mimetype:`application/x-www-form-urlencoded` format; see the :func:`urlencode`
-   function below.
-
-
-.. attribute:: URLopener.version
-
-   Variable that specifies the user agent of the opener object.  To get
-   :mod:`urllib` to tell servers that it is a particular user agent, set this in a
-   subclass as a class variable or in the constructor before calling the base
-   constructor.
-
-The :class:`FancyURLopener` class offers one additional method that should be
-overloaded to provide the appropriate behavior:
-
-
-.. method:: FancyURLopener.prompt_user_passwd(host, realm)
-
-   Return information needed to authenticate the user at the given host in the
-   specified security realm.  The return value should be a tuple, ``(user,
-   password)``, which can be used for basic authentication.
-
-   The implementation prompts for this information on the terminal; an application
-   should override this method to use an appropriate interaction model in the local
-   environment.
 
 
 .. _urllib-examples:

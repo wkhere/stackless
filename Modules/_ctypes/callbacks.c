@@ -201,7 +201,7 @@ static void _CallPythonObject(void *mem,
 	}
 
 #define CHECK(what, x) \
-if (x == NULL) _AddTraceback(what, __FILE__, __LINE__ - 1), PyErr_Print()
+if (x == NULL) _AddTraceback(what, "_ctypes/callbacks.c", __LINE__ - 1), PyErr_Print()
 
 	result = PyObject_CallObject(callable, arglist);
 	CHECK("'calling callback function'", result);
@@ -368,9 +368,9 @@ long Call_GetClassObject(REFCLSID rclsid, REFIID riid, LPVOID *ppv)
 	static PyObject *context;
 
 	if (context == NULL)
-		context = PyString_FromString("_ctypes.DllGetClassObject");
+		context = PyString_InternFromString("_ctypes.DllGetClassObject");
 
-	mod = PyImport_ImportModule("ctypes");
+	mod = PyImport_ImportModuleNoBlock("ctypes");
 	if (!mod) {
 		PyErr_WriteUnraisable(context ? context : Py_None);
 		/* There has been a warning before about this already */
@@ -447,9 +447,9 @@ long Call_CanUnloadNow(void)
 	static PyObject *context;
 
 	if (context == NULL)
-		context = PyString_FromString("_ctypes.DllCanUnloadNow");
+		context = PyString_InternFromString("_ctypes.DllCanUnloadNow");
 
-	mod = PyImport_ImportModule("ctypes");
+	mod = PyImport_ImportModuleNoBlock("ctypes");
 	if (!mod) {
 /*		OutputDebugString("Could not import ctypes"); */
 		/* We assume that this error can only occur when shutting

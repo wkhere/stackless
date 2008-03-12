@@ -58,6 +58,33 @@ always available.
    A string containing the copyright pertaining to the Python interpreter.
 
 
+.. function:: _compact_freelists()
+
+   Compact the free lists of integers and floats by deallocating unused blocks.
+   It can reduce the memory usage of the Python process several tenth of
+   thousands of integers or floats have been allocated at once.
+
+   The return value is a tuple of tuples each containing three elements,
+   amount of used objects, total block count before the blocks are deallocated
+   and amount of freed blocks. The first tuple refers to ints, the second to
+   floats.
+
+   This function should be used for specialized purposes only.
+
+   .. versionadded:: 2.6
+
+
+.. function:: _clear_type_cache()
+
+   Clear the internal type cache. The type cache is used to speed up attribute
+   and method lookups. Use the function *only* to drop unnecessary references
+   during reference leak debugging.
+
+   This function should be used for internal and specialized purposes only.
+
+   .. versionadded:: 2.6
+
+
 .. function:: _current_frames()
 
    Return a dictionary mapping each thread's identifier to the topmost stack frame
@@ -86,9 +113,9 @@ always available.
    If *value* is not ``None``, this function prints it to ``sys.stdout``, and saves
    it in ``__builtin__._``.
 
-   ``sys.displayhook`` is called on the result of evaluating an expression entered
-   in an interactive Python session.  The display of these values can be customized
-   by assigning another one-argument function to ``sys.displayhook``.
+   ``sys.displayhook`` is called on the result of evaluating an :term:`expression`
+   entered in an interactive Python session.  The display of these values can be
+   customized by assigning another one-argument function to ``sys.displayhook``.
 
 
 .. function:: excepthook(type, value, traceback)
@@ -240,6 +267,88 @@ always available.
       Use :mod:`atexit` instead.
 
 
+.. data:: flags
+
+   The struct sequence *flags* exposes the status of command line flags. The
+   attributes are read only.
+
+   +------------------------------+------------------------------------------+
+   | attribute                    | flag                                     |
+   +==============================+==========================================+
+   | :const:`debug`               | -d                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`py3k_warning`        | -3                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`division_warning`    | -Q                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`division_new`        | -Qnew                                    |
+   +------------------------------+------------------------------------------+
+   | :const:`inspect`             | -i                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`interactive`         | -i                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`optimize`            | -O or -OO                                |
+   +------------------------------+------------------------------------------+
+   | :const:`dont_write_bytecode` | -B                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`no_site`             | -S                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`ignore_environment`  | -E                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`tabcheck`            | -t or -tt                                |
+   +------------------------------+------------------------------------------+
+   | :const:`verbose`             | -v                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`unicode`             | -U                                       |
+   +------------------------------+------------------------------------------+
+
+   .. versionadded:: 2.6
+
+
+.. data:: float_info
+
+   A structseq holding information about the float type. It contains low level
+   information about the precision and internal representation. Please study
+   your system's :file:`float.h` for more information.
+
+   +---------------------+--------------------------------------------------+
+   | attribute           |  explanation                                     |
+   +=====================+==================================================+
+   | :const:`epsilon`    | Difference between 1 and the next representable  |
+   |                     | floating point number                            |
+   +---------------------+--------------------------------------------------+
+   | :const:`dig`        | digits (see :file:`float.h`)                     |
+   +---------------------+--------------------------------------------------+
+   | :const:`mant_dig`   | mantissa digits (see :file:`float.h`)            |
+   +---------------------+--------------------------------------------------+
+   | :const:`max`        | maximum representable finite float               |
+   +---------------------+--------------------------------------------------+
+   | :const:`max_exp`    | maximum int e such that radix**(e-1) is in the   |
+   |                     | range of finite representable floats             |
+   +---------------------+--------------------------------------------------+
+   | :const:`max_10_exp` | maximum int e such that 10**e is in the          |
+   |                     | range of finite representable floats             |
+   +---------------------+--------------------------------------------------+
+   | :const:`min`        | Minimum positive normalizer float                |
+   +---------------------+--------------------------------------------------+
+   | :const:`min_exp`    | minimum int e such that radix**(e-1) is a        |
+   |                     | normalized float                                 |
+   +---------------------+--------------------------------------------------+
+   | :const:`min_10_exp` | minimum int e such that 10**e is a normalized    |
+   |                     | float                                            |
+   +---------------------+--------------------------------------------------+
+   | :const:`radix`      | radix of exponent                                |
+   +---------------------+--------------------------------------------------+
+   | :const:`rounds`     | addition rounds (see :file:`float.h`)            |
+   +---------------------+--------------------------------------------------+
+
+   .. note::
+
+      The information in the table is simplified.
+
+   .. versionadded:: 2.6
+
+
 .. function:: getcheckinterval()
 
    Return the interpreter's "check interval"; see :func:`setcheckinterval`.
@@ -308,6 +417,35 @@ always available.
    for *depth* is zero, returning the frame at the top of the call stack.
 
    This function should be used for internal and specialized purposes only.
+
+
+.. function:: getprofile()
+
+   .. index::
+      single: profile function
+      single: profiler
+
+   Get the profiler function as set by :func:`setprofile`.
+
+   .. versionadded:: 2.6
+
+
+.. function:: gettrace()
+
+   .. index::
+      single: trace function
+      single: debugger
+
+   Get the trace function as set by :func:`settrace`.
+
+   .. note::
+
+      The :func:`gettrace` function is intended only for implementing debuggers,
+      profilers, coverage tools and the like. Its behavior is part of the
+      implementation platform, rather than part of the language definition,
+      and thus may not be available in all Python implementations.
+
+   .. versionadded:: 2.6
 
 
 .. function:: getwindowsversion()
@@ -425,9 +563,26 @@ always available.
 
 .. data:: platform
 
-   This string contains a platform identifier, e.g. ``'sunos5'`` or ``'linux1'``.
-   This can be used to append platform-specific components to ``path``, for
-   instance.
+   This string contains a platform identifier that can be used to append
+   platform-specific components to :data:`sys.path`, for instance.
+
+   For Unix systems, this is the lowercased OS name as returned by ``uname -s``
+   with the first part of the version as returned by ``uname -r`` appended,
+   e.g. ``'sunos5'`` or ``'linux2'``, *at the time when Python was built*.
+   For other systems, the values are:
+
+   ================ ===========================
+   System           :data:`platform` value
+   ================ ===========================
+   Windows          ``'win32'``
+   Windows/Cygwin   ``'cygwin'``
+   MacOS X          ``'darwin'``
+   MacOS 9          ``'mac'``
+   OS/2             ``'os2'``
+   OS/2 EMX         ``'os2emx'``
+   RiscOS           ``'riscos'``
+   AtheOS           ``'atheos'``
+   ================ ===========================
 
 
 .. data:: prefix
@@ -457,6 +612,23 @@ always available.
    implement a dynamic prompt.
 
 
+.. data:: py3kwarning
+
+   Bool containing the status of the Python 3.0 warning flag. It's ``True``
+   when Python is started with the -3 option.
+
+
+.. data:: dont_write_bytecode
+
+   If this is true, Python won't try to write ``.pyc`` or ``.pyo`` files on the
+   import of source modules.  This value is initially set to ``True`` or ``False``
+   depending on the ``-B`` command line option and the ``PYTHONDONTWRITEBYTECODE``
+   environment variable, but you can set it yourself to control bytecode file
+   generation.
+
+   .. versionadded:: 2.6
+
+
 .. function:: setcheckinterval(interval)
 
    Set the interpreter's "check interval".  This integer value determines how often
@@ -475,9 +647,8 @@ always available.
    implementation and, where needed, by :mod:`sitecustomize`.  Once used by the
    :mod:`site` module, it is removed from the :mod:`sys` module's namespace.
 
-   .. % Note that \refmodule{site} is not imported if
-   .. % the \programopt{-S} option is passed to the interpreter, in which
-   .. % case this function will remain available.
+   .. Note that :mod:`site` is not imported if the :option:`-S` option is passed
+      to the interpreter, in which case this function will remain available.
 
    .. versionadded:: 2.0
 
@@ -567,12 +738,12 @@ always available.
    File objects corresponding to the interpreter's standard input, output and error
    streams.  ``stdin`` is used for all interpreter input except for scripts but
    including calls to :func:`input` and :func:`raw_input`.  ``stdout`` is used for
-   the output of :keyword:`print` and expression statements and for the prompts of
-   :func:`input` and :func:`raw_input`. The interpreter's own prompts and (almost
-   all of) its error messages go to ``stderr``.  ``stdout`` and ``stderr`` needn't
-   be built-in file objects: any object is acceptable as long as it has a
-   :meth:`write` method that takes a string argument.  (Changing these objects
-   doesn't affect the standard I/O streams of processes executed by
+   the output of :keyword:`print` and :term:`expression` statements and for the
+   prompts of :func:`input` and :func:`raw_input`. The interpreter's own prompts
+   and (almost all of) its error messages go to ``stderr``.  ``stdout`` and
+   ``stderr`` needn't be built-in file objects: any object is acceptable as long
+   as it has a :meth:`write` method that takes a string argument.  (Changing these 
+   objects doesn't affect the standard I/O streams of processes executed by
    :func:`os.popen`, :func:`os.system` or the :func:`exec\*` family of functions in
    the :mod:`os` module.)
 

@@ -280,10 +280,10 @@ Operations which work with sequences include:
 
 Many operations have an "in-place" version.  The following functions provide a
 more primitive access to in-place operators than the usual syntax does; for
-example, the statement ``x += y`` is equivalent to ``x = operator.iadd(x, y)``.
-Another way to put it is to say that ``z = operator.iadd(x, y)`` is equivalent
-to the compound statement ``z = x; z += y``.
-
+example, the :term:`statement` ``x += y`` is equivalent to
+``x = operator.iadd(x, y)``.  Another way to put it is to say that
+``z = operator.iadd(x, y)`` is equivalent to the compound statement
+``z = x; z += y``.
 
 .. function:: iadd(a, b)
               __iadd__(a, b)
@@ -499,14 +499,20 @@ expect a function argument.
 
    Return a callable object that fetches *attr* from its operand. If more than one
    attribute is requested, returns a tuple of attributes. After,
-   ``f=attrgetter('name')``, the call ``f(b)`` returns ``b.name``.  After,
-   ``f=attrgetter('name', 'date')``, the call ``f(b)`` returns ``(b.name,
+   ``f = attrgetter('name')``, the call ``f(b)`` returns ``b.name``.  After,
+   ``f = attrgetter('name', 'date')``, the call ``f(b)`` returns ``(b.name,
    b.date)``.
+
+   The attribute names can also contain dots; after ``f = attrgetter('date.month')``,
+   the call ``f(b)`` returns ``b.date.month``.
 
    .. versionadded:: 2.4
 
    .. versionchanged:: 2.5
       Added support for multiple attributes.
+
+   .. versionchanged:: 2.6
+      Added support for dotted attributes.
 
 
 .. function:: itemgetter(item[, args...])
@@ -530,6 +536,17 @@ Examples::
    [3, 2, 5, 1]
    >>> sorted(inventory, key=getcount)
    [('orange', 1), ('banana', 2), ('apple', 3), ('pear', 5)]
+
+
+.. function:: methodcaller(name[, args...])
+
+   Return a callable object that calls the method *name* on its operand.  If
+   additional arguments and/or keyword arguments are given, they will be given
+   to the method as well.  After ``f = methodcaller('name')``, the call ``f(b)``
+   returns ``b.name()``.  After ``f = methodcaller('name', 'foo', bar=1)``, the
+   call ``f(b)`` returns ``b.name('foo', bar=1)``.
+
+   .. versionadded:: 2.6
 
 
 .. _operator-map:

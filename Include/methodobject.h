@@ -13,7 +13,7 @@ extern "C" {
 
 PyAPI_DATA(PyTypeObject) PyCFunction_Type;
 
-#define PyCFunction_Check(op) (Py_Type(op) == &PyCFunction_Type)
+#define PyCFunction_Check(op) (Py_TYPE(op) == &PyCFunction_Type)
 
 typedef PyObject *(*PyCFunction)(PyObject *, PyObject *);
 typedef PyObject *(*PyCFunctionWithKeywords)(PyObject *, PyObject *,
@@ -90,6 +90,8 @@ typedef struct {
     PyObject    *m_self; /* Passed as 'self' arg to the C func, can be NULL */
     PyObject    *m_module; /* The __module__ attribute, can be anything */
 } PyCFunctionObject;
+
+PyAPI_FUNC(int) PyCFunction_ClearFreeList(void);
 
 #ifdef __cplusplus
 }

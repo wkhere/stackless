@@ -199,6 +199,11 @@ CField_set(CFieldObject *self, PyObject *inst, PyObject *value)
 	assert(CDataObject_Check(inst));
 	dst = (CDataObject *)inst;
 	ptr = dst->b_ptr + self->offset;
+	if (value == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't delete attribute");
+		return -1;
+	}
 	return CData_set(inst, self->proto, self->setfunc, value,
 			 self->index, self->size, ptr);
 }
@@ -341,10 +346,9 @@ static int
 get_long(PyObject *v, long *p)
 {
 	long x;
-	if (!PyInt_Check(v) && !PyLong_Check(v)) {
-		PyErr_Format(PyExc_TypeError,
-			     "int expected instead of %s instance",
-			     v->ob_type->tp_name);
+	if (PyFloat_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"int expected instead of float");
 		return -1;
 	}
 	x = PyInt_AsUnsignedLongMask(v);
@@ -360,10 +364,9 @@ static int
 get_ulong(PyObject *v, unsigned long *p)
 {
 	unsigned long x;
-	if (!PyInt_Check(v) && !PyLong_Check(v)) {
-		PyErr_Format(PyExc_TypeError,
-			     "int expected instead of %s instance",
-			     v->ob_type->tp_name);
+	if (PyFloat_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"int expected instead of float");
 		return -1;
 	}
 	x = PyInt_AsUnsignedLongMask(v);
@@ -381,11 +384,10 @@ static int
 get_longlong(PyObject *v, PY_LONG_LONG *p)
 {
 	PY_LONG_LONG x;
-	if (!PyInt_Check(v) && !PyLong_Check(v)) {
-		PyErr_Format(PyExc_TypeError,
-			     "int expected instead of %s instance",
-			     v->ob_type->tp_name);
-		return -1;
+	if (PyFloat_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"int expected instead of float");
+ 		return -1;
 	}
 	x = PyInt_AsUnsignedLongLongMask(v);
 	if (x == -1 && PyErr_Occurred())
@@ -400,12 +402,11 @@ static int
 get_ulonglong(PyObject *v, unsigned PY_LONG_LONG *p)
 {
 	unsigned PY_LONG_LONG x;
-	if (!PyInt_Check(v) && !PyLong_Check(v)) {
-		PyErr_Format(PyExc_TypeError,
-			     "int expected instead of %s instance",
-			     v->ob_type->tp_name);
-		return -1;
-	}
+	if (PyFloat_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"int expected instead of float");
+ 		return -1;
+ 	}
 	x = PyInt_AsUnsignedLongLongMask(v);
 	if (x == -1 && PyErr_Occurred())
 		return -1;
@@ -990,7 +991,7 @@ Q_get_sw(void *ptr, Py_ssize_t size)
 
 
 static PyObject *
-D_set(void *ptr, PyObject *value, Py_ssize_t size)
+g_set(void *ptr, PyObject *value, Py_ssize_t size)
 {
 	long double x;
 
@@ -1006,7 +1007,7 @@ D_set(void *ptr, PyObject *value, Py_ssize_t size)
 }
 
 static PyObject *
-D_get(void *ptr, Py_ssize_t size)
+g_get(void *ptr, Py_ssize_t size)
 {
 	long double val;
 	memcpy(&val, ptr, sizeof(long double));
@@ -1607,7 +1608,7 @@ static struct fielddesc formattable[] = {
 	{ 'B', B_set, B_get, &ffi_type_uchar},
 	{ 'c', c_set, c_get, &ffi_type_schar},
 	{ 'd', d_set, d_get, &ffi_type_double, d_set_sw, d_get_sw},
-	{ 'D', D_set, D_get, &ffi_type_longdouble},
+	{ 'g', g_set, g_get, &ffi_type_longdouble},
 	{ 'f', f_set, f_get, &ffi_type_float, f_set_sw, f_get_sw},
 	{ 'h', h_set, h_get, &ffi_type_sshort, h_set_sw, h_get_sw},
 	{ 'H', H_set, H_get, &ffi_type_ushort, H_set_sw, H_get_sw},
@@ -1753,10 +1754,12 @@ ffi_type ffi_type_sint64 = { 8, LONG_LONG_ALIGN, FFI_TYPE_SINT64 };
 
 ffi_type ffi_type_float = { sizeof(float), FLOAT_ALIGN, FFI_TYPE_FLOAT };
 ffi_type ffi_type_double = { sizeof(double), DOUBLE_ALIGN, FFI_TYPE_DOUBLE };
+
+#ifdef ffi_type_longdouble
+#undef ffi_type_longdouble
+#endif
 ffi_type ffi_type_longdouble = { sizeof(long double), LONGDOUBLE_ALIGN,
 				 FFI_TYPE_LONGDOUBLE };
-
-/* ffi_type ffi_type_longdouble */
 
 ffi_type ffi_type_pointer = { sizeof(void *), VOID_P_ALIGN, FFI_TYPE_POINTER };
 

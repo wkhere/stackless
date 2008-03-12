@@ -4,7 +4,6 @@ from test import test_support, seq_tests
 from weakref import proxy
 import copy
 import cPickle as pickle
-from cStringIO import StringIO
 import random
 import os
 
@@ -29,8 +28,8 @@ class MutateCmp:
 class TestBasic(unittest.TestCase):
 
     def test_basics(self):
-        d = deque(xrange(100))
-        d.__init__(xrange(100, 200))
+        d = deque(xrange(-5125, -5000))
+        d.__init__(xrange(200))
         for i in xrange(200, 400):
             d.append(i)
         for i in reversed(xrange(-200, 0)):
@@ -451,8 +450,8 @@ class DequeWithBadIter(deque):
 class TestSubclass(unittest.TestCase):
 
     def test_basics(self):
-        d = Deque(xrange(100))
-        d.__init__(xrange(100, 200))
+        d = Deque(xrange(25))
+        d.__init__(xrange(200))
         for i in xrange(200, 400):
             d.append(i)
         for i in reversed(xrange(-200, 0)):

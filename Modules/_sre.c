@@ -99,6 +99,7 @@ static char copyright[] =
 #define SRE_ERROR_STATE -2 /* illegal state */
 #define SRE_ERROR_RECURSION_LIMIT -3 /* runaway recursion */
 #define SRE_ERROR_MEMORY -9 /* out of memory */
+#define SRE_ERROR_INTERRUPTED -10 /* signal handler raised exception */
 
 #if defined(VERBOSE)
 #define TRACE(v) printf v
@@ -809,6 +810,7 @@ SRE_MATCH(SRE_STATE* state, SRE_CODE* pattern)
     Py_ssize_t alloc_pos, ctx_pos = -1;
     Py_ssize_t i, ret = 0;
     Py_ssize_t jump;
+    unsigned int sigcount=0;
 
     SRE_MATCH_CONTEXT* ctx;
     SRE_MATCH_CONTEXT* nextctx;
@@ -837,6 +839,9 @@ entrance:
     }
 
     for (;;) {
+        ++sigcount;
+        if ((0 == (sigcount & 0xfff)) && PyErr_CheckSignals())
+            RETURN_ERROR(SRE_ERROR_INTERRUPTED);
 
         switch (*ctx->pattern++) {
 
@@ -1689,7 +1694,7 @@ getstring(PyObject* string, Py_ssize_t* p_length, int* p_charsize)
 #endif
 
     /* get pointer to string buffer */
-    buffer = Py_Type(string)->tp_as_buffer;
+    buffer = Py_TYPE(string)->tp_as_buffer;
     if (!buffer || !buffer->bf_getreadbuffer || !buffer->bf_getsegcount ||
         buffer->bf_getsegcount(string, NULL) != 1) {
         PyErr_SetString(PyExc_TypeError, "expected string or buffer");
@@ -1833,6 +1838,9 @@ pattern_error(int status)
         break;
     case SRE_ERROR_MEMORY:
         PyErr_NoMemory();
+        break;
+    case SRE_ERROR_INTERRUPTED:
+    /* An exception has already been raised, so let it fly */
         break;
     default:
         /* other error codes indicate compiler/engine bugs */
@@ -2670,7 +2678,7 @@ _compile(PyObject* self_, PyObject* args)
         return NULL;
 
     n = PyList_GET_SIZE(code);
-
+    /* coverity[ampersand_in_size] */
     self = PyObject_NEW_VAR(PatternObject, &Pattern_Type, n);
     if (!self)
         return NULL;
@@ -3177,6 +3185,7 @@ pattern_new_match(PatternObject* pattern, SRE_STATE* state, int status)
     if (status > 0) {
 
         /* create match object (with room for extra group marks) */
+        /* coverity[ampersand_in_size] */
         match = PyObject_NEW_VAR(MatchObject, &Match_Type,
                                  2*(pattern->groups+1));
         if (!match)

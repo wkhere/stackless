@@ -15,7 +15,7 @@ substring by assigning to a slice: ``obj[i1:i2] = '...'``.  You can also read
 and write data starting at the current file position, and :meth:`seek` through
 the file to different positions.
 
-A memory-mapped file is created by the :func:`mmap` function, which is different
+A memory-mapped file is created by the :class:`mmap` constructor, which is different
 on Unix and on Windows.  In either case you must provide a file descriptor for a
 file opened for update. If you wish to map an existing Python file object, use
 its :meth:`fileno` method to obtain the correct value for the *fileno*
@@ -23,7 +23,7 @@ parameter.  Otherwise, you can open the file using the :func:`os.open` function,
 which returns a file descriptor directly (the file still needs to be closed when
 done).
 
-For both the Unix and Windows versions of the function, *access* may be
+For both the Unix and Windows versions of the constructor, *access* may be
 specified as an optional keyword parameter. *access* accepts one of three
 values: :const:`ACCESS_READ`, :const:`ACCESS_WRITE`, or :const:`ACCESS_COPY` to
 specify readonly, write-through or copy-on-write memory respectively. *access*
@@ -39,11 +39,14 @@ not update the underlying file.
    To map anonymous memory, -1 should be passed as the fileno along with the
    length.
 
+.. versionchanged:: 2.6
+   mmap.mmap has formerly been a factory function creating mmap objects. Now 
+   mmap.mmap is the class itself.
 
-.. function:: mmap(fileno, length[, tagname[, access]])
+.. class:: mmap(fileno, length[, tagname[, access[, offset]]])
 
    **(Windows version)** Maps *length* bytes from the file specified by the file
-   handle *fileno*, and returns a mmap object.  If *length* is larger than the
+   handle *fileno*, and creates a mmap object.  If *length* is larger than the
    current size of the file, the file is extended to contain *length* bytes.  If
    *length* is ``0``, the maximum length of the map is the current size of the
    file, except that if the file is empty Windows raises an exception (you cannot
@@ -56,13 +59,17 @@ not update the underlying file.
    the mapping is created without a name.  Avoiding the use of the tag parameter
    will assist in keeping your code portable between Unix and Windows.
 
+   *offset* may be specified as a non-negative integer offset. mmap references will 
+   be relative to the offset from the beginning of the file. *offset* defaults to 0.
+   *offset* must be a multiple of the ALLOCATIONGRANULARITY.
 
-.. function:: mmap(fileno, length[, flags[, prot[, access]]])
+
+.. class:: mmap(fileno, length[, flags[, prot[, access[, offset]]]])
    :noindex:
 
    **(Unix version)** Maps *length* bytes from the file specified by the file
    descriptor *fileno*, and returns a mmap object.  If *length* is ``0``, the
-   maximum length of the map will be the current size of the file when :func:`mmap`
+   maximum length of the map will be the current size of the file when :class:`mmap`
    is called.
 
    *flags* specifies the nature of the mapping. :const:`MAP_PRIVATE` creates a
@@ -79,6 +86,53 @@ not update the underlying file.
    parameter.  It is an error to specify both *flags*, *prot* and *access*.  See
    the description of *access* above for information on how to use this parameter.
 
+   *offset* may be specified as a non-negative integer offset. mmap references will 
+   be relative to the offset from the beginning of the file. *offset* defaults to 0.
+   *offset* must be a multiple of the PAGESIZE or ALLOCATIONGRANULARITY.
+   
+   This example shows a simple way of using :class:`mmap`::
+
+      import mmap
+
+      # write a simple example file
+      with open("hello.txt", "w") as f:
+          f.write("Hello Python!\n")
+
+      with open("hello.txt", "r+") as f:
+          # memory-map the file, size 0 means whole file
+          map = mmap.mmap(f.fileno(), 0)
+          # read content via standard file methods
+          print map.readline()  # prints "Hello Python!"
+          # read content via slice notation
+          print map[:5]  # prints "Hello"
+          # update content using slice notation;
+          # note that new content must have same size
+          map[6:] = " world!\n"
+          # ... and read again using standard file methods
+          map.seek(0)
+          print map.readline()  # prints "Hello  world!"
+          # close the map
+          map.close()
+
+
+   The next example demonstrates how to create an anonymous map and exchange
+   data between the parent and child processes::
+
+      import mmap
+      import os
+
+      map = mmap.mmap(-1, 13)
+      map.write("Hello world!")
+
+      pid = os.fork()
+
+      if pid == 0: # In a child process
+          map.seek(0)
+          print map.readline()
+
+          map.close()
+
+
 Memory-mapped file objects support the following methods:
 
 
@@ -88,11 +142,12 @@ Memory-mapped file objects support the following methods:
    an exception being raised.
 
 
-.. method:: mmap.find(string[, start])
+.. method:: mmap.find(string[, start[, end]])
 
-   Returns the lowest index in the object where the substring *string* is found.
-   Returns ``-1`` on failure.  *start* is the index at which the search begins, and
-   defaults to zero.
+   Returns the lowest index in the object where the substring *string* is found,
+   such that *string* is contained in the range [*start*, *end*]. Optional
+   arguments *start* and *end* are interpreted as in slice notation.
+   Returns ``-1`` on failure.
 
 
 .. method:: mmap.flush([offset, size])
@@ -137,6 +192,14 @@ Memory-mapped file objects support the following methods:
    :exc:`TypeError` exception.
 
 
+.. method:: mmap.rfind(string[, start[, end]])
+
+   Returns the highest index in the object where the substring *string* is
+   found, such that *string* is contained in the range [*start*,
+   *end*]. Optional arguments *start* and *end* are interpreted as in slice
+   notation.  Returns ``-1`` on failure.
+
+
 .. method:: mmap.seek(pos[, whence])
 
    Set the file's current position.  *whence* argument is optional and defaults to
@@ -170,4 +233,5 @@ Memory-mapped file objects support the following methods:
    the file pointer; the file position is advanced by ``1``. If the mmap was
    created with :const:`ACCESS_READ`, then writing to it will throw a
    :exc:`TypeError` exception.
+
 

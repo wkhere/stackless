@@ -13,26 +13,26 @@ static char unnamed_fields_key[] = "n_unnamed_fields";
    They are only allowed for indices < n_visible_fields. */
 char *PyStructSequence_UnnamedField = "unnamed field";
 
-#define VISIBLE_SIZE(op) Py_Size(op)
+#define VISIBLE_SIZE(op) Py_SIZE(op)
 #define VISIBLE_SIZE_TP(tp) PyInt_AsLong( \
                       PyDict_GetItemString((tp)->tp_dict, visible_length_key))
 
 #define REAL_SIZE_TP(tp) PyInt_AsLong( \
                       PyDict_GetItemString((tp)->tp_dict, real_length_key))
-#define REAL_SIZE(op) REAL_SIZE_TP(Py_Type(op))
+#define REAL_SIZE(op) REAL_SIZE_TP(Py_TYPE(op))
 
 #define UNNAMED_FIELDS_TP(tp) PyInt_AsLong( \
                       PyDict_GetItemString((tp)->tp_dict, unnamed_fields_key))
-#define UNNAMED_FIELDS(op) UNNAMED_FIELDS_TP(Py_Type(op))
+#define UNNAMED_FIELDS(op) UNNAMED_FIELDS_TP(Py_TYPE(op))
 
 
 PyObject *
 PyStructSequence_New(PyTypeObject *type)
 {
 	PyStructSequence *obj;
-       
+
 	obj = PyObject_New(PyStructSequence, type);
-	Py_Size(obj) = VISIBLE_SIZE_TP(type);
+	Py_SIZE(obj) = VISIBLE_SIZE_TP(type);
 
 	return (PyObject*) obj;
 }
@@ -230,11 +230,83 @@ make_tuple(PyStructSequence *obj)
 static PyObject *
 structseq_repr(PyStructSequence *obj)
 {
-	PyObject *tup, *str;
-	tup = make_tuple(obj);
-	str = PyObject_Repr(tup);
+	/* buffer and type size were chosen well considered. */
+#define REPR_BUFFER_SIZE 512
+#define TYPE_MAXSIZE 100
+
+	PyObject *tup;
+	PyTypeObject *typ = Py_TYPE(obj);
+	int i, removelast = 0;
+	Py_ssize_t len;
+	char buf[REPR_BUFFER_SIZE];
+	char *endofbuf, *pbuf = buf;
+
+	/* pointer to end of writeable buffer; safes space for "...)\0" */
+	endofbuf= &buf[REPR_BUFFER_SIZE-5];
+
+	if ((tup = make_tuple(obj)) == NULL) {
+		return NULL;
+	}
+
+	/* "typename(", limited to  TYPE_MAXSIZE */
+	len = strlen(typ->tp_name) > TYPE_MAXSIZE ? TYPE_MAXSIZE :
+						    strlen(typ->tp_name);
+	strncpy(pbuf, typ->tp_name, len);
+	pbuf += len;
+	*pbuf++ = '(';
+
+	for (i=0; i < VISIBLE_SIZE(obj); i++) {
+		PyObject *val, *repr;
+		char *cname, *crepr;
+
+		cname = typ->tp_members[i].name;
+		
+		val = PyTuple_GetItem(tup, i);
+		if (cname == NULL || val == NULL) {
+			return NULL;
+		}
+		repr = PyObject_Repr(val);
+		if (repr == NULL) {
+			Py_DECREF(tup);
+			return NULL;
+		}
+		crepr = PyString_AsString(repr);
+		if (crepr == NULL) {
+			Py_DECREF(tup);
+			Py_DECREF(repr);
+			return NULL;
+		}
+		
+		/* + 3: keep space for "=" and ", " */
+ 		len = strlen(cname) + strlen(crepr) + 3;
+		if ((pbuf+len) <= endofbuf) {
+			strcpy(pbuf, cname);
+			pbuf += strlen(cname);
+			*pbuf++ = '=';
+			strcpy(pbuf, crepr);
+			pbuf += strlen(crepr);
+			*pbuf++ = ',';
+			*pbuf++ = ' ';
+			removelast = 1;
+			Py_DECREF(repr);
+		}
+		else {
+			strcpy(pbuf, "...");
+			pbuf += 3;
+			removelast = 0;
+			Py_DECREF(repr);
+			break;
+		}
+	}
 	Py_DECREF(tup);
-	return str;
+	if (removelast) {
+		/* overwrite last ", " */
+		pbuf-=2;
+	}
+	*pbuf++ = ')';
+	*pbuf = '\0';
+
+	return PyString_FromString(buf);
 }
 
 static PyObject *
@@ -322,12 +394,12 @@ structseq_reduce(PyStructSequence* self)
 	}
 	
 	for (; i < n_fields; i++) {
-		char *n = Py_Type(self)->tp_members[i-n_unnamed_fields].name;
+		char *n = Py_TYPE(self)->tp_members[i-n_unnamed_fields].name;
 		PyDict_SetItemString(dict, n,
 				     self->ob_item[i]);
 	}
 
-	result = Py_BuildValue("(O(OO))", Py_Type(self), tup, dict);
+	result = Py_BuildValue("(O(OO))", Py_TYPE(self), tup, dict);
 
 	Py_DECREF(tup);
 	Py_DECREF(dict);

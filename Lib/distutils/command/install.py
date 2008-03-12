@@ -17,7 +17,6 @@ from distutils.errors import DistutilsPlatformError
 from distutils.file_util import write_file
 from distutils.util import convert_path, subst_vars, change_root
 from distutils.errors import DistutilsOptionError
-from glob import glob
 
 if sys.version < "2.2":
     WINDOWS_SCHEME = {
@@ -352,7 +351,7 @@ class install (Command):
                 opt_name = opt[0]
                 if opt_name[-1] == "=":
                     opt_name = opt_name[0:-1]
-                if self.negative_opt.has_key(opt_name):
+                if opt_name in self.negative_opt:
                     opt_name = string.translate(self.negative_opt[opt_name],
                                                 longopt_xlate)
                     val = not getattr(self, opt_name)

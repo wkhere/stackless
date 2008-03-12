@@ -22,16 +22,27 @@ from distutils.errors import DistutilsPlatformError
 PREFIX = os.path.normpath(sys.prefix)
 EXEC_PREFIX = os.path.normpath(sys.exec_prefix)
 
+# Path to the base directory of the project. On Windows the binary may
+# live in project/PCBuild9
+project_base = os.path.dirname(os.path.abspath(sys.executable))
+if os.name == "nt" and "pcbuild" in project_base[-8:].lower():
+    project_base = os.path.abspath(os.path.join(project_base, os.path.pardir))
+# PC/VS7.1
+if os.name == "nt" and "\\pc\\v" in project_base[-10:].lower():
+    project_base = os.path.abspath(os.path.join(project_base, os.path.pardir,
+                                                os.path.pardir))
+
 # python_build: (Boolean) if true, we're either building Python or
 # building an extension with an un-installed Python, so we use
 # different (hard-wired) directories.
-
-argv0_path = os.path.dirname(os.path.abspath(sys.executable))
-landmark = os.path.join(argv0_path, "Modules", "Setup")
-
-python_build = os.path.isfile(landmark)
-
-del landmark
+# Setup.local is available for Makefile builds including VPATH builds,
+# Setup.dist is available on Windows
+def _python_build():
+    for fn in ("Setup.dist", "Setup.local"):
+        if os.path.isfile(os.path.join(project_base, "Modules", fn)):
+            return True
+    return False
+python_build = _python_build()
 
 
 def get_python_version():
@@ -150,22 +161,22 @@ def customize_compiler(compiler):
             get_config_vars('CC', 'CXX', 'OPT', 'CFLAGS',
                             'CCSHARED', 'LDSHARED', 'SO')
 
-        if os.environ.has_key('CC'):
+        if 'CC' in os.environ:
             cc = os.environ['CC']
-        if os.environ.has_key('CXX'):
+        if 'CXX' in os.environ:
             cxx = os.environ['CXX']
-        if os.environ.has_key('LDSHARED'):
+        if 'LDSHARED' in os.environ:
             ldshared = os.environ['LDSHARED']
-        if os.environ.has_key('CPP'):
+        if 'CPP' in os.environ:
             cpp = os.environ['CPP']
         else:
             cpp = cc + " -E"           # not always
-        if os.environ.has_key('LDFLAGS'):
+        if 'LDFLAGS' in os.environ:
             ldshared = ldshared + ' ' + os.environ['LDFLAGS']
-        if os.environ.has_key('CFLAGS'):
+        if 'CFLAGS' in os.environ:
             cflags = opt + ' ' + os.environ['CFLAGS']
             ldshared = ldshared + ' ' + os.environ['CFLAGS']
-        if os.environ.has_key('CPPFLAGS'):
+        if 'CPPFLAGS' in os.environ:
             cpp = cpp + ' ' + os.environ['CPPFLAGS']
             cflags = cflags + ' ' + os.environ['CPPFLAGS']
             ldshared = ldshared + ' ' + os.environ['CPPFLAGS']
@@ -185,7 +196,10 @@ def customize_compiler(compiler):
 def get_config_h_filename():
     """Return full pathname of installed pyconfig.h file."""
     if python_build:
-        inc_dir = argv0_path
+        if os.name == "nt":
+            inc_dir = os.path.join(project_base, "PC")
+        else:
+            inc_dir = project_base
     else:
         inc_dir = get_python_inc(plat_specific=1)
     if get_python_version() < '2.2':
@@ -277,12 +291,12 @@ def parse_makefile(fn, g=None):
             if m:
                 n = m.group(1)
                 found = True
-                if done.has_key(n):
+                if n in done:
                     item = str(done[n])
-                elif notdone.has_key(n):
+                elif n in notdone:
                     # get it on a subsequent round
                     found = False
-                elif os.environ.has_key(n):
+                elif n in os.environ:
                     # do it like make: fall back to environment
                     item = os.environ[n]
                 else:
@@ -366,7 +380,7 @@ def _init_posix():
     # MACOSX_DEPLOYMENT_TARGET: configure bases some choices on it so
     # it needs to be compatible.
     # If it isn't set we set it to the configure-time value
-    if sys.platform == 'darwin' and g.has_key('MACOSX_DEPLOYMENT_TARGET'):
+    if sys.platform == 'darwin' and 'MACOSX_DEPLOYMENT_TARGET' in g:
         cfg_target = g['MACOSX_DEPLOYMENT_TARGET']
         cur_target = os.getenv('MACOSX_DEPLOYMENT_TARGET', '')
         if cur_target == '':
@@ -428,6 +442,8 @@ def _init_nt():
 
     g['SO'] = '.pyd'
     g['EXE'] = ".exe"
+    g['VERSION'] = get_python_version().replace(".", "")
+    g['BINDIR'] = os.path.dirname(os.path.abspath(sys.executable))
 
     global _config_vars
     _config_vars = g

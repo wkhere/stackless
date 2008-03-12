@@ -8,10 +8,6 @@ import os
 import mimetools
 import tempfile
 import StringIO
-import ftplib
-import threading
-import socket
-import time
 
 def hexescape(char):
     """Escape char as RFC 2396 specifies"""
@@ -47,7 +43,7 @@ class urlopen_FileTests(unittest.TestCase):
     def test_interface(self):
         # Make sure object returned by urlopen() has the specified methods
         for attr in ("read", "readline", "readlines", "fileno",
-                     "close", "info", "geturl", "__iter__"):
+                     "close", "info", "geturl", "getcode", "__iter__"):
             self.assert_(hasattr(self.returned_obj, attr),
                          "object returned by urlopen() lacks %s attribute" %
                          attr)
@@ -87,6 +83,9 @@ class urlopen_FileTests(unittest.TestCase):
     def test_geturl(self):
         self.assertEqual(self.returned_obj.geturl(), self.pathname)
 
+    def test_getcode(self):
+        self.assertEqual(self.returned_obj.getcode(), None)
+
     def test_iter(self):
         # Test iterator
         # Don't need to count number of iterations since test would fail the
@@ -123,12 +122,27 @@ class urlopen_HttpTests(unittest.TestCase):
             fp = urllib.urlopen("http://python.org/")
             self.assertEqual(fp.readline(), 'Hello!')
             self.assertEqual(fp.readline(), '')
+            self.assertEqual(fp.geturl(), 'http://python.org/')
+            self.assertEqual(fp.getcode(), 200)
+        finally:
+            self.unfakehttp()
+
+    def test_read_bogus(self):
+        # urlopen() should raise IOError for many error codes.
+        self.fakehttp('''HTTP/1.1 401 Authentication Required
+Date: Wed, 02 Jan 2008 03:03:54 GMT
+Server: Apache/1.3.33 (Debian GNU/Linux) mod_ssl/2.8.22 OpenSSL/0.9.7e
+Connection: close
+Content-Type: text/html; charset=iso-8859-1
+''')
+        try:
+            self.assertRaises(IOError, urllib.urlopen, "http://python.org/")
         finally:
             self.unfakehttp()
 
     def test_empty_socket(self):
-        """urlopen() raises IOError if the underlying socket does not send any
-        data. (#1680230) """
+        # urlopen() raises IOError if the underlying socket does not send any
+        # data. (#1680230)
         self.fakehttp('')
         try:
             self.assertRaises(IOError, urllib.urlopen, 'http://something')

@@ -9,8 +9,8 @@ import socket
 import sys
 import os
 import os.path
+import shutil
 import warnings
-import types
 import unittest
 
 class Error(Exception):
@@ -65,6 +65,14 @@ def unlink(filename):
     except OSError:
         pass
 
+def rmtree(path):
+    try:
+        shutil.rmtree(path)
+    except OSError, e:
+        # Unix returns ENOENT, Windows returns ESRCH.
+        if e.errno not in (errno.ENOENT, errno.ESRCH):
+            raise
+
 def forget(modname):
     '''"Forget" a module was ever imported by removing it from sys.modules and
     deleting any .pyc and .pyo files.'''
@@ -97,7 +105,7 @@ def requires(resource, msg=None):
 
 def bind_port(sock, host='', preferred_port=54321):
     """Try to bind the sock to a port.  If we are running multiple
-    tests and we don't try multiple ports, the test can fails.  This
+    tests and we don't try multiple ports, the test can fail.  This
     makes the test more robust."""
 
     # Find some random ports that hopefully no one is listening on.

@@ -51,6 +51,10 @@ typedef struct BLOCK {
 	PyObject *data[BLOCKLEN];
 } block;
 
+#define MAXFREEBLOCKS 10
+static int numfreeblocks = 0;
+static block *freeblocks[MAXFREEBLOCKS];
+
 static block *
 newblock(block *leftlink, block *rightlink, int len) {
 	block *b;
@@ -66,14 +70,30 @@ newblock(block *leftlink, block *rightlink, int len) {
 				"cannot add more blocks to the deque");
 		return NULL;
 	}
-	b = PyMem_Malloc(sizeof(block));
-	if (b == NULL) {
-		PyErr_NoMemory();
-		return NULL;
+	if (numfreeblocks) {
+		numfreeblocks -= 1;
+		b = freeblocks[numfreeblocks];
+	} else {
+		b = PyMem_Malloc(sizeof(block));
+		if (b == NULL) {
+			PyErr_NoMemory();
+			return NULL;
+		}
 	}
 	b->leftlink = leftlink;
 	b->rightlink = rightlink;
 	return b;
+}
+
+void
+freeblock(block *b)
+{
+	if (numfreeblocks < MAXFREEBLOCKS) {
+		freeblocks[numfreeblocks] = b;
+		numfreeblocks++;
+	} else {
+		PyMem_Free(b);
+	}
 }
 
 typedef struct {
@@ -161,7 +181,7 @@ deque_pop(dequeobject *deque, PyObject *unused)
 		} else {
 			prevblock = deque->rightblock->leftlink;
 			assert(deque->leftblock != deque->rightblock);
-			PyMem_Free(deque->rightblock);
+			freeblock(deque->rightblock);
 			prevblock->rightlink = NULL;
 			deque->rightblock = prevblock;
 			deque->rightindex = BLOCKLEN - 1;
@@ -198,7 +218,7 @@ deque_popleft(dequeobject *deque, PyObject *unused)
 		} else {
 			assert(deque->leftblock != deque->rightblock);
 			prevblock = deque->leftblock->rightlink;
-			PyMem_Free(deque->leftblock);
+			freeblock(deque->leftblock);
 			assert(prevblock != NULL);
 			prevblock->leftlink = NULL;
 			deque->leftblock = prevblock;
@@ -559,11 +579,11 @@ deque_dealloc(dequeobject *deque)
 	if (deque->leftblock != NULL) {
 		deque_clear(deque);
 		assert(deque->leftblock != NULL);
-		PyMem_Free(deque->leftblock);
+		freeblock(deque->leftblock);
 	}
 	deque->leftblock = NULL;
 	deque->rightblock = NULL;
-	Py_Type(deque)->tp_free(deque);
+	Py_TYPE(deque)->tp_free(deque);
 }
 
 static int
@@ -599,9 +619,9 @@ static PyObject *
 deque_copy(PyObject *deque)
 {
 	if (((dequeobject *)deque)->maxlen == -1)
-		return PyObject_CallFunction((PyObject *)(Py_Type(deque)), "O", deque, NULL);
+		return PyObject_CallFunction((PyObject *)(Py_TYPE(deque)), "O", deque, NULL);
 	else
-		return PyObject_CallFunction((PyObject *)(Py_Type(deque)), "Oi",
+		return PyObject_CallFunction((PyObject *)(Py_TYPE(deque)), "Oi",
 			deque, ((dequeobject *)deque)->maxlen, NULL);
 }
 
@@ -622,14 +642,14 @@ deque_reduce(dequeobject *deque)
 	}
 	if (dict == NULL) {
 		if (deque->maxlen == -1)
-			result = Py_BuildValue("O(O)", Py_Type(deque), aslist);
+			result = Py_BuildValue("O(O)", Py_TYPE(deque), aslist);
 		else
-			result = Py_BuildValue("O(Oi)", Py_Type(deque), aslist, deque->maxlen);
+			result = Py_BuildValue("O(Oi)", Py_TYPE(deque), aslist, deque->maxlen);
 	} else {
 		if (deque->maxlen == -1)
-			result = Py_BuildValue("O(OO)O", Py_Type(deque), aslist, Py_None, dict);
+			result = Py_BuildValue("O(OO)O", Py_TYPE(deque), aslist, Py_None, dict);
 		else
-			result = Py_BuildValue("O(Oi)O", Py_Type(deque), aslist, deque->maxlen, dict);
+			result = Py_BuildValue("O(Oi)O", Py_TYPE(deque), aslist, deque->maxlen, dict);
 	}
 	Py_XDECREF(dict);
 	Py_DECREF(aslist);
@@ -823,6 +843,7 @@ deque_init(dequeobject *deque, PyObject *args, PyObject *kwdargs)
 		}
 	}
 	deque->maxlen = maxlen;
+	deque_clear(deque);
 	if (iterable != NULL) {
 		PyObject *rv = deque_extend(deque, iterable);
 		if (rv == NULL)
@@ -959,7 +980,7 @@ static void
 dequeiter_dealloc(dequeiterobject *dio)
 {
 	Py_XDECREF(dio->deque);
-	Py_Type(dio)->tp_free(dio);
+	Py_TYPE(dio)->tp_free(dio);
 }
 
 static PyObject *
@@ -1167,7 +1188,7 @@ defdict_copy(defdictobject *dd)
 	   whose class constructor has the same signature.  Subclasses that
 	   define a different constructor signature must override copy().
 	*/
-	return PyObject_CallFunctionObjArgs((PyObject*)Py_Type(dd),
+	return PyObject_CallFunctionObjArgs((PyObject*)Py_TYPE(dd),
 					    dd->default_factory, dd, NULL);
 }
 
@@ -1210,7 +1231,7 @@ defdict_reduce(defdictobject *dd)
 		Py_DECREF(args);
 		return NULL;
 	}
-	result = PyTuple_Pack(5, Py_Type(dd), args,
+	result = PyTuple_Pack(5, Py_TYPE(dd), args,
 			      Py_None, Py_None, items);
 	Py_DECREF(items);
 	Py_DECREF(args);
@@ -1279,7 +1300,17 @@ defdict_repr(defdictobject *dd)
 	if (dd->default_factory == NULL)
 		defrepr = PyString_FromString("None");
 	else
-		defrepr = PyObject_Repr(dd->default_factory);
+	{
+		int status = Py_ReprEnter(dd->default_factory);
+		if (status != 0) {
+			if (status < 0)
+				return NULL;
+			defrepr = PyString_FromString("...");
+		}
+		else
+			defrepr = PyObject_Repr(dd->default_factory);
+		Py_ReprLeave(dd->default_factory);
+	}
 	if (defrepr == NULL) {
 		Py_DECREF(baserepr);
 		return NULL;

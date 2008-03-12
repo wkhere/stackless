@@ -1558,7 +1558,8 @@ class TarFile(object):
         self.closed = False
         self.members = []       # list of members as TarInfo objects
         self._loaded = False    # flag if all members have been read
-        self.offset = 0L        # current position in the archive file
+        self.offset = self.fileobj.tell()
+                                # current position in the archive file
         self.inodes = {}        # dictionary caching the inodes of
                                 # archive members already added
 
@@ -2020,15 +2021,11 @@ class TarFile(object):
 
         for tarinfo in members:
             if tarinfo.isdir():
-                # Extract directory with a safe mode, so that
-                # all files below can be extracted as well.
-                try:
-                    os.makedirs(os.path.join(path, tarinfo.name), 0700)
-                except EnvironmentError:
-                    pass
+                # Extract directories with a safe mode.
                 directories.append(tarinfo)
-            else:
-                self.extract(tarinfo, path)
+                tarinfo = copy.copy(tarinfo)
+                tarinfo.mode = 0700
+            self.extract(tarinfo, path)
 
         # Reverse sort directories.
         directories.sort(lambda a, b: cmp(a.name, b.name))
@@ -2036,11 +2033,11 @@ class TarFile(object):
 
         # Set correct owner, mtime and filemode on directories.
         for tarinfo in directories:
-            path = os.path.join(path, tarinfo.name)
+            dirpath = os.path.join(path, tarinfo.name)
             try:
-                self.chown(tarinfo, path)
-                self.utime(tarinfo, path)
-                self.chmod(tarinfo, path)
+                self.chown(tarinfo, dirpath)
+                self.utime(tarinfo, dirpath)
+                self.chmod(tarinfo, dirpath)
             except ExtractError, e:
                 if self.errorlevel > 1:
                     raise
@@ -2133,6 +2130,8 @@ class TarFile(object):
         # Create all upper directories.
         upperdirs = os.path.dirname(targetpath)
         if upperdirs and not os.path.exists(upperdirs):
+            # Create directories that are not part of the archive with
+            # default permissions.
             os.makedirs(upperdirs)
 
         if tarinfo.islnk() or tarinfo.issym():
@@ -2169,7 +2168,9 @@ class TarFile(object):
         """Make a directory called targetpath.
         """
         try:
-            os.mkdir(targetpath)
+            # Use a safe mode for the directory, the real mode is set
+            # later in _extract_member().
+            os.mkdir(targetpath, 0700)
         except EnvironmentError, e:
             if e.errno != errno.EEXIST:
                 raise

@@ -60,7 +60,7 @@ Bookkeeping functions:
 .. function:: seed([x])
 
    Initialize the basic random number generator. Optional argument *x* can be any
-   hashable object. If *x* is omitted or ``None``, current system time is used;
+   :term:`hashable` object. If *x* is omitted or ``None``, current system time is used;
    current system time is also used to initialize the generator when the module is
    first imported.  If randomness sources are provided by the operating system,
    they are used instead of the system time (see the :func:`os.urandom` function
@@ -80,6 +80,9 @@ Bookkeeping functions:
 
    .. versionadded:: 2.1
 
+   .. versionchanged:: 2.6
+      State values produced in Python 2.6 cannot be loaded into earlier versions.
+
 
 .. function:: setstate(state)
 
@@ -95,7 +98,7 @@ Bookkeeping functions:
    Change the internal state to one different from and likely far away from the
    current state.  *n* is a non-negative integer which is used to scramble the
    current state vector.  This is most useful in multi-threaded programs, in
-   conjuction with multiple instances of the :class:`Random` class:
+   conjunction with multiple instances of the :class:`Random` class:
    :meth:`setstate` or :meth:`seed` can be used to force all instances into the
    same internal state, and then :meth:`jumpahead` can be used to force the
    instances' states far apart.
@@ -165,7 +168,7 @@ Functions for sequences:
    (the sample) to be partitioned into grand prize and second place winners (the
    subslices).
 
-   Members of the population need not be hashable or unique.  If the population
+   Members of the population need not be :term:`hashable` or unique.  If the population
    contains repeats, then each occurrence is a possible selection in the sample.
 
    To choose a sample from a range of integers, use an :func:`xrange` object as an
@@ -307,9 +310,4 @@ Examples of basic usage::
 
    Wichmann, B. A. & Hill, I. D., "Algorithm AS 183: An efficient and portable
    pseudo-random number generator", Applied Statistics 31 (1982) 188-190.
-
-   http://www.npl.co.uk/ssfm/download/abstracts.html#196
-      A modern variation of the Wichmann-Hill generator that greatly increases the
-      period, and passes now-standard statistical tests that the original generator
-      failed.
 

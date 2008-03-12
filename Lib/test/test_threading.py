@@ -8,6 +8,7 @@ import threading
 import thread
 import time
 import unittest
+import weakref
 
 # A trivial mutable counter.
 class Counter(object):
@@ -201,6 +202,85 @@ class ThreadTests(unittest.TestCase):
         if t.finished:
             t.join()
         # else the thread is still running, and we have no way to kill it
+
+    def test_finalize_runnning_thread(self):
+        # Issue 1402: the PyGILState_Ensure / _Release functions may be called
+        # very late on python exit: on deallocation of a running thread for
+        # example.
+        try:
+            import ctypes
+        except ImportError:
+            if verbose:
+                print("test_finalize_with_runnning_thread can't import ctypes")
+            return  # can't do anything
+
+        import subprocess
+        rc = subprocess.call([sys.executable, "-c", """if 1:
+            import ctypes, sys, time, thread
+
+            # Module globals are cleared before __del__ is run
+            # So we save the functions in class dict
+            class C:
+                ensure = ctypes.pythonapi.PyGILState_Ensure
+                release = ctypes.pythonapi.PyGILState_Release
+                def __del__(self):
+                    state = self.ensure()
+                    self.release(state)
+
+            def waitingThread():
+                x = C()
+                time.sleep(100)
+
+            thread.start_new_thread(waitingThread, ())
+            time.sleep(1) # be sure the other thread is waiting
+            sys.exit(42)
+            """])
+        self.assertEqual(rc, 42)
+
+    def test_enumerate_after_join(self):
+        # Try hard to trigger #1703448: a thread is still returned in
+        # threading.enumerate() after it has been join()ed.
+        enum = threading.enumerate
+        old_interval = sys.getcheckinterval()
+        sys.setcheckinterval(1)
+        try:
+            for i in xrange(1, 1000):
+                t = threading.Thread(target=lambda: None)
+                t.start()
+                t.join()
+                l = enum()
+                self.assertFalse(t in l,
+                    "#1703448 triggered after %d trials: %s" % (i, l))
+        finally:
+            sys.setcheckinterval(old_interval)
+
+    def test_no_refcycle_through_target(self):
+        class RunSelfFunction(object):
+            def __init__(self, should_raise):
+                # The links in this refcycle from Thread back to self
+                # should be cleaned up when the thread completes.
+                self.should_raise = should_raise
+                self.thread = threading.Thread(target=self._run,
+                                               args=(self,),
+                                               kwargs={'yet_another':self})
+                self.thread.start()
+
+            def _run(self, other_ref, yet_another):
+                if self.should_raise:
+                    raise SystemExit
+
+        cyclic_object = RunSelfFunction(should_raise=False)
+        weak_cyclic_object = weakref.ref(cyclic_object)
+        cyclic_object.thread.join()
+        del cyclic_object
+        self.assertEquals(None, weak_cyclic_object())
+
+        raising_cyclic_object = RunSelfFunction(should_raise=True)
+        weak_raising_cyclic_object = weakref.ref(raising_cyclic_object)
+        raising_cyclic_object.thread.join()
+        del raising_cyclic_object
+        self.assertEquals(None, weak_raising_cyclic_object())
+
 
 class ThreadingExceptionTests(unittest.TestCase):
     # A RuntimeError should be raised if Thread.start() is called

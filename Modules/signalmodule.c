@@ -12,6 +12,8 @@
 
 #include <signal.h>
 
+#include <sys/stat.h>
+
 #ifndef SIG_ERR
 #define SIG_ERR ((PyOS_sighandler_t)(-1))
 #endif
@@ -75,7 +77,10 @@ static struct {
         PyObject *func;
 } Handlers[NSIG];
 
-static int is_tripped = 0; /* Speed up sigcheck() when none tripped */
+static sig_atomic_t wakeup_fd = -1;
+
+/* Speed up sigcheck() when none tripped */
+static volatile sig_atomic_t is_tripped = 0;
 
 static PyObject *DefaultHandler;
 static PyObject *IgnoreHandler;
@@ -122,9 +127,13 @@ signal_handler(int sig_num)
 	/* See NOTES section above */
 	if (getpid() == main_pid) {
 #endif
-		is_tripped++;
 		Handlers[sig_num].tripped = 1;
+                /* Set is_tripped after setting .tripped, as it gets
+                   cleared in PyErr_CheckSignals() before .tripped. */
+		is_tripped = 1;
 		Py_AddPendingCall(checksignals_witharg, NULL);
+		if (wakeup_fd != -1)
+			write(wakeup_fd, "\0", 1);
 #ifdef WITH_THREAD
 	}
 #endif
@@ -263,6 +272,80 @@ SIG_DFL -- if the default action for the signal is in effect\n\
 None -- if an unknown handler is in effect\n\
 anything else -- the callable Python object used as a handler");
 
+#ifdef HAVE_SIGINTERRUPT
+PyDoc_STRVAR(siginterrupt_doc,
+"siginterrupt(sig, flag) -> None\n\
+change system call restart behaviour: if flag is False, system calls\n\
+will be restarted when interrupted by signal sig, else system calls\n\
+will be interrupted.");
+
+static PyObject *
+signal_siginterrupt(PyObject *self, PyObject *args)
+{
+	int sig_num;
+	int flag;
+
+	if (!PyArg_ParseTuple(args, "ii:siginterrupt", &sig_num, &flag))
+		return NULL;
+	if (sig_num < 1 || sig_num >= NSIG) {
+		PyErr_SetString(PyExc_ValueError,
+				"signal number out of range");
+		return NULL;
+	}
+	if (siginterrupt(sig_num, flag)<0) {
+		PyErr_SetFromErrno(PyExc_RuntimeError);
+		return NULL;
+	}
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+#endif
+
+static PyObject *
+signal_set_wakeup_fd(PyObject *self, PyObject *args)
+{
+	struct stat buf;
+	int fd, old_fd;
+	if (!PyArg_ParseTuple(args, "i:set_wakeup_fd", &fd))
+		return NULL;
+#ifdef WITH_THREAD
+	if (PyThread_get_thread_ident() != main_thread) {
+		PyErr_SetString(PyExc_ValueError,
+				"set_wakeup_fd only works in main thread");
+		return NULL;
+	}
+#endif
+	if (fd != -1 && fstat(fd, &buf) != 0) {
+		PyErr_SetString(PyExc_ValueError, "invalid fd");
+		return NULL;
+	}
+	old_fd = wakeup_fd;
+	wakeup_fd = fd;
+	return PyLong_FromLong(old_fd);
+}
+
+PyDoc_STRVAR(set_wakeup_fd_doc,
+"set_wakeup_fd(fd) -> fd\n\
+\n\
+Sets the fd to be written to (with '\\0') when a signal\n\
+comes in.  A library can use this to wakeup select or poll.\n\
+The previous fd is returned.\n\
+\n\
+The fd must be non-blocking.");
+
+/* C API for the same, without all the error checking */
+int
+PySignal_SetWakeupFd(int fd)
+{
+	int old_fd = wakeup_fd;
+	if (fd < 0)
+		fd = -1;
+	wakeup_fd = fd;
+	return old_fd;
+}
+
 
 /* List of functions defined in the module */
 static PyMethodDef signal_methods[] = {
@@ -271,11 +354,15 @@ static PyMethodDef signal_methods[] = {
 #endif
 	{"signal",	        signal_signal, METH_VARARGS, signal_doc},
 	{"getsignal",	        signal_getsignal, METH_VARARGS, getsignal_doc},
+	{"set_wakeup_fd",	signal_set_wakeup_fd, METH_VARARGS, set_wakeup_fd_doc},
+#ifdef HAVE_SIGINTERRUPT
+ 	{"siginterrupt",	signal_siginterrupt, METH_VARARGS, siginterrupt_doc},
+#endif
 #ifdef HAVE_PAUSE
 	{"pause",	        (PyCFunction)signal_pause,
 	 METH_NOARGS,pause_doc},
 #endif
-	{"default_int_handler", signal_default_int_handler, 
+	{"default_int_handler", signal_default_int_handler,
 	 METH_VARARGS, default_int_handler_doc},
 	{NULL,			NULL}		/* sentinel */
 };
@@ -597,13 +684,31 @@ PyErr_CheckSignals(void)
 
 	if (!is_tripped)
 		return 0;
+
 #ifdef WITH_THREAD
 	if (PyThread_get_thread_ident() != main_thread)
 		return 0;
 #endif
+
+	/*
+	 * The is_stripped variable is meant to speed up the calls to
+	 * PyErr_CheckSignals (both directly or via pending calls) when no
+	 * signal has arrived. This variable is set to 1 when a signal arrives
+	 * and it is set to 0 here, when we know some signals arrived. This way
+	 * we can run the registered handlers with no signals blocked.
+	 *
+	 * NOTE: with this approach we can have a situation where is_tripped is
+	 *       1 but we have no more signals to handle (Handlers[i].tripped
+	 *       is 0 for every signal i). This won't do us any harm (except
+	 *       we're gonna spent some cycles for nothing). This happens when
+	 *       we receive a signal i after we zero is_tripped and before we
+	 *       check Handlers[i].tripped.
+	 */
+	is_tripped = 0;
+
 	if (!(f = (PyObject *)PyEval_GetFrame()))
 		f = Py_None;
-	
+
 	for (i = 1; i < NSIG; i++) {
 		if (Handlers[i].tripped) {
 			PyObject *result = NULL;
@@ -621,7 +726,7 @@ PyErr_CheckSignals(void)
 			Py_DECREF(result);
 		}
 	}
-	is_tripped = 0;
+
 	return 0;
 }
 
@@ -632,7 +737,7 @@ PyErr_CheckSignals(void)
 void
 PyErr_SetInterrupt(void)
 {
-	is_tripped++;
+	is_tripped = 1;
 	Handlers[SIGINT].tripped = 1;
 	Py_AddPendingCall((int (*)(void *))PyErr_CheckSignals, NULL);
 }

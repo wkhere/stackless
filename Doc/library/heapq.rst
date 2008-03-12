@@ -1,4 +1,3 @@
-
 :mod:`heapq` --- Heap queue algorithm
 =====================================
 
@@ -7,9 +6,6 @@
 .. moduleauthor:: Kevin O'Connor
 .. sectionauthor:: Guido van Rossum <guido@python.org>
 .. sectionauthor:: François Pinard
-
-
-.. % Theoretical explanation:
 
 .. versionadded:: 2.3
 
@@ -92,8 +88,8 @@ The module also offers three general purpose functions based on heaps.
 .. function:: merge(*iterables)
 
    Merge multiple sorted inputs into a single sorted output (for example, merge
-   timestamped entries from multiple log files).  Returns an iterator over over the
-   sorted values.
+   timestamped entries from multiple log files).  Returns an :term:`iterator`
+   over over the sorted values.
 
    Similar to ``sorted(itertools.chain(*iterables))`` but returns an iterable, does
    not pull the data into memory all at once, and assumes that each of the input

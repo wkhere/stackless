@@ -17,7 +17,7 @@
 #ifdef WITH_THREAD
 #include "pythread.h"
 #define PySSL_BEGIN_ALLOW_THREADS { \
-			PyThreadState *_save;  \
+			PyThreadState *_save = NULL;  \
 			if (_ssl_locks_count>0) {_save = PyEval_SaveThread();}
 #define PySSL_BLOCK_THREADS	if (_ssl_locks_count>0){PyEval_RestoreThread(_save)};
 #define PySSL_UNBLOCK_THREADS	if (_ssl_locks_count>0){_save = PyEval_SaveThread()};
@@ -127,7 +127,7 @@ static int check_socket_and_wait_for_timeout(PySocketSockObject *s,
 static PyObject *PySSL_peercert(PySSLObject *self, PyObject *args);
 static PyObject *PySSL_cipher(PySSLObject *self);
 
-#define PySSLObject_Check(v)	(Py_Type(v) == &PySSL_Type)
+#define PySSLObject_Check(v)	(Py_TYPE(v) == &PySSL_Type)
 
 typedef enum {
 	SOCKET_IS_NONBLOCKING,
@@ -660,7 +660,7 @@ _get_peer_alt_names (X509 *certificate) {
 	char buf[2048];
 	char *vptr;
 	int len;
-	unsigned char *p;
+	const unsigned char *p;
 
 	if (certificate == NULL)
 		return peer_alt_names;
@@ -687,7 +687,7 @@ _get_peer_alt_names (X509 *certificate) {
 		}
 
 		p = ext->value->data;
-		if(method->it)
+		if (method->it)
 			names = (GENERAL_NAMES*) (ASN1_item_d2i(NULL,
 								&p,
 								ext->value->length,
@@ -1365,7 +1365,7 @@ PySSL_RAND_egd(PyObject *self, PyObject *arg)
     if (!PyString_Check(arg))
 	return PyErr_Format(PyExc_TypeError,
 			    "RAND_egd() expected string, found %s",
-			    Py_Type(arg)->tp_name);
+			    Py_TYPE(arg)->tp_name);
     bytes = RAND_egd(PyString_AS_STRING(arg));
     if (bytes == -1) {
 	PyErr_SetString(PySSLErrorObject,
@@ -1480,7 +1480,7 @@ init_ssl(void)
 {
 	PyObject *m, *d;
 
-	Py_Type(&PySSL_Type) = &PyType_Type;
+	Py_TYPE(&PySSL_Type) = &PyType_Type;
 
 	m = Py_InitModule3("_ssl", PySSL_methods, module_doc);
 	if (m == NULL)

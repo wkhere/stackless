@@ -1,7 +1,7 @@
 """
 Read and write ZIP files.
 """
-import struct, os, time, sys
+import struct, os, time, sys, shutil
 import binascii, cStringIO
 
 try:
@@ -32,9 +32,9 @@ ZIP_DEFLATED = 8
 # Other ZIP compression methods not supported
 
 # Here are some struct module formats for reading headers
-structEndArchive = "<4s4H2lH"     # 9 items, end of archive, 22 bytes
+structEndArchive = "<4s4H2LH"     # 9 items, end of archive, 22 bytes
 stringEndArchive = "PK\005\006"   # magic number for end of archive record
-structCentralDir = "<4s4B4HlLL5HLl"# 19 items, central directory, 46 bytes
+structCentralDir = "<4s4B4HlLL5HLL"# 19 items, central directory, 46 bytes
 stringCentralDir = "PK\001\002"   # magic number for central directory
 structFileHeader = "<4s2B4HlLL2H"  # 12 items, file header record, 30 bytes
 stringFileHeader = "PK\003\004"   # magic number for file header
@@ -186,6 +186,7 @@ class ZipInfo (object):
             'CRC',
             'compress_size',
             'file_size',
+            '_raw_time',
         )
 
     def __init__(self, filename="NoName", date_time=(1980,1,1,0,0,0)):
@@ -301,7 +302,7 @@ class _ZipDecrypter:
 
     ZIP supports a password-based form of encryption. Even though known
     plaintext attacks have been found against it, it is still useful
-    for low-level securicy.
+    to be able to get data out of such a file.
 
     Usage:
         zd = _ZipDecrypter(mypwd)
@@ -683,6 +684,7 @@ class ZipFile:
                 x.CRC, x.compress_size, x.file_size) = centdir[1:12]
             x.volume, x.internal_attr, x.external_attr = centdir[15:18]
             # Convert date/time code to (year, month, day, hour, min, sec)
+            x._raw_time = t
             x.date_time = ( (d>>9)+1980, (d>>5)&0xF, d&0x1F,
                                      t>>11, (t>>5)&0x3F, (t&0x1F) * 2 )
 
@@ -710,7 +712,7 @@ class ZipFile:
         """Print a table of contents for the zip file."""
         print "%-46s %19s %12s" % ("File Name", "Modified    ", "Size")
         for zinfo in self.filelist:
-            date = "%d-%02d-%02d %02d:%02d:%02d" % zinfo.date_time
+            date = "%d-%02d-%02d %02d:%02d:%02d" % zinfo.date_time[:6]
             print "%-46s %s %12d" % (zinfo.filename, date, zinfo.file_size)
 
     def testzip(self):
@@ -790,11 +792,18 @@ class ZipFile:
             # The first 12 bytes in the cypher stream is an encryption header
             #  used to strengthen the algorithm. The first 11 bytes are
             #  completely random, while the 12th contains the MSB of the CRC,
+            #  or the MSB of the file time depending on the header type
             #  and is used to check the correctness of the password.
             bytes = zef_file.read(12)
             h = map(zd, bytes[0:12])
-            if ord(h[11]) != ((zinfo.CRC>>24)&255):
-                raise RuntimeError, "Bad password for file %s" % name
+            if zinfo.flag_bits & 0x8:
+                # compare against the file type from extended local headers
+                check_byte = (zinfo._raw_time >> 8) & 0xff
+            else:
+                # compare against the CRC otherwise
+                check_byte = (zinfo.CRC >> 24) & 0xff
+            if ord(h[11]) != check_byte:
+                raise RuntimeError("Bad password for file", name)
 
         # build and return a ZipExtFile
         if zd is None:
@@ -806,6 +815,62 @@ class ZipFile:
         if "U" in mode:
             zef.set_univ_newlines(True)
         return zef
+
+    def extract(self, member, path=None, pwd=None):
+        """Extract a member from the archive to the current working directory,
+           using its full name. Its file information is extracted as accurately
+           as possible. `member' may be a filename or a ZipInfo object. You can
+           specify a different directory using `path'.
+        """
+        if not isinstance(member, ZipInfo):
+            member = self.getinfo(member)
+
+        if path is None:
+            path = os.getcwd()
+
+        return self._extract_member(member, path, pwd)
+
+    def extractall(self, path=None, members=None, pwd=None):
+        """Extract all members from the archive to the current working
+           directory. `path' specifies a different directory to extract to.
+           `members' is optional and must be a subset of the list returned
+           by namelist().
+        """
+        if members is None:
+            members = self.namelist()
+
+        for zipinfo in members:
+            self.extract(zipinfo, path, pwd)
+
+    def _extract_member(self, member, targetpath, pwd):
+        """Extract the ZipInfo object 'member' to a physical
+           file on the path targetpath.
+        """
+        # build the destination pathname, replacing
+        # forward slashes to platform specific separators.
+        if targetpath[-1:] == "/":
+            targetpath = targetpath[:-1]
+
+        # don't include leading "/" from file name if present
+        if os.path.isabs(member.filename):
+            targetpath = os.path.join(targetpath, member.filename[1:])
+        else:
+            targetpath = os.path.join(targetpath, member.filename)
+
+        targetpath = os.path.normpath(targetpath)
+
+        # Create all upper directories if necessary.
+        upperdirs = os.path.dirname(targetpath)
+        if upperdirs and not os.path.exists(upperdirs):
+            os.makedirs(upperdirs)
+
+        source = self.open(member.filename, pwd=pwd)
+        target = file(targetpath, "wb")
+        shutil.copyfileobj(source, target)
+        source.close()
+        target.close()
+
+        return targetpath
 
     def _writecheck(self, zinfo):
         """Check for errors before writing a file to the archive."""
@@ -905,7 +970,7 @@ class ZipFile:
         the name of the file in the archive."""
         if not isinstance(zinfo_or_arcname, ZipInfo):
             zinfo = ZipInfo(filename=zinfo_or_arcname,
-                            date_time=time.localtime(time.time()))
+                            date_time=time.localtime(time.time())[:6])
             zinfo.compress_type = self.compression
         else:
             zinfo = zinfo_or_arcname

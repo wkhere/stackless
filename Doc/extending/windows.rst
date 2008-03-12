@@ -7,8 +7,6 @@
 Building C and C++ Extensions on Windows
 ****************************************
 
-.. % 
-
 This chapter briefly explains how to create a Windows extension module for
 Python using Microsoft Visual C++, and follows with more detailed background
 information on how it works.  The explanatory material is useful for both the
@@ -181,7 +179,7 @@ and add the following to the module initialization function::
 
    MyObject_Type.ob_type = &PyType_Type;
 
-Refer to section 3 of the `Python FAQ <http://www.python.org/doc/FAQ.html>`_ for
+Refer to section 3 of the `Python FAQ <http://www.python.org/doc/faq>`_ for
 details on why you must do this.
 
 

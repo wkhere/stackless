@@ -30,7 +30,7 @@ class ServerHTMLDoc(pydoc.HTMLDoc):
         results = []
         here = 0
 
-        # XXX Note that this regular expressions does not allow for the
+        # XXX Note that this regular expression does not allow for the
         # hyperlinking of arbitrary strings being used as method
         # names. Only methods with names consisting of word characters
         # and '.'s are hyperlinked.
@@ -52,7 +52,7 @@ class ServerHTMLDoc(pydoc.HTMLDoc):
                 url = 'http://www.rfc-editor.org/rfc/rfc%d.txt' % int(rfc)
                 results.append('<a href="%s">%s</a>' % (url, escape(all)))
             elif pep:
-                url = 'http://www.python.org/peps/pep-%04d.html' % int(pep)
+                url = 'http://www.python.org/dev/peps/pep-%04d/' % int(pep)
                 results.append('<a href="%s">%s</a>' % (url, escape(all)))
             elif text[end:end+1] == '(':
                 results.append(self.namelink(name, methods, funcs, classes))
@@ -64,14 +64,15 @@ class ServerHTMLDoc(pydoc.HTMLDoc):
         results.append(escape(text[here:]))
         return ''.join(results)
 
-    def docroutine(self, object, name=None, mod=None,
+    def docroutine(self, object, name, mod=None,
                    funcs={}, classes={}, methods={}, cl=None):
         """Produce HTML documentation for a function or method object."""
 
         anchor = (cl and cl.__name__ or '') + '-' + name
         note = ''
 
-        title = '<a name="%s"><strong>%s</strong></a>' % (anchor, name)
+        title = '<a name="%s"><strong>%s</strong></a>' % (
+            self.escape(anchor), self.escape(name))
 
         if inspect.ismethod(object):
             args, varargs, varkw, defaults = inspect.getargspec(object.im_func)
@@ -113,6 +114,7 @@ class ServerHTMLDoc(pydoc.HTMLDoc):
             fdict[key] = '#-' + key
             fdict[value] = fdict[key]
 
+        server_name = self.escape(server_name)
         head = '<big><big><strong>%s</strong></big></big>' % server_name
         result = self.heading(head, '#ffffff', '#7799ee')
 
@@ -121,8 +123,7 @@ class ServerHTMLDoc(pydoc.HTMLDoc):
         result = result + '<p>%s</p>\n' % doc
 
         contents = []
-        method_items = methods.items()
-        method_items.sort()
+        method_items = sorted(methods.items())
         for key, value in method_items:
             contents.append(self.docroutine(value, key, funcs=fdict))
         result = result + self.bigsection(
@@ -280,29 +281,3 @@ class DocCGIXMLRPCRequestHandler(   CGIXMLRPCRequestHandler,
     def __init__(self):
         CGIXMLRPCRequestHandler.__init__(self)
         XMLRPCDocGenerator.__init__(self)
-
-if __name__ == '__main__':
-    def deg_to_rad(deg):
-        """deg_to_rad(90) => 1.5707963267948966
-
-        Converts an angle in degrees to an angle in radians"""
-        import math
-        return deg * math.pi / 180
-
-    server = DocXMLRPCServer(("localhost", 8000))
-
-    server.set_server_title("Math Server")
-    server.set_server_name("Math XML-RPC Server")
-    server.set_server_documentation("""This server supports various mathematical functions.
-
-You can use it from Python as follows:
-
->>> from xmlrpclib import ServerProxy
->>> s = ServerProxy("http://localhost:8000")
->>> s.deg_to_rad(90.0)
-1.5707963267948966""")
-
-    server.register_function(deg_to_rad)
-    server.register_introspection_functions()
-
-    server.serve_forever()

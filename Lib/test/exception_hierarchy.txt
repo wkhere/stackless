@@ -2,8 +2,8 @@ BaseException
  +-- SystemExit
  |    +-- TaskletExit
  +-- KeyboardInterrupt
+ +-- GeneratorExit
  +-- Exception
-      +-- GeneratorExit
       +-- StopIteration
       +-- StandardError
       |    +-- ArithmeticError
@@ -34,10 +34,10 @@ BaseException
       |    +-- SystemError
       |    +-- TypeError
       |    +-- ValueError
-      |    |    +-- UnicodeError
-      |    |         +-- UnicodeDecodeError
-      |    |         +-- UnicodeEncodeError
-      |    |         +-- UnicodeTranslateError
+      |         +-- UnicodeError
+      |              +-- UnicodeDecodeError
+      |              +-- UnicodeEncodeError
+      |              +-- UnicodeTranslateError
       +-- Warning
            +-- DeprecationWarning
            +-- PendingDeprecationWarning

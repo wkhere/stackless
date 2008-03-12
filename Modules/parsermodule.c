@@ -693,7 +693,7 @@ build_node_children(PyObject *tuple, node *root, int *line_num)
                 PyErr_Format(parser_error,
                              "second item in terminal node must be a string,"
                              " found %s",
-                             Py_Type(temp)->tp_name);
+                             Py_TYPE(temp)->tp_name);
                 Py_DECREF(temp);
                 return 0;
             }
@@ -706,7 +706,7 @@ build_node_children(PyObject *tuple, node *root, int *line_num)
                         PyErr_Format(parser_error,
                                      "third item in terminal node must be an"
                                      " integer, found %s",
-				     Py_Type(temp)->tp_name);
+				     Py_TYPE(temp)->tp_name);
                         Py_DECREF(o);
                         Py_DECREF(temp);
                         return 0;
@@ -1498,7 +1498,7 @@ validate_small_stmt(node *tree)
 
 
 /*  compound_stmt:
- *      if_stmt | while_stmt | for_stmt | try_stmt | funcdef | classdef
+ *      if_stmt | while_stmt | for_stmt | try_stmt | funcdef | classdef | decorated
  */
 static int
 validate_compound_stmt(node *tree)
@@ -1517,7 +1517,8 @@ validate_compound_stmt(node *tree)
           || (ntype == for_stmt)
           || (ntype == try_stmt)
           || (ntype == funcdef)
-          || (ntype == classdef))
+          || (ntype == classdef)
+          || (ntype == decorated))
         res = validate_node(tree);
     else {
         res = 0;
@@ -1526,7 +1527,6 @@ validate_compound_stmt(node *tree)
     }
     return (res);
 }
-
 
 static int
 validate_yield_or_testlist(node *tree)
@@ -2558,27 +2558,39 @@ validate_decorators(node *tree)
 
 /*  funcdef:
  *      
- *            -6   -5    -4         -3  -2 -1
- *  [decorators] 'def' NAME parameters ':' suite
+ *     -5   -4         -3  -2    -1
+ *  'def' NAME parameters ':' suite
  */
 static int
 validate_funcdef(node *tree)
 {
     int nch = NCH(tree);
     int ok = (validate_ntype(tree, funcdef)
-	       && ((nch == 5) || (nch == 6))
+	       && (nch == 5)
 	       && validate_name(RCHILD(tree, -5), "def")
 	       && validate_ntype(RCHILD(tree, -4), NAME)
 	       && validate_colon(RCHILD(tree, -2))
 	       && validate_parameters(RCHILD(tree, -3))
 	       && validate_suite(RCHILD(tree, -1)));
-
-    if (ok && (nch == 6))
-	ok = validate_decorators(CHILD(tree, 0));
-
     return ok;
 }
 
+
+/* decorated
+ *   decorators (classdef | funcdef)
+ */
+static int
+validate_decorated(node *tree)
+{
+  int nch = NCH(tree);
+  int ok = (validate_ntype(tree, decorated)
+	    && (nch == 2)
+	    && validate_decorators(RCHILD(tree, -2))
+	    && (validate_funcdef(RCHILD(tree, -1))
+		|| validate_class(RCHILD(tree, -1)))
+	    );
+  return ok;
+}
 
 static int
 validate_lambdef(node *tree)
@@ -2923,6 +2935,9 @@ validate_node(node *tree)
           case classdef:
             res = validate_class(tree);
             break;
+	  case decorated:
+	    res = validate_decorated(tree);
+	    break;
             /*
              *  "Trivial" parse tree nodes.
              *  (Why did I call these trivial?)
@@ -3232,7 +3247,7 @@ initparser(void)
 {
     PyObject *module, *copyreg;
 
-    Py_Type(&PyST_Type) = &PyType_Type;
+    Py_TYPE(&PyST_Type) = &PyType_Type;
     module = Py_InitModule("parser", parser_functions);
     if (module == NULL)
     	return;
@@ -3269,7 +3284,7 @@ initparser(void)
      * If this fails, the import of this module will fail because an
      * exception will be raised here; should we clear the exception?
      */
-    copyreg = PyImport_ImportModule("copy_reg");
+    copyreg = PyImport_ImportModuleNoBlock("copy_reg");
     if (copyreg != NULL) {
         PyObject *func, *pickler;
 

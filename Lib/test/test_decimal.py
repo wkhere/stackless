@@ -25,10 +25,11 @@ with the corresponding argument.
 """
 from __future__ import with_statement
 
-import unittest
 import glob
+import math
 import os, sys
 import pickle, copy
+import unittest
 from decimal import *
 from test.test_support import (TestSkipped, run_unittest, run_doctest,
                                is_resource_enabled)
@@ -429,6 +430,10 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
         #just not a number
         self.assertEqual(str(Decimal('ugly')), 'NaN')
 
+        #leading and trailing whitespace permitted
+        self.assertEqual(str(Decimal('1.3E4 \n')), '1.3E+4')
+        self.assertEqual(str(Decimal('  -7.89')), '-7.89')
+
     def test_explicit_from_tuples(self):
 
         #zero
@@ -464,6 +469,7 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
         self.assertRaises(ValueError, Decimal, (1, (4, 3, 4, None, 1), 2) )
         self.assertRaises(ValueError, Decimal, (1, (4, -3, 4, 9, 1), 2) )
         self.assertRaises(ValueError, Decimal, (1, (4, 10, 4, 9, 1), 2) )
+        self.assertRaises(ValueError, Decimal, (1, (4, 3, 4, 'a', 1), 2) )
 
     def test_explicit_from_Decimal(self):
 
@@ -516,6 +522,10 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
         self.assertEqual(str(d), '456789')
         d = nc.create_decimal('456789')
         self.assertEqual(str(d), '4.57E+5')
+        # leading and trailing whitespace should result in a NaN;
+        # spaces are already checked in Cowlishaw's test-suite, so
+        # here we just check that a trailing newline results in a NaN
+        self.assertEqual(str(nc.create_decimal('3.14\n')), 'NaN')
 
         # from tuples
         d = Decimal( (1, (4, 3, 4, 9, 1, 3, 5, 3, 4), -25) )
@@ -604,6 +614,98 @@ class DecimalImplicitConstructionTest(unittest.TestCase):
                              'str' + lop + '10')
             self.assertEqual(eval('Decimal(10)' + sym + 'E()'),
                              '10' + rop + 'str')
+
+class DecimalFormatTest(unittest.TestCase):
+    '''Unit tests for the format function.'''
+    def test_formatting(self):
+        # triples giving a format, a Decimal, and the expected result
+        test_values = [
+            ('e', '0E-15', '0e-15'),
+            ('e', '2.3E-15', '2.3e-15'),
+            ('e', '2.30E+2', '2.30e+2'), # preserve significant zeros
+            ('e', '2.30000E-15', '2.30000e-15'),
+            ('e', '1.23456789123456789e40', '1.23456789123456789e+40'),
+            ('e', '1.5', '1.5e+0'),
+            ('e', '0.15', '1.5e-1'),
+            ('e', '0.015', '1.5e-2'),
+            ('e', '0.0000000000015', '1.5e-12'),
+            ('e', '15.0', '1.50e+1'),
+            ('e', '-15', '-1.5e+1'),
+            ('e', '0', '0e+0'),
+            ('e', '0E1', '0e+1'),
+            ('e', '0.0', '0e-1'),
+            ('e', '0.00', '0e-2'),
+            ('.6e', '0E-15', '0.000000e-9'),
+            ('.6e', '0', '0.000000e+6'),
+            ('.6e', '9.999999', '9.999999e+0'),
+            ('.6e', '9.9999999', '1.000000e+1'),
+            ('.6e', '-1.23e5', '-1.230000e+5'),
+            ('.6e', '1.23456789e-3', '1.234568e-3'),
+            ('f', '0', '0'),
+            ('f', '0.0', '0.0'),
+            ('f', '0E-2', '0.00'),
+            ('f', '0.00E-8', '0.0000000000'),
+            ('f', '0E1', '0'), # loses exponent information
+            ('f', '3.2E1', '32'),
+            ('f', '3.2E2', '320'),
+            ('f', '3.20E2', '320'),
+            ('f', '3.200E2', '320.0'),
+            ('f', '3.2E-6', '0.0000032'),
+            ('.6f', '0E-15', '0.000000'), # all zeros treated equally
+            ('.6f', '0E1', '0.000000'),
+            ('.6f', '0', '0.000000'),
+            ('.0f', '0', '0'), # no decimal point
+            ('.0f', '0e-2', '0'),
+            ('.0f', '3.14159265', '3'),
+            ('.1f', '3.14159265', '3.1'),
+            ('.4f', '3.14159265', '3.1416'),
+            ('.6f', '3.14159265', '3.141593'),
+            ('.7f', '3.14159265', '3.1415926'), # round-half-even!
+            ('.8f', '3.14159265', '3.14159265'),
+            ('.9f', '3.14159265', '3.141592650'),
+
+            ('g', '0', '0'),
+            ('g', '0.0', '0.0'),
+            ('g', '0E1', '0e+1'),
+            ('G', '0E1', '0E+1'),
+            ('g', '0E-5', '0.00000'),
+            ('g', '0E-6', '0.000000'),
+            ('g', '0E-7', '0e-7'),
+            ('g', '-0E2', '-0e+2'),
+            ('.0g', '3.14159265', '3'),  # 0 sig fig -> 1 sig fig
+            ('.1g', '3.14159265', '3'),
+            ('.2g', '3.14159265', '3.1'),
+            ('.5g', '3.14159265', '3.1416'),
+            ('.7g', '3.14159265', '3.141593'),
+            ('.8g', '3.14159265', '3.1415926'), # round-half-even!
+            ('.9g', '3.14159265', '3.14159265'),
+            ('.10g', '3.14159265', '3.14159265'), # don't pad
+
+            ('%', '0E1', '0%'),
+            ('%', '0E0', '0%'),
+            ('%', '0E-1', '0%'),
+            ('%', '0E-2', '0%'),
+            ('%', '0E-3', '0.0%'),
+            ('%', '0E-4', '0.00%'),
+
+            ('.3%', '0', '0.000%'), # all zeros treated equally
+            ('.3%', '0E10', '0.000%'),
+            ('.3%', '0E-10', '0.000%'),
+            ('.3%', '2.34', '234.000%'),
+            ('.3%', '1.234567', '123.457%'),
+            ('.0%', '1.23', '123%'),
+
+            ('e', 'NaN', 'NaN'),
+            ('f', '-NaN123', '-NaN123'),
+            ('+g', 'NaN456', '+NaN456'),
+            ('.3e', 'Inf', 'Infinity'),
+            ('.16f', '-Inf', '-Infinity'),
+            ('.0g', '-sNaN', '-sNaN'),
+
+            ('', '1.00', '1.00'),
+            ]
+        for fmt, d, result in test_values:
+            self.assertEqual(format(Decimal(d), fmt), result)
 
 class DecimalArithmeticOperatorsTest(unittest.TestCase):
     '''Unit tests for all arithmetic operators, binary and unary.'''
@@ -828,6 +930,19 @@ class DecimalArithmeticOperatorsTest(unittest.TestCase):
         self.assertEqual(-Decimal(45), Decimal(-45))           #  -
         self.assertEqual(abs(Decimal(45)), abs(Decimal(-45)))  # abs
 
+    def test_nan_comparisons(self):
+        n = Decimal('NaN')
+        s = Decimal('sNaN')
+        i = Decimal('Inf')
+        f = Decimal('2')
+        for x, y in [(n, n), (n, i), (i, n), (n, f), (f, n),
+                     (s, n), (n, s), (s, i), (i, s), (s, f), (f, s), (s, s)]:
+            self.assert_(x != y)
+            self.assert_(not (x == y))
+            self.assert_(not (x < y))
+            self.assert_(not (x <= y))
+            self.assert_(not (x > y))
+            self.assert_(not (x >= y))
 
 # The following are two functions used to test threading in the next class
 
@@ -979,6 +1094,23 @@ class DecimalUsabilityTest(unittest.TestCase):
         self.assert_(hash(Decimal('Inf')))
         self.assert_(hash(Decimal('-Inf')))
 
+        # check that the value of the hash doesn't depend on the
+        # current context (issue #1757)
+        c = getcontext()
+        old_precision = c.prec
+        x = Decimal("123456789.1")
+
+        c.prec = 6
+        h1 = hash(x)
+        c.prec = 10
+        h2 = hash(x)
+        c.prec = 16
+        h3 = hash(x)
+
+        self.assertEqual(h1, h2)
+        self.assertEqual(h1, h3)
+        c.prec = old_precision
+
     def test_min_and_max_methods(self):
 
         d1 = Decimal('15.32')
@@ -1009,7 +1141,7 @@ class DecimalUsabilityTest(unittest.TestCase):
 
         d = Decimal('15.32')
         self.assertEqual(str(d), '15.32')               # str
-        self.assertEqual(repr(d), 'Decimal("15.32")')   # repr
+        self.assertEqual(repr(d), "Decimal('15.32')")   # repr
 
     def test_tonum_methods(self):
         #Test float, int and long methods.
@@ -1120,11 +1252,17 @@ class DecimalUsabilityTest(unittest.TestCase):
         checkSameDec("__add__", True)
         checkSameDec("__div__", True)
         checkSameDec("__divmod__", True)
-        checkSameDec("__cmp__", True)
+        checkSameDec("__eq__", True)
+        checkSameDec("__ne__", True)
+        checkSameDec("__le__", True)
+        checkSameDec("__lt__", True)
+        checkSameDec("__ge__", True)
+        checkSameDec("__gt__", True)
         checkSameDec("__float__")
         checkSameDec("__floordiv__", True)
         checkSameDec("__hash__")
         checkSameDec("__int__")
+        checkSameDec("__trunc__")
         checkSameDec("__long__")
         checkSameDec("__mod__", True)
         checkSameDec("__mul__", True)
@@ -1189,6 +1327,16 @@ class DecimalPythonAPItests(unittest.TestCase):
             d = Decimal(s)
             r = d.to_integral(ROUND_DOWN)
             self.assertEqual(Decimal(int(d)), r)
+
+    def test_trunc(self):
+        for x in range(-250, 250):
+            s = '%0.2f' % (x / 100.0)
+            # should work the same as for floats
+            self.assertEqual(int(Decimal(s)), int(float(s)))
+            # should work the same as to_integral in the ROUND_DOWN mode
+            d = Decimal(s)
+            r = d.to_integral(ROUND_DOWN)
+            self.assertEqual(Decimal(math.trunc(d)), r)
 
 class ContextAPItests(unittest.TestCase):
 
@@ -1307,6 +1455,7 @@ def test_main(arith=False, verbose=None, todo_tests=None, debug=None):
             DecimalExplicitConstructionTest,
             DecimalImplicitConstructionTest,
             DecimalArithmeticOperatorsTest,
+            DecimalFormatTest,
             DecimalUseOfContextTest,
             DecimalUsabilityTest,
             DecimalPythonAPItests,

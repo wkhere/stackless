@@ -3,7 +3,7 @@ Tests common to tuple, list and UserList.UserList
 """
 
 import unittest
-from test import test_support
+import sys
 
 # Various iterables
 # This is used for checking the constructor (here and in test_deque.py)
@@ -306,6 +306,13 @@ class CommonTest(unittest.TestCase):
             self.assertEqual(self.type2test(s)*(-4), self.type2test([]))
             self.assertEqual(id(s), id(s*1))
 
+    def test_bigrepeat(self):
+        x = self.type2test([0])
+        x *= 2**16
+        self.assertRaises(MemoryError, x.__mul__, 2**16)
+        if hasattr(x, '__imul__'):
+            self.assertRaises(MemoryError, x.__imul__, 2**16)
+
     def test_subscript(self):
         a = self.type2test([10, 11])
         self.assertEqual(a.__getitem__(0L), 10)
@@ -321,3 +328,64 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(a.__getitem__(slice(3,5)), self.type2test([]))
         self.assertRaises(ValueError, a.__getitem__, slice(0, 10, 0))
         self.assertRaises(TypeError, a.__getitem__, 'x')
+
+    def test_count(self):
+        a = self.type2test([0, 1, 2])*3
+        self.assertEqual(a.count(0), 3)
+        self.assertEqual(a.count(1), 3)
+        self.assertEqual(a.count(3), 0)
+
+        self.assertRaises(TypeError, a.count)
+
+        class BadExc(Exception):
+            pass
+
+        class BadCmp:
+            def __eq__(self, other):
+                if other == 2:
+                    raise BadExc()
+                return False
+
+        self.assertRaises(BadExc, a.count, BadCmp())
+
+    def test_index(self):
+        u = self.type2test([0, 1])
+        self.assertEqual(u.index(0), 0)
+        self.assertEqual(u.index(1), 1)
+        self.assertRaises(ValueError, u.index, 2)
+
+        u = self.type2test([-2, -1, 0, 0, 1, 2])
+        self.assertEqual(u.count(0), 2)
+        self.assertEqual(u.index(0), 2)
+        self.assertEqual(u.index(0, 2), 2)
+        self.assertEqual(u.index(-2, -10), 0)
+        self.assertEqual(u.index(0, 3), 3)
+        self.assertEqual(u.index(0, 3, 4), 3)
+        self.assertRaises(ValueError, u.index, 2, 0, -10)
+
+        self.assertRaises(TypeError, u.index)
+
+        class BadExc(Exception):
+            pass
+
+        class BadCmp:
+            def __eq__(self, other):
+                if other == 2:
+                    raise BadExc()
+                return False
+
+        a = self.type2test([0, 1, 2, 3])
+        self.assertRaises(BadExc, a.index, BadCmp())
+
+        a = self.type2test([-2, -1, 0, 0, 1, 2])
+        self.assertEqual(a.index(0), 2)
+        self.assertEqual(a.index(0, 2), 2)
+        self.assertEqual(a.index(0, -4), 2)
+        self.assertEqual(a.index(-2, -10), 0)
+        self.assertEqual(a.index(0, 3), 3)
+        self.assertEqual(a.index(0, -3), 3)
+        self.assertEqual(a.index(0, 3, 4), 3)
+        self.assertEqual(a.index(0, -3, -2), 3)
+        self.assertEqual(a.index(0, -4*sys.maxint, 4*sys.maxint), 2)
+        self.assertRaises(ValueError, a.index, 0, 4*sys.maxint,-4*sys.maxint)
+        self.assertRaises(ValueError, a.index, 2, 0, -10)

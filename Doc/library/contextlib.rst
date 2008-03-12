@@ -17,13 +17,12 @@ Functions provided:
 
 .. function:: contextmanager(func)
 
-   This function is a decorator that can be used to define a factory function for
-   :keyword:`with` statement context managers, without needing to create a class or
-   separate :meth:`__enter__` and :meth:`__exit__` methods.
+   This function is a :term:`decorator` that can be used to define a factory
+   function for :keyword:`with` statement context managers, without needing to
+   create a class or separate :meth:`__enter__` and :meth:`__exit__` methods.
 
    A simple example (this is not recommended as a real way of generating HTML!)::
 
-      from __future__ import with_statement
       from contextlib import contextmanager
 
       @contextmanager
@@ -39,9 +38,9 @@ Functions provided:
       foo
       </h1>
 
-   The function being decorated must return a generator-iterator when called. This
-   iterator must yield exactly one value, which will be bound to the targets in the
-   :keyword:`with` statement's :keyword:`as` clause, if any.
+   The function being decorated must return a :term:`generator`-iterator when
+   called. This iterator must yield exactly one value, which will be bound to
+   the targets in the :keyword:`with` statement's :keyword:`as` clause, if any.
 
    At the point where the generator yields, the block nested in the :keyword:`with`
    statement is executed.  The generator is then resumed after the block is exited.
@@ -100,7 +99,6 @@ Functions provided:
 
    And lets you write code like this::
 
-      from __future__ import with_statement
       from contextlib import closing
       import urllib
 

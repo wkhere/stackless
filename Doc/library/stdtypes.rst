@@ -162,10 +162,13 @@ This table summarizes the comparison operations:
 .. index::
    pair: operator; comparison
    operator: ==
+   operator: <
+   operator: <=
+   operator: >
+   operator: >=
+   operator: !=
    operator: is
    operator: is not
-
-.. % XXX *All* others have funny characters < ! >
 
 Notes:
 
@@ -267,9 +270,8 @@ numbers of mixed type use the same rule. [#]_ The constructors :func:`int`,
 :func:`long`, :func:`float`, and :func:`complex` can be used to produce numbers
 of a specific type.
 
-All numeric types (except complex) support the following operations, sorted by
-ascending priority (operations in the same box have the same priority; all
-numeric operations have a higher priority than comparison operations):
+All builtin numeric types support the following operations. See
+:ref:`power` and later sections for the operators' priorities.
 
 +--------------------+---------------------------------+--------+
 | Operation          | Result                          | Notes  |
@@ -282,7 +284,7 @@ numeric operations have a higher priority than comparison operations):
 +--------------------+---------------------------------+--------+
 | ``x / y``          | quotient of *x* and *y*         | \(1)   |
 +--------------------+---------------------------------+--------+
-| ``x // y``         | (floored) quotient of *x* and   | \(5)   |
+| ``x // y``         | (floored) quotient of *x* and   | (4)(5) |
 |                    | *y*                             |        |
 +--------------------+---------------------------------+--------+
 | ``x % y``          | remainder of ``x / y``          | \(4)   |
@@ -291,27 +293,27 @@ numeric operations have a higher priority than comparison operations):
 +--------------------+---------------------------------+--------+
 | ``+x``             | *x* unchanged                   |        |
 +--------------------+---------------------------------+--------+
-| ``abs(x)``         | absolute value or magnitude of  |        |
+| ``abs(x)``         | absolute value or magnitude of  | \(3)   |
 |                    | *x*                             |        |
 +--------------------+---------------------------------+--------+
 | ``int(x)``         | *x* converted to integer        | \(2)   |
 +--------------------+---------------------------------+--------+
 | ``long(x)``        | *x* converted to long integer   | \(2)   |
 +--------------------+---------------------------------+--------+
-| ``float(x)``       | *x* converted to floating point |        |
+| ``float(x)``       | *x* converted to floating point | \(6)   |
 +--------------------+---------------------------------+--------+
 | ``complex(re,im)`` | a complex number with real part |        |
 |                    | *re*, imaginary part *im*.      |        |
 |                    | *im* defaults to zero.          |        |
 +--------------------+---------------------------------+--------+
 | ``c.conjugate()``  | conjugate of the complex number |        |
-|                    | *c*                             |        |
+|                    | *c*. (Identity on real numbers) |        |
 +--------------------+---------------------------------+--------+
 | ``divmod(x, y)``   | the pair ``(x // y, x % y)``    | (3)(4) |
 +--------------------+---------------------------------+--------+
-| ``pow(x, y)``      | *x* to the power *y*            |        |
+| ``pow(x, y)``      | *x* to the power *y*            | (3)(7) |
 +--------------------+---------------------------------+--------+
-| ``x ** y``         | *x* to the power *y*            |        |
+| ``x ** y``         | *x* to the power *y*            | \(7)   |
 +--------------------+---------------------------------+--------+
 
 .. index::
@@ -338,9 +340,12 @@ Notes:
       pair: numeric; conversions
       pair: C; language
 
-   Conversion from floating point to (long or plain) integer may round or truncate
-   as in C; see functions :func:`floor` and :func:`ceil` in the :mod:`math` module
-   for well-defined conversions.
+   Conversion from floating point to (long or plain) integer may round or
+   truncate as in C; see functions :func:`math.floor` and :func:`math.ceil` for
+   well-defined conversions.
+
+   .. deprecated:: 2.6
+      Instead, convert floats to long explicitly with :func:`trunc`.
 
 (3)
    See :ref:`built-in-funcs` for a full description.
@@ -355,7 +360,34 @@ Notes:
    Also referred to as integer division.  The resultant value is a whole integer,
    though the result's type is not necessarily int.
 
-.. % XXXJH exceptions: overflow (when? what operations?) zerodivision
+(6)
+   float also accepts the strings "nan" and "inf" with an optional prefix "+" 
+   or "-" for Not a Number (NaN) and positive or negative infinity.
+   
+   .. versionadded:: 2.6
+
+(7)
+   Python defines ``pow(0, 0)`` and ``0 ** 0`` to be ``1``, as is common for
+   programming languages.
+
+All :class:`numbers.Real` types (:class:`int`, :class:`long`, and
+:class:`float`) also include the following operations:
+
++--------------------+------------------------------------+--------+
+| Operation          | Result                             | Notes  |
++====================+====================================+========+
+| ``trunc(x)``       | *x* truncated to Integral          |        |
++--------------------+------------------------------------+--------+
+| ``round(x[, n])``  | *x* rounded to n digits,           |        |
+|                    | rounding half to even. If n is     |        |
+|                    | omitted, it defaults to 0.         |        |
++--------------------+------------------------------------+--------+
+| ``math.floor(x)``  | the greatest integral float <= *x* |        |
++--------------------+------------------------------------+--------+
+| ``math.ceil(x)``   | the least integral float >= *x*    |        |
++--------------------+------------------------------------+--------+
+
+.. XXXJH exceptions: overflow (when? what operations?) zerodivision
 
 
 .. _bitstring-ops:
@@ -370,7 +402,7 @@ for bit-strings.  Negative numbers are treated as their 2's complement value
 (for long integers, this assumes a sufficiently large number of bits that no
 overflow occurs during the operation).
 
-The priorities of the binary bit-wise operations are all lower than the numeric
+The priorities of the binary bitwise operations are all lower than the numeric
 operations and higher than the comparisons; the unary operation ``~`` has the
 same priority as the other unary numeric operations (``+`` and ``-``).
 
@@ -389,9 +421,9 @@ This table lists the bit-string operations sorted in ascending priority
 | ``x & y``  | bitwise :dfn:`and` of *x* and  |          |
 |            | *y*                            |          |
 +------------+--------------------------------+----------+
-| ``x << n`` | *x* shifted left by *n* bits   | (1), (2) |
+| ``x << n`` | *x* shifted left by *n* bits   | (1)(2)   |
 +------------+--------------------------------+----------+
-| ``x >> n`` | *x* shifted right by *n* bits  | (1), (3) |
+| ``x >> n`` | *x* shifted right by *n* bits  | (1)(3)   |
 +------------+--------------------------------+----------+
 | ``~x``     | the bits of *x* inverted       |          |
 +------------+--------------------------------+----------+
@@ -437,6 +469,7 @@ the iteration methods.
 One method needs to be defined for container objects to provide iteration
 support:
 
+.. XXX duplicated in reference/datamodel!
 
 .. method:: container.__iter__()
 
@@ -479,10 +512,10 @@ Implementations that do not obey this property are deemed broken.  (This
 constraint was added in Python 2.3; in Python 2.2, various iterators are broken
 according to this rule.)
 
-Python's generators provide a convenient way to implement the iterator protocol.
-If a container object's :meth:`__iter__` method is implemented as a generator,
-it will automatically return an iterator object (technically, a generator
-object) supplying the :meth:`__iter__` and :meth:`next` methods.
+Python's :term:`generator`\s provide a convenient way to implement the iterator
+protocol.  If a container object's :meth:`__iter__` method is implemented as a
+generator, it will automatically return an iterator object (technically, a
+generator object) supplying the :meth:`__iter__` and :meth:`next` methods.
 
 
 .. _typesseq:
@@ -530,7 +563,7 @@ support slicing, concatenation or repetition, and using ``in``, ``not in``,
 Most sequence types support the following operations.  The ``in`` and ``not in``
 operations have the same priorities as the comparison operations.  The ``+`` and
 ``*`` operations have the same priority as the corresponding numeric operations.
-[#]_
+[#]_ Additional methods are provided for :ref:`typesseq-mutable`.
 
 This table lists the sequence operations sorted in ascending priority
 (operations in the same box have the same priority).  In the table, *s* and *t*
@@ -553,9 +586,9 @@ are sequences of the same type; *n*, *i* and *j* are integers:
 +------------------+--------------------------------+----------+
 | ``s[i]``         | *i*'th item of *s*, origin 0   | \(3)     |
 +------------------+--------------------------------+----------+
-| ``s[i:j]``       | slice of *s* from *i* to *j*   | (3), (4) |
+| ``s[i:j]``       | slice of *s* from *i* to *j*   | (3)(4)   |
 +------------------+--------------------------------+----------+
-| ``s[i:j:k]``     | slice of *s* from *i* to *j*   | (3), (5) |
+| ``s[i:j:k]``     | slice of *s* from *i* to *j*   | (3)(5)   |
 |                  | with step *k*                  |          |
 +------------------+--------------------------------+----------+
 | ``len(s)``       | length of *s*                  |          |
@@ -632,7 +665,7 @@ Notes:
 
 (5)
    The slice of *s* from *i* to *j* with step *k* is defined as the sequence of
-   items with index  ``x = i + n*k`` such that 0 ≤n < (j-i)/(k).  In other words,
+   items with index  ``x = i + n*k`` such that ``0 <= n < (j-i)/k``.  In other words,
    the indices are ``i``, ``i+k``, ``i+2*k``, ``i+3*k`` and so on, stopping when
    *j* is reached (but never including *j*).  If *i* or *j* is greater than
    ``len(s)``, use ``len(s)``.  If *i* or *j* are omitted or ``None``, they become
@@ -938,7 +971,7 @@ string functions based on regular expressions.
    specified, then there is no limit on the number of splits (all possible
    splits are made).
 
-   If *sep is given, consecutive delimiters are not grouped together and are
+   If *sep* is given, consecutive delimiters are not grouped together and are
    deemed to delimit empty strings (for example, ``'1,,2'.split(',')`` returns
    ``['1', '', '2']``).  The *sep* argument may consist of multiple characters
    (for example, ``'1<>2<>3'.split('<>')`` returns ``['1', '2', '3']``).
@@ -1225,7 +1258,7 @@ Notes:
 Since Python strings have an explicit length, ``%s`` conversions do not assume
 that ``'\0'`` is the end of the string.
 
-.. % XXX Examples?
+.. XXX Examples?
 
 For safety reasons, floating point precisions are clipped to 50; ``%f``
 conversions for numbers whose absolute value is over 1e25 are replaced by ``%g``
@@ -1311,7 +1344,7 @@ defined on mutable sequence types (where *x* is an arbitrary object):
 | ``s.reverse()``              | reverses the items of *s* in   | \(7)                |
 |                              | place                          |                     |
 +------------------------------+--------------------------------+---------------------+
-| ``s.sort([cmp[, key[,        | sort the items of *s* in place | (7), (8), (9), (10) |
+| ``s.sort([cmp[, key[,        | sort the items of *s* in place | (7)(8)(9)(10)       |
 | reverse]]])``                |                                |                     |
 +------------------------------+--------------------------------+---------------------+
 
@@ -1380,10 +1413,11 @@ Notes:
    *cmp* specifies a custom comparison function of two arguments (list items) which
    should return a negative, zero or positive number depending on whether the first
    argument is considered smaller than, equal to, or larger than the second
-   argument: ``cmp=lambda x,y: cmp(x.lower(), y.lower())``
+   argument: ``cmp=lambda x,y: cmp(x.lower(), y.lower())``.  The default value
+   is ``None``.
 
    *key* specifies a function of one argument that is used to extract a comparison
-   key from each list element: ``key=str.lower``
+   key from each list element: ``key=str.lower``.  The default value is ``None``.
 
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
@@ -1419,7 +1453,7 @@ Set Types --- :class:`set`, :class:`frozenset`
 
 .. index:: object: set
 
-A :dfn:`set` object is an unordered collection of distinct hashable objects.
+A :dfn:`set` object is an unordered collection of distinct :term:`hashable` objects.
 Common uses include membership testing, removing duplicates from a sequence, and
 computing mathematical operations such as intersection, union, difference, and
 symmetric difference.
@@ -1438,7 +1472,7 @@ There are currently two builtin set types, :class:`set` and :class:`frozenset`.
 The :class:`set` type is mutable --- the contents can be changed using methods
 like :meth:`add` and :meth:`remove`.  Since it is mutable, it has no hash value
 and cannot be used as either a dictionary key or as an element of another set.
-The :class:`frozenset` type is immutable and hashable --- its contents cannot be
+The :class:`frozenset` type is immutable and :term:`hashable` --- its contents cannot be
 altered after it is created; it can therefore be used as a dictionary key or as
 an element of another set.
 
@@ -1466,6 +1500,13 @@ operations:
 .. describe:: x not in s
 
    Test *x* for non-membership in *s*.
+
+.. method:: set.isdisjoint(other)
+
+   Return True if the set has no elements in common with *other*.
+   Sets are disjoint if and only if their interesection is the empty set.
+
+   .. versionadded:: 2.6
 
 .. method:: set.issubset(other)
             set <= other
@@ -1538,8 +1579,7 @@ or ``a>b``. Accordingly, sets do not implement the :meth:`__cmp__` method.
 Since sets only define partial ordering (subset relationships), the output of
 the :meth:`list.sort` method is undefined for lists of sets.
 
-Set elements are like dictionary keys; they need to define both :meth:`__hash__`
-and :meth:`__eq__` methods.
+Set elements, like dictionary keys, must be :term:`hashable`.
 
 Binary operations that mix :class:`set` instances with :class:`frozenset` return
 the type of the first operand.  For example: ``frozenset('ab') | set('bc')``
@@ -1602,7 +1642,7 @@ implementation found in the :mod:`sets` module.
 
 .. seealso::
 
-   `Comparison to the built-in set types <comparison-to-builtin-set.html>`_
+   :ref:`comparison-to-builtin-set`
       Differences between the :mod:`sets` module and the built-in set types.
 
 
@@ -1619,21 +1659,20 @@ Mapping Types --- :class:`dict`
    statement: del
    builtin: len
 
-A :dfn:`mapping` object maps immutable values to arbitrary objects.  Mappings
-are mutable objects.  There is currently only one standard mapping type, the
-:dfn:`dictionary`.
-(For other containers see the built in :class:`list`,
-:class:`set`, and :class:`tuple` classes, and the :mod:`collections`
-module.)
+A :dfn:`mapping` object maps :term:`hashable` values to arbitrary objects.
+Mappings are mutable objects.  There is currently only one standard mapping
+type, the :dfn:`dictionary`.  (For other containers see the built in
+:class:`list`, :class:`set`, and :class:`tuple` classes, and the
+:mod:`collections` module.)
 
-A dictionary's keys are *almost* arbitrary values.  Only
-values containing lists, dictionaries or other mutable types (that are compared
-by value rather than by object identity) may not be used as keys. Numeric types
-used for keys obey the normal rules for numeric comparison: if two numbers
-compare equal (such as ``1`` and ``1.0``) then they can be used interchangeably
-to index the same dictionary entry. (Note however, that since computers
-store floating-point numbers as approximations it is usually unwise to
-use them as dictionary keys.)
+A dictionary's keys are *almost* arbitrary values.  Values that are not
+:term:`hashable`, that is, values containing lists, dictionaries or other
+mutable types (that are compared by value rather than by object identity) may
+not be used as keys.  Numeric types used for keys obey the normal rules for
+numeric comparison: if two numbers compare equal (such as ``1`` and ``1.0``)
+then they can be used interchangeably to index the same dictionary entry.  (Note
+however, that since computers store floating-point numbers as approximations it
+is usually unwise to use them as dictionary keys.)
 
 Dictionaries can be created by placing a comma-separated list of ``key: value``
 pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
@@ -1827,7 +1866,7 @@ types should support too):
 .. method:: dict.values()
 
    Return a copy of the dictionary's list of values.  See the note for
-   :meth:`mapping.items`.
+   :meth:`dict.items`.
 
 
 .. _bltin-file-objects:
@@ -1842,11 +1881,13 @@ File Objects
    module: socket
 
 File objects are implemented using C's ``stdio`` package and can be
-created with the built-in :func:`file` and (more usually) :func:`open`
-constructors described in the :ref:`built-in-funcs` section. [#]_ File
+created with the built-in :func:`open` function.  File
 objects are also returned by some other built-in functions and methods,
 such as :func:`os.popen` and :func:`os.fdopen` and the :meth:`makefile`
-method of socket objects.
+method of socket objects. Temporary files can be created using the
+:mod:`tempfile` module, and high-level file operations such as copying,
+moving, and deleting files and directories can be achieved with the
+:mod:`shutil` module.
 
 When a file operation fails for an I/O-related reason, the exception
 :exc:`IOError` is raised.  This includes situations where the operation is not
@@ -1864,7 +1905,7 @@ Files have the following methods:
 
    As of Python 2.5, you can avoid having to call this method explicitly if you use
    the :keyword:`with` statement.  For example, the following code will
-   automatically close ``f`` when the :keyword:`with` block is exited::
+   automatically close *f* when the :keyword:`with` block is exited::
 
       from __future__ import with_statement
 
@@ -1899,8 +1940,7 @@ Files have the following methods:
 .. method:: file.fileno()
 
    .. index::
-      single: file descriptor
-      single: descriptor, file
+      pair: file; descriptor
       module: fcntl
 
    Return the integer "file descriptor" that is used by the underlying
@@ -1995,7 +2035,12 @@ Files have the following methods:
    argument is optional and defaults to  ``os.SEEK_SET`` or ``0`` (absolute file
    positioning); other values are ``os.SEEK_CUR`` or ``1`` (seek relative to the
    current position) and ``os.SEEK_END`` or ``2``  (seek relative to the file's
-   end).  There is no return value.  Note that if the file is opened for appending
+   end).  There is no return value.
+   
+   For example, ``f.seek(2, os.SEEK_CUR)`` advances the position by two and
+   ``f.seek(-3, os.SEEK_END)`` sets the position to the third to last.
+
+   Note that if the file is opened for appending
    (mode ``'a'`` or ``'a+'``), any :meth:`seek` operations will be undone at the
    next write.  If the file is only opened for writing in append mode (mode
    ``'a'``), this method is essentially a no-op, but it remains useful for files
@@ -2006,7 +2051,7 @@ Files have the following methods:
    Note that not all file objects are seekable.
 
    .. versionchanged:: 2.6
-      Passing float values as offset has been deprecated
+      Passing float values as offset has been deprecated.
 
 
 .. method:: file.tell()
@@ -2151,7 +2196,7 @@ to be provided for a context manager object to define a runtime context:
    the context expression in a :keyword:`with` statement.
 
    An example of a context manager that returns a related object is the one
-   returned by ``decimal.Context.get_manager()``. These managers set the active
+   returned by :func:`decimal.localcontext`. These managers set the active
    decimal context to a copy of the original decimal context and then return the
    copy. This allows changes to be made to the current decimal context in the body
    of the :keyword:`with` statement without affecting code outside the
@@ -2184,8 +2229,8 @@ decimal arithmetic context. The specific types are not treated specially beyond
 their implementation of the context management protocol. See the
 :mod:`contextlib` module for some examples.
 
-Python's generators and the ``contextlib.contextfactory`` decorator provide a
-convenient way to implement these protocols.  If a generator function is
+Python's :term:`generator`\s and the ``contextlib.contextfactory`` :term:`decorator`
+provide a convenient way to implement these protocols.  If a generator function is
 decorated with the ``contextlib.contextfactory`` decorator, it will return a
 context manager implementing the necessary :meth:`__enter__` and
 :meth:`__exit__` methods, rather than the iterator produced by an undecorated
@@ -2454,9 +2499,6 @@ types, where they are relevant.  Some of these are not reported by the
 .. [#] These numbers are fairly arbitrary.  They are intended to avoid printing endless
    strings of meaningless digits without hampering correct use and without having
    to know the exact precision of floating point values on a particular machine.
-
-.. [#] :func:`file` is new in Python 2.2.  The older built-in :func:`open` is an alias
-   for :func:`file`.
 
 .. [#] The advantage of leaving the newline on is that returning an empty string is
    then an unambiguous EOF indication.  It is also possible (in cases where it

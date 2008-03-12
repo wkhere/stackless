@@ -191,6 +191,12 @@ extern int chmod(const char *, int);
 #else
 extern int chmod(const char *, mode_t);
 #endif
+/*#ifdef HAVE_FCHMOD
+extern int fchmod(int, mode_t);
+#endif*/
+/*#ifdef HAVE_LCHMOD
+extern int lchmod(const char *, mode_t);
+#endif*/
 extern int chown(const char *, uid_t, gid_t);
 extern char *getcwd(char *, int);
 extern char *strerror(int);
@@ -1534,8 +1540,11 @@ finish:
 		/* File does not exist, or cannot read attributes */
 		return PyBool_FromLong(0);
 	/* Access is possible if either write access wasn't requested, or
-	   the file isn't read-only. */
-	return PyBool_FromLong(!(mode & 2) || !(attr & FILE_ATTRIBUTE_READONLY));
+	   the file isn't read-only, or if it's a directory, as there are
+	   no read-only directories on Windows. */
+	return PyBool_FromLong(!(mode & 2) 
+	                       || !(attr & FILE_ATTRIBUTE_READONLY)
+			       || (attr & FILE_ATTRIBUTE_DIRECTORY));
 #else
 	int res;
 	if (!PyArg_ParseTuple(args, "eti:access", 
@@ -1722,6 +1731,52 @@ posix_chmod(PyObject *self, PyObject *args)
 #endif
 }
 
+#ifdef HAVE_FCHMOD
+PyDoc_STRVAR(posix_fchmod__doc__,
+"fchmod(fd, mode)\n\n\
+Change the access permissions of the file given by file\n\
+descriptor fd.");
+
+static PyObject *
+posix_fchmod(PyObject *self, PyObject *args)
+{
+	int fd, mode, res;
+	if (!PyArg_ParseTuple(args, "ii:fchmod", &fd, &mode))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = fchmod(fd, mode);
+	Py_END_ALLOW_THREADS
+	if (res < 0)
+		return posix_error();
+	Py_RETURN_NONE;
+}
+#endif /* HAVE_FCHMOD */
+
+#ifdef HAVE_LCHMOD
+PyDoc_STRVAR(posix_lchmod__doc__,
+"lchmod(path, mode)\n\n\
+Change the access permissions of a file. If path is a symlink, this\n\
+affects the link itself rather than the target.");
+
+static PyObject *
+posix_lchmod(PyObject *self, PyObject *args)
+{
+	char *path = NULL;
+	int i;
+	int res;
+	if (!PyArg_ParseTuple(args, "eti:lchmod", Py_FileSystemDefaultEncoding,
+	                      &path, &i))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = lchmod(path, i);
+	Py_END_ALLOW_THREADS
+	if (res < 0)
+		return posix_error_with_allocated_filename(path);
+	PyMem_Free(path);
+	Py_RETURN_NONE;
+}
+#endif /* HAVE_LCHMOD */
+
 
 #ifdef HAVE_CHFLAGS
 PyDoc_STRVAR(posix_chflags__doc__,
@@ -1842,6 +1897,28 @@ posix_chown(PyObject *self, PyObject *args)
 	return Py_None;
 }
 #endif /* HAVE_CHOWN */
+
+#ifdef HAVE_FCHOWN
+PyDoc_STRVAR(posix_fchown__doc__,
+"fchown(fd, uid, gid)\n\n\
+Change the owner and group id of the file given by file descriptor\n\
+fd to the numeric uid and gid.");
+
+static PyObject *
+posix_fchown(PyObject *self, PyObject *args)
+{
+	int fd, uid, gid;
+	int res;
+	if (!PyArg_ParseTuple(args, "iii:chown", &fd, &uid, &gid))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = fchown(fd, (uid_t) uid, (gid_t) gid);
+	Py_END_ALLOW_THREADS
+	if (res < 0)
+		return posix_error();
+	Py_RETURN_NONE;
+}
+#endif /* HAVE_FCHOWN */
 
 #ifdef HAVE_LCHOWN
 PyDoc_STRVAR(posix_lchown__doc__,
@@ -2593,7 +2670,7 @@ extract_time(PyObject *t, long* sec, long* usec)
 	long intval;
 	if (PyFloat_Check(t)) {
 		double tval = PyFloat_AsDouble(t);
-		PyObject *intobj = Py_Type(t)->tp_as_number->nb_int(t);
+		PyObject *intobj = Py_TYPE(t)->tp_as_number->nb_int(t);
 		if (!intobj)
 			return -1;
 		intval = PyInt_AsLong(intobj);
@@ -3461,9 +3538,9 @@ posix_spawnvpe(PyObject *self, PyObject *args)
 
 	Py_BEGIN_ALLOW_THREADS
 #if defined(PYCC_GCC)
-	spawnval = spawnve(mode, path, argvlist, envlist);
+	spawnval = spawnvpe(mode, path, argvlist, envlist);
 #else
-	spawnval = _spawnve(mode, path, argvlist, envlist);
+	spawnval = _spawnvpe(mode, path, argvlist, envlist);
 #endif
 	Py_END_ALLOW_THREADS
 
@@ -3498,11 +3575,11 @@ Return 0 to child process and PID of child to parent process.");
 static PyObject *
 posix_fork1(PyObject *self, PyObject *noargs)
 {
-	int pid = fork1();
+	pid_t pid = fork1();
 	if (pid == -1)
 		return posix_error();
 	PyOS_AfterFork();
-	return PyInt_FromLong((long)pid);
+	return PyInt_FromLong(pid);
 }
 #endif
 
@@ -3516,12 +3593,12 @@ Return 0 to child process and PID of child to parent process.");
 static PyObject *
 posix_fork(PyObject *self, PyObject *noargs)
 {
-	int pid = fork();
+	pid_t pid = fork();
 	if (pid == -1)
 		return posix_error();
 	if (pid == 0)
 		PyOS_AfterFork();
-	return PyInt_FromLong((long)pid);
+	return PyInt_FromLong(pid);
 }
 #endif
 
@@ -3623,14 +3700,15 @@ To both, return fd of newly opened pseudo-terminal.\n");
 static PyObject *
 posix_forkpty(PyObject *self, PyObject *noargs)
 {
-	int master_fd = -1, pid;
+	int master_fd = -1;
+	pid_t pid;
 
 	pid = forkpty(&master_fd, NULL, NULL, NULL);
 	if (pid == -1)
 		return posix_error();
 	if (pid == 0)
 		PyOS_AfterFork();
-	return Py_BuildValue("(ii)", pid, master_fd);
+	return Py_BuildValue("(li)", pid, master_fd);
 }
 #endif
 
@@ -3790,7 +3868,7 @@ Return the parent's process id.");
 static PyObject *
 posix_getppid(PyObject *self, PyObject *noargs)
 {
-	return PyInt_FromLong((long)getppid());
+	return PyInt_FromLong(getppid());
 }
 #endif
 
@@ -3845,7 +3923,8 @@ Kill a process with a signal.");
 static PyObject *
 posix_kill(PyObject *self, PyObject *args)
 {
-	int pid, sig;
+	pid_t pid;
+	int sig;
 	if (!PyArg_ParseTuple(args, "ii:kill", &pid, &sig))
 		return NULL;
 #if defined(PYOS_OS2) && !defined(PYCC_GCC)
@@ -4189,7 +4268,8 @@ _PyPopen(char *cmdstring, int mode, int n, int bufsize)
 	struct file_ref stdio[3];
 	struct pipe_ref p_fd[3];
 	FILE *p_s[3];
-	int file_count, i, pipe_err, pipe_pid;
+	int file_count, i, pipe_err;
+	pid_t pipe_pid;
 	char *shell, *sh_name, *opt, *rd_mode, *wr_mode;
 	PyObject *f, *p_f[3];
 
@@ -4517,7 +4597,7 @@ static int _PyPclose(FILE *file)
 {
 	int result;
 	int exit_code;
-	int pipe_pid;
+	pid_t pipe_pid;
 	PyObject *procObj, *pidObj, *intObj, *fileObj;
 	int file_count;
 #ifdef WITH_THREAD
@@ -5565,7 +5645,7 @@ posix_setgroups(PyObject *self, PyObject *groups)
 
 #if defined(HAVE_WAIT3) || defined(HAVE_WAIT4)
 static PyObject *
-wait_helper(int pid, int status, struct rusage *ru)
+wait_helper(pid_t pid, int status, struct rusage *ru)
 {
 	PyObject *result;
    	static PyObject *struct_rusage;
@@ -5574,7 +5654,7 @@ wait_helper(int pid, int status, struct rusage *ru)
 		return posix_error();
 
 	if (struct_rusage == NULL) {
-		PyObject *m = PyImport_ImportModule("resource");
+		PyObject *m = PyImport_ImportModuleNoBlock("resource");
 		if (m == NULL)
 			return NULL;
 		struct_rusage = PyObject_GetAttrString(m, "struct_rusage");
@@ -5631,7 +5711,8 @@ Wait for completion of a child process.");
 static PyObject *
 posix_wait3(PyObject *self, PyObject *args)
 {
-	int pid, options;
+	pid_t pid;
+	int options;
 	struct rusage ru;
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
@@ -5655,7 +5736,8 @@ Wait for completion of a given child process.");
 static PyObject *
 posix_wait4(PyObject *self, PyObject *args)
 {
-	int pid, options;
+	pid_t pid;
+	int options;
 	struct rusage ru;
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
@@ -5679,7 +5761,8 @@ Wait for completion of a given child process.");
 static PyObject *
 posix_waitpid(PyObject *self, PyObject *args)
 {
-	int pid, options;
+	pid_t pid;
+	int options;
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
 
@@ -5728,7 +5811,7 @@ Wait for completion of a child process.");
 static PyObject *
 posix_wait(PyObject *self, PyObject *noargs)
 {
-	int pid;
+	pid_t pid;
 	WAIT_TYPE status;
 	WAIT_STATUS_INT(status) = 0;
 
@@ -5904,10 +5987,10 @@ posix_times(PyObject *self, PyObject *noargs)
 	*/
 	return Py_BuildValue(
 		"ddddd",
-		(double)(kernel.dwHighDateTime*429.4967296 +
-		         kernel.dwLowDateTime*1e-7),
 		(double)(user.dwHighDateTime*429.4967296 +
 		         user.dwLowDateTime*1e-7),
+		(double)(kernel.dwHighDateTime*429.4967296 +
+		         kernel.dwLowDateTime*1e-7),
 		(double)0,
 		(double)0,
 		(double)0);
@@ -5929,7 +6012,8 @@ Call the system call getsid().");
 static PyObject *
 posix_getsid(PyObject *self, PyObject *args)
 {
-	int pid, sid;
+	pid_t pid;
+	int sid;
 	if (!PyArg_ParseTuple(args, "i:getsid", &pid))
 		return NULL;
 	sid = getsid(pid);
@@ -5963,7 +6047,8 @@ Call the system call setpgid().");
 static PyObject *
 posix_setpgid(PyObject *self, PyObject *args)
 {
-	int pid, pgrp;
+	pid_t pid;
+	int pgrp;
 	if (!PyArg_ParseTuple(args, "ii:setpgid", &pid, &pgrp))
 		return NULL;
 	if (setpgid(pid, pgrp) < 0)
@@ -5982,7 +6067,8 @@ Return the process group associated with the terminal given by a fd.");
 static PyObject *
 posix_tcgetpgrp(PyObject *self, PyObject *args)
 {
-	int fd, pgid;
+	int fd;
+	pid_t pgid;
 	if (!PyArg_ParseTuple(args, "i:tcgetpgrp", &fd))
 		return NULL;
 	pgid = tcgetpgrp(fd);
@@ -6076,6 +6162,24 @@ posix_close(PyObject *self, PyObject *args)
 		return posix_error();
 	Py_INCREF(Py_None);
 	return Py_None;
+}
+
+
+PyDoc_STRVAR(posix_closerange__doc__, 
+"closerange(fd_low, fd_high)\n\n\
+Closes all file descriptors in [fd_low, fd_high), ignoring errors.");
+
+static PyObject *
+posix_closerange(PyObject *self, PyObject *args)
+{
+	int fd_from, fd_to, i;
+	if (!PyArg_ParseTuple(args, "ii:closerange", &fd_from, &fd_to))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	for (i = fd_from; i < fd_to; i++)
+		close(i);
+	Py_END_ALLOW_THREADS
+	Py_RETURN_NONE;
 }
 
 
@@ -8182,9 +8286,18 @@ static PyMethodDef posix_methods[] = {
 	{"chflags",	posix_chflags, METH_VARARGS, posix_chflags__doc__},
 #endif /* HAVE_CHFLAGS */
 	{"chmod",	posix_chmod, METH_VARARGS, posix_chmod__doc__},
+#ifdef HAVE_FCHMOD
+	{"fchmod",	posix_fchmod, METH_VARARGS, posix_fchmod__doc__},
+#endif /* HAVE_FCHMOD */
 #ifdef HAVE_CHOWN
 	{"chown",	posix_chown, METH_VARARGS, posix_chown__doc__},
 #endif /* HAVE_CHOWN */
+#ifdef HAVE_LCHMOD
+	{"lchmod",	posix_lchmod, METH_VARARGS, posix_lchmod__doc__},
+#endif /* HAVE_LCHMOD */
+#ifdef HAVE_FCHOWN
+	{"fchown",	posix_fchown, METH_VARARGS, posix_fchown__doc__},
+#endif /* HAVE_FCHOWN */
 #ifdef HAVE_LCHFLAGS
 	{"lchflags",	posix_lchflags, METH_VARARGS, posix_lchflags__doc__},
 #endif /* HAVE_LCHFLAGS */
@@ -8365,6 +8478,7 @@ static PyMethodDef posix_methods[] = {
 #endif /* HAVE_TCSETPGRP */
 	{"open",	posix_open, METH_VARARGS, posix_open__doc__},
 	{"close",	posix_close, METH_VARARGS, posix_close__doc__},
+	{"closerange",	posix_closerange, METH_VARARGS, posix_closerange__doc__},
 	{"dup",		posix_dup, METH_VARARGS, posix_dup__doc__},
 	{"dup2",	posix_dup2, METH_VARARGS, posix_dup2__doc__},
 	{"lseek",	posix_lseek, METH_VARARGS, posix_lseek__doc__},
@@ -8657,6 +8771,10 @@ all_ins(PyObject *d)
 #ifdef O_NOFOLLOW
         /* Do not follow links.	 */
         if (ins(d, "O_NOFOLLOW", (long)O_NOFOLLOW)) return -1;
+#endif
+#ifdef O_NOATIME
+	/* Do not update the access time. */
+	if (ins(d, "O_NOATIME", (long)O_NOATIME)) return -1;
 #endif
 
 	/* These come from sysexits.h */

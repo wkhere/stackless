@@ -108,6 +108,14 @@ class ReTests(unittest.TestCase):
                 self.assertEqual(z, y)
                 self.assertEqual(type(z), type(y))
 
+    def test_bug_1661(self):
+        # Verify that flags do not get silently ignored with compiled patterns
+        pattern = re.compile('.')
+        self.assertRaises(ValueError, re.match, pattern, 'A', re.I)
+        self.assertRaises(ValueError, re.search, pattern, 'A', re.I)
+        self.assertRaises(ValueError, re.findall, pattern, 'A', re.I)
+        self.assertRaises(ValueError, re.compile, pattern, re.I)
+
     def test_sub_template_numeric_escape(self):
         # bug 776311 and friends
         self.assertEqual(re.sub('x', r'\0', 'x'), '\0')
@@ -633,6 +641,48 @@ class ReTests(unittest.TestCase):
             a = array.array(typecode)
             self.assertEqual(re.compile("bla").match(a), None)
             self.assertEqual(re.compile("").match(a).groups(), ())
+
+    def test_inline_flags(self):
+        # Bug #1700
+        upper_char = unichr(0x1ea0) # Latin Capital Letter A with Dot Bellow
+        lower_char = unichr(0x1ea1) # Latin Small Letter A with Dot Bellow
+
+        p = re.compile(upper_char, re.I | re.U)
+        q = p.match(lower_char)
+        self.assertNotEqual(q, None)
+
+        p = re.compile(lower_char, re.I | re.U)
+        q = p.match(upper_char)
+        self.assertNotEqual(q, None)
+
+        p = re.compile('(?i)' + upper_char, re.U)
+        q = p.match(lower_char)
+        self.assertNotEqual(q, None)
+
+        p = re.compile('(?i)' + lower_char, re.U)
+        q = p.match(upper_char)
+        self.assertNotEqual(q, None)
+
+        p = re.compile('(?iu)' + upper_char)
+        q = p.match(lower_char)
+        self.assertNotEqual(q, None)
+
+        p = re.compile('(?iu)' + lower_char)
+        q = p.match(upper_char)
+        self.assertNotEqual(q, None)
+
+    def test_dollar_matches_twice(self):
+        "$ matches the end of string, and just before the terminating \n"
+        pattern = re.compile('$')
+        self.assertEqual(pattern.sub('#', 'a\nb\n'), 'a\nb#\n#')
+        self.assertEqual(pattern.sub('#', 'a\nb\nc'), 'a\nb\nc#')
+        self.assertEqual(pattern.sub('#', '\n'), '#\n#')
+
+        pattern = re.compile('$', re.MULTILINE)
+        self.assertEqual(pattern.sub('#', 'a\nb\n' ), 'a#\nb#\n#' )
+        self.assertEqual(pattern.sub('#', 'a\nb\nc'), 'a#\nb#\nc#')
+        self.assertEqual(pattern.sub('#', '\n'), '#\n#')
+
 
 def run_re_tests():
     from test.re_tests import benchmarks, tests, SUCCEED, FAIL, SYNTAX_ERROR

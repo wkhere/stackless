@@ -31,13 +31,15 @@ PyCell_Get(PyObject *op)
 int
 PyCell_Set(PyObject *op, PyObject *obj)
 {
+	PyObject* oldobj;
 	if (!PyCell_Check(op)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
-	Py_XDECREF(((PyCellObject*)op)->ob_ref);
+	oldobj = PyCell_GET(op);
 	Py_XINCREF(obj);
 	PyCell_SET(op, obj);
+	Py_XDECREF(oldobj);
 	return 0;
 }
 
@@ -89,7 +91,12 @@ cell_clear(PyCellObject *op)
 static PyObject *
 cell_get_contents(PyCellObject *op, void *closure)
 {
-	Py_XINCREF(op->ob_ref);
+	if (op->ob_ref == NULL)
+	{
+		PyErr_SetString(PyExc_ValueError, "Cell is empty");
+		return NULL;
+	}
+	Py_INCREF(op->ob_ref);
 	return op->ob_ref;
 }
 

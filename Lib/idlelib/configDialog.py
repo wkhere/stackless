@@ -11,11 +11,11 @@ Refer to comments in EditorWindow autoindent code for details.
 """
 from Tkinter import *
 import tkMessageBox, tkColorChooser, tkFont
-import string, copy
+import string
 
 from configHandler import idleConf
 from dynOptionMenuWidget import DynOptionMenu
-from tabpage import TabPageSet
+from tabbedpages import TabbedPageSet
 from keybindingDialog import GetKeysDialog
 from configSectionNameDialog import GetCfgSectionNameDialog
 from configHelpSourceEdit import GetHelpSourceDialog
@@ -65,10 +65,9 @@ class ConfigDialog(Toplevel):
         self.wait_window()
 
     def CreateWidgets(self):
-        self.tabPages = TabPageSet(self,
-                pageNames=['Fonts/Tabs','Highlighting','Keys','General'])
-        self.tabPages.ChangePage()#activates default (first) page
-        frameActionButtons = Frame(self)
+        self.tabPages = TabbedPageSet(self,
+                page_names=['Fonts/Tabs','Highlighting','Keys','General'])
+        frameActionButtons = Frame(self,pady=2)
         #action buttons
         self.buttonHelp = Button(frameActionButtons,text='Help',
                 command=self.Help,takefocus=FALSE,
@@ -91,7 +90,7 @@ class ConfigDialog(Toplevel):
         self.buttonApply.pack(side=LEFT,padx=5)
         self.buttonCancel.pack(side=LEFT,padx=5)
         frameActionButtons.pack(side=BOTTOM)
-        Frame(self, border=0).pack(side=BOTTOM,pady=2)
+        Frame(self, height=2, borderwidth=0).pack(side=BOTTOM)
         self.tabPages.pack(side=TOP,expand=TRUE,fill=BOTH)
 
     def CreatePageFontTab(self):
@@ -103,7 +102,7 @@ class ConfigDialog(Toplevel):
         self.editFont=tkFont.Font(self,('courier',10,'normal'))
         ##widget creation
         #body frame
-        frame=self.tabPages.pages['Fonts/Tabs']['page']
+        frame=self.tabPages.pages['Fonts/Tabs'].frame
         #body section frames
         frameFont=LabelFrame(frame,borderwidth=2,relief=GROOVE,
                              text=' Base Editor Font ')
@@ -167,7 +166,7 @@ class ConfigDialog(Toplevel):
         self.highlightTarget=StringVar(self)
         ##widget creation
         #body frame
-        frame=self.tabPages.pages['Highlighting']['page']
+        frame=self.tabPages.pages['Highlighting'].frame
         #body section frames
         frameCustom=LabelFrame(frame,borderwidth=2,relief=GROOVE,
                                text=' Custom Highlighting ')
@@ -255,7 +254,7 @@ class ConfigDialog(Toplevel):
         self.keyBinding=StringVar(self)
         ##widget creation
         #body frame
-        frame=self.tabPages.pages['Keys']['page']
+        frame=self.tabPages.pages['Keys'].frame
         #body section frames
         frameCustom=LabelFrame(frame,borderwidth=2,relief=GROOVE,
                                text=' Custom Key Bindings ')
@@ -275,26 +274,26 @@ class ConfigDialog(Toplevel):
         self.listBindings.config(xscrollcommand=scrollTargetX.set)
         self.buttonNewKeys=Button(frameCustom,text='Get New Keys for Selection',
             command=self.GetNewKeys,state=DISABLED)
-        buttonSaveCustomKeys=Button(frameCustom,
-                text='Save as New Custom Key Set',command=self.SaveAsNewKeySet)
         #frameKeySets
-        labelTypeTitle=Label(frameKeySets,text='Select : ')
-        self.radioKeysBuiltin=Radiobutton(frameKeySets,variable=self.keysAreBuiltin,
-            value=1,command=self.SetKeysType,text='a Built-in Key Set')
-        self.radioKeysCustom=Radiobutton(frameKeySets,variable=self.keysAreBuiltin,
-            value=0,command=self.SetKeysType,text='a Custom Key Set')
-        self.optMenuKeysBuiltin=DynOptionMenu(frameKeySets,
+        frames = [Frame(frameKeySets, padx=2, pady=2, borderwidth=0)
+                  for i in range(2)]
+        self.radioKeysBuiltin=Radiobutton(frames[0],variable=self.keysAreBuiltin,
+            value=1,command=self.SetKeysType,text='Use a Built-in Key Set')
+        self.radioKeysCustom=Radiobutton(frames[0],variable=self.keysAreBuiltin,
+            value=0,command=self.SetKeysType,text='Use a Custom Key Set')
+        self.optMenuKeysBuiltin=DynOptionMenu(frames[0],
             self.builtinKeys,None,command=None)
-        self.optMenuKeysCustom=DynOptionMenu(frameKeySets,
+        self.optMenuKeysCustom=DynOptionMenu(frames[0],
             self.customKeys,None,command=None)
-        self.buttonDeleteCustomKeys=Button(frameKeySets,text='Delete Custom Key Set',
+        self.buttonDeleteCustomKeys=Button(frames[1],text='Delete Custom Key Set',
                 command=self.DeleteCustomKeys)
+        buttonSaveCustomKeys=Button(frames[1],
+                text='Save as New Custom Key Set',command=self.SaveAsNewKeySet)
         ##widget packing
         #body
-        frameCustom.pack(side=LEFT,padx=5,pady=5,expand=TRUE,fill=BOTH)
-        frameKeySets.pack(side=LEFT,padx=5,pady=5,fill=Y)
+        frameCustom.pack(side=BOTTOM,padx=5,pady=5,expand=TRUE,fill=BOTH)
+        frameKeySets.pack(side=BOTTOM,padx=5,pady=5,fill=BOTH)
         #frameCustom
-        buttonSaveCustomKeys.pack(side=BOTTOM,fill=X,padx=5,pady=5)
         self.buttonNewKeys.pack(side=BOTTOM,fill=X,padx=5,pady=5)
         frameTarget.pack(side=LEFT,padx=5,pady=5,expand=TRUE,fill=BOTH)
         #frame target
@@ -305,12 +304,14 @@ class ConfigDialog(Toplevel):
         scrollTargetY.grid(row=1,column=1,sticky=NS)
         scrollTargetX.grid(row=2,column=0,sticky=EW)
         #frameKeySets
-        labelTypeTitle.pack(side=TOP,anchor=W,padx=5,pady=5)
-        self.radioKeysBuiltin.pack(side=TOP,anchor=W,padx=5)
-        self.radioKeysCustom.pack(side=TOP,anchor=W,padx=5,pady=2)
-        self.optMenuKeysBuiltin.pack(side=TOP,fill=X,padx=5,pady=5)
-        self.optMenuKeysCustom.pack(side=TOP,fill=X,anchor=W,padx=5,pady=5)
-        self.buttonDeleteCustomKeys.pack(side=TOP,fill=X,padx=5,pady=5)
+        self.radioKeysBuiltin.grid(row=0, column=0, sticky=W+NS)
+        self.radioKeysCustom.grid(row=1, column=0, sticky=W+NS)
+        self.optMenuKeysBuiltin.grid(row=0, column=1, sticky=NSEW)
+        self.optMenuKeysCustom.grid(row=1, column=1, sticky=NSEW)
+        self.buttonDeleteCustomKeys.pack(side=LEFT,fill=X,expand=True,padx=2)
+        buttonSaveCustomKeys.pack(side=LEFT,fill=X,expand=True,padx=2)
+        frames[0].pack(side=TOP, fill=BOTH, expand=True)
+        frames[1].pack(side=TOP, fill=X, expand=True, pady=2)
         return frame
 
     def CreatePageGeneral(self):
@@ -325,7 +326,7 @@ class ConfigDialog(Toplevel):
         self.helpBrowser=StringVar(self)
         #widget creation
         #body
-        frame=self.tabPages.pages['General']['page']
+        frame=self.tabPages.pages['General'].frame
         #body section frames
         frameRun=LabelFrame(frame,borderwidth=2,relief=GROOVE,
                             text=' Startup Preferences ')
@@ -1118,15 +1119,12 @@ class ConfigDialog(Toplevel):
     def ActivateConfigChanges(self):
         "Dynamically apply configuration changes"
         winInstances=self.parent.instance_dict.keys()
-        theme = idleConf.CurrentTheme()
-        cursor_color = idleConf.GetHighlight(theme, 'cursor', fgBg='fg')
         for instance in winInstances:
             instance.ResetColorizer()
             instance.ResetFont()
             instance.set_notabs_indentwidth()
             instance.ApplyKeybindings()
             instance.reset_help_menu_entries()
-            instance.text.configure(insertbackground=cursor_color)
 
     def Cancel(self):
         self.destroy()

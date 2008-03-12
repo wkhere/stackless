@@ -146,7 +146,9 @@ ffi_status ffi_prep_cif_machdep(ffi_cif *cif)
     case FFI_TYPE_SINT64:
     case FFI_TYPE_FLOAT:
     case FFI_TYPE_DOUBLE:
+#if FFI_TYPE_LONGDOUBLE != FFI_TYPE_DOUBLE
     case FFI_TYPE_LONGDOUBLE:
+#endif
       cif->flags = (unsigned) cif->rtype->type;
       break;
 
@@ -217,7 +219,7 @@ extern void ffi_call_STDCALL(void (*)(char *, extended_cif *),
 #endif /* X86_WIN32 */
 
 void ffi_call(/*@dependent@*/ ffi_cif *cif, 
-	      void (*fn)(), 
+	      void (*fn)(void), 
 	      /*@out@*/ void *rvalue, 
 	      /*@dependent@*/ void **avalue)
 {

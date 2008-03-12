@@ -13,6 +13,7 @@ static int
 gen_traverse(PyGenObject *gen, visitproc visit, void *arg)
 {
 	Py_VISIT((PyObject *)gen->gi_frame);
+	Py_VISIT(gen->gi_code);
 	return 0;
 }
 
@@ -30,13 +31,14 @@ gen_dealloc(PyGenObject *gen)
 
 	if (gen->gi_frame != NULL && gen->gi_frame->f_stacktop != NULL) {
 		/* Generator is paused, so we need to close */
-		Py_Type(gen)->tp_del(self);
+		Py_TYPE(gen)->tp_del(self);
 		if (self->ob_refcnt > 0)
 			return;		/* resurrected.  :( */
 	}
 
 	_PyObject_GC_UNTRACK(self);
 	Py_CLEAR(gen->gi_frame);
+	Py_CLEAR(gen->gi_code);
 	PyObject_GC_Del(gen);
 }
 
@@ -286,6 +288,7 @@ gen_iternext(PyGenObject *gen)
 static PyMemberDef gen_memberlist[] = {
 	{"gi_frame",	T_OBJECT, offsetof(PyGenObject, gi_frame),	RO},
 	{"gi_running",	T_INT,    offsetof(PyGenObject, gi_running),	RO},
+        {"gi_code",     T_OBJECT, offsetof(PyGenObject, gi_code),  RO},
 	{NULL}	/* Sentinel */
 };
 
@@ -363,6 +366,8 @@ PyGen_New(PyFrameObject *f)
 		return NULL;
 	}
 	gen->gi_frame = f;
+	Py_INCREF(f->f_code);
+	gen->gi_code = (PyObject *)(f->f_code);
 	gen->gi_running = 0;
 	gen->gi_weakreflist = NULL;
 	_PyObject_GC_TRACK(gen);

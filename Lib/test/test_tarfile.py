@@ -160,6 +160,38 @@ class MiscReadTest(ReadTest):
         tar = tarfile.open(fileobj=fobj, mode=self.mode)
         self.assertEqual(tar.name, None)
 
+    def test_fileobj_with_offset(self):
+        # Skip the first member and store values from the second member
+        # of the testtar.
+        tar = tarfile.open(self.tarname, mode=self.mode)
+        tar.next()
+        t = tar.next()
+        name = t.name
+        offset = t.offset
+        data = tar.extractfile(t).read()
+        tar.close()
+
+        # Open the testtar and seek to the offset of the second member.
+        if self.mode.endswith(":gz"):
+            _open = gzip.GzipFile
+        elif self.mode.endswith(":bz2"):
+            _open = bz2.BZ2File
+        else:
+            _open = open
+        fobj = _open(self.tarname, "rb")
+        fobj.seek(offset)
+
+        # Test if the tarfile starts with the second member.
+        tar = tar.open(self.tarname, mode="r:", fileobj=fobj)
+        t = tar.next()
+        self.assertEqual(t.name, name)
+        # Read to the end of fileobj and test if seeking back to the
+        # beginning works.
+        tar.getmembers()
+        self.assertEqual(tar.extractfile(t).read(), data,
+                "seek back did not work")
+        tar.close()
+
     def test_fail_comp(self):
         # For Gzip and Bz2 Tests: fail with a ReadError on an uncompressed file.
         if self.mode == "r:":
@@ -175,6 +207,15 @@ class MiscReadTest(ReadTest):
         tarinfo = self.tar.getmember("misc/dirtype-old-v7")
         self.assert_(tarinfo.type == tarfile.DIRTYPE,
                 "v7 dirtype failed")
+
+    def test_xstar_type(self):
+        # The xstar format stores extra atime and ctime fields inside the
+        # space reserved for the prefix field. The prefix field must be
+        # ignored in this case, otherwise it will mess up the name.
+        try:
+            self.tar.getmember("misc/regtype-xstar")
+        except KeyError:
+            self.fail("failed to find misc/regtype-xstar (mangled prefix?)")
 
     def test_check_members(self):
         for tarinfo in self.tar:
@@ -211,6 +252,23 @@ class MiscReadTest(ReadTest):
 
         data = open(os.path.join(TEMPDIR, "ustar/symtype"), "rb").read()
         self.assertEqual(md5sum(data), md5_regtype)
+
+    def test_extractall(self):
+        # Test if extractall() correctly restores directory permissions
+        # and times (see issue1735).
+        if sys.platform == "win32":
+            # Win32 has no support for utime() on directories or
+            # fine grained permissions.
+            return
+
+        tar = tarfile.open(tarname, encoding="iso8859-1")
+        directories = [t for t in tar if t.isdir()]
+        tar.extractall(TEMPDIR, directories)
+        for tarinfo in directories:
+            path = os.path.join(TEMPDIR, tarinfo.name)
+            self.assertEqual(tarinfo.mode & 0777, os.stat(path).st_mode & 0777)
+            self.assertEqual(tarinfo.mtime, os.path.getmtime(path))
+        tar.close()
 
 
 class StreamReadTest(ReadTest):

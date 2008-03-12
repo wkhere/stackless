@@ -392,9 +392,9 @@ compiler_unit_check(struct compiler_unit *u)
 {
 	basicblock *block;
 	for (block = u->u_blocks; block != NULL; block = block->b_list) {
-		assert(block != (void *)0xcbcbcbcb);
-		assert(block != (void *)0xfbfbfbfb);
-		assert(block != (void *)0xdbdbdbdb);
+		assert((void *)block != (void *)0xcbcbcbcb);
+		assert((void *)block != (void *)0xfbfbfbfb);
+		assert((void *)block != (void *)0xdbdbdbdb);
 		if (block->b_instr != NULL) {
 			assert(block->b_ialloc > 0);
 			assert(block->b_iused > 0);
@@ -638,11 +638,16 @@ compiler_next_instr(struct compiler *c, basicblock *b)
 	return b->b_iused++;
 }
 
-/* Set the i_lineno member of the instruction at offse off if the
-   line number for the current expression/statement (?) has not
+/* Set the i_lineno member of the instruction at offset off if the
+   line number for the current expression/statement has not
    already been set.  If it has been set, the call has no effect.
 
-   Every time a new node is b
+   The line number is reset in the following cases:
+   - when entering a new scope
+   - on each statement
+   - on each expression that start a new line
+   - before the "except" clause
+   - before the "for" and "while" expressions
 */
 
 static void
@@ -729,6 +734,8 @@ opcode_stack_effect(int opcode, int oparg)
 			return -1;
 		case STORE_SUBSCR:
 			return -3;
+		case STORE_MAP:
+			return -2;
 		case DELETE_SUBSCR:
 			return -2;
 
@@ -905,24 +912,59 @@ compiler_add_o(struct compiler *c, PyObject *dict, PyObject *o)
 {
 	PyObject *t, *v;
 	Py_ssize_t arg;
+	unsigned char *p, *q;
+	Py_complex z;
+	double d;
+	int real_part_zero, imag_part_zero;
 
 	/* necessary to make sure types aren't coerced (e.g., int and long) */
         /* _and_ to distinguish 0.0 from -0.0 e.g. on IEEE platforms */
         if (PyFloat_Check(o)) {
-            double d = PyFloat_AS_DOUBLE(o);
-            unsigned char* p = (unsigned char*) &d;
-            /* all we need is to make the tuple different in either the 0.0
-             * or -0.0 case from all others, just to avoid the "coercion".
-             */
-            if (*p==0 && p[sizeof(double)-1]==0)
-                t = PyTuple_Pack(3, o, o->ob_type, Py_None);
-            else
-	        t = PyTuple_Pack(2, o, o->ob_type);
-        } else {
-	    t = PyTuple_Pack(2, o, o->ob_type);
+		d = PyFloat_AS_DOUBLE(o);
+		p = (unsigned char*) &d;
+		/* all we need is to make the tuple different in either the 0.0
+		 * or -0.0 case from all others, just to avoid the "coercion".
+		 */
+		if (*p==0 && p[sizeof(double)-1]==0)
+			t = PyTuple_Pack(3, o, o->ob_type, Py_None);
+		else
+			t = PyTuple_Pack(2, o, o->ob_type);
+	}
+	else if (PyComplex_Check(o)) {
+		/* complex case is even messier: we need to make complex(x,
+		   0.) different from complex(x, -0.) and complex(0., y)
+		   different from complex(-0., y), for any x and y.  In
+		   particular, all four complex zeros should be
+		   distinguished.*/
+		z = PyComplex_AsCComplex(o);
+		p = (unsigned char*) &(z.real);
+		q = (unsigned char*) &(z.imag);
+		/* all that matters here is that on IEEE platforms
+		   real_part_zero will be true if z.real == 0., and false if
+		   z.real == -0.  In fact, real_part_zero will also be true
+		   for some other rarely occurring nonzero floats, but this
+		   doesn't matter. Similar comments apply to
+		   imag_part_zero. */
+		real_part_zero = *p==0 && p[sizeof(double)-1]==0;
+		imag_part_zero = *q==0 && q[sizeof(double)-1]==0;
+		if (real_part_zero && imag_part_zero) {
+			t = PyTuple_Pack(4, o, o->ob_type, Py_True, Py_True);
+		}
+		else if (real_part_zero && !imag_part_zero) {
+			t = PyTuple_Pack(4, o, o->ob_type, Py_True, Py_False);
+		}
+		else if (!real_part_zero && imag_part_zero) {
+			t = PyTuple_Pack(4, o, o->ob_type, Py_False, Py_True);
+		}
+		else {
+			t = PyTuple_Pack(2, o, o->ob_type);
+		}
+        }
+	else {
+		t = PyTuple_Pack(2, o, o->ob_type);
         }
 	if (t == NULL)
-	    return -1;
+		return -1;
 
 	v = PyDict_GetItem(dict, t);
 	if (!v) {
@@ -1151,7 +1193,7 @@ compiler_mod(struct compiler *c, mod_ty mod)
 	int addNone = 1;
 	static PyObject *module;
 	if (!module) {
-		module = PyString_FromString("<module>");
+		module = PyString_InternFromString("<module>");
 		if (!module)
 			return NULL;
 	}
@@ -1320,7 +1362,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 	PyCodeObject *co;
 	PyObject *first_const = Py_None;
 	arguments_ty args = s->v.FunctionDef.args;
-	asdl_seq* decos = s->v.FunctionDef.decorators;
+	asdl_seq* decos = s->v.FunctionDef.decorator_list;
 	stmt_ty st;
 	int i, n, docstring;
 
@@ -1371,9 +1413,14 @@ compiler_function(struct compiler *c, stmt_ty s)
 static int
 compiler_class(struct compiler *c, stmt_ty s)
 {
-	int n;
+	int n, i;
 	PyCodeObject *co;
 	PyObject *str;
+	asdl_seq* decos = s->v.ClassDef.decorator_list;
+	
+	if (!compiler_decorators(c, decos))
+		return 0;
+
 	/* push class name on stack, needed by BUILD_CLASS */
 	ADDOP_O(c, LOAD_CONST, s->v.ClassDef.name, consts);
 	/* push the tuple of base classes on the stack */
@@ -1419,6 +1466,10 @@ compiler_class(struct compiler *c, stmt_ty s)
 
 	ADDOP_I(c, CALL_FUNCTION, 0);
 	ADDOP(c, BUILD_CLASS);
+	/* apply decorators */
+	for (i = 0; i < asdl_seq_LEN(decos); i++) {
+		ADDOP_I(c, CALL_FUNCTION, 1);
+	}
 	if (!compiler_nameop(c, s->v.ClassDef.name, Store))
 		return 0;
 	return 1;
@@ -1574,9 +1625,8 @@ compiler_for(struct compiler *c, stmt_ty s)
 	VISIT(c, expr, s->v.For.iter);
 	ADDOP(c, GET_ITER);
 	compiler_use_next_block(c, start);
-	/* XXX(nnorwitz): is there a better way to handle this?
-	   for loops are special, we want to be able to trace them
-	   each time around, so we need to set an extra line number. */
+	/* for expressions must be traced on each iteration,
+	   so we need to set an extra line number. */
 	c->u->u_lineno_set = false;
 	ADDOP_JREL(c, FOR_ITER, cleanup);
 	VISIT(c, expr, s->v.For.target);
@@ -1596,8 +1646,11 @@ compiler_while(struct compiler *c, stmt_ty s)
 	basicblock *loop, *orelse, *end, *anchor = NULL;
 	int constant = expr_constant(s->v.While.test);
 
-	if (constant == 0)
+	if (constant == 0) {
+		if (s->v.While.orelse)
+			VISIT_SEQ(c, stmt, s->v.While.orelse);
 		return 1;
+	}
 	loop = compiler_new_block(c);
 	end = compiler_new_block(c);
 	if (constant == -1) {
@@ -1620,6 +1673,9 @@ compiler_while(struct compiler *c, stmt_ty s)
 	if (!compiler_push_fblock(c, LOOP, loop))
 		return 0;
 	if (constant == -1) {
+		/* while expressions must be traced on each iteration,
+		   so we need to set an extra line number. */
+		c->u->u_lineno_set = false;
 		VISIT(c, expr, s->v.While.test);
 		ADDOP_JREL(c, JUMP_IF_FALSE, anchor);
 		ADDOP(c, POP_TOP);
@@ -1800,8 +1856,8 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 						s->v.TryExcept.handlers, i);
 		if (!handler->type && i < n-1)
 		    return compiler_error(c, "default 'except:' must be last");
-	c->u->u_lineno_set = false;
-	c->u->u_lineno = handler->lineno;
+		c->u->u_lineno_set = false;
+		c->u->u_lineno = handler->lineno;
 		except = compiler_new_block(c);
 		if (except == NULL)
 			return 0;
@@ -1996,7 +2052,7 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	if (Py_OptimizeFlag)
 		return 1;
 	if (assertion_error == NULL) {
-		assertion_error = PyString_FromString("AssertionError");
+		assertion_error = PyString_InternFromString("AssertionError");
 		if (assertion_error == NULL)
 			return 0;
 	}
@@ -2267,7 +2323,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		return compiler_error(c, "can not assign to __debug__");
 	}
 
-mangled = _Py_Mangle(c->u->u_private, name);
+	mangled = _Py_Mangle(c->u->u_private, name);
 	if (!mangled)
 		return 0;
 
@@ -2920,19 +2976,14 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 	case IfExp_kind:
 		return compiler_ifexp(c, e);
 	case Dict_kind:
-		/* XXX get rid of arg? */
-		ADDOP_I(c, BUILD_MAP, 0);
 		n = asdl_seq_LEN(e->v.Dict.values);
-		/* We must arrange things just right for STORE_SUBSCR.
-		   It wants the stack to look like (value) (dict) (key) */
+		ADDOP_I(c, BUILD_MAP, (n>0xFFFF ? 0xFFFF : n));
 		for (i = 0; i < n; i++) {
-			ADDOP(c, DUP_TOP);
 			VISIT(c, expr, 
 				(expr_ty)asdl_seq_GET(e->v.Dict.values, i));
-			ADDOP(c, ROT_TWO);
 			VISIT(c, expr, 
 				(expr_ty)asdl_seq_GET(e->v.Dict.keys, i));
-			ADDOP(c, STORE_SUBSCR);
+			ADDOP(c, STORE_MAP);
 		}
 		break;
 	case ListComp_kind:
@@ -3442,10 +3493,10 @@ static int
 instrsize(struct instr *instr)
 {
 	if (!instr->i_hasarg)
-		return 1;
+		return 1;	/* 1 byte for the opcode*/
 	if (instr->i_oparg > 0xffff)
-		return 6;
-	return 3;
+		return 6;	/* 1 (opcode) + 1 (EXTENDED_ARG opcode) + 2 (oparg) + 2(oparg extended) */
+	return 3; 		/* 1 (opcode) + 2 (oparg) */
 }
 
 static int
@@ -3518,10 +3569,7 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	assert(d_bytecode >= 0);
 	assert(d_lineno >= 0);
 
-	/* XXX(nnorwitz): is there a better way to handle this?
-	   for loops are special, we want to be able to trace them
-	   each time around, so we need to set an extra line number. */
-	if (d_lineno == 0 && i->i_opcode != FOR_ITER)
+	if(d_bytecode == 0 && d_lineno == 0)
 		return 1;
 
 	if (d_bytecode > 255) {

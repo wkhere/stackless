@@ -1,4 +1,3 @@
-
 :mod:`xmlrpclib` --- XML-RPC client access
 ==========================================
 
@@ -8,8 +7,8 @@
 .. sectionauthor:: Eric S. Raymond <esr@snark.thyrsus.com>
 
 
-.. % Not everything is documented yet.  It might be good to describe
-.. % Marshaller, Unmarshaller, getparser, dumps, loads, and Transport.
+.. XXX Not everything is documented yet.  It might be good to describe
+   Marshaller, Unmarshaller, getparser, dumps, loads, and Transport.
 
 .. versionadded:: 2.2
 
@@ -35,10 +34,7 @@ between conformable Python objects and XML on the wire.
    all clients and servers; see http://ontosys.com/xml-rpc/extensions.php for a
    description.  The *use_datetime* flag can be used to cause date/time values to
    be presented as :class:`datetime.datetime` objects; this is false by default.
-   :class:`datetime.datetime`, :class:`datetime.date` and :class:`datetime.time`
-   objects may be passed to calls.  :class:`datetime.date` objects are converted
-   with a time of "00:00:00". :class:`datetime.time` objects are converted using
-   today's date.
+   :class:`datetime.datetime` objects may be passed to calls.
 
    Both the HTTP and HTTPS transports support the URL syntax extension for HTTP
    Basic Authentication: ``http://user:pass@host:port/path``.  The  ``user:pass``
@@ -82,9 +78,7 @@ between conformable Python objects and XML on the wire.
    +---------------------------------+---------------------------------------------+
    | :const:`dates`                  | in seconds since the epoch (pass in an      |
    |                                 | instance of the :class:`DateTime` class) or |
-   |                                 | a :class:`datetime.datetime`,               |
-   |                                 | :class:`datetime.date` or                   |
-   |                                 | :class:`datetime.time` instance             |
+   |                                 | a :class:`datetime.datetime` instance.      |
    +---------------------------------+---------------------------------------------+
    | :const:`binary data`            | pass in an instance of the :class:`Binary`  |
    |                                 | wrapper class                               |
@@ -113,19 +107,19 @@ between conformable Python objects and XML on the wire.
       The *use_datetime* flag was added.
 
    .. versionchanged:: 2.6
-      Instances of new-style classes can be passed in if they have an *__dict__*
-      attribute and don't have a base class that is marshalled in a special way.
+      Instances of :term:`new-style class`\es can be passed in if they have an
+      *__dict__* attribute and don't have a base class that is marshalled in a
+      special way.
 
 
 .. seealso::
 
    `XML-RPC HOWTO <http://www.tldp.org/HOWTO/XML-RPC-HOWTO/index.html>`_
-      A good description of XML operation and client software in several languages.
+      A good description of XML-RPC operation and client software in several languages.
       Contains pretty much everything an XML-RPC client developer needs to know.
 
-   `XML-RPC Hacks page <http://xmlrpc-c.sourceforge.net/hacks.php>`_
-      Extensions for various open-source libraries to support introspection and
-      multicall.
+   `XML-RPC Introspection <http://xmlrpc-c.sourceforge.net/introspection.html>`_
+      Describes the XML-RPC protocol extension for introspection.
 
 
 .. _serverproxy-objects:
@@ -177,11 +171,6 @@ grouped under the reserved :attr:`system` member:
    no such string is available, an empty string is returned. The documentation
    string may contain HTML markup.
 
-Introspection methods are currently supported by servers written in PHP, C and
-Microsoft .NET. Partial introspection support is included in recent updates to
-UserLand Frontier. Introspection support for Perl, Python and Java is available
-at the `XML-RPC Hacks <http://xmlrpc-c.sourceforge.net/hacks.php>`_ page.
-
 
 .. _boolean-objects:
 
@@ -201,16 +190,36 @@ unmarshalling code:
 
    Write the XML-RPC encoding of this Boolean item to the out stream object.
 
+A working example follows. The server code::
+
+   import xmlrpclib
+   from SimpleXMLRPCServer import SimpleXMLRPCServer
+
+   def is_even(n):
+       return n%2 == 0
+
+   server = SimpleXMLRPCServer(("localhost", 8000))
+   print "Listening on port 8000..."
+   server.register_function(is_even, "is_even")
+   server.serve_forever()
+
+The client code for the preceding server::
+
+   import xmlrpclib
+
+   proxy = xmlrpclib.ServerProxy("http://localhost:8000/")
+   print "3 is even: %s" % str(proxy.is_even(3))
+   print "100 is even: %s" % str(proxy.is_even(100))
 
 .. _datetime-objects:
 
 DateTime Objects
 ----------------
 
-This class may be initialized with seconds since the epoch, a time tuple, an ISO
-8601 time/date string, or a :class:`datetime.datetime`, :class:`datetime.date`
-or :class:`datetime.time` instance.  It has the following methods, supported
-mainly for internal use by the marshalling/unmarshalling code:
+This class may be initialized with seconds since the epoch, a time
+tuple, an ISO 8601 time/date string, or a :class:`datetime.datetime`
+instance.  It has the following methods, supported mainly for internal
+use by the marshalling/unmarshalling code:
 
 
 .. method:: DateTime.decode(string)
@@ -226,6 +235,32 @@ mainly for internal use by the marshalling/unmarshalling code:
 It also supports certain of Python's built-in operators through  :meth:`__cmp__`
 and :meth:`__repr__` methods.
 
+A working example follows. The server code::
+
+   import datetime
+   from SimpleXMLRPCServer import SimpleXMLRPCServer
+   import xmlrpclib
+
+   def today():
+       today = datetime.datetime.today()
+       return xmlrpclib.DateTime(today)
+
+   server = SimpleXMLRPCServer(("localhost", 8000))
+   print "Listening on port 8000..."
+   server.register_function(today, "today")
+   server.serve_forever()
+
+The client code for the preceding server::
+
+   import xmlrpclib
+   import datetime
+
+   proxy = xmlrpclib.ServerProxy("http://localhost:8000/")
+
+   today = proxy.today()
+   # convert the ISO8601 string to a datetime object
+   converted = datetime.datetime.strptime(today.value, "%Y%m%dT%H:%M:%S")
+   print "Today: %s" % converted.strftime("%d.%m.%Y, %H:%M")
 
 .. _binary-objects:
 
@@ -258,6 +293,31 @@ internal use by the marshalling/unmarshalling code:
 It also supports certain of Python's built-in operators through a
 :meth:`__cmp__` method.
 
+Example usage of the binary objects.  We're going to transfer an image over
+XMLRPC::
+
+   from SimpleXMLRPCServer import SimpleXMLRPCServer
+   import xmlrpclib
+
+   def python_logo():
+        handle = open("python_logo.jpg")
+        return xmlrpclib.Binary(handle.read())
+        handle.close()
+
+   server = SimpleXMLRPCServer(("localhost", 8000))
+   print "Listening on port 8000..."
+   server.register_function(python_logo, 'python_logo')
+
+   server.serve_forever()
+
+The client gets the image and saves it to a file::
+
+   import xmlrpclib
+
+   proxy = xmlrpclib.ServerProxy("http://localhost:8000/")
+   handle = open("fetched_python_logo.jpg", "w")
+   handle.write(proxy.python_logo().data)
+   handle.close()
 
 .. _fault-objects:
 
@@ -276,6 +336,35 @@ objects have the following members:
 .. attribute:: Fault.faultString
 
    A string containing a diagnostic message associated with the fault.
+
+In the following example we're going to intentionally cause a :exc:`Fault` by
+returning a complex type object.  The server code::
+
+   from SimpleXMLRPCServer import SimpleXMLRPCServer
+
+   # A marshalling error is going to occur because we're returning a
+   # complex number
+   def add(x,y):
+       return x+y+0j
+
+   server = SimpleXMLRPCServer(("localhost", 8000))
+   print "Listening on port 8000..."
+   server.register_function(add, 'add')
+
+   server.serve_forever()
+
+The client code for the preceding server::
+
+   import xmlrpclib
+
+   proxy = xmlrpclib.ServerProxy("http://localhost:8000/")
+   try:
+       proxy.add(2, 5)
+   except xmlrpclib.Fault, err:
+       print "A fault occured"
+       print "Fault code: %d" % err.faultCode
+       print "Fault string: %s" % err.faultString
+
 
 
 .. _protocol-error-objects:
@@ -308,6 +397,22 @@ does not exist).  It has the following members:
    A string containing the headers of the HTTP/HTTPS request that triggered the
    error.
 
+In the following example we're going to intentionally cause a :exc:`ProtocolError`
+by providing an invalid URI::
+
+   import xmlrpclib
+
+   # create a ServerProxy with an invalid URI
+   proxy = xmlrpclib.ServerProxy("http://invalidaddress/")
+
+   try:
+       proxy.some_method()
+   except xmlrpclib.ProtocolError, err:
+       print "A protocol error occured"
+       print "URL: %s" % err.url
+       print "HTTP/HTTPS headers: %s" % err.headers
+       print "Error code: %d" % err.errcode
+       print "Error message: %s" % err.errmsg
 
 MultiCall Objects
 -----------------
@@ -325,14 +430,48 @@ encapsulate multiple calls to a remote server into a single request.
    return ``None``, and only store the call name and parameters in the
    :class:`MultiCall` object. Calling the object itself causes all stored calls to
    be transmitted as a single ``system.multicall`` request. The result of this call
-   is a generator; iterating over this generator yields the individual results.
+   is a :term:`generator`; iterating over this generator yields the individual
+   results.
 
-A usage example of this class is ::
+A usage example of this class follows.  The server code ::
 
-   multicall = MultiCall(server_proxy)
-   multicall.add(2,3)
-   multicall.get_address("Guido")
-   add_result, address = multicall()
+   from SimpleXMLRPCServer import SimpleXMLRPCServer
+
+   def add(x,y):
+       return x+y
+
+   def subtract(x, y):
+       return x-y
+
+   def multiply(x, y):
+       return x*y
+
+   def divide(x, y):
+       return x/y
+
+   # A simple server with simple arithmetic functions
+   server = SimpleXMLRPCServer(("localhost", 8000))
+   print "Listening on port 8000..."
+   server.register_multicall_functions()
+   server.register_function(add, 'add')
+   server.register_function(subtract, 'subtract')
+   server.register_function(multiply, 'multiply')
+   server.register_function(divide, 'divide')
+   server.serve_forever()
+
+The client code for the preceding server::
+
+   import xmlrpclib
+
+   proxy = xmlrpclib.ServerProxy("http://localhost:8000/")
+   multicall = xmlrpclib.MultiCall(proxy)
+   multicall.add(7,3)
+   multicall.subtract(7,3)
+   multicall.multiply(7,3)
+   multicall.divide(7,3)
+   result = multicall()
+
+   print "7+3=%d, 7-3=%d, 7*3=%d, 7/3=%d" % tuple(result)
 
 
 Convenience Functions
@@ -363,10 +502,7 @@ Convenience Functions
    ``None`` if no method name is present in the packet. If the XML-RPC packet
    represents a fault condition, this function will raise a :exc:`Fault` exception.
    The *use_datetime* flag can be used to cause date/time values to be presented as
-   :class:`datetime.datetime` objects; this is false by default. Note that even if
-   you call an XML-RPC method with :class:`datetime.date` or :class:`datetime.time`
-   objects, they are converted to :class:`DateTime` objects internally, so only
-   :class:`datetime.datetime` objects will be returned.
+   :class:`datetime.datetime` objects; this is false by default.
 
    .. versionchanged:: 2.5
       The *use_datetime* flag was added.
@@ -393,11 +529,9 @@ Example of Client Usage
        print "ERROR", v
 
 To access an XML-RPC server through a proxy, you need to define  a custom
-transport.  The following example,  written by NoboNobo, shows how:
+transport.  The following example shows how:
 
-.. % fill in original author's name if we ever learn it
-
-.. % Example taken from http://lowlife.jp/nobonobo/wiki/xmlrpcwithproxy.html
+.. Example taken from http://lowlife.jp/nobonobo/wiki/xmlrpcwithproxy.html
 
 ::
 
@@ -419,4 +553,11 @@ transport.  The following example,  written by NoboNobo, shows how:
    p.set_proxy('proxy-server:8080')
    server = xmlrpclib.Server('http://time.xmlrpc.com/RPC2', transport=p)
    print server.currentTime.getCurrentTime()
+
+
+Example of Client and Server Usage
+----------------------------------
+
+See :ref:`simplexmlrpcserver-example`.
+
 

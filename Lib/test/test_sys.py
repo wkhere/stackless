@@ -329,6 +329,8 @@ class SysModuleTest(unittest.TestCase):
         self.assert_(isinstance(sys.copyright, basestring))
         self.assert_(isinstance(sys.exec_prefix, basestring))
         self.assert_(isinstance(sys.executable, basestring))
+        self.assertEqual(len(sys.float_info), 11)
+        self.assertEqual(sys.float_info.radix, 2)
         self.assert_(isinstance(sys.hexversion, int))
         self.assert_(isinstance(sys.maxint, int))
         if test.test_support.have_unicode:
@@ -349,6 +351,39 @@ class SysModuleTest(unittest.TestCase):
         # Can't use sys.stdout, as this is a cStringIO object when
         # the test runs under regrtest.
         self.assert_(sys.__stdout__.encoding == sys.__stderr__.encoding)
+
+    def test_sys_flags(self):
+        self.failUnless(sys.flags)
+        attrs = ("debug", "py3k_warning", "division_warning", "division_new",
+                 "inspect", "interactive", "optimize", "dont_write_bytecode",
+                 "no_site", "ignore_environment", "tabcheck", "verbose",
+                 "unicode")
+        for attr in attrs:
+            self.assert_(hasattr(sys.flags, attr), attr)
+            self.assertEqual(type(getattr(sys.flags, attr)), int, attr)
+        self.assert_(repr(sys.flags))
+
+    def test_clear_type_cache(self):
+        sys._clear_type_cache()
+
+    def test_compact_freelists(self):
+        sys._compact_freelists()
+        r = sys._compact_freelists()
+##        # freed blocks shouldn't change
+##        self.assertEqual(r[0][2], 0)
+##        self.assertEqual(r[1][2], 0)
+##        # fill freelists
+##        ints = list(range(10000))
+##        floats = [float(i) for i in ints]
+##        del ints
+##        del floats
+##        # should free more than 200 blocks each
+##        r = sys._compact_freelists()
+##        self.assert_(r[0][1] > 100, r[0][1])
+##        self.assert_(r[1][2] > 100, r[1][1])
+##
+##        self.assert_(r[0][2] > 100, r[0][2])
+##        self.assert_(r[1][2] > 100, r[1][2])
 
 def test_main():
     test.test_support.run_unittest(SysModuleTest)

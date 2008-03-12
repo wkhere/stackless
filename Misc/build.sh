@@ -67,7 +67,7 @@ REFLOG="build/reflog.txt.out"
 # Note: test_XXX (none currently) really leak, but are disabled
 # so we don't send spam.  Any test which really leaks should only 
 # be listed here if there are also test cases under Lib/test/leakers.
-LEAKY_TESTS="test_(cmd_line|popen2|socket|urllib2_localnet)"
+LEAKY_TESTS="test_(asynchat|cmd_line|popen2|socket|sys|threadsignals|urllib2_localnet)"
 
 # Skip these tests altogether when looking for leaks.  These tests
 # do not need to be stored above in LEAKY_TESTS too.
@@ -90,6 +90,24 @@ update_status() {
     echo "<li><a href=\"$2\">$1</a> <font size=\"-1\">($time seconds)</font></li>" >> $RESULT_FILE
 }
 
+place_summary_first() {
+    testf=$1
+    sed -n '/^[0-9][0-9]* tests OK\./,$p' < $testf \
+	| egrep -v '\[[0-9]+ refs\]' > $testf.tmp
+    echo "" >> $testf.tmp
+    cat $testf >> $testf.tmp
+    mv $testf.tmp $testf
+}
+
+count_failures () {
+    testf=$1
+    n=`grep -ic " failed:" $testf`
+    if [ $n -eq 1 ] ; then
+	n=`grep " failed:" $testf | sed -e 's/ .*//'`
+    fi
+    echo $n
+}
+
 mail_on_failure() {
     if [ "$NUM_FAILURES" != "0" ]; then
         dest=$FAILURE_MAILTO
@@ -97,7 +115,17 @@ mail_on_failure() {
         if [ "$FAILURE_CC" != "" ]; then
             dest="$dest -c $FAILURE_CC"
         fi
-        mutt -s "$FAILURE_SUBJECT $1 ($NUM_FAILURES)" $dest < $2
+	if [ "x$3" != "x" ] ; then
+	    (echo "More important issues:"
+	     echo "----------------------"
+	     egrep -v "$3" < $2
+	     echo ""
+	     echo "Less important issues:"
+	     echo "----------------------"
+	     egrep "$3" < $2)
+        else
+	    cat $2
+	fi | mutt -s "$FAILURE_SUBJECT $1 ($NUM_FAILURES)" $dest
     fi
 }
 
@@ -175,14 +203,16 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             F=make-test.out
             start=`current_time`
             $PYTHON $REGRTEST_ARGS >& build/$F
-            NUM_FAILURES=`grep -ic " failed:" build/$F`
+            NUM_FAILURES=`count_failures build/$F`
+            place_summary_first build/$F
             update_status "Testing basics ($NUM_FAILURES failures)" "$F" $start
             mail_on_failure "basics" build/$F
 
             F=make-test-opt.out
             start=`current_time`
             $PYTHON -O $REGRTEST_ARGS >& build/$F
-            NUM_FAILURES=`grep -ic " failed:" build/$F`
+            NUM_FAILURES=`count_failures build/$F`
+            place_summary_first build/$F
             update_status "Testing opt ($NUM_FAILURES failures)" "$F" $start
             mail_on_failure "opt" build/$F
 
@@ -192,9 +222,11 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             ## ensure that the reflog exists so the grep doesn't fail
             touch $REFLOG
             $PYTHON $REGRTEST_ARGS -R 4:3:$REFLOG -u network $LEAKY_SKIPS >& build/$F
-            NUM_FAILURES=`egrep -vc "($LEAKY_TESTS|sum=0)" $REFLOG`
+	    LEAK_PAT="($LEAKY_TESTS|sum=0)"
+            NUM_FAILURES=`egrep -vc "$LEAK_PAT" $REFLOG`
+            place_summary_first build/$F
             update_status "Testing refleaks ($NUM_FAILURES failures)" "$F" $start
-            mail_on_failure "refleak" $REFLOG
+            mail_on_failure "refleak" $REFLOG "$LEAK_PAT"
 
             ## now try to run all the tests
             F=make-testall.out
@@ -202,7 +234,8 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             ## skip curses when running from cron since there's no terminal
             ## skip sound since it's not setup on the PSF box (/dev/dsp)
             $PYTHON $REGRTEST_ARGS -uall -x test_curses test_linuxaudiodev test_ossaudiodev >& build/$F
-            NUM_FAILURES=`grep -ic " failed:" build/$F`
+            NUM_FAILURES=`count_failures build/$F`
+            place_summary_first build/$F
             update_status "Testing all except curses and sound ($NUM_FAILURES failures)" "$F" $start
             mail_on_failure "all" build/$F
         fi

@@ -19,6 +19,19 @@ for DOS, OS/2, and possibly other systems as well.  This extension module is
 designed to match the API of ncurses, an open-source curses library hosted on
 Linux and the BSD variants of Unix.
 
+.. note::
+
+   Since version 5.4, the ncurses library decides how to interpret non-ASCII data
+   using the ``nl_langinfo`` function.  That means that you have to call
+   :func:`locale.setlocale` in the application and encode Unicode strings
+   using one of the system's available encodings.  This example uses the
+   system's default encoding::
+
+      import locale
+      locale.setlocale(locale.LC_ALL, '')
+      code = locale.getpreferredencoding()
+
+   Then use *code* as the encoding for :meth:`str.encode` calls.
 
 .. seealso::
 
@@ -35,9 +48,9 @@ Linux and the BSD variants of Unix.
       Convenience function to ensure proper terminal setup and resetting on
       application entry and exit.
 
-   `Curses Programming with Python <http://www.python.org/doc/howto/curses/curses.html>`_
+   :ref:`curses-howto`
       Tutorial material on using curses with Python, by Andrew Kuchling and Eric
-      Raymond, is available on the Python Web site.
+      Raymond.
 
    The :file:`Demo/curses/` directory in the Python source distribution contains
    some example programs using the curses bindings provided by this module.
@@ -1170,8 +1183,7 @@ Several constants are available to specify character cell attributes:
 Keys are referred to by integer constants with names starting with  ``KEY_``.
 The exact keycaps available are system dependent.
 
-.. % XXX this table is far too large!
-.. % XXX should this table be alphabetized?
+.. XXX this table is far too large! should it be alphabetized?
 
 +-------------------+--------------------------------------------+
 | Key constant      | Key                                        |

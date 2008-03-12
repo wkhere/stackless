@@ -137,7 +137,7 @@ the Distutils to go out and find the right files; you have to specify the
 extension name, source file(s), and any compile/link requirements (include
 directories, libraries to link with, etc.).
 
-.. % XXX read over this section
+.. XXX read over this section
 
 All of this is done through another keyword argument to :func:`setup`, the
 :option:`ext_modules` option.  :option:`ext_modules` is just a list of
@@ -185,7 +185,7 @@ If you have a number of extensions all in the same package (or all under the
 same base package), use the :option:`ext_package` keyword argument to
 :func:`setup`.  For example, ::
 
-   setup(...
+   setup(...,
          ext_package='pkg',
          ext_modules=[Extension('foo', ['foo.c']),
                       Extension('subpkg.bar', ['bar.c'])],
@@ -214,7 +214,7 @@ extension.
 This warning notwithstanding, options to SWIG can be currently passed like
 this::
 
-   setup(...
+   setup(...,
          ext_modules=[Extension('_foo', ['foo.i'], 
                                 swig_opts=['-modern', '-I../include'])],
          py_modules=['foo'],
@@ -443,7 +443,7 @@ option will allow the interpreter path to be explicitly overridden.
 The :option:`scripts` option simply is a list of files to be handled in this
 way.  From the PyXML setup script::
 
-   setup(... 
+   setup(...,
          scripts=['scripts/xmlproc_parse', 'scripts/xmlproc_val']
          )
 
@@ -501,7 +501,7 @@ anything which doesn't fit in the previous categories.
 :option:`data_files` specifies a sequence of (*directory*, *files*) pairs in the
 following way::
 
-   setup(...
+   setup(...,
          data_files=[('bitmaps', ['bm/b1.gif', 'bm/b2.gif']),
                      ('config', ['cfg/data.cfg']),
                      ('/etc/init.d', ['init-script'])]
@@ -613,7 +613,7 @@ information is sometimes used to indicate sub-releases.  These are
 
 :option:`classifiers` are specified in a python list::
 
-   setup(...
+   setup(...,
          classifiers=[
              'Development Status :: 4 - Beta',
              'Environment :: Console',

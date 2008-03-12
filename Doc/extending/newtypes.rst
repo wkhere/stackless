@@ -232,8 +232,6 @@ at a shell should produce a file :file:`noddy.so` in a subdirectory; move to
 that directory and fire up Python --- you should be able to ``import noddy`` and
 play around with Noddy objects.
 
-.. % $ <-- bow to font-lock  ;-(
-
 That wasn't so hard, was it?
 
 Of course, the current Noddy type is pretty uninteresting. It has no data and
@@ -1149,7 +1147,7 @@ Note that this list does not place any restrictions on the values of the
 attributes, when the values are computed, or how relevant data is stored.
 
 When :cfunc:`PyType_Ready` is called, it uses three tables referenced by the
-type object to create *descriptors* which are placed in the dictionary of the
+type object to create :term:`descriptor`\s which are placed in the dictionary of the
 type object.  Each descriptor controls access to one attribute of the instance
 object.  Each of the tables is optional; if all three are *NULL*, instances of
 the type will only have attributes that are inherited from their base type, and
@@ -1193,7 +1191,7 @@ be read-only or read-write.  The structures in the table are defined as::
        char *doc;
    } PyMemberDef;
 
-For each entry in the table, a descriptor will be constructed and added to the
+For each entry in the table, a :term:`descriptor` will be constructed and added to the
 type which will be able to extract a value from the instance structure.  The
 :attr:`type` field should contain one of the type codes defined in the
 :file:`structmember.h` header; the value will be used to determine how to
@@ -1235,16 +1233,14 @@ class object, and get the doc string using its :attr:`__doc__` attribute.
 As with the :attr:`tp_methods` table, a sentinel entry with a :attr:`name` value
 of *NULL* is required.
 
-.. % XXX Descriptors need to be explained in more detail somewhere, but
-.. % not here.
-.. % 
-.. % Descriptor objects have two handler functions which correspond to
-.. % the \member{tp_getattro} and \member{tp_setattro} handlers.  The
-.. % \method{__get__()} handler is a function which is passed the
-.. % descriptor, instance, and type objects, and returns the value of the
-.. % attribute, or it returns \NULL{} and sets an exception.  The
-.. % \method{__set__()} handler is passed the descriptor, instance, type,
-.. % and new value;
+.. XXX Descriptors need to be explained in more detail somewhere, but not here.
+   
+   Descriptor objects have two handler functions which correspond to the
+   \member{tp_getattro} and \member{tp_setattro} handlers.  The
+   \method{__get__()} handler is a function which is passed the descriptor,
+   instance, and type objects, and returns the value of the attribute, or it
+   returns \NULL{} and sets an exception.  The \method{__set__()} handler is
+   passed the descriptor, instance, type, and new value;
 
 
 Type-specific Attribute Management

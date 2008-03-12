@@ -64,12 +64,14 @@ The following command-line arguments are supported:
    stdout for each file processed.
 
 :option:`--ignore-module`
-   Ignore the named module and its submodules (if it is a package).  May be given
+   Accepts comma separated list of module names. Ignore each of the named
+   module and its submodules (if it is a package).  May be given 
    multiple times.
 
 :option:`--ignore-dir`
-   Ignore all modules and packages in the named directory and subdirectories.  May
-   be given multiple times.
+   Ignore all modules and packages in the named directory and subdirectories
+   (multiple directories can be joined by os.pathsep).  May be given multiple
+   times. 
 
 
 .. _trace-api:
@@ -78,7 +80,7 @@ Programming Interface
 ---------------------
 
 
-.. class:: Trace([count=1[, trace=1[, countfuncs=0[, countcallers=0[, ignoremods=()[, ignoredirs=()[, infile=None[, outfile=None]]]]]]]])
+.. class:: Trace([count=1[, trace=1[, countfuncs=0[, countcallers=0[, ignoremods=()[, ignoredirs=()[, infile=None[, outfile=None[, timing=False]]]]]]]]])
 
    Create an object to trace execution of a single statement or expression. All
    parameters are optional.  *count* enables counting of line numbers. *trace*
@@ -87,7 +89,8 @@ Programming Interface
    *ignoremods* is a list of modules or packages to ignore.  *ignoredirs* is a list
    of directories whose modules or packages should be ignored.  *infile* is the
    file from which to read stored count information.  *outfile* is a file in which
-   to write updated count information.
+   to write updated count information. *timing* enables a timestamp relative
+   to when tracing was started to be displayed.
 
 
 .. method:: Trace.run(cmd)

@@ -109,7 +109,7 @@ static int prtrace(PyObject *, char *);
 #endif
 static int call_trace(Py_tracefunc, PyObject *, PyFrameObject *,
 		      int, PyObject *);
-static void call_trace_protected(Py_tracefunc, PyObject *,
+static int call_trace_protected(Py_tracefunc, PyObject *,
 				 PyFrameObject *, int, PyObject *);
 static void call_exc_trace(Py_tracefunc, PyObject *, PyFrameObject *);
 static int maybe_call_line_trace(Py_tracefunc, PyObject *,
@@ -645,7 +645,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 	next opcode.
 
 	A successful prediction saves a trip through the eval-loop including
-	its two unpredictable branches, the HASARG test and the switch-case.
+	its two unpredictable branches, the HAS_ARG test and the switch-case.
 
         If collecting opcode statistics, turn off prediction so that
 	statistics are accurately maintained (the predictions bypass
@@ -700,8 +700,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #define STACKADJ(n)	{ (void)(BASIC_STACKADJ(n), \
                                lltrace && prtrace(TOP(), "stackadj")); \
                                assert(STACK_LEVEL() <= co->co_stacksize); }
-#define EXT_POP(STACK_POINTER) (lltrace && prtrace((STACK_POINTER)[-1], \
-				"ext_pop"), *--(STACK_POINTER))
+#define EXT_POP(STACK_POINTER) ((void)(lltrace && \
+				prtrace((STACK_POINTER)[-1], "ext_pop")), \
+				*--(STACK_POINTER))
 #else
 #define PUSH(v)		BASIC_PUSH(v)
 #define POP()		BASIC_POP()
@@ -762,8 +763,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			   an argument which depends on the situation.
 			   The global trace function is also called
 			   whenever an exception is detected. */
-			if (call_trace(tstate->c_tracefunc, tstate->c_traceobj,
-				       f, PyTrace_CALL, Py_None)) {
+			if (call_trace_protected(tstate->c_tracefunc, 
+						 tstate->c_traceobj,
+						 f, PyTrace_CALL, Py_None)) {
 				/* Trace function raised an error */
 				goto exit_eval_frame;
 			}
@@ -771,9 +773,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 		if (tstate->c_profilefunc != NULL) {
 			/* Similar for c_profilefunc, except it needn't
 			   return itself and isn't called for "line" events */
-			if (call_trace(tstate->c_profilefunc,
-				       tstate->c_profileobj,
-				       f, PyTrace_CALL, Py_None)) {
+			if (call_trace_protected(tstate->c_profilefunc,
+						 tstate->c_profileobj,
+						 f, PyTrace_CALL, Py_None)) {
 				/* Profile function raised an error */
 				goto exit_eval_frame;
 			}
@@ -2193,9 +2195,21 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 			break;
 
 		case BUILD_MAP:
-			x = PyDict_New();
+			x = _PyDict_NewPresized((Py_ssize_t)oparg);
 			PUSH(x);
 			if (x != NULL) continue;
+			break;
+
+		case STORE_MAP:
+			w = TOP();     /* key */
+			u = SECOND();  /* value */
+			v = THIRD();   /* dict */
+			STACKADJ(-2);
+			assert (PyDict_CheckExact(v));
+			err = PyDict_SetItem(v, w, u);  /* v[w] = u */
+			Py_DECREF(u);
+			Py_DECREF(w);
+			if (err == 0) continue;
 			break;
 
 		case LOAD_ATTR:
@@ -2250,6 +2264,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 						"__import__ not found");
 				break;
 			}
+			Py_INCREF(x);
 			v = POP();
 			u = TOP();
 			if (PyInt_AsLong(u) != -1 || PyErr_Occurred())
@@ -2271,11 +2286,14 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 			Py_DECREF(u);
 			if (w == NULL) {
 				u = POP();
+				Py_DECREF(x);
 				x = NULL;
 				break;
 			}
 			READ_TIMESTAMP(intr0);
-			x = PyEval_CallObject(x, w);
+			v = x;
+			x = PyEval_CallObject(v, w);
+			Py_DECREF(v);
 			READ_TIMESTAMP(intr1);
 			Py_DECREF(w);
 			SET_TOP(x);
@@ -2357,7 +2375,18 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 		PREDICTED_WITH_ARG(JUMP_ABSOLUTE);
 		case JUMP_ABSOLUTE:
 			JUMPTO(oparg);
+#if FAST_LOOPS
+			/* Enabling this path speeds-up all while and for-loops by bypassing
+                           the per-loop checks for signals.  By default, this should be turned-off
+                           because it prevents detection of a control-break in tight loops like
+                           "while 1: pass".  Compile with this option turned-on when you need
+                           the speed-up and do not need break checking inside tight loops (ones
+                           that contain only instructions ending with goto fast_next_opcode). 
+                        */
+			goto fast_next_opcode;
+#else
 			continue;
+#endif
 
 		case GET_ITER:
 			/* before: [obj]; after [getiter(obj)] */
@@ -2683,7 +2712,7 @@ stackless_call_return:
 		else {
 			/* This check is expensive! */
 			if (PyErr_Occurred()) {
-				char buf[1024];
+				char buf[128];
 				sprintf(buf, "Stack unwind with exception "
 					"set and why=%d", why);
 				Py_FatalError(buf);
@@ -3503,7 +3532,7 @@ call_exc_trace(Py_tracefunc func, PyObject *self, PyFrameObject *f)
 	}
 }
 
-static void
+static int
 call_trace_protected(Py_tracefunc func, PyObject *obj, PyFrameObject *frame,
 		     int what, PyObject *arg)
 {
@@ -3512,11 +3541,15 @@ call_trace_protected(Py_tracefunc func, PyObject *obj, PyFrameObject *frame,
 	PyErr_Fetch(&type, &value, &traceback);
 	err = call_trace(func, obj, frame, what, arg);
 	if (err == 0)
+	{
 		PyErr_Restore(type, value, traceback);
+		return 0;
+	}
 	else {
 		Py_XDECREF(type);
 		Py_XDECREF(value);
 		Py_XDECREF(traceback);
+		return -1;
 	}
 }
 
@@ -3995,7 +4028,7 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
 	}
 	if (argdefs != NULL) {
 		d = &PyTuple_GET_ITEM(argdefs, 0);
-		nd = Py_Size(argdefs);
+		nd = Py_SIZE(argdefs);
 	}
 	STACKLESS_PROPOSE_ALL();
 	return PyEval_EvalCodeEx(co, globals,

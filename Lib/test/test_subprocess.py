@@ -241,7 +241,7 @@ class ProcessTestCase(unittest.TestCase):
         self.assertEquals(rc, 2)
 
     def test_cwd(self):
-        tmpdir = os.getenv("TEMP", "/tmp")
+        tmpdir = tempfile.gettempdir()
         # We cannot use os.path.realpath to canonicalize the path,
         # since it doesn't expand Tru64 {memb} strings. See bug 1063571.
         cwd = os.getcwd()
@@ -422,6 +422,8 @@ class ProcessTestCase(unittest.TestCase):
                          '"a b c" d e')
         self.assertEqual(subprocess.list2cmdline(['ab"c', '\\', 'd']),
                          'ab\\"c \\ d')
+        self.assertEqual(subprocess.list2cmdline(['ab"c', ' \\', 'd']),
+                         'ab\\"c " \\\\" d')
         self.assertEqual(subprocess.list2cmdline(['a\\\\\\b', 'de fg', 'h']),
                          'a\\\\\\b "de fg" h')
         self.assertEqual(subprocess.list2cmdline(['a\\"b', 'c', 'd']),
@@ -432,6 +434,8 @@ class ProcessTestCase(unittest.TestCase):
                          '"a\\\\b\\ c" d e')
         self.assertEqual(subprocess.list2cmdline(['ab', '']),
                          'ab ""')
+        self.assertEqual(subprocess.list2cmdline(['echo', 'foo|bar']),
+                         'echo "foo|bar"')
 
 
     def test_poll(self):

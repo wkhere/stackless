@@ -162,6 +162,24 @@ show_counts(void)
 }
 #endif
 
+/* Debug statistic to compare allocations with reuse through the free list */
+#undef SHOW_ALLOC_COUNT
+#ifdef SHOW_ALLOC_COUNT
+static size_t count_alloc = 0;
+static size_t count_reuse = 0;
+
+static void
+show_alloc(void)
+{
+	fprintf(stderr, "Dict allocations: %" PY_FORMAT_SIZE_T "d\n",
+		count_alloc);
+	fprintf(stderr, "Dict reuse through freelist: %" PY_FORMAT_SIZE_T
+		"d\n", count_reuse);
+	fprintf(stderr, "%.2f%% reuse rate\n\n",
+		(100.0*count_reuse/(count_alloc+count_reuse)));
+}
+#endif
+
 /* Initialization macros.
    There are two ways to create a dict:  PyDict_New() is the main C API
    function, and the tp_new slot maps to dict_new().  In the latter case we
@@ -183,9 +201,23 @@ show_counts(void)
     } while(0)
 
 /* Dictionary reuse scheme to save calls to malloc, free, and memset */
-#define MAXFREEDICTS 80
-static PyDictObject *free_dicts[MAXFREEDICTS];
-static int num_free_dicts = 0;
+#ifndef PyDict_MAXFREELIST
+#define PyDict_MAXFREELIST 80
+#endif
+static PyDictObject *free_list[PyDict_MAXFREELIST];
+static int numfree = 0;
+
+void
+PyDict_Fini(void)
+{
+	PyDictObject *op;
+
+	while (numfree) {
+		op = free_list[--numfree];
+		assert(PyDict_CheckExact(op));
+		PyObject_GC_Del(op);
+	}
+}
 
 PyObject *
 PyDict_New(void)
@@ -198,11 +230,14 @@ PyDict_New(void)
 #ifdef SHOW_CONVERSION_COUNTS
 		Py_AtExit(show_counts);
 #endif
+#ifdef SHOW_ALLOC_COUNT
+		Py_AtExit(show_alloc);
+#endif
 	}
-	if (num_free_dicts) {
-		mp = free_dicts[--num_free_dicts];
+	if (numfree) {
+		mp = free_list[--numfree];
 		assert (mp != NULL);
-		assert (Py_Type(mp) == &PyDict_Type);
+		assert (Py_TYPE(mp) == &PyDict_Type);
 		_Py_NewReference((PyObject *)mp);
 		if (mp->ma_fill) {
 			EMPTY_TO_MINSIZE(mp);
@@ -210,11 +245,17 @@ PyDict_New(void)
 		assert (mp->ma_used == 0);
 		assert (mp->ma_table == mp->ma_smalltable);
 		assert (mp->ma_mask == PyDict_MINSIZE - 1);
+#ifdef SHOW_ALLOC_COUNT
+		count_reuse++;
+#endif
 	} else {
 		mp = PyObject_GC_New(PyDictObject, &PyDict_Type);
 		if (mp == NULL)
 			return NULL;
 		EMPTY_TO_MINSIZE(mp);
+#ifdef SHOW_ALLOC_COUNT
+		count_alloc++;
+#endif
 	}
 	mp->ma_lookup = lookdict_string;
 #ifdef SHOW_CONVERSION_COUNTS
@@ -270,7 +311,9 @@ lookdict(PyDictObject *mp, PyObject *key, register long hash)
 	else {
 		if (ep->me_hash == hash) {
 			startkey = ep->me_key;
+			Py_INCREF(startkey);
 			cmp = PyObject_RichCompareBool(startkey, key, Py_EQ);
+			Py_DECREF(startkey);
 			if (cmp < 0)
 				return NULL;
 			if (ep0 == mp->ma_table && ep->me_key == startkey) {
@@ -300,7 +343,9 @@ lookdict(PyDictObject *mp, PyObject *key, register long hash)
 			return ep;
 		if (ep->me_hash == hash && ep->me_key != dummy) {
 			startkey = ep->me_key;
+			Py_INCREF(startkey);
 			cmp = PyObject_RichCompareBool(startkey, key, Py_EQ);
+			Py_DECREF(startkey);
 			if (cmp < 0)
 				return NULL;
 			if (ep0 == mp->ma_table && ep->me_key == startkey) {
@@ -543,6 +588,23 @@ dictresize(PyDictObject *mp, Py_ssize_t minused)
 	if (is_oldtable_malloced)
 		PyMem_DEL(oldtable);
 	return 0;
+}
+
+/* Create a new dictionary pre-sized to hold an estimated number of elements.
+   Underestimates are okay because the dictionary will resize as necessary.
+   Overestimates just mean the dictionary will be more sparse than usual.
+*/
+
+PyObject *
+_PyDict_NewPresized(Py_ssize_t minused)
+{
+	PyObject *op = PyDict_New();
+
+	if (minused>5 && op != NULL && dictresize((PyDictObject *)op, minused) == -1) {
+		Py_DECREF(op);
+		return NULL;
+	}
+	return op;
 }
 
 /* Note that, for historical reasons, PyDict_GetItem() suppresses all errors
@@ -847,10 +909,10 @@ dict_dealloc(register PyDictObject *mp)
 	}
 	if (mp->ma_table != mp->ma_smalltable)
 		PyMem_DEL(mp->ma_table);
-	if (num_free_dicts < MAXFREEDICTS && Py_Type(mp) == &PyDict_Type)
-		free_dicts[num_free_dicts++] = mp;
+	if (numfree < PyDict_MAXFREELIST && Py_TYPE(mp) == &PyDict_Type)
+		free_list[numfree++] = mp;
 	else
-		Py_Type(mp)->tp_free((PyObject *)mp);
+		Py_TYPE(mp)->tp_free((PyObject *)mp);
 	Py_TRASHCAN_SAFE_END(mp)
 }
 
@@ -1020,7 +1082,7 @@ dict_subscript(PyDictObject *mp, register PyObject *key)
 			if (missing_str == NULL)
 				missing_str =
 				  PyString_InternFromString("__missing__");
-			missing = _PyType_Lookup(Py_Type(mp), missing_str);
+			missing = _PyType_Lookup(Py_TYPE(mp), missing_str);
 			if (missing != NULL)
 				return PyObject_CallFunctionObjArgs(missing,
 					(PyObject *)mp, key, NULL);
@@ -1184,6 +1246,25 @@ dict_fromkeys(PyObject *cls, PyObject *args)
 	if (d == NULL)
 		return NULL;
 
+	if (PyDict_CheckExact(d) && PyDict_CheckExact(seq)) {
+		PyDictObject *mp = (PyDictObject *)d;
+		PyObject *oldvalue;
+		Py_ssize_t pos = 0;
+		PyObject *key;
+		long hash;
+
+		if (dictresize(mp, PySet_GET_SIZE(seq)))
+			return NULL;
+
+		while (_PyDict_Next(seq, &pos, &key, &oldvalue, &hash)) {
+			Py_INCREF(key);
+			Py_INCREF(value);
+			if (insertdict(mp, key, hash, value))
+				return NULL;
+		}
+		return d;
+	}
+
 	if (PyDict_CheckExact(d) && PyAnySet_CheckExact(seq)) {
 		PyDictObject *mp = (PyDictObject *)d;
 		Py_ssize_t pos = 0;
@@ -1208,19 +1289,24 @@ dict_fromkeys(PyObject *cls, PyObject *args)
 		return NULL;
 	}
 
-	for (;;) {
-		key = PyIter_Next(it);
-		if (key == NULL) {
-			if (PyErr_Occurred())
+	if (PyDict_CheckExact(d)) {
+		while ((key = PyIter_Next(it)) != NULL) {
+			status = PyDict_SetItem(d, key, value);
+			Py_DECREF(key);
+			if (status < 0)
 				goto Fail;
-			break;
 		}
-		status = PyObject_SetItem(d, key, value);
-		Py_DECREF(key);
-		if (status < 0)
-			goto Fail;
+	} else {
+		while ((key = PyIter_Next(it)) != NULL) {
+			status = PyObject_SetItem(d, key, value);
+			Py_DECREF(key);
+			if (status < 0)
+				goto Fail;
+		}
 	}
 
+	if (PyErr_Occurred())
+		goto Fail;
 	Py_DECREF(it);
 	return d;
 
@@ -1361,7 +1447,7 @@ PyDict_Merge(PyObject *a, PyObject *b, int override)
 		return -1;
 	}
 	mp = (PyDictObject*)a;
-	if (PyDict_CheckExact(b)) {
+	if (PyDict_Check(b)) {
 		other = (PyDictObject*)b;
 		if (other == mp || other->ma_used == 0)
 			/* a.update(a) or a.update({}); nothing to do */
@@ -2103,13 +2189,6 @@ dict_init(PyObject *self, PyObject *args, PyObject *kwds)
 	return dict_update_common(self, args, kwds, "dict");
 }
 
-static long
-dict_nohash(PyObject *self)
-{
-	PyErr_SetString(PyExc_TypeError, "dict objects are unhashable");
-	return -1;
-}
-
 static PyObject *
 dict_iter(PyDictObject *dict)
 {
@@ -2141,7 +2220,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_as_number */
 	&dict_as_sequence,			/* tp_as_sequence */
 	&dict_as_mapping,			/* tp_as_mapping */
-	dict_nohash,				/* tp_hash */
+	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */

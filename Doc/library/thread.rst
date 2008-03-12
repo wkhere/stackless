@@ -65,12 +65,13 @@ It defines the following constant and functions:
    Raise the :exc:`SystemExit` exception.  When not caught, this will cause the
    thread to exit silently.
 
-.. % \begin{funcdesc}{exit_prog}{status}
-.. % Exit all threads and report the value of the integer argument
-.. % \var{status} as the exit status of the entire program.
-.. % \strong{Caveat:} code in pending \keyword{finally} clauses, in this thread
-.. % or in other threads, is not executed.
-.. % \end{funcdesc}
+..
+   function:: exit_prog(status)
+
+      Exit all threads and report the value of the integer argument
+      *status* as the exit status of the entire program.
+      **Caveat:** code in pending :keyword:`finally` clauses, in this thread
+      or in other threads, is not executed.
 
 
 .. function:: allocate_lock()
@@ -134,7 +135,6 @@ Lock objects have the following methods:
 In addition to these methods, lock objects can also be used via the
 :keyword:`with` statement, e.g.::
 
-   from __future__ import with_statement
    import thread
 
    a_lock = thread.allocate_lock()

@@ -5,9 +5,7 @@
 .. module:: shutil
    :synopsis: High-level file operations, including copying.
 .. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>
-
-
-.. % partly based on the docstrings
+.. partly based on the docstrings
 
 .. index::
    single: file; copying
@@ -15,19 +13,25 @@
 
 The :mod:`shutil` module offers a number of high-level operations on files and
 collections of files.  In particular, functions are provided  which support file
-copying and removal.
+copying and removal. For operations on individual files, see also the
+:mod:`os` module.
 
 .. warning::
+
+   Even the higher-level file copying functions (:func:`copy`, :func:`copy2`)
+   can't copy all file metadata.
    
-   On MacOS, the resource fork and other metadata are not used.  For file copies,
-   this means that resources will be lost and  file type and creator codes will
-   not be correct.
+   On POSIX platforms, this means that file owner and group are lost as well
+   as ACLs.  On MacOS, the resource fork and other metadata are not used.
+   This means that resources will be lost and file type and creator codes will
+   not be correct. On Windows, file owners, ACLs and alternate data streams
+   are not copied.
 
 
 .. function:: copyfile(src, dst)
 
-   Copy the contents of the file named *src* to a file named *dst*.  The
-   destination location must be writable; otherwise,  an :exc:`IOError` exception
+   Copy the contents (no metadata) of the file named *src* to a file named *dst*.
+   The destination location must be writable; otherwise,  an :exc:`IOError` exception
    will be raised. If *dst* already exists, it will be replaced.   Special files
    such as character or block devices and pipes cannot be copied with this
    function.  *src* and *dst* are path names given as strings.
@@ -82,7 +86,7 @@ copying and removal.
    files are copied to the new tree.  If exception(s) occur, an :exc:`Error` is
    raised with a list of reasons.
 
-   The source code for this should be considered an example rather than  a tool.
+   The source code for this should be considered an example rather than a tool.
 
    .. versionchanged:: 2.3
       :exc:`Error` is raised if any exceptions occur during copying, rather than
@@ -97,25 +101,31 @@ copying and removal.
 
    .. index:: single: directory; deleting
 
-   Delete an entire directory tree (*path* must point to a directory). If
-   *ignore_errors* is true, errors resulting from failed removals will be ignored;
-   if false or omitted, such errors are handled by calling a handler specified by
-   *onerror* or, if that is omitted, they raise an exception.
+   Delete an entire directory tree; *path* must point to a directory (but not a
+   symbolic link to a directory).  If *ignore_errors* is true, errors resulting
+   from failed removals will be ignored; if false or omitted, such errors are
+   handled by calling a handler specified by *onerror* or, if that is omitted,
+   they raise an exception.
 
-   If *onerror* is provided, it must be a callable that accepts three parameters:
-   *function*, *path*, and *excinfo*. The first parameter, *function*, is the
-   function which raised the exception; it will be :func:`os.listdir`,
-   :func:`os.remove` or :func:`os.rmdir`.  The second parameter, *path*, will be
-   the path name passed to *function*.  The third parameter, *excinfo*, will be the
-   exception information return by :func:`sys.exc_info`.  Exceptions raised by
-   *onerror* will not be caught.
+   If *onerror* is provided, it must be a callable that accepts three
+   parameters: *function*, *path*, and *excinfo*. The first parameter,
+   *function*, is the function which raised the exception; it will be
+   :func:`os.path.islink`, :func:`os.listdir`, :func:`os.remove` or
+   :func:`os.rmdir`.  The second parameter, *path*, will be the path name passed
+   to *function*.  The third parameter, *excinfo*, will be the exception
+   information return by :func:`sys.exc_info`.  Exceptions raised by *onerror*
+   will not be caught.
+
+   .. versionchanged:: 2.6
+      Explicitly check for *path* being a symbolic link and raise :exc:`OSError`
+      in that case.
 
 
 .. function:: move(src, dst)
 
    Recursively move a file or directory to another location.
 
-   If the destination is on our current filesystem, then simply use rename.
+   If the destination is on the current filesystem, then simply use rename.
    Otherwise, copy src to the dst and then remove src.
 
    .. versionadded:: 2.3
@@ -123,7 +133,7 @@ copying and removal.
 
 .. exception:: Error
 
-   This exception collects exceptions that raised during a mult-file operation. For
+   This exception collects exceptions that raised during a multi-file operation. For
    :func:`copytree`, the exception argument is a list of 3-tuples (*srcname*,
    *dstname*, *exception*).
 

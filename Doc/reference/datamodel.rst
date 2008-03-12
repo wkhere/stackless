@@ -150,7 +150,7 @@ Ellipsis
    indicate the presence of the ``...`` syntax in a slice.  Its truth value is
    true.
 
-Numbers
+:class:`numbers.Number`
    .. index:: object: numeric
 
    These are created by numeric literals and returned as results by arithmetic
@@ -162,7 +162,7 @@ Numbers
    Python distinguishes between integers, floating point numbers, and complex
    numbers:
 
-   Integers
+   :class:`numbers.Integral`
       .. index:: object: integer
 
       These represent elements from the mathematical set of integers (positive and
@@ -214,9 +214,7 @@ Numbers
       without causing overflow, will yield the same result in the long integer domain
       or when using mixed operands.
 
-      .. % Integers
-
-   Floating point numbers
+   :class:`numbers.Real` (:class:`float`)
       .. index::
          object: floating point
          pair: floating point; number
@@ -231,7 +229,7 @@ Numbers
       overhead of using objects in Python, so there is no reason to complicate the
       language with two kinds of floating point numbers.
 
-   Complex numbers
+   :class:`numbers.Complex`
       .. index::
          object: complex
          pair: complex; number
@@ -240,8 +238,6 @@ Numbers
       floating point numbers.  The same caveats apply as for floating point numbers.
       The real and imaginary parts of a complex number ``z`` can be retrieved through
       the read-only attributes ``z.real`` and ``z.imag``.
-
-   .. % Numbers
 
 Sequences
    .. index::
@@ -346,8 +342,6 @@ Sequences
          by itself does not create a tuple, since parentheses must be usable for grouping
          of expressions).  An empty tuple can be formed by an empty pair of parentheses.
 
-      .. % Immutable sequences
-
    Mutable sequences
       .. index::
          object: mutable sequence
@@ -375,10 +369,6 @@ Sequences
 
       The extension module :mod:`array` provides an additional example of a mutable
       sequence type.
-
-      .. % Mutable sequences
-
-   .. % Sequences
 
 Set types
    .. index::
@@ -409,11 +399,10 @@ Set types
    Frozen sets
       .. index:: object: frozenset
 
-      These represent an immutable set. They are created by the built-in
-      :func:`frozenset` constructor. As a frozenset is immutable and hashable, it can
-      be used again as an element of another set, or as a dictionary key.
-
-   .. % Set types
+      These represent an immutable set.  They are created by the built-in
+      :func:`frozenset` constructor.  As a frozenset is immutable and
+      :term:`hashable`, it can be used again as an element of another set, or as
+      a dictionary key.
 
 Mappings
    .. index::
@@ -451,8 +440,6 @@ Mappings
 
       The extension modules :mod:`dbm`, :mod:`gdbm`, and :mod:`bsddb` provide
       additional examples of mapping types.
-
-   .. % Mapping types
 
 Callable types
    .. index::
@@ -725,8 +712,6 @@ Modules
    object used to initialize the module (since it isn't needed once the
    initialization is done).
 
-   .. % 
-
    Attribute assignment updates the module's namespace dictionary, e.g., ``m.x =
    1`` is equivalent to ``m.__dict__["x"] = 1``.
 
@@ -884,7 +869,7 @@ Internal types
          single: bytecode
          object: code
 
-      Code objects represent *byte-compiled* executable Python code, or *bytecode*.
+      Code objects represent *byte-compiled* executable Python code, or :term:`bytecode`.
       The difference between a code object and a function object is that the function
       object contains an explicit reference to the function's globals (the module in
       which it was defined), while a code object contains no context; also the default
@@ -905,7 +890,7 @@ Internal types
       used by the bytecode; :attr:`co_names` is a tuple containing the names used by
       the bytecode; :attr:`co_filename` is the filename from which the code was
       compiled; :attr:`co_firstlineno` is the first line number of the function;
-      :attr:`co_lnotab` is a string encoding the mapping from byte code offsets to
+      :attr:`co_lnotab` is a string encoding the mapping from bytecode offsets to
       line numbers (for details see the source code of the interpreter);
       :attr:`co_stacksize` is the required stack size (including local variables);
       :attr:`co_flags` is an integer encoding a number of flags for the interpreter.
@@ -1077,11 +1062,8 @@ Internal types
       described above, under "User-defined methods". Class method objects are created
       by the built-in :func:`classmethod` constructor.
 
-   .. % Internal types
 
-.. % Types
-.. % =========================================================================
-
+.. _newstyle:
 
 New-style and classic classes
 =============================
@@ -1096,7 +1078,7 @@ that all old-style instances, independently of their class, are implemented with
 a single built-in type, called ``instance``.
 
 New-style classes were introduced in Python 2.2 to unify classes and types.  A
-new-style class neither more nor less than a user-defined type.  If *x* is an
+new-style class is neither more nor less than a user-defined type.  If *x* is an
 instance of a new-style class, then ``type(x)`` is the same as ``x.__class__``.
 
 The major motivation for introducing new-style classes is to provide a unified
@@ -1115,18 +1097,15 @@ implemented before for compatibility concerns, like the method resolution order
 in case of multiple inheritance.
 
 This manual is not up-to-date with respect to new-style classes.  For now,
-please see http://www.python.org/doc/newstyle.html for more information.
+please see http://www.python.org/doc/newstyle/ for more information.
 
 .. index::
-   single: class
-   single: class
-   single: class
+   single: class; new-style
+   single: class; classic
+   single: class; old-style
 
 The plan is to eventually drop old-style classes, leaving only the semantics of
 new-style classes.  This change will probably only be feasible in Python 3.0.
-new-style classic old-style
-
-.. % =========================================================================
 
 
 .. _specialnames:
@@ -1198,7 +1177,8 @@ Basic customization
    :meth:`__init__` method will not be invoked.
 
    :meth:`__new__` is intended mainly to allow subclasses of immutable types (like
-   int, str, or tuple) to customize instance creation.
+   int, str, or tuple) to customize instance creation.  It is also commonly
+   overridden in custom metaclasses in order to customize class creation.
 
 
 .. method:: object.__init__(self[, ...])
@@ -1314,6 +1294,9 @@ Basic customization
 
    .. versionadded:: 2.1
 
+   .. index::
+      single: comparisons
+
    These are the so-called "rich comparison" methods, and are called for comparison
    operators in preference to :meth:`__cmp__` below. The correspondence between
    operator symbols and method names is as follows: ``x<y`` calls ``x.__lt__(y)``,
@@ -1328,14 +1311,16 @@ Basic customization
    context (e.g., in the condition of an ``if`` statement), Python will call
    :func:`bool` on the value to determine if the result is true or false.
 
-   There are no implied relationships among the comparison operators. The truth of
-   ``x==y`` does not imply that ``x!=y`` is false.  Accordingly, when defining
-   :meth:`__eq__`, one should also define :meth:`__ne__` so that the operators will
-   behave as expected.
+   There are no implied relationships among the comparison operators. The truth
+   of ``x==y`` does not imply that ``x!=y`` is false.  Accordingly, when
+   defining :meth:`__eq__`, one should also define :meth:`__ne__` so that the
+   operators will behave as expected.  See the paragraph on :meth:`__hash__` for
+   some important notes on creating :term:`hashable` objects which support
+   custom comparison operations and are usable as dictionary keys.
 
-   There are no reflected (swapped-argument) versions of these methods (to be used
-   when the left argument does not support the operation but the right argument
-   does); rather, :meth:`__lt__` and :meth:`__gt__` are each other's reflection,
+   There are no swapped-argument versions of these methods (to be used when the
+   left argument does not support the operation but the right argument does);
+   rather, :meth:`__lt__` and :meth:`__gt__` are each other's reflection,
    :meth:`__le__` and :meth:`__ge__` are each other's reflection, and
    :meth:`__eq__` and :meth:`__ne__` are their own reflection.
 
@@ -1348,14 +1333,15 @@ Basic customization
       builtin: cmp
       single: comparisons
 
-   Called by comparison operations if rich comparison (see above) is not defined.
-   Should return a negative integer if ``self < other``, zero if ``self == other``,
-   a positive integer if ``self > other``.  If no :meth:`__cmp__`, :meth:`__eq__`
-   or :meth:`__ne__` operation is defined, class instances are compared by object
-   identity ("address").  See also the description of :meth:`__hash__` for some
-   important notes on creating objects which support custom comparison operations
-   and are usable as dictionary keys. (Note: the restriction that exceptions are
-   not propagated by :meth:`__cmp__` has been removed since Python 1.5.)
+   Called by comparison operations if rich comparison (see above) is not
+   defined.  Should return a negative integer if ``self < other``, zero if
+   ``self == other``, a positive integer if ``self > other``.  If no
+   :meth:`__cmp__`, :meth:`__eq__` or :meth:`__ne__` operation is defined, class
+   instances are compared by object identity ("address").  See also the
+   description of :meth:`__hash__` for some important notes on creating
+   :term:`hashable` objects which support custom comparison operations and are
+   usable as dictionary keys. (Note: the restriction that exceptions are not
+   propagated by :meth:`__cmp__` has been removed since Python 1.5.)
 
 
 .. method:: object.__rcmp__(self, other)
@@ -1370,25 +1356,29 @@ Basic customization
       object: dictionary
       builtin: hash
 
-   Called for the key object for dictionary  operations, and by the built-in
-   function :func:`hash`.  Should return a 32-bit integer usable as a hash value
+   Called for the key object for dictionary operations, and by the built-in
+   function :func:`hash`.  Should return an integer usable as a hash value
    for dictionary operations.  The only required property is that objects which
    compare equal have the same hash value; it is advised to somehow mix together
    (e.g., using exclusive or) the hash values for the components of the object that
-   also play a part in comparison of objects.  If a class does not define a
-   :meth:`__cmp__` method it should not define a :meth:`__hash__` operation either;
-   if it defines :meth:`__cmp__` or :meth:`__eq__` but not :meth:`__hash__`, its
-   instances will not be usable as dictionary keys.  If a class defines mutable
-   objects and implements a :meth:`__cmp__` or :meth:`__eq__` method, it should not
-   implement :meth:`__hash__`, since the dictionary implementation requires that a
-   key's hash value is immutable (if the object's hash value changes, it will be in
-   the wrong hash bucket).
+   also play a part in comparison of objects.
+
+   If a class does not define a :meth:`__cmp__` or :meth:`__eq__` method it
+   should not define a :meth:`__hash__` operation either; if it defines
+   :meth:`__cmp__` or :meth:`__eq__` but not :meth:`__hash__`, its instances
+   will not be usable as dictionary keys.  If a class defines mutable objects
+   and implements a :meth:`__cmp__` or :meth:`__eq__` method, it should not
+   implement :meth:`__hash__`, since the dictionary implementation requires that
+   a key's hash value is immutable (if the object's hash value changes, it will
+   be in the wrong hash bucket).
+
+   User-defined classes have :meth:`__cmp__` and :meth:`__hash__` methods
+   by default; with them, all objects compare unequal and ``x.__hash__()``
+   returns ``id(x)``.
 
    .. versionchanged:: 2.5
-      :meth:`__hash__` may now also return a long integer object; the 32-bit integer
-      is then derived from the hash of that object.
-
-   .. index:: single: __cmp__() (object method)
+      :meth:`__hash__` may now also return a long integer object; the 32-bit
+      integer is then derived from the hash of that object.
 
 
 .. method:: object.__nonzero__(self)
@@ -1662,7 +1652,7 @@ definition is read into a separate namespace and the value of class name is
 bound to the result of ``type(name, bases, dict)``.
 
 When the class definition is read, if *__metaclass__* is defined then the
-callable assigned to it will be called instead of :func:`type`. The allows
+callable assigned to it will be called instead of :func:`type`. This allows
 classes or functions to be written which monitor or alter the class creation
 process:
 
@@ -1670,6 +1660,20 @@ process:
 
 * Returning an instance of another class -- essentially performing the role of a
   factory function.
+
+These steps will have to be performed in the metaclass's :meth:`__new__` method
+-- :meth:`type.__new__` can then be called from this method to create a class
+with different properties.  This example adds a new element to the class
+dictionary before creating the class::
+
+  class metacls(type):
+      def __new__(mcs, name, bases, dict):
+          dict['foo'] = 'metacls was here'
+          return type.__new__(mcs, name, bases, dict)
+
+You can of course also override other class methods (or add new methods); for
+example defining a custom :meth:`__call__` method in the metaclass allows custom
+behavior when the class is called, e.g. not always creating a new instance.
 
 
 .. data:: __metaclass__
@@ -1806,6 +1810,22 @@ sequences, it should iterate through the values.
 
    Iterator objects also need to implement this method; they are required to return
    themselves.  For more information on iterator objects, see :ref:`typeiter`.
+
+
+.. method:: object.__reversed__(self)
+
+   Called (if present) by the :func:`reversed` builtin to implement
+   reverse iteration.  It should return a new iterator object that iterates
+   over all the objects in the container in reverse order.
+
+   If the :meth:`__reversed__` method is not provided, the
+   :func:`reversed` builtin will fall back to using the sequence protocol
+   (:meth:`__len__` and :meth:`__getitem__`).  Objects should normally
+   only provide :meth:`__reversed__` if they do not support the sequence
+   protocol and an efficient implementation of reverse iteration is possible.
+
+   .. versionadded:: 2.6
+
 
 The membership test operators (:keyword:`in` and :keyword:`not in`) are normally
 implemented as an iteration through a sequence.  However, container objects can
@@ -2252,7 +2272,7 @@ For more information on context managers, see :ref:`typecontextmanager`.
    extensive revision, it must now be taken as authoritative only regarding
    "classic classes", that are still the default, for compatibility purposes, in
    Python 2.2 and 2.3.  For more information, see
-   http://www.python.org/doc/newstyle.html.
+   http://www.python.org/doc/newstyle/.
 
 .. [#] This, and other statements, are only roughly true for instances of new-style
    classes.

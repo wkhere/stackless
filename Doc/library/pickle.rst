@@ -1,4 +1,3 @@
-
 :mod:`pickle` --- Python object serialization
 =============================================
 
@@ -12,10 +11,8 @@
 
 .. module:: pickle
    :synopsis: Convert Python objects to streams of bytes and back.
-
-
-.. % Substantial improvements by Jim Kerr <jbkerr@sr.hp.com>.
-.. % Rewritten by Barry Warsaw <barry@zope.com>
+.. sectionauthor:: Jim Kerr <jbkerr@sr.hp.com>.
+.. sectionauthor:: Barry Warsaw <barry@zope.com>
 
 The :mod:`pickle` module implements a fundamental, but powerful algorithm for
 serializing and de-serializing a Python object structure.  "Pickling" is the
@@ -122,7 +119,7 @@ There are currently 3 different protocols which can be used for pickling.
   earlier versions of Python.
 
 * Protocol version 2 was introduced in Python 2.3.  It provides much more
-  efficient pickling of new-style classes.
+  efficient pickling of :term:`new-style class`\es.
 
 Refer to :pep:`307` for more information.
 
@@ -430,8 +427,8 @@ New-style types can provide a :meth:`__getnewargs__` method that is used for
 protocol 2.  Implementing this method is needed if the type establishes some
 internal invariants when the instance is created, or if the memory allocation is
 affected by the values passed to the :meth:`__new__` method for the type (as it
-is for tuples and strings).  Instances of a new-style type :class:`C` are
-created using ::
+is for tuples and strings).  Instances of a :term:`new-style class` :class:`C`
+are created using ::
 
    obj = C.__new__(C, *args)
 
@@ -459,12 +456,17 @@ can do what they want. [#]_
 
 .. warning::
 
-   For new-style classes, if :meth:`__getstate__` returns a false value, the
-   :meth:`__setstate__` method will not be called.
+   For :term:`new-style class`\es, if :meth:`__getstate__` returns a false
+   value, the :meth:`__setstate__` method will not be called.
 
 
 Pickling and unpickling extension types
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. index::
+   single: __reduce__() (pickle protocol)
+   single: __reduce_ex__() (pickle protocol)
+   single: __safe_for_unpickling__ (pickle protocol)
 
 When the :class:`Pickler` encounters an object of a type it knows nothing about
 --- such as an extension type --- it looks in two places for a hint of how to
@@ -544,6 +546,10 @@ unpickling as described above.
 Pickling and unpickling external objects
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. index::
+   single: persistent_id (pickle protocol)
+   single: persistent_load (pickle protocol)
+
 For the benefit of object persistence, the :mod:`pickle` module supports the
 notion of a reference to an object outside the pickled data stream.  Such
 objects are referenced by a "persistent id", which is just an arbitrary string
@@ -622,16 +628,20 @@ object references without actually instantiating all the objects in a pickle.
 [#]_  Setting :attr:`persistent_load` to a list is usually used in conjunction
 with the :meth:`noload` method on the Unpickler.
 
-.. % BAW: Both pickle and cPickle support something called
-.. % inst_persistent_id() which appears to give unknown types a second
-.. % shot at producing a persistent id.  Since Jim Fulton can't remember
-.. % why it was added or what it's for, I'm leaving it undocumented.
+.. BAW: Both pickle and cPickle support something called inst_persistent_id()
+   which appears to give unknown types a second shot at producing a persistent
+   id.  Since Jim Fulton can't remember why it was added or what it's for, I'm
+   leaving it undocumented.
 
 
 .. _pickle-sub:
 
 Subclassing Unpicklers
 ----------------------
+
+.. index::
+   single: load_global() (pickle protocol)
+   single: find_global() (pickle protocol)
 
 By default, unpickling will import any class that it finds in the pickle data.
 You can control exactly what gets unpickled and what gets called by customizing

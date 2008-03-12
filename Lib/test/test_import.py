@@ -3,9 +3,11 @@ from test.test_support import TESTFN, run_unittest, catch_warning
 import unittest
 import os
 import random
+import shutil
 import sys
 import py_compile
 import warnings
+from test.test_support import unlink, TESTFN, unload
 
 
 def remove_files(name):
@@ -221,8 +223,39 @@ class ImportTest(unittest.TestCase):
             warnings.simplefilter('error', ImportWarning)
             self.assertRaises(ImportWarning, __import__, "site-packages")
 
+    def test_importbyfilename(self):
+        path = os.path.abspath(TESTFN)
+        try:
+            __import__(path)
+        except ImportError, err:
+            self.assertEqual("Import by filename is not supported.",
+                              err.args[0])
+        else:
+            self.fail("import by path didn't raise an exception")
+
+class PathsTests(unittest.TestCase):
+    path = TESTFN
+
+    def setUp(self):
+        os.mkdir(self.path)
+        self.syspath = sys.path[:]
+
+    def tearDown(self):
+        shutil.rmtree(self.path)
+        sys.path = self.syspath
+
+    # http://bugs.python.org/issue1293
+    def test_trailing_slash(self):
+        f = open(os.path.join(self.path, 'test_trailing_slash.py'), 'w')
+        f.write("testdata = 'test_trailing_slash'")
+        f.close()
+        sys.path.append(self.path+'/')
+        mod = __import__("test_trailing_slash")
+        self.assertEqual(mod.testdata, 'test_trailing_slash')
+        unload("test_trailing_slash")
+
 def test_main(verbose=None):
-    run_unittest(ImportTest)
+    run_unittest(ImportTest, PathsTests)
 
 if __name__ == '__main__':
     test_main()

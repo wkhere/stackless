@@ -317,7 +317,7 @@ time_gmtime(PyObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(gmtime_doc,
-"gmtime([seconds]) -> (tm_year, tm_mon, tm_day, tm_hour, tm_min,\n\
+"gmtime([seconds]) -> (tm_year, tm_mon, tm_mday, tm_hour, tm_min,\n\
                        tm_sec, tm_wday, tm_yday, tm_isdst)\n\
 \n\
 Convert seconds since the Epoch to a time tuple expressing UTC (a.k.a.\n\
@@ -333,7 +333,8 @@ time_localtime(PyObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(localtime_doc,
-"localtime([seconds]) -> (tm_year,tm_mon,tm_day,tm_hour,tm_min,tm_sec,tm_wday,tm_yday,tm_isdst)\n\
+"localtime([seconds]) -> (tm_year,tm_mon,tm_mday,tm_hour,tm_min,\n\
+			  tm_sec,tm_wday,tm_yday,tm_isdst)\n\
 \n\
 Convert seconds since the Epoch to a time tuple expressing local time.\n\
 When 'seconds' is not passed in, convert the current time instead.");
@@ -514,7 +515,7 @@ is not present, current time as returned by localtime() is used.");
 static PyObject *
 time_strptime(PyObject *self, PyObject *args)
 {
-    PyObject *strptime_module = PyImport_ImportModule("_strptime");
+    PyObject *strptime_module = PyImport_ImportModuleNoBlock("_strptime");
     PyObject *strptime_result;
 
     if (!strptime_module)
@@ -626,7 +627,7 @@ time_tzset(PyObject *self, PyObject *unused)
 {
 	PyObject* m;
 
-	m = PyImport_ImportModule("time");
+	m = PyImport_ImportModuleNoBlock("time");
 	if (m == NULL) {
 	    return NULL;
 	}

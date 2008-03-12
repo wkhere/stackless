@@ -255,6 +255,42 @@ class MmapTests(unittest.TestCase):
                 self.assertEqual(m.find(slice + 'x'), -1)
         m.close()
 
+    def test_find_end(self):
+        # test the new 'end' parameter works as expected
+        f = open(TESTFN, 'w+')
+        data = 'one two ones'
+        n = len(data)
+        f.write(data)
+        f.flush()
+        m = mmap.mmap(f.fileno(), n)
+        f.close()
+
+        self.assertEqual(m.find('one'), 0)
+        self.assertEqual(m.find('ones'), 8)
+        self.assertEqual(m.find('one', 0, -1), 0)
+        self.assertEqual(m.find('one', 1), 8)
+        self.assertEqual(m.find('one', 1, -1), 8)
+        self.assertEqual(m.find('one', 1, -2), -1)
+
+
+    def test_rfind(self):
+        # test the new 'end' parameter works as expected
+        f = open(TESTFN, 'w+')
+        data = 'one two ones'
+        n = len(data)
+        f.write(data)
+        f.flush()
+        m = mmap.mmap(f.fileno(), n)
+        f.close()
+
+        self.assertEqual(m.rfind('one'), 8)
+        self.assertEqual(m.rfind('one '), 0)
+        self.assertEqual(m.rfind('one', 0, -1), 8)
+        self.assertEqual(m.rfind('one', 0, -2), 0)
+        self.assertEqual(m.rfind('one', 1, -1), 8)
+        self.assertEqual(m.rfind('one', 1, -2), -1)
+
+
     def test_double_close(self):
         # make sure a double close doesn't crash on Solaris (Bug# 665913)
         f = open(TESTFN, 'w+')
@@ -339,6 +375,71 @@ class MmapTests(unittest.TestCase):
                     L[start:stop:step] = data
                     m[start:stop:step] = data
                     self.assertEquals(m[:], "".join(L))
+
+    def make_mmap_file (self, f, halfsize):
+        # Write 2 pages worth of data to the file
+        f.write ('\0' * halfsize)
+        f.write ('foo')
+        f.write ('\0' * (halfsize - 3))
+        f.flush ()
+        return mmap.mmap (f.fileno(), 0)
+
+    def test_offset (self):
+        f = open (TESTFN, 'w+b')
+
+        try: # unlink TESTFN no matter what
+            halfsize = mmap.ALLOCATIONGRANULARITY
+            m = self.make_mmap_file (f, halfsize)
+            m.close ()
+            f.close ()
+
+            mapsize = halfsize * 2
+            # Try invalid offset
+            f = open(TESTFN, "r+b")
+            for offset in [-2, -1, None]:
+                try:
+                    m = mmap.mmap(f.fileno(), mapsize, offset=offset)
+                    self.assertEqual(0, 1)
+                except (ValueError, TypeError, OverflowError):
+                    pass
+                else:
+                    self.assertEqual(0, 0)
+            f.close()
+
+            # Try valid offset, hopefully 8192 works on all OSes
+            f = open(TESTFN, "r+b")
+            m = mmap.mmap(f.fileno(), mapsize - halfsize, offset=halfsize)
+            self.assertEqual(m[0:3], 'foo')
+            f.close()
+            m.close()
+
+        finally:
+            f.close()
+            try:
+                os.unlink(TESTFN)
+            except OSError:
+                pass
+
+    def test_subclass(self):
+        class anon_mmap(mmap.mmap):
+            def __new__(klass, *args, **kwargs):
+                return mmap.mmap.__new__(klass, -1, *args, **kwargs)
+        anon_mmap(PAGESIZE)
+
+    def test_prot_readonly(self):
+        if not hasattr(mmap, 'PROT_READ'):
+            return
+        mapsize = 10
+        open(TESTFN, "wb").write("a"*mapsize)
+        f = open(TESTFN, "rb")
+        m = mmap.mmap(f.fileno(), mapsize, prot=mmap.PROT_READ)
+        self.assertRaises(TypeError, m.write, "foo")
+
+
+    def test_error(self):
+        self.assert_(issubclass(mmap.error, EnvironmentError))
+        self.assert_("mmap.error" in str(mmap.error))
+
 
 def test_main():
     run_unittest(MmapTests)

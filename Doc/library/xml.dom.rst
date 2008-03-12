@@ -31,19 +31,22 @@ representation for XML data.
 
 The Document Object Model is being defined by the W3C in stages, or "levels" in
 their terminology.  The Python mapping of the API is substantially based on the
-DOM Level 2 recommendation.  The mapping of the Level 3 specification, currently
-only available in draft form, is being developed by the `Python XML Special
-Interest Group <http://www.python.org/sigs/xml-sig/>`_ as part of the `PyXML
-package <http://pyxml.sourceforge.net/>`_.  Refer to the documentation bundled
-with that package for information on the current state of DOM Level 3 support.
+DOM Level 2 recommendation.
 
-.. % What if your needs are somewhere between SAX and the DOM?  Perhaps
-.. % you cannot afford to load the entire tree in memory but you find the
-.. % SAX model somewhat cumbersome and low-level.  There is also a module
-.. % called xml.dom.pulldom that allows you to build trees of only the
-.. % parts of a document that you need structured access to.  It also has
-.. % features that allow you to find your way around the DOM.
-.. % See http://www.prescod.net/python/pulldom
+.. XXX PyXML is dead...
+.. The mapping of the Level 3 specification, currently
+   only available in draft form, is being developed by the `Python XML Special
+   Interest Group <http://www.python.org/sigs/xml-sig/>`_ as part of the `PyXML
+   package <http://pyxml.sourceforge.net/>`_.  Refer to the documentation bundled
+   with that package for information on the current state of DOM Level 3 support.
+
+.. What if your needs are somewhere between SAX and the DOM?  Perhaps
+   you cannot afford to load the entire tree in memory but you find the
+   SAX model somewhat cumbersome and low-level.  There is also a module
+   called xml.dom.pulldom that allows you to build trees of only the
+   parts of a document that you need structured access to.  It also has
+   features that allow you to find your way around the DOM.
+   See http://www.prescod.net/python/pulldom
 
 DOM applications typically start by parsing some XML into a DOM.  How this is
 accomplished is not covered at all by DOM Level 1, and Level 2 provides only
@@ -75,10 +78,6 @@ implementations are free to support the strict mapping from IDL).  See section
 
    `Document Object Model (DOM) Level 1 Specification <http://www.w3.org/TR/REC-DOM-Level-1/>`_
       The W3C recommendation for the DOM supported by :mod:`xml.dom.minidom`.
-
-   `PyXML <http://pyxml.sourceforge.net>`_
-      Users that require a full-featured implementation of DOM should use the PyXML
-      package.
 
    `Python Language Mapping Specification <http://www.omg.org/docs/formal/02-11-05.pdf>`_
       This specifies the mapping from OMG IDL to Python.
@@ -158,7 +157,7 @@ provided as part of this module does provide the constants used for the
 within the class rather than at the module level to conform with the DOM
 specifications.
 
-.. % Should the Node documentation go here?
+.. Should the Node documentation go here?
 
 
 .. _dom-objects:
@@ -373,8 +372,9 @@ All of the components of an XML document are subclasses of :class:`Node`.
 
 .. method:: Node.appendChild(newChild)
 
-   Add a new child node to this node at the end of the list of children, returning
-   *newChild*.
+   Add a new child node to this node at the end of the list of
+   children, returning *newChild*. If the node was already in
+   in the tree, it is removed first.
 
 
 .. method:: Node.insertBefore(newChild, refChild)
@@ -652,8 +652,8 @@ of that class.
 
 .. method:: Element.removeAttribute(name)
 
-   Remove an attribute by name.  No exception is raised if there is no matching
-   attribute.
+   Remove an attribute by name.  If there is no matching attribute, a
+   :exc:`NotFoundErr` is raised.
 
 
 .. method:: Element.removeAttributeNode(oldAttr)
@@ -906,7 +906,7 @@ attribute.
 
    This is raised if data is specified for a node which does not support data.
 
-   .. % XXX  a better explanation is needed!
+   .. XXX  a better explanation is needed!
 
 
 .. exception:: NoModificationAllowedErr
@@ -919,7 +919,7 @@ attribute.
 
    Raised when an invalid or illegal string is specified.
 
-   .. % XXX  how is this different from InvalidCharacterErr ???
+   .. XXX  how is this different from InvalidCharacterErr?
 
 
 .. exception:: WrongDocumentErr
@@ -1001,8 +1001,8 @@ Additionally, the :class:`DOMString` defined in the recommendation is mapped to
 a Python string or Unicode string.  Applications should be able to handle
 Unicode whenever a string is returned from the DOM.
 
-The IDL :keyword:`null` value is mapped to ``None``, which may be accepted or
-provided by the implementation whenever :keyword:`null` is allowed by the API.
+The IDL ``null`` value is mapped to ``None``, which may be accepted or
+provided by the implementation whenever ``null`` is allowed by the API.
 
 
 .. _dom-accessor-methods:
@@ -1011,7 +1011,7 @@ Accessor Methods
 ^^^^^^^^^^^^^^^^
 
 The mapping from OMG IDL to Python defines accessor functions for IDL
-:keyword:`attribute` declarations in much the way the Java mapping does.
+``attribute`` declarations in much the way the Java mapping does.
 Mapping the IDL declarations ::
 
    readonly attribute string someValue;
@@ -1030,13 +1030,13 @@ likely to work, and wrapper objects may be needed on the client if the DOM
 objects are accessed via CORBA. While this does require some additional
 consideration for CORBA DOM clients, the implementers with experience using DOM
 over CORBA from Python do not consider this a problem.  Attributes that are
-declared :keyword:`readonly` may not restrict write access in all DOM
+declared ``readonly`` may not restrict write access in all DOM
 implementations.
 
 In the Python DOM API, accessor functions are not required.  If provided, they
 should take the form defined by the Python IDL mapping, but these methods are
 considered unnecessary since the attributes are accessible directly from Python.
-"Set" accessors should never be provided for :keyword:`readonly` attributes.
+"Set" accessors should never be provided for ``readonly`` attributes.
 
 The IDL definitions do not fully embody the requirements of the W3C DOM API,
 such as the notion of certain objects, such as the return value of

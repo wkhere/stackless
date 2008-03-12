@@ -6,23 +6,50 @@
    :synopsis: A synchronized queue class.
 
 
-The :mod:`Queue` module implements a multi-producer, multi-consumer FIFO queue.
+The :mod:`Queue` module implements multi-producer, multi-consumer queues.
 It is especially useful in threaded programming when information must be
 exchanged safely between multiple threads.  The :class:`Queue` class in this
 module implements all the required locking semantics.  It depends on the
 availability of thread support in Python; see the :mod:`threading`
 module.
 
-The :mod:`Queue` module defines the following class and exception:
+Implements three types of queue whose only difference is the order that
+the entries are retrieved.  In a FIFO queue, the first tasks added are
+the first retrieved. In a LIFO queue, the most recently added entry is
+the first retrieved (operating like a stack).  With a priority queue,
+the entries are kept sorted (using the :mod:`heapq` module) and the
+lowest valued entry is retrieved first.
 
+The :mod:`Queue` module defines the following classes and exceptions:
 
 .. class:: Queue(maxsize)
 
-   Constructor for the class.  *maxsize* is an integer that sets the upperbound
+   Constructor for a FIFO queue.  *maxsize* is an integer that sets the upperbound
    limit on the number of items that can be placed in the queue.  Insertion will
    block once this size has been reached, until queue items are consumed.  If
    *maxsize* is less than or equal to zero, the queue size is infinite.
 
+.. class:: LifoQueue(maxsize)
+
+   Constructor for a LIFO queue.  *maxsize* is an integer that sets the upperbound
+   limit on the number of items that can be placed in the queue.  Insertion will
+   block once this size has been reached, until queue items are consumed.  If
+   *maxsize* is less than or equal to zero, the queue size is infinite.
+
+   .. versionadded:: 2.6
+
+.. class:: PriorityQueue(maxsize)
+
+   Constructor for a priority queue.  *maxsize* is an integer that sets the upperbound
+   limit on the number of items that can be placed in the queue.  Insertion will
+   block once this size has been reached, until queue items are consumed.  If
+   *maxsize* is less than or equal to zero, the queue size is infinite.
+
+   The lowest valued entries are retrieved first (the lowest valued entry is the
+   one returned by ``sorted(list(entries))[0]``).  A typical pattern for entries
+   is a tuple in the form: ``(priority_number, data)``.
+
+   .. versionadded:: 2.6
 
 .. exception:: Empty
 
@@ -41,28 +68,31 @@ The :mod:`Queue` module defines the following class and exception:
 Queue Objects
 -------------
 
-Class :class:`Queue` implements queue objects and has the methods described
-below.  This class can be derived from in order to implement other queue
-organizations (e.g. stack) but the inheritable interface is not described here.
-See the source code for details.  The public methods are:
+Queue objects (:class:`Queue`, :class:`LifoQueue`, or :class:`PriorityQueue`)
+provide the public methods described below.  
 
 
 .. method:: Queue.qsize()
 
-   Return the approximate size of the queue.  Because of multithreading semantics,
-   this number is not reliable.
+   Return the approximate size of the queue.  Note, qsize() > 0 doesn't
+   guarantee that a subsequent get() will not block, nor will qsize() < maxsize
+   guarantee that put() will not block.
 
 
 .. method:: Queue.empty()
 
-   Return ``True`` if the queue is empty, ``False`` otherwise. Because of
-   multithreading semantics, this is not reliable.
+   Return ``True`` if the queue is empty, ``False`` otherwise.  If empty()
+   returns ``True`` it doesn't guarantee that a subsequent call to put()
+   will not block.  Similarly, if empty() returns ``False`` it doesn't
+   guarantee that a subsequent call to get() will not block.
 
 
 .. method:: Queue.full()
 
-   Return ``True`` if the queue is full, ``False`` otherwise. Because of
-   multithreading semantics, this is not reliable.
+   Return ``True`` if the queue is full, ``False`` otherwise.  If full()
+   returns ``True`` it doesn't guarantee that a subsequent call to get()
+   will not block.  Similarly, if full() returns ``False`` it doesn't
+   guarantee that a subsequent call to put() will not block.
 
 
 .. method:: Queue.put(item[, block[, timeout]])

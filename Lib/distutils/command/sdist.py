@@ -6,7 +6,7 @@ Implements the Distutils 'sdist' command (create a source distribution)."""
 
 __revision__ = "$Id$"
 
-import sys, os, string
+import os, string
 from types import *
 from glob import glob
 from distutils.core import Command
@@ -383,6 +383,7 @@ class sdist (Command):
             if line[-1] == '\n':
                 line = line[0:-1]
             self.filelist.append(line)
+        manifest.close()
 
     # read_manifest ()
 

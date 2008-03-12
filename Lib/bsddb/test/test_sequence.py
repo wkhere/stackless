@@ -1,8 +1,6 @@
 import unittest
 import os
-import sys
 import tempfile
-import glob
 
 try:
     # For Pythons w/distutils pybsddb
@@ -10,13 +8,11 @@ try:
 except ImportError:
     from bsddb import db
 
-from test_all import verbose
-
 
 class DBSequenceTest(unittest.TestCase):
     def setUp(self):
         self.int_32_max = 0x100000000
-        self.homeDir = os.path.join(os.path.dirname(sys.argv[0]), 'db_home')
+        self.homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
         try:
             os.mkdir(self.homeDir)
         except os.error:
@@ -41,9 +37,8 @@ class DBSequenceTest(unittest.TestCase):
             self.dbenv.close()
             del self.dbenv
 
-        files = glob.glob(os.path.join(self.homeDir, '*'))
-        for file in files:
-            os.remove(file)
+        from test import test_support
+        test_support.rmtree(self.homeDir)
 
     def test_get(self):
         self.seq = db.DBSequence(self.d, flags=0)

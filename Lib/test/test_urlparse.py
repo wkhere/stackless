@@ -254,6 +254,24 @@ class UrlParseTestCase(unittest.TestCase):
         self.assertEqual(p.port, 80)
         self.assertEqual(p.geturl(), url)
 
+        # Addressing issue1698, which suggests Username can contain
+        # "@" characters.  Though not RFC compliant, many ftp sites allow
+        # and request email addresses as usernames.
+
+        url = "http://User@example.com:Pass@www.python.org:080/doc/?query=yes#frag"
+        p = urlparse.urlsplit(url)
+        self.assertEqual(p.scheme, "http")
+        self.assertEqual(p.netloc, "User@example.com:Pass@www.python.org:080")
+        self.assertEqual(p.path, "/doc/")
+        self.assertEqual(p.query, "query=yes")
+        self.assertEqual(p.fragment, "frag")
+        self.assertEqual(p.username, "User@example.com")
+        self.assertEqual(p.password, "Pass")
+        self.assertEqual(p.hostname, "www.python.org")
+        self.assertEqual(p.port, 80)
+        self.assertEqual(p.geturl(), url)
+
+
     def test_attributes_bad_port(self):
         """Check handling of non-integer ports."""
         p = urlparse.urlsplit("http://www.example.net:foo")
@@ -287,6 +305,21 @@ class UrlParseTestCase(unittest.TestCase):
         self.assertEqual(p.port, None)
         self.assertEqual(p.geturl(), uri)
 
+    def test_caching(self):
+        # Test case for bug #1313119
+        uri = "http://example.com/doc/"
+        unicode_uri = unicode(uri)
+
+        urlparse.urlparse(unicode_uri)
+        p = urlparse.urlparse(uri)
+        self.assertEqual(type(p.scheme), type(uri))
+        self.assertEqual(type(p.hostname), type(uri))
+        self.assertEqual(type(p.path), type(uri))
+
+    def test_noslash(self):
+        # Issue 1637: http://foo.com?query is legal
+        self.assertEqual(urlparse.urlparse("http://example.com?blahblah=/foo"),
+                         ('http', 'example.com', '', '', 'blahblah=/foo', ''))
 
 def test_main():
     test_support.run_unittest(UrlParseTestCase)

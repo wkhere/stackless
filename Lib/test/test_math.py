@@ -51,12 +51,29 @@ class MathTests(unittest.TestCase):
 
     def testCeil(self):
         self.assertRaises(TypeError, math.ceil)
+        # These types will be int in py3k.
+        self.assertEquals(float, type(math.ceil(1)))
+        self.assertEquals(float, type(math.ceil(1L)))
+        self.assertEquals(float, type(math.ceil(1.0)))
         self.ftest('ceil(0.5)', math.ceil(0.5), 1)
         self.ftest('ceil(1.0)', math.ceil(1.0), 1)
         self.ftest('ceil(1.5)', math.ceil(1.5), 2)
         self.ftest('ceil(-0.5)', math.ceil(-0.5), 0)
         self.ftest('ceil(-1.0)', math.ceil(-1.0), -1)
         self.ftest('ceil(-1.5)', math.ceil(-1.5), -1)
+
+        class TestCeil(object):
+            def __float__(self):
+                return 41.3
+        class TestNoCeil(object):
+            pass
+        self.ftest('ceil(TestCeil())', math.ceil(TestCeil()), 42)
+        self.assertRaises(TypeError, math.ceil, TestNoCeil())
+
+        t = TestNoCeil()
+        t.__ceil__ = lambda *args: args
+        self.assertRaises(TypeError, math.ceil, t)
+        self.assertRaises(TypeError, math.ceil, t, 0)
 
     def testCos(self):
         self.assertRaises(TypeError, math.cos)
@@ -90,6 +107,10 @@ class MathTests(unittest.TestCase):
 
     def testFloor(self):
         self.assertRaises(TypeError, math.floor)
+        # These types will be int in py3k.
+        self.assertEquals(float, type(math.floor(1)))
+        self.assertEquals(float, type(math.floor(1L)))
+        self.assertEquals(float, type(math.floor(1.0)))
         self.ftest('floor(0.5)', math.floor(0.5), 0)
         self.ftest('floor(1.0)', math.floor(1.0), 1)
         self.ftest('floor(1.5)', math.floor(1.5), 1)
@@ -100,6 +121,19 @@ class MathTests(unittest.TestCase):
         # This fails on some platforms - so check it here
         self.ftest('floor(1.23e167)', math.floor(1.23e167), 1.23e167)
         self.ftest('floor(-1.23e167)', math.floor(-1.23e167), -1.23e167)
+
+        class TestFloor(object):
+            def __float__(self):
+                return 42.3
+        class TestNoFloor(object):
+            pass
+        self.ftest('floor(TestFloor())', math.floor(TestFloor()), 42)
+        self.assertRaises(TypeError, math.floor, TestNoFloor())
+
+        t = TestNoFloor()
+        t.__floor__ = lambda *args: args
+        self.assertRaises(TypeError, math.floor, t)
+        self.assertRaises(TypeError, math.floor, t, 0)
 
     def testFmod(self):
         self.assertRaises(TypeError, math.fmod)
@@ -202,6 +236,60 @@ class MathTests(unittest.TestCase):
         self.assertRaises(TypeError, math.tanh)
         self.ftest('tanh(0)', math.tanh(0), 0)
         self.ftest('tanh(1)+tanh(-1)', math.tanh(1)+math.tanh(-1), 0)
+
+    def test_trunc(self):
+        self.assertEqual(math.trunc(1), 1)
+        self.assertEqual(math.trunc(-1), -1)
+        self.assertEqual(type(math.trunc(1)), int)
+        self.assertEqual(type(math.trunc(1.5)), int)
+        self.assertEqual(math.trunc(1.5), 1)
+        self.assertEqual(math.trunc(-1.5), -1)
+        self.assertEqual(math.trunc(1.999999), 1)
+        self.assertEqual(math.trunc(-1.999999), -1)
+        self.assertEqual(math.trunc(-0.999999), -0)
+        self.assertEqual(math.trunc(-100.999), -100)
+
+        class TestTrunc(object):
+            def __trunc__(self):
+                return 23
+
+        class TestNoTrunc(object):
+            pass
+
+        self.assertEqual(math.trunc(TestTrunc()), 23)
+
+        self.assertRaises(TypeError, math.trunc)
+        self.assertRaises(TypeError, math.trunc, 1, 2)
+        # XXX: This is not ideal, but see the comment in math_trunc().
+        self.assertRaises(AttributeError, math.trunc, TestNoTrunc())
+
+        t = TestNoTrunc()
+        t.__trunc__ = lambda *args: args
+        self.assertEquals((), math.trunc(t))
+        self.assertRaises(TypeError, math.trunc, t, 0)
+
+    def testCopysign(self):
+        self.assertEqual(math.copysign(1, 42), 1.0)
+        self.assertEqual(math.copysign(0., 42), 0.0)
+        self.assertEqual(math.copysign(1., -42), -1.0)
+        self.assertEqual(math.copysign(3, 0.), 3.0)
+        self.assertEqual(math.copysign(4., -0.), -4.0)
+
+    def testIsnan(self):
+        self.assert_(math.isnan(float("nan")))
+        self.assert_(math.isnan(float("inf")* 0.))
+        self.failIf(math.isnan(float("inf")))
+        self.failIf(math.isnan(0.))
+        self.failIf(math.isnan(1.))
+
+    def testIsinf(self):
+        self.assert_(math.isinf(float("inf")))
+        self.assert_(math.isinf(float("-inf")))
+        self.assert_(math.isinf(1E400))
+        self.assert_(math.isinf(-1E400))
+        self.failIf(math.isinf(float("nan")))
+        self.failIf(math.isinf(0.))
+        self.failIf(math.isinf(1.))
 
     # RED_FLAG 16-Oct-2000 Tim
     # While 2.0 is more consistent about exceptions than previous releases, it

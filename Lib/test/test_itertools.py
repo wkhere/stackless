@@ -40,13 +40,44 @@ def take(n, seq):
     'Convenience function for partially consuming a long of infinite iterable'
     return list(islice(seq, n))
 
+def fact(n):
+    'Factorial'
+    return reduce(operator.mul, range(1, n+1), 1)
+
 class TestBasicOps(unittest.TestCase):
     def test_chain(self):
         self.assertEqual(list(chain('abc', 'def')), list('abcdef'))
         self.assertEqual(list(chain('abc')), list('abc'))
         self.assertEqual(list(chain('')), [])
         self.assertEqual(take(4, chain('abc', 'def')), list('abcd'))
-        self.assertRaises(TypeError, chain, 2, 3)
+        self.assertRaises(TypeError, list,chain(2, 3))
+
+    def test_chain_from_iterable(self):
+        self.assertEqual(list(chain.from_iterable(['abc', 'def'])), list('abcdef'))
+        self.assertEqual(list(chain.from_iterable(['abc'])), list('abc'))
+        self.assertEqual(list(chain.from_iterable([''])), [])
+        self.assertEqual(take(4, chain.from_iterable(['abc', 'def'])), list('abcd'))
+        self.assertRaises(TypeError, list, chain.from_iterable([2, 3]))
+
+    def test_combinations(self):
+        self.assertRaises(TypeError, combinations, 'abc')   # missing r argument
+        self.assertRaises(TypeError, combinations, 'abc', 2, 1) # too many arguments
+        self.assertRaises(ValueError, combinations, 'abc', -2)  # r is negative
+        self.assertRaises(ValueError, combinations, 'abc', 32)  # r is too big
+        self.assertEqual(list(combinations(range(4), 3)),
+                                           [(0,1,2), (0,1,3), (0,2,3), (1,2,3)])
+        for n in range(8):
+            values = [5*x-12 for x in range(n)]
+            for r in range(n+1):
+                result = list(combinations(values, r))
+                self.assertEqual(len(result), fact(n) / fact(r) / fact(n-r)) # right number of combs
+                self.assertEqual(len(result), len(set(result)))         # no repeats
+                self.assertEqual(result, sorted(result))                # lexicographic order
+                for c in result:
+                    self.assertEqual(len(c), r)                         # r-length combinations
+                    self.assertEqual(len(set(c)), r)                    # no duplicate elements
+                    self.assertEqual(list(c), sorted(c))                # keep original ordering
+                    self.assert_(all(e in values for e in c))           # elements taken from input iterable
 
     def test_count(self):
         self.assertEqual(zip('abc',count()), [('a', 0), ('b', 1), ('c', 2)])
@@ -171,6 +202,7 @@ class TestBasicOps(unittest.TestCase):
     def test_ifilter(self):
         self.assertEqual(list(ifilter(isEven, range(6))), [0,2,4])
         self.assertEqual(list(ifilter(None, [0,1,0,2,0])), [1,2])
+        self.assertEqual(list(ifilter(bool, [0,1,0,2,0])), [1,2])
         self.assertEqual(take(4, ifilter(isEven, count())), [0,2,4,6])
         self.assertRaises(TypeError, ifilter)
         self.assertRaises(TypeError, ifilter, lambda x:x)
@@ -181,6 +213,7 @@ class TestBasicOps(unittest.TestCase):
     def test_ifilterfalse(self):
         self.assertEqual(list(ifilterfalse(isEven, range(6))), [1,3,5])
         self.assertEqual(list(ifilterfalse(None, [0,1,0,2,0])), [0,0,0])
+        self.assertEqual(list(ifilterfalse(bool, [0,1,0,2,0])), [0,0,0])
         self.assertEqual(take(4, ifilterfalse(isEven, count())), [1,3,5,7])
         self.assertRaises(TypeError, ifilterfalse)
         self.assertRaises(TypeError, ifilterfalse, lambda x:x)
@@ -253,6 +286,34 @@ class TestBasicOps(unittest.TestCase):
         ids = map(id, list(izip_longest('abc', 'def')))
         self.assertEqual(len(dict.fromkeys(ids)), len(ids))
 
+    def test_product(self):
+        for args, result in [
+            ([], []),                       # zero iterables   ??? is this correct
+            (['ab'], [('a',), ('b',)]),     # one iterable
+            ([range(2), range(3)], [(0,0), (0,1), (0,2), (1,0), (1,1), (1,2)]),     # two iterables
+            ([range(0), range(2), range(3)], []),           # first iterable with zero length
+            ([range(2), range(0), range(3)], []),           # middle iterable with zero length
+            ([range(2), range(3), range(0)], []),           # last iterable with zero length
+            ]:
+            self.assertEqual(list(product(*args)), result)
+            for r in range(4):
+                self.assertEqual(list(product(*(args*r))),
+                                 list(product(*args, **dict(repeat=r))))
+        self.assertEqual(len(list(product(*[range(7)]*6))), 7**6)
+        self.assertRaises(TypeError, product, range(6), None)
+        argtypes = ['', 'abc', '', xrange(0), xrange(4), dict(a=1, b=2, c=3),
+                    set('abcdefg'), range(11), tuple(range(13))]
+        for i in range(100):
+            args = [random.choice(argtypes) for j in range(random.randrange(5))]
+            n = reduce(operator.mul, map(len, args), 1) if args else 0
+            self.assertEqual(len(list(product(*args))), n)
+            args = map(iter, args)
+            self.assertEqual(len(list(product(*args))), n)
+
+        # Test implementation detail:  tuple re-use
+        self.assertEqual(len(set(map(id, product('abc', 'def')))), 1)
+        self.assertNotEqual(len(set(map(id, list(product('abc', 'def'))))), 1)
+
     def test_repeat(self):
         self.assertEqual(zip(xrange(3),repeat('a')),
                          [(0, 'a'), (1, 'a'), (2, 'a')])
@@ -292,7 +353,8 @@ class TestBasicOps(unittest.TestCase):
         self.assertEqual(take(3, starmap(operator.pow, izip(count(), count(1)))),
                          [0**1, 1**2, 2**3])
         self.assertEqual(list(starmap(operator.pow, [])), [])
-        self.assertRaises(TypeError, list, starmap(operator.pow, [[4,5]]))
+        self.assertEqual(list(starmap(operator.pow, [iter([4,5])])), [4**5])
+        self.assertRaises(TypeError, list, starmap(operator.pow, [None]))
         self.assertRaises(TypeError, starmap)
         self.assertRaises(TypeError, starmap, operator.pow, [(4,5)], 'extra')
         self.assertRaises(TypeError, starmap(10, [(4,5)]).next)
@@ -618,9 +680,15 @@ class TestVariousIteratorArgs(unittest.TestCase):
             for g in (G, I, Ig, S, L, R):
                 self.assertEqual(list(chain(g(s))), list(g(s)))
                 self.assertEqual(list(chain(g(s), g(s))), list(g(s))+list(g(s)))
-            self.assertRaises(TypeError, chain, X(s))
+            self.assertRaises(TypeError, list, chain(X(s)))
             self.assertRaises(TypeError, list, chain(N(s)))
             self.assertRaises(ZeroDivisionError, list, chain(E(s)))
+
+    def test_product(self):
+        for s in ("123", "", range(1000), ('do', 1.2), xrange(2000,2200,5)):
+            self.assertRaises(TypeError, product, X(s))
+            self.assertRaises(TypeError, product, N(s))
+            self.assertRaises(ZeroDivisionError, product, E(s))
 
     def test_cycle(self):
         for s in ("123", "", range(1000), ('do', 1.2), xrange(2000,2200,5)):

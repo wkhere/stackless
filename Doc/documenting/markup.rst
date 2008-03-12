@@ -210,7 +210,7 @@ The directives are:
 
 .. describe:: opcode
 
-   Describes a Python bytecode instruction.
+   Describes a Python :term:`bytecode` instruction.
 
 .. describe:: cmdoption
 
@@ -220,6 +220,11 @@ The directives are:
       .. cmdoption:: -m <module>
 
          Run a module as a script.
+
+.. describe:: envvar
+
+   Describes an environment variable that Python uses or defines.
+
 
 There is also a generic version of these directives:
 
@@ -450,7 +455,7 @@ in a different style:
 
 .. describe:: keyword
 
-   The name of a keyword in a programming language.
+   The name of a keyword in Python.
 
 .. describe:: mailheader
 

@@ -356,6 +356,7 @@ mswindows = (sys.platform == "win32")
 import os
 import types
 import traceback
+import gc
 
 # Exception classes used by this module.
 class CalledProcessError(Exception):
@@ -470,8 +471,8 @@ def list2cmdline(seq):
 
     2) A string surrounded by double quotation marks is
        interpreted as a single argument, regardless of white space
-       contained within.  A quoted string can be embedded in an
-       argument.
+       or pipe characters contained within.  A quoted string can be
+       embedded in an argument.
 
     3) A double quotation mark preceded by a backslash is
        interpreted as a literal double quotation mark.
@@ -497,7 +498,7 @@ def list2cmdline(seq):
         if result:
             result.append(' ')
 
-        needquote = (" " in arg) or ("\t" in arg) or arg == ""
+        needquote = (" " in arg) or ("\t" in arg) or ("|" in arg) or not arg
         if needquote:
             result.append('"')
 
@@ -506,7 +507,7 @@ def list2cmdline(seq):
                 # Don't know if we need to double yet.
                 bs_buf.append(c)
             elif c == '"':
-                # Double backspaces.
+                # Double backslashes.
                 result.append('\\' * len(bs_buf)*2)
                 bs_buf = []
                 result.append('\\"')
@@ -517,7 +518,7 @@ def list2cmdline(seq):
                     bs_buf = []
                 result.append(c)
 
-        # Add remaining backspaces, if any.
+        # Add remaining backslashes, if any.
         if bs_buf:
             result.extend(bs_buf)
 
@@ -965,13 +966,8 @@ class Popen(object):
 
 
         def _close_fds(self, but):
-            for i in xrange(3, MAXFD):
-                if i == but:
-                    continue
-                try:
-                    os.close(i)
-                except:
-                    pass
+            os.closerange(3, but)
+            os.closerange(but + 1, MAXFD)
 
 
         def _execute_child(self, args, executable, preexec_fn, close_fds,
@@ -999,7 +995,16 @@ class Popen(object):
             errpipe_read, errpipe_write = os.pipe()
             self._set_cloexec_flag(errpipe_write)
 
-            self.pid = os.fork()
+            gc_was_enabled = gc.isenabled()
+            # Disable gc to avoid bug where gc -> file_dealloc ->
+            # write to stderr -> hang.  http://bugs.python.org/issue1336
+            gc.disable()
+            try:
+                self.pid = os.fork()
+            except:
+                if gc_was_enabled:
+                    gc.enable()
+                raise
             self._child_created = True
             if self.pid == 0:
                 # Child
@@ -1059,6 +1064,8 @@ class Popen(object):
                 os._exit(255)
 
             # Parent
+            if gc_was_enabled:
+                gc.enable()
             os.close(errpipe_write)
             if p2cread is not None and p2cwrite is not None:
                 os.close(p2cread)

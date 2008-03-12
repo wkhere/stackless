@@ -1,7 +1,12 @@
 import unittest
 from test import test_support
 import signal
-import os, sys, time
+import sys, os, time, errno
+
+if sys.platform[:3] in ('win', 'os2') or sys.platform == 'riscos':
+    raise test_support.TestSkipped("Can't test signal on %s" % \
+                                   sys.platform)
+
 
 class HandlerBCalled(Exception):
     pass
@@ -165,12 +170,99 @@ class BasicSignalTests(unittest.TestCase):
         self.assertRaises(TypeError, signal.signal,
                           signal.SIGUSR1, None)
 
-def test_main():
-    if sys.platform[:3] in ('win', 'os2') or sys.platform == 'riscos':
-        raise test_support.TestSkipped("Can't test signal on %s" % \
-                                       sys.platform)
+class WakeupSignalTests(unittest.TestCase):
+    TIMEOUT_FULL = 10
+    TIMEOUT_HALF = 5
 
-    test_support.run_unittest(BasicSignalTests, InterProcessSignalTests)
+    def test_wakeup_fd_early(self):
+        import select
+
+        signal.alarm(1)
+        before_time = time.time()
+        # We attempt to get a signal during the sleep,
+        # before select is called
+        time.sleep(self.TIMEOUT_FULL)
+        mid_time = time.time()
+        self.assert_(mid_time - before_time < self.TIMEOUT_HALF)
+        select.select([self.read], [], [], self.TIMEOUT_FULL)
+        after_time = time.time()
+        self.assert_(after_time - mid_time < self.TIMEOUT_HALF)
+
+    def test_wakeup_fd_during(self):
+        import select
+
+        signal.alarm(1)
+        before_time = time.time()
+        # We attempt to get a signal during the select call
+        self.assertRaises(select.error, select.select,
+            [self.read], [], [], self.TIMEOUT_FULL)
+        after_time = time.time()
+        self.assert_(after_time - before_time < self.TIMEOUT_HALF)
+
+    def setUp(self):
+        import fcntl
+
+        self.alrm = signal.signal(signal.SIGALRM, lambda x,y:None)
+        self.read, self.write = os.pipe()
+        flags = fcntl.fcntl(self.write, fcntl.F_GETFL, 0)
+        flags = flags | os.O_NONBLOCK
+        fcntl.fcntl(self.write, fcntl.F_SETFL, flags)
+        self.old_wakeup = signal.set_wakeup_fd(self.write)
+
+    def tearDown(self):
+        signal.set_wakeup_fd(self.old_wakeup)
+        os.close(self.read)
+        os.close(self.write)
+        signal.signal(signal.SIGALRM, self.alrm)
+
+class SiginterruptTest(unittest.TestCase):
+    signum = signal.SIGUSR1
+    def readpipe_interrupted(self, cb):
+        r, w = os.pipe()
+        ppid = os.getpid()
+        pid = os.fork()
+
+        oldhandler = signal.signal(self.signum, lambda x,y: None)
+        cb()
+        if pid==0:
+            # child code: sleep, kill, sleep. and then exit,
+            # which closes the pipe from which the parent process reads
+            try:
+                time.sleep(0.2)
+                os.kill(ppid, self.signum)
+                time.sleep(0.2)
+            finally:
+                os._exit(0)
+
+        try:
+            os.close(w)
+
+            try:
+                d=os.read(r, 1)
+                return False
+            except OSError, err:
+                if err.errno != errno.EINTR:
+                    raise
+                return True
+        finally:
+            signal.signal(self.signum, oldhandler)
+            os.waitpid(pid, 0)
+
+    def test_without_siginterrupt(self):
+        i=self.readpipe_interrupted(lambda: None)
+        self.assertEquals(i, True)
+
+    def test_siginterrupt_on(self):
+        i=self.readpipe_interrupted(lambda: signal.siginterrupt(self.signum, 1))
+        self.assertEquals(i, True)
+
+    def test_siginterrupt_off(self):
+        i=self.readpipe_interrupted(lambda: signal.siginterrupt(self.signum, 0))
+        self.assertEquals(i, False)
+
+def test_main():
+    test_support.run_unittest(BasicSignalTests, InterProcessSignalTests,
+        WakeupSignalTests, SiginterruptTest)
 
 
 if __name__ == "__main__":

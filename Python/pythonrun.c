@@ -73,6 +73,7 @@ int Py_VerboseFlag; /* Needed by import.c */
 int Py_InteractiveFlag; /* Needed by Py_FdIsInteractive() below */
 int Py_InspectFlag; /* Needed to determine whether to exit at SystemError */
 int Py_NoSiteFlag; /* Suppress 'import site' */
+int Py_DontWriteBytecodeFlag; /* Suppress writing bytecode files (*.py[co]) */
 int Py_UseClassExceptionsFlag = 1; /* Needed by bltinmodule.c: deprecated */
 int Py_FrozenFlag; /* Needed by getpath.c */
 int Py_UnicodeFlag = 0; /* Needed by compile.c */
@@ -173,6 +174,8 @@ Py_InitializeEx(int install_sigs)
 		Py_VerboseFlag = add_flag(Py_VerboseFlag, p);
 	if ((p = Py_GETENV("PYTHONOPTIMIZE")) && *p != '\0')
 		Py_OptimizeFlag = add_flag(Py_OptimizeFlag, p);
+	if ((p = Py_GETENV("PYTHONDONTWRITEBYTECODE")) && *p != '\0')
+		Py_DontWriteBytecodeFlag = add_flag(Py_DontWriteBytecodeFlag, p);
 
 	interp = PyInterpreterState_New();
 	if (interp == NULL)
@@ -388,6 +391,9 @@ Py_Finalize(void)
 	Py_XDECREF(warnings_module);
 	warnings_module = NULL;
 
+	/* Clear type lookup cache */
+	PyType_ClearCache();
+
 	/* Collect garbage.  This may call finalizers; it's nice to call these
 	 * before all modules are destroyed.
 	 * XXX If a __del__ or weakref callback is triggered here, and tries to
@@ -451,11 +457,6 @@ Py_Finalize(void)
 		_Py_PrintReferences(stderr);
 #endif /* Py_TRACE_REFS */
 
-	/* Cleanup auto-thread-state */
-#ifdef WITH_THREAD
-	_PyGILState_Fini();
-#endif /* WITH_THREAD */
-
 	/* Clear interpreter state */
 	PyInterpreterState_Clear(interp);
 
@@ -466,6 +467,11 @@ Py_Finalize(void)
 	*/
 
 	_PyExc_Fini();
+
+	/* Cleanup auto-thread-state */
+#ifdef WITH_THREAD
+	_PyGILState_Fini();
+#endif /* WITH_THREAD */
 
 	/* Delete current thread */
 	PyThreadState_Swap(NULL);
@@ -481,6 +487,7 @@ Py_Finalize(void)
 	PyString_Fini();
 	PyInt_Fini();
 	PyFloat_Fini();
+	PyDict_Fini();
 
 #ifdef Py_USING_UNICODE
 	/* Cleanup Unicode implementation */
@@ -1726,8 +1733,14 @@ PyOS_CheckStack(void)
 		   not enough space left on the stack */
 		alloca(PYOS_STACK_MARGIN * sizeof(void*));
 		return 0;
-	} __except (EXCEPTION_EXECUTE_HANDLER) {
-		/* just ignore all errors */
+	} __except (GetExceptionCode() == STATUS_STACK_OVERFLOW ?
+		        EXCEPTION_EXECUTE_HANDLER : 
+		        EXCEPTION_CONTINUE_SEARCH) {
+		int errcode = _resetstkoflw();
+		if (errcode)
+		{
+			Py_FatalError("Could not reset the stack!");
+		}
 	}
 	return 1;
 }

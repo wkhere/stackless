@@ -114,9 +114,14 @@ typedef struct {
 	PyObject_VAR_HEAD
 } PyVarObject;
 
-#define Py_Refcnt(ob)		(((PyObject*)(ob))->ob_refcnt)
-#define Py_Type(ob)		(((PyObject*)(ob))->ob_type)
-#define Py_Size(ob)		(((PyVarObject*)(ob))->ob_size)
+#define Py_REFCNT(ob)		(((PyObject*)(ob))->ob_refcnt)
+#define Py_TYPE(ob)		(((PyObject*)(ob))->ob_type)
+#define Py_SIZE(ob)		(((PyVarObject*)(ob))->ob_size)
+
+/* B/w compatibility */
+#define Py_Refcnt(ob)		Py_REFCNT(op)
+#define Py_Type(op)		Py_TYPE(op)
+#define Py_Size(op)		Py_SIZE(op)
 
 /*
 Type objects contain a string containing the type name (to help somewhat
@@ -343,6 +348,9 @@ typedef struct _typeobject {
 	PyObject *tp_weaklist;
 	destructor tp_del;
 
+	/* Type attribute cache version tag. Added in version 2.6 */
+	unsigned int tp_version_tag;
+
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
 	Py_ssize_t tp_allocs;
@@ -395,28 +403,29 @@ typedef struct _heaptypeobject {
 
 /* access macro to the members which are floating "behind" the object */
 #define PyHeapType_GET_MEMBERS(etype) \
-    ((PyMemberDef *)(((char *)etype) + Py_Type(etype)->tp_basicsize))
+    ((PyMemberDef *)(((char *)etype) + Py_TYPE(etype)->tp_basicsize))
 
 #endif
 
 /* Generic type check */
 PyAPI_FUNC(int) PyType_IsSubtype(PyTypeObject *, PyTypeObject *);
 #define PyObject_TypeCheck(ob, tp) \
-	(Py_Type(ob) == (tp) || PyType_IsSubtype(Py_Type(ob), (tp)))
+	(Py_TYPE(ob) == (tp) || PyType_IsSubtype(Py_TYPE(ob), (tp)))
 
 PyAPI_DATA(PyTypeObject) PyType_Type; /* built-in 'type' */
 PyAPI_DATA(PyTypeObject) PyBaseObject_Type; /* built-in 'object' */
 PyAPI_DATA(PyTypeObject) PySuper_Type; /* built-in 'super' */
 
 #define PyType_Check(op) \
-	PyType_FastSubclass(Py_Type(op), Py_TPFLAGS_TYPE_SUBCLASS)
-#define PyType_CheckExact(op) (Py_Type(op) == &PyType_Type)
+	PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_TYPE_SUBCLASS)
+#define PyType_CheckExact(op) (Py_TYPE(op) == &PyType_Type)
 
 PyAPI_FUNC(int) PyType_Ready(PyTypeObject *);
 PyAPI_FUNC(PyObject *) PyType_GenericAlloc(PyTypeObject *, Py_ssize_t);
 PyAPI_FUNC(PyObject *) PyType_GenericNew(PyTypeObject *,
 					       PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) _PyType_Lookup(PyTypeObject *, PyObject *);
+PyAPI_FUNC(unsigned int) PyType_ClearCache(void);
 
 /* Generic operations on objects */
 PyAPI_FUNC(int) PyObject_Print(PyObject *, FILE *, int);
@@ -551,6 +560,13 @@ given type object has a specified feature.
 /* Objects support nb_index in PyNumberMethods */
 #define Py_TPFLAGS_HAVE_INDEX (1L<<17)
 
+/* Objects support type attribute cache */
+#define Py_TPFLAGS_HAVE_VERSION_TAG   (1L<<18)
+#define Py_TPFLAGS_VALID_VERSION_TAG  (1L<<19)
+
+/* Type is abstract and cannot be instantiated */
+#define Py_TPFLAGS_IS_ABSTRACT (1L<<20)
+
 /* These flags are used to determine if a type is a subclass. */
 #define Py_TPFLAGS_INT_SUBCLASS		(1L<<23)
 #define Py_TPFLAGS_LONG_SUBCLASS	(1L<<24)
@@ -572,6 +588,7 @@ given type object has a specified feature.
                              Py_TPFLAGS_HAVE_CLASS | \
                              Py_TPFLAGS_HAVE_STACKLESS_EXTENSION | \
                              Py_TPFLAGS_HAVE_INDEX | \
+                             Py_TPFLAGS_HAVE_VERSION_TAG | \
                             0)
 
 #define PyType_HasFeature(t,f)  (((t)->tp_flags & (f)) != 0)
@@ -646,9 +663,9 @@ PyAPI_FUNC(Py_ssize_t) _Py_GetRefTotal(void);
 #ifdef COUNT_ALLOCS
 PyAPI_FUNC(void) inc_count(PyTypeObject *);
 PyAPI_FUNC(void) dec_count(PyTypeObject *);
-#define _Py_INC_TPALLOCS(OP)	inc_count(Py_Type(OP))
-#define _Py_INC_TPFREES(OP)	dec_count(Py_Type(OP))
-#define _Py_DEC_TPFREES(OP)	Py_Type(OP)->tp_frees--
+#define _Py_INC_TPALLOCS(OP)	inc_count(Py_TYPE(OP))
+#define _Py_INC_TPFREES(OP)	dec_count(Py_TYPE(OP))
+#define _Py_DEC_TPFREES(OP)	Py_TYPE(OP)->tp_frees--
 #define _Py_COUNT_ALLOCS_COMMA	,
 #else
 #define _Py_INC_TPALLOCS(OP)
@@ -673,13 +690,13 @@ PyAPI_FUNC(void) _Py_AddToAllObjects(PyObject *, int force);
 #define _Py_NewReference(op) (				\
 	_Py_INC_TPALLOCS(op) _Py_COUNT_ALLOCS_COMMA	\
 	_Py_INC_REFTOTAL  _Py_REF_DEBUG_COMMA		\
-	Py_Refcnt(op) = 1)
+	Py_REFCNT(op) = 1)
 
 #define _Py_ForgetReference(op) _Py_INC_TPFREES(op)
 
 #define _Py_Dealloc(op) (				\
 	_Py_INC_TPFREES(op) _Py_COUNT_ALLOCS_COMMA	\
-	(*Py_Type(op)->tp_dealloc)((PyObject *)(op)))
+	(*Py_TYPE(op)->tp_dealloc)((PyObject *)(op)))
 #endif /* !Py_TRACE_REFS */
 
 #define Py_INCREF(op) (				\

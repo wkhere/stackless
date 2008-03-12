@@ -1,8 +1,8 @@
 /* hypot() replacement */
 
-#include "pyconfig.h"
-#include "pyport.h"
+#include "Python.h"
 
+#ifndef HAVE_HYPOT
 double hypot(double x, double y)
 {
 	double yx;
@@ -21,3 +21,5 @@ double hypot(double x, double y)
 		return x*sqrt(1.+yx*yx);
 	}
 }
+#endif /* HAVE_HYPOT */
+

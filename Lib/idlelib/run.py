@@ -1,5 +1,4 @@
 import sys
-import os
 import linecache
 import time
 import socket
@@ -206,7 +205,10 @@ def exit():
 
     """
     if no_exitfunc:
-        del sys.exitfunc
+        try:
+            del sys.exitfunc
+        except AttributeError:
+            pass
     sys.exit(0)
 
 class MyRPCServer(rpc.RPCServer):

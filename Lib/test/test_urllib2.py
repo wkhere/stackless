@@ -1,7 +1,7 @@
 import unittest
 from test import test_support
 
-import os, socket
+import os
 import StringIO
 
 import urllib2
@@ -589,7 +589,7 @@ class HandlerTests(unittest.TestCase):
             self.assertEqual(int(headers["Content-length"]), len(data))
 
     def test_file(self):
-        import time, rfc822, socket
+        import rfc822, socket
         h = urllib2.FileHandler()
         o = h.parent = MockOpener()
 
@@ -822,6 +822,8 @@ class HandlerTests(unittest.TestCase):
                 method = getattr(h, "http_error_%s" % code)
                 req = Request(from_url, data)
                 req.add_header("Nonsense", "viking=withhold")
+                if data is not None:
+                    req.add_header("Content-Length", str(len(data)))
                 req.add_unredirected_header("Spam", "spam")
                 try:
                     method(req, MockFile(), code, "Blah",
@@ -834,6 +836,13 @@ class HandlerTests(unittest.TestCase):
                     self.assertEqual(o.req.get_method(), "GET")
                 except AttributeError:
                     self.assert_(not o.req.has_data())
+
+                # now it's a GET, there should not be headers regarding content
+                # (possibly dragged from before being a POST)
+                headers = [x.lower() for x in o.req.headers]
+                self.assertTrue("content-length" not in headers)
+                self.assertTrue("content-type" not in headers)
+
                 self.assertEqual(o.req.headers["Nonsense"],
                                  "viking=withhold")
                 self.assert_("Spam" not in o.req.headers)
@@ -984,7 +993,7 @@ class HandlerTests(unittest.TestCase):
     def _test_basic_auth(self, opener, auth_handler, auth_header,
                          realm, http_handler, password_manager,
                          request_url, protected_url):
-        import base64, httplib
+        import base64
         user, password = "wile", "coyote"
 
         # .add_password() fed through to password manager

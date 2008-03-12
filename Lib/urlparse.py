@@ -37,52 +37,17 @@ _parse_cache = {}
 
 def clear_cache():
     """Clear the parse cache."""
-    global _parse_cache
-    _parse_cache = {}
+    _parse_cache.clear()
 
 
-class BaseResult(tuple):
-    """Base class for the parsed result objects.
-
-    This provides the attributes shared by the two derived result
-    objects as read-only properties.  The derived classes are
-    responsible for checking the right number of arguments were
-    supplied to the constructor.
-
-    """
-
-    __slots__ = ()
-
-    # Attributes that access the basic components of the URL:
-
-    @property
-    def scheme(self):
-        return self[0]
-
-    @property
-    def netloc(self):
-        return self[1]
-
-    @property
-    def path(self):
-        return self[2]
-
-    @property
-    def query(self):
-        return self[-2]
-
-    @property
-    def fragment(self):
-        return self[-1]
-
-    # Additional attributes that provide access to parsed-out portions
-    # of the netloc:
+class ResultMixin(object):
+    """Shared methods for the parsed result objects."""
 
     @property
     def username(self):
         netloc = self.netloc
         if "@" in netloc:
-            userinfo = netloc.split("@", 1)[0]
+            userinfo = netloc.rsplit("@", 1)[0]
             if ":" in userinfo:
                 userinfo = userinfo.split(":", 1)[0]
             return userinfo
@@ -92,7 +57,7 @@ class BaseResult(tuple):
     def password(self):
         netloc = self.netloc
         if "@" in netloc:
-            userinfo = netloc.split("@", 1)[0]
+            userinfo = netloc.rsplit("@", 1)[0]
             if ":" in userinfo:
                 return userinfo.split(":", 1)[1]
         return None
@@ -101,7 +66,7 @@ class BaseResult(tuple):
     def hostname(self):
         netloc = self.netloc
         if "@" in netloc:
-            netloc = netloc.split("@", 1)[1]
+            netloc = netloc.rsplit("@", 1)[1]
         if ":" in netloc:
             netloc = netloc.split(":", 1)[0]
         return netloc.lower() or None
@@ -110,36 +75,25 @@ class BaseResult(tuple):
     def port(self):
         netloc = self.netloc
         if "@" in netloc:
-            netloc = netloc.split("@", 1)[1]
+            netloc = netloc.rsplit("@", 1)[1]
         if ":" in netloc:
             port = netloc.split(":", 1)[1]
             return int(port, 10)
         return None
 
+from collections import namedtuple
 
-class SplitResult(BaseResult):
+class SplitResult(namedtuple('SplitResult', 'scheme netloc path query fragment'), ResultMixin):
 
     __slots__ = ()
-
-    def __new__(cls, scheme, netloc, path, query, fragment):
-        return BaseResult.__new__(
-            cls, (scheme, netloc, path, query, fragment))
 
     def geturl(self):
         return urlunsplit(self)
 
 
-class ParseResult(BaseResult):
+class ParseResult(namedtuple('ParseResult', 'scheme netloc path params query fragment'), ResultMixin):
 
     __slots__ = ()
-
-    def __new__(cls, scheme, netloc, path, params, query, fragment):
-        return BaseResult.__new__(
-            cls, (scheme, netloc, path, params, query, fragment))
-
-    @property
-    def params(self):
-        return self[3]
 
     def geturl(self):
         return urlunparse(self)
@@ -169,13 +123,12 @@ def _splitparams(url):
     return url[:i], url[i+1:]
 
 def _splitnetloc(url, start=0):
-    for c in '/?#': # the order is important!
-        delim = url.find(c, start)
-        if delim >= 0:
-            break
-    else:
-        delim = len(url)
-    return url[start:delim], url[delim:]
+    delim = len(url)   # position of end of domain part of url, default is end
+    for c in '/?#':    # look for delimiters; the order is NOT important
+        wdelim = url.find(c, start)        # find first of this delim
+        if wdelim >= 0:                    # if found
+            delim = min(delim, wdelim)     # use earliest delim position
+    return url[start:delim], url[delim:]   # return (domain, rest)
 
 def urlsplit(url, scheme='', allow_fragments=True):
     """Parse a URL into 5 components:
@@ -184,7 +137,7 @@ def urlsplit(url, scheme='', allow_fragments=True):
     Note that we don't break the components up in smaller bits
     (e.g. netloc is a single string) and we don't expand % escapes."""
     allow_fragments = bool(allow_fragments)
-    key = url, scheme, allow_fragments
+    key = url, scheme, allow_fragments, type(url), type(scheme)
     cached = _parse_cache.get(key, None)
     if cached:
         return cached
@@ -353,9 +306,7 @@ def test():
         except ImportError:
             from StringIO import StringIO
         fp = StringIO(test_input)
-    while 1:
-        line = fp.readline()
-        if not line: break
+    for line in fp:
         words = line.split()
         if not words:
             continue

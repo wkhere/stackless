@@ -19,6 +19,7 @@
 struct compiling {
     char *c_encoding; /* source encoding */
     PyArena *c_arena; /* arena for allocating memeory */
+    const char *c_filename; /* filename */
 };
 
 static asdl_seq *seq_for_testlist(struct compiling *, const node *);
@@ -28,6 +29,7 @@ static asdl_seq *ast_for_suite(struct compiling *, const node *);
 static asdl_seq *ast_for_exprlist(struct compiling *, const node *,
                                   expr_context_ty);
 static expr_ty ast_for_testlist(struct compiling *, const node *);
+static stmt_ty ast_for_classdef(struct compiling *, const node *, asdl_seq *);
 static expr_ty ast_for_testlist_gexp(struct compiling *, const node *);
 
 /* Note different signature for ast_for_call */
@@ -197,6 +199,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
         c.c_encoding = NULL;
     }
     c.c_arena = arena;
+    c.c_filename = filename;
 
     k = 0;
     switch (TYPE(n)) {
@@ -826,26 +829,15 @@ ast_for_decorators(struct compiling *c, const node *n)
 }
 
 static stmt_ty
-ast_for_funcdef(struct compiling *c, const node *n)
+ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
 {
-    /* funcdef: 'def' [decorators] NAME parameters ':' suite */
+    /* funcdef: 'def' NAME parameters ':' suite */
     identifier name;
     arguments_ty args;
     asdl_seq *body;
-    asdl_seq *decorator_seq = NULL;
-    int name_i;
+    int name_i = 1;
 
     REQ(n, funcdef);
-
-    if (NCH(n) == 6) { /* decorators are present */
-        decorator_seq = ast_for_decorators(c, CHILD(n, 0));
-        if (!decorator_seq)
-            return NULL;
-        name_i = 2;
-    }
-    else {
-        name_i = 1;
-    }
 
     name = NEW_IDENTIFIER(CHILD(n, name_i));
     if (!name)
@@ -863,6 +855,36 @@ ast_for_funcdef(struct compiling *c, const node *n)
 
     return FunctionDef(name, args, body, decorator_seq, LINENO(n),
                        n->n_col_offset, c->c_arena);
+}
+
+static stmt_ty
+ast_for_decorated(struct compiling *c, const node *n)
+{
+    /* decorated: decorators (classdef | funcdef) */
+    stmt_ty thing = NULL;
+    asdl_seq *decorator_seq = NULL;
+
+    REQ(n, decorated);
+
+    decorator_seq = ast_for_decorators(c, CHILD(n, 0));
+    if (!decorator_seq)
+      return NULL;
+
+    assert(TYPE(CHILD(n, 1)) == funcdef ||
+	   TYPE(CHILD(n, 1)) == classdef);
+
+    if (TYPE(CHILD(n, 1)) == funcdef) {
+      thing = ast_for_funcdef(c, CHILD(n, 1), decorator_seq);
+    } else if (TYPE(CHILD(n, 1)) == classdef) {
+      thing = ast_for_classdef(c, CHILD(n, 1), decorator_seq);
+    }
+    /* we count the decorators in when talking about the class' or
+       function's line number */
+    if (thing) {
+        thing->lineno = LINENO(n);
+        thing->col_offset = n->n_col_offset;
+    }
+    return thing;
 }
 
 static expr_ty
@@ -1244,6 +1266,7 @@ ast_for_atom(struct compiling *c, const node *n)
     case STRING: {
         PyObject *str = parsestrplus(c, n);
         if (!str) {
+#ifdef Py_USING_UNICODE
             if (PyErr_ExceptionMatches(PyExc_UnicodeError)){
                 PyObject *type, *value, *tback, *errstr;
                 PyErr_Fetch(&type, &value, &tback);
@@ -1261,6 +1284,7 @@ ast_for_atom(struct compiling *c, const node *n)
                 Py_DECREF(value);
                 Py_XDECREF(tback);
             }
+#endif
             return NULL;
         }
         PyArena_AddPyObject(c->c_arena, str);
@@ -1336,7 +1360,16 @@ ast_for_atom(struct compiling *c, const node *n)
         return Dict(keys, values, LINENO(n), n->n_col_offset, c->c_arena);
     }
     case BACKQUOTE: { /* repr */
-        expr_ty expression = ast_for_testlist(c, CHILD(n, 1));
+        expr_ty expression;
+        if (Py_Py3kWarningFlag) {
+            if (PyErr_WarnExplicit(PyExc_DeprecationWarning,
+                                   "backquote not supported in 3.x",
+                                   c->c_filename, LINENO(n),
+                                   NULL, NULL)) {
+            return NULL;
+            }
+        }
+        expression = ast_for_testlist(c, CHILD(n, 1));
         if (!expression)
             return NULL;
 
@@ -2955,7 +2988,7 @@ ast_for_with_stmt(struct compiling *c, const node *n)
 }
 
 static stmt_ty
-ast_for_classdef(struct compiling *c, const node *n)
+ast_for_classdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
 {
     /* classdef: 'class' NAME ['(' testlist ')'] ':' suite */
     asdl_seq *bases, *s;
@@ -2971,16 +3004,16 @@ ast_for_classdef(struct compiling *c, const node *n)
         s = ast_for_suite(c, CHILD(n, 3));
         if (!s)
             return NULL;
-        return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), NULL, s, LINENO(n),
-                        n->n_col_offset, c->c_arena);
+        return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), NULL, s, decorator_seq,
+                        LINENO(n), n->n_col_offset, c->c_arena);
     }
     /* check for empty base list */
     if (TYPE(CHILD(n,3)) == RPAR) {
         s = ast_for_suite(c, CHILD(n,5));
         if (!s)
                 return NULL;
-        return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), NULL, s, LINENO(n),
-                        n->n_col_offset, c->c_arena);
+        return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), NULL, s, decorator_seq,
+                        LINENO(n), n->n_col_offset, c->c_arena);
     }
 
     /* else handle the base class list */
@@ -2991,8 +3024,8 @@ ast_for_classdef(struct compiling *c, const node *n)
     s = ast_for_suite(c, CHILD(n, 6));
     if (!s)
         return NULL;
-    return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), bases, s, LINENO(n),
-                    n->n_col_offset, c->c_arena);
+    return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), bases, s, decorator_seq,
+                    LINENO(n), n->n_col_offset, c->c_arena);
 }
 
 static stmt_ty
@@ -3041,7 +3074,7 @@ ast_for_stmt(struct compiling *c, const node *n)
     }
     else {
         /* compound_stmt: if_stmt | while_stmt | for_stmt | try_stmt
-                        | funcdef | classdef
+                        | funcdef | classdef | decorated
         */
         node *ch = CHILD(n, 0);
         REQ(n, compound_stmt);
@@ -3057,9 +3090,11 @@ ast_for_stmt(struct compiling *c, const node *n)
             case with_stmt:
                 return ast_for_with_stmt(c, ch);
             case funcdef:
-                return ast_for_funcdef(c, ch);
+                return ast_for_funcdef(c, ch, NULL);
             case classdef:
-                return ast_for_classdef(c, ch);
+                return ast_for_classdef(c, ch, NULL);
+	    case decorated:
+	        return ast_for_decorated(c, ch);
             default:
                 PyErr_Format(PyExc_SystemError,
                              "unhandled small_stmt: TYPE=%d NCH=%d\n",
@@ -3224,6 +3259,9 @@ parsestr(const char *s, const char *encoding)
                 if (quote == 'u' || quote == 'U') {
                         quote = *++s;
                         unicode = 1;
+                }
+                if (quote == 'b' || quote == 'B') {
+                        quote = *++s;
                 }
                 if (quote == 'r' || quote == 'R') {
                         quote = *++s;

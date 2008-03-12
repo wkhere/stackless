@@ -4,8 +4,8 @@
 
 .. module:: atexit
    :synopsis: Register and execute cleanup functions.
-.. moduleauthor:: Skip Montanaro <skip@mojam.com>
-.. sectionauthor:: Skip Montanaro <skip@mojam.com>
+.. moduleauthor:: Skip Montanaro <skip@pobox.com>
+.. sectionauthor:: Skip Montanaro <skip@pobox.com>
 
 
 .. versionadded:: 2.0
@@ -96,7 +96,7 @@ passed along to the registered function when it is called::
    # or:
    atexit.register(goodbye, adjective='nice', name='Donny')
 
-Usage as a decorator::
+Usage as a :term:`decorator`::
 
    import atexit
 

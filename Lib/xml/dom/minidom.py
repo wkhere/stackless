@@ -203,6 +203,8 @@ class Node(xml.dom.Node):
                 L.append(child)
                 if child.nodeType == Node.ELEMENT_NODE:
                     child.normalize()
+        if L:
+            L[-1].nextSibling = None
         self.childNodes[:] = L
 
     def cloneNode(self, deep):
@@ -956,7 +958,7 @@ class CharacterData(Childless, Node):
             dotdotdot = "..."
         else:
             dotdotdot = ""
-        return "<DOM %s node \"%s%s\">" % (
+        return '<DOM %s node "%r%s">' % (
             self.__class__.__name__, data[0:10], dotdotdot)
 
     def substringData(self, offset, count):

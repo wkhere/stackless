@@ -158,6 +158,7 @@ class BaseServer:
     - server_bind()
     - server_activate()
     - get_request() -> request, client_address
+    - handle_timeout()
     - verify_request(request, client_address)
     - server_close()
     - process_request(request, client_address)
@@ -171,6 +172,7 @@ class BaseServer:
     Class variables that may be overridden by derived classes or
     instances:
 
+    - timeout
     - address_family
     - socket_type
     - allow_reuse_address
@@ -181,6 +183,8 @@ class BaseServer:
     - socket
 
     """
+
+    timeout = None
 
     def __init__(self, server_address, RequestHandlerClass):
         """Constructor.  May be extended, do not override."""
@@ -204,8 +208,9 @@ class BaseServer:
     # finishing a request is fairly arbitrary.  Remember:
     #
     # - handle_request() is the top-level call.  It calls
-    #   get_request(), verify_request() and process_request()
-    # - get_request() is different for stream or datagram sockets
+    #   await_request(), verify_request() and process_request()
+    # - get_request(), called by await_request(), is different for
+    #   stream or datagram sockets
     # - process_request() is the place that may fork a new process
     #   or create a new thread to finish the request
     # - finish_request() instantiates the request handler class;
@@ -214,7 +219,7 @@ class BaseServer:
     def handle_request(self):
         """Handle one request, possibly blocking."""
         try:
-            request, client_address = self.get_request()
+            request, client_address = self.await_request()
         except socket.error:
             return
         if self.verify_request(request, client_address):
@@ -223,6 +228,28 @@ class BaseServer:
             except:
                 self.handle_error(request, client_address)
                 self.close_request(request)
+
+    def await_request(self):
+        """Call get_request or handle_timeout, observing self.timeout.
+
+        Returns value from get_request() or raises socket.timeout exception if
+        timeout was exceeded.
+        """
+        if self.timeout is not None:
+            # If timeout == 0, you're responsible for your own fd magic.
+            import select
+            fd_sets = select.select([self], [], [], self.timeout)
+            if not fd_sets[0]:
+                self.handle_timeout()
+                raise socket.timeout("Listening timed out")
+        return self.get_request()
+
+    def handle_timeout(self):
+        """Called if no new request arrives within self.timeout.
+
+        Overridden by ForkingMixIn.
+        """
+        pass
 
     def verify_request(self, request, client_address):
         """Verify the request.  May be overridden.
@@ -289,6 +316,7 @@ class TCPServer(BaseServer):
     - server_bind()
     - server_activate()
     - get_request() -> request, client_address
+    - handle_timeout()
     - verify_request(request, client_address)
     - process_request(request, client_address)
     - close_request(request)
@@ -301,6 +329,7 @@ class TCPServer(BaseServer):
     Class variables that may be overridden by derived classes or
     instances:
 
+    - timeout
     - address_family
     - socket_type
     - request_queue_size (only for stream sockets)
@@ -405,24 +434,48 @@ class ForkingMixIn:
 
     """Mix-in class to handle each request in a new process."""
 
+    timeout = 300
     active_children = None
     max_children = 40
 
     def collect_children(self):
-        """Internal routine to wait for died children."""
-        while self.active_children:
-            if len(self.active_children) < self.max_children:
-                options = os.WNOHANG
-            else:
-                # If the maximum number of children are already
-                # running, block while waiting for a child to exit
-                options = 0
+        """Internal routine to wait for children that have exited."""
+        if self.active_children is None: return
+        while len(self.active_children) >= self.max_children:
+            # XXX: This will wait for any child process, not just ones
+            # spawned by this library. This could confuse other
+            # libraries that expect to be able to wait for their own
+            # children.
             try:
-                pid, status = os.waitpid(0, options)
+                pid, status = os.waitpid(0, options=0)
             except os.error:
                 pid = None
-            if not pid: break
+            if pid not in self.active_children: continue
             self.active_children.remove(pid)
+
+        # XXX: This loop runs more system calls than it ought
+        # to. There should be a way to put the active_children into a
+        # process group and then use os.waitpid(-pgid) to wait for any
+        # of that set, but I couldn't find a way to allocate pgids
+        # that couldn't collide.
+        for child in self.active_children:
+            try:
+                pid, status = os.waitpid(child, os.WNOHANG)
+            except os.error:
+                pid = None
+            if not pid: continue
+            try:
+                self.active_children.remove(pid)
+            except ValueError, e:
+                raise ValueError('%s. x=%d and list=%r' % (e.message, pid,
+                                                           self.active_children))
+
+    def handle_timeout(self):
+        """Wait for zombies after self.timeout seconds of inactivity.
+
+        May be extended, do not override.
+        """
+        self.collect_children()
 
     def process_request(self, request, client_address):
         """Fork a new subprocess to process the request."""

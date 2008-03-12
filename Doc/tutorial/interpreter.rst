@@ -22,7 +22,7 @@ guru or system administrator.  (E.g., :file:`/usr/local/python` is a popular
 alternative location.)
 
 On Windows machines, the Python installation is usually placed in
-:file:`C:\Python26`, though you can change this when you're running the
+:file:`C:\\Python26`, though you can change this when you're running the
 installer.  To add this directory to your path,  you can type the following
 command into the command prompt in a DOS box::
 
@@ -102,8 +102,8 @@ prints a welcome message stating its version number and a copyright notice
 before printing the first prompt::
 
    python
-   Python 1.5.2b2 (#1, Feb 28 1999, 00:02:06)  [GCC 2.8.1] on sunos5
-   Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam
+   Python 2.5 (#1, Feb 28 2007, 00:02:06)
+   Type "help", "copyright", "credits" or "license" for more information.
    >>>
 
 Continuation lines are needed when entering a multi-line construct. As an
@@ -166,6 +166,12 @@ The script can be given an executable mode, or permission, using the
 
    $ chmod +x myscript.py
 
+On Windows systems, there is no notion of an "executable mode".  The Python
+installer automatically associates ``.py`` files with ``python.exe`` so that
+a double-click on a Python file will run it as a script.  The extension can
+also be ``.pyw``, in that case, the console window that normally appears is
+suppressed.
+
 
 Source Code Encoding
 --------------------
@@ -219,8 +225,8 @@ setting an environment variable named :envvar:`PYTHONSTARTUP` to the name of a
 file containing your start-up commands.  This is similar to the :file:`.profile`
 feature of the Unix shells.
 
-.. % XXX This should probably be dumped in an appendix, since most people
-.. % don't use Python interactively in non-trivial ways.
+.. XXX This should probably be dumped in an appendix, since most people
+   don't use Python interactively in non-trivial ways.
 
 This file is only read in interactive sessions, not when Python reads commands
 from a script, and not when :file:`/dev/tty` is given as the explicit source of

@@ -19,12 +19,12 @@ in Python, including many standard and optional extension modules.
 .. function:: readmodule(module[, path])
 
    Read a module and return a dictionary mapping class names to class descriptor
-   objects.  The parameter *module* should be the name of a module as a string; it
-   may be the name of a module within a package.  The *path* parameter should be a
-   sequence, and is used to augment the value of ``sys.path``, which is used to
-   locate module source code.
+   objects.  The parameter *module* should be the name of a module as a string;
+   it may be the name of a module within a package.  The *path* parameter should
+   be a sequence, and is used to augment the value of ``sys.path``, which is
+   used to locate module source code.
 
-   .. % The 'inpackage' parameter appears to be for internal use only....
+   .. The 'inpackage' parameter appears to be for internal use only....
 
 
 .. function:: readmodule_ex(module[, path])
@@ -35,7 +35,7 @@ in Python, including many standard and optional extension modules.
    the key ``'__path__'`` in the returned dictionary has as its value a list which
    contains the package search path.
 
-   .. % The 'inpackage' parameter appears to be for internal use only....
+   .. The 'inpackage' parameter appears to be for internal use only....
 
 
 .. _pyclbr-class-objects:

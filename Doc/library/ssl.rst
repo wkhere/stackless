@@ -112,13 +112,14 @@ Functions, Constants, and Exceptions
 
        ========================  =========  =========  ==========  =========
         *client* / **server**    **SSLv2**  **SSLv3**  **SSLv23**  **TLSv1**
+       ------------------------  ---------  ---------  ----------  ---------
         *SSLv2*                    yes        no         yes*        no
         *SSLv3*                    yes        yes        yes         no
         *SSLv23*                   yes        no         yes         no
         *TLSv1*                    no         no         yes         yes
        ========================  =========  =========  ==========  =========
 
-   `*` In some older versions of OpenSSL (for instance, 0.9.7l on OS X 10.4),
+   In some older versions of OpenSSL (for instance, 0.9.7l on OS X 10.4),
    an SSLv2 client could not connect to an SSLv23 server.
 
 .. function:: RAND_status()
@@ -226,7 +227,7 @@ Functions, Constants, and Exceptions
 
 .. data:: PROTOCOL_TLSv1
 
-   Selects SSL version 2 as the channel encryption protocol.  This is
+   Selects TLS version 1 as the channel encryption protocol.  This is
    the most modern version, and probably the best choice for maximum
    protection, if both sides can speak it.
 

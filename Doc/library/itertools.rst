@@ -10,7 +10,7 @@
 
 .. versionadded:: 2.3
 
-This module implements a number of iterator building blocks inspired by
+This module implements a number of :term:`iterator` building blocks inspired by
 constructs from the Haskell and SML programming languages.  Each has been recast
 in a form suitable for Python.
 
@@ -75,6 +75,57 @@ loops that truncate the stream.
               for element in it:
                   yield element
 
+
+.. function:: itertools.chain.from_iterable(iterable)
+
+   Alternate constructor for :func:`chain`.  Gets chained inputs from a 
+   single iterable argument that is evaluated lazily.  Equivalent to::
+
+      @classmethod
+      def from_iterable(iterables):
+          for it in iterables:
+              for element in it:
+                  yield element
+
+   .. versionadded:: 2.6
+
+.. function:: combinations(iterable, r)
+
+   Return successive *r* length combinations of elements in the *iterable*.
+
+   Combinations are emitted in lexicographic sort order.  So, if the 
+   input *iterable* is sorted, the combination tuples will be produced
+   in sorted order.  
+
+   Elements are treated as unique based on their position, not on their
+   value.  So if the input elements are unique, there will be no repeat
+   values in each combination.
+
+   Each result tuple is ordered to match the input order.  So, every
+   combination is a subsequence of the input *iterable*.
+
+   Example:  ``combinations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)``
+
+   Equivalent to::
+
+        def combinations(iterable, r):
+            pool = tuple(iterable)
+            n = len(pool)
+            assert 0 <= r <= n
+            vec = range(r)
+            yield tuple(pool[i] for i in vec)
+            while 1:
+                for i in reversed(range(r)):
+                    if vec[i] != i + n - r:
+                        break
+                else:
+                    return
+                vec[i] += 1
+                for j in range(i+1, r):
+                    vec[j] = vec[j-1] + 1
+                yield tuple(pool[i] for i in vec)
+
+   .. versionadded:: 2.6
 
 .. function:: count([n])
 
@@ -159,7 +210,7 @@ loops that truncate the stream.
                   key = lambda x: x
               self.keyfunc = key
               self.it = iter(iterable)
-              self.tgtkey = self.currkey = self.currvalue = xrange(0)
+              self.tgtkey = self.currkey = self.currvalue = object()
           def __iter__(self):
               return self
           def next(self):
@@ -218,7 +269,7 @@ loops that truncate the stream.
       def imap(function, *iterables):
           iterables = map(iter, iterables)
           while True:
-              args = [i.next() for i in iterables]
+              args = [it.next() for it in iterables]
               if function is None:
                   yield tuple(args)
               else:
@@ -269,22 +320,13 @@ loops that truncate the stream.
       When no iterables are specified, returns a zero length iterator instead of
       raising a :exc:`TypeError` exception.
 
-   Note, the left-to-right evaluation order of the iterables is guaranteed. This
-   makes possible an idiom for clustering a data series into n-length groups using
-   ``izip(*[iter(s)]*n)``.  For data that doesn't fit n-length groups exactly, the
-   last tuple can be pre-padded with fill values using ``izip(*[chain(s,
-   [None]*(n-1))]*n)``.
+   The left-to-right evaluation order of the iterables is guaranteed. This
+   makes possible an idiom for clustering a data series into n-length groups
+   using ``izip(*[iter(s)]*n)``.
 
-   Note, when :func:`izip` is used with unequal length inputs, subsequent
-   iteration over the longer iterables cannot reliably be continued after
-   :func:`izip` terminates.  Potentially, up to one entry will be missing from
-   each of the left-over iterables. This occurs because a value is fetched from
-   each iterator in turn, but the process ends when one of the iterators
-   terminates.  This leaves the last fetched values in limbo (they cannot be
-   returned in a final, incomplete tuple and they are cannot be pushed back into
-   the iterator for retrieval with ``it.next()``).  In general, :func:`izip`
-   should only be used with unequal length inputs when you don't care about
-   trailing, unmatched values from the longer iterables.
+   :func:`izip` should only be used with unequal length inputs when you don't
+   care about trailing, unmatched values from the longer iterables.  If those
+   values are important, use :func:`izip_longest` instead.
 
 
 .. function:: izip_longest(*iterables[, fillvalue])
@@ -311,6 +353,56 @@ loops that truncate the stream.
 
    .. versionadded:: 2.6
 
+.. function:: permutations(iterable[, r])
+
+   Return successive *r* length permutations of elements in the *iterable*.
+
+   If *r* is not specified or is ``None``, then *r* defaults to the length
+   of the *iterable* and all possible full-length permutations 
+   are generated.
+
+   Permutations are emitted in lexicographic sort order.  So, if the 
+   input *iterable* is sorted, the permutation tuples will be produced
+   in sorted order.  
+
+   Elements are treated as unique based on their position, not on their
+   value.  So if the input elements are unique, there will be no repeat
+   values in each permutation.
+
+   Example:  ``permutations(range(3),2) --> (1,2) (1,3) (2,1) (2,3) (3,1) (3,2)``
+
+   .. versionadded:: 2.6
+
+.. function:: product(*iterables[, repeat])
+
+   Cartesian product of input iterables.
+
+   Equivalent to nested for-loops in a generator expression. For example,
+   ``product(A, B)`` returns the same as ``((x,y) for x in A for y in B)``.
+
+   The leftmost iterators are in the outermost for-loop, so the output tuples
+   cycle in a manner similar to an odometer (with the rightmost element
+   changing on every iteration).  This results in a lexicographic ordering
+   so that if the inputs iterables are sorted, the product tuples are emitted
+   in sorted order.
+
+   To compute the product of an iterable with itself, specify the number of
+   repetitions with the optional *repeat* keyword argument.  For example,
+   ``product(A, repeat=4)`` means the same as ``product(A, A, A, A)``.
+
+   Equivalent to the following except that the actual implementation does not
+   build-up intermediate results in memory::
+
+       def product(*args, **kwds):
+           pools = map(tuple, args) * kwds.get('repeat', 1)
+           if pools:            
+               result = [[]]
+               for pool in pools:
+                   result = [x+[y] for x in result for y in pool]
+               for prod in result:
+                   yield tuple(prod)
+
+   .. versionadded:: 2.6
 
 .. function:: repeat(object[, times])
 
@@ -330,17 +422,19 @@ loops that truncate the stream.
 
 .. function:: starmap(function, iterable)
 
-   Make an iterator that computes the function using arguments tuples obtained from
+   Make an iterator that computes the function using arguments obtained from
    the iterable.  Used instead of :func:`imap` when argument parameters are already
    grouped in tuples from a single iterable (the data has been "pre-zipped").  The
    difference between :func:`imap` and :func:`starmap` parallels the distinction
    between ``function(a,b)`` and ``function(*c)``. Equivalent to::
 
       def starmap(function, iterable):
-          iterable = iter(iterable)
-          while True:
-              yield function(*iterable.next())
+          for args in iterable:
+              yield function(*args)
 
+   .. versionchanged:: 2.6
+      Previously, :func:`starmap` required the function arguments to be tuples.
+      Now, any iterable is allowed.
 
 .. function:: takewhile(predicate, iterable)
 
@@ -361,16 +455,15 @@ loops that truncate the stream.
    is equivalent to::
 
       def tee(iterable):
-          def gen(next, data={}, cnt=[0]):
+          def gen(next, data={}):
               for i in count():
-                  if i == cnt[0]:
-                      item = data[i] = next()
-                      cnt[0] += 1
+                  if i in data:
+                      yield data.pop(i)
                   else:
-                      item = data.pop(i)
-                  yield item
+                      data[i] = next()
+                      yield data[i]
           it = iter(iterable)
-          return (gen(it.next), gen(it.next))
+          return gen(it.next), gen(it.next)
 
    Note, once :func:`tee` has made a split, the original *iterable* should not be
    used anywhere else; otherwise, the *iterable* could get advanced without the tee
@@ -408,17 +501,6 @@ can be combined. ::
    8
    27
    64
-
-   >>> reportlines = ['EuroPython', 'Roster', '', 'alex', '', 'laura',
-   ...                '', 'martin', '', 'walter', '', 'mark']
-   >>> for name in islice(reportlines, 3, None, 2):
-   ...    print name.title()
-   ...
-   Alex
-   Laura
-   Martin
-   Walter
-   Mark
 
    # Show a dictionary sorted and grouped by value
    >>> from operator import itemgetter
@@ -460,8 +542,8 @@ The superior memory performance is kept by processing elements one at a time
 rather than bringing the whole iterable into memory all at once. Code volume is
 kept small by linking the tools together in a functional style which helps
 eliminate temporary variables.  High speed is retained by preferring
-"vectorized" building blocks over the use of for-loops and generators which
-incur interpreter overhead. ::
+"vectorized" building blocks over the use of for-loops and :term:`generator`\s
+which incur interpreter overhead. ::
 
    def take(n, seq):
        return list(islice(seq, n))
@@ -511,13 +593,13 @@ incur interpreter overhead. ::
 
    def ncycles(seq, n):
        "Returns the sequence elements n times"
-       return chain(*repeat(seq, n))
+       return chain.from_iterable(repeat(seq, n))
 
    def dotproduct(vec1, vec2):
        return sum(imap(operator.mul, vec1, vec2))
 
    def flatten(listOfLists):
-       return list(chain(*listOfLists))
+       return list(chain.from_iterable(listOfLists))
 
    def repeatfunc(func, times=None, *args):
        """Repeat calls to func with specified arguments.
@@ -526,8 +608,7 @@ incur interpreter overhead. ::
        """
        if times is None:
            return starmap(func, repeat(args))
-       else:
-           return starmap(func, repeat(args, times))
+       return starmap(func, repeat(args, times))
 
    def pairwise(iterable):
        "s -> (s0,s1), (s1,s2), (s2, s3), ..."
@@ -542,5 +623,23 @@ incur interpreter overhead. ::
        "grouper(3, 'abcdefg', 'x') --> ('a','b','c'), ('d','e','f'), ('g','x','x')"
        return izip(*[chain(iterable, repeat(padvalue, n-1))]*n)
 
+   def roundrobin(*iterables):
+       "roundrobin('abc', 'd', 'ef') --> 'a', 'd', 'e', 'b', 'f', 'c'"
+       # Recipe credited to George Sakkis
+       pending = len(iterables)
+       nexts = cycle(iter(it).next for it in iterables)
+       while pending:
+           try:
+               for next in nexts:
+                   yield next()
+           except StopIteration:
+               pending -= 1
+               nexts = cycle(islice(nexts, pending))
 
+   def powerset(iterable):
+       "powerset('ab') --> set([]), set(['a']), set(['b']), set(['a', 'b'])"
+       # Recipe credited to Eric Raymond
+       pairs = [(2**i, x) for i, x in enumerate(iterable)]
+       for n in xrange(2**len(pairs)):
+           yield set(x for m, x in pairs if m&n)
 

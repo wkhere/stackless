@@ -25,9 +25,12 @@ width constraint.
    dictionary was sorted only if its display required more than one line, although
    that wasn't documented.
 
+.. versionchanged:: 2.6
+   Added support for :class:`set` and :class:`frozenset`.
+
 The :mod:`pprint` module defines one class:
 
-.. % First the implementation class:
+.. First the implementation class:
 
 
 .. class:: PrettyPrinter(...)
@@ -48,35 +51,27 @@ The :mod:`pprint` module defines one class:
    structure cannot be formatted within the constrained width, a best effort will
    be made. ::
 
-      >>> import pprint, sys
-      >>> stuff = sys.path[:]
+      >>> import pprint
+      >>> stuff = ['spam', 'eggs', 'lumberjack', 'knights', 'ni']
       >>> stuff.insert(0, stuff[:])
       >>> pp = pprint.PrettyPrinter(indent=4)
       >>> pp.pprint(stuff)
-      [   [   '',
-              '/usr/local/lib/python1.5',
-              '/usr/local/lib/python1.5/test',
-              '/usr/local/lib/python1.5/sunos5',
-              '/usr/local/lib/python1.5/sharedmodules',
-              '/usr/local/lib/python1.5/tkinter'],
-          '',
-          '/usr/local/lib/python1.5',
-          '/usr/local/lib/python1.5/test',
-          '/usr/local/lib/python1.5/sunos5',
-          '/usr/local/lib/python1.5/sharedmodules',
-          '/usr/local/lib/python1.5/tkinter']
-      >>>
-      >>> import parser
-      >>> tup = parser.ast2tuple(
-      ...     parser.suite(open('pprint.py').read()))[1][1][1]
+      [   ['spam', 'eggs', 'lumberjack', 'knights', 'ni'],
+          'spam',
+          'eggs',
+          'lumberjack',
+          'knights',
+          'ni']
+      >>> tup = ('spam', ('eggs', ('lumberjack', ('knights', ('ni', ('dead',
+      ... ('parrot', ('fresh fruit',))))))))
       >>> pp = pprint.PrettyPrinter(depth=6)
       >>> pp.pprint(tup)
-      (266, (267, (307, (287, (288, (...))))))
+      ('spam',
+       ('eggs', ('lumberjack', ('knights', ('ni', ('dead', ('parrot', (...,))))))))
 
 The :class:`PrettyPrinter` class supports several derivative functions:
 
-.. % Now the derivative functions:
-
+.. Now the derivative functions:
 
 .. function:: pformat(object[, indent[, width[, depth]]])
 
@@ -96,7 +91,8 @@ The :class:`PrettyPrinter` class supports several derivative functions:
    inspecting values.    *indent*, *width* and *depth* will be passed to the
    :class:`PrettyPrinter` constructor as formatting parameters. ::
 
-      >>> stuff = sys.path[:]
+      >>> import pprint
+      >>> stuff = ['spam', 'eggs', 'lumberjack', 'knights', 'ni']
       >>> stuff.insert(0, stuff)
       >>> pprint.pprint(stuff)
       [<Recursion on list with id=869440>,
@@ -136,9 +132,6 @@ One more support function is also defined:
    structures.  If the representation of *object* exposes a recursive entry, the
    recursive reference will be represented as ``<Recursion on typename with
    id=number>``.  The representation is not otherwise formatted.
-
-.. % This example is outside the {funcdesc} to keep it from running over
-.. % the right margin.
 
 ::
 
@@ -210,4 +203,39 @@ are converted to strings.  The default implementation uses the internals of the
    should be passed a value less than that of the current call.
 
    .. versionadded:: 2.3
+
+.. _pprint-example:
+
+pprint Example
+--------------
+
+This example demonstrates several uses of the :func:`pprint` function and its parameters.
+
+   >>> import pprint
+   >>> tup = ('spam', ('eggs', ('lumberjack', ('knights', ('ni', ('dead',
+   ... ('parrot', ('fresh fruit',))))))))
+   >>> stuff = ['a' * 10, tup, ['a' * 30, 'b' * 30], ['c' * 20, 'd' * 20]]
+   >>> pprint.pprint(stuff)
+   ['aaaaaaaaaa',
+    ('spam',
+     ('eggs',
+      ('lumberjack',
+       ('knights', ('ni', ('dead', ('parrot', ('fresh fruit',)))))))),
+    ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'],
+    ['cccccccccccccccccccc', 'dddddddddddddddddddd']]
+   >>> pprint.pprint(stuff, depth=3)
+   ['aaaaaaaaaa',
+    ('spam', ('eggs', ('lumberjack', (...)))),
+    ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'],
+    ['cccccccccccccccccccc', 'dddddddddddddddddddd']]
+   >>> pprint.pprint(stuff, width=60)
+   ['aaaaaaaaaa',
+    ('spam',
+     ('eggs',
+      ('lumberjack',
+       ('knights',
+        ('ni', ('dead', ('parrot', ('fresh fruit',)))))))),
+    ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+     'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'],
+    ['cccccccccccccccccccc', 'dddddddddddddddddddd']]
 

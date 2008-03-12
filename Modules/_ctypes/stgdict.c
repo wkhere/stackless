@@ -191,7 +191,7 @@ MakeFields(PyObject *type, CFieldObject *descr,
 			Py_DECREF(fieldlist);
 			return -1;
 		}
-		if (Py_Type(fdescr) != &CField_Type) {
+		if (Py_TYPE(fdescr) != &CField_Type) {
 			PyErr_SetString(PyExc_TypeError, "unexpected type");
 			Py_DECREF(fdescr);
 			Py_DECREF(fieldlist);
@@ -214,7 +214,7 @@ MakeFields(PyObject *type, CFieldObject *descr,
 			Py_DECREF(fieldlist);
 			return -1;
 		}
-		assert(Py_Type(new_descr) == &CField_Type);
+		assert(Py_TYPE(new_descr) == &CField_Type);
  		new_descr->size = fdescr->size;
  		new_descr->offset = fdescr->offset + offset;
  		new_descr->index = fdescr->index + index;
@@ -262,7 +262,7 @@ MakeAnonFields(PyObject *type)
 			Py_DECREF(anon_names);
 			return -1;
 		}
-		assert(Py_Type(descr) == &CField_Type);
+		assert(Py_TYPE(descr) == &CField_Type);
 		descr->anonymous = 1;
 
 		/* descr is in the field descriptor. */
@@ -414,6 +414,8 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 			return -1;
 		}
 		stgdict->ffi_type_pointer.elements[ffi_ofs + i] = &dict->ffi_type_pointer;
+		if (dict->flags & (TYPEFLAG_ISPOINTER | TYPEFLAG_HASPOINTER))
+			stgdict->flags |= TYPEFLAG_HASPOINTER;
 		dict->flags |= DICTFLAG_FINAL; /* mark field type final */
 		if (PyTuple_Size(pair) == 3) { /* bits specified */
 			switch(dict->ffi_type_pointer.type) {
@@ -470,7 +472,7 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 			Py_DECREF(pair);
 			return -1;
 		}
-		if (-1 == PyDict_SetItem(realdict, name, prop)) {
+		if (-1 == PyObject_SetAttr(type, name, prop)) {
 			Py_DECREF(prop);
 			Py_DECREF(pair);
 			return -1;

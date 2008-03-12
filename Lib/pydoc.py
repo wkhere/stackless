@@ -27,7 +27,7 @@ to a file named "<name>.html".
 
 Module docs for core modules are assumed to be in
 
-    http://www.python.org/doc/current/lib/
+    http://docs.python.org/library/
 
 This can be overridden by setting the PYTHONDOCS environment variable
 to a different URL or to a local directory containing the Library
@@ -346,7 +346,7 @@ class Doc:
             file = '(built-in)'
 
         docloc = os.environ.get("PYTHONDOCS",
-                                "http://www.python.org/doc/current/lib")
+                                "http://docs.python.org/library")
         basedir = os.path.join(sys.exec_prefix, "lib",
                                "python"+sys.version[0:3])
         if (isinstance(object, type(os)) and
@@ -355,11 +355,10 @@ class Doc:
                                  'thread', 'zipimport') or
              (file.startswith(basedir) and
               not file.startswith(os.path.join(basedir, 'site-packages'))))):
-            htmlfile = "module-%s.html" % object.__name__
             if docloc.startswith("http://"):
-                docloc = "%s/%s" % (docloc.rstrip("/"), htmlfile)
+                docloc = "%s/%s" % (docloc.rstrip("/"), object.__name__)
             else:
-                docloc = os.path.join(docloc, htmlfile)
+                docloc = os.path.join(docloc, object.__name__ + ".html")
         else:
             docloc = None
         return docloc
@@ -541,7 +540,7 @@ class HTMLDoc(Doc):
                 url = 'http://www.rfc-editor.org/rfc/rfc%d.txt' % int(rfc)
                 results.append('<a href="%s">%s</a>' % (url, escape(all)))
             elif pep:
-                url = 'http://www.python.org/peps/pep-%04d.html' % int(pep)
+                url = 'http://www.python.org/dev/peps/pep-%04d/' % int(pep)
                 results.append('<a href="%s">%s</a>' % (url, escape(all)))
             elif text[end:end+1] == '(':
                 results.append(self.namelink(name, methods, funcs, classes))
@@ -665,7 +664,7 @@ class HTMLDoc(Doc):
             contents = self.multicolumn(
                 modules, lambda (key, value), s=self: s.modulelink(value))
             result = result + self.bigsection(
-                'Modules', '#fffff', '#aa55cc', contents)
+                'Modules', '#ffffff', '#aa55cc', contents)
 
         if classes:
             classlist = map(lambda (key, value): value, classes)
@@ -1052,9 +1051,11 @@ class TextDoc(Doc):
             if visiblename(key, all):
                 data.append((key, value))
 
+        modpkgs = []
+        modpkgs_names = set()
         if hasattr(object, '__path__'):
-            modpkgs = []
             for importer, modname, ispkg in pkgutil.iter_modules(object.__path__):
+                modpkgs_names.add(modname)
                 if ispkg:
                     modpkgs.append(modname + ' (package)')
                 else:
@@ -1063,6 +1064,16 @@ class TextDoc(Doc):
             modpkgs.sort()
             result = result + self.section(
                 'PACKAGE CONTENTS', join(modpkgs, '\n'))
+
+        # Detect submodules as sometimes created by C extensions
+        submodules = []
+        for key, value in inspect.getmembers(object, inspect.ismodule):
+            if value.__name__.startswith(name + '.') and key not in modpkgs_names:
+                submodules.append(key)
+        if submodules:
+            submodules.sort()
+            result = result + self.section(
+                'SUBMODULES', join(submodules, '\n'))
 
         if classes:
             classlist = map(lambda (key, value): value, classes)
@@ -1186,7 +1197,6 @@ class TextDoc(Doc):
             else:
                 tag = "inherited from %s" % classname(thisclass,
                                                       object.__module__)
-            filter(lambda t: not t[0].startswith('_'), attrs)
 
             # Sort attrs by name.
             attrs.sort()
@@ -1710,7 +1720,7 @@ has the same effect as typing a particular string at the help> prompt.
 Welcome to Python %s!  This is the online help utility.
 
 If this is your first time using Python, you should definitely check out
-the tutorial on the Internet at http://www.python.org/doc/tut/.
+the tutorial on the Internet at http://docs.python.org/tutorial/.
 
 Enter the name of any module, keyword, or topic to get help on writing
 Python programs and using Python modules.  To quit this help utility and
@@ -1816,7 +1826,9 @@ Please wait a moment while I gather a list of all available modules...
                     modname = modname[:-9] + ' (package)'
                 if find(modname, '.') < 0:
                     modules[modname] = 1
-            ModuleScanner().run(callback)
+            def onerror(modname):
+                callback(None, modname, None)
+            ModuleScanner().run(callback, onerror=onerror)
             self.list(modules.keys())
             self.output.write('''
 Enter any module name to get more help.  Or, type "modules spam" to search
@@ -1852,7 +1864,7 @@ class Scanner:
 class ModuleScanner:
     """An interruptible scanner that searches module synopses."""
 
-    def run(self, callback, key=None, completer=None):
+    def run(self, callback, key=None, completer=None, onerror=None):
         if key: key = lower(key)
         self.quit = False
         seen = {}
@@ -1867,7 +1879,7 @@ class ModuleScanner:
                     if find(lower(modname + ' - ' + desc), key) >= 0:
                         callback(None, modname, desc)
 
-        for importer, modname, ispkg in pkgutil.walk_packages():
+        for importer, modname, ispkg in pkgutil.walk_packages(onerror=onerror):
             if self.quit:
                 break
             if key is None:

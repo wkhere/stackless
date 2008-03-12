@@ -306,6 +306,22 @@ getargs_tuple(PyObject *self, PyObject *args)
 	return Py_BuildValue("iii", a, b, c);
 }
 
+/* test PyArg_ParseTupleAndKeywords */
+static PyObject *getargs_keywords(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+	static char *keywords[] = {"arg1","arg2","arg3","arg4","arg5", NULL};
+	static char *fmt="(ii)i|(i(ii))(iii)i";
+	int int_args[10]={-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, fmt, keywords,
+		&int_args[0], &int_args[1], &int_args[2], &int_args[3], &int_args[4],
+		&int_args[5], &int_args[6], &int_args[7], &int_args[8], &int_args[9]))
+		return NULL;
+	return Py_BuildValue("iiiiiiiiii",
+		int_args[0], int_args[1], int_args[2], int_args[3], int_args[4],
+		int_args[5], int_args[6], int_args[7], int_args[8], int_args[9]);
+}
+
 /* Functions to call PyArg_ParseTuple with integer format codes,
    and return the result.
 */
@@ -732,6 +748,8 @@ static PyMethodDef TestMethods[] = {
 	 PyDoc_STR("This is a pretty normal docstring.")},
 
 	{"getargs_tuple",	getargs_tuple,			 METH_VARARGS},
+	{"getargs_keywords", (PyCFunction)getargs_keywords, 
+	  METH_VARARGS|METH_KEYWORDS},
 	{"getargs_b",		getargs_b,			 METH_VARARGS},
 	{"getargs_B",		getargs_B,			 METH_VARARGS},
 	{"getargs_H",		getargs_H,			 METH_VARARGS},
@@ -762,6 +780,7 @@ static PyMethodDef TestMethods[] = {
 #define AddSym(d, n, f, v) {PyObject *o = f(v); PyDict_SetItemString(d, n, o); Py_DECREF(o);}
 
 typedef struct {
+	char bool_member;
 	char byte_member;
 	unsigned char ubyte_member;
 	short short_member;
@@ -784,6 +803,7 @@ typedef struct {
 } test_structmembers;
 
 static struct PyMemberDef test_members[] = {
+	{"T_BOOL", T_BOOL, offsetof(test_structmembers, structmembers.bool_member), 0, NULL},
 	{"T_BYTE", T_BYTE, offsetof(test_structmembers, structmembers.byte_member), 0, NULL},
 	{"T_UBYTE", T_UBYTE, offsetof(test_structmembers, structmembers.ubyte_member), 0, NULL},
 	{"T_SHORT", T_SHORT, offsetof(test_structmembers, structmembers.short_member), 0, NULL},
@@ -802,39 +822,53 @@ static struct PyMemberDef test_members[] = {
 };
 
 
-static PyObject *test_structmembers_new(PyTypeObject *type, PyObject *args, PyObject *kwargs){
-	static char *keywords[]={"T_BYTE", "T_UBYTE", "T_SHORT", "T_USHORT", "T_INT", "T_UINT",
-		"T_LONG", "T_ULONG", "T_FLOAT", "T_DOUBLE",
-		#ifdef HAVE_LONG_LONG	
+static PyObject *
+test_structmembers_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
+{
+	static char *keywords[] = {
+		"T_BOOL", "T_BYTE", "T_UBYTE", "T_SHORT", "T_USHORT",
+		"T_INT", "T_UINT", "T_LONG", "T_ULONG",
+		"T_FLOAT", "T_DOUBLE",
+#ifdef HAVE_LONG_LONG	
 		"T_LONGLONG", "T_ULONGLONG",
-		#endif
+#endif
 		NULL};
-	static char *fmt="|bBhHiIlkfd"
-		#ifdef HAVE_LONG_LONG
+	static char *fmt = "|bbBhHiIlkfd"
+#ifdef HAVE_LONG_LONG
 		"LK"
-		#endif
+#endif
 		;
-	test_structmembers *ob=PyObject_New(test_structmembers, type);
-	if (ob==NULL)
+	test_structmembers *ob;
+	ob = PyObject_New(test_structmembers, type);
+	if (ob == NULL)
 		return NULL;
 	memset(&ob->structmembers, 0, sizeof(all_structmembers));
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, fmt, keywords,
-		&ob->structmembers.byte_member, &ob->structmembers.ubyte_member,
-		&ob->structmembers.short_member, &ob->structmembers.ushort_member,
-		&ob->structmembers.int_member, &ob->structmembers.uint_member, 
-		&ob->structmembers.long_member, &ob->structmembers.ulong_member,
-		&ob->structmembers.float_member, &ob->structmembers.double_member
-		#ifdef HAVE_LONG_LONG
-		,&ob->structmembers.longlong_member, &ob->structmembers.ulonglong_member
-		#endif
-		)){
+					 &ob->structmembers.bool_member,
+					 &ob->structmembers.byte_member,
+					 &ob->structmembers.ubyte_member,
+					 &ob->structmembers.short_member,
+					 &ob->structmembers.ushort_member,
+					 &ob->structmembers.int_member,
+					 &ob->structmembers.uint_member, 
+					 &ob->structmembers.long_member,
+					 &ob->structmembers.ulong_member,
+					 &ob->structmembers.float_member,
+					 &ob->structmembers.double_member
+#ifdef HAVE_LONG_LONG
+					 , &ob->structmembers.longlong_member,
+					 &ob->structmembers.ulonglong_member
+#endif
+		)) {
 		Py_DECREF(ob);
 		return NULL;
-		}
+	}
 	return (PyObject *)ob;
 }
 
-static void test_structmembers_free(PyObject *ob){
+static void
+test_structmembers_free(PyObject *ob)
+{
 	PyObject_FREE(ob);
 }
 
@@ -855,8 +889,8 @@ static PyTypeObject test_structmembersType = {
 	0,				/* tp_hash */
 	0,				/* tp_call */
 	0,				/* tp_str */
-	PyObject_GenericGetAttr,
-	PyObject_GenericSetAttr,
+	PyObject_GenericGetAttr,	/* tp_getattro */
+	PyObject_GenericSetAttr,	/* tp_setattro */
 	0,				/* tp_as_buffer */
 	0,				/* tp_flags */
 	"Type containing all structmember types",
@@ -867,7 +901,7 @@ static PyTypeObject test_structmembersType = {
 	0,				/* tp_iter */
 	0,				/* tp_iternext */
 	0,				/* tp_methods */
-	test_members,	/* tp_members */
+	test_members,			/* tp_members */
 	0,
 	0,
 	0,
@@ -876,7 +910,7 @@ static PyTypeObject test_structmembersType = {
 	0,
 	0,
 	0,
-	test_structmembers_new,			/* tp_new */
+	test_structmembers_new,	       	/* tp_new */
 };
 
 
@@ -889,7 +923,7 @@ init_testcapi(void)
 	if (m == NULL)
 		return;
 
-	Py_Type(&test_structmembersType)=&PyType_Type;
+	Py_TYPE(&test_structmembersType)=&PyType_Type;
 	Py_INCREF(&test_structmembersType);
 	PyModule_AddObject(m, "test_structmembersType", (PyObject *)&test_structmembersType);
 

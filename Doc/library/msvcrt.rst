@@ -16,6 +16,10 @@ this in the implementation of the :func:`getpass` function.
 Further documentation on these functions can be found in the Platform API
 documentation.
 
+The module implements both the normal and wide char variants of the console I/O
+api. The normal API deals only with ASCII characters and is of limited use
+for internationalized applications. The wide char API should be used where 
+ever possible
 
 .. _msvcrt-files:
 
@@ -63,7 +67,7 @@ File Operations
 .. function:: open_osfhandle(handle, flags)
 
    Create a C runtime file descriptor from the file handle *handle*.  The *flags*
-   parameter should be a bit-wise OR of :const:`os.O_APPEND`, :const:`os.O_RDONLY`,
+   parameter should be a bitwise OR of :const:`os.O_APPEND`, :const:`os.O_RDONLY`,
    and :const:`os.O_TEXT`.  The returned file descriptor may be used as a parameter
    to :func:`os.fdopen` to create a file object.
 
@@ -94,6 +98,13 @@ Console I/O
    return the keycode.  The :kbd:`Control-C` keypress cannot be read with this
    function.
 
+   
+.. function:: getwch()
+
+   Wide char variant of :func:`getch`, returning a Unicode value.
+   
+   .. versionadded:: 2.6
+   
 
 .. function:: getche()
 
@@ -101,15 +112,36 @@ Console I/O
    printable character.
 
 
+.. function:: getwche()
+
+   Wide char variant of :func:`getche`, returning a Unicode value.
+   
+   .. versionadded:: 2.6
+
+
 .. function:: putch(char)
 
    Print the character *char* to the console without buffering.
 
+   
+.. function:: putwch(unicode_char)
+
+   Wide char variant of :func:`putch`, accepting a Unicode value.
+   
+   .. versionadded:: 2.6
+   
 
 .. function:: ungetch(char)
 
    Cause the character *char* to be "pushed back" into the console buffer; it will
    be the next character read by :func:`getch` or :func:`getche`.
+
+   
+.. function:: ungetwch(unicode_char)
+
+   Wide char variant of :func:`ungetch`, accepting a Unicode value.
+   
+   .. versionadded:: 2.6
 
 
 .. _msvcrt-other:

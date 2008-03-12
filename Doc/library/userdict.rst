@@ -11,7 +11,7 @@ for classes that already have a minimum mapping interface.  This greatly
 simplifies writing classes that need to be substitutable for dictionaries (such
 as the shelve module).
 
-This also module defines a class, :class:`UserDict`, that acts as a wrapper
+This module also defines a class, :class:`UserDict`, that acts as a wrapper
 around dictionary objects.  The need for this class has been largely supplanted
 by the ability to subclass directly from :class:`dict` (a feature that became
 available starting with Python version 2.2).  Prior to the introduction of
@@ -68,6 +68,8 @@ provide the following attribute:
    Since the mixin has no knowledge of the subclass constructor, it does not define
    :meth:`__init__` or :meth:`copy`.
 
+   Starting with Python version 2.6, it is recommended to use
+   :class:`collections.MutableMapping` instead of :class:`DictMixin`.
 
 :mod:`UserList` --- Class wrapper for list objects
 ==================================================

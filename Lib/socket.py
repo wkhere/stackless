@@ -143,6 +143,9 @@ _socketmethods = (
     'sendall', 'setblocking',
     'settimeout', 'gettimeout', 'shutdown')
 
+if os.name == "nt":
+    _socketmethods = _socketmethods + ('ioctl',)
+
 if sys.platform == "riscos":
     _socketmethods = _socketmethods + ('sleeptaskw',)
 
@@ -325,7 +328,7 @@ class _fileobject(object):
             self._rbuf = ""
             while True:
                 left = size - buf_len
-                recv_size = max(self._rbufsize, left)
+                recv_size = min(self._rbufsize, left)
                 data = self._sock.recv(recv_size)
                 if not data:
                     break

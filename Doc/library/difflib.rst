@@ -6,9 +6,9 @@
    :synopsis: Helpers for computing differences between objects.
 .. moduleauthor:: Tim Peters <tim_one@users.sourceforge.net>
 .. sectionauthor:: Tim Peters <tim_one@users.sourceforge.net>
+.. Markup by Fred L. Drake, Jr. <fdrake@acm.org>
 
 
-.. % LaTeXification by Fred L. Drake, Jr. <fdrake@acm.org>.
 
 .. versionadded:: 2.1
 
@@ -20,7 +20,7 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 .. class:: SequenceMatcher
 
    This is a flexible class for comparing pairs of sequences of any type, so long
-   as the sequence elements are hashable.  The basic algorithm predates, and is a
+   as the sequence elements are :term:`hashable`.  The basic algorithm predates, and is a
    little fancier than, an algorithm published in the late 1980's by Ratcliff and
    Obershelp under the hyperbolic name "gestalt pattern matching."  The idea is to
    find the longest contiguous matching subsequence that contains no "junk"
@@ -126,8 +126,8 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 
 .. function:: context_diff(a, b[, fromfile][, tofile][, fromfiledate][, tofiledate][, n][, lineterm])
 
-   Compare *a* and *b* (lists of strings); return a delta (a generator generating
-   the delta lines) in context diff format.
+   Compare *a* and *b* (lists of strings); return a delta (a :term:`generator`
+   generating the delta lines) in context diff format.
 
    Context diffs are a compact way of showing just the lines that have changed plus
    a few lines of context.  The changes are shown in a before/after style.  The
@@ -148,7 +148,27 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    expressed in the format returned by :func:`time.ctime`.  If not specified, the
    strings default to blanks.
 
-   :file:`Tools/scripts/diff.py` is a command-line front-end for this function.
+   ::
+
+      >>> s1 = ['bacon\n', 'eggs\n', 'ham\n', 'guido\n']
+      >>> s2 = ['python\n', 'eggy\n', 'hamster\n', 'guido\n']
+      >>> for line in context_diff(s1, s2, fromfile='before.py', tofile='after.py'):
+      ...     sys.stdout.write(line)
+      *** before.py
+      --- after.py
+      ***************
+      *** 1,4 ****
+      ! bacon
+      ! eggs
+      ! ham
+        guido
+      --- 1,4 ----
+      ! python
+      ! eggy
+      ! hamster
+        guido
+
+   See :ref:`difflib-interface` for a more detailed example.
 
    .. versionadded:: 2.3
 
@@ -181,8 +201,8 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 
 .. function:: ndiff(a, b[, linejunk][, charjunk])
 
-   Compare *a* and *b* (lists of strings); return a :class:`Differ`\ -style delta
-   (a generator generating the delta lines).
+   Compare *a* and *b* (lists of strings); return a :class:`Differ`\ -style
+   delta (a :term:`generator` generating the delta lines).
 
    Optional keyword parameters *linejunk* and *charjunk* are for filter functions
    (or ``None``):
@@ -242,8 +262,8 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 
 .. function:: unified_diff(a, b[, fromfile][, tofile][, fromfiledate][, tofiledate][, n][, lineterm])
 
-   Compare *a* and *b* (lists of strings); return a delta (a generator generating
-   the delta lines) in unified diff format.
+   Compare *a* and *b* (lists of strings); return a delta (a :term:`generator`
+   generating the delta lines) in unified diff format.
 
    Unified diffs are a compact way of showing just the lines that have changed plus
    a few lines of context.  The changes are shown in a inline style (instead of
@@ -265,7 +285,25 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
    expressed in the format returned by :func:`time.ctime`.  If not specified, the
    strings default to blanks.
 
-   :file:`Tools/scripts/diff.py` is a command-line front-end for this function.
+   ::
+
+
+      >>> s1 = ['bacon\n', 'eggs\n', 'ham\n', 'guido\n']
+      >>> s2 = ['python\n', 'eggy\n', 'hamster\n', 'guido\n']
+      >>> for line in unified_diff(s1, s2, fromfile='before.py', tofile='after.py'):
+      ...     sys.stdout.write(line)
+      --- before.py
+      +++ after.py
+      @@ -1,4 +1,4 @@
+      -bacon
+      -eggs
+      -ham
+      +python
+      +eggy
+      +hamster
+       guido
+
+   See :ref:`difflib-interface` for a more detailed example.
 
    .. versionadded:: 2.3
 
@@ -313,7 +351,7 @@ The :class:`SequenceMatcher` class has this constructor:
    on blanks or hard tabs.
 
    The optional arguments *a* and *b* are sequences to be compared; both default to
-   empty strings.  The elements of both sequences must be hashable.
+   empty strings.  The elements of both sequences must be :term:`hashable`.
 
 :class:`SequenceMatcher` objects have the following methods:
 
@@ -344,7 +382,7 @@ use :meth:`set_seq2` to set the commonly used sequence once and call
 
    Find longest matching block in ``a[alo:ahi]`` and ``b[blo:bhi]``.
 
-   If *isjunk* was omitted or ``None``, :meth:`get_longest_match` returns ``(i, j,
+   If *isjunk* was omitted or ``None``, :meth:`find_longest_match` returns ``(i, j,
    k)`` such that ``a[i:i+k]`` is equal to ``b[j:j+k]``, where ``alo <= i <= i+k <=
    ahi`` and ``blo <= j <= j+k <= bhi``. For all ``(i', j', k')`` meeting those
    conditions, the additional conditions ``k >= k'``, ``i <= i'``, and if ``i ==
@@ -373,6 +411,9 @@ use :meth:`set_seq2` to set the commonly used sequence once and call
 
    If no blocks match, this returns ``(alo, blo, 0)``.
 
+   .. versionchanged:: 2.6
+      This method returns a :term:`named tuple` ``Match(a, b, size)``.
+
 
 .. method:: SequenceMatcher.get_matching_blocks()
 
@@ -386,7 +427,7 @@ use :meth:`set_seq2` to set the commonly used sequence once and call
    then ``i+n != i'`` or ``j+n != j'``; in other words, adjacent triples always
    describe non-adjacent equal blocks.
 
-   .. % Explain why a dummy is used!
+   .. XXX Explain why a dummy is used!
 
    .. versionchanged:: 2.5
       The guarantee that adjacent triples always describe non-adjacent blocks was
@@ -442,7 +483,7 @@ use :meth:`set_seq2` to set the commonly used sequence once and call
 
 .. method:: SequenceMatcher.get_grouped_opcodes([n])
 
-   Return a generator of groups with up to *n* lines of context.
+   Return a :term:`generator` of groups with up to *n* lines of context.
 
    Starting with the groups returned by :meth:`get_opcodes`, this method splits out
    smaller change clusters and eliminates intervening ranges which have no changes.
@@ -646,3 +687,75 @@ As a single multi-line string it looks like this::
    ?           ++++ ^                      ^
    +   5. Flat is better than nested.
 
+
+.. _difflib-interface:
+
+A command-line interface to difflib
+-----------------------------------
+
+This example shows how to use difflib to create a ``diff``-like utility.
+It is also contained in the Python source distribution, as
+:file:`Tools/scripts/diff.py`.
+
+::
+
+   """ Command line interface to difflib.py providing diffs in four formats:
+
+   * ndiff:    lists every line and highlights interline changes.
+   * context:  highlights clusters of changes in a before/after format.
+   * unified:  highlights clusters of changes in an inline format.
+   * html:     generates side by side comparison with change highlights.
+
+   """
+
+   import sys, os, time, difflib, optparse
+
+   def main():
+        # Configure the option parser
+       usage = "usage: %prog [options] fromfile tofile"
+       parser = optparse.OptionParser(usage)
+       parser.add_option("-c", action="store_true", default=False,
+                         help='Produce a context format diff (default)')
+       parser.add_option("-u", action="store_true", default=False,
+                         help='Produce a unified format diff')
+       hlp = 'Produce HTML side by side diff (can use -c and -l in conjunction)'
+       parser.add_option("-m", action="store_true", default=False, help=hlp)
+       parser.add_option("-n", action="store_true", default=False,
+                         help='Produce a ndiff format diff')
+       parser.add_option("-l", "--lines", type="int", default=3,
+                         help='Set number of context lines (default 3)')
+       (options, args) = parser.parse_args()
+
+       if len(args) == 0:
+           parser.print_help()
+           sys.exit(1)
+       if len(args) != 2:
+           parser.error("need to specify both a fromfile and tofile")
+
+       n = options.lines
+       fromfile, tofile = args # as specified in the usage string
+
+       # we're passing these as arguments to the diff function
+       fromdate = time.ctime(os.stat(fromfile).st_mtime)
+       todate = time.ctime(os.stat(tofile).st_mtime)
+       fromlines = open(fromfile, 'U').readlines()
+       tolines = open(tofile, 'U').readlines()
+
+       if options.u:
+           diff = difflib.unified_diff(fromlines, tolines, fromfile, tofile,
+                                       fromdate, todate, n=n)
+       elif options.n:
+           diff = difflib.ndiff(fromlines, tolines)
+       elif options.m:
+           diff = difflib.HtmlDiff().make_file(fromlines, tolines, fromfile,
+                                               tofile, context=options.c,
+                                               numlines=n)
+       else:
+           diff = difflib.context_diff(fromlines, tolines, fromfile, tofile,
+                                       fromdate, todate, n=n)
+
+       # we're using writelines because diff is a generator
+       sys.stdout.writelines(diff)
+
+   if __name__ == '__main__':
+       main()

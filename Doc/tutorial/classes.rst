@@ -341,7 +341,7 @@ is called with this new argument list.
 Random Remarks
 ==============
 
-.. % [These should perhaps be placed more carefully...]
+.. These should perhaps be placed more carefully...
 
 Data attributes override method attributes with the same name; to avoid
 accidental name conflicts, which may cause hard-to-find bugs in large programs,
@@ -457,7 +457,7 @@ Derived classes may override methods of their base classes.  Because methods
 have no special privileges when calling other methods of the same object, a
 method of a base class that calls another method defined in the same base class
 may end up calling a method of a derived class that overrides it.  (For C++
-programmers: all methods in Python are effectively :keyword:`virtual`.)
+programmers: all methods in Python are effectively ``virtual``.)
 
 An overriding method in a derived class may in fact want to extend rather than
 simply replace the base class method of the same name. There is a simple way to
@@ -495,8 +495,8 @@ figure out the consequences of a name conflict with an attribute of
 :class:`Base2`.  The depth-first rule makes no differences between direct and
 inherited attributes of :class:`Base1`.)
 
-For new-style classes, the method resolution order changes dynamically to
-support cooperative calls to :func:`super`.  This approach is known in some
+For :term:`new-style class`\es, the method resolution order changes dynamically
+to support cooperative calls to :func:`super`.  This approach is known in some
 other multiple-inheritance languages as call-next-method and is more powerful
 than the super call found in single-inheritance languages.
 
@@ -574,12 +574,10 @@ instance, if you have a function that formats some data from a file object, you
 can define a class with methods :meth:`read` and :meth:`readline` that get the
 data from a string buffer instead, and pass it as an argument.
 
-.. % (Unfortunately, this
-.. % technique has its limitations: a class can't define operations that
-.. % are accessed by special syntax such as sequence subscripting or
-.. % arithmetic operators, and assigning such a ``pseudo-file'' to
-.. % \code{sys.stdin} will not cause the interpreter to read further input
-.. % from it.)
+.. (Unfortunately, this technique has its limitations: a class can't define
+   operations that are accessed by special syntax such as sequence subscripting
+   or arithmetic operators, and assigning such a "pseudo-file" to sys.stdin will
+   not cause the interpreter to read further input from it.)
 
 Instance method objects have attributes, too: ``m.im_self`` is the instance
 object with the method :meth:`m`, and ``m.im_func`` is the function object
@@ -711,12 +709,12 @@ returns an object with a :meth:`next` method.  If the class defines
 Generators
 ==========
 
-Generators are a simple and powerful tool for creating iterators.  They are
-written like regular functions but use the :keyword:`yield` statement whenever
-they want to return data.  Each time :meth:`next` is called, the generator
-resumes where it left-off (it remembers all the data values and which statement
-was last executed).  An example shows that generators can be trivially easy to
-create::
+:term:`Generator`\s are a simple and powerful tool for creating iterators.  They
+are written like regular functions but use the :keyword:`yield` statement
+whenever they want to return data.  Each time :meth:`next` is called, the
+generator resumes where it left-off (it remembers all the data values and which
+statement was last executed).  An example shows that generators can be trivially
+easy to create::
 
    def reverse(data):
        for index in range(len(data)-1, -1, -1):

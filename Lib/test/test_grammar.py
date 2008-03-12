@@ -30,6 +30,8 @@ class TokenTests(unittest.TestCase):
         self.assertEquals(0xff, 255)
         self.assertEquals(0377, 255)
         self.assertEquals(2147483647, 017777777777)
+        # "0x" is not a valid literal
+        self.assertRaises(SyntaxError, eval, "0x")
         from sys import maxint
         if maxint == 2147483647:
             self.assertEquals(-2147483647-1, -020000000000)
@@ -570,6 +572,15 @@ hello world
         while 0: pass
         else: pass
 
+        # Issue1920: "while 0" is optimized away,
+        # ensure that the "else" clause is still present.
+        x = 0
+        while 0:
+            x = 1
+        else:
+            x = 2
+        self.assertEquals(x, 2)
+
     def testFor(self):
         # 'for' exprlist 'in' exprlist ':' suite ['else' ':' suite]
         for i in 1, 2, 3: pass
@@ -768,6 +779,16 @@ hello world
             def meth1(self): pass
             def meth2(self, arg): pass
             def meth3(self, a1, a2): pass
+        # decorator: '@' dotted_name [ '(' [arglist] ')' ] NEWLINE
+        # decorators: decorator+
+        # decorated: decorators (classdef | funcdef)
+        def class_decorator(x):
+            x.decorated = True
+            return x
+        @class_decorator
+        class G:
+            pass
+        self.assertEqual(G.decorated, True)
 
     def testListcomps(self):
         # list comprehension tests

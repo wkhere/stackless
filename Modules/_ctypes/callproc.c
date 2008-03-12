@@ -766,7 +766,7 @@ static PyObject *GetResult(PyObject *restype, void *result, PyObject *checker)
 
 	v = PyObject_CallFunctionObjArgs(checker, retval, NULL);
 	if (v == NULL)
-		_AddTraceback("GetResult", __FILE__, __LINE__-2);
+		_AddTraceback("GetResult", "_ctypes/callproc.c", __LINE__-2);
 	Py_DECREF(retval);
 	return v;
 }
@@ -1180,7 +1180,7 @@ call_commethod(PyObject *self, PyObject *args)
 	if (!CDataObject_Check(pcom) || (pcom->b_size != sizeof(void *))) {
 		PyErr_Format(PyExc_TypeError,
 			     "COM Pointer expected instead of %s instance",
-			     Py_Type(pcom)->tp_name);
+			     Py_TYPE(pcom)->tp_name);
 		return NULL;
 	}
 
@@ -1420,7 +1420,7 @@ byref(PyObject *self, PyObject *obj)
 	if (!CDataObject_Check(obj)) {
 		PyErr_Format(PyExc_TypeError,
 			     "byref() argument must be a ctypes instance, not '%s'",
-			     Py_Type(obj)->tp_name);
+			     Py_TYPE(obj)->tp_name);
 		return NULL;
 	}
 
@@ -1578,7 +1578,30 @@ resize(PyObject *self, PyObject *args)
 	return Py_None;
 }
 
+static PyObject *
+unpickle(PyObject *self, PyObject *args)
+{
+	PyObject *typ;
+	PyObject *state;
+	PyObject *result;
+	PyObject *tmp;
+
+	if (!PyArg_ParseTuple(args, "OO", &typ, &state))
+		return NULL;
+	result = PyObject_CallMethod(typ, "__new__", "O", typ);
+	if (result == NULL)
+		return NULL;
+	tmp = PyObject_CallMethod(result, "__setstate__", "O", state);
+	if (tmp == NULL) {
+		Py_DECREF(result);
+		return NULL;
+	}
+	Py_DECREF(tmp);
+	return result;
+}
+
 PyMethodDef module_methods[] = {
+	{"_unpickle", unpickle, METH_VARARGS },
 	{"resize", resize, METH_VARARGS, "Resize the memory buffer of a ctypes instance"},
 #ifdef CTYPES_UNICODE
 	{"set_conversion_mode", set_conversion_mode, METH_VARARGS, set_conversion_mode_doc},

@@ -7,9 +7,6 @@
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
 .. sectionauthor:: Michael Hudson <mwh@python.net>
 
-
-.. % LaTeXed from excellent doc-string.
-
 The :mod:`codeop` module provides utilities upon which the Python
 read-eval-print loop can be emulated, as is done in the :mod:`code` module.  As
 a result, you probably don't want to use the module directly; if you want to
@@ -29,7 +26,6 @@ of doing them both.
 
 To do just the former:
 
-
 .. function:: compile_command(source[, filename[, symbol]])
 
    Tries to compile *source*, which should be a string of Python code and return a
@@ -43,8 +39,8 @@ To do just the former:
    :exc:`OverflowError` or :exc:`ValueError` if there is an invalid literal.
 
    The *symbol* argument determines whether *source* is compiled as a statement
-   (``'single'``, the default) or as an expression (``'eval'``).  Any other value
-   will cause :exc:`ValueError` to  be raised.
+   (``'single'``, the default) or as an :term:`expression` (``'eval'``).  Any
+   other value will cause :exc:`ValueError` to  be raised.
 
    .. warning::
       

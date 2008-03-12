@@ -122,6 +122,10 @@ typedef Py_intptr_t	Py_ssize_t;
 /* Smallest negative value of type Py_ssize_t. */
 #define PY_SSIZE_T_MIN (-PY_SSIZE_T_MAX-1)
 
+#if SIZEOF_PID_T > SIZEOF_LONG
+#   error "Python doesn't support sizeof(pid_t) > sizeof(long)"
+#endif
+
 /* PY_FORMAT_SIZE_T is a platform-specific modifier for use in a printf
  * format to convert an argument with the width of a size_t or Py_ssize_t.
  * C99 introduced "z" for this purpose, but not all platforms support that;
@@ -349,6 +353,24 @@ extern "C" {
 #define Py_SAFE_DOWNCAST(VALUE, WIDE, NARROW) (NARROW)(VALUE)
 #endif
 
+/* High precision defintion of pi and e (Euler)
+ * The values are taken from libc6's math.h.
+ */
+#ifndef Py_MATH_PIl
+#define Py_MATH_PIl 3.1415926535897932384626433832795029L
+#endif
+#ifndef Py_MATH_PI
+#define Py_MATH_PI 3.14159265358979323846
+#endif
+
+#ifndef Py_MATH_El
+#define Py_MATH_El 2.7182818284590452353602874713526625L
+#endif
+
+#ifndef Py_MATH_E
+#define Py_MATH_E 2.7182818284590452354
+#endif
+
 /* Py_IS_NAN(X)
  * Return 1 if float or double arg is a NaN, else 0.
  * Caution:
@@ -358,7 +380,11 @@ extern "C" {
  *     a platform where it doesn't work.
  */
 #ifndef Py_IS_NAN
+#ifdef HAVE_ISNAN
+#define Py_IS_NAN(X) isnan(X)
+#else
 #define Py_IS_NAN(X) ((X) != (X))
+#endif
 #endif
 
 /* Py_IS_INFINITY(X)
@@ -370,7 +396,11 @@ extern "C" {
  *    Override in pyconfig.h if you have a better spelling on your platform.
  */
 #ifndef Py_IS_INFINITY
+#ifdef HAVE_ISINF
+#define Py_IS_INFINITY(X) isinf(X)
+#else
 #define Py_IS_INFINITY(X) ((X) && (X)*0.5 == (X))
+#endif
 #endif
 
 /* Py_IS_FINITE(X)
@@ -379,7 +409,11 @@ extern "C" {
  * macro for this particular test is useful
  */
 #ifndef Py_IS_FINITE
+#ifdef HAVE_FINITE
+#define Py_IS_FINITE(X) finite(X)
+#else
 #define Py_IS_FINITE(X) (!Py_IS_INFINITY(X) && !Py_IS_NAN(X))
+#endif
 #endif
 
 /* HUGE_VAL is supposed to expand to a positive double infinity.  Python
@@ -391,6 +425,15 @@ extern "C" {
  */
 #ifndef Py_HUGE_VAL
 #define Py_HUGE_VAL HUGE_VAL
+#endif
+
+/* Py_NAN
+ * A value that evaluates to a NaN. On IEEE 754 platforms INF*0 or
+ * INF/INF works. Define Py_NO_NAN in pyconfig.h if your platform
+ * doesn't support NaNs.
+ */
+#if !defined(Py_NAN) && !defined(Py_NO_NAN)
+#define Py_NAN (Py_HUGE_VAL * 0.)
 #endif
 
 /* Py_OVERFLOWED(X)
@@ -534,7 +577,7 @@ extern char * _getpty(int *, int, mode_t, int);
    functions, even though they are included in libutil. */
 #include <termios.h>
 extern int openpty(int *, int *, char *, struct termios *, struct winsize *);
-extern int forkpty(int *, char *, struct termios *, struct winsize *);
+extern pid_t forkpty(int *, char *, struct termios *, struct winsize *);
 #endif /* !defined(HAVE_PTY_H) && !defined(HAVE_LIBUTIL_H) */
 #endif /* defined(HAVE_OPENPTY) || defined(HAVE_FORKPTY) */
 

@@ -5,14 +5,6 @@
 #define _SGI_MP_SOURCE
 #endif
 
-/* Convert a possibly signed character to a nonnegative int */
-/* XXX This assumes characters are 8 bits wide */
-#ifdef __CHAR_UNSIGNED__
-#define Py_CHARMASK(c)		(c)
-#else
-#define Py_CHARMASK(c)		((c) & 0xff)
-#endif
-
 /* strtol and strtoul, renamed to avoid conflicts */
 
 
@@ -112,27 +104,40 @@ PyOS_strtoul(register char *str, char **ptr, int base)
 
 	/* check for leading 0 or 0x for auto-base or base 16 */
 	switch (base) {
-		case 0:		/* look for leading 0, 0x or 0X */
-			if (*str == '0') {
-				++str;
-				if (*str == 'x' || *str == 'X') {
-					++str;
-					base = 16;
+	case 0:		/* look for leading 0, 0x or 0X */
+		if (*str == '0') {
+			++str;
+			if (*str == 'x' || *str == 'X') {
+				/* there must be at least one digit after 0x */
+				if (_PyLong_DigitValue[Py_CHARMASK(str[1])] >= 16) {
+					if (ptr)
+						*ptr = str;
+					return 0;
 				}
-				else
-					base = 8;
+				++str;
+				base = 16;
 			}
 			else
-				base = 10;
-			break;
+				base = 8;
+		}
+		else
+			base = 10;
+		break;
 
-		case 16:	/* skip leading 0x or 0X */
-			if (*str == '0') {
+	case 16:	/* skip leading 0x or 0X */
+		if (*str == '0') {
+			++str;
+			if (*str == 'x' || *str == 'X') {
+				/* there must be at least one digit after 0x */
+				if (_PyLong_DigitValue[Py_CHARMASK(str[1])] >= 16) {
+					if (ptr)
+						*ptr = str;
+					return 0;
+				}
 				++str;
-				if (*str == 'x' || *str == 'X')
-					++str;
 			}
-			break;
+		}
+		break;
 	}
 
 	/* catch silly bases */

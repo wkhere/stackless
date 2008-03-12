@@ -70,11 +70,16 @@ on a separate line for clarity.
 
 
 .. _if:
+.. _elif:
+.. _else:
 
 The :keyword:`if` statement
 ===========================
 
-.. index:: statement: if
+.. index::
+   statement: if
+   keyword: elif
+   keyword: else
 
 The :keyword:`if` statement is used for conditional execution:
 
@@ -82,10 +87,6 @@ The :keyword:`if` statement is used for conditional execution:
    if_stmt: "if" `expression` ":" `suite`
           : ( "elif" `expression` ":" `suite` )*
           : ["else" ":" `suite`]
-
-.. index::
-   keyword: elif
-   keyword: else
 
 It selects exactly one of the suites by evaluating the expressions one by one
 until one is found to be true (see section :ref:`booleans` for the definition of
@@ -102,6 +103,7 @@ The :keyword:`while` statement
 .. index::
    statement: while
    pair: loop; statement
+   keyword: else
 
 The :keyword:`while` statement is used for repeated execution as long as an
 expression is true:
@@ -109,8 +111,6 @@ expression is true:
 .. productionlist::
    while_stmt: "while" `expression` ":" `suite`
              : ["else" ":" `suite`]
-
-.. index:: keyword: else
 
 This repeatedly tests the expression and, if it is true, executes the first
 suite; if the expression is false (which may be the first time it is tested) the
@@ -135,8 +135,10 @@ The :keyword:`for` statement
 .. index::
    statement: for
    pair: loop; statement
-
-.. index:: object: sequence
+   keyword: in
+   keyword: else
+   pair: target; list
+   object: sequence
 
 The :keyword:`for` statement is used to iterate over the elements of a sequence
 (such as a string, tuple or list) or other iterable object:
@@ -144,11 +146,6 @@ The :keyword:`for` statement is used to iterate over the elements of a sequence
 .. productionlist::
    for_stmt: "for" `target_list` "in" `expression_list` ":" `suite`
            : ["else" ":" `suite`]
-
-.. index::
-   keyword: in
-   keyword: else
-   pair: target; list
 
 The expression list is evaluated once; it should yield an iterable object.  An
 iterator is created for the result of the ``expression_list``.  The suite is
@@ -206,11 +203,16 @@ effect of Pascal's ``for i := a to b do``; e.g., ``range(3)`` returns the list
 
 
 .. _try:
+.. _except:
+.. _finally:
 
 The :keyword:`try` statement
 ============================
 
-.. index:: statement: try
+.. index::
+   statement: try
+   keyword: except
+   keyword: finally
 
 The :keyword:`try` statement specifies exception handlers and/or cleanup code
 for a group of statements:
@@ -228,8 +230,6 @@ for a group of statements:
    In previous versions of Python, :keyword:`try`...\ :keyword:`except`...\
    :keyword:`finally` did not work. :keyword:`try`...\ :keyword:`except` had to be
    nested in :keyword:`try`...\ :keyword:`finally`.
-
-.. index:: keyword: except
 
 The :keyword:`except` clause(s) specify one or more exception handlers. When no
 exception occurs in the :keyword:`try` clause, no exception handler is executed.
@@ -320,6 +320,7 @@ may be found in section :ref:`raise`.
 
 
 .. _with:
+.. _as:
 
 The :keyword:`with` statement
 =============================
@@ -371,12 +372,8 @@ The execution of the :keyword:`with` statement proceeds as follows:
 .. note::
 
    In Python 2.5, the :keyword:`with` statement is only allowed when the
-   ``with_statement`` feature has been enabled.  It will always be enabled in
-   Python 2.6.  This ``__future__`` import statement can be used to enable the
-   feature::
-
-      from __future__ import with_statement
-
+   ``with_statement`` feature has been enabled.  It is always enabled in
+   Python 2.6.
 
 .. seealso::
 
@@ -386,15 +383,16 @@ The execution of the :keyword:`with` statement proceeds as follows:
 
 
 .. _function:
+.. _def:
 
 Function definitions
 ====================
 
 .. index::
-   pair: function; definition
    statement: def
-
-.. index::
+   pair: function; definition
+   pair: function; name
+   pair: name; binding
    object: user-defined function
    object: function
 
@@ -415,10 +413,6 @@ A function definition defines a user-defined function object (see section
    parameter: `identifier` | "(" `sublist` ")"
    funcname: `identifier`
 
-.. index::
-   pair: function; name
-   pair: name; binding
-
 A function definition is an executable statement.  Its execution binds the
 function name in the current local namespace to a function object (a wrapper
 around the executable code for the function).  This function object contains a
@@ -428,7 +422,7 @@ when the function is called.
 The function definition does not execute the function body; this gets executed
 only when the function is called.
 
-A function definition may be wrapped by one or more decorator expressions.
+A function definition may be wrapped by one or more :term:`decorator` expressions.
 Decorator expressions are evaluated when the function is defined, in the scope
 that contains the function definition.  The result must be a callable, which is
 invoked with the function object as the only argument. The returned value is
@@ -499,10 +493,13 @@ Class definitions
 =================
 
 .. index::
-   pair: class; definition
+   object: class
    statement: class
-
-.. index:: object: class
+   pair: class; definition
+   pair: class; name
+   pair: name; binding
+   pair: execution; frame
+   single: inheritance
 
 A class definition defines a class object (see section :ref:`types`):
 
@@ -510,12 +507,6 @@ A class definition defines a class object (see section :ref:`types`):
    classdef: "class" `classname` [`inheritance`] ":" `suite`
    inheritance: "(" [`expression_list`] ")"
    classname: `identifier`
-
-.. index::
-   single: inheritance
-   pair: class; name
-   pair: name; binding
-   pair: execution; frame
 
 A class definition is an executable statement.  It first evaluates the
 inheritance list, if present.  Each item in the inheritance list should evaluate
@@ -529,20 +520,20 @@ the saved local namespace for the attribute dictionary.  The class name is bound
 to this class object in the original local namespace.
 
 **Programmer's note:** Variables defined in the class definition are class
-variables; they are shared by all instances.  To define instance variables, they
-must be given a value in the :meth:`__init__` method or in another method.  Both
-class and instance variables are accessible through the notation
-"``self.name``", and an instance variable hides a class variable with the same
-name when accessed in this way.  Class variables with immutable values can be
-used as defaults for instance variables. For new-style classes, descriptors can
-be used to create instance variables with different implementation details.
+variables; they are shared by all instances.  To create instance variables, they
+can be set in a method with ``self.name = value``.  Both class and instance
+variables are accessible through the notation "``self.name``", and an instance
+variable hides a class variable with the same name when accessed in this way.
+Class variables can be used as defaults for instance variables, but using
+mutable values there can lead to unexpected results.  For :term:`new-style
+class`\es, descriptors can be used to create instance variables with different
+implementation details.
 
 .. rubric:: Footnotes
 
-.. [#] The exception is propogated to the invocation stack only if there is no
+.. [#] The exception is propagated to the invocation stack only if there is no
    :keyword:`finally` clause that negates the exception.
 
 .. [#] Currently, control "flows off the end" except in the case of an exception or the
    execution of a :keyword:`return`, :keyword:`continue`, or :keyword:`break`
    statement.
-

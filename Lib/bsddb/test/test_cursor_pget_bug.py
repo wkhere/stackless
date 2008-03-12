@@ -1,5 +1,6 @@
 import unittest
-import sys, os, glob
+import tempfile
+import os, glob
 
 try:
     # For Pythons w/distutils pybsddb
@@ -16,7 +17,7 @@ class pget_bugTestCase(unittest.TestCase):
     db_name = 'test-cursor_pget.db'
 
     def setUp(self):
-        self.homeDir = os.path.join(os.path.dirname(sys.argv[0]), 'db_home')
+        self.homeDir = os.path.join(tempfile.gettempdir(), 'db_home%d'%os.getpid())
         try:
             os.mkdir(self.homeDir)
         except os.error:
@@ -41,9 +42,8 @@ class pget_bugTestCase(unittest.TestCase):
         del self.secondary_db
         del self.primary_db
         del self.env
-        for file in glob.glob(os.path.join(self.homeDir, '*')):
-            os.remove(file)
-        os.removedirs(self.homeDir)
+        from test import test_support
+        test_support.rmtree(self.homeDir)
 
     def test_pget(self):
         cursor = self.secondary_db.cursor()

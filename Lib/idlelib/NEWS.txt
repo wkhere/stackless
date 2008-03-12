@@ -1,7 +1,25 @@
 What's New in IDLE 2.6a1?
 =========================
 
-*Release date: XX-XXX-200X*
+*Release date: 29-Feb-2008*
+
+- Configured selection highlighting colors were ignored; updating highlighting
+  in the config dialog would cause non-Python files to be colored as if they
+  were Python source; improve use of ColorDelagator.  Patch 1334. Tal Einat.
+
+- ScriptBinding event handlers weren't returning 'break'. Patch 2050, Tal Einat.
+
+- There was an error on exit if no sys.exitfunc was defined. Issue 1647.
+
+- Could not open files in .idlerc directory if latter was hidden on Windows.
+  Issue 1743, Issue 1862.
+
+- Configure Dialog: improved layout for keybinding.  Patch 1457 Tal Einat.
+
+- tabpage.py updated: tabbedPages.py now supports multiple dynamic rows
+  of tabs.  Patch 1612746 Tal Einat.
+
+- Add confirmation dialog before printing.  Patch 1717170 Tal Einat.
 
 - Show paste position if > 80 col.  Patch 1659326 Tal Einat.
 
@@ -15,6 +33,13 @@ What's New in IDLE 2.6a1?
 - textView cleanup. Patch 1718043 Tal Einat.
 
 - Clean up EditorWindow close.
+
+- Patch 1693258: Fix for duplicate "preferences" menu-OS X. Backport of r56204.
+
+- OSX: Avoid crash for those versions of Tcl/Tk which don't have a console
+
+- Bug in idlelib.MultiCall: Options dialog was crashing IDLE if there was an
+  option in config-extensions w/o a value. Patch #1672481, Tal Einat
 
 - Corrected some bugs in AutoComplete.  Also, Page Up/Down in ACW implemented;
   mouse and cursor selection in ACWindow implemented; double Tab inserts

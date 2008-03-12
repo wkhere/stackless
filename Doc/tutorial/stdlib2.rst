@@ -134,8 +134,10 @@ Working with Binary Data Record Layouts
 
 The :mod:`struct` module provides :func:`pack` and :func:`unpack` functions for
 working with variable length binary record formats.  The following example shows
-how to loop through header information in a ZIP file (with pack codes ``"H"``
-and ``"L"`` representing two and four byte unsigned numbers respectively)::
+how to loop through header information in a ZIP file without using the
+:mod:`zipfile` module.  Pack codes ``"H"`` and ``"I"`` represent two and four
+byte unsigned numbers respectively.  The ``"<"`` indicates that they are
+standard size and in little-endian byte order::
 
    import struct
 
@@ -143,7 +145,7 @@ and ``"L"`` representing two and four byte unsigned numbers respectively)::
    start = 0
    for i in range(3):                      # show the first 3 file headers
        start += 14
-       fields = struct.unpack('LLLHH', data[start:start+16])
+       fields = struct.unpack('<IIIHH', data[start:start+16])
        crc32, comp_size, uncomp_size, filenamesize, extra_size = fields
 
        start += 16
@@ -239,8 +241,8 @@ Weak References
 ===============
 
 Python does automatic memory management (reference counting for most objects and
-garbage collection to eliminate cycles).  The memory is freed shortly after the
-last reference to it has been eliminated.
+:term:`garbage collection` to eliminate cycles).  The memory is freed shortly
+after the last reference to it has been eliminated.
 
 This approach works fine for most applications but occasionally there is a need
 to track objects only as long as they are being used by something else.
@@ -267,7 +269,7 @@ applications include caching objects that are expensive to create::
    0
    >>> d['primary']                # entry was automatically removed
    Traceback (most recent call last):
-     File "<pyshell#108>", line 1, in -toplevel-
+     File "<stdin>", line 1, in <module>
        d['primary']                # entry was automatically removed
      File "C:/python26/lib/weakref.py", line 46, in __getitem__
        o = self.data[key]()

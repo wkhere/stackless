@@ -176,6 +176,8 @@ THREADOBJ=	@THREADOBJ@
 DLINCLDIR=	@DLINCLDIR@
 DYNLOADFILE=	@DYNLOADFILE@
 MACHDEP_OBJS=	@MACHDEP_OBJS@
+LIBOBJDIR=	Python/
+LIBOBJS=	@LIBOBJS@
 UNICODE_OBJS=   @UNICODE_OBJS@
 
 PYTHON=		python$(EXE)
@@ -228,6 +230,10 @@ PGOBJS=		\
 		Parser/tokenizer_pgen.o \
 		Parser/printgrammar.o \
 		Parser/pgenmain.o
+
+PARSER_HEADERS= \
+		Parser/parser.h \
+		Parser/tokenizer.h
 
 PGENOBJS=	$(PGENMAIN) $(POBJS) $(PGOBJS)
 
@@ -290,8 +296,12 @@ PYTHON_OBJS=	\
 		Python/sysmodule.o \
 		Python/traceback.o \
 		Python/getopt.o \
+		Python/pystrcmp.o \
 		Python/pystrtod.o \
+		Python/formatter_unicode.o \
+		Python/formatter_string.o \
 		Python/$(DYNLOADFILE) \
+		$(LIBOBJS) \
 		$(MACHDEP_OBJS) \
 		$(THREADOBJ)
 
@@ -367,7 +377,7 @@ platform: $(BUILDPYTHON)
 # Build the shared modules
 sharedmods: $(BUILDPYTHON)
 	@case $$MAKEFLAGS in \
-	*-s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
+	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
 	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
 	esac
 
@@ -524,6 +534,28 @@ Python/importdl.o: $(srcdir)/Python/importdl.c
 Objects/unicodectype.o:	$(srcdir)/Objects/unicodectype.c \
 				$(srcdir)/Objects/unicodetype_db.h
 
+STRINGLIB_HEADERS= \
+		$(srcdir)/Objects/stringlib/count.h \
+		$(srcdir)/Objects/stringlib/fastsearch.h \
+		$(srcdir)/Objects/stringlib/find.h \
+		$(srcdir)/Objects/stringlib/formatter.h \
+		$(srcdir)/Objects/stringlib/partition.h \
+		$(srcdir)/Objects/stringlib/stringdefs.h \
+		$(srcdir)/Objects/stringlib/string_format.h \
+		$(srcdir)/Objects/stringlib/unicodedefs.h
+
+Objects/unicodeobject.o: $(srcdir)/Objects/unicodeobject.c \
+				$(STRINGLIB_HEADERS)
+
+Objects/stringobject.o: $(srcdir)/Objects/stringobject.c \
+				$(STRINGLIB_HEADERS)
+
+Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
+				$(STRINGLIB_HEADERS)
+
+Python/formatter_string.o: $(srcdir)/Python/formatter_string.c \
+				$(STRINGLIB_HEADERS)
+
 Stackless/core/slp_transfer.o: $(srcdir)/Stackless/core/slp_transfer.c
 		$(CC) -c $(PY_CFLAGS) $(SLPFLAGS) -I$(DLINCLDIR) -o $@ $(srcdir)/Stackless/core/slp_transfer.c
 
@@ -531,12 +563,15 @@ Stackless/core/slp_transfer.o: $(srcdir)/Stackless/core/slp_transfer.c
 # Header files
 
 PYTHON_HEADERS= \
-		Include/Python.h \
 		Include/Python-ast.h \
-		Include/asdl.h \
+		Include/Python.h \
 		Include/abstract.h \
+		Include/asdl.h \
+		Include/ast.h \
+		Include/bitset.h \
 		Include/boolobject.h \
 		Include/bufferobject.h \
+		Include/cellobject.h \
 		Include/ceval.h \
 		Include/classobject.h \
 		Include/cobject.h \
@@ -547,41 +582,57 @@ PYTHON_HEADERS= \
 		Include/descrobject.h \
 		Include/dictobject.h \
 		Include/enumobject.h \
-		Include/genobject.h \
+		Include/errcode.h \
+		Include/eval.h \
 		Include/fileobject.h \
 		Include/floatobject.h \
+		Include/frameobject.h \
 		Include/funcobject.h \
+		Include/genobject.h \
 		Include/import.h \
 		Include/intobject.h \
 		Include/intrcheck.h \
 		Include/iterobject.h \
 		Include/listobject.h \
+		Include/longintrepr.h \
 		Include/longobject.h \
+		Include/marshal.h \
+		Include/metagrammar.h \
 		Include/methodobject.h \
 		Include/modsupport.h \
 		Include/moduleobject.h \
+		Include/node.h \
 		Include/object.h \
 		Include/objimpl.h \
+		Include/opcode.h \
+		Include/osdefs.h \
 		Include/parsetok.h \
 		Include/patchlevel.h \
+		Include/pgen.h \
+		Include/pgenheaders.h \
 		Include/pyarena.h \
 		Include/pydebug.h \
 		Include/pyerrors.h \
 		Include/pyfpe.h \
+		Include/pygetopt.h \
 		Include/pymem.h \
 		Include/pyport.h \
 		Include/pystate.h \
+		Include/pystrcmp.h \
+		Include/pystrtod.h \
 		Include/pythonrun.h \
+		Include/pythread.h \
 		Include/rangeobject.h \
-                Include/setobject.h \
+		Include/setobject.h \
 		Include/sliceobject.h \
 		Include/stringobject.h \
-		Include/structseq.h \
 		Include/structmember.h \
+		Include/structseq.h \
 		Include/symtable.h \
 		Include/sysmodule.h \
 		Include/traceback.h \
 		Include/tupleobject.h \
+		Include/ucnhash.h \
 		Include/unicodeobject.h \
 		Include/weakrefobject.h \
 		Stackless/stackless.h \
@@ -603,7 +654,8 @@ PYTHON_HEADERS= \
 		Stackless/platf/switch_arm32_gcc.h \
 		Stackless/platf/switch_x86_msvc.h \
 		Stackless/platf/switch_x86_unix.h \
-		pyconfig.h
+		pyconfig.h \
+		$(PARSER_HEADERS)
 
 $(LIBRARY_OBJS) $(MODOBJS) Modules/python.o: $(PYTHON_HEADERS)
 
@@ -627,6 +679,8 @@ test:		all platform
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS)
 
 testall:	all platform
+		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
+		$(TESTPYTHON) $(srcdir)/Lib/compileall.py
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
@@ -1050,7 +1104,7 @@ config.status:	$(srcdir)/configure
 
 # Run reindent on the library
 reindent:
-	./python$(EXEEXT) $(srcdir)/Tools/scripts/reindent.py -r $(srcdir)/Lib
+	./$(BUILDPYTHON) $(srcdir)/Tools/scripts/reindent.py -r $(srcdir)/Lib
 
 # Rerun configure with the same options as it was run last time,
 # provided the config.status script exists

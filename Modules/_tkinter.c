@@ -262,12 +262,12 @@ typedef struct {
 	Tcl_ObjType *StringType;
 } TkappObject;
 
-#define Tkapp_Check(v) (Py_Type(v) == &Tkapp_Type)
+#define Tkapp_Check(v) (Py_TYPE(v) == &Tkapp_Type)
 #define Tkapp_Interp(v) (((TkappObject *) (v))->interp)
 #define Tkapp_Result(v) Tcl_GetStringResult(Tkapp_Interp(v))
 
 #define DEBUG_REFCNT(v) (printf("DEBUG: id=%p, refcnt=%i\n", \
-(void *) v, Py_Refcnt(v)))
+(void *) v, Py_REFCNT(v)))
 
 
 
@@ -936,10 +936,12 @@ AsObj(PyObject *value)
 		/* This #ifdef assumes that Tcl uses UCS-2.
 		   See TCL_UTF_MAX test above. */
 #if defined(Py_UNICODE_WIDE) && TCL_UTF_MAX == 3
-		Tcl_UniChar *outbuf;
+		Tcl_UniChar *outbuf = NULL;
 		Py_ssize_t i;
-		assert(size < size * sizeof(Tcl_UniChar));
-		outbuf = (Tcl_UniChar*)ckalloc(size * sizeof(Tcl_UniChar));
+		size_t allocsize = ((size_t)size) * sizeof(Tcl_UniChar);
+		if (allocsize >= size)
+			outbuf = (Tcl_UniChar*)ckalloc(allocsize);
+		/* Else overflow occurred, and we take the next exit */
 		if (!outbuf) {
 			PyErr_NoMemory();
 			return NULL;
@@ -1992,9 +1994,9 @@ static int
 PythonCmd(ClientData clientData, Tcl_Interp *interp, int argc, char *argv[])
 {
 	PythonCmd_ClientData *data = (PythonCmd_ClientData *)clientData;
-	PyObject *self, *func, *arg, *res, *tmp;
+	PyObject *self, *func, *arg, *res;
 	int i, rv;
-	char *s;
+	Tcl_Obj *obj_res;
 
 	ENTER_PYTHON
 
@@ -2021,24 +2023,17 @@ PythonCmd(ClientData clientData, Tcl_Interp *interp, int argc, char *argv[])
 	if (res == NULL)
 		return PythonCmd_Error(interp);
 
-	if (!(tmp = PyList_New(0))) {
+	obj_res = AsObj(res);
+	if (obj_res == NULL) {
 		Py_DECREF(res);
-		return PythonCmd_Error(interp);
-	}
-
-	s = AsString(res, tmp);
-	if (s == NULL) {
-		Py_DECREF(res);
-		Py_DECREF(tmp);
 		return PythonCmd_Error(interp);
 	}
 	else {
-		Tcl_SetResult(Tkapp_Interp(self), s, TCL_VOLATILE);
+		Tcl_SetObjResult(Tkapp_Interp(self), obj_res);
 		rv = TCL_OK;
 	}
 
 	Py_DECREF(res);
-	Py_DECREF(tmp);
 
 	LEAVE_PYTHON
 
@@ -3105,7 +3100,7 @@ init_tkinter(void)
 {
 	PyObject *m, *d;
 
-	Py_Type(&Tkapp_Type) = &PyType_Type;
+	Py_TYPE(&Tkapp_Type) = &PyType_Type;
 
 #ifdef WITH_THREAD
 	tcl_lock = PyThread_allocate_lock();
@@ -3133,10 +3128,10 @@ init_tkinter(void)
 
 	PyDict_SetItemString(d, "TkappType", (PyObject *)&Tkapp_Type);
 
-	Py_Type(&Tktt_Type) = &PyType_Type;
+	Py_TYPE(&Tktt_Type) = &PyType_Type;
 	PyDict_SetItemString(d, "TkttType", (PyObject *)&Tktt_Type);
 
-	Py_Type(&PyTclObject_Type) = &PyType_Type;
+	Py_TYPE(&PyTclObject_Type) = &PyType_Type;
 	PyDict_SetItemString(d, "Tcl_Obj", (PyObject *)&PyTclObject_Type);
 
 #ifdef TK_AQUA

@@ -6,7 +6,7 @@ Implements the Distutils 'build_scripts' command."""
 
 __revision__ = "$Id$"
 
-import sys, os, re
+import os, re
 from stat import ST_MODE
 from distutils import sysconfig
 from distutils.core import Command
@@ -112,7 +112,8 @@ class build_scripts (Command):
                 if f:
                     f.close()
             else:
-                f.close()
+                if f:
+                    f.close()
                 self.copy_file(script, outfile)
 
         if os.name == 'posix':

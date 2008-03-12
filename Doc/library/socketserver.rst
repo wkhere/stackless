@@ -44,7 +44,7 @@ to behave autonomously; the default is :const:`False`, meaning that Python will
 not exit until all threads created by :class:`ThreadingMixIn` have exited.
 
 Server classes have the same external methods and attributes, no matter what
-network protocol they use:
+network protocol they use.
 
 
 Server Creation Notes
@@ -115,9 +115,8 @@ next (or whether to handle a new incoming request).  This is particularly
 important for stream services where each client can potentially be connected for
 a long time (if threads or subprocesses cannot be used).
 
-.. % XXX should data and methods be intermingled, or separate?
-.. % how should the distinction between class and instance variables be
-.. % drawn?
+.. XXX should data and methods be intermingled, or separate?
+   how should the distinction between class and instance variables be drawn?
 
 
 Server Objects
@@ -171,8 +170,7 @@ Server Objects
 
 The server classes support the following class variables:
 
-.. % XXX should class variables be covered before instance variables, or
-.. % vice versa?
+.. XXX should class variables be covered before instance variables, or vice versa?
 
 
 .. data:: allow_reuse_address
@@ -195,12 +193,19 @@ The server classes support the following class variables:
    The type of socket used by the server; :const:`socket.SOCK_STREAM` and
    :const:`socket.SOCK_DGRAM` are two possible values.
 
+.. data:: timeout
+
+   Timeout duration, measured in seconds, or :const:`None` if no timeout is desired.
+   If no incoming requests are received within the timeout period, 
+   the :meth:`handle_timeout` method is called and then the server resumes waiting for 
+   requests.
+
 There are various server methods that can be overridden by subclasses of base
 server classes like :class:`TCPServer`; these methods aren't useful to external
 users of the server object.
 
-.. % should the default implementations of these be documented, or should
-.. % it be assumed that the user will look at SocketServer.py?
+.. XXX should the default implementations of these be documented, or should
+   it be assumed that the user will look at SocketServer.py?
 
 
 .. function:: finish_request()
@@ -222,6 +227,13 @@ users of the server object.
    method raises an exception.  The default action is to print the traceback to
    standard output and continue handling further requests.
 
+.. function:: handle_timeout()
+
+   This function is called when the :attr:`timeout` attribute has been set to a 
+   value other than :const:`None` and the timeout period has passed with no 
+   requests being received.  The default action for forking servers is
+   to collect the status of any child processes that have exited, while
+   in threading servers this method does nothing.
 
 .. function:: process_request(request, client_address)
 
@@ -230,9 +242,9 @@ users of the server object.
    or thread to handle the request; the :class:`ForkingMixIn` and
    :class:`ThreadingMixIn` classes do this.
 
-.. % Is there any point in documenting the following two functions?
-.. % What would the purpose of overriding them be: initializing server
-.. % instance variables, adding new network families?
+.. Is there any point in documenting the following two functions?
+   What would the purpose of overriding them be: initializing server
+   instance variables, adding new network families?
 
 
 .. function:: server_activate()

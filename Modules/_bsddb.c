@@ -203,13 +203,18 @@ static PyObject* DBPermissionsError;    /* EPERM  */
 
 staticforward PyTypeObject DB_Type, DBCursor_Type, DBEnv_Type, DBTxn_Type, DBLock_Type;
 
-#define DBObject_Check(v)           (Py_Type(v) == &DB_Type)
-#define DBCursorObject_Check(v)     (Py_Type(v) == &DBCursor_Type)
-#define DBEnvObject_Check(v)        (Py_Type(v) == &DBEnv_Type)
-#define DBTxnObject_Check(v)        (Py_Type(v) == &DBTxn_Type)
-#define DBLockObject_Check(v)       (Py_Type(v) == &DBLock_Type)
+#ifndef Py_Type
+/* for compatibility with Python 2.5 and earlier */
+#define Py_TYPE(ob)              (((PyObject*)(ob))->ob_type)
+#endif
+
+#define DBObject_Check(v)           (Py_TYPE(v) == &DB_Type)
+#define DBCursorObject_Check(v)     (Py_TYPE(v) == &DBCursor_Type)
+#define DBEnvObject_Check(v)        (Py_TYPE(v) == &DBEnv_Type)
+#define DBTxnObject_Check(v)        (Py_TYPE(v) == &DBTxn_Type)
+#define DBLockObject_Check(v)       (Py_TYPE(v) == &DBLock_Type)
 #if (DBVER >= 43)
-#define DBSequenceObject_Check(v)   (Py_Type(v) == &DBSequence_Type)
+#define DBSequenceObject_Check(v)   (Py_TYPE(v) == &DBSequence_Type)
 #endif
 
 
@@ -335,11 +340,13 @@ make_key_dbt(DBObject* self, PyObject* keyobj, DBT* key, int* pflags)
          * the code check for DB_THREAD and forceably set DBT_MALLOC
          * when we otherwise would leave flags 0 to indicate that.
          */
-        key->data = strdup(PyString_AS_STRING(keyobj));
+        key->data = malloc(PyString_GET_SIZE(keyobj));
         if (key->data == NULL) {
             PyErr_SetString(PyExc_MemoryError, "Key memory allocation failed");
             return 0;
         }
+        memcpy(key->data, PyString_AS_STRING(keyobj),
+               PyString_GET_SIZE(keyobj));
         key->flags = DB_DBT_REALLOC;
         key->size = PyString_GET_SIZE(keyobj);
     }
@@ -376,7 +383,7 @@ make_key_dbt(DBObject* self, PyObject* keyobj, DBT* key, int* pflags)
     else {
         PyErr_Format(PyExc_TypeError,
                      "String or Integer object expected for key, %s found",
-                     Py_Type(keyobj)->tp_name);
+                     Py_TYPE(keyobj)->tp_name);
         return 0;
     }
 
@@ -526,7 +533,7 @@ static int makeDBError(int err)
 static void makeTypeError(char* expected, PyObject* found)
 {
     PyErr_Format(PyExc_TypeError, "Expected %s argument, %s found.",
-                 expected, Py_Type(found)->tp_name);
+                 expected, Py_TYPE(found)->tp_name);
 }
 
 
@@ -817,7 +824,6 @@ DBCursor_dealloc(DBCursorObject* self)
     }
 
     if (self->dbc != NULL) {
-        MYDB_BEGIN_ALLOW_THREADS;
 	/* If the underlying database has been closed, we don't
 	   need to do anything. If the environment has been closed
 	   we need to leak, as BerkeleyDB will crash trying to access
@@ -826,9 +832,14 @@ DBCursor_dealloc(DBCursorObject* self)
 	   a database open. */
 	if (self->mydb->db && self->mydb->myenvobj &&
 	    !self->mydb->myenvobj->closed)
+        /* test for: open db + no environment or non-closed environment */
+	if (self->mydb->db && (!self->mydb->myenvobj || (self->mydb->myenvobj &&
+	    !self->mydb->myenvobj->closed))) {
+            MYDB_BEGIN_ALLOW_THREADS;
             err = self->dbc->c_close(self->dbc);
+            MYDB_END_ALLOW_THREADS;
+        }
         self->dbc = NULL;
-        MYDB_END_ALLOW_THREADS;
     }
     Py_XDECREF( self->mydb );
     PyObject_Del(self);
@@ -1834,21 +1845,6 @@ DB_open(DBObject* self, PyObject* args, PyObject* kwargs)
         return NULL;
     }
 
-#if 0 && (DBVER >= 41)
-    if ((!txn) && (txnobj != Py_None) && self->myenvobj
-        && (self->myenvobj->flags & DB_INIT_TXN))
-    {
-	/* If no 'txn' parameter was supplied (no DbTxn object and None was not
-	 * explicitly passed) but we are in a transaction ready environment:
-	 *   add DB_AUTO_COMMIT to allow for older pybsddb apps using transactions
-	 *   to work on BerkeleyDB 4.1 without needing to modify their
-	 *   DBEnv or DB open calls. 
-	 * TODO make this behaviour of the library configurable.
-	 */
-	flags |= DB_AUTO_COMMIT;
-    }
-#endif
-
     MYDB_BEGIN_ALLOW_THREADS;
 #if (DBVER >= 41)
     err = self->db->open(self->db, txn, filename, dbname, type, flags, mode);
@@ -1861,6 +1857,10 @@ DB_open(DBObject* self, PyObject* args, PyObject* kwargs)
         self->db = NULL;
         return NULL;
     }
+
+#if (DBVER >= 42)
+    self->db->get_flags(self->db, &self->setflags);
+#endif
 
     self->flags = flags;
     RETURN_NONE();
@@ -4261,6 +4261,24 @@ DBEnv_lock_id(DBEnvObject* self, PyObject* args)
     return PyInt_FromLong((long)theID);
 }
 
+#if (DBVER >= 40)
+static PyObject*
+DBEnv_lock_id_free(DBEnvObject* self, PyObject* args)
+{
+    int err;
+    u_int32_t theID;
+
+    if (!PyArg_ParseTuple(args, "I:lock_id_free", &theID))
+        return NULL;
+
+    CHECK_ENV_NOT_CLOSED(self);
+    MYDB_BEGIN_ALLOW_THREADS;
+    err = self->db_env->lock_id_free(self->db_env, theID);
+    MYDB_END_ALLOW_THREADS;
+    RETURN_IF_ERR();
+    RETURN_NONE();
+}
+#endif
 
 static PyObject*
 DBEnv_lock_put(DBEnvObject* self, PyObject* args)
@@ -5136,6 +5154,9 @@ static PyMethodDef DBEnv_methods[] = {
     {"lock_detect",     (PyCFunction)DBEnv_lock_detect,      METH_VARARGS},
     {"lock_get",        (PyCFunction)DBEnv_lock_get,         METH_VARARGS},
     {"lock_id",         (PyCFunction)DBEnv_lock_id,          METH_VARARGS},
+#if (DBVER >= 40)
+    {"lock_id_free",    (PyCFunction)DBEnv_lock_id_free,     METH_VARARGS},
+#endif
     {"lock_put",        (PyCFunction)DBEnv_lock_put,         METH_VARARGS},
     {"lock_stat",       (PyCFunction)DBEnv_lock_stat,        METH_VARARGS},
     {"log_archive",     (PyCFunction)DBEnv_log_archive,      METH_VARARGS},
@@ -5518,13 +5539,13 @@ DL_EXPORT(void) init_bsddb(void)
 
     /* Initialize the type of the new type objects here; doing it here
        is required for portability to Windows without requiring C++. */
-    Py_Type(&DB_Type) = &PyType_Type;
-    Py_Type(&DBCursor_Type) = &PyType_Type;
-    Py_Type(&DBEnv_Type) = &PyType_Type;
-    Py_Type(&DBTxn_Type) = &PyType_Type;
-    Py_Type(&DBLock_Type) = &PyType_Type;
+    Py_TYPE(&DB_Type) = &PyType_Type;
+    Py_TYPE(&DBCursor_Type) = &PyType_Type;
+    Py_TYPE(&DBEnv_Type) = &PyType_Type;
+    Py_TYPE(&DBTxn_Type) = &PyType_Type;
+    Py_TYPE(&DBLock_Type) = &PyType_Type;
 #if (DBVER >= 43)    
-    Py_Type(&DBSequence_Type) = &PyType_Type;
+    Py_TYPE(&DBSequence_Type) = &PyType_Type;
 #endif    
 
 
@@ -5793,6 +5814,10 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_YIELDCPU);
     ADD_INT(d, DB_PANIC_ENVIRONMENT);
     ADD_INT(d, DB_NOPANIC);
+#endif
+
+#ifdef DB_REGISTER
+    ADD_INT(d, DB_REGISTER);
 #endif
 
 #if (DBVER >= 42)

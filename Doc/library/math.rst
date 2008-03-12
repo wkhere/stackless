@@ -30,6 +30,14 @@ Number-theoretic and representation functions:
    equal to *x*.
 
 
+.. function:: copysign(x, y)
+
+   Return *x* with the sign of *y*. ``copysign`` copies the sign bit of an IEEE
+   754 float, ``copysign(1, -0.0)`` returns *-1.0*.
+
+   .. versionadded:: 2.6
+
+
 .. function:: fabs(x)
 
    Return the absolute value of *x*.
@@ -39,6 +47,9 @@ Number-theoretic and representation functions:
 
    Return the floor of *x* as a float, the largest integer value less than or equal
    to *x*.
+
+   .. versionchanged:: 2.6
+      Added :meth:`__floor__` delegation.
 
 
 .. function:: fmod(x, y)
@@ -64,6 +75,23 @@ Number-theoretic and representation functions:
    apart" the internal representation of a float in a portable way.
 
 
+.. function:: isinf(x)
+
+   Checks if the float *x* is positive or negative infinite.
+
+   .. versionadded:: 2.6
+
+
+.. function:: isnan(x)
+
+   Checks if the float *x* is a NaN (not a number). NaNs are part of the
+   IEEE 754 standards. Operation like but not limited to ``inf * 0``, 
+   ``inf / inf`` or any operation involving a NaN, e.g. ``nan * 1``, return
+   a NaN.
+
+   .. versionadded:: 2.6
+
+
 .. function:: ldexp(x, i)
 
    Return ``x * (2**i)``.  This is essentially the inverse of function
@@ -74,6 +102,14 @@ Number-theoretic and representation functions:
 
    Return the fractional and integer parts of *x*.  Both results carry the sign of
    *x*, and both are floats.
+
+
+.. function:: trunc(x)
+
+   Return the :class:`Real` value *x* truncated to an :class:`Integral` (usually
+   a long integer). Delegates to ``x.__trunc__()``.
+
+   .. versionadded:: 2.6
 
 Note that :func:`frexp` and :func:`modf` have a different call/return pattern
 than their C equivalents: they take a single argument and return a pair of

@@ -31,11 +31,8 @@ example::
 There can be zero or more :keyword:`elif` parts, and the :keyword:`else` part is
 optional.  The keyword ':keyword:`elif`' is short for 'else if', and is useful
 to avoid excessive indentation.  An  :keyword:`if` ... :keyword:`elif` ...
-:keyword:`elif` ... sequence is a substitute for the :keyword:`switch` or
-:keyword:`case` statements found in other languages.
-
-.. % Weird spacings happen here if the wrapping of the source text
-.. % gets changed in the wrong way.
+:keyword:`elif` ... sequence is a substitute for the ``switch`` or
+``case`` statements found in other languages.
 
 
 .. _tut-for:
@@ -54,8 +51,8 @@ iteration step and halting condition (as C), Python's :keyword:`for` statement
 iterates over the items of any sequence (a list or a string), in the order that
 they appear in the sequence.  For example (no pun intended):
 
-.. % One suggestion was to give a real C example here, but that may only
-.. % serve to confuse non-C programmers.
+.. One suggestion was to give a real C example here, but that may only serve to
+   confuse non-C programmers.
 
 ::
 
@@ -207,10 +204,11 @@ it.
 The *execution* of a function introduces a new symbol table used for the local
 variables of the function.  More precisely, all variable assignments in a
 function store the value in the local symbol table; whereas variable references
-first look in the local symbol table, then in the global symbol table, and then
-in the table of built-in names. Thus,  global variables cannot be directly
-assigned a value within a function (unless named in a :keyword:`global`
-statement), although they may be referenced.
+first look in the local symbol table, then in the local symbol tables of
+enclosing functions, then in the global symbol table, and finally in the table
+of built-in names. Thus, global variables cannot be directly assigned a value
+within a function (unless named in a :keyword:`global` statement), although they
+may be referenced.
 
 The actual parameters (arguments) to a function call are introduced in the local
 symbol table of the called function when it is called; thus, arguments are
@@ -235,8 +233,9 @@ like in C, procedures are just functions that don't return a value.  In fact,
 technically speaking, procedures do return a value, albeit a rather boring one.
 This value is called ``None`` (it's a built-in name).  Writing the value
 ``None`` is normally suppressed by the interpreter if it would be the only value
-written.  You can see it if you really want to::
+written.  You can see it if you really want to using :keyword:`print`::
 
+   >>> fib(0)
    >>> print fib(0)
    None
 
@@ -553,10 +552,57 @@ Here is an example of a multi-line docstring::
        No, really, it doesn't do anything.
 
 
+.. _tut-codingstyle:
+
+Intermezzo: Coding Style
+========================
+
+.. sectionauthor:: Georg Brandl <georg@python.org>
+.. index:: pair: coding; style
+
+Now that you are about to write longer, more complex pieces of Python, it is a
+good time to talk about *coding style*.  Most languages can be written (or more
+concise, *formatted*) in different styles; some are more readable than others.
+Making it easy for others to read your code is always a good idea, and adopting
+a nice coding style helps tremendously for that.
+
+For Python, :pep:`8` has emerged as the style guide that most projects adher to;
+it promotes a very readable and eye-pleasing coding style.  Every Python
+developer should read it at some point; here are the most important points
+extracted for you:
+
+* Use 4-space indentation, and no tabs.
+
+  4 spaces are a good compromise between small indentation (allows greater
+  nesting depth) and large indentation (easier to read).  Tabs introduce
+  confusion, and are best left out.
+
+* Wrap lines so that they don't exceed 79 characters.
+
+  This helps users with small displays and makes it possible to have several
+  code files side-by-side on larger displays.
+
+* Use blank lines to separate functions and classes, and larger blocks of
+  code inside functions.
+
+* When possible, put comments on a line of their own.
+
+* Use docstrings.
+
+* Use spaces around operators and after commas, but not directly inside
+  bracketing constructs: ``a = f(1, 2) + g(3, 4)``.
+
+* Name your classes and functions consistently; the convention is to use
+  ``CamelCase`` for classes and ``lower_case_with_underscores`` for functions
+  and methods.  Always use ``self`` as the name for the first method argument.
+
+* Don't use fancy encodings if your code is meant to be used in international
+  environments.  Plain ASCII works best in any case.
+
 
 .. rubric:: Footnotes
 
-.. [#] Actually, *call by object reference* would be a better description, since if a
-   mutable object is passed, the caller will see any changes the callee makes to it
-   (items inserted into a list).
+.. [#] Actually, *call by object reference* would be a better description,
+   since if a mutable object is passed, the caller will see any changes the
+   callee makes to it (items inserted into a list).
 
