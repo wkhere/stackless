@@ -169,14 +169,17 @@ enable_softswitch(PyObject *self, PyObject *flag)
 
 
 static char run_watchdog__doc__[] =
-"run_watchdog(timeout) -- run tasklets until they are all\n\
+"run_watchdog(timeout, threadblocking) -- run tasklets until they are all\n\
 done, or timeout instructions have passed. Tasklets must\n\
 provide cooperative schedule() calls.\n\
 If the timeout is met, the function returns.\n\
 The calling tasklet is put aside while the tasklets are running.\n\
 It is inserted back after the function stops, right before the\n\
 tasklet that caused a timeout, if any.\n\
-If an exception occours, it will be passed to the main tasklet.";
+If an exception occours, it will be passed to the main tasklet.\n\
+The optional threadblocking argument ensures, when True, that the thread\n\
+will block when it runs out of tasklets to await channel activity from\n\
+other Python threads to wake it up.";
 
 static PyObject *
 interrupt_timeout_return(void)
@@ -202,20 +205,30 @@ interrupt_timeout_return(void)
 }
 
 static PyObject *
-PyStackless_RunWatchdog_M(long timeout)
+PyStackless_RunWatchdog_M(long timeout, long threadblocking)
 {
-	return PyStackless_CallMethod_Main(slp_module, "run", "(l)", timeout);
+	return PyStackless_CallMethod_Main(slp_module, "run", "(ll)", timeout, threadblocking);
 }
+
 
 PyObject *
 PyStackless_RunWatchdog(long timeout)
+{
+	long threadblocking = 0;
+	return PyStackless_RunWatchdogEx(timeout, threadblocking);
+}
+
+
+PyObject *
+PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *victim;
 	PyObject *retval;
 	int err;
 
-	if (ts->st.main == NULL) return PyStackless_RunWatchdog_M(timeout);
+	if (ts->st.main == NULL)
+		return PyStackless_RunWatchdog_M(timeout, threadblocking);
 	if (ts->st.current != ts->st.main)
 		RUNTIME_ERROR(
 		    "run() must be run from the main tasklet.",
@@ -235,7 +248,13 @@ PyStackless_RunWatchdog(long timeout)
 	Py_DECREF(ts->st.main);
 
 	/* now let them run until the end. */
+#ifdef WITH_THREAD
+	ts->st.thread.runflags = threadblocking;
+#endif
 	retval = slp_schedule_task(ts->st.main, ts->st.current, 0);
+#ifdef WITH_THREAD
+	ts->st.thread.runflags = 0;
+#endif
 
 	ts->st.interrupt = NULL;
 
@@ -262,13 +281,14 @@ PyStackless_RunWatchdog(long timeout)
 static PyObject *
 run_watchdog(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	static char *argnames[] = {"timeout", NULL};
+	static char *argnames[] = {"timeout", "threadblocking", NULL};
 	long timeout = 0;
+	long threadblocking = 0;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|l:run_watchdog",
-					 argnames, &timeout))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|ll:run_watchdog",
+					 argnames, &timeout, &threadblocking))
 		return NULL;
-	return PyStackless_RunWatchdog(timeout);
+	return PyStackless_RunWatchdogEx(timeout, threadblocking);
 }
 
 static char get_thread_info__doc__[] =
