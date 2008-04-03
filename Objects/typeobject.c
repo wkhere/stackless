@@ -2768,12 +2768,22 @@ excess_args(PyObject *args, PyObject *kwds)
 		(kwds && PyDict_Check(kwds) && PyDict_Size(kwds));
 }
 
+#ifdef STACKLESS
+PyObject * generic_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+int generic_init(PyObject *ob, PyObject *args, PyObject *kwds);
+#endif
+
 static int
 object_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	int err = 0;
 	if (excess_args(args, kwds)) {
 		PyTypeObject *type = Py_TYPE(self);
+#ifdef STACKLESS
+		/* The following checking clashes with Stackless unpickling. */
+		if (type->tp_init == generic_init)
+			type = type->tp_base;
+#endif
 		if (type->tp_init != object_init &&
 		    type->tp_new != object_new)
 		{

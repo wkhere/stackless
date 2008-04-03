@@ -30,7 +30,7 @@ static int is_wrong_type(PyTypeObject *type)
 
 /* supporting __setstate__ for the wrapper type */
 
-static PyObject *
+PyObject *
 generic_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *inst;
@@ -44,7 +44,7 @@ generic_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return inst;
 }
 
-static int
+int
 generic_init(PyObject *ob, PyObject *args, PyObject *kwds)
 {
 
@@ -2054,6 +2054,9 @@ typedef struct {
 	/* True if generator is being executed. */
 	int gi_running;
 
+	/* The code object backing the generator */
+	PyObject *gi_code;
+
 	/* List of weak reference. */
 	PyObject *gi_weakreflist;
 } genobject;
@@ -2078,10 +2081,10 @@ gen_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	genobject *gen;
 
 	if (is_wrong_type(type)) return NULL;
+	Py_INCREF(Py_None);
 	gen = (genobject *) PyGenerator_New((PyFrameObject *) Py_None);
 	if (gen == NULL)
 		return NULL;
-	Py_INCREF(Py_None);
 	gen->ob_type = type;
 	return (PyObject *) gen;
 }
@@ -2111,6 +2114,9 @@ gen_setstate(PyObject *self, PyObject *args)
 			Py_INCREF(f);
 			Py_DECREF(gen->gi_frame);
 			gen->gi_frame = f;
+			Py_INCREF(f->f_code);
+			Py_DECREF(gen->gi_code);
+			gen->gi_code = (PyObject *)f->f_code;
 			/* The frame the temporary generator references
 			   will have GeneratorExit raised on it, when the
 			   temporary generator is torn down.  So clearing
@@ -2136,6 +2142,9 @@ gen_setstate(PyObject *self, PyObject *args)
 	Py_INCREF(f);
 	Py_DECREF(gen->gi_frame);
 	gen->gi_frame = f;
+	Py_INCREF(f->f_code);
+	Py_DECREF(gen->gi_code);
+	gen->gi_code = (PyObject *)f->f_code;
 	gen->gi_running = gi_running;
 	gen->ob_type = gen->ob_type->tp_base;
 	Py_INCREF(gen);
