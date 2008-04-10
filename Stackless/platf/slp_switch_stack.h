@@ -20,6 +20,7 @@ slp_switch_stack(void)
 	    SLP_STACK_END();
 	    return 0;
 	}
+#pragma warning(default:4731)
 }
 
 #elif defined(MS_WIN64) && defined(_M_X64)
@@ -31,10 +32,14 @@ static int
 slp_switch_stack(void)
 {
 	register int *stackref, stsizediff;
+#if STACKLESS_FRHACK
+	__asm__ volatile ("" : : : "esi", "edi");
+#else
 	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+#endif
 	__asm__ ("movl %%esp, %0" : "=g" (stackref));
 	{
-		SLP_STACK_BEGIN(stackref, stsizediff);
+ 		SLP_STACK_BEGIN(stackref, stsizediff);
 		__asm__ volatile (
 		    "addl %0, %%esp\n"
 		    "addl %0, %%ebp\n"
@@ -44,7 +49,11 @@ slp_switch_stack(void)
 		SLP_STACK_END();
 		return 0;
 	}
+#if STACKLESS_FRHACK
+	__asm__ volatile ("" : : : "esi", "edi");
+#else
 	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+#endif
 }
 
 #elif defined(__GNUC__) && defined(__amd64__)
@@ -99,7 +108,8 @@ static int
 slp_switch_stack(void)
 {
 	static int x = 0;
-	register int *stackref, stsizediff;
+	register intptr_t *stackref;
+	register int stsizediff;
 	__asm__ volatile (
 	    "; asm block 1\n"
 	    : /* no outputs */
@@ -217,6 +227,53 @@ slp_switch_stack(void)
 
 #elif defined(__GNUC__) && defined(__arm__) && defined(__thumb__)
 
+
+#elif defined(__GNUC__) && defined(__arm32__)
+
+static int
+slp_switch_stack(void)
+{
+	register int *stackref, stsizediff;
+	__asm__ volatile ("" : : : REGS_TO_SAVE);
+	__asm__ ("mov %0,sp" : "=g" (stackref));
+	{
+		SLP_STACK_BEGIN(stackref, stsizediff);
+		__asm__ volatile (
+		    "add sp,sp,%0\n"
+		    "add fp,fp,%0\n"
+		    :
+		    : "r" (stsizediff)
+		    );
+		SLP_STACK_END();
+		return 0;
+	}
+	__asm__ volatile ("" : : : REGS_TO_SAVE);
+}
+
+#elif defined(__GNUC__) && defined(__mips__) && defined(__linux__)
+
+static int
+slp_switch_stack(void)
+{
+    register int *stackref, stsizediff;
+    /* __asm__ __volatile__ ("" : : : REGS_TO_SAVE); */
+    __asm__ ("move %0, $29" : "=r" (stackref) : );
+    {
+        SLP_STACK_BEGIN(stackref, stsizediff);
+        __asm__ __volatile__ (
+#ifdef __mips64
+            "daddu $29, %0\n"
+#else
+            "addu $29, %0\n"
+#endif
+            : /* no outputs */
+            : "r" (stsizediff)
+            );
+        SLP_STACK_END();
+    }
+    /* __asm__ __volatile__ ("" : : : REGS_TO_SAVE); */
+    return 0;
+}
 
 #endif
 
