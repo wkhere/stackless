@@ -732,7 +732,8 @@ functions.
 .. function:: shutdown()
 
    Informs the logging system to perform an orderly shutdown by flushing and
-   closing all handlers.
+   closing all handlers. This should be called at application exit and no
+   further use of the logging system should be made after this call.
 
 
 .. function:: setLoggerClass(klass)
@@ -1651,27 +1652,29 @@ timed intervals.
    You can use the *when* to specify the type of *interval*. The list of possible
    values is, note that they are not case sensitive:
 
-   +----------+-----------------------+
-   | Value    | Type of interval      |
-   +==========+=======================+
-   | S        | Seconds               |
-   +----------+-----------------------+
-   | M        | Minutes               |
-   +----------+-----------------------+
-   | H        | Hours                 |
-   +----------+-----------------------+
-   | D        | Days                  |
-   +----------+-----------------------+
-   | W        | Week day (0=Monday)   |
-   +----------+-----------------------+
-   | midnight | Roll over at midnight |
-   +----------+-----------------------+
+   +----------------+-----------------------+
+   | Value          | Type of interval      |
+   +================+=======================+
+   | ``'S'``        | Seconds               |
+   +----------------+-----------------------+
+   | ``'M'``        | Minutes               |
+   +----------------+-----------------------+
+   | ``'H'``        | Hours                 |
+   +----------------+-----------------------+
+   | ``'D'``        | Days                  |
+   +----------------+-----------------------+
+   | ``'W'``        | Week day (0=Monday)   |
+   +----------------+-----------------------+
+   | ``'midnight'`` | Roll over at midnight |
+   +----------------+-----------------------+
 
-   If *backupCount* is non-zero, the system will save old log files by appending
-   extensions to the filename. The extensions are date-and-time based, using the
-   strftime format ``%Y-%m-%d_%H-%M-%S`` or a leading portion thereof, depending on
-   the rollover interval. At most *backupCount* files will be kept, and if more
-   would be created when rollover occurs, the oldest one is deleted.
+   The system will save old log files by appending extensions to the filename.
+   The extensions are date-and-time based, using the strftime format
+   ``%Y-%m-%d_%H-%M-%S`` or a leading portion thereof, depending on the
+   rollover interval. If *backupCount* is nonzero, at most *backupCount* files
+   will be kept, and if more would be created when rollover occurs, the oldest
+   one is deleted. The deletion logic uses the interval to determine which
+   files to delete, so changing the interval may leave old files lying around.
 
 
 .. method:: TimedRotatingFileHandler.doRollover()

@@ -28,7 +28,7 @@ Types and members
 -----------------
 
 The :func:`getmembers` function retrieves the members of an object such as a
-class or module. The fifteen functions whose names begin with "is" are mainly
+class or module. The sixteen functions whose names begin with "is" are mainly
 provided as convenient choices for the second argument to :func:`getmembers`.
 They also help you determine when you can expect to find the following special
 attributes:
@@ -54,12 +54,12 @@ attributes:
 |           | im_class        | class object that asked   | \(1)  |
 |           |                 | for this method           |       |
 +-----------+-----------------+---------------------------+-------+
-|           | im_func         | function object           |       |
-|           |                 | containing implementation |       |
+|           | im_func or      | function object           |       |
+|           | __func__        | containing implementation |       |
 |           |                 | of method                 |       |
 +-----------+-----------------+---------------------------+-------+
-|           | im_self         | instance to which this    |       |
-|           |                 | method is bound, or       |       |
+|           | im_self or      | instance to which this    |       |
+|           | __self__        | method is bound, or       |       |
 |           |                 | ``None``                  |       |
 +-----------+-----------------+---------------------------+-------+
 | function  | __doc__         | documentation string      |       |
@@ -279,9 +279,13 @@ Note:
 
    Return true if the object is a Python generator function.
 
+   .. versionadded:: 2.6
+
 .. function:: isgenerator(object)
 
    Return true if the object is a generator.
+
+   .. versionadded:: 2.6
 
 .. function:: istraceback(object)
 
@@ -306,6 +310,12 @@ Note:
 .. function:: isroutine(object)
 
    Return true if the object is a user-defined or built-in function or method.
+
+.. function:: isabstract(object)
+
+   Return true if the object is an abstract base class.
+
+   .. versionadded:: 2.6
 
 
 .. function:: ismethoddescriptor(object)

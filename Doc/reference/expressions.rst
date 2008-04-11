@@ -230,14 +230,15 @@ generator are those that would be produced by considering each of the
 evaluating the expression to yield a value that is reached the innermost block
 for each iteration.
 
-Variables used in the generator expression are evaluated lazily when the
-:meth:`next` method is called for generator object (in the same fashion as
-normal generators). However, the leftmost :keyword:`for` clause is immediately
-evaluated so that error produced by it can be seen before any other possible
-error in the code that handles the generator expression. Subsequent
-:keyword:`for` clauses cannot be evaluated immediately since they may depend on
-the previous :keyword:`for` loop. For example: ``(x*y for x in range(10) for y
-in bar(x))``.
+Variables used in the generator expression are evaluated lazily in a separate
+scope when the :meth:`next` method is called for the generator object (in the
+same fashion as for normal generators).  However, the :keyword:`in` expression
+of the leftmost :keyword:`for` clause is immediately evaluated in the current
+scope so that an error produced by it can be seen before any other possible
+error in the code that handles the generator expression.  Subsequent
+:keyword:`for` and :keyword:`if` clauses cannot be evaluated immediately since
+they may depend on the previous :keyword:`for` loop.  For example:
+``(x*y for x in range(10) for y in bar(x))``.
 
 The parentheses can be omitted on calls with only one argument. See section
 :ref:`calls` for the detail.
@@ -1060,14 +1061,14 @@ Comparison of objects of the same type depends on the type:
   another one is made arbitrarily but consistently within one execution of a
   program.
 
-The operators :keyword:`in` and :keyword:`not in` test for set membership.  ``x
-in s`` evaluates to true if *x* is a member of the set *s*, and false otherwise.
-``x not in s`` returns the negation of ``x in s``. The set membership test has
-traditionally been bound to sequences; an object is a member of a set if the set
-is a sequence and contains an element equal to that object.  However, it is
-possible for an object to support membership tests without being a sequence.  In
-particular, dictionaries support membership testing as a nicer way of spelling
-``key in dict``; other mapping types may follow suit.
+The operators :keyword:`in` and :keyword:`not in` test for collection
+membership.  ``x in s`` evaluates to true if *x* is a member of the collection
+*s*, and false otherwise.  ``x not in s`` returns the negation of ``x in s``.
+The collection membership test has traditionally been bound to sequences; an
+object is a member of a collection if the collection is a sequence and contains
+an element equal to that object.  However, it make sense for many other object
+types to support membership tests without being a sequence.  In particular,
+dictionaries (for keys) and sets support membership testing.
 
 For the list and tuple types, ``x in y`` is true if and only if there exists an
 index *i* such that ``x == y[i]`` is true.

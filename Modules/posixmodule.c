@@ -1881,9 +1881,9 @@ static PyObject *
 posix_chown(PyObject *self, PyObject *args)
 {
 	char *path = NULL;
-	int uid, gid;
+	long uid, gid;
 	int res;
-	if (!PyArg_ParseTuple(args, "etii:chown",
+	if (!PyArg_ParseTuple(args, "etll:chown",
 	                      Py_FileSystemDefaultEncoding, &path,
 	                      &uid, &gid))
 		return NULL;
@@ -6710,7 +6710,6 @@ posix_unsetenv(PyObject *self, PyObject *args)
 }
 #endif /* unsetenv */
 
-#ifdef HAVE_STRERROR
 PyDoc_STRVAR(posix_strerror__doc__,
 "strerror(code) -> string\n\n\
 Translate an error code to a message string.");
@@ -6730,7 +6729,6 @@ posix_strerror(PyObject *self, PyObject *args)
 	}
 	return PyString_FromString(message);
 }
-#endif /* strerror */
 
 
 #ifdef HAVE_SYS_WAIT_H
@@ -8510,9 +8508,7 @@ static PyMethodDef posix_methods[] = {
 #ifdef HAVE_UNSETENV
 	{"unsetenv",	posix_unsetenv, METH_VARARGS, posix_unsetenv__doc__},
 #endif
-#ifdef HAVE_STRERROR
 	{"strerror",	posix_strerror, METH_VARARGS, posix_strerror__doc__},
-#endif
 #ifdef HAVE_FCHDIR
 	{"fchdir",	posix_fchdir, METH_O, posix_fchdir__doc__},
 #endif

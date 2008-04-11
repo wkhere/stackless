@@ -40,7 +40,7 @@ static char **orig_argv;
 static int  orig_argc;
 
 /* command line options */
-#define BASE_OPTS "3Bc:dEhim:OQ:StuUvVW:xX?"
+#define BASE_OPTS "3bBc:dEhim:OQ:StuUvVW:xX?"
 
 #ifndef RISCOS
 #define PROGRAM_OPTS BASE_OPTS
@@ -140,6 +140,15 @@ static void RunStartupFile(PyCompilerFlags *cf)
 			(void) PyRun_SimpleFileExFlags(fp, startup, 0, cf);
 			PyErr_Clear();
 			fclose(fp);
+               } else {
+			int save_errno;
+			save_errno = errno;
+			PySys_WriteStderr("Could not open PYTHONSTARTUP\n");
+			errno = save_errno;
+			PyErr_SetFromErrnoWithFilename(PyExc_IOError,
+						       startup);
+			PyErr_Print();
+			PyErr_Clear();
 		}
 	}
 }
@@ -296,6 +305,9 @@ Py_Main(int argc, char **argv)
 		}
 
 		switch (c) {
+		case 'b':
+			Py_BytesWarningFlag++;
+			break;
 
 		case 'd':
 			Py_DebugFlag++;
@@ -539,13 +551,9 @@ Py_Main(int argc, char **argv)
 
 		if (sts==-1 && filename!=NULL) {
 			if ((fp = fopen(filename, "r")) == NULL) {
-#ifdef HAVE_STRERROR
 				fprintf(stderr, "%s: can't open file '%s': [Errno %d] %s\n",
 					argv[0], filename, errno, strerror(errno));
-#else
-				fprintf(stderr, "%s: can't open file '%s': Errno %d\n",
-					argv[0], filename, errno);
-#endif
+
 				return 2;
 			}
 			else if (skipfirstline) {

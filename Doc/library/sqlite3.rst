@@ -232,6 +232,24 @@ A :class:`Connection` instance has the following attributes and methods:
    :class:`sqlite3.Cursor`.
 
 
+.. method:: Connection.commit()
+
+   This method commits the current transaction. If you don't call this method,
+   anything you did since the last call to commit() is not visible from from
+   other database connections. If you wonder why you don't see the data you've
+   written to the database, please check you didn't forget to call this method.
+
+.. method:: Connection.rollback()
+
+   This method rolls back any changes to the database since the last call to 
+   :meth:`commit`.
+
+.. method:: Connection.close()
+
+   This closes the database connection. Note that this does not automatically
+   call :meth:`commit`. If you just close your database connection without
+   calling :meth:`commit` first, your changes will be lost!
+
 .. method:: Connection.execute(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
@@ -244,7 +262,6 @@ A :class:`Connection` instance has the following attributes and methods:
    This is a nonstandard shortcut that creates an intermediate cursor object by
    calling the cursor method, then calls the cursor's :meth:`executemany` method
    with the parameters given.
-
 
 .. method:: Connection.executescript(sql_script)
 
@@ -332,6 +349,19 @@ A :class:`Connection` instance has the following attributes and methods:
    one. All necessary constants are available in the :mod:`sqlite3` module.
 
 
+.. method:: Connection.set_progress_handler(handler, n)
+
+   .. versionadded:: 2.6
+
+   This routine registers a callback. The callback is invoked for every *n*
+   instructions of the SQLite virtual machine. This is useful if you want to
+   get called from SQLite during long-running operations, for example to update
+   a GUI.
+
+   If you want to clear any previously installed progress handler, call the
+   method with :const:`None` for *handler*.
+
+
 .. attribute:: Connection.row_factory
 
    You can change this attribute to a callable that accepts the cursor and the
@@ -376,6 +406,27 @@ A :class:`Connection` instance has the following attributes and methods:
 
    Returns the total number of database rows that have been modified, inserted, or
    deleted since the database connection was opened.
+
+
+.. attribute:: Connection.iterdump
+
+   Returns an iterator to dump the database in an SQL text format.  Useful when
+   saving an in-memory database for later restoration.  This function provides
+   the same capabilities as the :kbd:`.dump` command in the :program:`sqlite3`
+   shell.
+
+   .. versionadded:: 2.6
+
+   Example::
+
+      # Convert file existing_db.db to SQL dump file dump.sql
+      import sqlite3, os
+
+      con = sqlite3.connect('existing_db.db')
+      full_dump = os.linesep.join([line for line in con.iterdump()])
+      f = open('dump.sql', 'w')
+      f.writelines(full_dump)
+      f.close()
 
 
 .. _sqlite3-cursor-objects:
@@ -481,6 +532,12 @@ A :class:`Cursor` instance has the following attributes and methods:
    This includes ``SELECT`` statements because we cannot determine the number of
    rows a query produced until all rows were fetched.
 
+.. attribute:: Cursor.lastrowid
+
+   This read-only attribute provides the rowid of the last modified row. It is
+   only set if you issued a ``INSERT`` statement using the :meth:`execute`
+   method. For operations other than ``INSERT`` or when :meth:`executemany` is
+   called, :attr:`lastrowid` is set to :const:`None`.
 
 .. _sqlite3-types:
 
@@ -680,10 +737,6 @@ Otherwise leave it at its default, which will result in a plain "BEGIN"
 statement, or set it to one of SQLite's supported isolation levels: DEFERRED,
 IMMEDIATE or EXCLUSIVE.
 
-As the :mod:`sqlite3` module needs to keep track of the transaction state, you
-should not use ``OR ROLLBACK`` or ``ON CONFLICT ROLLBACK`` in your SQL. Instead,
-catch the :exc:`IntegrityError` and call the :meth:`rollback` method of the
-connection yourself.
 
 
 Using pysqlite efficiently
@@ -715,3 +768,15 @@ case-insensitively by name:
 
 .. literalinclude:: ../includes/sqlite3/rowclass.py
 
+
+Using the connection as a context manager
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 2.6
+
+Connection objects can be used as context managers
+that automatically commit or rollback transactions.  In the event of an
+exception, the transaction is rolled back; otherwise, the transaction is
+committed:
+
+.. literalinclude:: ../includes/sqlite3/ctx_manager.py

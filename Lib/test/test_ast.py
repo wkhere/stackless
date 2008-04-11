@@ -1,4 +1,5 @@
-import sys, itertools
+import sys, itertools, unittest
+from test import test_support
 import _ast
 
 def to_tuple(t):
@@ -14,6 +15,7 @@ def to_tuple(t):
     for f in t._fields:
         result.append(to_tuple(getattr(t, f)))
     return tuple(result)
+
 
 # These tests are compiled through "exec"
 # There should be atleast one test per statement
@@ -118,40 +120,83 @@ eval_tests = [
 # TODO: expr_context, slice, boolop, operator, unaryop, cmpop, comprehension
 # excepthandler, arguments, keywords, alias
 
-if __name__=='__main__' and sys.argv[1:] == ['-g']:
-    for statements, kind in ((exec_tests, "exec"), (single_tests, "single"),
-                             (eval_tests, "eval")):
-        print kind+"_results = ["
-        for s in statements:
-            print repr(to_tuple(compile(s, "?", kind, 0x400)))+","
-        print "]"
-    print "run_tests()"
-    raise SystemExit
+class AST_Tests(unittest.TestCase):
 
-def test_order(ast_node, parent_pos):
+    def _assert_order(self, ast_node, parent_pos):
+        if not isinstance(ast_node, _ast.AST) or ast_node._fields is None:
+            return
+        if isinstance(ast_node, (_ast.expr, _ast.stmt, _ast.excepthandler)):
+            node_pos = (ast_node.lineno, ast_node.col_offset)
+            self.assert_(node_pos >= parent_pos)
+            parent_pos = (ast_node.lineno, ast_node.col_offset)
+        for name in ast_node._fields:
+            value = getattr(ast_node, name)
+            if isinstance(value, list):
+                for child in value:
+                    self._assert_order(child, parent_pos)
+            elif value is not None:
+                self._assert_order(value, parent_pos)
 
-    if not isinstance(ast_node, _ast.AST) or ast_node._fields == None:
+    def test_snippets(self):
+        for input, output, kind in ((exec_tests, exec_results, "exec"),
+                                    (single_tests, single_results, "single"),
+                                    (eval_tests, eval_results, "eval")):
+            for i, o in itertools.izip(input, output):
+                ast_tree = compile(i, "?", kind, _ast.PyCF_ONLY_AST)
+                self.assertEquals(to_tuple(ast_tree), o)
+                self._assert_order(ast_tree, (0, 0))
+
+    def test_nodeclasses(self):
+        x = _ast.BinOp(1, 2, 3, lineno=0)
+        self.assertEquals(x.left, 1)
+        self.assertEquals(x.op, 2)
+        self.assertEquals(x.right, 3)
+        self.assertEquals(x.lineno, 0)
+
+        # node raises exception when not given enough arguments
+        self.assertRaises(TypeError, _ast.BinOp, 1, 2)
+
+        # can set attributes through kwargs too
+        x = _ast.BinOp(left=1, op=2, right=3, lineno=0)
+        self.assertEquals(x.left, 1)
+        self.assertEquals(x.op, 2)
+        self.assertEquals(x.right, 3)
+        self.assertEquals(x.lineno, 0)
+
+        # this used to fail because Sub._fields was None
+        x = _ast.Sub()
+
+    def test_pickling(self):
+        import pickle
+        mods = [pickle]
+        try:
+            import cPickle
+            mods.append(cPickle)
+        except ImportError:
+            pass
+        protocols = [0, 1, 2]
+        for mod in mods:
+            for protocol in protocols:
+                for ast in (compile(i, "?", "exec", 0x400) for i in exec_tests):
+                    ast2 = mod.loads(mod.dumps(ast, protocol))
+                    self.assertEquals(to_tuple(ast2), to_tuple(ast))
+
+def test_main():
+    test_support.run_unittest(AST_Tests)
+
+def main():
+    if __name__ != '__main__':
         return
-    if isinstance(ast_node, (_ast.expr, _ast.stmt, _ast.excepthandler)):
-        node_pos = (ast_node.lineno, ast_node.col_offset)
-        assert node_pos >= parent_pos, (node_pos, parent_pos)
-        parent_pos = (ast_node.lineno, ast_node.col_offset)
-    for name in ast_node._fields:
-        value = getattr(ast_node, name)
-        if isinstance(value, list):
-            for child in value:
-                test_order(child, parent_pos)
-        elif value != None:
-            test_order(value, parent_pos)
-
-def run_tests():
-    for input, output, kind in ((exec_tests, exec_results, "exec"),
-                                (single_tests, single_results, "single"),
-                                (eval_tests, eval_results, "eval")):
-        for i, o in itertools.izip(input, output):
-            ast_tree = compile(i, "?", kind, 0x400)
-            assert to_tuple(ast_tree) == o
-            test_order(ast_tree, (0, 0))
+    if sys.argv[1:] == ['-g']:
+        for statements, kind in ((exec_tests, "exec"), (single_tests, "single"),
+                                 (eval_tests, "eval")):
+            print kind+"_results = ["
+            for s in statements:
+                print repr(to_tuple(compile(s, "?", kind, 0x400)))+","
+                print "]"
+        print "main()"
+        raise SystemExit
+    test_main()
 
 #### EVERYTHING BELOW IS GENERATED #####
 exec_results = [
@@ -166,7 +211,7 @@ exec_results = [
 ('Module', [('While', (1, 0), ('Name', (1, 6), 'v', ('Load',)), [('Pass', (1, 8))], [])]),
 ('Module', [('If', (1, 0), ('Name', (1, 3), 'v', ('Load',)), [('Pass', (1, 5))], [])]),
 ('Module', [('Raise', (1, 0), ('Name', (1, 6), 'Exception', ('Load',)), ('Str', (1, 17), 'string'), None)]),
-('Module', [('TryExcept', (1, 0), [('Pass', (2, 2))], [('excepthandler', (3, 0), ('Name', (3, 7), 'Exception', ('Load',)), None, [('Pass', (4, 2))], 3, 0)], [])]),
+('Module', [('TryExcept', (1, 0), [('Pass', (2, 2))], [('ExceptHandler', (3, 0), ('Name', (3, 7), 'Exception', ('Load',)), None, [('Pass', (4, 2))])], [])]),
 ('Module', [('TryFinally', (1, 0), [('Pass', (2, 2))], [('Pass', (4, 2))])]),
 ('Module', [('Assert', (1, 0), ('Name', (1, 7), 'v', ('Load',)), None)]),
 ('Module', [('Import', (1, 0), [('alias', 'sys', None)])]),
@@ -201,4 +246,4 @@ eval_results = [
 ('Expression', ('Tuple', (1, 0), [('Num', (1, 0), 1), ('Num', (1, 2), 2), ('Num', (1, 4), 3)], ('Load',))),
 ('Expression', ('Call', (1, 0), ('Attribute', (1, 0), ('Attribute', (1, 0), ('Attribute', (1, 0), ('Name', (1, 0), 'a', ('Load',)), 'b', ('Load',)), 'c', ('Load',)), 'd', ('Load',)), [('Subscript', (1, 8), ('Attribute', (1, 8), ('Name', (1, 8), 'a', ('Load',)), 'b', ('Load',)), ('Slice', ('Num', (1, 12), 1), ('Num', (1, 14), 2), None), ('Load',))], [], None, None)),
 ]
-run_tests()
+main()

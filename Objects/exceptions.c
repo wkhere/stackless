@@ -189,6 +189,12 @@ static PyMethodDef BaseException_methods[] = {
 static PyObject *
 BaseException_getitem(PyBaseExceptionObject *self, Py_ssize_t index)
 {
+    if (Py_Py3kWarningFlag) {
+        if (PyErr_Warn(PyExc_DeprecationWarning,
+                       "__getitem__ not supported for exception "
+                       "classes in 3.x; use args attribute") == -1)
+            return NULL;
+    }
     return PySequence_GetItem(self->args, index);
 }
 
@@ -196,6 +202,12 @@ static PyObject *
 BaseException_getslice(PyBaseExceptionObject *self,
 			Py_ssize_t start, Py_ssize_t stop)
 {
+    if (Py_Py3kWarningFlag) {
+        if (PyErr_Warn(PyExc_DeprecationWarning,
+                       "__getslice__ not supported for exception "
+                       "classes in 3.x; use args attribute") == -1)
+            return NULL;
+    }
     return PySequence_GetSlice(self->args, start, stop);
 }
 
@@ -1846,6 +1858,11 @@ SimpleExtendsException(PyExc_StandardError, ReferenceError,
  */
 SimpleExtendsException(PyExc_StandardError, MemoryError, "Out of memory.");
 
+/*
+ *    BufferError extends StandardError
+ */
+SimpleExtendsException(PyExc_StandardError, BufferError, "Buffer error.");
+
 
 /* Warning category docstrings */
 
@@ -1914,6 +1931,12 @@ SimpleExtendsException(PyExc_Warning, UnicodeWarning,
     "Base class for warnings about Unicode related problems, mostly\n"
     "related to conversion problems.");
 
+/*
+ *    BytesWarning extends Warning
+ */
+SimpleExtendsException(PyExc_Warning, BytesWarning,
+    "Base class for warnings about bytes and buffer related problems, mostly\n"
+    "related to conversion from str or comparing to str.");
 
 /* Pre-computed MemoryError instance.  Best to create this as early as
  * possible and not wait until a MemoryError is actually raised!
@@ -2025,6 +2048,7 @@ _PyExc_Init(void)
     PRE_INIT(FutureWarning)
     PRE_INIT(ImportWarning)
     PRE_INIT(UnicodeWarning)
+    PRE_INIT(BytesWarning)
 
     m = Py_InitModule4("exceptions", functions, exceptions_doc,
         (PyObject *)NULL, PYTHON_API_VERSION);
@@ -2094,6 +2118,7 @@ _PyExc_Init(void)
     POST_INIT(FutureWarning)
     POST_INIT(ImportWarning)
     POST_INIT(UnicodeWarning)
+    POST_INIT(BytesWarning)
 
     PyExc_MemoryErrorInst = BaseException_new(&_PyExc_MemoryError, NULL, NULL);
     if (!PyExc_MemoryErrorInst)

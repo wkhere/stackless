@@ -379,7 +379,7 @@ class TestMailbox(TestBase):
 
     def test_flush(self):
         # Write changes to disk
-        self._test_flush_or_close(self._box.flush)
+        self._test_flush_or_close(self._box.flush, True)
 
     def test_lock_unlock(self):
         # Lock and unlock the mailbox
@@ -391,14 +391,16 @@ class TestMailbox(TestBase):
 
     def test_close(self):
         # Close mailbox and flush changes to disk
-        self._test_flush_or_close(self._box.close)
+        self._test_flush_or_close(self._box.close, False)
 
-    def _test_flush_or_close(self, method):
+    def _test_flush_or_close(self, method, should_call_close):
         contents = [self._template % i for i in xrange(3)]
         self._box.add(contents[0])
         self._box.add(contents[1])
         self._box.add(contents[2])
         method()
+        if should_call_close:
+            self._box.close()
         self._box = self._factory(self._path)
         keys = self._box.keys()
         self.assert_(len(keys) == 3)
@@ -628,9 +630,9 @@ class TestMaildir(TestMailbox):
                                                                 "tmp")),
                              "File in wrong location: '%s'" % head)
             match = pattern.match(tail)
-            self.assert_(match != None, "Invalid file name: '%s'" % tail)
+            self.assert_(match is not None, "Invalid file name: '%s'" % tail)
             groups = match.groups()
-            if previous_groups != None:
+            if previous_groups is not None:
                 self.assert_(int(groups[0] >= previous_groups[0]),
                              "Non-monotonic seconds: '%s' before '%s'" %
                              (previous_groups[0], groups[0]))

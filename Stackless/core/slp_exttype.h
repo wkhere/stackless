@@ -64,6 +64,8 @@ typedef struct _slp_methodflags {
 	signed char bf_getwritebuffer;
 	signed char bf_getsegcount;
 	signed char bf_getcharbuffer;
+	signed char bf_getbuffer;
+	signed char bf_releasebuffer;
 	signed char tp_dealloc;
 	signed char tp_print;
 	signed char tp_repr;

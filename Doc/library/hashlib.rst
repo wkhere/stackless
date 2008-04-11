@@ -21,6 +21,10 @@ algorithm (defined in Internet :rfc:`1321`). The terms secure hash and message
 digest are interchangeable.  Older algorithms were called message digests.  The
 modern term is secure hash.
 
+.. note::
+   If you want the adler32 or crc32 hash functions they are available in
+   the :mod:`zlib` module.
+
 .. warning::
 
    Some algorithms have known hash collision weaknesses, see the FAQ at the end.
@@ -40,7 +44,7 @@ Constructors for hash algorithms that are always present in this module are
 OpenSSL library that Python uses on your platform.
 
 For example, to obtain the digest of the string ``'Nobody inspects the spammish
-repetition'``::
+repetition'``:
 
    >>> import hashlib
    >>> m = hashlib.md5()
@@ -53,7 +57,7 @@ repetition'``::
    >>> m.block_size
    64
 
-More condensed::
+More condensed:
 
    >>> hashlib.sha224("Nobody inspects the spammish repetition").hexdigest()
    'a4337bc45a8fc544c03f52dc550cd6e1e87021bc896588bd79e901e2'
@@ -63,7 +67,7 @@ algorithm as its first parameter also exists to allow access to the above listed
 hashes as well as any other algorithms that your OpenSSL library may offer.  The
 named constructors are much faster than :func:`new` and should be preferred.
 
-Using :func:`new` with an algorithm provided by OpenSSL::
+Using :func:`new` with an algorithm provided by OpenSSL:
 
    >>> h = hashlib.new('ripemd160')
    >>> h.update("Nobody inspects the spammish repetition")

@@ -198,7 +198,7 @@ _grouper_create(groupbyobject *parent, PyObject *tgtkey)
 {
 	_grouperobject *igo;
 
-	igo = PyObject_New(_grouperobject, &_grouper_type);
+	igo = PyObject_GC_New(_grouperobject, &_grouper_type);
 	if (igo == NULL)
 		return NULL;
 	igo->parent = (PyObject *)parent;
@@ -206,15 +206,25 @@ _grouper_create(groupbyobject *parent, PyObject *tgtkey)
 	igo->tgtkey = tgtkey;
 	Py_INCREF(tgtkey);
 
+	PyObject_GC_Track(igo);
 	return (PyObject *)igo;
 }
 
 static void
 _grouper_dealloc(_grouperobject *igo)
 {
+	PyObject_GC_UnTrack(igo);
 	Py_DECREF(igo->parent);
 	Py_DECREF(igo->tgtkey);
-	PyObject_Del(igo);
+	PyObject_GC_Del(igo);
+}
+
+static int
+_grouper_traverse(_grouperobject *igo, visitproc visit, void *arg)
+{
+	Py_VISIT(igo->parent);
+	Py_VISIT(igo->tgtkey);
+	return 0;
 }
 
 static PyObject *
@@ -280,9 +290,9 @@ static PyTypeObject _grouper_type = {
 	PyObject_GenericGetAttr,	/* tp_getattro */
 	0,				/* tp_setattro */
 	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,	/* tp_flags */
 	0,				/* tp_doc */
-	0, 				/* tp_traverse */
+	(traverseproc)_grouper_traverse,/* tp_traverse */
 	0,				/* tp_clear */
 	0,				/* tp_richcompare */
 	0,				/* tp_weaklistoffset */
@@ -299,7 +309,7 @@ static PyTypeObject _grouper_type = {
 	0,				/* tp_init */
 	0,				/* tp_alloc */
 	0,				/* tp_new */
-	PyObject_Del,			/* tp_free */
+	PyObject_GC_Del,		/* tp_free */
 };
 
  
@@ -1682,8 +1692,8 @@ chain_next(chainobject *lz)
 			return NULL;			/* no more input sources */
 		}
 		lz->active = PyObject_GetIter(iterable);
+		Py_DECREF(iterable);
 		if (lz->active == NULL) {
-			Py_DECREF(iterable);
 			Py_CLEAR(lz->source);
 			return NULL;			/* input not iterable */
 		}
@@ -1770,7 +1780,6 @@ static PyTypeObject chain_type = {
 typedef struct {
 	PyObject_HEAD
 	PyObject *pools;		/* tuple of pool tuples */
-	Py_ssize_t *maxvec;             /* size of each pool */
 	Py_ssize_t *indices;            /* one index per pool */
 	PyObject *result;               /* most recently returned result tuple */
 	int stopped;                    /* set to 1 when the product iterator is exhausted */
@@ -1784,7 +1793,6 @@ product_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	productobject *lz;
 	Py_ssize_t nargs, npools, repeat=1;
 	PyObject *pools = NULL;
-	Py_ssize_t *maxvec = NULL;
 	Py_ssize_t *indices = NULL;
 	Py_ssize_t i;
 
@@ -1809,9 +1817,8 @@ product_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	nargs = (repeat == 0) ? 0 : PyTuple_GET_SIZE(args);
 	npools = nargs * repeat;
 
-	maxvec = PyMem_Malloc(npools * sizeof(Py_ssize_t));
 	indices = PyMem_Malloc(npools * sizeof(Py_ssize_t));
-	if (maxvec == NULL || indices == NULL) {
+	if (indices == NULL) {
     		PyErr_NoMemory();
 		goto error;
 	}
@@ -1825,16 +1832,13 @@ product_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		PyObject *pool = PySequence_Tuple(item);
 		if (pool == NULL)
 			goto error;
-
 		PyTuple_SET_ITEM(pools, i, pool);
-		maxvec[i] = PyTuple_GET_SIZE(pool);
 		indices[i] = 0;
 	}
 	for ( ; i < npools; ++i) {
 		PyObject *pool = PyTuple_GET_ITEM(pools, i - nargs);
 		Py_INCREF(pool);
 		PyTuple_SET_ITEM(pools, i, pool);
-		maxvec[i] = maxvec[i - nargs];
 		indices[i] = 0;
 	}
 
@@ -1844,7 +1848,6 @@ product_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		goto error;
 
 	lz->pools = pools;
-	lz->maxvec = maxvec;
 	lz->indices = indices;
 	lz->result = NULL;
 	lz->stopped = 0;
@@ -1852,8 +1855,6 @@ product_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return (PyObject *)lz;
 
 error:
-	if (maxvec != NULL)
-		PyMem_Free(maxvec);
 	if (indices != NULL)
 		PyMem_Free(indices);
 	Py_XDECREF(pools);
@@ -1866,7 +1867,6 @@ product_dealloc(productobject *lz)
 	PyObject_GC_UnTrack(lz);
 	Py_XDECREF(lz->pools);
 	Py_XDECREF(lz->result);
-	PyMem_Free(lz->maxvec);
 	PyMem_Free(lz->indices);
 	Py_TYPE(lz)->tp_free(lz);
 }
@@ -1895,10 +1895,7 @@ product_next(productobject *lz)
 
 	if (result == NULL) {
                 /* On the first pass, return an initial tuple filled with the 
-                   first element from each pool.  If any pool is empty, then 
-                   whole product is empty and we're already done */
-		if (npools == 0)
-			goto empty;
+                   first element from each pool. */
 		result = PyTuple_New(npools);
 		if (result == NULL)
             		goto empty;
@@ -1913,7 +1910,6 @@ product_next(productobject *lz)
 		}
 	} else {
 		Py_ssize_t *indices = lz->indices;
-		Py_ssize_t *maxvec = lz->maxvec;
 
 		/* Copy the previous result tuple or re-use it if available */
 		if (Py_REFCNT(result) > 1) {
@@ -1930,14 +1926,14 @@ product_next(productobject *lz)
 			Py_DECREF(old_result);
 		}
 		/* Now, we've got the only copy so we can update it in-place */
-		assert (Py_REFCNT(result) == 1);
+		assert (npools==0 || Py_REFCNT(result) == 1);
 
                 /* Update the pool indices right-to-left.  Only advance to the
                    next pool when the previous one rolls-over */
 		for (i=npools-1 ; i >= 0 ; i--) {
 			pool = PyTuple_GET_ITEM(pools, i);
 			indices[i]++;
-			if (indices[i] == maxvec[i]) {
+			if (indices[i] == PyTuple_GET_SIZE(pool)) {
 				/* Roll-over and advance to next pool */
 				indices[i] = 0;
 				elem = PyTuple_GET_ITEM(pool, 0);
@@ -2248,6 +2244,277 @@ static PyTypeObject combinations_type = {
 	0,				/* tp_init */
 	0,				/* tp_alloc */
 	combinations_new,			/* tp_new */
+	PyObject_GC_Del,		/* tp_free */
+};
+
+
+/* permutations object ************************************************************
+  
+def permutations(iterable, r=None):
+    'permutations(range(3), 2) --> (0,1) (0,2) (1,0) (1,2) (2,0) (2,1)'
+    pool = tuple(iterable)
+    n = len(pool)
+    r = n if r is None else r
+    indices = range(n)
+    cycles = range(n-r+1, n+1)[::-1]
+    yield tuple(pool[i] for i in indices[:r])
+    while n:
+        for i in reversed(range(r)):
+            cycles[i] -= 1
+            if cycles[i] == 0:
+                indices[i:] = indices[i+1:] + indices[i:i+1]
+                cycles[i] = n - i
+            else:
+                j = cycles[i]
+                indices[i], indices[-j] = indices[-j], indices[i]
+                yield tuple(pool[i] for i in indices[:r])
+                break
+        else:
+            return
+*/
+
+typedef struct {
+	PyObject_HEAD
+	PyObject *pool;			/* input converted to a tuple */
+	Py_ssize_t *indices;            /* one index per element in the pool */
+	Py_ssize_t *cycles;		/* one rollover counter per element in the result */
+	PyObject *result;               /* most recently returned result tuple */
+	Py_ssize_t r;			/* size of result tuple */
+	int stopped;			/* set to 1 when the permutations iterator is exhausted */
+} permutationsobject;
+
+static PyTypeObject permutations_type;
+
+static PyObject *
+permutations_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	permutationsobject *po;
+	Py_ssize_t n;
+	Py_ssize_t r;
+	PyObject *robj = Py_None;
+	PyObject *pool = NULL;
+	PyObject *iterable = NULL;
+	Py_ssize_t *indices = NULL;
+	Py_ssize_t *cycles = NULL;
+	Py_ssize_t i;
+	static char *kwargs[] = {"iterable", "r", NULL};
+ 
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O:permutations", kwargs, 
+					 &iterable, &robj))
+		return NULL;
+
+	pool = PySequence_Tuple(iterable);
+	if (pool == NULL)
+		goto error;
+	n = PyTuple_GET_SIZE(pool);
+
+	r = n;
+	if (robj != Py_None) {
+		r = PyInt_AsSsize_t(robj);
+		if (r == -1 && PyErr_Occurred())
+			goto error;
+	}
+	if (r < 0) {
+		PyErr_SetString(PyExc_ValueError, "r must be non-negative");
+		goto error;
+	}
+	if (r > n) {
+		PyErr_SetString(PyExc_ValueError, "r cannot be bigger than the iterable");
+		goto error;
+	}
+
+	indices = PyMem_Malloc(n * sizeof(Py_ssize_t));
+	cycles = PyMem_Malloc(r * sizeof(Py_ssize_t));
+	if (indices == NULL || cycles == NULL) {
+    		PyErr_NoMemory();
+		goto error;
+	}
+
+	for (i=0 ; i<n ; i++)
+		indices[i] = i;
+	for (i=0 ; i<r ; i++)
+		cycles[i] = n - i;
+
+	/* create permutationsobject structure */
+	po = (permutationsobject *)type->tp_alloc(type, 0);
+	if (po == NULL)
+		goto error;
+
+	po->pool = pool;
+	po->indices = indices;
+	po->cycles = cycles;
+	po->result = NULL;
+	po->r = r;
+	po->stopped = 0;
+
+	return (PyObject *)po;
+
+error:
+	if (indices != NULL)
+		PyMem_Free(indices);
+	if (cycles != NULL)
+		PyMem_Free(cycles);
+	Py_XDECREF(pool);
+	return NULL;
+}
+
+static void
+permutations_dealloc(permutationsobject *po)
+{
+	PyObject_GC_UnTrack(po);
+	Py_XDECREF(po->pool);
+	Py_XDECREF(po->result);
+	PyMem_Free(po->indices);
+	PyMem_Free(po->cycles);
+	Py_TYPE(po)->tp_free(po);
+}
+
+static int
+permutations_traverse(permutationsobject *po, visitproc visit, void *arg)
+{
+	Py_VISIT(po->pool);
+	Py_VISIT(po->result);
+	return 0;
+}
+
+static PyObject *
+permutations_next(permutationsobject *po)
+{
+	PyObject *elem;
+	PyObject *oldelem;
+	PyObject *pool = po->pool;
+	Py_ssize_t *indices = po->indices;
+	Py_ssize_t *cycles = po->cycles;
+	PyObject *result = po->result;
+	Py_ssize_t n = PyTuple_GET_SIZE(pool);
+	Py_ssize_t r = po->r;
+	Py_ssize_t i, j, k, index;
+
+	if (po->stopped)
+		return NULL;
+
+	if (result == NULL) {
+                /* On the first pass, initialize result tuple using the indices */
+		result = PyTuple_New(r);
+		if (result == NULL)
+            		goto empty;
+		po->result = result;
+		for (i=0; i<r ; i++) {
+			index = indices[i];
+    			elem = PyTuple_GET_ITEM(pool, index);
+    			Py_INCREF(elem);
+    			PyTuple_SET_ITEM(result, i, elem);
+		}
+	} else {
+		if (n == 0)
+			goto empty;
+
+		/* Copy the previous result tuple or re-use it if available */
+		if (Py_REFCNT(result) > 1) {
+			PyObject *old_result = result;
+			result = PyTuple_New(r);
+			if (result == NULL)
+				goto empty;
+			po->result = result;
+			for (i=0; i<r ; i++) {
+				elem = PyTuple_GET_ITEM(old_result, i);
+    				Py_INCREF(elem);
+    				PyTuple_SET_ITEM(result, i, elem);
+			}
+			Py_DECREF(old_result);
+		}
+		/* Now, we've got the only copy so we can update it in-place */
+		assert(r == 0 || Py_REFCNT(result) == 1);
+
+                /* Decrement rightmost cycle, moving leftward upon zero rollover */
+		for (i=r-1 ; i>=0 ; i--) {
+			cycles[i] -= 1;
+			if (cycles[i] == 0) {
+				/* rotatation: indices[i:] = indices[i+1:] + indices[i:i+1] */
+				index = indices[i];
+				for (j=i ; j<n-1 ; j++)
+					indices[j] = indices[j+1];
+				indices[n-1] = index;
+				cycles[i] = n - i;
+			} else {
+				j = cycles[i];
+				index = indices[i];
+				indices[i] = indices[n-j];
+				indices[n-j] = index;
+
+				for (k=i; k<r ; k++) {
+					/* start with i, the leftmost element that changed */
+					/* yield tuple(pool[k] for k in indices[:r]) */
+					index = indices[k];
+					elem = PyTuple_GET_ITEM(pool, index);
+    					Py_INCREF(elem);
+					oldelem = PyTuple_GET_ITEM(result, k);
+    					PyTuple_SET_ITEM(result, k, elem);
+					Py_DECREF(oldelem);
+				}
+				break;
+			}
+		}
+		/* If i is negative, then the cycles have all
+                   rolled-over and we're done. */
+		if (i < 0)
+			goto empty;
+	}
+	Py_INCREF(result);
+	return result;
+
+empty:
+	po->stopped = 1;
+	return NULL;
+}
+
+PyDoc_STRVAR(permutations_doc,
+"permutations(iterables[, r]) --> permutations object\n\
+\n\
+Return successive r-length permutations of elements in the iterable.\n\n\
+permutations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)");
+
+static PyTypeObject permutations_type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"itertools.permutations",		/* tp_name */
+	sizeof(permutationsobject),	/* tp_basicsize */
+	0,				/* tp_itemsize */
+	/* methods */
+	(destructor)permutations_dealloc,	/* tp_dealloc */
+	0,				/* tp_print */
+	0,				/* tp_getattr */
+	0,				/* tp_setattr */
+	0,				/* tp_compare */
+	0,				/* tp_repr */
+	0,				/* tp_as_number */
+	0,				/* tp_as_sequence */
+	0,				/* tp_as_mapping */
+	0,				/* tp_hash */
+	0,				/* tp_call */
+	0,				/* tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro */
+	0,				/* tp_setattro */
+	0,				/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+		Py_TPFLAGS_BASETYPE,	/* tp_flags */
+	permutations_doc,			/* tp_doc */
+	(traverseproc)permutations_traverse,	/* tp_traverse */
+	0,				/* tp_clear */
+	0,				/* tp_richcompare */
+	0,				/* tp_weaklistoffset */
+	PyObject_SelfIter,		/* tp_iter */
+	(iternextfunc)permutations_next,	/* tp_iternext */
+	0,				/* tp_methods */
+	0,				/* tp_members */
+	0,				/* tp_getset */
+	0,				/* tp_base */
+	0,				/* tp_dict */
+	0,				/* tp_descr_get */
+	0,				/* tp_descr_set */
+	0,				/* tp_dictoffset */
+	0,				/* tp_init */
+	0,				/* tp_alloc */
+	permutations_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
 
@@ -3309,7 +3576,8 @@ inititertools(void)
 		&count_type,
 		&izip_type,
 		&iziplongest_type,
-		&product_type,         
+		&permutations_type,
+		&product_type,
 		&repeat_type,
 		&groupby_type,
 		NULL

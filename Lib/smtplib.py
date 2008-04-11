@@ -175,6 +175,7 @@ else:
             chr = None
             while chr != "\n":
                 chr = self.sslobj.read(1)
+                if not chr: break
                 str += chr
             return str
 
@@ -725,8 +726,9 @@ class SMTP:
 
     def quit(self):
         """Terminate the SMTP session."""
-        self.docmd("quit")
+        res = self.docmd("quit")
         self.close()
+        return res
 
 if _have_ssl:
 

@@ -51,9 +51,10 @@ Ignore = Whitespace + any(r'\\\r?\n' + Whitespace) + maybe(Comment)
 Name = r'[a-zA-Z_]\w*'
 
 Hexnumber = r'0[xX][\da-fA-F]+[lL]?'
-Octnumber = r'0[0-7]*[lL]?'
+Octnumber = r'(0[oO][0-7]+)|(0[0-7]*)[lL]?'
+Binnumber = r'0[bB][01]+[lL]?'
 Decnumber = r'[1-9]\d*[lL]?'
-Intnumber = group(Hexnumber, Octnumber, Decnumber)
+Intnumber = group(Hexnumber, Binnumber, Octnumber, Decnumber)
 Exponent = r'[eE][-+]?\d+'
 Pointfloat = group(r'\d+\.\d*', r'\.\d+') + maybe(Exponent)
 Expfloat = r'\d+' + Exponent
@@ -209,11 +210,20 @@ class Untokenizer:
             tokval += ' '
         if toknum in (NEWLINE, NL):
             startline = True
+        prevstring = False
         for tok in iterable:
             toknum, tokval = tok[:2]
 
             if toknum in (NAME, NUMBER):
                 tokval += ' '
+
+            # Insert a space between two consecutive strings
+            if toknum == STRING:
+                if prevstring:
+                    tokval = ' ' + tokval
+                prevstring = True
+            else:
+                prevstring = False
 
             if toknum == INDENT:
                 indents.append(tokval)
@@ -243,7 +253,7 @@ def untokenize(iterable):
         t1 = [tok[:2] for tok in generate_tokens(f.readline)]
         newcode = untokenize(t1)
         readline = iter(newcode.splitlines(1)).next
-        t2 = [tok[:2] for tokin generate_tokens(readline)]
+        t2 = [tok[:2] for tok in generate_tokens(readline)]
         assert t1 == t2
     """
     ut = Untokenizer()

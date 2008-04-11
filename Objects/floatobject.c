@@ -10,6 +10,10 @@
 #include <ctype.h>
 #include <float.h>
 
+#ifdef HAVE_IEEEFP_H
+#include <ieeefp.h>
+#endif
+
 #include "formatter_string.h"
 
 #if !defined(__STDC__)
@@ -1719,7 +1723,7 @@ PyFloat_Fini(void)
 	}
 	else {
 		fprintf(stderr,
-			": %" PY_FORMAT_SIZE_T "d unfreed floats%s in %"
+			": %" PY_FORMAT_SIZE_T "d unfreed float%s in %"
 			PY_FORMAT_SIZE_T "d out of %"
 			PY_FORMAT_SIZE_T "d block%s\n",
 			fsum, fsum == 1 ? "" : "s",
@@ -1751,9 +1755,6 @@ PyFloat_Fini(void)
 
 /*----------------------------------------------------------------------------
  * _PyFloat_{Pack,Unpack}{4,8}.  See floatobject.h.
- *
- * TODO:  On platforms that use the standard IEEE-754 single and double
- * formats natively, these routines could simply copy the bytes.
  */
 int
 _PyFloat_Pack4(double x, unsigned char *p, int le)
@@ -1833,28 +1834,31 @@ _PyFloat_Pack4(double x, unsigned char *p, int le)
 		/* Done */
 		return 0;
 
-	  Overflow:
-		PyErr_SetString(PyExc_OverflowError,
-				"float too large to pack with f format");
-		return -1;
 	}
 	else {
 		float y = (float)x;
 		const char *s = (char*)&y;
 		int i, incr = 1;
 
+		if (Py_IS_INFINITY(y) && !Py_IS_INFINITY(x))
+			goto Overflow;
+
 		if ((float_format == ieee_little_endian_format && !le)
 		    || (float_format == ieee_big_endian_format && le)) {
 			p += 3;
 			incr = -1;
 		}
-		
+
 		for (i = 0; i < 4; i++) {
 			*p = *s++;
 			p += incr;
 		}
 		return 0;
 	}
+  Overflow:
+	PyErr_SetString(PyExc_OverflowError,
+			"float too large to pack with f format");
+	return -1;
 }
 
 int

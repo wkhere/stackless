@@ -43,7 +43,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(bsddbDir);..\Stackless"
+				AdditionalIncludeDirectories="$(bsddbDir),$(bsddbDir)\..;..\Stackless"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -53,11 +53,9 @@
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-				CommandLine="cd $(bsddbDir)&#x0D;&#x0A;if exist Debug\libdb44sd.lib exit 0&#x0D;&#x0A;vcbuild /useenv db_static.vcproj &quot;Debug|Win32&quot;&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(bsddbDir)\Debug\libdb44sd.lib"
 				BaseAddress="0x1e180000"
 			/>
 			<Tool
@@ -106,7 +104,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(bsddbDir);..\Stackless"
+				AdditionalIncludeDirectories="$(bsddbDir),$(bsddbDir)\..;..\Stackless"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -116,11 +114,11 @@
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-				CommandLine="cd $(bsddbDir)&#x0D;&#x0A;if exist Release\libdb44s.lib exit 0&#x0D;&#x0A;vcbuild /useenv db_static.vcproj &quot;Release|Win32&quot;&#x0D;&#x0A;"
+				CommandLine=""
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(bsddbDir)\Release\libdb44s.lib"
+				AdditionalDependencies="$(bsddbDepLibs)"
 				BaseAddress="0x1e180000"
 			/>
 			<Tool
@@ -169,7 +167,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(bsddbDir);..\Stackless"
+				AdditionalIncludeDirectories="$(bsddbDir),$(bsddbDir)\..;..\Stackless"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -179,11 +177,10 @@
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-				CommandLine="cd $(bsddbDir)&#x0D;&#x0A;if exist Release\libdb44s.lib exit 0&#x0D;&#x0A;vcbuild /useenv db_static.vcproj &quot;Release|Win32&quot;&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(bsddbDir)\Release\libdb44s.lib"
+				AdditionalDependencies="$(bsddbDepLibs)"
 				BaseAddress="0x1e180000"
 			/>
 			<Tool
@@ -232,7 +229,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(bsddbDir);..\Stackless"
+				AdditionalIncludeDirectories="$(bsddbDir),$(bsddbDir)\..;..\Stackless"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -242,11 +239,11 @@
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-				CommandLine="cd $(bsddbDir)&#x0D;&#x0A;if exist Release\libdb44s.lib exit 0&#x0D;&#x0A;vcbuild /useenv db_static.vcproj &quot;Release|Win32&quot;&#x0D;&#x0A;"
+				CommandLine=""
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(bsddbDir)\Release\libdb44s.lib"
+				AdditionalDependencies="$(bsddbDepLibs)"
 				BaseAddress="0x1e180000"
 			/>
 			<Tool
@@ -295,7 +292,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(bsddbDir);..\Stackless"
+				AdditionalIncludeDirectories="$(bsddbDir),$(bsddbDir)\..;..\Stackless"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -305,11 +302,10 @@
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-				CommandLine="cd $(bsddbDir)&#x0D;&#x0A;if exist Debug_AMD64\libdb44sd.lib exit 0&#x0D;&#x0A;vcbuild /useenv db_static.vcproj &quot;Debug AMD64|Win32&quot;&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(bsddbDir)\Debug_AMD64\libdb44sd.lib"
+				AdditionalDependencies="$(bsddbDepLibs)"
 				BaseAddress="0x1e180000"
 			/>
 			<Tool
@@ -359,7 +355,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(bsddbDir);..\Stackless"
+				AdditionalIncludeDirectories="$(bsddbDir),$(bsddbDir)\..;..\Stackless"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -369,11 +365,10 @@
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-				CommandLine="cd $(bsddbDir)&#x0D;&#x0A;if exist Release_AMD64\libdb44s.lib exit 0&#x0D;&#x0A;vcbuild /useenv db_static.vcproj &quot;Release AMD64|Win32&quot;&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(bsddbDir)\Release_AMD64\libdb44s.lib"
+				AdditionalDependencies="$(bsddbDepLibs)"
 				BaseAddress="0x1e180000"
 			/>
 			<Tool
@@ -423,7 +418,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(bsddbDir);..\Stackless"
+				AdditionalIncludeDirectories="$(bsddbDir),$(bsddbDir)\..;..\Stackless"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -433,13 +428,11 @@
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-				CommandLine="cd $(bsddbDir)&#x0D;&#x0A;if exist Release_AMD64\libdb44s.lib exit 0&#x0D;&#x0A;vcbuild /useenv db_static.vcproj &quot;Release AMD64|Win32&quot;&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(bsddbDir)\Release_AMD64\libdb44s.lib"
+				AdditionalDependencies="$(bsddbDepLibs)"
 				BaseAddress="0x1e180000"
-				TargetMachine="17"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -488,7 +481,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(bsddbDir);..\Stackless"
+				AdditionalIncludeDirectories="$(bsddbDir),$(bsddbDir)\..;..\Stackless"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -498,11 +491,10 @@
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-				CommandLine="cd $(bsddbDir)&#x0D;&#x0A;if exist Release_AMD64\libdb44s.lib exit 0&#x0D;&#x0A;vcbuild /useenv db_static.vcproj &quot;Release AMD64|Win32&quot;&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(bsddbDir)\Release_AMD64\libdb44s.lib"
+				AdditionalDependencies="$(bsddbDepLibs)"
 				BaseAddress="0x1e180000"
 				TargetMachine="17"
 			/>

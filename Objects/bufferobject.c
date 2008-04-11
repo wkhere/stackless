@@ -233,6 +233,12 @@ buffer_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	Py_ssize_t offset = 0;
 	Py_ssize_t size = Py_END_OF_BUFFER;
 
+	if (Py_Py3kWarningFlag &&
+	    PyErr_WarnEx(PyExc_DeprecationWarning,
+			 "buffer() not supported in 3.x; "
+			 "use memoryview()", 1) < 0)
+		return NULL;
+	
 	if (!_PyArg_NoKeywords("buffer()", kw))
 		return NULL;
 

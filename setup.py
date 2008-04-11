@@ -417,13 +417,13 @@ class PyBuildExt(build_ext):
                                libraries=math_libs) )
         exts.append( Extension('datetime', ['datetimemodule.c', 'timemodule.c'],
                                libraries=math_libs) )
+        # fast iterator tools implemented in C
+        exts.append( Extension("itertools", ["itertoolsmodule.c"]) )
         # code that will be builtins in the future, but conflict with the
         #  current builtins
         exts.append( Extension('future_builtins', ['future_builtins.c']) )
         # random number generator implemented in C
         exts.append( Extension("_random", ["_randommodule.c"]) )
-        # fast iterator tools implemented in C
-        exts.append( Extension("itertools", ["itertoolsmodule.c"]) )
         # high-performance collections
         exts.append( Extension("_collections", ["_collectionsmodule.c"]) )
         # bisect
@@ -485,9 +485,6 @@ class PyBuildExt(build_ext):
 
         # select(2); not on ancient System V
         exts.append( Extension('select', ['selectmodule.c']) )
-
-        # Helper module for various ascii-encoders
-        exts.append( Extension('binascii', ['binascii.c']) )
 
         # Fred Drake's interface to the Python parser
         exts.append( Extension('parser', ['parsermodule.c']) )
@@ -1069,6 +1066,7 @@ class PyBuildExt(build_ext):
         # You can upgrade zlib to version 1.1.4 yourself by going to
         # http://www.gzip.org/zlib/
         zlib_inc = find_file('zlib.h', [], inc_dirs)
+        have_zlib = False
         if zlib_inc is not None:
             zlib_h = zlib_inc[0] + '/zlib.h'
             version = '"0.0.0"'
@@ -1090,12 +1088,28 @@ class PyBuildExt(build_ext):
                     exts.append( Extension('zlib', ['zlibmodule.c'],
                                            libraries = ['z'],
                                            extra_link_args = zlib_extra_link_args))
+                    have_zlib = True
                 else:
                     missing.append('zlib')
             else:
                 missing.append('zlib')
         else:
             missing.append('zlib')
+
+        # Helper module for various ascii-encoders.  Uses zlib for an optimized
+        # crc32 if we have it.  Otherwise binascii uses its own.
+        if have_zlib:
+            extra_compile_args = ['-DUSE_ZLIB_CRC32']
+            libraries = ['z']
+            extra_link_args = zlib_extra_link_args
+        else:
+            extra_compile_args = []
+            libraries = []
+            extra_link_args = []
+        exts.append( Extension('binascii', ['binascii.c'],
+                               extra_compile_args = extra_compile_args,
+                               libraries = libraries,
+                               extra_link_args = extra_link_args) )
 
         # Gustavo Niemeyer's bz2 module.
         if (self.compiler.find_library_file(lib_dirs, 'bz2')):
@@ -1455,8 +1469,37 @@ class PyBuildExt(build_ext):
         # *** Uncomment these for TOGL extension only:
         #       -lGL -lGLU -lXext -lXmu \
 
+    def configure_ctypes_darwin(self, ext):
+        # Darwin (OS X) uses preconfigured files, in
+        # the Modules/_ctypes/libffi_osx directory.
+        (srcdir,) = sysconfig.get_config_vars('srcdir')
+        ffi_srcdir = os.path.abspath(os.path.join(srcdir, 'Modules',
+                                                  '_ctypes', 'libffi_osx'))
+        sources = [os.path.join(ffi_srcdir, p)
+                   for p in ['ffi.c',
+                             'x86/x86-darwin.S',
+                             'x86/x86-ffi_darwin.c',
+                             'x86/x86-ffi64.c',
+                             'powerpc/ppc-darwin.S',
+                             'powerpc/ppc-darwin_closure.S',
+                             'powerpc/ppc-ffi_darwin.c',
+                             'powerpc/ppc64-darwin_closure.S',
+                             ]]
+
+        # Add .S (preprocessed assembly) to C compiler source extensions.
+        self.compiler.src_extensions.append('.S')
+
+        include_dirs = [os.path.join(ffi_srcdir, 'include'),
+                        os.path.join(ffi_srcdir, 'powerpc')]
+        ext.include_dirs.extend(include_dirs)
+        ext.sources.extend(sources)
+        return True
+
     def configure_ctypes(self, ext):
         if not self.use_system_libffi:
+            if sys.platform == 'darwin':
+                return self.configure_ctypes_darwin(ext)
+
             (srcdir,) = sysconfig.get_config_vars('srcdir')
             ffi_builddir = os.path.join(self.build_temp, 'libffi')
             ffi_srcdir = os.path.abspath(os.path.join(srcdir, 'Modules',
@@ -1515,6 +1558,7 @@ class PyBuildExt(build_ext):
 
         if sys.platform == 'darwin':
             sources.append('_ctypes/darwin/dlfcn_simple.c')
+            extra_compile_args.append('-DMACOSX')
             include_dirs.append('_ctypes/darwin')
 # XXX Is this still needed?
 ##            extra_link_args.extend(['-read_only_relocs', 'warning'])
@@ -1543,6 +1587,11 @@ class PyBuildExt(build_ext):
 
         if not '--with-system-ffi' in sysconfig.get_config_var("CONFIG_ARGS"):
             return
+
+        if sys.platform == 'darwin':
+            # OS X 10.5 comes with libffi.dylib; the include files are
+            # in /usr/include/ffi
+            inc_dirs.append('/usr/include/ffi')
 
         ffi_inc = find_file('ffi.h', [], inc_dirs)
         if ffi_inc is not None:
@@ -1667,6 +1716,7 @@ def main():
 
           # Scripts to install
           scripts = ['Tools/scripts/pydoc', 'Tools/scripts/idle',
+                     'Tools/scripts/2to3',
                      'Lib/smtpd.py']
         )
 

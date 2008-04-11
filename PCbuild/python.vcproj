@@ -287,7 +287,7 @@
 				AdditionalDependencies="odbccp32.lib"
 				OutputFile="$(OutDir)\python.exe"
 				SubSystem="1"
-				StackReserveSize="2000000"
+				StackReserveSize="2100000"
 				BaseAddress="0x1d000000"
 				ImportLibrary=""
 			/>

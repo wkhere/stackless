@@ -27,14 +27,6 @@ extern char *PyOS_Readline(FILE *, FILE *, char *);
 /* Don't ever change this -- it would break the portability of Python code */
 #define TABSIZE 8
 
-/* Convert a possibly signed character to a nonnegative int */
-/* XXX This assumes characters are 8 bits wide */
-#ifdef __CHAR_UNSIGNED__
-#define Py_CHARMASK(c)		(c)
-#else
-#define Py_CHARMASK(c)		((c) & 0xff)
-#endif
-
 /* Forward */
 static struct tok_state *tok_new(void);
 static int tok_nextc(struct tok_state *tok);
@@ -1335,7 +1327,7 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 	/* Number */
 	if (isdigit(c)) {
 		if (c == '0') {
-			/* Hex or octal -- maybe. */
+			/* Hex, octal or binary -- maybe. */
 			c = tok_nextc(tok);
 			if (c == '.')
 				goto fraction;
@@ -1355,6 +1347,30 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 				do {
 					c = tok_nextc(tok);
 				} while (isxdigit(c));
+			}
+                        else if (c == 'o' || c == 'O') {
+				/* Octal */
+				c = tok_nextc(tok);
+				if (c < '0' || c > '8') {
+					tok->done = E_TOKEN;
+					tok_backup(tok, c);
+					return ERRORTOKEN;
+				}
+				do {
+					c = tok_nextc(tok);
+				} while ('0' <= c && c < '8');
+			}
+			else if (c == 'b' || c == 'B') {
+				/* Binary */
+				c = tok_nextc(tok);
+				if (c != '0' && c != '1') {
+					tok->done = E_TOKEN;
+					tok_backup(tok, c);
+					return ERRORTOKEN;
+				}
+				do {
+					c = tok_nextc(tok);
+				} while (c == '0' || c == '1');
 			}
 			else {
 				int found_decimal = 0;
@@ -1507,7 +1523,7 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 #ifndef PGEN
 		if (Py_Py3kWarningFlag && token == NOTEQUAL && c == '<') {
 			if (PyErr_WarnExplicit(PyExc_DeprecationWarning,
-					       "<> not supported in 3.x",
+					       "<> not supported in 3.x; use !=",
 					       tok->filename, tok->lineno,
 					       NULL, NULL)) {
 				return ERRORTOKEN;

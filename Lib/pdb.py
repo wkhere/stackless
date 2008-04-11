@@ -1198,7 +1198,16 @@ def set_trace():
 
 # Post-Mortem interface
 
-def post_mortem(t):
+def post_mortem(t=None):
+    # handling the default
+    if t is None:
+        # sys.exc_info() returns (type, value, traceback) if an exception is
+        # being handled, otherwise it returns None
+        t = sys.exc_info()[2]
+        if t is None:
+            raise ValueError("A valid traceback must be passed if no "
+                                               "exception is being handled")
+
     p = Pdb()
     p.reset()
     while t.tb_next is not None:
@@ -1229,7 +1238,7 @@ def help():
         print 'along the Python search path'
 
 def main():
-    if not sys.argv[1:]:
+    if not sys.argv[1:] or sys.argv[1] in ("--help", "-h"):
         print "usage: pdb.py scriptfile [arg] ..."
         sys.exit(2)
 

@@ -83,11 +83,7 @@ dircheck(PyFileObject* f)
 		return f;
 	if (fstat(fileno(f->f_fp), &buf) == 0 &&
 	    S_ISDIR(buf.st_mode)) {
-#ifdef HAVE_STRERROR
 		char *msg = strerror(EISDIR);
-#else
-		char *msg = "Is a directory";
-#endif
 		PyObject *exc = PyObject_CallFunction(PyExc_IOError, "(is)",
 						      EISDIR, msg);
 		PyErr_SetObject(PyExc_IOError, exc);
@@ -256,9 +252,12 @@ open_the_file(PyFileObject *f, char *name, char *mode)
 		else if (errno == EINVAL) /* unknown, but not a mode string */
 			errno = ENOENT;
 #endif
+                /* EINVAL is returned when an invalid filename or
+                 * an invalid mode is supplied. */
 		if (errno == EINVAL)
-			PyErr_Format(PyExc_IOError, "invalid mode: %s",
-				     mode);
+			PyErr_Format(PyExc_IOError,
+                                     "invalid filename: %s or mode: %s",
+				     name, mode);
 		else
 			PyErr_SetFromErrnoWithFilenameObject(PyExc_IOError, f->f_name);
 		f = NULL;
@@ -395,11 +394,7 @@ file_dealloc(PyFileObject *f)
 		sts = (*f->f_close)(f->f_fp);
 		Py_END_ALLOW_THREADS
 		if (sts == EOF) 
-#ifdef HAVE_STRERROR
 			PySys_WriteStderr("close failed: [Errno %d] %s\n", errno, strerror(errno)); 
-#else
-			PySys_WriteStderr("close failed: [Errno %d]\n", errno); 
-#endif
 	}
 	PyMem_Free(f->f_setbuf);
 	Py_XDECREF(f->f_name);
@@ -1788,8 +1783,6 @@ static PyMethodDef file_methods[] = {
 #define OFF(x) offsetof(PyFileObject, x)
 
 static PyMemberDef file_memberlist[] = {
-	{"softspace",	T_INT,		OFF(f_softspace), 0,
-	 "flag indicating that a space needs to be printed; used by print"},
 	{"mode",	T_OBJECT,	OFF(f_mode),	RO,
 	 "file mode ('r', 'U', 'w', 'a', possibly with 'b' or '+' added)"},
 	{"name",	T_OBJECT,	OFF(f_name),	RO,
@@ -1834,10 +1827,44 @@ get_newlines(PyFileObject *f, void *closure)
 	}
 }
 
+static PyObject *
+get_softspace(PyFileObject *f, void *closure)
+{
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning,
+		       "file.softspace not supported in 3.x") < 0)
+		return NULL;
+	return PyInt_FromLong(f->f_softspace);
+}
+
+static int
+set_softspace(PyFileObject *f, PyObject *value)
+{
+	int new;
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning,
+		       "file.softspace not supported in 3.x") < 0)
+		return -1;
+
+	if (value == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't delete softspace attribute");
+		return -1;
+	}
+
+	new = PyInt_AsLong(value);
+	if (new == -1 && PyErr_Occurred())
+		return -1;
+	f->f_softspace = new;
+	return 0;
+}
+
 static PyGetSetDef file_getsetlist[] = {
 	{"closed", (getter)get_closed, NULL, "True if the file is closed"},
 	{"newlines", (getter)get_newlines, NULL,
 	 "end-of-line convention used in this file"},
+	{"softspace", (getter)get_softspace, (setter)set_softspace,
+	 "flag indicating that a space needs to be printed; used by print"},
 	{0},
 };
 

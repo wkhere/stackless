@@ -169,8 +169,16 @@ clause in the current stack frame or in an older stack frame."
 static PyObject *
 sys_exc_clear(PyObject *self, PyObject *noargs)
 {
-	PyThreadState *tstate = PyThreadState_GET();
+	PyThreadState *tstate;
 	PyObject *tmp_type, *tmp_value, *tmp_tb;
+
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning,
+		       "sys.exc_clear() not supported in 3.x; "
+		       "use except clauses") < 0)
+		return NULL;
+
+	tstate = PyThreadState_GET();
 	tmp_type = tstate->exc_type;
 	tmp_value = tstate->exc_value;
 	tmp_tb = tstate->exc_traceback;
@@ -1065,6 +1073,15 @@ svnversion_init(void)
 #endif
 	if (!python)
 		Py_FatalError("subversion keywords missing");
+	if (!python) {
+		/* XXX quick hack to get bzr working */
+		*patchlevel_revision = '\0';
+		strcpy(branch, "");
+		strcpy(shortbranch, "unknown");
+		svn_revision = "";
+		return;
+		/* Py_FatalError("subversion keywords missing"); */
+	}
 
 	br_start = python + 11;
 	br_end = strchr(br_start, '/');

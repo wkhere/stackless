@@ -8,7 +8,8 @@ extern "C" {
 #endif
 
 #define PyCF_MASK (CO_FUTURE_DIVISION | CO_FUTURE_ABSOLUTE_IMPORT | \
-                   CO_FUTURE_WITH_STATEMENT)
+                   CO_FUTURE_WITH_STATEMENT | CO_FUTURE_PRINT_FUNCTION | \
+                   CO_FUTURE_UNICODE_LITERALS)
 #define PyCF_MASK_OBSOLETE (CO_NESTED)
 #define PyCF_SOURCE_IS_UTF8  0x0100
 #define PyCF_DONT_IMPLY_DEDENT 0x0200
@@ -123,6 +124,7 @@ PyAPI_FUNC(void) _PyImportHooks_Init(void);
 PyAPI_FUNC(int) _PyFrame_Init(void);
 PyAPI_FUNC(int) _PyInt_Init(void);
 PyAPI_FUNC(void) _PyFloat_Init(void);
+PyAPI_FUNC(int) PyBytes_Init(void);
 
 /* Various internal finalizers */
 PyAPI_FUNC(void) _PyExc_Fini(void);
@@ -138,6 +140,7 @@ PyAPI_FUNC(void) PyString_Fini(void);
 PyAPI_FUNC(void) PyInt_Fini(void);
 PyAPI_FUNC(void) PyFloat_Fini(void);
 PyAPI_FUNC(void) PyOS_FiniInterrupts(void);
+PyAPI_FUNC(void) PyBytes_Fini(void);
 
 /* Stuff with no proper home (yet) */
 PyAPI_FUNC(char *) PyOS_Readline(FILE *, FILE *, char *);

@@ -93,7 +93,9 @@
 #endif
 #include "rangeobject.h"
 #include "stringobject.h"
+/* #include "memoryobject.h" */
 #include "bufferobject.h"
+#include "bytesobject.h"
 #include "tupleobject.h"
 #include "listobject.h"
 #include "dictobject.h"
@@ -149,7 +151,7 @@ PyAPI_FUNC(PyObject*) _Py_Mangle(PyObject *p, PyObject *name);
 #ifdef __CHAR_UNSIGNED__
 #define Py_CHARMASK(c)		(c)
 #else
-#define Py_CHARMASK(c)		((c) & 0xff)
+#define Py_CHARMASK(c)		((unsigned char)((c) & 0xff))
 #endif
 
 #include "pyfpe.h"

@@ -1038,7 +1038,7 @@ int_getnewargs(PyIntObject *v)
 
 static PyObject *
 int_getN(PyIntObject *v, void *context) {
-	return PyInt_FromLong((intptr_t)context);
+	return PyInt_FromLong((Py_intptr_t)context);
 }
 
 /* Convert an integer to the given base.  Returns a string.
@@ -1378,7 +1378,7 @@ PyInt_Fini(void)
 	}
 	else {
 		fprintf(stderr,
-			": %" PY_FORMAT_SIZE_T "d unfreed ints%s in %"
+			": %" PY_FORMAT_SIZE_T "d unfreed int%s in %"
 			PY_FORMAT_SIZE_T "d out of %"
 			PY_FORMAT_SIZE_T "d block%s\n",
 			isum, isum == 1 ? "" : "s",

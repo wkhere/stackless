@@ -10,7 +10,7 @@ from compiler import pyassem, misc, future, symbols
 from compiler.consts import SC_LOCAL, SC_GLOBAL, SC_FREE, SC_CELL
 from compiler.consts import (CO_VARARGS, CO_VARKEYWORDS, CO_NEWLOCALS,
      CO_NESTED, CO_GENERATOR, CO_FUTURE_DIVISION,
-     CO_FUTURE_ABSIMPORT, CO_FUTURE_WITH_STATEMENT)
+     CO_FUTURE_ABSIMPORT, CO_FUTURE_WITH_STATEMENT, CO_FUTURE_PRINT_FUNCTION)
 from compiler.pyassem import TupleArg
 
 # XXX The version-specific code can go, since this code only works with 2.x.
@@ -218,6 +218,8 @@ class CodeGenerator:
                 self.graph.setFlag(CO_FUTURE_ABSIMPORT)
             elif feature == "with_statement":
                 self.graph.setFlag(CO_FUTURE_WITH_STATEMENT)
+            elif feature == "print_function":
+                self.graph.setFlag(CO_FUTURE_PRINT_FUNCTION)
 
     def initClass(self):
         """This method is called once for each class"""
@@ -822,14 +824,13 @@ class CodeGenerator:
     def visitWith(self, node):
         body = self.newBlock()
         final = self.newBlock()
-        exitvar = "$exit%d" % self.__with_count
         valuevar = "$value%d" % self.__with_count
         self.__with_count += 1
         self.set_lineno(node)
         self.visit(node.expr)
         self.emit('DUP_TOP')
         self.emit('LOAD_ATTR', '__exit__')
-        self._implicitNameOp('STORE', exitvar)
+        self.emit('ROT_TWO')
         self.emit('LOAD_ATTR', '__enter__')
         self.emit('CALL_FUNCTION', 0)
         if node.vars is None:
@@ -849,8 +850,6 @@ class CodeGenerator:
         self.emit('LOAD_CONST', None)
         self.nextBlock(final)
         self.setups.push((END_FINALLY, final))
-        self._implicitNameOp('LOAD', exitvar)
-        self._implicitNameOp('DELETE', exitvar)
         self.emit('WITH_CLEANUP')
         self.emit('END_FINALLY')
         self.setups.pop()

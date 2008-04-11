@@ -863,8 +863,19 @@ try_3way_to_rich_compare(PyObject *v, PyObject *w, int op)
 	int c;
 
 	c = try_3way_compare(v, w);
-	if (c >= 2)
+	if (c >= 2) {
+
+		/* Py3K warning if types are not equal and comparison isn't == or !=  */
+		if (Py_Py3kWarningFlag &&
+		    v->ob_type != w->ob_type && op != Py_EQ && op != Py_NE &&
+		    PyErr_Warn(PyExc_DeprecationWarning,
+			       "comparing unequal types not supported "
+			       "in 3.x") < 0) {
+			return NULL;
+		}
+
 		c = default_3way_compare(v, w);
+	}
 	if (c <= -2)
 		return NULL;
 	return convert_3way_to_object(op, c);
@@ -1677,6 +1688,16 @@ merge_list_attr(PyObject* dict, PyObject* obj, const char *attrname)
 					break;
 			}
 		}
+		if (Py_Py3kWarningFlag &&
+		    (strcmp(attrname, "__members__") == 0 ||
+		     strcmp(attrname, "__methods__") == 0)) {
+			if (PyErr_Warn(PyExc_DeprecationWarning, 
+				       "__members__ and __methods__ not "
+				       "supported in 3.x") < 0) {
+				Py_XDECREF(list);
+				return -1;
+			}
+		}
 	}
 
 	Py_XDECREF(list);
@@ -1964,6 +1985,9 @@ _Py_ReadyTypes(void)
 
 	if (PyType_Ready(&PyString_Type) < 0)
 		Py_FatalError("Can't initialize 'str'");
+
+	if (PyType_Ready(&PyBytes_Type) < 0)
+		Py_FatalError("Can't initialize 'bytes'");
 
 	if (PyType_Ready(&PyList_Type) < 0)
 		Py_FatalError("Can't initialize 'list'");

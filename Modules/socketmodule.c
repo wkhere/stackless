@@ -3110,15 +3110,10 @@ gethost_common(struct hostent *h, struct sockaddr *addr, int alen, int af)
 	}
 
 	if (h->h_addrtype != af) {
-#ifdef HAVE_STRERROR
 		/* Let's get real error message to return */
 		PyErr_SetString(socket_error,
 				(char *)strerror(EAFNOSUPPORT));
-#else
-		PyErr_SetString(
-			socket_error,
-			"Address family not supported by protocol family");
-#endif
+
 		return NULL;
 	}
 
@@ -5235,8 +5230,12 @@ init_socket(void)
 	PyModule_AddIntConstant(m, "RCVALL_OFF", RCVALL_OFF);
 	PyModule_AddIntConstant(m, "RCVALL_ON", RCVALL_ON);
 	PyModule_AddIntConstant(m, "RCVALL_SOCKETLEVELONLY", RCVALL_SOCKETLEVELONLY);
+#ifdef RCVALL_IPLEVEL
 	PyModule_AddIntConstant(m, "RCVALL_IPLEVEL", RCVALL_IPLEVEL);
+#endif
+#ifdef RCVALL_MAX
 	PyModule_AddIntConstant(m, "RCVALL_MAX", RCVALL_MAX);
+#endif
 #endif /* _MSTCPIP_ */
 
 	/* Initialize gethostbyname lock */

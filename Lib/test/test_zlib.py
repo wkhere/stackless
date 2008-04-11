@@ -1,6 +1,7 @@
 import unittest
 from test import test_support
 import zlib
+import binascii
 import random
 
 
@@ -38,6 +39,29 @@ class ChecksumTestCase(unittest.TestCase):
         self.assertEqual(zlib.crc32("penguin"), zlib.crc32("penguin", 0))
         self.assertEqual(zlib.adler32("penguin"),zlib.adler32("penguin",1))
 
+    def test_abcdefghijklmnop(self):
+        """test issue1202 compliance: signed crc32, adler32 in 2.x"""
+        foo = 'abcdefghijklmnop'
+        # explicitly test signed behavior
+        self.assertEqual(zlib.crc32(foo), -1808088941)
+        self.assertEqual(zlib.crc32('spam'), 1138425661)
+        self.assertEqual(zlib.adler32(foo+foo), -721416943)
+        self.assertEqual(zlib.adler32('spam'), 72286642)
+
+    def test_same_as_binascii_crc32(self):
+        foo = 'abcdefghijklmnop'
+        self.assertEqual(binascii.crc32(foo), zlib.crc32(foo))
+        self.assertEqual(binascii.crc32('spam'), zlib.crc32('spam'))
+
+    def test_negative_crc_iv_input(self):
+        # The range of valid input values for the crc state should be
+        # -2**31 through 2**32-1 to allow inputs artifically constrained
+        # to a signed 32-bit integer.
+        self.assertEqual(zlib.crc32('ham', -1), zlib.crc32('ham', 0xffffffffL))
+        self.assertEqual(zlib.crc32('spam', -3141593),
+                         zlib.crc32('spam',  0xffd01027L))
+        self.assertEqual(zlib.crc32('spam', -(2**31)),
+                         zlib.crc32('spam',  (2**31)))
 
 
 class ExceptionTestCase(unittest.TestCase):

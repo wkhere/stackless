@@ -73,6 +73,7 @@ int Py_VerboseFlag; /* Needed by import.c */
 int Py_InteractiveFlag; /* Needed by Py_FdIsInteractive() below */
 int Py_InspectFlag; /* Needed to determine whether to exit at SystemError */
 int Py_NoSiteFlag; /* Suppress 'import site' */
+int Py_BytesWarningFlag; /* Warn on str(bytes) and str(buffer) */
 int Py_DontWriteBytecodeFlag; /* Suppress writing bytecode files (*.py[co]) */
 int Py_UseClassExceptionsFlag = 1; /* Needed by bltinmodule.c: deprecated */
 int Py_FrozenFlag; /* Needed by getpath.c */
@@ -201,6 +202,9 @@ Py_InitializeEx(int install_sigs)
 	if (!_PyInt_Init())
 		Py_FatalError("Py_Initialize: can't init ints");
 
+	if (!PyBytes_Init())
+		Py_FatalError("Py_Initialize: can't init bytearray");
+
 	_PyFloat_Init();
 
 	interp->modules = PyDict_New();
@@ -262,8 +266,28 @@ Py_InitializeEx(int install_sigs)
 #endif /* WITH_THREAD */
 
 	warnings_module = PyImport_ImportModule("warnings");
-	if (!warnings_module)
+	if (!warnings_module) {
 		PyErr_Clear();
+	}
+	else {
+		PyObject *o;
+		char *action[8];
+
+		if (Py_BytesWarningFlag > 1)
+			*action = "error";
+		else if (Py_BytesWarningFlag)
+			*action = "default";
+		else
+			*action = "ignore";
+
+		o = PyObject_CallMethod(warnings_module,
+					"simplefilter", "sO",
+					*action, PyExc_BytesWarning);
+		if (o == NULL)
+			Py_FatalError("Py_Initialize: can't initialize"
+				      "warning filter for BytesWarning.");
+		Py_DECREF(o);
+        }
 
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the
@@ -485,6 +509,7 @@ Py_Finalize(void)
 	PyList_Fini();
 	PySet_Fini();
 	PyString_Fini();
+	PyBytes_Fini();
 	PyInt_Fini();
 	PyFloat_Fini();
 	PyDict_Fini();
@@ -755,18 +780,22 @@ PyRun_InteractiveLoopFlags(FILE *fp, const char *filename, PyCompilerFlags *flag
 	}
 }
 
+#if 0
 /* compute parser flags based on compiler flags */
 #define PARSER_FLAGS(flags) \
 	((flags) ? ((((flags)->cf_flags & PyCF_DONT_IMPLY_DEDENT) ? \
 		      PyPARSE_DONT_IMPLY_DEDENT : 0)) : 0)
-
-#if 0
+#endif
+#if 1
 /* Keep an example of flags with future keyword support. */
 #define PARSER_FLAGS(flags) \
 	((flags) ? ((((flags)->cf_flags & PyCF_DONT_IMPLY_DEDENT) ? \
 		      PyPARSE_DONT_IMPLY_DEDENT : 0) \
-		    | ((flags)->cf_flags & CO_FUTURE_WITH_STATEMENT ? \
-		       PyPARSE_WITH_IS_KEYWORD : 0)) : 0)
+		    | (((flags)->cf_flags & CO_FUTURE_PRINT_FUNCTION) ? \
+		       PyPARSE_PRINT_IS_FUNCTION : 0) \
+		    | (((flags)->cf_flags & CO_FUTURE_UNICODE_LITERALS) ? \
+		       PyPARSE_UNICODE_LITERALS : 0) \
+		    ) : 0)
 #endif
 
 int
@@ -1396,11 +1425,14 @@ Py_SymtableString(const char *str, const char *filename, int start)
 {
 	struct symtable *st;
 	mod_ty mod;
+	PyCompilerFlags flags;
 	PyArena *arena = PyArena_New();
 	if (arena == NULL)
 		return NULL;
 
-	mod = PyParser_ASTFromString(str, filename, start, NULL, arena);
+	flags.cf_flags = 0;
+
+	mod = PyParser_ASTFromString(str, filename, start, &flags, arena);
 	if (mod == NULL) {
 		PyArena_Free(arena);
 		return NULL;
@@ -1417,10 +1449,15 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 {
 	mod_ty mod;
 	perrdetail err;
-	node *n = PyParser_ParseStringFlagsFilename(s, filename,
+	int iflags = PARSER_FLAGS(flags);
+
+	node *n = PyParser_ParseStringFlagsFilenameEx(s, filename,
 					&_PyParser_Grammar, start, &err,
-					PARSER_FLAGS(flags));
+					&iflags);
 	if (n) {
+		if (flags) {
+			flags->cf_flags |= iflags & PyCF_MASK;
+		}
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
 		return mod;
@@ -1438,9 +1475,14 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1,
 {
 	mod_ty mod;
 	perrdetail err;
-	node *n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar,
-				start, ps1, ps2, &err, PARSER_FLAGS(flags));
+	int iflags = PARSER_FLAGS(flags);
+
+	node *n = PyParser_ParseFileFlagsEx(fp, filename, &_PyParser_Grammar,
+				start, ps1, ps2, &err, &iflags);
 	if (n) {
+		if (flags) {
+			flags->cf_flags |= iflags & PyCF_MASK;
+		}
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
 		return mod;
