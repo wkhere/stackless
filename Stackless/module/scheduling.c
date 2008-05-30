@@ -600,12 +600,9 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 	int revive_main = 0;
 	
 #ifdef WITH_THREAD
-	if (ts->st.thread.runflags == 0)
+	if (ts->st.thread.runflags == 0 && ts->st.main->next == NULL)
 		/* we also must never block if watchdog is running not in threadblocking mode */
 		revive_main = 1;
-
-	if (revive_main)
-		assert(ts->st.main->next == NULL); /* main must be floating */
 #endif
 
 	if (revive_main || check_for_deadlock()) {
