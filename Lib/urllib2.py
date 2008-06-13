@@ -117,7 +117,7 @@ from urllib import localhost, url2pathname, getproxies
 __version__ = sys.version[:3]
 
 _opener = None
-def urlopen(url, data=None, timeout=None):
+def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
     global _opener
     if _opener is None:
         _opener = build_opener()
@@ -159,7 +159,7 @@ class HTTPError(URLError, addinfourl):
         # file object.  If this happens, the simplest workaround is to
         # not initialize the base classes.
         if fp is not None:
-            self.__super_init(fp, hdrs, url)
+            self.__super_init(fp, hdrs, url, code)
 
     def __str__(self):
         return 'HTTP Error %s: %s' % (self.code, self.msg)
@@ -359,7 +359,7 @@ class OpenerDirector:
             if result is not None:
                 return result
 
-    def open(self, fullurl, data=None, timeout=None):
+    def open(self, fullurl, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
         # accept a URL or a Request object
         if isinstance(fullurl, basestring):
             req = Request(fullurl, data)
@@ -446,14 +446,14 @@ def build_opener(*handlers):
                        FTPHandler, FileHandler, HTTPErrorProcessor]
     if hasattr(httplib, 'HTTPS'):
         default_classes.append(HTTPSHandler)
-    skip = []
+    skip = set()
     for klass in default_classes:
         for check in handlers:
             if isclass(check):
                 if issubclass(check, klass):
-                    skip.append(klass)
+                    skip.add(klass)
             elif isinstance(check, klass):
-                skip.append(klass)
+                skip.add(klass)
     for klass in skip:
         default_classes.remove(klass)
 
@@ -976,6 +976,8 @@ class AbstractDigestAuthHandler:
         return base
 
     def get_algorithm_impls(self, algorithm):
+        # algorithm should be case-insensitive according to RFC2617
+        algorithm = algorithm.upper()
         # lambdas assume digest modules are imported at the top level
         if algorithm == 'MD5':
             H = lambda x: hashlib.md5(x).hexdigest()

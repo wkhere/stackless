@@ -477,11 +477,7 @@ def localcontext(ctx=None):
                  # General Decimal Arithmetic Specification
              return +s  # Convert result to normal context
 
-    """
-    # The string below can't be included in the docstring until Python 2.6
-    # as the doctest module doesn't understand __future__ statements
-    """
-    >>> from __future__ import with_statement
+    >>> setcontext(DefaultContext)
     >>> print getcontext().prec
     28
     >>> with localcontext():
@@ -1210,7 +1206,7 @@ class Decimal(object):
         return ans
     __rmul__ = __mul__
 
-    def __div__(self, other, context=None):
+    def __truediv__(self, other, context=None):
         """Return self / other."""
         other = _convert_other(other)
         if other is NotImplemented:
@@ -1269,8 +1265,6 @@ class Decimal(object):
         ans = _dec_from_triple(sign, str(coeff), exp)
         return ans._fix(context)
 
-    __truediv__ = __div__
-
     def _divide(self, other, context):
         """Return (self // other, self % other), to context.prec precision.
 
@@ -1304,13 +1298,15 @@ class Decimal(object):
                                    'quotient too large in //, % or divmod')
         return ans, ans
 
-    def __rdiv__(self, other, context=None):
-        """Swaps self/other and returns __div__."""
+    def __rtruediv__(self, other, context=None):
+        """Swaps self/other and returns __truediv__."""
         other = _convert_other(other)
         if other is NotImplemented:
             return other
-        return other.__div__(self, context=context)
-    __rtruediv__ = __rdiv__
+        return other.__truediv__(self, context=context)
+
+    __div__ = __truediv__
+    __rdiv__ = __rtruediv__
 
     def __divmod__(self, other, context=None):
         """
@@ -1510,7 +1506,7 @@ class Decimal(object):
                 context = getcontext()
                 return context._raise_error(InvalidContext)
             elif self._isinfinity():
-                raise OverflowError("Cannot convert infinity to long")
+                raise OverflowError("Cannot convert infinity to int")
         s = (-1)**self._sign
         if self._exp >= 0:
             return s*int(self._int)*10**self._exp
@@ -3597,7 +3593,7 @@ class Context(object):
     traps - If traps[exception] = 1, then the exception is
                     raised when it is caused.  Otherwise, a value is
                     substituted in.
-    flags  - When an exception is caused, flags[exception] is incremented.
+    flags  - When an exception is caused, flags[exception] is set.
              (Whether or not the trap_enabler is set)
              Should be reset by user of Decimal instance.
     Emin -   Minimum exponent
@@ -3617,10 +3613,10 @@ class Context(object):
         if _ignored_flags is None:
             _ignored_flags = []
         if not isinstance(flags, dict):
-            flags = dict([(s,s in flags) for s in _signals])
+            flags = dict([(s, int(s in flags)) for s in _signals])
             del s
         if traps is not None and not isinstance(traps, dict):
-            traps = dict([(s,s in traps) for s in _signals])
+            traps = dict([(s, int(s in traps)) for s in _signals])
             del s
         for name, val in locals().items():
             if val is None:
@@ -3665,23 +3661,23 @@ class Context(object):
         """Handles an error
 
         If the flag is in _ignored_flags, returns the default response.
-        Otherwise, it increments the flag, then, if the corresponding
+        Otherwise, it sets the flag, then, if the corresponding
         trap_enabler is set, it reaises the exception.  Otherwise, it returns
-        the default value after incrementing the flag.
+        the default value after setting the flag.
         """
         error = _condition_map.get(condition, condition)
         if error in self._ignored_flags:
             # Don't touch the flag
             return error().handle(self, *args)
 
-        self.flags[error] += 1
+        self.flags[error] = 1
         if not self.traps[error]:
             # The errors define how to handle themselves.
             return condition().handle(self, *args)
 
         # Errors should only be risked on copies of the context
         # self._ignored_flags = []
-        raise error, explanation
+        raise error(explanation)
 
     def _ignore_all_flags(self):
         """Ignore all flags, if they are raised"""

@@ -3,7 +3,6 @@
 
 #include "Python.h"
 #include <ctype.h>
-#include "formatter_string.h"
 
 static PyObject *int_int(PyIntObject *v);
 
@@ -1116,36 +1115,44 @@ int__format__(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "O:__format__", &format_spec))
 		return NULL;
-	if (PyString_Check(format_spec))
-		return string_int__format__(self, args);
+	if (PyBytes_Check(format_spec))
+		return _PyInt_FormatAdvanced(self,
+					     PyBytes_AS_STRING(format_spec),
+					     PyBytes_GET_SIZE(format_spec));
 	if (PyUnicode_Check(format_spec)) {
 		/* Convert format_spec to a str */
-		PyObject *result = NULL;
-		PyObject *newargs = NULL;
-		PyObject *string_format_spec = NULL;
+		PyObject *result;
+		PyObject *str_spec = PyObject_Str(format_spec);
 
-		string_format_spec = PyObject_Str(format_spec);
-		if (string_format_spec == NULL)
-			goto done;
+		if (str_spec == NULL)
+			return NULL;
 
-		newargs = Py_BuildValue("(O)", string_format_spec);
-		if (newargs == NULL)
-			goto done;
+		result = _PyInt_FormatAdvanced(self,
+					       PyBytes_AS_STRING(str_spec),
+					       PyBytes_GET_SIZE(str_spec));
 
-		result = string_int__format__(self, newargs);
-
-		done:
-		Py_XDECREF(string_format_spec);
-		Py_XDECREF(newargs);
+		Py_DECREF(str_spec);
 		return result;
 	}
 	PyErr_SetString(PyExc_TypeError, "__format__ requires str or unicode");
 	return NULL;
 }
 
+#if 0
+static PyObject *
+int_is_finite(PyObject *v)
+{
+	Py_RETURN_TRUE;
+}
+#endif
+
 static PyMethodDef int_methods[] = {
 	{"conjugate",	(PyCFunction)int_int,	METH_NOARGS,
 	 "Returns self, the complex conjugate of any int."},
+#if 0
+	{"is_finite",	(PyCFunction)int_is_finite,	METH_NOARGS,
+	 "Returns always True."},
+#endif
 	{"__trunc__",	(PyCFunction)int_int,	METH_NOARGS,
          "Truncating an Integral returns itself."},
 	{"__getnewargs__",	(PyCFunction)int_getnewargs,	METH_NOARGS},

@@ -5,6 +5,12 @@
 .. module:: HTMLParser
    :synopsis: A simple parser that can handle HTML and XHTML.
 
+.. note::
+
+   The :mod:`HTMLParser` module has been renamed to :mod:`html.parser` in Python
+   3.0.  The :term:`2to3` tool will automatically adapt imports when converting
+   your sources to 3.0.
+
 
 .. versionadded:: 2.2
 
@@ -22,7 +28,7 @@ in :mod:`sgmllib`.
 
    The :class:`HTMLParser` class is instantiated without arguments.
 
-   An HTMLParser instance is fed HTML data and calls handler functions when tags
+   An :class:`HTMLParser` instance is fed HTML data and calls handler functions when tags
    begin and end.  The :class:`HTMLParser` class is meant to be overridden by the
    user to provide a desired behavior.
 
@@ -92,7 +98,7 @@ An exception is defined as well:
    ``handle_starttag('a', [('href', 'http://www.cwi.nl/')])``.
 
    .. versionchanged:: 2.6
-      All entity references from htmlentitydefs are now replaced in the attribute
+      All entity references from :mod:`htmlentitydefs` are now replaced in the attribute
       values.
 
 

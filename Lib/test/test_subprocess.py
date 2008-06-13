@@ -287,14 +287,12 @@ class ProcessTestCase(unittest.TestCase):
                              stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate()
         self.assertEqual(stdout, None)
-        # When running with a pydebug build, the # of references is outputted
-        # to stderr, so just check if stderr at least started with "pinapple"
-        self.assert_(stderr.startswith("pineapple"))
+        self.assertEqual(remove_stderr_debug_decorations(stderr), "pineapple")
 
     def test_communicate(self):
         p = subprocess.Popen([sys.executable, "-c",
-                          'import sys,os;' \
-                          'sys.stderr.write("pineapple");' \
+                          'import sys,os;'
+                          'sys.stderr.write("pineapple");'
                           'sys.stdout.write(sys.stdin.read())'],
                          stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE,
@@ -303,6 +301,22 @@ class ProcessTestCase(unittest.TestCase):
         self.assertEqual(stdout, "banana")
         self.assertEqual(remove_stderr_debug_decorations(stderr),
                          "pineapple")
+
+    # This test is Linux specific for simplicity to at least have
+    # some coverage.  It is not a platform specific bug.
+    if os.path.isdir('/proc/%d/fd' % os.getpid()):
+        # Test for the fd leak reported in http://bugs.python.org/issue2791.
+        def test_communicate_pipe_fd_leak(self):
+            fd_directory = '/proc/%d/fd' % os.getpid()
+            num_fds_before_popen = len(os.listdir(fd_directory))
+            p = subprocess.Popen([sys.executable, '-c', 'print()'],
+                                 stdout=subprocess.PIPE)
+            p.communicate()
+            num_fds_after_communicate = len(os.listdir(fd_directory))
+            del p
+            num_fds_after_destruction = len(os.listdir(fd_directory))
+            self.assertEqual(num_fds_before_popen, num_fds_after_destruction)
+            self.assertEqual(num_fds_before_popen, num_fds_after_communicate)
 
     def test_communicate_returns(self):
         # communicate() should return None if no redirection is active
@@ -534,7 +548,7 @@ class ProcessTestCase(unittest.TestCase):
             # args is a string
             f, fname = self.mkstemp()
             os.write(f, "#!/bin/sh\n")
-            os.write(f, "exec %s -c 'import sys; sys.exit(47)'\n" %
+            os.write(f, "exec '%s' -c 'import sys; sys.exit(47)'\n" %
                         sys.executable)
             os.close(f)
             os.chmod(fname, 0700)
@@ -576,7 +590,7 @@ class ProcessTestCase(unittest.TestCase):
             # call() function with string argument on UNIX
             f, fname = self.mkstemp()
             os.write(f, "#!/bin/sh\n")
-            os.write(f, "exec %s -c 'import sys; sys.exit(47)'\n" %
+            os.write(f, "exec '%s' -c 'import sys; sys.exit(47)'\n" %
                         sys.executable)
             os.close(f)
             os.chmod(fname, 0700)
@@ -584,6 +598,29 @@ class ProcessTestCase(unittest.TestCase):
             os.remove(fname)
             self.assertEqual(rc, 47)
 
+        def DISABLED_test_send_signal(self):
+            p = subprocess.Popen([sys.executable,
+                              "-c", "input()"])
+
+            self.assert_(p.poll() is None, p.poll())
+            p.send_signal(signal.SIGINT)
+            self.assertNotEqual(p.wait(), 0)
+
+        def DISABLED_test_kill(self):
+            p = subprocess.Popen([sys.executable,
+                            "-c", "input()"])
+
+            self.assert_(p.poll() is None, p.poll())
+            p.kill()
+            self.assertEqual(p.wait(), -signal.SIGKILL)
+
+        def DISABLED_test_terminate(self):
+            p = subprocess.Popen([sys.executable,
+                            "-c", "input()"])
+
+            self.assert_(p.poll() is None, p.poll())
+            p.terminate()
+            self.assertEqual(p.wait(), -signal.SIGTERM)
 
     #
     # Windows tests
@@ -655,6 +692,29 @@ class ProcessTestCase(unittest.TestCase):
                                  ' -c "import sys; sys.exit(47)"')
             self.assertEqual(rc, 47)
 
+        def DISABLED_test_send_signal(self):
+            p = subprocess.Popen([sys.executable,
+                              "-c", "input()"])
+
+            self.assert_(p.poll() is None, p.poll())
+            p.send_signal(signal.SIGTERM)
+            self.assertNotEqual(p.wait(), 0)
+
+        def DISABLED_test_kill(self):
+            p = subprocess.Popen([sys.executable,
+                            "-c", "input()"])
+
+            self.assert_(p.poll() is None, p.poll())
+            p.kill()
+            self.assertNotEqual(p.wait(), 0)
+
+        def DISABLED_test_terminate(self):
+            p = subprocess.Popen([sys.executable,
+                            "-c", "input()"])
+
+            self.assert_(p.poll() is None, p.poll())
+            p.terminate()
+            self.assertNotEqual(p.wait(), 0)
 
 def test_main():
     test_support.run_unittest(ProcessTestCase)

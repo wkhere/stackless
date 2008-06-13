@@ -8,6 +8,30 @@ annotated by François Pinard, and converted to C by Raymond Hettinger.
 
 #include "Python.h"
 
+/* Older implementations of heapq used Py_LE for comparisons.  Now, it uses
+   Py_LT so it will match min(), sorted(), and bisect().  Unfortunately, some
+   client code (Twisted for example) relied on Py_LE, so this little function
+   restores compatability by trying both.
+*/
+static int
+cmp_lt(PyObject *x, PyObject *y)
+{
+	int cmp;
+	static PyObject *lt = NULL;
+
+	if (lt == NULL) {
+		lt = PyString_FromString("__lt__");
+		if (lt == NULL)
+			return -1;
+	}
+	if (PyObject_HasAttr(x, lt))
+		return PyObject_RichCompareBool(x, y, Py_LT);
+	cmp = PyObject_RichCompareBool(y, x, Py_LE);
+	if (cmp != -1)
+		cmp = 1 - cmp;
+	return cmp;
+}
+
 static int
 _siftdown(PyListObject *heap, Py_ssize_t startpos, Py_ssize_t pos)
 {
@@ -28,12 +52,12 @@ _siftdown(PyListObject *heap, Py_ssize_t startpos, Py_ssize_t pos)
 	while (pos > startpos){
 		parentpos = (pos - 1) >> 1;
 		parent = PyList_GET_ITEM(heap, parentpos);
-		cmp = PyObject_RichCompareBool(parent, newitem, Py_LE);
+		cmp = cmp_lt(newitem, parent);
 		if (cmp == -1) {
 			Py_DECREF(newitem);
 			return -1;
 		}
-		if (cmp == 1)
+		if (cmp == 0)
 			break;
 		Py_INCREF(parent);
 		Py_DECREF(PyList_GET_ITEM(heap, pos));
@@ -68,15 +92,14 @@ _siftup(PyListObject *heap, Py_ssize_t pos)
 		/* Set childpos to index of smaller child.   */
 		rightpos = childpos + 1;
 		if (rightpos < endpos) {
-			cmp = PyObject_RichCompareBool(
-				PyList_GET_ITEM(heap, rightpos),
+			cmp = cmp_lt(
 				PyList_GET_ITEM(heap, childpos),
-				Py_LE);
+				PyList_GET_ITEM(heap, rightpos));
 			if (cmp == -1) {
 				Py_DECREF(newitem);
 				return -1;
 			}
-			if (cmp == 1)
+			if (cmp == 0)
 				childpos = rightpos;
 		}
 		/* Move the smaller child up. */
@@ -214,10 +237,10 @@ heappushpop(PyObject *self, PyObject *args)
 		return item;
 	}
 
-	cmp = PyObject_RichCompareBool(item, PyList_GET_ITEM(heap, 0), Py_LE);
+	cmp = cmp_lt(PyList_GET_ITEM(heap, 0), item);
 	if (cmp == -1)
 		return NULL;
-	if (cmp == 1) {
+	if (cmp == 0) {
 		Py_INCREF(item);
 		return item;
 	}
@@ -270,6 +293,7 @@ nlargest(PyObject *self, PyObject *args)
 {
 	PyObject *heap=NULL, *elem, *iterable, *sol, *it, *oldelem;
 	Py_ssize_t i, n;
+	int cmp;
 
 	if (!PyArg_ParseTuple(args, "nO:nlargest", &n, &iterable))
 		return NULL;
@@ -312,7 +336,12 @@ nlargest(PyObject *self, PyObject *args)
 			else
 				goto sortit;
 		}
-		if (PyObject_RichCompareBool(elem, sol, Py_LE)) {
+		cmp = cmp_lt(sol, elem);
+		if (cmp == -1) {
+			Py_DECREF(elem);
+			goto fail;
+		}
+		if (cmp == 0) {
 			Py_DECREF(elem);
 			continue;
 		}
@@ -362,12 +391,12 @@ _siftdownmax(PyListObject *heap, Py_ssize_t startpos, Py_ssize_t pos)
 	while (pos > startpos){
 		parentpos = (pos - 1) >> 1;
 		parent = PyList_GET_ITEM(heap, parentpos);
-		cmp = PyObject_RichCompareBool(newitem, parent, Py_LE);
+		cmp = cmp_lt(parent, newitem);
 		if (cmp == -1) {
 			Py_DECREF(newitem);
 			return -1;
 		}
-		if (cmp == 1)
+		if (cmp == 0)
 			break;
 		Py_INCREF(parent);
 		Py_DECREF(PyList_GET_ITEM(heap, pos));
@@ -402,15 +431,14 @@ _siftupmax(PyListObject *heap, Py_ssize_t pos)
 		/* Set childpos to index of smaller child.   */
 		rightpos = childpos + 1;
 		if (rightpos < endpos) {
-			cmp = PyObject_RichCompareBool(
-				PyList_GET_ITEM(heap, childpos),
+			cmp = cmp_lt(
 				PyList_GET_ITEM(heap, rightpos),
-				Py_LE);
+				PyList_GET_ITEM(heap, childpos));
 			if (cmp == -1) {
 				Py_DECREF(newitem);
 				return -1;
 			}
-			if (cmp == 1)
+			if (cmp == 0)
 				childpos = rightpos;
 		}
 		/* Move the smaller child up. */
@@ -434,6 +462,7 @@ nsmallest(PyObject *self, PyObject *args)
 {
 	PyObject *heap=NULL, *elem, *iterable, *los, *it, *oldelem;
 	Py_ssize_t i, n;
+	int cmp;
 
 	if (!PyArg_ParseTuple(args, "nO:nsmallest", &n, &iterable))
 		return NULL;
@@ -477,7 +506,12 @@ nsmallest(PyObject *self, PyObject *args)
 			else
 				goto sortit;
 		}
-		if (PyObject_RichCompareBool(los, elem, Py_LE)) {
+		cmp = cmp_lt(elem, los);
+		if (cmp == -1) {
+			Py_DECREF(elem);
+			goto fail;
+		}
+		if (cmp == 0) {
 			Py_DECREF(elem);
 			continue;
 		}

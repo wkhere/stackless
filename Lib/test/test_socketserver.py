@@ -22,7 +22,7 @@ from test.test_support import TESTFN as TEST_FILE
 test.test_support.requires("network")
 
 TEST_STR = "hello world\n"
-HOST = "localhost"
+HOST = test.test_support.HOST
 
 HAVE_UNIX_SOCKETS = hasattr(socket, "AF_UNIX")
 HAVE_FORKING = hasattr(os, "fork") and os.name != "os2"
@@ -139,7 +139,7 @@ class SocketServerTest(unittest.TestCase):
             # Time between requests is short enough that we won't wake
             # up spuriously too many times.
             kwargs={'poll_interval':0.01})
-        t.setDaemon(True)  # In case this function raises.
+        t.set_daemon(True)  # In case this function raises.
         t.start()
         if verbose: print "server running"
         for i in range(3):

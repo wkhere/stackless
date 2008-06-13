@@ -641,9 +641,9 @@ Or, where the user fails to pass a value at all::
 option involved in the error; be sure to do the same when calling
 ``parser.error()`` from your application code.
 
-If :mod:`optparse`'s default error-handling behaviour does not suite your needs,
-you'll need to subclass OptionParser and override ``exit()`` and/or
-:meth:`error`.
+If :mod:`optparse`'s default error-handling behaviour does not suit your needs,
+you'll need to subclass OptionParser and override its :meth:`exit` and/or
+:meth:`error` methods.
 
 
 .. _optparse-putting-it-all-together:
@@ -1638,7 +1638,7 @@ arguments::
 
    [...]
    parser.add_option("-c", "--callback",
-                     action="callback", callback=varargs)
+                     action="callback", callback=vararg_callback)
 
 The main weakness with this particular implementation is that negative numbers
 in the arguments following ``"-c"`` will be interpreted as further options

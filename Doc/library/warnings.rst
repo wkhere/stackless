@@ -200,7 +200,7 @@ Available Functions
    sources).
 
    .. versionchanged:: 2.5
-      Added the `module_globals` parameter.
+      Added the *module_globals* parameter.
 
 
 .. function:: warnpy3k(message[, category[, stacklevel]])
@@ -211,19 +211,31 @@ Available Functions
    is using :exc:`DeprecationWarning` as default warning class.
 
 
-.. function:: showwarning(message, category, filename, lineno[, file])
+.. function:: showwarning(message, category, filename, lineno[, file[, line]])
 
    Write a warning to a file.  The default implementation calls
-   ``formatwarning(message, category, filename, lineno)`` and writes the resulting
-   string to *file*, which defaults to ``sys.stderr``.  You may replace this
-   function with an alternative implementation by assigning to
+   ``formatwarning(message, category, filename, lineno, line)`` and writes the
+   resulting string to *file*, which defaults to ``sys.stderr``.  You may replace
+   this function with an alternative implementation by assigning to
    ``warnings.showwarning``.
+   *line* is a line of source code to be included in the warning
+   message; if *line* is not supplied, :func:`showwarning` will 
+   try to read the line specified by *filename* and *lineno*.
+
+   .. versionchanged:: 2.6
+      Added the *line* argument. Implementations that lack the new argument
+      will trigger a :exc:`DeprecationWarning`.
 
 
-.. function:: formatwarning(message, category, filename, lineno)
+.. function:: formatwarning(message, category, filename, lineno[, line])
 
    Format a warning the standard way.  This returns a string  which may contain
-   embedded newlines and ends in a newline.
+   embedded newlines and ends in a newline.  *line* is 
+   a line of source code to be included in the warning message; if *line* is not supplied, 
+   :func:`formatwarning` will try to read the line specified by *filename* and *lineno*.
+
+   .. versionchanged:: 2.6
+      Added the *line* argument.
 
 
 .. function:: filterwarnings(action[, message[, category[, module[, lineno[, append]]]]])

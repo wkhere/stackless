@@ -1,9 +1,13 @@
-
 :mod:`httplib` --- HTTP protocol client
 =======================================
 
 .. module:: httplib
    :synopsis: HTTP and HTTPS protocol client (requires sockets).
+
+.. note::
+   The :mod:`httplib` module has been renamed to :mod:`http.client` in Python
+   3.0.  The :term:`2to3` tool will automatically adapt imports when converting
+   your sources to 3.0.
 
 
 .. index::
@@ -33,14 +37,14 @@ The module provides the following classes:
 .. class:: HTTPConnection(host[, port[, strict[, timeout]]])
 
    An :class:`HTTPConnection` instance represents one transaction with an HTTP
-   server.  It should be instantiated passing it a host and optional port number.
-   If no port number is passed, the port is extracted from the host string if it
-   has the form ``host:port``, else the default HTTP port (80) is used.  When True,
-   the optional parameter *strict* causes ``BadStatusLine`` to be raised if the
-   status line can't be parsed as a valid HTTP/1.0 or 1.1 status line.  If the
-   optional *timeout* parameter is given, connection attempts will timeout after
-   that many seconds (if it is not given or ``None``, the global default  timeout
-   setting is used).
+   server.  It should be instantiated passing it a host and optional port
+   number.  If no port number is passed, the port is extracted from the host
+   string if it has the form ``host:port``, else the default HTTP port (80) is
+   used.  When True, the optional parameter *strict* causes ``BadStatusLine`` to
+   be raised if the status line can't be parsed as a valid HTTP/1.0 or 1.1
+   status line.  If the optional *timeout* parameter is given, blocking
+   operations (like connection attempts) will timeout after that many seconds
+   (if it is not given, the global default timeout setting is used).
 
    For example, the following calls all create instances that connect to the server
    at the same host and port::

@@ -29,7 +29,6 @@ sqlite_dir = "../sqlite-source-3.3.4"
 # path to PCbuild directory
 PCBUILD="PCbuild"
 # msvcrt version
-#MSVCR = "71"
 MSVCR = "90"
 
 try:
@@ -106,13 +105,17 @@ extensions = [
 # Using the same UUID is fine since these files are versioned,
 # so Installer will always keep the newest version.
 # NOTE: All uuids are self generated.
-msvcr71_uuid = "{8666C8DD-D0B4-4B42-928E-A69E32FA5D4D}"
-msvcr90_uuid = "{9C28CD84-397C-4045-855C-28B02291A272}"
 pythondll_uuid = {
     "24":"{9B81E618-2301-4035-AC77-75D9ABEB7301}",
     "25":"{2e41b118-38bd-4c1b-a840-6977efd1b911}",
     "26":"{34ebecac-f046-4e1c-b0e3-9bac3cdaacfa}",
     } [major+minor]
+
+# Compute the name that Sphinx gives to the docfile
+docfile = ""
+if level < 0xf:
+    docfile = '%x%s' % (level, serial)
+docfile = 'python%s%s%s.chm' % (major, minor, docfile)
 
 # Build the mingw import library, libpythonXY.a
 # This requires 'nm' and 'dlltool' executables on your PATH
@@ -378,7 +381,8 @@ def add_ui(db):
               ("VerdanaRed9", "Verdana", 9, 255, 0),
              ])
 
-    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x bad_coding|badsyntax|site-packages "[TARGETDIR]Lib"'
+    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x bad_coding|badsyntax|site-packages|py3_ "[TARGETDIR]Lib"'
+    lib2to3args = r'-c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"'
     # See "CustomAction Table"
     add_data(db, "CustomAction", [
         # msidbCustomActionTypeFirstSequence + msidbCustomActionTypeTextData + msidbCustomActionTypeProperty
@@ -392,6 +396,7 @@ def add_ui(db):
         # See "Custom Action Type 18"
         ("CompilePyc", 18, "python.exe", compileargs),
         ("CompilePyo", 18, "python.exe", "-O "+compileargs),
+        ("CompileGrammar", 18, "python.exe", lib2to3args),
         ])
 
     # UI Sequences, see "InstallUISequence Table", "Using a Sequence Table"
@@ -421,12 +426,14 @@ def add_ui(db):
              ("UpdateEditIDLE", None, 1050),
              ("CompilePyc", "COMPILEALL", 6800),
              ("CompilePyo", "COMPILEALL", 6801),
+             ("CompileGrammar", "COMPILEALL", 6802),
             ])
     add_data(db, "AdminExecuteSequence",
             [("InitialTargetDir", 'TARGETDIR=""', 750),
              ("SetDLLDirToTarget", 'DLLDIR=""', 751),
              ("CompilePyc", "COMPILEALL", 6800),
              ("CompilePyo", "COMPILEALL", 6801),
+             ("CompileGrammar", "COMPILEALL", 6802),
             ])
 
     #####################################################################
@@ -794,10 +801,16 @@ def add_features(db):
     # (i.e. additional Python libraries) need to follow the parent feature.
     # Features that have no advertisement trigger (e.g. the test suite)
     # must not support advertisement
-    global default_feature, tcltk, htmlfiles, tools, testsuite, ext_feature
+    global default_feature, tcltk, htmlfiles, tools, testsuite, ext_feature, private_crt
     default_feature = Feature(db, "DefaultFeature", "Python",
                               "Python Interpreter and Libraries",
                               1, directory = "TARGETDIR")
+    shared_crt = Feature(db, "SharedCRT", "MSVCRT", "C Run-Time (system-wide)", 0,
+                         level=0)
+    private_crt = Feature(db, "PrivateCRT", "MSVCRT", "C Run-Time (private)", 0,
+                          level=0)
+    add_data(db, "Condition", [("SharedCRT", 1, sys32cond),
+                               ("PrivateCRT", 1, "not "+sys32cond)])
     # We don't support advertisement of extensions
     ext_feature = Feature(db, "Extensions", "Register Extensions",
                           "Make this Python installation the default Python installation", 3,
@@ -813,27 +826,6 @@ def add_features(db):
     testsuite = Feature(db, "Testsuite", "Test suite",
                         "Python test suite (Lib/test/)", 11,
                         parent = default_feature, attributes=2|8)
-
-def extract_msvcr71():
-    import _winreg
-    # Find the location of the merge modules
-    k = _winreg.OpenKey(
-        _winreg.HKEY_LOCAL_MACHINE,
-        r"Software\Microsoft\VisualStudio\7.1\Setup\VS")
-    dir = _winreg.QueryValueEx(k, "MSMDir")[0]
-    _winreg.CloseKey(k)
-    files = glob.glob1(dir, "*CRT71*")
-    assert len(files) == 1, (dir, files)
-    file = os.path.join(dir, files[0])
-    # Extract msvcr71.dll
-    m = msilib.MakeMerge2()
-    m.OpenModule(file, 0)
-    m.ExtractFiles(".")
-    m.CloseModule()
-    # Find the version/language of msvcr71.dll
-    installer = msilib.MakeInstaller()
-    return installer.FileVersion("msvcr71.dll", 0), \
-           installer.FileVersion("msvcr71.dll", 1)
 
 def extract_msvcr90():
     # Find the redistributable files
@@ -851,6 +843,27 @@ def extract_msvcr90():
             kw['language'] = installer.FileVersion(path, 1)
         result.append((f, kw))
     return result
+
+def generate_license():
+    import shutil, glob
+    out = open("LICENSE.txt", "w")
+    shutil.copyfileobj(open(os.path.join(srcdir, "LICENSE")), out)
+    for name, pat, file in (("bzip2","bzip2-*", "LICENSE"),
+                      ("Berkeley DB", "db-*", "LICENSE"),
+                      ("openssl", "openssl-*", "LICENSE"),
+                      ("Tcl", "tcl8*", "license.terms"),
+                      ("Tk", "tk8*", "license.terms"),
+                      ("Tix", "tix-*", "license.terms")):
+        out.write("\nThis copy of Python includes a copy of %s, which is licensed under the following terms:\n\n" % name)
+        dirs = glob.glob(srcdir+"/../"+pat)
+        if not dirs:
+            raise ValueError, "Could not find "+srcdir+"/../"+pat
+        if len(dirs) > 2:
+            raise ValueError, "Multiple copies of "+pat
+        dir = dirs[0]
+        shutil.copyfileobj(open(os.path.join(dir, file)), out)
+    out.close()
+
 
 class PyDirectory(Directory):
     """By default, all components in the Python installer
@@ -872,7 +885,8 @@ def add_files(db):
         root.add_file("%s/w9xpopen.exe" % PCBUILD)
     root.add_file("README.txt", src="README")
     root.add_file("NEWS.txt", src="Misc/NEWS")
-    root.add_file("LICENSE.txt", src="LICENSE")
+    generate_license()
+    root.add_file("LICENSE.txt", src=os.path.abspath("LICENSE.txt"))
     root.start_component("python.exe", keyfile="python.exe")
     root.add_file("%s/python.exe" % PCBUILD)
     root.start_component("pythonw.exe", keyfile="pythonw.exe")
@@ -896,21 +910,24 @@ def add_files(db):
                     version=pyversion,
                     language=installer.FileVersion(pydllsrc, 1))
     DLLs = PyDirectory(db, cab, root, srcdir + "/" + PCBUILD, "DLLs", "DLLS|DLLs")
-    # XXX determine dependencies
-    if MSVCR == "90":
-        root.start_component("msvcr90")
-        for file, kw in extract_msvcr90():
-            root.add_file(file, **kw)
-            if file.endswith("manifest"):
-                DLLs.add_file(file, **kw)
-    else:
-        version, lang = extract_msvcr71()
-        dlldir.start_component("msvcr71", flags=8, keyfile="msvcr71.dll",
-                               uuid=msvcr71_uuid)
-        dlldir.add_file("msvcr71.dll", src=os.path.abspath("msvcr71.dll"),
-                        version=version, language=lang)
-        tmpfiles.append("msvcr71.dll")
 
+    # msvcr90.dll: Need to place the DLL and the manifest into the root directory,
+    # plus another copy of the manifest in the DLLs directory, with the manifest
+    # pointing to the root directory
+    root.start_component("msvcr90", feature=private_crt)
+    # Results are ID,keyword pairs
+    manifest, crtdll = extract_msvcr90()
+    root.add_file(manifest[0], **manifest[1])
+    root.add_file(crtdll[0], **crtdll[1])
+    # Copy the manifest
+    manifest_dlls = manifest[0]+".root"
+    open(manifest_dlls, "w").write(open(manifest[1]['src']).read().replace("msvcr","../msvcr"))
+    DLLs.start_component("msvcr90_dlls", feature=private_crt)
+    DLLs.add_file(manifest[0], src=os.path.abspath(manifest_dlls))
+
+    # Now start the main component for the DLLs directory;
+    # no regular files have been added to the directory yet.
+    DLLs.start_component()
 
     # Check if _ctypes.pyd exists
     have_ctypes = os.path.exists(srcdir+"/%s/_ctypes.pyd" % PCBUILD)
@@ -983,13 +1000,12 @@ def add_files(db):
             lib.glob("*.gif")
             lib.add_file("idle.icns")
         if dir=="command" and parent.physical=="distutils":
-            lib.add_file("wininst-6.0.exe")
-            lib.add_file("wininst-7.1.exe")
-            lib.add_file("wininst-8.0.exe")
-            lib.add_file("wininst-9.0.exe")
+            lib.glob("wininst*.exe")
         if dir=="setuptools":
             lib.add_file("cli.exe")
             lib.add_file("gui.exe")
+        if dir=="lib2to3":
+            lib.removefile("pickle", "*.pickle")
         if dir=="data" and parent.physical=="test" and parent.basedir.physical=="email":
             # This should contain all non-.svn files listed in subversion
             for f in os.listdir(lib.absolute):
@@ -1090,8 +1106,8 @@ def add_files(db):
     # Add documentation
     htmlfiles.set_current()
     lib = PyDirectory(db, cab, root, "Doc", "Doc", "DOC|Doc")
-    lib.start_component("documentation", keyfile="Python%s%s.chm" % (major,minor))
-    lib.add_file("Python%s%s.chm" % (major, minor), src="build/htmlhelp/pydoc.chm")
+    lib.start_component("documentation", keyfile=docfile)
+    lib.add_file(docfile, src="build/htmlhelp/"+docfile)
 
     cab.commit(db)
 
@@ -1199,7 +1215,7 @@ def add_registry(db):
               ("PythonPath", -1, prefix+r"\PythonPath", "",
                r"[TARGETDIR]Lib;[TARGETDIR]DLLs;[TARGETDIR]Lib\lib-tk", "REGISTRY"),
               ("Documentation", -1, prefix+r"\Help\Main Python Documentation", "",
-               r"[TARGETDIR]Doc\Python%s%s.chm" % (major, minor), "REGISTRY.doc"),
+               "[TARGETDIR]Doc\\"+docfile , "REGISTRY.doc"),
               ("Modules", -1, prefix+r"\Modules", "+", None, "REGISTRY"),
               ("AppPaths", -1, r"Software\Microsoft\Windows\CurrentVersion\App Paths\Python.exe",
                "", r"[TARGETDIR]Python.exe", "REGISTRY.def")
@@ -1229,7 +1245,7 @@ def add_registry(db):
               # htmlfiles.id, None, None, None, None, None, None, None),
               ## Non-advertised shortcuts: must be associated with a registry component
               ("Manual", "MenuDir", "MANUAL|Python Manuals", "REGISTRY.doc",
-               "[#Python%s%s.chm]" % (major,minor), None,
+               "[#%s]" % docfile, None,
                None, None, None, None, None, None),
               ("Uninstall", "MenuDir", "UNINST|Uninstall Python", "REGISTRY",
                SystemFolderName+"msiexec",  "/x%s" % product_code,

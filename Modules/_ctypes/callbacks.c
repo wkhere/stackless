@@ -12,6 +12,74 @@
 #endif
 #include "ctypes.h"
 
+/**************************************************************/
+
+static void
+CThunkObject_dealloc(PyObject *_self)
+{
+	CThunkObject *self = (CThunkObject *)_self;
+	Py_XDECREF(self->converters);
+	Py_XDECREF(self->callable);
+	Py_XDECREF(self->restype);
+	if (self->pcl)
+		FreeClosure(self->pcl);
+	PyObject_Del(self);
+}
+
+static int
+CThunkObject_traverse(PyObject *_self, visitproc visit, void *arg)
+{
+	CThunkObject *self = (CThunkObject *)_self;
+	Py_VISIT(self->converters);
+	Py_VISIT(self->callable);
+	Py_VISIT(self->restype);
+	return 0;
+}
+
+static int
+CThunkObject_clear(PyObject *_self)
+{
+	CThunkObject *self = (CThunkObject *)_self;
+	Py_CLEAR(self->converters);
+	Py_CLEAR(self->callable);
+	Py_CLEAR(self->restype);
+	return 0;
+}
+
+PyTypeObject CThunk_Type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"_ctypes.CThunkObject",
+	sizeof(CThunkObject),			/* tp_basicsize */
+	sizeof(ffi_type),			/* tp_itemsize */
+	CThunkObject_dealloc,			/* tp_dealloc */
+	0,					/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	0,					/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	0,					/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	"CThunkObject",				/* tp_doc */
+	CThunkObject_traverse,			/* tp_traverse */
+	CThunkObject_clear,	       		/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	0,					/* tp_members */
+};
+
+/**************************************************************/
+
 static void
 PrintError(char *msg, ...)
 {
@@ -121,12 +189,15 @@ static void _CallPythonObject(void *mem,
 			      SETFUNC setfunc,
 			      PyObject *callable,
 			      PyObject *converters,
+			      int flags,
 			      void **pArgs)
 {
 	Py_ssize_t i;
 	PyObject *result;
 	PyObject *arglist = NULL;
 	Py_ssize_t nArgs;
+	PyObject *error_object = NULL;
+	int *space;
 #ifdef WITH_THREAD
 	PyGILState_STATE state = PyGILState_Ensure();
 #endif
@@ -203,8 +274,41 @@ static void _CallPythonObject(void *mem,
 #define CHECK(what, x) \
 if (x == NULL) _AddTraceback(what, "_ctypes/callbacks.c", __LINE__ - 1), PyErr_Print()
 
+	if (flags & (FUNCFLAG_USE_ERRNO | FUNCFLAG_USE_LASTERROR)) {
+		error_object = get_error_object(&space);
+		if (error_object == NULL)
+			goto Done;
+		if (flags & FUNCFLAG_USE_ERRNO) {
+			int temp = space[0];
+			space[0] = errno;
+			errno = temp;
+		}
+#ifdef MS_WIN32
+		if (flags & FUNCFLAG_USE_LASTERROR) {
+			int temp = space[1];
+			space[1] = GetLastError();
+			SetLastError(temp);
+		}
+#endif
+	}
+
 	result = PyObject_CallObject(callable, arglist);
 	CHECK("'calling callback function'", result);
+
+#ifdef MS_WIN32
+	if (flags & FUNCFLAG_USE_LASTERROR) {
+		int temp = space[1];
+		space[1] = GetLastError();
+		SetLastError(temp);
+	}
+#endif
+	if (flags & FUNCFLAG_USE_ERRNO) {
+		int temp = space[0];
+		space[0] = errno;
+		errno = temp;
+	}
+	Py_XDECREF(error_object);
+
 	if ((restype != &ffi_type_void) && result) {
 		PyObject *keep;
 		assert(setfunc);
@@ -247,38 +351,64 @@ static void closure_fcn(ffi_cif *cif,
 			void **args,
 			void *userdata)
 {
-	ffi_info *p = userdata;
+	CThunkObject *p = (CThunkObject *)userdata;
 
 	_CallPythonObject(resp,
-			  p->restype,
+			  p->ffi_restype,
 			  p->setfunc,
 			  p->callable,
 			  p->converters,
+			  p->flags,
 			  args);
 }
 
-ffi_info *AllocFunctionCallback(PyObject *callable,
-				PyObject *converters,
-				PyObject *restype,
-				int is_cdecl)
+static CThunkObject* CThunkObject_new(Py_ssize_t nArgs)
 {
-	int result;
-	ffi_info *p;
-	Py_ssize_t nArgs, i;
-	ffi_abi cc;
+	CThunkObject *p;
+	int i;
 
-	nArgs = PySequence_Size(converters);
-	p = (ffi_info *)PyMem_Malloc(sizeof(ffi_info) + sizeof(ffi_type) * (nArgs));
+	p = PyObject_NewVar(CThunkObject, &CThunk_Type, nArgs);
 	if (p == NULL) {
 		PyErr_NoMemory();
 		return NULL;
 	}
+
+	p->pcl = NULL;
+	memset(&p->cif, 0, sizeof(p->cif));
+	p->converters = NULL;
+	p->callable = NULL;
+	p->setfunc = NULL;
+	p->ffi_restype = NULL;
+	
+	for (i = 0; i < nArgs + 1; ++i)
+		p->atypes[i] = NULL;
+	return p;
+}
+
+CThunkObject *AllocFunctionCallback(PyObject *callable,
+				    PyObject *converters,
+				    PyObject *restype,
+				    int flags)
+{
+	int result;
+	CThunkObject *p;
+	Py_ssize_t nArgs, i;
+	ffi_abi cc;
+
+	nArgs = PySequence_Size(converters);
+	p = CThunkObject_new(nArgs);
+	if (p == NULL)
+		return NULL;
+
+	assert(CThunk_CheckExact(p));
+
 	p->pcl = MallocClosure();
 	if (p->pcl == NULL) {
 		PyErr_NoMemory();
 		goto error;
 	}
 
+	p->flags = flags;
 	for (i = 0; i < nArgs; ++i) {
 		PyObject *cnv = PySequence_GetItem(converters, i);
 		if (cnv == NULL)
@@ -288,9 +418,11 @@ ffi_info *AllocFunctionCallback(PyObject *callable,
 	}
 	p->atypes[i] = NULL;
 
+	Py_INCREF(restype);
+	p->restype = restype;
 	if (restype == Py_None) {
 		p->setfunc = NULL;
-		p->restype = &ffi_type_void;
+		p->ffi_restype = &ffi_type_void;
 	} else {
 		StgDictObject *dict = PyType_stgdict(restype);
 		if (dict == NULL || dict->setfunc == NULL) {
@@ -299,12 +431,12 @@ ffi_info *AllocFunctionCallback(PyObject *callable,
 		  goto error;
 		}
 		p->setfunc = dict->setfunc;
-		p->restype = &dict->ffi_type_pointer;
+		p->ffi_restype = &dict->ffi_type_pointer;
 	}
 
 	cc = FFI_DEFAULT_ABI;
 #if defined(MS_WIN32) && !defined(_WIN32_WCE) && !defined(MS_WIN64)
-	if (is_cdecl == 0)
+	if ((flags & FUNCFLAG_CDECL) == 0)
 		cc = FFI_STDCALL;
 #endif
 	result = ffi_prep_cif(&p->cif, cc,
@@ -323,16 +455,14 @@ ffi_info *AllocFunctionCallback(PyObject *callable,
 		goto error;
 	}
 
+	Py_INCREF(converters);
 	p->converters = converters;
+	Py_INCREF(callable);
 	p->callable = callable;
 	return p;
 
   error:
-	if (p) {
-		if (p->pcl)
-			FreeClosure(p->pcl);
-		PyMem_Free(p);
-	}
+	Py_XDECREF(p);
 	return NULL;
 }
 

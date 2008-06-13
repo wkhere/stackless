@@ -6,6 +6,7 @@
 
 #include "patchlevel.h"
 #include "pyconfig.h"
+#include "pymacconfig.h"
 
 /* Cyclic gc is always enabled, starting with release 2.3a1.  Supply the
  * old symbol for the benefit of extension modules written before then
@@ -43,7 +44,7 @@
 #include <unistd.h>
 #endif
 
-/* For uintptr_t, intptr_t */
+/* For size_t? */
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
 #endif
@@ -73,6 +74,7 @@
 #if defined(PYMALLOC_DEBUG) && !defined(WITH_PYMALLOC)
 #error "PYMALLOC_DEBUG requires WITH_PYMALLOC"
 #endif
+#include "pymath.h"
 #include "pymem.h"
 
 /* comment this out if you don't want to be stackless */
@@ -96,6 +98,7 @@
 /* #include "memoryobject.h" */
 #include "bufferobject.h"
 #include "bytesobject.h"
+#include "bytearrayobject.h"
 #include "tupleobject.h"
 #include "listobject.h"
 #include "dictobject.h"
@@ -113,6 +116,7 @@
 #include "iterobject.h"
 #include "genobject.h"
 #include "descrobject.h"
+#include "warnings.h"
 #include "weakrefobject.h"
 
 #include "codecs.h"

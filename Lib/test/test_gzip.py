@@ -24,17 +24,14 @@ data2 = """/* zlibmodule.c -- gzip-compatible data compression */
 class TestGzip(unittest.TestCase):
     filename = test_support.TESTFN
 
-    def setUp (self):
-        pass
+    def setUp(self):
+        test_support.unlink(self.filename)
 
-    def tearDown (self):
-        try:
-            os.unlink(self.filename)
-        except os.error:
-            pass
+    def tearDown(self):
+        test_support.unlink(self.filename)
 
 
-    def test_write (self):
+    def test_write(self):
         f = gzip.GzipFile(self.filename, 'wb') ; f.write(data1 * 50)
 
         # Try flush and fileno.
@@ -42,6 +39,9 @@ class TestGzip(unittest.TestCase):
         f.fileno()
         if hasattr(os, 'fsync'):
             os.fsync(f.fileno())
+        f.close()
+
+        # Test multiple close() calls.
         f.close()
 
     def test_read(self):

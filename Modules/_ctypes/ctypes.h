@@ -9,7 +9,17 @@
 #if (PY_VERSION_HEX < 0x02050000)
 typedef int Py_ssize_t;
 #define PyInt_FromSsize_t PyInt_FromLong
+#define PyNumber_AsSsize_t(ob, exc) PyInt_AsLong(ob)
+#define PyIndex_Check(ob) PyInt_Check(ob)
 #endif
+
+#if (PY_VERSION_HEX < 0x02060000)
+#define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
+#define PyVarObject_HEAD_INIT(type, size) \
+	PyObject_HEAD_INIT(type) size,
+#define PyImport_ImportModuleNoBlock PyImport_ImportModule
+#endif
+
 
 #ifndef MS_WIN32
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -74,14 +84,19 @@ struct tagCDataObject {
 };
 
 typedef struct {
+	PyObject_VAR_HEAD
 	ffi_closure *pcl; /* the C callable */
 	ffi_cif cif;
+	int flags;
 	PyObject *converters;
 	PyObject *callable;
+	PyObject *restype;
 	SETFUNC setfunc;
-	ffi_type *restype;
+	ffi_type *ffi_restype;
 	ffi_type *atypes[1];
-} ffi_info;
+} CThunkObject;
+extern PyTypeObject CThunk_Type;
+#define CThunk_CheckExact(v)	    ((v)->ob_type == &CThunk_Type)
 
 typedef struct {
 	/* First part identical to tagCDataObject */
@@ -97,7 +112,7 @@ typedef struct {
 	union value b_value;
 	/* end of tagCDataObject, additional fields follow */
 
-	ffi_info *thunk;
+	CThunkObject *thunk;
 	PyObject *callable;
 
 	/* These two fields will override the ones in the type's stgdict if
@@ -168,10 +183,10 @@ extern void init_callbacks_in_module(PyObject *m);
 
 extern PyMethodDef module_methods[];
 
-extern ffi_info *AllocFunctionCallback(PyObject *callable,
-				       PyObject *converters,
-				       PyObject *restype,
-				       int stdcall);
+extern CThunkObject *AllocFunctionCallback(PyObject *callable,
+					   PyObject *converters,
+					   PyObject *restype,
+					   int flags);
 /* a table entry describing a predefined ctypes type */
 struct fielddesc {
 	char code;
@@ -221,6 +236,14 @@ typedef struct {
 	PyObject *restype;	/* CDataObject or NULL */
 	PyObject *checker;
 	int flags;		/* calling convention and such */
+
+	/* pep3118 fields, pointers neeed PyMem_Free */
+	char *format;
+	int ndim;
+	Py_ssize_t *shape;
+/*	Py_ssize_t *strides;	*/ /* unused in ctypes */
+/*	Py_ssize_t *suboffsets;	*/ /* unused in ctypes */
+
 } StgDictObject;
 
 /****************************************************************
@@ -289,6 +312,8 @@ PyObject *_CallProc(PPROC pProc,
 #define FUNCFLAG_CDECL   0x1
 #define FUNCFLAG_HRESULT 0x2
 #define FUNCFLAG_PYTHONAPI 0x4
+#define FUNCFLAG_USE_ERRNO 0x8
+#define FUNCFLAG_USE_LASTERROR 0x10
 
 #define TYPEFLAG_ISPOINTER 0x100
 #define TYPEFLAG_HASPOINTER 0x200
@@ -401,10 +426,13 @@ extern void *MallocClosure(void);
 extern void _AddTraceback(char *, char *, int);
 
 extern PyObject *CData_FromBaseObj(PyObject *type, PyObject *base, Py_ssize_t index, char *adr);
+extern char *alloc_format_string(const char *prefix, const char *suffix);
 
 /* XXX better name needed! */
 extern int IsSimpleSubType(PyObject *obj);
 
+extern PyObject *_pointer_type_cache;
+PyObject *get_error_object(int **pspace);
 
 #ifdef MS_WIN32
 extern PyObject *ComError;

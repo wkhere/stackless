@@ -36,6 +36,11 @@ class ExceptionClassTests(unittest.TestCase):
         inheritance_tree = open(os.path.join(os.path.split(__file__)[0],
                                                 'exception_hierarchy.txt'))
         try:
+            import stackless
+            haveStackless = True
+        except:
+            haveStackless = False
+        try:
             superclass_name = inheritance_tree.readline().rstrip()
             try:
                 last_exc = getattr(__builtin__, superclass_name)
@@ -59,6 +64,8 @@ class ExceptionClassTests(unittest.TestCase):
                 if '[' in exc_name:
                     left_bracket = exc_name.index('[')
                     exc_name = exc_name[:left_bracket-1]  # cover space
+                if not haveStackless and exc_name == "TaskletExit":
+                    continue
                 try:
                     exc = getattr(__builtin__, exc_name)
                 except AttributeError:

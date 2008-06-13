@@ -126,7 +126,7 @@ static PyObject *__class___str, *__getinitargs___str, *__dict___str,
   *__reduce_ex___str,
   *write_str, *append_str,
   *read_str, *readline_str, *__main___str,
-  *copy_reg_str, *dispatch_table_str;
+  *copyreg_str, *dispatch_table_str;
 
 /*************************************************************************
  Internal Data type for pickle data.                                     */
@@ -436,9 +436,11 @@ write_file(Picklerobject *self, const char *s, Py_ssize_t  n)
 		return -1;
 	}
 
+	PyFile_IncUseCount((PyFileObject *)self->file);
 	Py_BEGIN_ALLOW_THREADS
 	nbyteswritten = fwrite(s, sizeof(char), n, self->fp);
 	Py_END_ALLOW_THREADS
+	PyFile_DecUseCount((PyFileObject *)self->file);
 	if (nbyteswritten != (size_t)n) {
 		PyErr_SetFromErrno(PyExc_IOError);
 		return -1;
@@ -547,9 +549,11 @@ read_file(Unpicklerobject *self, char **s, Py_ssize_t n)
 		self->buf_size = n;
 	}
 
+	PyFile_IncUseCount((PyFileObject *)self->file);
 	Py_BEGIN_ALLOW_THREADS
 	nbytesread = fread(self->buf, sizeof(char), n, self->fp);
 	Py_END_ALLOW_THREADS
+	PyFile_DecUseCount((PyFileObject *)self->file);
 	if (nbytesread != (size_t)n) {
 		if (feof(self->fp)) {
 			PyErr_SetNone(PyExc_EOFError);
@@ -2882,7 +2886,7 @@ newPicklerobject(PyObject *file, int proto)
 
 	if (PyEval_GetRestricted()) {
 		/* Restricted execution, get private tables */
-		PyObject *m = PyImport_Import(copy_reg_str);
+		PyObject *m = PyImport_Import(copyreg_str);
 
 		if (m == NULL)
 			goto err;
@@ -3503,6 +3507,14 @@ load_binstring(Unpicklerobject *self)
 	if (self->read_func(self, &s, 4) < 0) return -1;
 
 	l = calc_binint(s, 4);
+	if (l < 0) {
+		/* Corrupt or hostile pickle -- we never write one like
+		 * this.
+		 */
+		PyErr_SetString(UnpicklingError,
+				"BINSTRING pickle has negative byte count");
+		return -1;
+	}
 
 	if (self->read_func(self, &s, l) < 0)
 		return -1;
@@ -3570,6 +3582,14 @@ load_binunicode(Unpicklerobject *self)
 	if (self->read_func(self, &s, 4) < 0) return -1;
 
 	l = calc_binint(s, 4);
+	if (l < 0) {
+		/* Corrupt or hostile pickle -- we never write one like
+		 * this.
+		 */
+		PyErr_SetString(UnpicklingError,
+				"BINUNICODE pickle has negative byte count");
+		return -1;
+	}
 
 	if (self->read_func(self, &s, l) < 0)
 		return -1;
@@ -5634,7 +5654,7 @@ static struct PyMethodDef cPickle_methods[] = {
 static int
 init_stuff(PyObject *module_dict)
 {
-	PyObject *copy_reg, *t, *r;
+	PyObject *copyreg, *t, *r;
 
 #define INIT_STR(S) if (!( S ## _str=PyString_InternFromString(#S)))  return -1;
 
@@ -5656,30 +5676,30 @@ init_stuff(PyObject *module_dict)
 	INIT_STR(append);
 	INIT_STR(read);
 	INIT_STR(readline);
-	INIT_STR(copy_reg);
+	INIT_STR(copyreg);
 	INIT_STR(dispatch_table);
 
-	if (!( copy_reg = PyImport_ImportModule("copy_reg")))
+	if (!( copyreg = PyImport_ImportModule("copy_reg")))
 		return -1;
 
 	/* This is special because we want to use a different
 	   one in restricted mode. */
-	dispatch_table = PyObject_GetAttr(copy_reg, dispatch_table_str);
+	dispatch_table = PyObject_GetAttr(copyreg, dispatch_table_str);
 	if (!dispatch_table) return -1;
 
-	extension_registry = PyObject_GetAttrString(copy_reg,
+	extension_registry = PyObject_GetAttrString(copyreg,
 				"_extension_registry");
 	if (!extension_registry) return -1;
 
-	inverted_registry = PyObject_GetAttrString(copy_reg,
+	inverted_registry = PyObject_GetAttrString(copyreg,
 				"_inverted_registry");
 	if (!inverted_registry) return -1;
 
-	extension_cache = PyObject_GetAttrString(copy_reg,
+	extension_cache = PyObject_GetAttrString(copyreg,
 				"_extension_cache");
 	if (!extension_cache) return -1;
 
-	Py_DECREF(copy_reg);
+	Py_DECREF(copyreg);
 
 	if (!(empty_tuple = PyTuple_New(0)))
 		return -1;
@@ -5777,6 +5797,12 @@ initcPickle(void)
 	char *rev = "1.71";	/* XXX when does this change? */
 	PyObject *format_version;
 	PyObject *compatible_formats;
+
+	/* XXX: Should mention that the pickle module will include the C
+	   XXX: optimized implementation automatically. */
+	if (PyErr_WarnPy3k("the cPickle module has been removed in "
+			   "Python 3.0", 2) < 0)
+		return;
 
 	Py_TYPE(&Picklertype) = &PyType_Type;
 	Py_TYPE(&Unpicklertype) = &PyType_Type;

@@ -82,14 +82,17 @@ def namedtuple(typename, field_names, verbose=False):
             result = self._make(map(kwds.pop, %(field_names)r, self))
             if kwds:
                 raise ValueError('Got unexpected field names: %%r' %% kwds.keys())
-            return result \n\n''' % locals()
+            return result \n
+        def __getnewargs__(self):
+            return tuple(self) \n\n''' % locals()
     for i, name in enumerate(field_names):
         template += '        %s = property(itemgetter(%d))\n' % (name, i)
     if verbose:
         print template
 
-    # Execute the template string in a temporary namespace
-    namespace = dict(itemgetter=_itemgetter)
+    # Execute the template string in a temporary namespace and
+    # support tracing utilities by setting a value for frame.f_globals['__name__']
+    namespace = dict(itemgetter=_itemgetter, __name__='namedtuple_%s' % typename)
     try:
         exec template in namespace
     except SyntaxError, e:

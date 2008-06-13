@@ -97,7 +97,7 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.seek(-1, 2), 13)
         self.assertEqual(f.tell(), 13)
         self.assertEqual(f.truncate(12), 12)
-        self.assertEqual(f.tell(), 13)
+        self.assertEqual(f.tell(), 12)
         self.assertRaises(TypeError, f.seek, 0.0)
 
     def read_ops(self, f, buffered=False):
@@ -142,7 +142,7 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.tell(), self.LARGE + 2)
         self.assertEqual(f.seek(0, 2), self.LARGE + 2)
         self.assertEqual(f.truncate(self.LARGE + 1), self.LARGE + 1)
-        self.assertEqual(f.tell(), self.LARGE + 2)
+        self.assertEqual(f.tell(), self.LARGE + 1)
         self.assertEqual(f.seek(0, 2), self.LARGE + 1)
         self.assertEqual(f.seek(-1, 2), self.LARGE)
         self.assertEqual(f.read(2), b"x")
@@ -560,9 +560,9 @@ class StatefulIncrementalDecoder(codecs.IncrementalDecoder):
 
     def process_word(self):
         output = ''
-        if self.buffer[0] == 'i':
+        if self.buffer[0] == ord('i'):
             self.i = min(99, int(self.buffer[1:] or 0)) # set input length
-        elif self.buffer[0] == 'o':
+        elif self.buffer[0] == ord('o'):
             self.o = min(99, int(self.buffer[1:] or 0)) # set output length
         else:
             output = self.buffer.decode('ascii')
@@ -726,6 +726,7 @@ class TextIOWrapperTest(unittest.TestCase):
             txt.write("BB\nCCC\n")
             txt.write("X\rY\r\nZ")
             txt.flush()
+            self.assertEquals(buf.closed, False)
             self.assertEquals(buf.getvalue(), expected)
 
     def testNewlines(self):
@@ -806,7 +807,8 @@ class TextIOWrapperTest(unittest.TestCase):
                 txt = io.TextIOWrapper(buf, encoding="ascii", newline=newline)
                 txt.write(data)
                 txt.close()
-                self.assertEquals(buf.getvalue(), expected)
+                self.assertEquals(buf.closed, True)
+                self.assertRaises(ValueError, buf.getvalue)
         finally:
             os.linesep = save_linesep
 
@@ -1160,10 +1162,10 @@ class MiscIOTest(unittest.TestCase):
 
 def test_main():
     test_support.run_unittest(IOTest, BytesIOTest, StringIOTest,
-                              BufferedReaderTest,
-                              BufferedWriterTest, BufferedRWPairTest,
-                              BufferedRandomTest, TextIOWrapperTest,
-                              MiscIOTest)
+                              BufferedReaderTest, BufferedWriterTest,
+                              BufferedRWPairTest, BufferedRandomTest,
+                              StatefulIncrementalDecoderTest,
+                              TextIOWrapperTest, MiscIOTest)
 
 if __name__ == "__main__":
     unittest.main()

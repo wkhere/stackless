@@ -189,12 +189,9 @@ static PyMethodDef BaseException_methods[] = {
 static PyObject *
 BaseException_getitem(PyBaseExceptionObject *self, Py_ssize_t index)
 {
-    if (Py_Py3kWarningFlag) {
-        if (PyErr_Warn(PyExc_DeprecationWarning,
-                       "__getitem__ not supported for exception "
-                       "classes in 3.x; use args attribute") == -1)
-            return NULL;
-    }
+    if (PyErr_WarnPy3k("__getitem__ not supported for exception "
+                       "classes in 3.x; use args attribute", 1) < 0)
+        return NULL;
     return PySequence_GetItem(self->args, index);
 }
 
@@ -202,12 +199,9 @@ static PyObject *
 BaseException_getslice(PyBaseExceptionObject *self,
 			Py_ssize_t start, Py_ssize_t stop)
 {
-    if (Py_Py3kWarningFlag) {
-        if (PyErr_Warn(PyExc_DeprecationWarning,
-                       "__getslice__ not supported for exception "
-                       "classes in 3.x; use args attribute") == -1)
-            return NULL;
-    }
+    if (PyErr_WarnPy3k("__getslice__ not supported for exception "
+                       "classes in 3.x; use args attribute", 1) < 0)
+        return NULL;
     return PySequence_GetSlice(self->args, start, stop);
 }
 
@@ -285,9 +279,8 @@ BaseException_get_message(PyBaseExceptionObject *self)
 	int ret;
 	ret = PyErr_WarnEx(PyExc_DeprecationWarning,
 				"BaseException.message has been deprecated as "
-					"of Python 2.6",
-				1);
-	if (ret == -1)
+				"of Python 2.6", 1);
+	if (ret < 0)
 		return NULL;
 
 	Py_INCREF(self->message);
@@ -300,9 +293,8 @@ BaseException_set_message(PyBaseExceptionObject *self, PyObject *val)
 	int ret;
 	ret = PyErr_WarnEx(PyExc_DeprecationWarning,
 				"BaseException.message has been deprecated as "
-					"of Python 2.6",
-				1);
-	if (ret == -1)
+				"of Python 2.6", 1);
+	if (ret < 0)
 		return -1;
 	Py_INCREF(val);
 	Py_DECREF(self->message);

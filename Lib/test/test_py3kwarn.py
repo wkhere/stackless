@@ -1,7 +1,7 @@
 import unittest
 import sys
-from test.test_support import (catch_warning, TestSkipped, run_unittest,
-                                TestSkipped)
+from test.test_support import (catch_warning, CleanImport,
+                               TestSkipped, run_unittest)
 import warnings
 
 if not sys.py3kwarning:
@@ -9,6 +9,61 @@ if not sys.py3kwarning:
 
 
 class TestPy3KWarnings(unittest.TestCase):
+
+    def test_backquote(self):
+        expected = 'backquote not supported in 3.x; use repr()'
+        with catch_warning() as w:
+            exec "`2`" in {}
+        self.assertWarning(None, w, expected)
+
+    def test_bool_assign(self):
+        # So we don't screw up our globals
+        def safe_exec(expr):
+            def f(**kwargs): pass
+            exec expr in {'f' : f}
+
+        expected = "assignment to True or False is forbidden in 3.x"
+        with catch_warning() as w:
+            safe_exec("True = False")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("False = True")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            try:
+                safe_exec("obj.False = True")
+            except NameError: pass
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            try:
+                safe_exec("obj.True = False")
+            except NameError: pass
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("def False(): pass")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("def True(): pass")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("class False: pass")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("class True: pass")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("def f(True=43): pass")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("def f(False=None): pass")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("f(False=True)")
+            self.assertWarning(None, w, expected)
+        with catch_warning() as w:
+            safe_exec("f(True=1)")
+            self.assertWarning(None, w, expected)
+
 
     def test_type_inequality_comparisons(self):
         expected = 'type inequality comparisons not supported in 3.x'
@@ -118,14 +173,127 @@ class TestPy3KWarnings(unittest.TestCase):
             with catch_warning() as w:
                 self.assertWarning(set(), w, expected)
 
+    def test_tuple_parameter_unpacking(self):
+        expected = "tuple parameter unpacking has been removed in 3.x"
+        with catch_warning() as w:
+            exec "def f((a, b)): pass"
+            self.assertWarning(None, w, expected)
+
     def test_buffer(self):
         expected = 'buffer() not supported in 3.x; use memoryview()'
         with catch_warning() as w:
             self.assertWarning(buffer('a'), w, expected)
 
+    def test_file_xreadlines(self):
+        expected = ("f.xreadlines() not supported in 3.x, "
+                    "try 'for line in f' instead")
+        with file(__file__) as f:
+            with catch_warning() as w:
+                self.assertWarning(f.xreadlines(), w, expected)
+
+
+class TestStdlibRemovals(unittest.TestCase):
+
+    # test.testall not tested as it executes all unit tests as an
+    # import side-effect.
+    all_platforms = ('audiodev', 'imputil', 'mutex', 'user', 'new', 'rexec',
+                        'Bastion', 'compiler', 'dircache', 'mimetools', 'fpformat',
+                        'ihooks', 'mhlib', 'statvfs', 'htmllib', 'sgmllib', 'rfc822')
+    inclusive_platforms = {'irix' : ('pure', 'AL', 'al', 'CD', 'cd', 'cddb',
+                                     'cdplayer', 'CL', 'cl', 'DEVICE', 'GL',
+                                     'gl', 'ERRNO', 'FILE', 'FL', 'flp', 'fl',
+                                     'fm', 'GET', 'GLWS', 'imgfile', 'IN',
+                                     'IOCTL', 'jpeg', 'panel', 'panelparser',
+                                     'readcd', 'SV', 'torgb', 'WAIT'),
+                          'darwin' : ('autoGIL', 'Carbon', 'OSATerminology',
+                                      'icglue', 'Nav', 'MacOS', 'aepack',
+                                      'aetools', 'aetypes', 'applesingle',
+                                      'appletrawmain', 'appletrunner',
+                                      'argvemulator', 'bgenlocations',
+                                      'EasyDialogs', 'macerrors', 'macostools',
+                                      'findertools', 'FrameWork', 'ic',
+                                      'gensuitemodule', 'icopen', 'macresource',
+                                      'MiniAEFrame', 'pimp', 'PixMapWrapper',
+                                      'terminalcommand', 'videoreader',
+                                      '_builtinSuites', 'CodeWarrior',
+                                      'Explorer', 'Finder', 'Netscape',
+                                      'StdSuites', 'SystemEvents', 'Terminal',
+                                      'cfmfile', 'bundlebuilder', 'buildtools',
+                                      'ColorPicker'),
+                           'sunos5' : ('sunaudiodev', 'SUNAUDIODEV'),
+                          }
+    optional_modules = ('bsddb185', 'Canvas', 'dl', 'linuxaudiodev', 'imageop',
+                        'sv', 'cPickle')
+
+    def check_removal(self, module_name, optional=False):
+        """Make sure the specified module, when imported, raises a
+        DeprecationWarning and specifies itself in the message."""
+        with CleanImport(module_name):
+            with catch_warning(record=False) as w:
+                warnings.filterwarnings("error", ".+ removed",
+                                        DeprecationWarning)
+                try:
+                    __import__(module_name, level=0)
+                except DeprecationWarning as exc:
+                    self.assert_(module_name in exc.args[0],
+                                 "%s warning didn't contain module name"
+                                 % module_name)
+                except ImportError:
+                    if not optional:
+                        self.fail("Non-optional module {0} raised an "
+                                  "ImportError.".format(module_name))
+                else:
+                    self.fail("DeprecationWarning not raised for {0}"
+                                .format(module_name))
+
+    def test_platform_independent_removals(self):
+        # Make sure that the modules that are available on all platforms raise
+        # the proper DeprecationWarning.
+        for module_name in self.all_platforms:
+            self.check_removal(module_name)
+
+    def test_platform_specific_removals(self):
+        # Test the removal of platform-specific modules.
+        for module_name in self.inclusive_platforms.get(sys.platform, []):
+            self.check_removal(module_name, optional=True)
+
+    def test_optional_module_removals(self):
+        # Test the removal of modules that may or may not be built.
+        for module_name in self.optional_modules:
+            self.check_removal(module_name, optional=True)
+
+    def test_os_path_walk(self):
+        msg = "In 3.x, os.path.walk is removed in favor of os.walk."
+        def dumbo(where, names, args): pass
+        for path_mod in ("ntpath", "macpath", "os2emxpath", "posixpath"):
+            mod = __import__(path_mod)
+            with catch_warning() as w:
+                mod.walk("crashers", dumbo, None)
+            self.assertEquals(str(w.message), msg)
+
+    def test_commands_members(self):
+        import commands
+        members = {"mk2arg" : 2, "mkarg" : 1, "getstatus" : 1}
+        for name, arg_count in members.items():
+            with catch_warning(record=False):
+                warnings.filterwarnings("error")
+                func = getattr(commands, name)
+                self.assertRaises(DeprecationWarning, func, *([None]*arg_count))
+
+    def test_mutablestring_removal(self):
+        # UserString.MutableString has been removed in 3.0.
+        import UserString
+        with catch_warning(record=False):
+            warnings.filterwarnings("error", ".*MutableString",
+                                    DeprecationWarning)
+            self.assertRaises(DeprecationWarning, UserString.MutableString)
+
 
 def test_main():
-    run_unittest(TestPy3KWarnings)
+    with catch_warning(record=True):
+        warnings.simplefilter("always")
+        run_unittest(TestPy3KWarnings,
+                     TestStdlibRemovals)
 
 if __name__ == '__main__':
     test_main()

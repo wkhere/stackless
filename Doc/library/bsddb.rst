@@ -15,15 +15,15 @@ objects the user must serialize them somehow, typically using
 :func:`marshal.dumps` or  :func:`pickle.dumps`.
 
 The :mod:`bsddb` module requires a Berkeley DB library version from 3.3 thru
-4.5.
+4.7.
 
 
 .. seealso::
 
-   http://pybsddb.sourceforge.net/
+   http://www.jcea.es/programacion/pybsddb.htm
       The website with documentation for the :mod:`bsddb.db` Python Berkeley DB
       interface that closely mirrors the object oriented interface provided in
-      Berkeley DB 3 and 4.
+      Berkeley DB 4.x itself.
 
    http://www.oracle.com/database/berkeley-db/
       The Berkeley DB library.
@@ -82,7 +82,8 @@ arguments should be used in most instances.
    Beginning in 2.3 some Unix versions of Python may have a :mod:`bsddb185` module.
    This is present *only* to allow backwards compatibility with systems which ship
    with the old Berkeley DB 1.85 database library.  The :mod:`bsddb185` module
-   should never be used directly in new code.
+   should never be used directly in new code. The module has been removed in
+   Python 3.0.  If you find you still need it look in PyPI.
 
 
 .. seealso::

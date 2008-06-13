@@ -447,7 +447,7 @@ PyBuffer_GetPointer(Py_buffer *view, Py_ssize_t *indices)
 }
 
 
-void
+static void
 _add_one_to_index_F(int nd, Py_ssize_t *index, Py_ssize_t *shape)
 {
 	int k;
@@ -463,7 +463,7 @@ _add_one_to_index_F(int nd, Py_ssize_t *index, Py_ssize_t *shape)
 	}
 }
 
-void
+static void
 _add_one_to_index_C(int nd, Py_ssize_t *index, Py_ssize_t *shape)
 {
 	int k;
@@ -686,12 +686,6 @@ PyBuffer_FillInfo(Py_buffer *view, void *buf, Py_ssize_t len,
 	      int readonly, int flags)
 {
 	if (view == NULL) return 0;
-	if (((flags & PyBUF_LOCK) == PyBUF_LOCK) &&
-	    readonly != 0) {
-		PyErr_SetString(PyExc_BufferError,
-				"Cannot lock this object.");
-		return -1;
-	}
 	if (((flags & PyBUF_WRITABLE) == PyBUF_WRITABLE) &&
 	    (readonly == 1)) {
 		PyErr_SetString(PyExc_BufferError,

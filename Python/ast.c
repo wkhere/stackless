@@ -36,7 +36,7 @@ static expr_ty ast_for_testlist_gexp(struct compiling *, const node *);
 /* Note different signature for ast_for_call */
 static expr_ty ast_for_call(struct compiling *, const node *, expr_ty);
 
-static PyObject *parsenumber(const char *);
+static PyObject *parsenumber(struct compiling *, const char *);
 static PyObject *parsestr(struct compiling *, const char *);
 static PyObject *parsestrplus(struct compiling *, const node *n);
 
@@ -111,6 +111,30 @@ ast_error_finish(const char *filename)
     if (!value)
         return;
     PyErr_Restore(type, value, tback);
+}
+
+static int
+ast_warn(struct compiling *c, const node *n, char *msg)
+{
+    if (PyErr_WarnExplicit(PyExc_SyntaxWarning, msg, c->c_filename, LINENO(n),
+                           NULL, NULL) < 0) {
+        /* if -Werr, change it to a SyntaxError */
+        if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_SyntaxWarning))
+            ast_error(n, msg);
+        return 0;
+    }
+    return 1;
+}
+
+static int
+forbidden_check(struct compiling *c, const node *n, const char *x)
+{
+    if (!strcmp(x, "None"))
+        return ast_error(n, "assignment to None");
+    if (Py_Py3kWarningFlag && !(strcmp(x, "True") && strcmp(x, "False")) &&
+        !ast_warn(c, n, "assignment to True or False is forbidden in 3.x"))
+        return 0;
+    return 1;
 }
 
 /* num_stmts() returns number of contained statements.
@@ -332,7 +356,7 @@ get_operator(const node *n)
 */
 
 static int
-set_context(expr_ty e, expr_context_ty ctx, const node *n)
+set_context(struct compiling *c, expr_ty e, expr_context_ty ctx, const node *n)
 {
     asdl_seq *s = NULL;
     /* If a particular expression type can't be used for assign / delete,
@@ -351,20 +375,18 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
 
     switch (e->kind) {
         case Attribute_kind:
-            if (ctx == Store &&
-                !strcmp(PyString_AS_STRING(e->v.Attribute.attr), "None")) {
-                return ast_error(n, "assignment to None");
-            }
+            if (ctx == Store && !forbidden_check(c, n,
+                                PyBytes_AS_STRING(e->v.Attribute.attr)))
+                    return 0;
             e->v.Attribute.ctx = ctx;
             break;
         case Subscript_kind:
             e->v.Subscript.ctx = ctx;
             break;
         case Name_kind:
-            if (ctx == Store &&
-                !strcmp(PyString_AS_STRING(e->v.Name.id), "None")) {
-                    return ast_error(n, "assignment to None");
-            }
+            if (ctx == Store && !forbidden_check(c, n,
+                                PyBytes_AS_STRING(e->v.Name.id)))
+                    return 0;
             e->v.Name.ctx = ctx;
             break;
         case List_kind:
@@ -434,7 +456,7 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
         int i;
 
         for (i = 0; i < asdl_seq_LEN(s); i++) {
-            if (!set_context((expr_ty)asdl_seq_GET(s, i), ctx, n))
+            if (!set_context(c, (expr_ty)asdl_seq_GET(s, i), ctx, n))
                 return 0;
         }
     }
@@ -442,7 +464,7 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
 }
 
 static operator_ty
-ast_for_augassign(const node *n)
+ast_for_augassign(struct compiling *c, const node *n)
 {
     REQ(n, augassign);
     n = CHILD(n, 0);
@@ -480,7 +502,7 @@ ast_for_augassign(const node *n)
 }
 
 static cmpop_ty
-ast_for_comp_op(const node *n)
+ast_for_comp_op(struct compiling *c, const node *n)
 {
     /* comp_op: '<'|'>'|'=='|'>='|'<='|'<>'|'!='|'in'|'not' 'in'|'is'
                |'is' 'not'
@@ -582,10 +604,8 @@ set_name:
         /* fpdef_node is either a NAME or an fplist */
         child = CHILD(fpdef_node, 0);
         if (TYPE(child) == NAME) {
-            if (!strcmp(STR(child), "None")) {
-                ast_error(child, "assignment to None");
-                return NULL;
-            }   
+            if (!forbidden_check(c, n, STR(child)))
+                return NULL;  
             arg = Name(NEW_IDENTIFIER(child), Store, LINENO(child),
                        child->n_col_offset, c->c_arena);
         }
@@ -606,7 +626,7 @@ set_name:
     }
 
     result = Tuple(args, Store, LINENO(n), n->n_col_offset, c->c_arena);
-    if (!set_context(result, Store, n))
+    if (!set_context(c, result, Store, n))
         return NULL;
     return result;
 }
@@ -681,6 +701,9 @@ ast_for_arguments(struct compiling *c, const node *n)
                     /* def foo((x)): is not complex, special case. */
                     if (NCH(ch) != 1) {
                         /* We have complex arguments, setup for unpacking. */
+                        if (Py_Py3kWarningFlag && !ast_warn(c, ch,
+                            "tuple parameter unpacking has been removed in 3.x"))
+                            goto error;
                         asdl_seq_SET(args, k++, compiler_complex_args(c, ch));
                         if (!asdl_seq_GET(args, k-1))
                                 goto error;
@@ -695,10 +718,8 @@ ast_for_arguments(struct compiling *c, const node *n)
                 }
                 if (TYPE(CHILD(ch, 0)) == NAME) {
                     expr_ty name;
-                    if (!strcmp(STR(CHILD(ch, 0)), "None")) {
-                        ast_error(CHILD(ch, 0), "assignment to None");
+                    if (!forbidden_check(c, n, STR(CHILD(ch, 0))))
                         goto error;
-                    }
                     name = Name(NEW_IDENTIFIER(CHILD(ch, 0)),
                                 Param, LINENO(ch), ch->n_col_offset,
                                 c->c_arena);
@@ -710,18 +731,14 @@ ast_for_arguments(struct compiling *c, const node *n)
                 i += 2; /* the name and the comma */
                 break;
             case STAR:
-                if (!strcmp(STR(CHILD(n, i+1)), "None")) {
-                    ast_error(CHILD(n, i+1), "assignment to None");
+                if (!forbidden_check(c, CHILD(n, i+1), STR(CHILD(n, i+1))))
                     goto error;
-                }
                 vararg = NEW_IDENTIFIER(CHILD(n, i+1));
                 i += 3;
                 break;
             case DOUBLESTAR:
-                if (!strcmp(STR(CHILD(n, i+1)), "None")) {
-                    ast_error(CHILD(n, i+1), "assignment to None");
+                if (!forbidden_check(c, CHILD(n, i+1), STR(CHILD(n, i+1))))
                     goto error;
-                }
                 kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
                 i += 3;
                 break;
@@ -844,10 +861,8 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     name = NEW_IDENTIFIER(CHILD(n, name_i));
     if (!name)
         return NULL;
-    else if (!strcmp(STR(CHILD(n, name_i)), "None")) {
-        ast_error(CHILD(n, name_i), "assignment to None");
+    else if (!forbidden_check(c, CHILD(n, name_i), STR(CHILD(n, name_i))))
         return NULL;
-    }
     args = ast_for_arguments(c, CHILD(n, name_i + 1));
     if (!args)
         return NULL;
@@ -947,7 +962,7 @@ ast_for_ifexpr(struct compiling *c, const node *n)
 */
 
 static int
-count_list_fors(const node *n)
+count_list_fors(struct compiling *c, const node *n)
 {
     int n_fors = 0;
     node *ch = CHILD(n, 1);
@@ -984,7 +999,7 @@ count_list_fors(const node *n)
 */
 
 static int
-count_list_ifs(const node *n)
+count_list_ifs(struct compiling *c, const node *n)
 {
     int n_ifs = 0;
 
@@ -1022,7 +1037,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
     if (!elt)
         return NULL;
 
-    n_fors = count_list_fors(n);
+    n_fors = count_list_fors(c, n);
     if (n_fors == -1)
         return NULL;
 
@@ -1066,7 +1081,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
             expr_ty list_for_expr;
 
             ch = CHILD(ch, 4);
-            n_ifs = count_list_ifs(ch);
+            n_ifs = count_list_ifs(c, ch);
             if (n_ifs == -1)
                 return NULL;
 
@@ -1104,7 +1119,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
 */
 
 static int
-count_gen_fors(const node *n)
+count_gen_fors(struct compiling *c, const node *n)
 {
     int n_fors = 0;
     node *ch = CHILD(n, 1);
@@ -1142,7 +1157,7 @@ count_gen_fors(const node *n)
 */
 
 static int
-count_gen_ifs(const node *n)
+count_gen_ifs(struct compiling *c, const node *n)
 {
     int n_ifs = 0;
 
@@ -1177,7 +1192,7 @@ ast_for_genexp(struct compiling *c, const node *n)
     if (!elt)
         return NULL;
     
-    n_fors = count_gen_fors(n);
+    n_fors = count_gen_fors(c, n);
     if (n_fors == -1)
         return NULL;
 
@@ -1220,7 +1235,7 @@ ast_for_genexp(struct compiling *c, const node *n)
             asdl_seq *ifs;
             
             ch = CHILD(ch, 4);
-            n_ifs = count_gen_ifs(ch);
+            n_ifs = count_gen_ifs(c, ch);
             if (n_ifs == -1)
                 return NULL;
 
@@ -1293,7 +1308,7 @@ ast_for_atom(struct compiling *c, const node *n)
         return Str(str, LINENO(n), n->n_col_offset, c->c_arena);
     }
     case NUMBER: {
-        PyObject *pynum = parsenumber(STR(ch));
+        PyObject *pynum = parsenumber(c, STR(ch));
         if (!pynum)
             return NULL;
 
@@ -1363,14 +1378,9 @@ ast_for_atom(struct compiling *c, const node *n)
     }
     case BACKQUOTE: { /* repr */
         expr_ty expression;
-        if (Py_Py3kWarningFlag) {
-            if (PyErr_WarnExplicit(PyExc_DeprecationWarning,
-                                   "backquote not supported in 3.x; use repr()",
-                                   c->c_filename, LINENO(n),
-                                   NULL, NULL)) {
+        if (Py_Py3kWarningFlag &&
+            !ast_warn(c, n, "backquote not supported in 3.x; use repr()"))
             return NULL;
-            }
-        }
         expression = ast_for_testlist(c, CHILD(n, 1));
         if (!expression)
             return NULL;
@@ -1766,7 +1776,7 @@ ast_for_expr(struct compiling *c, const node *n)
                 for (i = 1; i < NCH(n); i += 2) {
                     cmpop_ty newoperator;
 
-                    newoperator = ast_for_comp_op(CHILD(n, i));
+                    newoperator = ast_for_comp_op(c, CHILD(n, i));
                     if (!newoperator) {
                         return NULL;
                     }
@@ -1921,10 +1931,8 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                     return NULL;
                 }
                 key = e->v.Name.id;
-                if (!strcmp(PyString_AS_STRING(key), "None")) {
-                    ast_error(CHILD(ch, 0), "assignment to None");
+                if (!forbidden_check(c, CHILD(ch, 0), PyBytes_AS_STRING(key)))
                     return NULL;
-                }
                 e = ast_for_expr(c, CHILD(ch, 2));
                 if (!e)
                     return NULL;
@@ -2050,11 +2058,10 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
                           "expression not possible");
                 return NULL;
             case Name_kind: {
-                const char *var_name = PyString_AS_STRING(expr1->v.Name.id);
-                if (var_name[0] == 'N' && !strcmp(var_name, "None")) {
-                    ast_error(ch, "assignment to None");
+                const char *var_name = PyBytes_AS_STRING(expr1->v.Name.id);
+                if ((var_name[0] == 'N' || var_name[0] == 'T' || var_name[0] == 'F') &&
+                    !forbidden_check(c, ch, var_name))
                     return NULL;
-                }
                 break;
             }
             case Attribute_kind:
@@ -2065,7 +2072,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
                           "assignment");
                 return NULL;
         }
-        if(!set_context(expr1, Store, ch))
+        if(!set_context(c, expr1, Store, ch))
             return NULL;
 
         ch = CHILD(n, 2);
@@ -2076,7 +2083,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
         if (!expr2)
             return NULL;
 
-        newoperator = ast_for_augassign(CHILD(n, 1));
+        newoperator = ast_for_augassign(c, CHILD(n, 1));
         if (!newoperator)
             return NULL;
 
@@ -2107,7 +2114,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
             if (!e) 
                 return NULL;
 
-            if (!set_context(e, Store, CHILD(n, i)))
+            if (!set_context(c, e, Store, CHILD(n, i)))
                 return NULL;
 
             asdl_seq_SET(targets, i / 2, e);
@@ -2172,7 +2179,7 @@ ast_for_exprlist(struct compiling *c, const node *n, expr_context_ty context)
         if (!e)
             return NULL;
         asdl_seq_SET(seq, i / 2, e);
-        if (context && !set_context(e, context, CHILD(n, i)))
+        if (context && !set_context(c, e, context, CHILD(n, i)))
             return NULL;
     }
     return seq;
@@ -2853,7 +2860,7 @@ ast_for_except_clause(struct compiling *c, const node *exc, node *body)
         expr_ty e = ast_for_expr(c, CHILD(exc, 3));
         if (!e)
             return NULL;
-        if (!set_context(e, Store, CHILD(exc, 3)))
+        if (!set_context(c, e, Store, CHILD(exc, 3)))
             return NULL;
         expression = ast_for_expr(c, CHILD(exc, 1));
         if (!expression)
@@ -2975,7 +2982,7 @@ ast_for_with_stmt(struct compiling *c, const node *n)
         if (!optional_vars) {
             return NULL;
         }
-        if (!set_context(optional_vars, Store, n)) {
+        if (!set_context(c, optional_vars, Store, n)) {
             return NULL;
         }
         suite_index = 4;
@@ -2997,10 +3004,8 @@ ast_for_classdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     
     REQ(n, classdef);
 
-    if (!strcmp(STR(CHILD(n, 1)), "None")) {
-            ast_error(n, "assignment to None");
+    if (!forbidden_check(c, n, STR(CHILD(n, 1))))
             return NULL;
-    }
 
     if (NCH(n) == 4) {
         s = ast_for_suite(c, CHILD(n, 3));
@@ -3107,13 +3112,13 @@ ast_for_stmt(struct compiling *c, const node *n)
 }
 
 static PyObject *
-parsenumber(const char *s)
+parsenumber(struct compiling *c, const char *s)
 {
         const char *end;
         long x;
         double dx;
 #ifndef WITHOUT_COMPLEX
-        Py_complex c;
+        Py_complex complex;
         int imflag;
 #endif
 
@@ -3142,11 +3147,11 @@ parsenumber(const char *s)
         /* XXX Huge floats may silently fail */
 #ifndef WITHOUT_COMPLEX
         if (imflag) {
-                c.real = 0.;
+                complex.real = 0.;
                 PyFPE_START_PROTECT("atof", return 0)
-                c.imag = PyOS_ascii_atof(s);
-                PyFPE_END_PROTECT(c)
-                return PyComplex_FromCComplex(c);
+                complex.imag = PyOS_ascii_atof(s);
+                PyFPE_END_PROTECT(complex)
+                return PyComplex_FromCComplex(complex);
         }
         else
 #endif
@@ -3159,7 +3164,7 @@ parsenumber(const char *s)
 }
 
 static PyObject *
-decode_utf8(const char **sPtr, const char *end, char* encoding)
+decode_utf8(struct compiling *c, const char **sPtr, const char *end, char* encoding)
 {
 #ifndef Py_USING_UNICODE
         Py_FatalError("decode_utf8 should not be called in this build.");
@@ -3182,7 +3187,7 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
 
 #ifdef Py_USING_UNICODE
 static PyObject *
-decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
+decode_unicode(struct compiling *c, const char *s, size_t len, int rawmode, const char *encoding)
 {
         PyObject *v, *u;
         char *buf;
@@ -3195,6 +3200,9 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
                 buf = (char *)s;
                 u = NULL;
         } else {
+                /* check for integer overflow */
+                if (len > PY_SIZE_MAX / 4)
+                        return NULL;
                 /* "\XX" may become "\u005c\uHHLL" (12 bytes) */
                 u = PyString_FromStringAndSize((char *)NULL, len * 4);
                 if (u == NULL)
@@ -3213,7 +3221,7 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
                                 PyObject *w;
                                 char *r;
                                 Py_ssize_t rn, i;
-                                w = decode_utf8(&s, end, "utf-16-be");
+                                w = decode_utf8(c, &s, end, "utf-16-be");
                                 if (w == NULL) {
                                         Py_DECREF(u);
                                         return NULL;
@@ -3296,7 +3304,7 @@ parsestr(struct compiling *c, const char *s)
         }
 #ifdef Py_USING_UNICODE
         if (unicode || Py_UnicodeFlag) {
-                return decode_unicode(s, len, rawmode, c->c_encoding);
+                return decode_unicode(c, s, len, rawmode, c->c_encoding);
         }
 #endif
         need_encoding = (c->c_encoding != NULL &&

@@ -12,18 +12,9 @@ import select
 from unittest import TestCase
 from test import test_support
 
-# PORT is used to communicate the port number assigned to the server
-# to the test client
-HOST = "localhost"
-PORT = None
+HOST = test_support.HOST
 
-def server(evt, buf):
-    serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    serv.settimeout(15)
-    serv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    serv.bind(("", 0))
-    global PORT
-    PORT = serv.getsockname()[1]
+def server(evt, buf, serv):
     serv.listen(5)
     evt.set()
     try:
@@ -43,14 +34,16 @@ def server(evt, buf):
         conn.close()
     finally:
         serv.close()
-        PORT = None
         evt.set()
 
 class GeneralTests(TestCase):
 
     def setUp(self):
         self.evt = threading.Event()
-        servargs = (self.evt, "220 Hola mundo\n")
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(15)
+        self.port = test_support.bind_port(self.sock)
+        servargs = (self.evt, "220 Hola mundo\n", self.sock)
         threading.Thread(target=server, args=servargs).start()
         self.evt.wait()
         self.evt.clear()
@@ -60,49 +53,48 @@ class GeneralTests(TestCase):
 
     def testBasic1(self):
         # connects
-        smtp = smtplib.SMTP(HOST, PORT)
-        smtp.sock.close()
+        smtp = smtplib.SMTP(HOST, self.port)
+        smtp.close()
 
     def testBasic2(self):
         # connects, include port in host name
-        smtp = smtplib.SMTP("%s:%s" % (HOST, PORT))
-        smtp.sock.close()
+        smtp = smtplib.SMTP("%s:%s" % (HOST, self.port))
+        smtp.close()
 
     def testLocalHostName(self):
         # check that supplied local_hostname is used
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname="testhost")
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname="testhost")
         self.assertEqual(smtp.local_hostname, "testhost")
-        smtp.sock.close()
+        smtp.close()
 
     def testTimeoutDefault(self):
-        # default
-        smtp = smtplib.SMTP(HOST, PORT)
-        self.assertTrue(smtp.sock.gettimeout() is None)
-        smtp.sock.close()
-
-    def testTimeoutValue(self):
-        # a value
-        smtp = smtplib.SMTP(HOST, PORT, timeout=30)
-        self.assertEqual(smtp.sock.gettimeout(), 30)
-        smtp.sock.close()
-
-    def testTimeoutNone(self):
-        # None, having other default
-        previous = socket.getdefaulttimeout()
+        self.assertTrue(socket.getdefaulttimeout() is None)
         socket.setdefaulttimeout(30)
         try:
-            smtp = smtplib.SMTP(HOST, PORT, timeout=None)
+            smtp = smtplib.SMTP(HOST, self.port)
         finally:
-            socket.setdefaulttimeout(previous)
+            socket.setdefaulttimeout(None)
         self.assertEqual(smtp.sock.gettimeout(), 30)
-        smtp.sock.close()
+        smtp.close()
+
+    def testTimeoutNone(self):
+        self.assertTrue(socket.getdefaulttimeout() is None)
+        socket.setdefaulttimeout(30)
+        try:
+            smtp = smtplib.SMTP(HOST, self.port, timeout=None)
+        finally:
+            socket.setdefaulttimeout(None)
+        self.assertTrue(smtp.sock.gettimeout() is None)
+        smtp.close()
+
+    def testTimeoutValue(self):
+        smtp = smtplib.SMTP(HOST, self.port, timeout=30)
+        self.assertEqual(smtp.sock.gettimeout(), 30)
+        smtp.close()
 
 
 # Test server thread using the specified SMTP server class
-def debugging_server(server_class, serv_evt, client_evt):
-    serv = server_class(("", 0), ('nowhere', -1))
-    global PORT
-    PORT = serv.getsockname()[1]
+def debugging_server(serv, serv_evt, client_evt):
     serv_evt.set()
 
     try:
@@ -117,7 +109,7 @@ def debugging_server(server_class, serv_evt, client_evt):
 
             # when the client conversation is finished, it will
             # set client_evt, and it's then ok to kill the server
-            if client_evt.isSet():
+            if client_evt.is_set():
                 serv.close()
                 break
 
@@ -126,12 +118,11 @@ def debugging_server(server_class, serv_evt, client_evt):
     except socket.timeout:
         pass
     finally:
-        if not client_evt.isSet():
+        if not client_evt.is_set():
             # allow some time for the client to read the result
             time.sleep(0.5)
             serv.close()
         asyncore.close_all()
-        PORT = None
         serv_evt.set()
 
 MSG_BEGIN = '---------- MESSAGE FOLLOWS ----------\n'
@@ -153,7 +144,9 @@ class DebuggingServerTests(TestCase):
 
         self.serv_evt = threading.Event()
         self.client_evt = threading.Event()
-        serv_args = (smtpd.DebuggingServer, self.serv_evt, self.client_evt)
+        self.port = test_support.find_unused_port()
+        self.serv = smtpd.DebuggingServer((HOST, self.port), ('nowhere', -1))
+        serv_args = (self.serv, self.serv_evt, self.client_evt)
         threading.Thread(target=debugging_server, args=serv_args).start()
 
         # wait until server thread has assigned a port number
@@ -170,31 +163,31 @@ class DebuggingServerTests(TestCase):
 
     def testBasic(self):
         # connect
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=3)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
         smtp.quit()
 
     def testNOOP(self):
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=3)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
         expected = (250, 'Ok')
         self.assertEqual(smtp.noop(), expected)
         smtp.quit()
 
     def testRSET(self):
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=3)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
         expected = (250, 'Ok')
         self.assertEqual(smtp.rset(), expected)
         smtp.quit()
 
     def testNotImplemented(self):
         # EHLO isn't implemented in DebuggingServer
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=3)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
         expected = (502, 'Error: command "EHLO" not implemented')
         self.assertEqual(smtp.ehlo(), expected)
         smtp.quit()
 
     def testVRFY(self):
         # VRFY isn't implemented in DebuggingServer
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=3)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
         expected = (502, 'Error: command "VRFY" not implemented')
         self.assertEqual(smtp.vrfy('nobody@nowhere.com'), expected)
         self.assertEqual(smtp.verify('nobody@nowhere.com'), expected)
@@ -203,21 +196,21 @@ class DebuggingServerTests(TestCase):
     def testSecondHELO(self):
         # check that a second HELO returns a message that it's a duplicate
         # (this behavior is specific to smtpd.SMTPChannel)
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=3)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
         smtp.helo()
         expected = (503, 'Duplicate HELO/EHLO')
         self.assertEqual(smtp.helo(), expected)
         smtp.quit()
 
     def testHELP(self):
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=3)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
         self.assertEqual(smtp.help(), 'Error: command "HELP" not implemented')
         smtp.quit()
 
     def testSend(self):
         # connect and send mail
         m = 'A test message'
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=3)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=3)
         smtp.sendmail('John', 'Sally', m)
         smtp.quit()
 
@@ -257,7 +250,10 @@ class BadHELOServerTests(TestCase):
         sys.stdout = self.output
 
         self.evt = threading.Event()
-        servargs = (self.evt, "199 no hello for you!\n")
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(15)
+        self.port = test_support.bind_port(self.sock)
+        servargs = (self.evt, "199 no hello for you!\n", self.sock)
         threading.Thread(target=server, args=servargs).start()
         self.evt.wait()
         self.evt.clear()
@@ -268,7 +264,7 @@ class BadHELOServerTests(TestCase):
 
     def testFailingHELO(self):
         self.assertRaises(smtplib.SMTPConnectError, smtplib.SMTP,
-                            HOST, PORT, 'localhost', 3)
+                            HOST, self.port, 'localhost', 3)
 
 
 sim_users = {'Mr.A@somewhere.com':'John A',
@@ -333,7 +329,9 @@ class SMTPSimTests(TestCase):
     def setUp(self):
         self.serv_evt = threading.Event()
         self.client_evt = threading.Event()
-        serv_args = (SimSMTPServer, self.serv_evt, self.client_evt)
+        self.port = test_support.find_unused_port()
+        self.serv = SimSMTPServer((HOST, self.port), ('nowhere', -1))
+        serv_args = (self.serv, self.serv_evt, self.client_evt)
         threading.Thread(target=debugging_server, args=serv_args).start()
 
         # wait until server thread has assigned a port number
@@ -348,11 +346,11 @@ class SMTPSimTests(TestCase):
 
     def testBasic(self):
         # smoke test
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=15)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=15)
         smtp.quit()
 
     def testEHLO(self):
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=15)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=15)
 
         # no features should be present before the EHLO
         self.assertEqual(smtp.esmtp_features, {})
@@ -373,7 +371,7 @@ class SMTPSimTests(TestCase):
         smtp.quit()
 
     def testVRFY(self):
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=15)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=15)
 
         for email, name in sim_users.items():
             expected_known = (250, '%s %s' % (name, smtplib.quoteaddr(email)))
@@ -385,7 +383,7 @@ class SMTPSimTests(TestCase):
         smtp.quit()
 
     def testEXPN(self):
-        smtp = smtplib.SMTP(HOST, PORT, local_hostname='localhost', timeout=15)
+        smtp = smtplib.SMTP(HOST, self.port, local_hostname='localhost', timeout=15)
 
         for listname, members in sim_lists.items():
             users = []

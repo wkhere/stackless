@@ -97,6 +97,10 @@ SOURCE=..\..\Modules\_bisectmodule.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_bytesio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Modules\cjkcodecs\_codecs_cn.c
 # End Source File
 # Begin Source File
@@ -149,6 +153,10 @@ SOURCE=..\..\Modules\_hotshot.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_json.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Modules\_localemodule.c
 # End Source File
 # Begin Source File
@@ -173,10 +181,6 @@ SOURCE=..\..\PC\_subprocess.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\_typesmodule.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Modules\_weakref.c
 # End Source File
 # Begin Source File
@@ -198,6 +202,10 @@ SOURCE=..\..\Modules\zlib\adler32.c
 # Begin Source File
 
 SOURCE=..\..\Modules\arraymodule.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\_warnings.c
 # End Source File
 # Begin Source File
 
@@ -233,7 +241,11 @@ SOURCE=..\..\Objects\bufferobject.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Objects\bytesobject.c
+SOURCE=..\..\Objects\bytearrayobject.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Objects\stringobject.c
 # End Source File
 # Begin Source File
 
@@ -583,6 +595,10 @@ SOURCE=..\..\Python\pyfpe.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Python\pymath.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Python\pystate.c
 # End Source File
 # Begin Source File
@@ -632,10 +648,6 @@ SOURCE=..\..\Modules\signalmodule.c
 # Begin Source File
 
 SOURCE=..\..\Objects\sliceobject.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Objects\stringobject.c
 # End Source File
 # Begin Source File
 

@@ -83,39 +83,14 @@ int Py_IgnoreEnvironmentFlag; /* e.g. PYTHONPATH, PYTHONHOME */
   on the command line, and is used in 2.2 by ceval.c to make all "/" divisions
   true divisions (which they will be in 2.3). */
 int _Py_QnewFlag = 0;
+int Py_NoUserSiteDirectory = 0; /* for -s and site.py */
 
-/* Reference to 'warnings' module, to avoid importing it
-   on the fly when the import lock may be held.  See 683658/771097
-*/
-static PyObject *warnings_module = NULL;
-
-/* Returns a borrowed reference to the 'warnings' module, or NULL.
-   If the module is returned, it is guaranteed to have been obtained
-   without acquiring the import lock
-*/
-PyObject *PyModule_GetWarningsModule(void)
+/* PyModule_GetWarningsModule is no longer necessary as of 2.6
+since _warnings is builtin.  This API should not be used. */
+PyObject *
+PyModule_GetWarningsModule(void)
 {
-	PyObject *typ, *val, *tb;
-	PyObject *all_modules;
-	/* If we managed to get the module at init time, just use it */
-	if (warnings_module)
-		return warnings_module;
-	/* If it wasn't available at init time, it may be available
-	   now in sys.modules (common scenario is frozen apps: import
-	   at init time fails, but the frozen init code sets up sys.path
-	   correctly, then does an implicit import of warnings for us
-	*/
-	/* Save and restore any exceptions */
-	PyErr_Fetch(&typ, &val, &tb);
-
-	all_modules = PySys_GetObject("modules");
-	if (all_modules) {
-		warnings_module = PyDict_GetItemString(all_modules, "warnings");
-		/* We keep a ref in the global */
-		Py_XINCREF(warnings_module);
-	}
-	PyErr_Restore(typ, val, tb);
-	return warnings_module;
+	return PyImport_ImportModule("warnings");
 }
 
 static int initialized = 0;
@@ -158,10 +133,19 @@ Py_InitializeEx(int install_sigs)
 	PyThreadState *tstate;
 	PyObject *bimod, *sysmod;
 	char *p;
-#if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
-	char *codeset;
-	char *saved_locale;
+	char *icodeset; /* On Windows, input codeset may theoretically 
+			   differ from output codeset. */
+	char *codeset = NULL;
+	char *errors = NULL;
+	int free_codeset = 0;
+	int overridden = 0;
 	PyObject *sys_stream, *sys_isatty;
+#if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
+	char *saved_locale, *loc_codeset;
+#endif
+#ifdef MS_WINDOWS
+	char ibuf[128];
+	char buf[128];
 #endif
 	extern void _Py_ReadyTypes(void);
 
@@ -202,7 +186,7 @@ Py_InitializeEx(int install_sigs)
 	if (!_PyInt_Init())
 		Py_FatalError("Py_Initialize: can't init ints");
 
-	if (!PyBytes_Init())
+	if (!PyByteArray_Init())
 		Py_FatalError("Py_Initialize: can't init bytearray");
 
 	_PyFloat_Init();
@@ -252,6 +236,15 @@ Py_InitializeEx(int install_sigs)
 
 	if (install_sigs)
 		initsigs(); /* Signal handling stuff, including initintr() */
+		
+    /* Initialize warnings. */
+    _PyWarnings_Init();
+    if (PySys_HasWarnOptions()) {
+        PyObject *warnings_module = PyImport_ImportModule("warnings");
+        if (!warnings_module)
+            PyErr_Clear();
+        Py_XDECREF(warnings_module);
+    }
 
 #ifdef STACKLESS
 	_PyStackless_Init();
@@ -265,62 +258,75 @@ Py_InitializeEx(int install_sigs)
 	_PyGILState_Init(interp, tstate);
 #endif /* WITH_THREAD */
 
-	warnings_module = PyImport_ImportModule("warnings");
-	if (!warnings_module) {
-		PyErr_Clear();
+	if ((p = Py_GETENV("PYTHONIOENCODING")) && *p != '\0') {
+		p = icodeset = codeset = strdup(p);
+		free_codeset = 1;
+		errors = strchr(p, ':');
+		if (errors) {
+			*errors = '\0';
+			errors++;
+		}
+		overridden = 1;
 	}
-	else {
-		PyObject *o;
-		char *action[8];
-
-		if (Py_BytesWarningFlag > 1)
-			*action = "error";
-		else if (Py_BytesWarningFlag)
-			*action = "default";
-		else
-			*action = "ignore";
-
-		o = PyObject_CallMethod(warnings_module,
-					"simplefilter", "sO",
-					*action, PyExc_BytesWarning);
-		if (o == NULL)
-			Py_FatalError("Py_Initialize: can't initialize"
-				      "warning filter for BytesWarning.");
-		Py_DECREF(o);
-        }
 
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the
 	   user's preference, if the CODESET names a well-known
 	   Python codec, and Py_FileSystemDefaultEncoding isn't
 	   initialized by other means. Also set the encoding of
-	   stdin and stdout if these are terminals.  */
+	   stdin and stdout if these are terminals, unless overridden.  */
 
-	saved_locale = strdup(setlocale(LC_CTYPE, NULL));
-	setlocale(LC_CTYPE, "");
-	codeset = nl_langinfo(CODESET);
-	if (codeset && *codeset) {
-		PyObject *enc = PyCodec_Encoder(codeset);
-		if (enc) {
-			codeset = strdup(codeset);
-			Py_DECREF(enc);
-		} else {
-			codeset = NULL;
-			PyErr_Clear();
+	if (!overridden || !Py_FileSystemDefaultEncoding) {
+		saved_locale = strdup(setlocale(LC_CTYPE, NULL));
+		setlocale(LC_CTYPE, "");
+		loc_codeset = nl_langinfo(CODESET);
+		if (loc_codeset && *loc_codeset) {
+			PyObject *enc = PyCodec_Encoder(loc_codeset);
+			if (enc) {
+				loc_codeset = strdup(loc_codeset);
+				Py_DECREF(enc);
+			} else {
+				loc_codeset = NULL;
+				PyErr_Clear();
+			}
+		} else
+			loc_codeset = NULL;
+		setlocale(LC_CTYPE, saved_locale);
+		free(saved_locale);
+
+		if (!overridden) {
+			codeset = icodeset = loc_codeset;
+			free_codeset = 1;
 		}
-	} else
-		codeset = NULL;
-	setlocale(LC_CTYPE, saved_locale);
-	free(saved_locale);
+
+		/* Initialize Py_FileSystemDefaultEncoding from
+		   locale even if PYTHONIOENCODING is set. */
+		if (!Py_FileSystemDefaultEncoding) {
+			Py_FileSystemDefaultEncoding = loc_codeset;
+			if (!overridden)
+				free_codeset = 0;
+		}
+	}
+#endif
+
+#ifdef MS_WINDOWS
+	if (!overridden) {
+		icodeset = ibuf;
+		codeset = buf;
+		sprintf(ibuf, "cp%d", GetConsoleCP());
+		sprintf(buf, "cp%d", GetConsoleOutputCP());
+	}
+#endif
 
 	if (codeset) {
 		sys_stream = PySys_GetObject("stdin");
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		if ((overridden ||
+		     (sys_isatty && PyObject_IsTrue(sys_isatty))) &&
 		   PyFile_Check(sys_stream)) {
-			if (!PyFile_SetEncoding(sys_stream, codeset))
+			if (!PyFile_SetEncodingAndErrors(sys_stream, icodeset, errors))
 				Py_FatalError("Cannot set codeset of stdin");
 		}
 		Py_XDECREF(sys_isatty);
@@ -329,9 +335,10 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		if ((overridden || 
+		     (sys_isatty && PyObject_IsTrue(sys_isatty))) &&
 		   PyFile_Check(sys_stream)) {
-			if (!PyFile_SetEncoding(sys_stream, codeset))
+			if (!PyFile_SetEncodingAndErrors(sys_stream, codeset, errors))
 				Py_FatalError("Cannot set codeset of stdout");
 		}
 		Py_XDECREF(sys_isatty);
@@ -340,19 +347,17 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		if((overridden || 
+		    (sys_isatty && PyObject_IsTrue(sys_isatty))) &&
 		   PyFile_Check(sys_stream)) {
-			if (!PyFile_SetEncoding(sys_stream, codeset))
+			if (!PyFile_SetEncodingAndErrors(sys_stream, codeset, errors))
 				Py_FatalError("Cannot set codeset of stderr");
 		}
 		Py_XDECREF(sys_isatty);
 
-		if (!Py_FileSystemDefaultEncoding)
-			Py_FileSystemDefaultEncoding = codeset;
-		else
+		if (free_codeset)
 			free(codeset);
 	}
-#endif
 }
 
 void
@@ -410,10 +415,6 @@ Py_Finalize(void)
 
 	/* Disable signal handling */
 	PyOS_FiniInterrupts();
-
-	/* drop module references we saved */
-	Py_XDECREF(warnings_module);
-	warnings_module = NULL;
 
 	/* Clear type lookup cache */
 	PyType_ClearCache();
@@ -509,7 +510,7 @@ Py_Finalize(void)
 	PyList_Fini();
 	PySet_Fini();
 	PyString_Fini();
-	PyBytes_Fini();
+	PyByteArray_Fini();
 	PyInt_Fini();
 	PyFloat_Fini();
 	PyDict_Fini();
@@ -1576,10 +1577,10 @@ err_input(perrdetail *err)
 		msg = "invalid token";
 		break;
 	case E_EOFS:
-		msg = "EOF while scanning triple-quoted string";
+		msg = "EOF while scanning triple-quoted string literal";
 		break;
 	case E_EOLS:
-		msg = "EOL while scanning single-quoted string";
+		msg = "EOL while scanning string literal";
 		break;
 	case E_INTR:
 		if (!PyErr_Occurred())

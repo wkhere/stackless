@@ -167,10 +167,8 @@ builtin_apply(PyObject *self, PyObject *args)
 	PyObject *func, *alist = NULL, *kwdict = NULL;
 	PyObject *t = NULL, *retval = NULL;
 
-	if (Py_Py3kWarningFlag &&
-	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "apply() not supported in 3.x; "
-		       "use func(*args, **kwargs)") < 0)
+	if (PyErr_WarnPy3k("apply() not supported in 3.x; "
+			   "use func(*args, **kwargs)", 1) < 0)
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "apply", 1, 3, &func, &alist, &kwdict))
@@ -227,10 +225,8 @@ Return the binary representation of an integer or long integer.");
 static PyObject *
 builtin_callable(PyObject *self, PyObject *v)
 {
-	if (Py_Py3kWarningFlag &&
-	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "callable() not supported in 3.x; "
-		       "use hasattr(o, '__call__')") < 0)
+	if (PyErr_WarnPy3k("callable() not supported in 3.x; "
+			   "use hasattr(o, '__call__')", 1) < 0)
 		return NULL;
 	return PyBool_FromLong((long)PyCallable_Check(v));
 }
@@ -440,9 +436,7 @@ builtin_coerce(PyObject *self, PyObject *args)
 	PyObject *v, *w;
 	PyObject *res;
 
-	if (Py_Py3kWarningFlag &&
-	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "coerce() not supported in 3.x") < 0)
+	if (PyErr_WarnPy3k("coerce() not supported in 3.x", 1) < 0)
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "coerce", 2, 2, &v, &w))
@@ -716,9 +710,8 @@ builtin_execfile(PyObject *self, PyObject *args)
 	PyCompilerFlags cf;
 	int exists;
 
-	if (Py_Py3kWarningFlag &&
-	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "execfile() not supported in 3.x; use exec()") < 0)
+	if (PyErr_WarnPy3k("execfile() not supported in 3.x; use exec()",
+			   1) < 0)
 		return NULL;
 
 	if (!PyArg_ParseTuple(args, "s|O!O:execfile",
@@ -893,9 +886,13 @@ builtin_hasattr(PyObject *self, PyObject *args)
 	}
 	v = PyObject_GetAttr(v, name);
 	if (v == NULL) {
-		PyErr_Clear();
-		Py_INCREF(Py_False);
-		return Py_False;
+		if (!PyErr_ExceptionMatches(PyExc_Exception))
+			return NULL;
+		else {
+			PyErr_Clear();
+			Py_INCREF(Py_False);
+			return Py_False;
+		}
 	}
 	Py_DECREF(v);
 	Py_INCREF(Py_True);
@@ -946,10 +943,8 @@ builtin_map(PyObject *self, PyObject *args)
 	n--;
 
 	if (func == Py_None) {
-		if (Py_Py3kWarningFlag &&
-		    PyErr_Warn(PyExc_DeprecationWarning, 
-			       "map(None, ...) not supported in 3.x; "
-			       "use list(...)") < 0)
+		if (PyErr_WarnPy3k("map(None, ...) not supported in 3.x; "
+				   "use list(...)", 1) < 0)
 			return NULL;
 		if (n == 1) {
 			/* map(None, S) is the same as list(S). */
@@ -1086,6 +1081,47 @@ function is called with an argument list consisting of the corresponding\n\
 item of each sequence, substituting None for missing values when not all\n\
 sequences have the same length.  If the function is None, return a list of\n\
 the items of the sequence (or a list of tuples if more than one sequence).");
+
+
+static PyObject *
+builtin_next(PyObject *self, PyObject *args)
+{
+	PyObject *it, *res;
+	PyObject *def = NULL;
+
+	if (!PyArg_UnpackTuple(args, "next", 1, 2, &it, &def))
+		return NULL;
+	if (!PyIter_Check(it)) {
+		PyErr_Format(PyExc_TypeError,
+			"%.200s object is not an iterator",
+			it->ob_type->tp_name);
+		return NULL;
+	}
+	
+	res = (*it->ob_type->tp_iternext)(it);
+	if (res != NULL) {
+		return res;
+	} else if (def != NULL) {
+		if (PyErr_Occurred()) {
+			if (!PyErr_ExceptionMatches(PyExc_StopIteration))
+				return NULL;
+			PyErr_Clear();
+		}
+		Py_INCREF(def);
+		return def;
+	} else if (PyErr_Occurred()) {
+		return NULL;
+	} else {
+		PyErr_SetNone(PyExc_StopIteration);
+		return NULL;
+	}
+}
+
+PyDoc_STRVAR(next_doc,
+"next(iterator[, default])\n\
+\n\
+Return the next item from the iterator. If default is given and the iterator\n\
+is exhausted, it is returned instead of raising StopIteration.");
 
 
 static PyObject *
@@ -1471,10 +1507,10 @@ builtin_ord(PyObject *self, PyObject* obj)
 			ord = (long)((unsigned char)*PyString_AS_STRING(obj));
 			return PyInt_FromLong(ord);
 		}
-	} else if (PyBytes_Check(obj)) {
-		size = PyBytes_GET_SIZE(obj);
+	} else if (PyByteArray_Check(obj)) {
+		size = PyByteArray_GET_SIZE(obj);
 		if (size == 1) {
-			ord = (long)((unsigned char)*PyBytes_AS_STRING(obj));
+			ord = (long)((unsigned char)*PyByteArray_AS_STRING(obj));
 			return PyInt_FromLong(ord);
 		}
 
@@ -1976,10 +2012,8 @@ builtin_reduce(PyObject *self, PyObject *args)
 {
 	PyObject *seq, *func, *result = NULL, *it;
 
-	if (Py_Py3kWarningFlag &&
-	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "reduce() not supported in 3.x; "
-		       "use functools.reduce()") < 0)
+	if (PyErr_WarnPy3k("reduce() not supported in 3.x; "
+			   "use functools.reduce()", 1) < 0)
 		return NULL;
 
 	if (!PyArg_UnpackTuple(args, "reduce", 2, 3, &func, &seq, &result))
@@ -2054,9 +2088,8 @@ sequence is empty.");
 static PyObject *
 builtin_reload(PyObject *self, PyObject *v)
 {
-	if (Py_Py3kWarningFlag &&
-	    PyErr_Warn(PyExc_DeprecationWarning, 
-		       "reload() not supported in 3.x; use imp.reload()") < 0)
+	if (PyErr_WarnPy3k("In 3.x, reload() is renamed to imp.reload()",
+			   1) < 0)
 		return NULL;
 
 	return PyImport_ReloadModule(v);
@@ -2281,14 +2314,14 @@ builtin_sum(PyObject *self, PyObject *args)
     				return PyFloat_FromDouble(f_result);
 			}
         		if (PyFloat_CheckExact(item)) {
-				PyFPE_START_PROTECT("add", return 0)
+				PyFPE_START_PROTECT("add", Py_DECREF(item); Py_DECREF(iter); return 0)
 				f_result += PyFloat_AS_DOUBLE(item);
 				PyFPE_END_PROTECT(f_result)
 				Py_DECREF(item);
 				continue;
 			}
         		if (PyInt_CheckExact(item)) {
-				PyFPE_START_PROTECT("add", return 0)
+				PyFPE_START_PROTECT("add", Py_DECREF(item); Py_DECREF(iter); return 0)
 				f_result += (double)PyInt_AS_LONG(item);
 				PyFPE_END_PROTECT(f_result)
 				Py_DECREF(item);
@@ -2537,6 +2570,7 @@ static PyMethodDef builtin_methods[] = {
  	{"map",		builtin_map,        METH_VARARGS, map_doc},
  	{"max",		(PyCFunction)builtin_max,        METH_VARARGS | METH_KEYWORDS, max_doc},
  	{"min",		(PyCFunction)builtin_min,        METH_VARARGS | METH_KEYWORDS, min_doc},
+	{"next", 	builtin_next,       METH_VARARGS, next_doc},
  	{"oct",		builtin_oct,        METH_O, oct_doc},
  	{"open",	(PyCFunction)builtin_open,       METH_VARARGS | METH_KEYWORDS, open_doc},
  	{"ord",		builtin_ord,        METH_O, ord_doc},
@@ -2600,7 +2634,7 @@ _PyBuiltin_Init(void)
 	SETBUILTIN("basestring",	&PyBaseString_Type);
 	SETBUILTIN("bool",		&PyBool_Type);
 	/*	SETBUILTIN("memoryview",        &PyMemoryView_Type); */
-	SETBUILTIN("bytearray",		&PyBytes_Type);
+	SETBUILTIN("bytearray",		&PyByteArray_Type);
 	SETBUILTIN("bytes",		&PyString_Type);
 	SETBUILTIN("buffer",		&PyBuffer_Type);
 	SETBUILTIN("classmethod",	&PyClassMethod_Type);
@@ -2774,11 +2808,43 @@ filterstring(PyObject *func, PyObject *strobj)
 					PyString_AS_STRING(item)[0];
 			} else {
 				/* do we need more space? */
-				Py_ssize_t need = j + reslen + len-i-1;
+				Py_ssize_t need = j;
+
+				/* calculate space requirements while checking for overflow */
+				if (need > PY_SSIZE_T_MAX - reslen) {
+					Py_DECREF(item);
+					goto Fail_1;
+				}
+
+				need += reslen;
+
+				if (need > PY_SSIZE_T_MAX - len) {
+					Py_DECREF(item);
+					goto Fail_1;
+				}
+
+				need += len;
+
+				if (need <= i) {
+					Py_DECREF(item);
+					goto Fail_1;
+				}
+
+				need = need - i - 1;
+
+				assert(need >= 0);
+				assert(outlen >= 0);
+
 				if (need > outlen) {
 					/* overallocate, to avoid reallocations */
-					if (need<2*outlen)
+					if (outlen > PY_SSIZE_T_MAX / 2) {
+						Py_DECREF(item);
+						return NULL;
+					}
+
+					if (need<2*outlen) {
 						need = 2*outlen;
+          }
 					if (_PyString_Resize(&result, need)) {
 						Py_DECREF(item);
 						return NULL;
@@ -2870,11 +2936,31 @@ filterunicode(PyObject *func, PyObject *strobj)
 			else {
 				/* do we need more space? */
 				Py_ssize_t need = j + reslen + len - i - 1;
+        
+				/* check that didnt overflow */
+				if ((j > PY_SSIZE_T_MAX - reslen) ||
+					((j + reslen) > PY_SSIZE_T_MAX - len) ||
+						((j + reslen + len) < i) ||
+							((j + reslen + len - i) <= 0)) {
+					Py_DECREF(item);
+					return NULL;
+				}
+
+				assert(need >= 0);
+				assert(outlen >= 0);
+				
 				if (need > outlen) {
 					/* overallocate,
 					   to avoid reallocations */
-					if (need < 2 * outlen)
-						need = 2 * outlen;
+					if (need < 2 * outlen) {
+            if (outlen > PY_SSIZE_T_MAX / 2) {
+              Py_DECREF(item);
+              return NULL;
+						} else {
+							need = 2 * outlen;
+				    }
+          }
+
 					if (PyUnicode_Resize(
 						&result, need) < 0) {
 						Py_DECREF(item);

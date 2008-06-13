@@ -233,6 +233,16 @@ end, assuming longs are aligned on 4-byte boundaries.  This only works when
 native size and alignment are in effect; standard size and alignment does not
 enforce any alignment.
 
+Unpacked fields can be named by assigning them to variables or by wrapping
+the result in a named tuple::
+
+    >>> record = 'raymond   \x32\x12\x08\x01\x08'
+    >>> name, serialnum, school, gradelevel = unpack('<10sHHb', record)
+
+    >>> from collections import namedtuple
+    >>> Student = namedtuple('Student', 'name serialnum school gradelevel')
+    >>> Student._make(unpack('<10sHHb', s))
+    Student(name='raymond   ', serialnum=4658, school=264, gradelevel=8)
 
 .. seealso::
 
@@ -260,38 +270,38 @@ The :mod:`struct` module also defines the following type:
 
    .. versionadded:: 2.5
 
-Compiled Struct objects support the following methods and attributes:
+   Compiled Struct objects support the following methods and attributes:
 
 
-.. method:: Struct.pack(v1, v2, ...)
+   .. method:: pack(v1, v2, ...)
 
-   Identical to the :func:`pack` function, using the compiled format.
-   (``len(result)`` will equal :attr:`self.size`.)
-
-
-.. method:: Struct.pack_into(buffer, offset, v1, v2, ...)
-
-   Identical to the :func:`pack_into` function, using the compiled format.
+      Identical to the :func:`pack` function, using the compiled format.
+      (``len(result)`` will equal :attr:`self.size`.)
 
 
-.. method:: Struct.unpack(string)
+   .. method:: pack_into(buffer, offset, v1, v2, ...)
 
-   Identical to the :func:`unpack` function, using the compiled format.
-   (``len(string)`` must equal :attr:`self.size`).
-
-
-.. method:: Struct.unpack_from(buffer[, offset=0])
-
-   Identical to the :func:`unpack_from` function, using the compiled format.
-   (``len(buffer[offset:])`` must be at least :attr:`self.size`).
+      Identical to the :func:`pack_into` function, using the compiled format.
 
 
-.. attribute:: Struct.format
+   .. method:: unpack(string)
 
-   The format string used to construct this Struct object.
+      Identical to the :func:`unpack` function, using the compiled format.
+      (``len(string)`` must equal :attr:`self.size`).
 
-.. attribute:: Struct.size
 
-   The calculated size of the struct (and hence of the string) corresponding
-   to :attr:`format`.
+   .. method:: unpack_from(buffer[, offset=0])
+
+      Identical to the :func:`unpack_from` function, using the compiled format.
+      (``len(buffer[offset:])`` must be at least :attr:`self.size`).
+
+
+   .. attribute:: format
+
+      The format string used to construct this Struct object.
+
+   .. attribute:: size
+
+      The calculated size of the struct (and hence of the string) corresponding
+      to :attr:`format`.
 

@@ -1,4 +1,3 @@
-
 :mod:`CGIHTTPServer` --- CGI-capable HTTP request handler
 =========================================================
 
@@ -6,6 +5,11 @@
    :synopsis: This module provides a request handler for HTTP servers which can run CGI
               scripts.
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
+
+.. note::
+   The :mod:`CGIHTTPServer` module has been merged into :mod:`http.server` in
+   Python 3.0.  The :term:`2to3` tool will automatically adapt imports when
+   converting your sources to 3.0.
 
 
 The :mod:`CGIHTTPServer` module defines a request-handler class, interface
@@ -43,22 +47,22 @@ The :mod:`CGIHTTPServer` module defines the following class:
    and serve the output, instead of serving files, if the request leads to
    somewhere below the ``cgi_directories`` path.
 
-The :class:`CGIHTTPRequestHandler` defines the following data member:
+   The :class:`CGIHTTPRequestHandler` defines the following data member:
 
 
-.. attribute:: CGIHTTPRequestHandler.cgi_directories
+   .. attribute:: cgi_directories
 
-   This defaults to ``['/cgi-bin', '/htbin']`` and describes directories to treat
-   as containing CGI scripts.
+      This defaults to ``['/cgi-bin', '/htbin']`` and describes directories to
+      treat as containing CGI scripts.
 
-The :class:`CGIHTTPRequestHandler` defines the following methods:
+   The :class:`CGIHTTPRequestHandler` defines the following methods:
 
 
-.. method:: CGIHTTPRequestHandler.do_POST()
+   .. method:: do_POST()
 
-   This method serves the ``'POST'`` request type, only allowed for CGI scripts.
-   Error 501, "Can only POST to CGI scripts", is output when trying to POST to a
-   non-CGI url.
+      This method serves the ``'POST'`` request type, only allowed for CGI
+      scripts.  Error 501, "Can only POST to CGI scripts", is output when trying
+      to POST to a non-CGI url.
 
 Note that CGI scripts will be run with UID of user nobody, for security reasons.
 Problems with the CGI script will be translated to error 403.

@@ -3,6 +3,7 @@
 import test.test_support
 from test.test_support import verbose
 import random
+import re
 import sys
 import threading
 import thread
@@ -33,7 +34,7 @@ class TestThread(threading.Thread):
         delay = random.random() / 10000.0
         if verbose:
             print 'task %s will run for %.1f usec' % (
-                self.getName(), delay * 1e6)
+                self.get_name(), delay * 1e6)
 
         with self.sema:
             with self.mutex:
@@ -44,14 +45,14 @@ class TestThread(threading.Thread):
 
             time.sleep(delay)
             if verbose:
-                print 'task', self.getName(), 'done'
+                print 'task', self.get_name(), 'done'
 
             with self.mutex:
                 self.nrunning.dec()
                 self.testcase.assert_(self.nrunning.get() >= 0)
                 if verbose:
                     print '%s is finished. %d tasks are running' % (
-                        self.getName(), self.nrunning.get())
+                        self.get_name(), self.nrunning.get())
 
 class ThreadTests(unittest.TestCase):
 
@@ -72,13 +73,17 @@ class ThreadTests(unittest.TestCase):
         for i in range(NUMTASKS):
             t = TestThread("<thread %d>"%i, self, sema, mutex, numrunning)
             threads.append(t)
+            self.failUnlessEqual(t.get_ident(), None)
+            self.assert_(re.match('<TestThread\(.*, initial\)>', repr(t)))
             t.start()
 
         if verbose:
             print 'waiting for all tasks to complete'
         for t in threads:
             t.join(NUMTASKS)
-            self.assert_(not t.isAlive())
+            self.assert_(not t.is_alive())
+            self.failIfEqual(t.get_ident(), 0)
+            self.assert_(re.match('<TestThread\(.*, \w+ -?\d+\)>', repr(t)))
         if verbose:
             print 'all tasks done'
         self.assertEqual(numrunning.get(), 0)
@@ -167,7 +172,7 @@ class ThreadTests(unittest.TestCase):
                     worker_saw_exception.set()
 
         t = Worker()
-        t.setDaemon(True) # so if this fails, we don't hang Python at shutdown
+        t.set_daemon(True) # so if this fails, we don't hang Python at shutdown
         t.start()
         if verbose:
             print "    started worker thread"
@@ -237,6 +242,35 @@ class ThreadTests(unittest.TestCase):
             sys.exit(42)
             """])
         self.assertEqual(rc, 42)
+
+    def test_finalize_with_trace(self):
+        # Issue1733757
+        # Avoid a deadlock when sys.settrace steps into threading._shutdown
+        import subprocess
+        rc = subprocess.call([sys.executable, "-c", """if 1:
+            import sys, threading
+
+            # A deadlock-killer, to prevent the
+            # testsuite to hang forever
+            def killer():
+                import os, time
+                time.sleep(2)
+                print 'program blocked; aborting'
+                os._exit(2)
+            t = threading.Thread(target=killer)
+            t.set_daemon(True)
+            t.start()
+
+            # This is the trace function
+            def func(frame, event, arg):
+                threading.current_thread()
+                return func
+
+            sys.settrace(func)
+            """])
+        self.failIf(rc == 2, "interpreted was blocked")
+        self.failUnless(rc == 0, "Unexpected error")
+
 
     def test_enumerate_after_join(self):
         # Try hard to trigger #1703448: a thread is still returned in
@@ -314,8 +348,8 @@ class ThreadingExceptionTests(unittest.TestCase):
         self.assertRaises(ValueError, threading.Semaphore, value = -sys.maxint)
 
     def test_joining_current_thread(self):
-        currentThread = threading.currentThread()
-        self.assertRaises(RuntimeError, currentThread.join);
+        current_thread = threading.current_thread()
+        self.assertRaises(RuntimeError, current_thread.join);
 
     def test_joining_inactive_thread(self):
         thread = threading.Thread()
@@ -324,7 +358,7 @@ class ThreadingExceptionTests(unittest.TestCase):
     def test_daemonize_active_thread(self):
         thread = threading.Thread()
         thread.start()
-        self.assertRaises(RuntimeError, thread.setDaemon, True)
+        self.assertRaises(RuntimeError, thread.set_daemon, True)
 
 
 def test_main():

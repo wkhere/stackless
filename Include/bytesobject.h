@@ -1,53 +1,33 @@
-/* Bytes object interface */
+#define PyBytesObject PyStringObject
+#define PyBytes_Type PyString_Type
 
-#ifndef Py_BYTESOBJECT_H
-#define Py_BYTESOBJECT_H
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define PyBytes_Check PyString_Check
+#define PyBytes_CheckExact PyString_CheckExact 
+#define PyBytes_CHECK_INTERNED PyString_CHECK_INTERNED
+#define PyBytes_AS_STRING PyString_AS_STRING
+#define PyBytes_GET_SIZE PyString_GET_SIZE
+#define Py_TPFLAGS_BYTES_SUBCLASS Py_TPFLAGS_STRING_SUBCLASS
 
-#include <stdarg.h>
-
-/* Type PyBytesObject represents a mutable array of bytes.
- * The Python API is that of a sequence;
- * the bytes are mapped to ints in [0, 256).
- * Bytes are not characters; they may be used to encode characters.
- * The only way to go between bytes and str/unicode is via encoding
- * and decoding.
- * For the convenience of C programmers, the bytes type is considered
- * to contain a char pointer, not an unsigned char pointer.
- */
-
-/* Object layout */
-typedef struct {
-    PyObject_VAR_HEAD
-    /* XXX(nnorwitz): should ob_exports be Py_ssize_t? */
-    int ob_exports; /* how many buffer exports */
-    Py_ssize_t ob_alloc; /* How many bytes allocated */
-    char *ob_bytes;
-} PyBytesObject;
-
-/* Type object */
-PyAPI_DATA(PyTypeObject) PyBytes_Type;
-PyAPI_DATA(PyTypeObject) PyBytesIter_Type;
-
-/* Type check macros */
-#define PyBytes_Check(self) PyObject_TypeCheck(self, &PyBytes_Type)
-#define PyBytes_CheckExact(self) (Py_TYPE(self) == &PyBytes_Type)
-
-/* Direct API functions */
-PyAPI_FUNC(PyObject *) PyBytes_FromObject(PyObject *);
-PyAPI_FUNC(PyObject *) PyBytes_Concat(PyObject *, PyObject *);
-PyAPI_FUNC(PyObject *) PyBytes_FromStringAndSize(const char *, Py_ssize_t);
-PyAPI_FUNC(Py_ssize_t) PyBytes_Size(PyObject *);
-PyAPI_FUNC(char *) PyBytes_AsString(PyObject *);
-PyAPI_FUNC(int) PyBytes_Resize(PyObject *, Py_ssize_t);
-
-/* Macros, trading safety for speed */
-#define PyBytes_AS_STRING(self) (assert(PyBytes_Check(self)),((PyBytesObject *)(self))->ob_bytes)
-#define PyBytes_GET_SIZE(self)  (assert(PyBytes_Check(self)),Py_SIZE(self))
-
-#ifdef __cplusplus
-}
-#endif
-#endif /* !Py_BYTESOBJECT_H */
+#define PyBytes_FromStringAndSize PyString_FromStringAndSize
+#define PyBytes_FromString PyString_FromString
+#define PyBytes_FromFormatV PyString_FromFormatV
+#define PyBytes_FromFormat PyString_FromFormat
+#define PyBytes_Size PyString_Size
+#define PyBytes_AsString PyString_AsString
+#define PyBytes_Repr PyString_Repr
+#define PyBytes_Concat PyString_Concat
+#define PyBytes_ConcatAndDel PyString_ConcatAndDel
+#define _PyBytes_Resize _PyString_Resize
+#define _PyBytes_Eq _PyString_Eq
+#define PyBytes_Format PyString_Format
+#define _PyBytes_FormatLong _PyString_FormatLong
+#define PyBytes_DecodeEscape PyString_DecodeEscape
+#define _PyBytes_Join _PyString_Join
+#define PyBytes_Decode PyString_Decode
+#define PyBytes_Encode PyString_Encode
+#define PyBytes_AsEncodedObject PyString_AsEncodedObject
+#define PyBytes_AsEncodedString PyString_AsEncodedString
+#define PyBytes_AsDecodedObject PyString_AsDecodedObject
+#define PyBytes_AsDecodedString PyString_AsDecodedString
+#define PyBytes_AsStringAndSize PyString_AsStringAndSize
+#define _PyBytes_InsertThousandsGrouping _PyString_InsertThousandsGrouping

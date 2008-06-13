@@ -42,6 +42,10 @@ Number-theoretic and representation functions:
 
    Return the absolute value of *x*.
 
+.. function:: factorial(x)
+
+   Return *x* factorial.  Raises :exc:`ValueError` if *x* is not intergral or
+   is negative.
 
 .. function:: floor(x)
 
@@ -103,6 +107,12 @@ Number-theoretic and representation functions:
    Return the fractional and integer parts of *x*.  Both results carry the sign of
    *x*, and both are floats.
 
+.. function:: sum(iterable)
+
+   Return an accurate floating point sum of values in the iterable.  Avoids
+   loss of precision by tracking multiple intermediate partial sums.  The
+   algorithm's accuracy depends on IEEE-754 arithmetic guarantees and the
+   typical case where the rounding mode is half-even.
 
 .. function:: trunc(x)
 
@@ -139,6 +149,14 @@ Power and logarithmic functions:
       *base* argument added.
 
 
+.. function:: log1p(x)
+
+   Return the natural logarithm of *1+x* (base *e*). The
+   result is calculated in a way which is accurate for *x* near zero.
+
+   .. versionadded:: 2.6
+
+
 .. function:: log10(x)
 
    Return the base-10 logarithm of *x*.
@@ -146,7 +164,15 @@ Power and logarithmic functions:
 
 .. function:: pow(x, y)
 
-   Return ``x**y``.
+   Return ``x`` raised to the power ``y``.  Exceptional cases follow
+   Annex 'F' of the C99 standard as far as possible.  In particular,
+   ``pow(1.0, x)`` and ``pow(x, 0.0)`` always return ``1.0``, even
+   when ``x`` is a zero or a NaN.  If both ``x`` and ``y`` are finite,
+   ``x`` is negative, and ``y`` is not an integer then ``pow(x, y)``
+   is undefined, and raises :exc:`ValueError`.
+
+   .. versionchanged:: 2.6
+      The outcome of ``1**nan`` and ``nan**0`` was undefined.
 
 
 .. function:: sqrt(x)
@@ -216,6 +242,27 @@ Angular conversion:
 Hyperbolic functions:
 
 
+.. function:: acosh(x)
+
+   Return the inverse hyperbolic cosine of *x*.
+
+   .. versionadded:: 2.6
+
+
+.. function:: asinh(x)
+
+   Return the inverse hyperbolic sine of *x*.
+
+   .. versionadded:: 2.6
+
+
+.. function:: atanh(x)
+
+   Return the inverse hyperbolic tangent of *x*.
+
+   .. versionadded:: 2.6
+
+
 .. function:: cosh(x)
 
    Return the hyperbolic cosine of *x*.
@@ -230,6 +277,8 @@ Hyperbolic functions:
 
    Return the hyperbolic tangent of *x*.
 
+
+
 The module also defines two mathematical constants:
 
 
@@ -241,6 +290,7 @@ The module also defines two mathematical constants:
 .. data:: e
 
    The mathematical constant *e*.
+
 
 .. note::
 
@@ -255,9 +305,17 @@ The module also defines two mathematical constants:
    :exc:`OverflowError` isn't defined, and in cases where ``math.log(0)`` raises
    :exc:`OverflowError`, ``math.log(0L)`` may raise :exc:`ValueError` instead.
 
+   All functions return a quiet *NaN* if at least one of the args is *NaN*.
+   Signaling *NaN*s raise an exception. The exception type still depends on the
+   platform and libm implementation. It's usually :exc:`ValueError` for *EDOM*
+   and :exc:`OverflowError` for errno *ERANGE*.
+
+   .. versionchanged:: 2.6
+      In earlier versions of Python the outcome of an operation with NaN as
+      input depended on platform and libm implementation.
+
 
 .. seealso::
 
    Module :mod:`cmath`
       Complex number versions of many of these functions.
-

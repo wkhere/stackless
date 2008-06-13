@@ -28,15 +28,6 @@ copying and removal. For operations on individual files, see also the
    are not copied.
 
 
-.. function:: copyfile(src, dst)
-
-   Copy the contents (no metadata) of the file named *src* to a file named *dst*.
-   The destination location must be writable; otherwise,  an :exc:`IOError` exception
-   will be raised. If *dst* already exists, it will be replaced.   Special files
-   such as character or block devices and pipes cannot be copied with this
-   function.  *src* and *dst* are path names given as strings.
-
-
 .. function:: copyfileobj(fsrc, fdst[, length])
 
    Copy the contents of the file-like object *fsrc* to the file-like object *fdst*.
@@ -46,6 +37,17 @@ copying and removal. For operations on individual files, see also the
    consumption. Note that if the current file position of the *fsrc* object is not
    0, only the contents from the current file position to the end of the file will
    be copied.
+
+
+.. function:: copyfile(src, dst)
+
+   Copy the contents (no metadata) of the file named *src* to a file named *dst*.
+   *dst* must be the complete target file name; look at :func:`copy` for a copy that
+   accepts a target directory path.
+   The destination location must be writable; otherwise,  an :exc:`IOError` exception
+   will be raised. If *dst* already exists, it will be replaced.   Special files
+   such as character or block devices and pipes cannot be copied with this
+   function.  *src* and *dst* are path names given as strings.
 
 
 .. function:: copymode(src, dst)
@@ -71,8 +73,9 @@ copying and removal. For operations on individual files, see also the
 
 .. function:: copy2(src, dst)
 
-   Similar to :func:`copy`, but last access time and last modification time are
-   copied as well.  This is similar to the Unix command :program:`cp -p`.
+   Similar to :func:`copy`, but metadata is copied as well -- in fact, this is just
+   :func:`copy` followed by :func:`copystat`.  This is similar to the
+   Unix command :program:`cp -p`.
 
 
 .. function:: copytree(src, dst[, symlinks])

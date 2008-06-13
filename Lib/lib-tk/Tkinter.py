@@ -34,7 +34,8 @@ __version__ = "$Revision$"
 
 import sys
 if sys.platform == "win32":
-    import FixTk # Attempt to configure Tcl/Tk without requiring PATH
+    # Attempt to configure Tcl/Tk without requiring PATH
+    import FixTk
 import _tkinter # If this fails your Python may not be configured for Tk
 tkinter = _tkinter # b/w compat for export
 TclError = _tkinter.TclError
@@ -590,9 +591,6 @@ class Misc:
         status = self.tk.call('grab', 'status', self._w)
         if status == 'none': status = None
         return status
-    def lower(self, belowThis=None):
-        """Lower this widget in the stacking order."""
-        self.tk.call('lower', self._w, belowThis)
     def option_add(self, pattern, value, priority = None):
         """Set a VALUE (second parameter) for an option
         PATTERN (first parameter).
@@ -1055,6 +1053,18 @@ class Misc:
                 if k[-1] == '_': k = k[:-1]
                 if callable(v):
                     v = self._register(v)
+                elif isinstance(v, (tuple, list)):
+                    nv = []
+                    for item in v:
+                        if not isinstance(item, (basestring, int)):
+                            break
+                        elif isinstance(item, int):
+                            nv.append('%d' % item)
+                        else:
+                            # format it to proper Tcl code if it contains space
+                            nv.append(('{%s}' if ' ' in item else '%s') % item)
+                    else:
+                        v = ' '.join(nv)
                 res = res + ('-'+k, v)
         return res
     def nametowidget(self, name):
@@ -1094,7 +1104,6 @@ class Misc:
             if self._tclCommands is None:
                 self._tclCommands = []
             self._tclCommands.append(name)
-        #print '+ Tkinter created command', name
         return name
     register = _register
     def _root(self):
@@ -1202,6 +1211,8 @@ class Misc:
     __getitem__ = cget
     def __setitem__(self, key, value):
         self.configure({key: value})
+    def __contains__(self, key):
+        raise TypeError("Tkinter objects don't support 'in' tests.")
     def keys(self):
         """Return a list of all resource names of this widget."""
         return map(lambda x: x[0][1:],
@@ -1747,10 +1758,11 @@ class Pack:
         after=widget - pack it after you have packed widget
         anchor=NSEW (or subset) - position widget according to
                                   given direction
-                before=widget - pack it before you will pack widget
+        before=widget - pack it before you will pack widget
         expand=bool - expand widget if parent size grows
         fill=NONE or X or Y or BOTH - fill widget if widget grows
         in=master - use master to contain this widget
+        in_=master - see 'in' option description
         ipadx=amount - add internal padding in x direction
         ipady=amount - add internal padding in y direction
         padx=amount - add padding in x direction
@@ -1788,29 +1800,26 @@ class Place:
     Base class to use the methods place_* in every widget."""
     def place_configure(self, cnf={}, **kw):
         """Place a widget in the parent widget. Use as options:
-        in=master - master relative to which the widget is placed.
+        in=master - master relative to which the widget is placed
+        in_=master - see 'in' option description
         x=amount - locate anchor of this widget at position x of master
         y=amount - locate anchor of this widget at position y of master
         relx=amount - locate anchor of this widget between 0.0 and 1.0
                       relative to width of master (1.0 is right edge)
-            rely=amount - locate anchor of this widget between 0.0 and 1.0
+        rely=amount - locate anchor of this widget between 0.0 and 1.0
                       relative to height of master (1.0 is bottom edge)
-            anchor=NSEW (or subset) - position anchor according to given direction
+        anchor=NSEW (or subset) - position anchor according to given direction
         width=amount - width of this widget in pixel
         height=amount - height of this widget in pixel
         relwidth=amount - width of this widget between 0.0 and 1.0
                           relative to width of master (1.0 is the same width
-                  as the master)
-            relheight=amount - height of this widget between 0.0 and 1.0
+                          as the master)
+        relheight=amount - height of this widget between 0.0 and 1.0
                            relative to height of master (1.0 is the same
-                   height as the master)
-            bordermode="inside" or "outside" - whether to take border width of master widget
-                                               into account
-            """
-        for k in ['in_']:
-            if kw.has_key(k):
-                kw[k[:-1]] = kw[k]
-                del kw[k]
+                           height as the master)
+        bordermode="inside" or "outside" - whether to take border width of
+                                           master widget into account
+        """
         self.tk.call(
               ('place', 'configure', self._w)
               + self._options(cnf, kw))
@@ -1845,6 +1854,7 @@ class Grid:
         column=number - use cell identified with given column (starting with 0)
         columnspan=number - this widget will span several columns
         in=master - use master to contain this widget
+        in_=master - see 'in' option description
         ipadx=amount - add internal padding in x direction
         ipady=amount - add internal padding in y direction
         padx=amount - add padding in x direction
@@ -2910,8 +2920,7 @@ class Text(Widget):
         and edit_undo
 
         """
-        return self._getints(
-            self.tk.call((self._w, 'edit') + args)) or ()
+        return self.tk.call(self._w, 'edit', *args)
 
     def edit_modified(self, arg=None):
         """Get or Set the modified flag

@@ -163,6 +163,7 @@ class BaseTest(unittest.TestCase):
         a = array.array(self.typecode, 2*self.example)
         self.assertRaises(TypeError, a.tofile)
         self.assertRaises(TypeError, a.tofile, cStringIO.StringIO())
+        test_support.unlink(test_support.TESTFN)
         f = open(test_support.TESTFN, 'wb')
         try:
             a.tofile(f)
@@ -1008,6 +1009,23 @@ tests.append(FloatTest)
 class DoubleTest(FPTest):
     typecode = 'd'
     minitemsize = 8
+
+    def test_alloc_overflow(self):
+        a = array.array('d', [-1]*65536)
+        try:
+            a *= 65536
+        except MemoryError:
+            pass
+        else:
+            self.fail("a *= 2**16 didn't raise MemoryError")
+        b = array.array('d', [ 2.71828183, 3.14159265, -1])
+        try:
+            b * 1431655766
+        except MemoryError:
+            pass
+        else:
+            self.fail("a * 1431655766 didn't raise MemoryError")
+
 tests.append(DoubleTest)
 
 def test_main(verbose=None):

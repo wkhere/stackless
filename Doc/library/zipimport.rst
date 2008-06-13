@@ -65,66 +65,71 @@ zipimporter Objects
 
 .. class:: zipimporter(archivepath)
 
-   Create a new zipimporter instance. *archivepath* must be a path to a ZIP file.
+   Create a new zipimporter instance. *archivepath* must be a path to a ZIP
+   file, or to a specific path within a ZIP file.  For example, an *archivepath*
+   of :file:`foo/bar.zip/lib` will look for modules in the :file:`lib` directory
+   inside the ZIP file :file:`foo/bar.zip` (provided that it exists).
+
    :exc:`ZipImportError` is raised if *archivepath* doesn't point to a valid ZIP
    archive.
 
-   *archivepath* can also contain a path within the ZIP file -- the importer
-   object will then look under that path instead of the ZIP file root.  For
-   example, an *archivepath* of :file:`foo/bar.zip/lib` will look for modules
-   in the :file:`lib` directory inside the ZIP file :file:`foo/bar.zip`
-   (provided that it exists).
+   .. method:: find_module(fullname[, path])
+
+      Search for a module specified by *fullname*. *fullname* must be the fully
+      qualified (dotted) module name. It returns the zipimporter instance itself
+      if the module was found, or :const:`None` if it wasn't. The optional
+      *path* argument is ignored---it's there for compatibility with the
+      importer protocol.
 
 
-.. method:: zipimporter.find_module(fullname[, path])
+   .. method:: get_code(fullname)
 
-   Search for a module specified by *fullname*. *fullname* must be the fully
-   qualified (dotted) module name. It returns the zipimporter instance itself if
-   the module was found, or :const:`None` if it wasn't. The optional *path*
-   argument is ignored---it's there for  compatibility with the importer protocol.
+      Return the code object for the specified module. Raise
+      :exc:`ZipImportError` if the module couldn't be found.
 
 
-.. method:: zipimporter.get_code(fullname)
+   .. method:: get_data(pathname)
 
-   Return the code object for the specified module. Raise :exc:`ZipImportError` if
-   the module couldn't be found.
-
-
-.. method:: zipimporter.get_data(pathname)
-
-   Return the data associated with *pathname*. Raise :exc:`IOError` if the file
-   wasn't found.
+      Return the data associated with *pathname*. Raise :exc:`IOError` if the
+      file wasn't found.
 
 
-.. method:: zipimporter.get_source(fullname)
+   .. method:: get_source(fullname)
 
-   Return the source code for the specified module. Raise :exc:`ZipImportError` if
-   the module couldn't be found, return :const:`None` if the archive does contain
-   the module, but has no source for it.
-
-
-.. method:: zipimporter.is_package(fullname)
-
-   Return True if the module specified by *fullname* is a package. Raise
-   :exc:`ZipImportError` if the module couldn't be found.
+      Return the source code for the specified module. Raise
+      :exc:`ZipImportError` if the module couldn't be found, return
+      :const:`None` if the archive does contain the module, but has no source
+      for it.
 
 
-.. method:: zipimporter.load_module(fullname)
+   .. method:: is_package(fullname)
 
-   Load the module specified by *fullname*. *fullname* must be the fully qualified
-   (dotted) module name. It returns the imported module, or raises
-   :exc:`ZipImportError` if it wasn't found.
-
-
-.. attribute:: zipimporter.archive
-
-   The file name of the importer's associated ZIP file.
+      Return True if the module specified by *fullname* is a package. Raise
+      :exc:`ZipImportError` if the module couldn't be found.
 
 
-.. attribute:: zipimporter.prefix
+   .. method:: load_module(fullname)
 
-   The path within the ZIP file where modules are searched; see
-   :class:`zipimporter` for details.
+      Load the module specified by *fullname*. *fullname* must be the fully
+      qualified (dotted) module name. It returns the imported module, or raises
+      :exc:`ZipImportError` if it wasn't found.
+
+
+   .. attribute:: archive
+
+      The file name of the importer's associated ZIP file, without a possible
+      subpath.
+
+
+   .. attribute:: prefix
+
+      The subpath within the ZIP file where modules are searched.  This is the
+      empty string for zipimporter objects which point to the root of the ZIP
+      file.
+
+   The :attr:`archive` and :attr:`prefix` attributes, when combined with a
+   slash, equal the original *archivepath* argument given to the
+   :class:`zipimporter` constructor.
 
 
 .. _zipimport-examples:

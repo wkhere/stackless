@@ -22,10 +22,12 @@ classes.  In addition, the internal module :mod:`_tkinter` provides a threadsafe
 mechanism which allows Python and Tcl to interact.
 
 :mod:`Tkinter`'s chief virtues are that it is fast, and that it usually comes
-bundled with Python. Although it has been used to create some very good
-applications, including IDLE, it has weak documentation and an outdated look and
-feel. For more modern, better documented, and much more extensive GUI
-libraries, see the :ref:`other-gui-packages` section.
+bundled with Python. Although its standard documentation is weak, good 
+material is available, which includes: references, tutorials, a book and 
+others. :mod:`Tkinter` is also famous for having an outdated look and feel, 
+which has been vastly improved in Tk 8.5. Nevertheless, there are many other 
+GUI libraries that you could be interested in. For more information about 
+alternatives, see the :ref:`other-gui-packages` section.
 
 .. toctree::
    

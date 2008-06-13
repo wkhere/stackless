@@ -6,18 +6,13 @@ import time
 from unittest import TestCase
 from test import test_support
 
-server_port = None
+HOST = test_support.HOST
 
 # This function sets the evt 3 times:
 #  1) when the connection is ready to be accepted.
 #  2) when it is safe for the caller to close the connection
 #  3) when we have closed the socket
-def server(evt):
-    global server_port
-    serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    serv.settimeout(3)
-    serv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_port = test_support.bind_port(serv, "", 9091)
+def server(evt, serv):
     serv.listen(5)
     # (1) Signal the caller that we are ready to accept the connection.
     evt.set()
@@ -39,14 +34,16 @@ class GeneralTests(TestCase):
 
     def setUp(self):
         self.evt = threading.Event()
-        threading.Thread(target=server, args=(self.evt,)).start()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(3)
+        self.port = test_support.bind_port(self.sock)
+        threading.Thread(target=server, args=(self.evt,self.sock)).start()
         # Wait for the server to be ready.
         self.evt.wait()
         self.evt.clear()
-        ftplib.FTP.port = server_port
+        ftplib.FTP.port = self.port
 
     def tearDown(self):
-        # Wait on the closing of the socket (this shouldn't be necessary).
         self.evt.wait()
 
     def testBasic(self):
@@ -54,54 +51,59 @@ class GeneralTests(TestCase):
         ftplib.FTP()
 
         # connects
-        ftp = ftplib.FTP("localhost")
+        ftp = ftplib.FTP(HOST)
         self.evt.wait()
-        ftp.sock.close()
+        ftp.close()
 
     def testTimeoutDefault(self):
-        # default
-        ftp = ftplib.FTP("localhost")
-        self.assertTrue(ftp.sock.gettimeout() is None)
-        self.evt.wait()
-        ftp.sock.close()
-
-    def testTimeoutValue(self):
-        # a value
-        ftp = ftplib.FTP("localhost", timeout=30)
+        # default -- use global socket timeout
+        self.assert_(socket.getdefaulttimeout() is None)
+        socket.setdefaulttimeout(30)
+        try:
+            ftp = ftplib.FTP("localhost")
+        finally:
+            socket.setdefaulttimeout(None)
         self.assertEqual(ftp.sock.gettimeout(), 30)
         self.evt.wait()
-        ftp.sock.close()
-
-    def testTimeoutConnect(self):
-        ftp = ftplib.FTP()
-        ftp.connect("localhost", timeout=30)
-        self.assertEqual(ftp.sock.gettimeout(), 30)
-        self.evt.wait()
-        ftp.sock.close()
-
-    def testTimeoutDifferentOrder(self):
-        ftp = ftplib.FTP(timeout=30)
-        ftp.connect("localhost")
-        self.assertEqual(ftp.sock.gettimeout(), 30)
-        self.evt.wait()
-        ftp.sock.close()
-
-    def testTimeoutDirectAccess(self):
-        ftp = ftplib.FTP()
-        ftp.timeout = 30
-        ftp.connect("localhost")
-        self.assertEqual(ftp.sock.gettimeout(), 30)
-        self.evt.wait()
-        ftp.sock.close()
+        ftp.close()
 
     def testTimeoutNone(self):
-        # None, having other default
-        previous = socket.getdefaulttimeout()
+        # no timeout -- do not use global socket timeout
+        self.assert_(socket.getdefaulttimeout() is None)
         socket.setdefaulttimeout(30)
         try:
             ftp = ftplib.FTP("localhost", timeout=None)
         finally:
-            socket.setdefaulttimeout(previous)
+            socket.setdefaulttimeout(None)
+        self.assertTrue(ftp.sock.gettimeout() is None)
+        self.evt.wait()
+        ftp.close()
+
+    def testTimeoutValue(self):
+        # a value
+        ftp = ftplib.FTP(HOST, timeout=30)
+        self.assertEqual(ftp.sock.gettimeout(), 30)
+        self.evt.wait()
+        ftp.close()
+
+    def testTimeoutConnect(self):
+        ftp = ftplib.FTP()
+        ftp.connect(HOST, timeout=30)
+        self.assertEqual(ftp.sock.gettimeout(), 30)
+        self.evt.wait()
+        ftp.close()
+
+    def testTimeoutDifferentOrder(self):
+        ftp = ftplib.FTP(timeout=30)
+        ftp.connect(HOST)
+        self.assertEqual(ftp.sock.gettimeout(), 30)
+        self.evt.wait()
+        ftp.close()
+
+    def testTimeoutDirectAccess(self):
+        ftp = ftplib.FTP()
+        ftp.timeout = 30
+        ftp.connect(HOST)
         self.assertEqual(ftp.sock.gettimeout(), 30)
         self.evt.wait()
         ftp.close()

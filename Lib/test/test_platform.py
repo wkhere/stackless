@@ -1,6 +1,9 @@
+import sys
+import os
 import unittest
-from test import test_support
 import platform
+
+from test import test_support
 
 class PlatformTest(unittest.TestCase):
     def test_architecture(self):
@@ -49,9 +52,12 @@ class PlatformTest(unittest.TestCase):
 
     def test_uname(self):
         res = platform.uname()
+        self.assert_(any(res))
 
     def test_java_ver(self):
         res = platform.java_ver()
+        if sys.platform == 'java':
+            self.assert_(all(res))
 
     def test_win32_ver(self):
         res = platform.win32_ver()
@@ -59,16 +65,46 @@ class PlatformTest(unittest.TestCase):
     def test_mac_ver(self):
         res = platform.mac_ver()
 
+        try:
+            import gestalt
+        except ImportError:
+            have_toolbox_glue = False
+        else:
+            have_toolbox_glue = True
+
+        if have_toolbox_glue and platform.uname()[0] == 'Darwin':
+            # We're on a MacOSX system, check that
+            # the right version information is returned
+            fd = os.popen('sw_vers', 'r')
+            real_ver = None
+            for ln in fd:
+                if ln.startswith('ProductVersion:'):
+                    real_ver = ln.strip().split()[-1]
+                    break
+            fd.close()
+            self.failIf(real_ver is None)
+            self.assertEquals(res[0], real_ver)
+
+            # res[1] claims to contain
+            # (version, dev_stage, non_release_version)
+            # That information is no longer available
+            self.assertEquals(res[1], ('', '', ''))
+
+            if sys.byteorder == 'little':
+                self.assertEquals(res[2], 'i386')
+            else:
+                self.assertEquals(res[2], 'PowerPC')
+
     def test_dist(self):
         res = platform.dist()
 
     def test_libc_ver(self):
-        from sys import executable
         import os
-        if os.path.isdir(executable) and os.path.exists(executable+'.exe'):
+        if os.path.isdir(sys.executable) and \
+           os.path.exists(sys.executable+'.exe'):
             # Cygwin horror
             executable = executable + '.exe'
-        res = platform.libc_ver(executable)
+        res = platform.libc_ver(sys.executable)
 
 def test_main():
     test_support.run_unittest(

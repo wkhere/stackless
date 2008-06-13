@@ -124,7 +124,7 @@ PyAPI_FUNC(void) _PyImportHooks_Init(void);
 PyAPI_FUNC(int) _PyFrame_Init(void);
 PyAPI_FUNC(int) _PyInt_Init(void);
 PyAPI_FUNC(void) _PyFloat_Init(void);
-PyAPI_FUNC(int) PyBytes_Init(void);
+PyAPI_FUNC(int) PyByteArray_Init(void);
 
 /* Various internal finalizers */
 PyAPI_FUNC(void) _PyExc_Fini(void);
@@ -140,7 +140,7 @@ PyAPI_FUNC(void) PyString_Fini(void);
 PyAPI_FUNC(void) PyInt_Fini(void);
 PyAPI_FUNC(void) PyFloat_Fini(void);
 PyAPI_FUNC(void) PyOS_FiniInterrupts(void);
-PyAPI_FUNC(void) PyBytes_Fini(void);
+PyAPI_FUNC(void) PyByteArray_Fini(void);
 
 /* Stuff with no proper home (yet) */
 PyAPI_FUNC(char *) PyOS_Readline(FILE *, FILE *, char *);
@@ -153,7 +153,7 @@ PyAPI_DATA(PyThreadState*) _PyOS_ReadlineTState;
    to a 8k margin. */
 #define PYOS_STACK_MARGIN 2048
 
-#if defined(WIN32) && !defined(MS_WIN64) && defined(_MSC_VER)
+#if defined(WIN32) && !defined(MS_WIN64) && defined(_MSC_VER) && _MSC_VER >= 1300
 /* Enable stack checking under Microsoft C */
 #define USE_STACKCHECK
 #endif

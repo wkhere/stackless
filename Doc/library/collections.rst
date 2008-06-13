@@ -122,7 +122,7 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
    Since some set operations create new sets, the default mixin methods need
    a way to create new instances from an iterable. The class constructor is
    assumed to have a signature in the form ``ClassName(iterable)``.
-   That assumption is factored-out to a singleinternal classmethod called
+   That assumption is factored-out to an internal classmethod called
    :meth:`_from_iterable` which calls ``cls(iterable)`` to produce a new set.
    If the :class:`Set` mixin is being used in a class with a different
    constructor signature, you will need to override :meth:`from_iterable`
@@ -179,62 +179,63 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
    .. versionchanged:: 2.6
       Added *maxlen* parameter.
 
-Deque objects support the following methods:
+   Deque objects support the following methods:
 
 
-.. method:: deque.append(x)
+   .. method:: append(x)
 
-   Add *x* to the right side of the deque.
-
-
-.. method:: deque.appendleft(x)
-
-   Add *x* to the left side of the deque.
+      Add *x* to the right side of the deque.
 
 
-.. method:: deque.clear()
+   .. method:: appendleft(x)
 
-   Remove all elements from the deque leaving it with length 0.
-
-
-.. method:: deque.extend(iterable)
-
-   Extend the right side of the deque by appending elements from the iterable
-   argument.
+      Add *x* to the left side of the deque.
 
 
-.. method:: deque.extendleft(iterable)
+   .. method:: clear()
 
-   Extend the left side of the deque by appending elements from *iterable*.  Note,
-   the series of left appends results in reversing the order of elements in the
-   iterable argument.
+      Remove all elements from the deque leaving it with length 0.
 
 
-.. method:: deque.pop()
+   .. method:: extend(iterable)
 
-   Remove and return an element from the right side of the deque. If no elements
-   are present, raises an :exc:`IndexError`.
-
-
-.. method:: deque.popleft()
-
-   Remove and return an element from the left side of the deque. If no elements are
-   present, raises an :exc:`IndexError`.
+      Extend the right side of the deque by appending elements from the iterable
+      argument.
 
 
-.. method:: deque.remove(value)
+   .. method:: extendleft(iterable)
 
-   Removed the first occurrence of *value*.  If not found, raises a
-   :exc:`ValueError`.
+      Extend the left side of the deque by appending elements from *iterable*.
+      Note, the series of left appends results in reversing the order of
+      elements in the iterable argument.
 
-   .. versionadded:: 2.5
+
+   .. method:: pop()
+
+      Remove and return an element from the right side of the deque. If no
+      elements are present, raises an :exc:`IndexError`.
 
 
-.. method:: deque.rotate(n)
+   .. method:: popleft()
 
-   Rotate the deque *n* steps to the right.  If *n* is negative, rotate to the
-   left.  Rotating one step to the right is equivalent to:
-   ``d.appendleft(d.pop())``.
+      Remove and return an element from the left side of the deque. If no
+      elements are present, raises an :exc:`IndexError`.
+
+
+   .. method:: remove(value)
+
+      Removed the first occurrence of *value*.  If not found, raises a
+      :exc:`ValueError`.
+
+      .. versionadded:: 2.5
+
+
+   .. method:: rotate(n)
+
+      Rotate the deque *n* steps to the right.  If *n* is negative, rotate to
+      the left.  Rotating one step to the right is equivalent to:
+      ``d.appendleft(d.pop())``.
+
 
 In addition to the above, deques support iteration, pickling, ``len(d)``,
 ``reversed(d)``, ``copy.copy(d)``, ``copy.deepcopy(d)``, membership testing with
@@ -365,33 +366,35 @@ in Unix::
 
    .. versionadded:: 2.5
 
-:class:`defaultdict` objects support the following method in addition to the
-standard :class:`dict` operations:
+   :class:`defaultdict` objects support the following method in addition to the
+   standard :class:`dict` operations:
 
 
-.. method:: defaultdict.__missing__(key)
+   .. method:: defaultdict.__missing__(key)
 
-   If the :attr:`default_factory` attribute is ``None``, this raises an
-   :exc:`KeyError` exception with the *key* as argument.
+      If the :attr:`default_factory` attribute is ``None``, this raises an
+      :exc:`KeyError` exception with the *key* as argument.
 
-   If :attr:`default_factory` is not ``None``, it is called without arguments to
-   provide a default value for the given *key*, this value is inserted in the
-   dictionary for the *key*, and returned.
+      If :attr:`default_factory` is not ``None``, it is called without arguments
+      to provide a default value for the given *key*, this value is inserted in
+      the dictionary for the *key*, and returned.
 
-   If calling :attr:`default_factory` raises an exception this exception is
-   propagated unchanged.
+      If calling :attr:`default_factory` raises an exception this exception is
+      propagated unchanged.
 
-   This method is called by the :meth:`__getitem__` method of the :class:`dict`
-   class when the requested key is not found; whatever it returns or raises is then
-   returned or raised by :meth:`__getitem__`.
-
-:class:`defaultdict` objects support the following instance variable:
+      This method is called by the :meth:`__getitem__` method of the
+      :class:`dict` class when the requested key is not found; whatever it
+      returns or raises is then returned or raised by :meth:`__getitem__`.
 
 
-.. attribute:: defaultdict.default_factory
+   :class:`defaultdict` objects support the following instance variable:
 
-   This attribute is used by the :meth:`__missing__` method; it is initialized from
-   the first argument to the constructor, if present, or to ``None``,  if absent.
+
+   .. attribute:: defaultdict.default_factory
+
+      This attribute is used by the :meth:`__missing__` method; it is
+      initialized from the first argument to the constructor, if present, or to
+      ``None``, if absent.
 
 
 .. _defaultdict-examples:
@@ -536,6 +539,9 @@ Example:
                if kwds:
                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
                return result
+   <BLANKLINE>            
+        def __getnewargs__(self): 
+            return tuple(self)
    <BLANKLINE>
            x = property(itemgetter(0))
            y = property(itemgetter(1))
@@ -566,16 +572,6 @@ by the :mod:`csv` or :mod:`sqlite3` modules::
    cursor.execute('SELECT name, age, title, department, paygrade FROM employees')
    for emp in map(EmployeeRecord._make, cursor.fetchall()):
        print emp.name, emp.title
-
-Named tuples can also be used to generate enumerated constants:
-
-.. testcode::
-
-   def enum(*names):
-       return namedtuple('Enum', ' '.join(names))(*range(len(names)))
-   
-   Status = enum('open', 'pending', 'closed')
-   assert (0, 1, 2) == (Status.open, Status.pending, Status.closed)
 
 In addition to the methods inherited from tuples, named tuples support
 three additional methods and one attribute.  To prevent conflicts with
@@ -670,6 +666,15 @@ customize a prototype instance:
     >>> Account = namedtuple('Account', 'owner balance transaction_count')
     >>> default_account = Account('<owner name>', 0.0, 0)
     >>> johns_account = default_account._replace(owner='John')
+
+Enumerated constants can be implemented with named tuples, but it is simpler
+and more efficient to use a simple class declaration:
+
+    >>> Status = namedtuple('Status', 'open pending closed')._make(range(3))
+    >>> Status.open, Status.pending, Status.closed
+    (0, 1, 2)
+    >>> class Status:
+    ...     open, pending, closed = range(3)
 
 .. rubric:: Footnotes
 

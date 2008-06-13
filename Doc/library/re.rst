@@ -43,6 +43,9 @@ fine-tuning parameters.
       second edition of the book no longer covers Python at all, but the first
       edition covered writing good regular expression patterns in great detail.
 
+   `Kodos <http://kodos.sf.net/>`_
+      is a graphical regular expression debugger written in Python.
+
 
 .. _re-syntax:
 
@@ -177,6 +180,12 @@ The special characters are:
    ``'^'`` elsewhere will simply match the ``'^'`` character.  For example,
    ``[^5]`` will match any character except ``'5'``, and ``[^^]`` will match any
    character except ``'^'``.
+
+   Note that inside ``[]`` the special forms and special characters lose
+   their meanings and only the syntaxes described here are valid. For
+   example, ``+``, ``*``, ``(``, ``)``, and so on are treated as
+   literals inside ``[]``, and backreferences cannot be used inside
+   ``[]``.
 
 ``'|'``
    ``A|B``, where A and B can be arbitrary REs, creates a regular expression that

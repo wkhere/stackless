@@ -44,6 +44,7 @@ try:
     from socket import getfqdn; socket.getfqdn = getfqdn; del getfqdn
 except ImportError:
     import socket
+from socket import _GLOBAL_DEFAULT_TIMEOUT
 
 __all__ = ["FTP","Netrc"]
 
@@ -65,12 +66,11 @@ class error_proto(Error): pass          # response does not begin with [1-5]
 
 # All exceptions (hopefully) that may be raised here and that aren't
 # (always) programming errors on our side
-all_errors = (Error, socket.error, IOError, EOFError)
+all_errors = (Error, IOError, EOFError)
 
 
 # Line terminators (we always output CRLF, but accept any of CRLF, CR, LF)
 CRLF = '\r\n'
-
 
 # The class itself
 class FTP:
@@ -109,14 +109,15 @@ class FTP:
     # Initialize host to localhost, port to standard ftp port
     # Optional arguments are host (for connect()),
     # and user, passwd, acct (for login())
-    def __init__(self, host='', user='', passwd='', acct='', timeout=None):
+    def __init__(self, host='', user='', passwd='', acct='',
+                 timeout=_GLOBAL_DEFAULT_TIMEOUT):
         self.timeout = timeout
         if host:
             self.connect(host)
             if user:
                 self.login(user, passwd, acct)
 
-    def connect(self, host='', port=0, timeout=None):
+    def connect(self, host='', port=0, timeout=-999):
         '''Connect to host.  Arguments are:
          - host: hostname to connect to (string, default previous host)
          - port: port to connect to (integer, default previous port)
@@ -125,7 +126,7 @@ class FTP:
             self.host = host
         if port > 0:
             self.port = port
-        if timeout is not None:
+        if timeout != -999:
             self.timeout = timeout
         self.sock = socket.create_connection((self.host, self.port), self.timeout)
         self.af = self.sock.family

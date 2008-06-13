@@ -722,8 +722,22 @@ def mac_ver(release='',versioninfo=('','',''),machine=''):
         major = (sysv & 0xFF00) >> 8
         minor = (sysv & 0x00F0) >> 4
         patch = (sysv & 0x000F)
-        release = '%s.%i.%i' % (_bcd2str(major),minor,patch)
+
+        if (major, minor) >= (10, 4):
+            # the 'sysv' gestald cannot return patchlevels
+            # higher than 9. Apple introduced 3 new
+            # gestalt codes in 10.4 to deal with this
+            # issue (needed because patch levels can
+            # run higher than 9, such as 10.4.11)
+            major,minor,patch = _mac_ver_lookup(('sys1','sys2','sys3'))
+            release = '%i.%i.%i' %(major, minor, patch)
+        else:
+            release = '%s.%i.%i' % (_bcd2str(major),minor,patch)
+
     if sysu:
+        # NOTE: this block is left as documentation of the
+        # intention of this function, the 'sysu' gestalt is no
+        # longer available and there are no alternatives.
         major =  int((sysu & 0xFF000000L) >> 24)
         minor =  (sysu & 0x00F00000) >> 20
         bugfix = (sysu & 0x000F0000) >> 16
@@ -736,6 +750,8 @@ def mac_ver(release='',versioninfo=('','',''),machine=''):
                  0x60:'beta',
                  0x80:'final'}.get(stage,'')
         versioninfo = (version,stage,nonrel)
+
+
     if sysa:
         machine = {0x1: '68k',
                    0x2: 'PowerPC',
@@ -1074,23 +1090,30 @@ def uname():
 
     """
     global _uname_cache
+    no_os_uname = 0
 
     if _uname_cache is not None:
         return _uname_cache
 
+    processor = ''
+
     # Get some infos from the builtin os.uname API...
     try:
         system,node,release,version,machine = os.uname()
-
     except AttributeError:
-        # Hmm, no uname... we'll have to poke around the system then.
-        system = sys.platform
-        release = ''
-        version = ''
-        node = _node()
-        machine = ''
-        processor = ''
-        use_syscmd_ver = 1
+        no_os_uname = 1
+
+    if no_os_uname or not filter(None, (system, node, release, version, machine)):
+        # Hmm, no there is either no uname or uname has returned
+        #'unknowns'... we'll have to poke around the system then.
+        if no_os_uname:
+            system = sys.platform
+            release = ''
+            version = ''
+            node = _node()
+            machine = ''
+
+        use_syscmd_ver = 01
 
         # Try win32_ver() on win32 platforms
         if system == 'win32':
@@ -1101,8 +1124,10 @@ def uname():
             # available on Win XP and later; see
             # http://support.microsoft.com/kb/888731 and
             # http://www.geocities.com/rick_lively/MANUALS/ENV/MSWIN/PROCESSI.HTM
-            machine = os.environ.get('PROCESSOR_ARCHITECTURE', '')
-            processor = os.environ.get('PROCESSOR_IDENTIFIER', machine)
+            if not machine:
+                machine = os.environ.get('PROCESSOR_ARCHITECTURE', '')
+            if not processor:
+                processor = os.environ.get('PROCESSOR_IDENTIFIER', machine)
 
         # Try the 'ver' system command available on some
         # platforms
@@ -1144,30 +1169,28 @@ def uname():
             release,(version,stage,nonrel),machine = mac_ver()
             system = 'MacOS'
 
-    else:
-        # System specific extensions
-        if system == 'OpenVMS':
-            # OpenVMS seems to have release and version mixed up
-            if not release or release == '0':
-                release = version
-                version = ''
-            # Get processor information
-            try:
-                import vms_lib
-            except ImportError:
-                pass
-            else:
-                csid, cpu_number = vms_lib.getsyi('SYI$_CPU',0)
-                if (cpu_number >= 128):
-                    processor = 'Alpha'
-                else:
-                    processor = 'VAX'
+    # System specific extensions
+    if system == 'OpenVMS':
+        # OpenVMS seems to have release and version mixed up
+        if not release or release == '0':
+            release = version
+            version = ''
+        # Get processor information
+        try:
+            import vms_lib
+        except ImportError:
+            pass
         else:
-            # Get processor information from the uname system command
-            processor = _syscmd_uname('-p','')
+            csid, cpu_number = vms_lib.getsyi('SYI$_CPU',0)
+            if (cpu_number >= 128):
+                processor = 'Alpha'
+            else:
+                processor = 'VAX'
+    if not processor:
+        # Get processor information from the uname system command
+        processor = _syscmd_uname('-p','')
 
-    # 'unknown' is not really any useful as information; we'll convert
-    # it to '' which is more portable
+    #If any unknowns still exist, replace them with ''s, which are more portable
     if system == 'unknown':
         system = ''
     if node == 'unknown':

@@ -1,4 +1,3 @@
-
 :mod:`Cookie` --- HTTP state management
 =======================================
 
@@ -6,6 +5,11 @@
    :synopsis: Support for HTTP state management (cookies).
 .. moduleauthor:: Timothy O'Malley <timo@alum.mit.edu>
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
+
+.. note::
+   The :mod:`Cookie` module has been renamed to :mod:`http.cookies` in Python
+   3.0.  The :term:`2to3` tool will automatically adapt imports when converting
+   your sources to 3.0.
 
 
 The :mod:`Cookie` module defines classes for abstracting the concept of
@@ -17,6 +21,12 @@ The module formerly strictly applied the parsing rules described in the
 :rfc:`2109` and :rfc:`2068` specifications.  It has since been discovered that
 MSIE 3.0x doesn't follow the character rules outlined in those specs.  As a
 result, the parsing rules used are a bit less strict.
+
+.. note::
+
+   On encountering an invalid cookie, :exc:`CookieError` is raised, so if your
+   cookie data comes from a browser you should always prepare for invalid data
+   and catch :exc:`CookieError` on parsing.
 
 
 .. exception:: CookieError

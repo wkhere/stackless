@@ -4,7 +4,10 @@
 
 .. module:: user
    :synopsis: A standard way to reference user-specific modules.
+   :deprecated:
 
+.. deprecated:: 2.6
+   The :mod:`user` module has been removed in Python 3.0.
 
 .. index::
    pair: .pythonrc.py; file

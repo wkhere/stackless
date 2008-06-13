@@ -1,14 +1,19 @@
-
 :mod:`ConfigParser` --- Configuration file parser
 =================================================
 
 .. module:: ConfigParser
    :synopsis: Configuration file parser.
+
 .. moduleauthor:: Ken Manheimer <klm@zope.com>
 .. moduleauthor:: Barry Warsaw <bwarsaw@python.org>
 .. moduleauthor:: Eric S. Raymond <esr@thyrsus.com>
 .. sectionauthor:: Christopher G. Petrilli <petrilli@amber.org>
 
+.. note::
+
+   The :mod:`ConfigParser` module has been renamed to `configparser` in Python
+   3.0.  The :term:`2to3` tool will automatically adapt imports when converting
+   your sources to 3.0.
 
 .. index::
    pair: .ini; file
@@ -371,7 +376,7 @@ An example of writing to a configuration file::
    import ConfigParser
 
    config = ConfigParser.RawConfigParser()
-   
+
    # When adding sections or items, add them in the reverse order of
    # how you want them to be displayed in the actual file.
    # In addition, please note that using RawConfigParser's and the raw
@@ -386,7 +391,7 @@ An example of writing to a configuration file::
    config.set('Section1', 'baz', 'fun')
    config.set('Section1', 'bar', 'Python')
    config.set('Section1', 'foo', '%(bar)s is %(baz)s!')
-   
+
    # Writing our configuration file to 'example.cfg'
    with open('example.cfg', 'wb') as configfile:
        config.write(configfile)
@@ -426,7 +431,7 @@ To get interpolation, you will need to use a :class:`ConfigParser` or
    print config.get('Section1', 'foo', 0, {'bar': 'Documentation',
                                            'baz': 'evil'})
 
-Defaults are available in all three types of ConfigParsers. They are used in 
+Defaults are available in all three types of ConfigParsers. They are used in
 interpolation if an option used is not defined elsewhere. ::
 
    import ConfigParser
@@ -434,7 +439,7 @@ interpolation if an option used is not defined elsewhere. ::
    # New instance with 'bar' and 'baz' defaulting to 'Life' and 'hard' each
    config = ConfigParser.SafeConfigParser({'bar': 'Life', 'baz': 'hard'})
    config.read('example.cfg')
-   
+
    print config.get('Section1', 'foo') # -> "Python is fun!"
    config.remove_option('Section1', 'bar')
    config.remove_option('Section1', 'baz')

@@ -21,6 +21,7 @@ help:
 	@echo "  web       to make file usable by Sphinx.web"
 	@echo "  htmlhelp  to make HTML files and a HTML help project"
 	@echo "  latex     to make LaTeX files, you can set PAPER=a4 or PAPER=letter"
+	@echo "  text      to make plain text files"
 	@echo "  changes   to make an overview over all changed/added/deprecated items"
 	@echo "  linkcheck to check all external links for integrity"
 	@echo "  coverage  to check documentation coverage for library and C API"
@@ -34,6 +35,10 @@ checkout:
 	  echo "Checking out Docutils..."; \
 	  svn checkout $(SVNROOT)/external/docutils-0.4/docutils tools/docutils; \
 	fi
+	@if [ ! -d tools/jinja ]; then \
+	  echo "Checking out Jinja..."; \
+	  svn checkout $(SVNROOT)/external/Jinja-1.1/jinja tools/jinja; \
+	fi
 	@if [ ! -d tools/pygments ]; then \
 	  echo "Checking out Pygments..."; \
 	  svn checkout $(SVNROOT)/external/Pygments-0.9/pygments tools/pygments; \
@@ -42,6 +47,7 @@ checkout:
 update: checkout
 	svn update tools/sphinx
 	svn update tools/docutils
+	svn update tools/jinja
 	svn update tools/pygments
 
 build: checkout
@@ -70,6 +76,10 @@ latex: build
 	@echo "Run \`make all-pdf' or \`make all-ps' in that directory to" \
 	      "run these through (pdf)latex."
 
+text: BUILDER = text
+text: build
+	@echo "Build finished; the text files are in build/text."
+
 changes: BUILDER = changes
 changes: build
 	@echo "The overview file is in build/changes."
@@ -87,6 +97,11 @@ doctest: BUILDER = doctest
 doctest: build
 	@echo "Testing of doctests in the sources finished, look at the " \
 	      "results in build/doctest/output.txt"
+
+pydoc-topics: BUILDER = pydoc-topics
+pydoc-topics: build
+	@echo "Building finished; now copy build/pydoc-topics/pydoc_topics.py " \
+	      "into the Lib/ directory"
 
 clean:
 	-rm -rf build/*

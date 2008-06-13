@@ -118,11 +118,6 @@ typedef struct {
 #define Py_TYPE(ob)		(((PyObject*)(ob))->ob_type)
 #define Py_SIZE(ob)		(((PyVarObject*)(ob))->ob_size)
 
-/* B/w compatibility */
-#define Py_Refcnt(ob)		Py_REFCNT(op)
-#define Py_Type(op)		Py_TYPE(op)
-#define Py_Size(op)		Py_SIZE(op)
-
 /*
 Type objects contain a string containing the type name (to help somewhat
 in debugging), the allocation parameters (see PyObject_New() and
@@ -191,7 +186,6 @@ typedef void (*releasebufferproc)(PyObject *, Py_buffer *);
 #define PyBUF_WRITABLE 0x0001
 /*  we used to include an E, backwards compatible alias  */
 #define PyBUF_WRITEABLE PyBUF_WRITABLE
-#define PyBUF_LOCK 0x0002
 #define PyBUF_FORMAT 0x0004
 #define PyBUF_ND 0x0008
 #define PyBUF_STRIDES (0x0010 | PyBUF_ND)
@@ -202,25 +196,15 @@ typedef void (*releasebufferproc)(PyObject *, Py_buffer *);
 
 #define PyBUF_CONTIG (PyBUF_ND | PyBUF_WRITABLE)
 #define PyBUF_CONTIG_RO (PyBUF_ND)
-#define PyBUF_CONTIG_LCK (PyBUF_ND | PyBUF_LOCK)
-#define PyBUF_CONTIG_XLCK (PyBUF_ND | PyBUF_LOCK | PyBUF_WRITABLE)
 
 #define PyBUF_STRIDED (PyBUF_STRIDES | PyBUF_WRITABLE)
 #define PyBUF_STRIDED_RO (PyBUF_STRIDES)
-#define PyBUF_STRIDED_LCK (PyBUF_STRIDES | PyBUF_LOCK)
-#define PyBUF_STRIDED_XLCK (PyBUF_STRIDES | PyBUF_LOCK | PyBUF_WRITABLE)
 
 #define PyBUF_RECORDS (PyBUF_STRIDES | PyBUF_WRITABLE | PyBUF_FORMAT)
 #define PyBUF_RECORDS_RO (PyBUF_STRIDES | PyBUF_FORMAT)
-#define PyBUF_RECORDS_LCK (PyBUF_STRIDES | PyBUF_LOCK | PyBUF_FORMAT)
-#define PyBUF_RECORDS_XLCK (PyBUF_STRIDES | PyBUF_LOCK | PyBUF_WRITABLE \
-			    | PyBUF_FORMAT)
 
 #define PyBUF_FULL (PyBUF_INDIRECT | PyBUF_WRITABLE | PyBUF_FORMAT)
 #define PyBUF_FULL_RO (PyBUF_INDIRECT | PyBUF_FORMAT)
-#define PyBUF_FULL_LCK (PyBUF_INDIRECT | PyBUF_LOCK | PyBUF_FORMAT)
-#define PyBUF_FULL_XLCK (PyBUF_INDIRECT | PyBUF_LOCK | PyBUF_WRITABLE \
-			 | PyBUF_FORMAT)
 
 
 #define PyBUF_READ  0x100
@@ -491,6 +475,7 @@ PyAPI_FUNC(PyObject *) PyType_GenericNew(PyTypeObject *,
 					       PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) _PyType_Lookup(PyTypeObject *, PyObject *);
 PyAPI_FUNC(unsigned int) PyType_ClearCache(void);
+PyAPI_FUNC(void) PyType_Modified(PyTypeObject *);
 
 /* Generic operations on objects */
 PyAPI_FUNC(int) PyObject_Print(PyObject *, FILE *, int);

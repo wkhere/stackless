@@ -1,11 +1,8 @@
-/* String object implementation */
+/* String (str/bytes) object implementation */
 
 #define PY_SSIZE_T_CLEAN
 
 #include "Python.h"
-
-#include "formatter_string.h"
-
 #include <ctype.h>
 
 #ifdef COUNT_ALLOCS
@@ -55,7 +52,11 @@ PyObject *
 PyString_FromStringAndSize(const char *str, Py_ssize_t size)
 {
 	register PyStringObject *op;
-	assert(size >= 0);
+	if (size < 0) {
+		PyErr_SetString(PyExc_SystemError,
+		    "Negative size passed to PyString_FromStringAndSize");
+		return NULL;
+	}
 	if (size == 0 && (op = nullstring) != NULL) {
 #ifdef COUNT_ALLOCS
 		null_strings++;
@@ -780,6 +781,10 @@ PyString_AsStringAndSize(register PyObject *obj,
 #include "stringlib/find.h"
 #include "stringlib/partition.h"
 
+#define _Py_InsertThousandsGrouping _PyString_InsertThousandsGrouping
+#include "stringlib/localeutil.h"
+
+
 
 static int
 string_print(PyStringObject *op, FILE *fp, int flags)
@@ -953,8 +958,8 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 		if (PyUnicode_Check(bb))
 		    return PyUnicode_Concat((PyObject *)a, bb);
 #endif
-		if (PyBytes_Check(bb))
-		    return PyBytes_Concat((PyObject *)a, bb);
+		if (PyByteArray_Check(bb))
+		    return PyByteArray_Concat((PyObject *)a, bb);
 		PyErr_Format(PyExc_TypeError,
 			     "cannot concatenate 'str' and '%.200s' objects",
 			     Py_TYPE(bb)->tp_name);
@@ -1494,7 +1499,8 @@ PyDoc_STRVAR(split__doc__,
 Return a list of the words in the string S, using sep as the\n\
 delimiter string.  If maxsplit is given, at most maxsplit\n\
 splits are done. If sep is not specified or is None, any\n\
-whitespace string is a separator.");
+whitespace string is a separator and empty strings are removed\n\
+from the result.");
 
 static PyObject *
 string_split(PyStringObject *self, PyObject *args)
@@ -3911,6 +3917,17 @@ string_splitlines(PyStringObject *self, PyObject *args)
     return NULL;
 }
 
+PyDoc_STRVAR(sizeof__doc__,
+"S.__sizeof__() -> size of S in memory, in bytes");
+
+static PyObject *
+string_sizeof(PyStringObject *v)
+{
+	Py_ssize_t res;
+	res = sizeof(PyStringObject) + v->ob_size * v->ob_type->tp_itemsize;
+	return PyInt_FromSsize_t(res);
+}
+
 #undef SPLIT_APPEND
 #undef SPLIT_ADD
 #undef MAX_PREALLOC
@@ -3929,6 +3946,35 @@ PyDoc_STRVAR(format__doc__,
 "S.format(*args, **kwargs) -> unicode\n\
 \n\
 ");
+
+static PyObject *
+string__format__(PyObject* self, PyObject* args)
+{
+    PyObject *format_spec;
+    PyObject *result = NULL;
+    PyObject *tmp = NULL;
+
+    /* If 2.x, convert format_spec to the same type as value */
+    /* This is to allow things like u''.format('') */
+    if (!PyArg_ParseTuple(args, "O:__format__", &format_spec))
+        goto done;
+    if (!(PyString_Check(format_spec) || PyUnicode_Check(format_spec))) {
+        PyErr_Format(PyExc_TypeError, "__format__ arg must be str "
+		     "or unicode, not %s", Py_TYPE(format_spec)->tp_name);
+	goto done;
+    }
+    tmp = PyObject_Str(format_spec);
+    if (tmp == NULL)
+        goto done;
+    format_spec = tmp;
+
+    result = _PyBytes_FormatAdvanced(self,
+				     PyString_AS_STRING(format_spec),
+				     PyString_GET_SIZE(format_spec));
+done:
+    Py_XDECREF(tmp);
+    return result;
+}
 
 PyDoc_STRVAR(p_format__doc__,
 "S.__format__(format_spec) -> unicode\n\
@@ -3989,6 +4035,8 @@ string_methods[] = {
 	 expandtabs__doc__},
 	{"splitlines", (PyCFunction)string_splitlines, METH_VARARGS,
 	 splitlines__doc__},
+	{"__sizeof__", (PyCFunction)string_sizeof, METH_NOARGS,
+	 sizeof__doc__},
 	{"__getnewargs__",	(PyCFunction)string_getnewargs,	METH_NOARGS},
 	{NULL,     NULL}		     /* sentinel */
 };

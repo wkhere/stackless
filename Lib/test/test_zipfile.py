@@ -132,6 +132,25 @@ class TestsWithSourceFile(unittest.TestCase):
         for f in (TESTFN2, TemporaryFile(), StringIO()):
             self.zipOpenTest(f, zipfile.ZIP_STORED)
 
+    def testOpenViaZipInfo(self):
+        # Create the ZIP archive
+        zipfp = zipfile.ZipFile(TESTFN2, "w", zipfile.ZIP_STORED)
+        zipfp.writestr("name", "foo")
+        zipfp.writestr("name", "bar")
+        zipfp.close()
+
+        zipfp = zipfile.ZipFile(TESTFN2, "r")
+        infos = zipfp.infolist()
+        data = ""
+        for info in infos:
+            data += zipfp.open(info).read()
+        self.assert_(data == "foobar" or data == "barfoo")
+        data = ""
+        for info in infos:
+            data += zipfp.read(info)
+        self.assert_(data == "foobar" or data == "barfoo")
+        zipfp.close()
+
     def zipRandomOpenTest(self, f, compression):
         self.makeTestArchive(f, compression)
 
@@ -553,6 +572,17 @@ class PyZipFileTests(unittest.TestCase):
 
 
 class OtherTests(unittest.TestCase):
+    def testUnicodeFilenames(self):
+        zf = zipfile.ZipFile(TESTFN, "w")
+        zf.writestr(u"foo.txt", "Test for unicode filename")
+        zf.writestr(u"\xf6.txt", "Test for unicode filename")
+        self.assertTrue(isinstance(zf.infolist()[0].filename, unicode))
+        zf.close()
+        zf = zipfile.ZipFile(TESTFN, "r")
+        self.assertEqual(zf.filelist[0].filename, "foo.txt")
+        self.assertEqual(zf.filelist[1].filename, u"\xf6.txt")
+        zf.close()
+
     def testCreateNonExistentFileForAppend(self):
         if os.path.exists(TESTFN):
             os.unlink(TESTFN)

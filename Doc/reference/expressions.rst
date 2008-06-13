@@ -663,6 +663,14 @@ slots for which no default value is specified, a :exc:`TypeError` exception is
 raised.  Otherwise, the list of filled slots is used as the argument list for
 the call.
 
+.. note::
+   
+   An implementation may provide builtin functions whose positional parameters do
+   not have names, even if they are 'named' for the purpose of documentation, and
+   which therefore cannot be supplied by keyword.  In CPython, this is the case for
+   functions implemented in C that use :cfunc:`PyArg_ParseTuple` to parse their
+   arguments.
+
 If there are more positional arguments than there are formal parameter slots, a
 :exc:`TypeError` exception is raised, unless a formal parameter using the syntax
 ``*identifier`` is present; in this case, that formal parameter receives a tuple
@@ -936,11 +944,9 @@ by the number of bits given by the second argument.
 
 .. index:: exception: ValueError
 
-A right shift by *n* bits is defined as division by ``pow(2,n)``.  A left shift
-by *n* bits is defined as multiplication with ``pow(2,n)``; for plain integers
-there is no overflow check so in that case the operation drops bits and flips
-the sign if the result is not less than ``pow(2,31)`` in absolute value.
-Negative shift counts raise a :exc:`ValueError` exception.
+A right shift by *n* bits is defined as division by ``pow(2, n)``.  A left shift
+by *n* bits is defined as multiplication with ``pow(2, n)``.  Negative shift
+counts raise a :exc:`ValueError` exception.
 
 
 .. _bitwise:
@@ -1312,10 +1318,9 @@ groups from right to left).
 
 .. rubric:: Footnotes
 
-.. [#] In Python 2.3, a list comprehension "leaks" the control variables of each
-   ``for`` it contains into the containing scope.  However, this behavior is
-   deprecated, and relying on it will not work once this bug is fixed in a future
-   release
+.. [#] In Python 2.3 and later releases, a list comprehension "leaks" the control
+   variables of each ``for`` it contains into the containing scope.  However, this 
+   behavior is deprecated, and relying on it will not work in Python 3.0
 
 .. [#] While ``abs(x%y) < abs(y)`` is true mathematically, for floats it may not be
    true numerically due to roundoff.  For example, and assuming a platform on which

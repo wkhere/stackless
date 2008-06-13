@@ -2,11 +2,15 @@
 
 .. _stringobjects:
 
-String Objects
---------------
+String/Bytes Objects
+--------------------
 
 These functions raise :exc:`TypeError` when expecting a string parameter and are
 called with a non-string parameter.
+
+.. note::
+   These functions have been renamed to PyBytes_* in Python 3.x. The PyBytes
+   names are also available in 2.6.
 
 .. index:: object: string
 
@@ -120,7 +124,7 @@ called with a non-string parameter.
 
 .. cfunction:: PyObject* PyString_FromFormatV(const char *format, va_list vargs)
 
-   Identical to :func:`PyString_FromFormat` except that it takes exactly two
+   Identical to :cfunc:`PyString_FromFormat` except that it takes exactly two
    arguments.
 
 

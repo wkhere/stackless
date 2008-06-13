@@ -40,43 +40,45 @@ The module defines the following items:
 .. class:: FTP([host[, user[, passwd[, acct[, timeout]]]]])
 
    Return a new instance of the :class:`FTP` class.  When *host* is given, the
-   method call ``connect(host)`` is made.  When *user* is given, additionally the
-   method call ``login(user, passwd, acct)`` is made (where *passwd* and *acct*
-   default to the empty string when not given). The optional *timeout* parameter
-   specifies a timeout in seconds for the connection attempt (if is not specified,
-   or passed as None, the global default timeout setting will be used).
+   method call ``connect(host)`` is made.  When *user* is given, additionally
+   the method call ``login(user, passwd, acct)`` is made (where *passwd* and
+   *acct* default to the empty string when not given).  The optional *timeout*
+   parameter specifies a timeout in seconds for blocking operations like the
+   connection attempt (if is not specified, the global default timeout setting
+   will be used).
 
    .. versionchanged:: 2.6
       *timeout* was added.
 
 
-.. data:: all_errors
+   .. attribute:: all_errors
 
-   The set of all exceptions (as a tuple) that methods of :class:`FTP` instances
-   may raise as a result of problems with the FTP connection (as opposed to
-   programming errors made by the caller).  This set includes the four exceptions
-   listed below as well as :exc:`socket.error` and :exc:`IOError`.
-
-
-.. exception:: error_reply
-
-   Exception raised when an unexpected reply is received from the server.
+      The set of all exceptions (as a tuple) that methods of :class:`FTP`
+      instances may raise as a result of problems with the FTP connection (as
+      opposed to programming errors made by the caller).  This set includes the
+      four exceptions listed below as well as :exc:`socket.error` and
+      :exc:`IOError`.
 
 
-.. exception:: error_temp
+   .. exception:: error_reply
 
-   Exception raised when an error code in the range 400--499 is received.
-
-
-.. exception:: error_perm
-
-   Exception raised when an error code in the range 500--599 is received.
+      Exception raised when an unexpected reply is received from the server.
 
 
-.. exception:: error_proto
+   .. exception:: error_temp
 
-   Exception raised when a reply is received from the server that does not begin
-   with a digit in the range 1--5.
+      Exception raised when an error code in the range 400--499 is received.
+
+
+   .. exception:: error_perm
+
+      Exception raised when an error code in the range 500--599 is received.
+
+
+   .. exception:: error_proto
+
+      Exception raised when a reply is received from the server that does not
+      begin with a digit in the range 1--5.
 
 
 .. seealso::
@@ -124,9 +126,8 @@ followed by ``lines`` for the text version or ``binary`` for the binary version.
    made.
 
    The optional *timeout* parameter specifies a timeout in seconds for the
-   connection attempt. If is not specified, or passed as None, the  object timeout
-   is used (the timeout that you passed when instantiating the class); if the
-   object timeout is also None, the global default timeout  setting will be used.
+   connection attempt. If no *timeout* is passed, the global default timeout
+   setting will be used.
 
    .. versionchanged:: 2.6
       *timeout* was added.

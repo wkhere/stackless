@@ -172,10 +172,8 @@ sys_exc_clear(PyObject *self, PyObject *noargs)
 	PyThreadState *tstate;
 	PyObject *tmp_type, *tmp_value, *tmp_tb;
 
-	if (Py_Py3kWarningFlag &&
-	    PyErr_Warn(PyExc_DeprecationWarning,
-		       "sys.exc_clear() not supported in 3.x; "
-		       "use except clauses") < 0)
+	if (PyErr_WarnPy3k("sys.exc_clear() not supported in 3.x; "
+			   "use except clauses", 1) < 0)
 		return NULL;
 
 	tstate = PyThreadState_GET();
@@ -642,6 +640,45 @@ sys_mdebug(PyObject *self, PyObject *args)
 #endif /* USE_MALLOPT */
 
 static PyObject *
+sys_getsizeof(PyObject *self, PyObject *args)
+{
+	static PyObject * str__sizeof__ = NULL;
+
+	/* Initialize static variable needed by _PyType_Lookup */
+	if (str__sizeof__ == NULL) {
+		str__sizeof__ = PyString_InternFromString("__sizeof__");
+		if (str__sizeof__ == NULL)
+			return NULL;
+	}
+
+	/* Type objects */
+	if (PyType_Check(args)){
+		PyObject *method = _PyType_Lookup(Py_TYPE(args),
+						  str__sizeof__);
+		if (method == NULL) {
+			PyErr_Format(PyExc_TypeError,
+				     "Type %.100s doesn't define __sizeof__",
+				     Py_TYPE(args)->tp_name);
+			return NULL;
+		}
+		return PyObject_CallFunctionObjArgs(method, args, NULL);
+	} 
+	/* Instance of old-style classes */
+	else if (PyInstance_Check(args))
+		return PyInt_FromSsize_t(PyInstance_Type.tp_basicsize);
+	/* Old-style classes */
+	else if (PyClass_Check(args))
+		return PyInt_FromSsize_t(PyClass_Type.tp_basicsize);
+	else
+		return PyObject_CallMethod(args, "__sizeof__", NULL);
+}
+
+PyDoc_STRVAR(getsizeof_doc,
+"getsizeof(object) -> int\n\
+\n\
+Return the size of object in bytes.");
+
+static PyObject *
 sys_getrefcount(PyObject *self, PyObject *arg)
 {
 	return PyInt_FromSsize_t(arg->ob_refcnt);
@@ -856,6 +893,7 @@ static PyMethodDef sys_methods[] = {
 	{"getrefcount",	(PyCFunction)sys_getrefcount, METH_O, getrefcount_doc},
 	{"getrecursionlimit", (PyCFunction)sys_getrecursionlimit, METH_NOARGS,
 	 getrecursionlimit_doc},
+ 	{"getsizeof",	sys_getsizeof,  METH_O, getsizeof_doc},
 	{"_getframe", sys_getframe, METH_VARARGS, getframe_doc},
 #ifdef MS_WINDOWS
 	{"getwindowsversion", (PyCFunction)sys_getwindowsversion, METH_NOARGS,
@@ -944,6 +982,12 @@ PySys_AddWarnOption(char *s)
 	}
 }
 
+int
+PySys_HasWarnOptions(void)
+{
+    return (warnoptions != NULL && (PyList_Size(warnoptions) > 0)) ? 1 : 0;
+}
+
 /* XXX This doc string is too long to be a single string literal in VC++ 5.0.
    Two literals concatenated works just fine.  If you have a K&R compiler
    or other abomination that however *does* understand longer strings,
@@ -992,6 +1036,7 @@ PyDoc_STR(
 Static objects:\n\
 \n\
 maxint -- the largest supported integer (the smallest is -maxint-1)\n\
+maxsize -- the largest supported length of containers.\n\
 maxunicode -- the largest supported character\n\
 builtin_module_names -- tuple of module names built into this interpreter\n\
 version -- the version of this interpreter as a string\n\
@@ -1030,6 +1075,7 @@ getdlopenflags() -- returns flags to be used for dlopen() calls\n\
 getprofile() -- get the global profiling function\n\
 getrefcount() -- return the reference count for an object (plus one :-)\n\
 getrecursionlimit() -- return the max recursion depth for the interpreter\n\
+getsizeof() -- return the size of an object in bytes\n\
 gettrace() -- get the global debug tracing function\n\
 setcheckinterval() -- control how often the interpreter checks for events\n\
 setdlopenflags() -- set the flags to be used for dlopen() calls\n\
@@ -1107,7 +1153,7 @@ svnversion_init(void)
 		shortbranch[len] = '\0';
 	}
 	else {
-		Py_FatalError("bad HeadURL");
+		Py_FatalError("bad HeadURL"); 
 		return;
 	}
 
@@ -1164,7 +1210,7 @@ static PyStructSequence_Field flags_fields[] = {
 	{"interactive",		"-i"},
 	{"optimize",		"-O or -OO"},
 	{"dont_write_bytecode",	"-B"},
-	/* {"no_user_site",	"-s"}, */
+	{"no_user_site",	"-s"},
 	{"no_site",		"-S"},
 	{"ignore_environment",	"-E"},
 	{"tabcheck",		"-t or -tt"},
@@ -1175,6 +1221,7 @@ static PyStructSequence_Field flags_fields[] = {
 	/* {"unbuffered",		"-u"}, */
 	{"unicode",		"-U"},
 	/* {"skip_first",		"-x"}, */
+	{"bytes_warning", "-b"},
 	{0}
 };
 
@@ -1183,9 +1230,9 @@ static PyStructSequence_Desc flags_desc = {
 	flags__doc__,	/* doc */
 	flags_fields,	/* fields */
 #ifdef RISCOS
-	14
+	16
 #else
-	13
+	15
 #endif
 };
 
@@ -1210,7 +1257,7 @@ make_flags(void)
 	SetFlag(Py_InteractiveFlag);
 	SetFlag(Py_OptimizeFlag);
 	SetFlag(Py_DontWriteBytecodeFlag);
-	/* SetFlag(Py_NoUserSiteDirectory); */
+	SetFlag(Py_NoUserSiteDirectory);
 	SetFlag(Py_NoSiteFlag);
 	SetFlag(Py_IgnoreEnvironmentFlag);
 	SetFlag(Py_TabcheckFlag);
@@ -1221,6 +1268,7 @@ make_flags(void)
 	/* SetFlag(saw_unbuffered_flag); */
 	SetFlag(Py_UnicodeFlag);
 	/* SetFlag(skipfirstline); */
+    SetFlag(Py_BytesWarningFlag);
 #undef SetFlag
 
 	if (PyErr_Occurred()) {
@@ -1235,9 +1283,6 @@ _PySys_Init(void)
 	PyObject *m, *v, *sysdict;
 	PyObject *sysin, *sysout, *syserr;
 	char *s;
-#ifdef MS_WINDOWS
-	char buf[128];
-#endif
 
 	m = Py_InitModule3("sys", sys_methods, sys_doc);
 	if (m == NULL)
@@ -1275,23 +1320,6 @@ _PySys_Init(void)
 	syserr = PyFile_FromFile(stderr, "<stderr>", "w", _check_and_flush);
 	if (PyErr_Occurred())
 		return NULL;
-#ifdef MS_WINDOWS
-	if(isatty(_fileno(stdin)) && PyFile_Check(sysin)) {
-		sprintf(buf, "cp%d", GetConsoleCP());
-		if (!PyFile_SetEncoding(sysin, buf))
-			return NULL;
-	}
-	if(isatty(_fileno(stdout)) && PyFile_Check(sysout)) {
-		sprintf(buf, "cp%d", GetConsoleOutputCP());
-		if (!PyFile_SetEncoding(sysout, buf))
-			return NULL;
-	}
-	if(isatty(_fileno(stderr)) && PyFile_Check(syserr)) {
-		sprintf(buf, "cp%d", GetConsoleOutputCP());
-		if (!PyFile_SetEncoding(syserr, buf))
-			return NULL;
-	}
-#endif
 
 	PyDict_SetItemString(sysdict, "stdin", sysin);
 	PyDict_SetItemString(sysdict, "stdout", sysout);
@@ -1301,9 +1329,9 @@ _PySys_Init(void)
 	PyDict_SetItemString(sysdict, "__stdout__", sysout);
 	PyDict_SetItemString(sysdict, "__stderr__", syserr);
 	PyDict_SetItemString(sysdict, "__displayhook__",
-                             PyDict_GetItemString(sysdict, "displayhook"));
+			     PyDict_GetItemString(sysdict, "displayhook"));
 	PyDict_SetItemString(sysdict, "__excepthook__",
-                             PyDict_GetItemString(sysdict, "excepthook"));
+			     PyDict_GetItemString(sysdict, "excepthook"));
 	Py_XDECREF(sysin);
 	Py_XDECREF(sysout);
 	Py_XDECREF(syserr);
@@ -1314,10 +1342,10 @@ _PySys_Init(void)
 			     PyInt_FromLong(PY_VERSION_HEX));
 	svnversion_init();
 	SET_SYS_FROM_STRING("subversion",
-			    Py_BuildValue("(ssz)", "CPython", branch,
+			     Py_BuildValue("(ssz)", "CPython", branch,
 					  svn_revision));
 	SET_SYS_FROM_STRING("dont_write_bytecode",
-			    PyBool_FromLong(Py_DontWriteBytecodeFlag));
+			     PyBool_FromLong(Py_DontWriteBytecodeFlag));
 	/*
 	 * These release level checks are mutually exclusive and cover
 	 * the field, so don't get too fancy with the pre-processor!
@@ -1349,6 +1377,8 @@ _PySys_Init(void)
 			    PyString_FromString(Py_GetPrefix()));
 	SET_SYS_FROM_STRING("exec_prefix",
 		   	    PyString_FromString(Py_GetExecPrefix()));
+	SET_SYS_FROM_STRING("maxsize",
+			    PyInt_FromSsize_t(PY_SSIZE_T_MAX));
 	SET_SYS_FROM_STRING("maxint",
 			    PyInt_FromLong(PyInt_GetMax()));
 	SET_SYS_FROM_STRING("py3kwarning",

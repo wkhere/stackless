@@ -3457,16 +3457,16 @@ do_raise(PyObject *type, PyObject *value, PyObject *tb)
 		/* Not something you can raise.  You get an exception
 		   anyway, just not what you specified :-) */
 		PyErr_Format(PyExc_TypeError,
-			     "exceptions must be classes or instances, not %s",
-			     type->ob_type->tp_name);
+			"exceptions must be classes or instances, not %s",
+			type->ob_type->tp_name);
 		goto raise_error;
 	}
 
 	assert(PyExceptionClass_Check(type));
 	if (Py_Py3kWarningFlag && PyClass_Check(type)) {
-		if (PyErr_Warn(PyExc_DeprecationWarning,
-			       "exceptions must derive from BaseException "
-			       "in 3.x") == -1)
+		if (PyErr_WarnEx(PyExc_DeprecationWarning,
+				"exceptions must derive from BaseException "
+				"in 3.x", 1) < 0)
 			goto raise_error;
 	}
 
@@ -4428,7 +4428,7 @@ cmp_outcome(int op, register PyObject *v, register PyObject *w)
 						PyExc_DeprecationWarning,
 						"catching of string "
 						"exceptions is deprecated", 1);
-					if (ret_val == -1)
+					if (ret_val < 0)
 						return NULL;
 				}
 				else if (Py_Py3kWarningFlag  &&
@@ -4439,7 +4439,7 @@ cmp_outcome(int op, register PyObject *v, register PyObject *w)
 					ret_val = PyErr_WarnEx(
 						PyExc_DeprecationWarning,
 						CANNOT_CATCH_MSG, 1);
-					if (ret_val == -1)
+					if (ret_val < 0)
 						return NULL;
 				}
 			}
@@ -4451,7 +4451,7 @@ cmp_outcome(int op, register PyObject *v, register PyObject *w)
 						PyExc_DeprecationWarning,
 						"catching of string "
 						"exceptions is deprecated", 1);
-				if (ret_val == -1)
+				if (ret_val < 0)
 					return NULL;
 			}
 			else if (Py_Py3kWarningFlag  &&
@@ -4462,7 +4462,7 @@ cmp_outcome(int op, register PyObject *v, register PyObject *w)
 				ret_val = PyErr_WarnEx(
 					PyExc_DeprecationWarning,
 					CANNOT_CATCH_MSG, 1);
-				if (ret_val == -1)
+				if (ret_val < 0)
 					return NULL;
 			}
 		}

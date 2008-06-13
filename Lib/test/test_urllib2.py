@@ -2,6 +2,7 @@ import unittest
 from test import test_support
 
 import os
+import socket
 import StringIO
 
 import urllib2
@@ -551,14 +552,15 @@ class HandlerTests(unittest.TestCase):
 
         class NullFTPHandler(urllib2.FTPHandler):
             def __init__(self, data): self.data = data
-            def connect_ftp(self, user, passwd, host, port, dirs, timeout=None):
+            def connect_ftp(self, user, passwd, host, port, dirs,
+                            timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
                 self.user, self.passwd = user, passwd
                 self.host, self.port = host, port
                 self.dirs = dirs
                 self.ftpwrapper = MockFTPWrapper(self.data)
                 return self.ftpwrapper
 
-        import ftplib, socket
+        import ftplib
         data = "rheum rhaponicum"
         h = NullFTPHandler(data)
         o = h.parent = MockOpener()
@@ -691,7 +693,7 @@ class HandlerTests(unittest.TestCase):
                 self.req_headers = []
                 self.data = None
                 self.raise_on_endheaders = False
-            def __call__(self, host, timeout=None):
+            def __call__(self, host, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
                 self.host = host
                 self.timeout = timeout
                 return self
@@ -1062,6 +1064,12 @@ class MiscTests(unittest.TestCase):
         self.opener_has_handler(o, urllib2.HTTPHandler)
         o = build_opener(urllib2.HTTPHandler())
         self.opener_has_handler(o, urllib2.HTTPHandler)
+
+        # Issue2670: multiple handlers sharing the same base class
+        class MyOtherHTTPHandler(urllib2.HTTPHandler): pass
+        o = build_opener(MyHTTPHandler, MyOtherHTTPHandler)
+        self.opener_has_handler(o, MyHTTPHandler)
+        self.opener_has_handler(o, MyOtherHTTPHandler)
 
     def opener_has_handler(self, opener, handler_class):
         for h in opener.handlers:

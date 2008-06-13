@@ -6,6 +6,11 @@
 .. moduleauthor:: Fredrik Lundh <fredrik@pythonware.com>
 .. sectionauthor:: Eric S. Raymond <esr@snark.thyrsus.com>
 
+.. note::
+   The :mod:`xmlrpclib` module has been renamed to :mod:`xmlrpc.client` in
+   Python 3.0.  The :term:`2to3` tool will automatically adapt imports when
+   converting your sources to 3.0.
+
 
 .. XXX Not everything is documented yet.  It might be good to describe
    Marshaller, Unmarshaller, getparser, dumps, loads, and Transport.
@@ -121,6 +126,14 @@ between conformable Python objects and XML on the wire.
    `XML-RPC Introspection <http://xmlrpc-c.sourceforge.net/introspection.html>`_
       Describes the XML-RPC protocol extension for introspection.
 
+   `XML-RPC Specification <http://www.xmlrpc.com/spec>`_
+      The official specification.
+
+   `Unofficial XML-RPC Errata <http://effbot.org/zone/xmlrpc-errata.htm>`_
+      Fredrik Lundh's "unofficial errata, intended to clarify certain
+      details in the XML-RPC specification, as well as hint at
+      'best practices' to use when designing your own XML-RPC
+      implementations."
 
 .. _serverproxy-objects:
 
@@ -289,6 +302,11 @@ internal use by the marshalling/unmarshalling code:
 .. method:: Binary.encode(out)
 
    Write the XML-RPC base 64 encoding of this binary item to the out stream object.
+
+   The encoded data will have newlines every 76 characters as per
+   `RFC 2045 section 6.8 <http://tools.ietf.org/html/rfc2045#section-6.8>`_,
+   which was the de facto standard base64 specification when the
+   XML-RPC spec was written.
 
 It also supports certain of Python's built-in operators through a
 :meth:`__cmp__` method.

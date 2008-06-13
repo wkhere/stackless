@@ -8,13 +8,13 @@
 # that aren't pickleable (module imports are okay, they're removed automatically).
 
 import sys, os, time
-sys.path.append('tools/sphinxext')
+sys.path.append(os.path.abspath('tools/sphinxext'))
 
 # General configuration
 # ---------------------
 
 extensions = ['sphinx.ext.refcounting', 'sphinx.ext.coverage',
-              'sphinx.ext.doctest']
+              'sphinx.ext.doctest', 'pyspecific']
 templates_path = ['tools/sphinxext']
 
 # General substitutions.
@@ -74,9 +74,6 @@ html_last_updated_fmt = '%b %d, %Y'
 # typographically correct entities.
 html_use_smartypants = True
 
-# Content template for the index page, filename relative to this file.
-html_index = 'indexcontent.html'
-
 # Custom sidebar templates, filenames relative to this file.
 html_sidebars = {
     'index': 'indexsidebar.html',
@@ -85,7 +82,14 @@ html_sidebars = {
 # Additional templates that should be rendered to pages.
 html_additional_pages = {
     'download': 'download.html',
+    'index': 'indexcontent.html',
 }
+
+# Output an OpenSearch description file.
+html_use_opensearch = 'http://docs.python.org/dev'
+
+# Additional static files.
+html_static_path = ['tools/sphinxext/static']
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'python' + release.replace('.', '')

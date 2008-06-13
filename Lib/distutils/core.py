@@ -20,6 +20,7 @@ from distutils.util import grok_environment_error
 # Mainly import these so setup scripts can "from distutils.core import" them.
 from distutils.dist import Distribution
 from distutils.cmd import Command
+from distutils.config import PyPIRCCommand
 from distutils.extension import Extension
 
 # This is a barebones help message generated displayed when the user
@@ -210,7 +211,7 @@ def run_setup (script_name, script_args=None, stop_after="run"):
     _setup_stop_after = stop_after
 
     save_argv = sys.argv
-    g = {}
+    g = {'__file__': script_name}
     l = {}
     try:
         try:

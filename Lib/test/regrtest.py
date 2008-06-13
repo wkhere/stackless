@@ -678,10 +678,16 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
 
 def dash_R_cleanup(fs, ps, pic, abcs):
     import gc, copy_reg
-    import _strptime, linecache, dircache
+    import _strptime, linecache
+    dircache = test_support.import_module('dircache', deprecated=True)
     import urlparse, urllib, urllib2, mimetypes, doctest
     import struct, filecmp
     from distutils.dir_util import _path_created
+
+    # Clear the warnings registry, so they can be displayed again
+    for mod in sys.modules.values():
+        if hasattr(mod, '__warningregistry__'):
+            del mod.__warningregistry__
 
     # Restore some original values.
     warnings.filters[:] = fs

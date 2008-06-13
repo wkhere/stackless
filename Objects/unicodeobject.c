@@ -42,8 +42,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
 
-#include "formatter_unicode.h"
-
 #include "unicodeobject.h"
 #include "ucnhash.h"
 
@@ -465,6 +463,13 @@ PyObject *PyUnicode_FromUnicode(const Py_UNICODE *u,
 PyObject *PyUnicode_FromStringAndSize(const char *u, Py_ssize_t size)
 {
     PyUnicodeObject *unicode;
+
+	if (size < 0) {
+		PyErr_SetString(PyExc_SystemError,
+		    "Negative size passed to PyUnicode_FromStringAndSize");
+		return NULL;
+	}
+
     /* If the Unicode data is known at construction time, we can apply
        some optimizations which share commonly used objects.
        Also, this means the input must be UTF-8, so fall back to the
@@ -1077,7 +1082,7 @@ PyObject *PyUnicode_FromEncodedObject(register PyObject *obj,
 	    s = PyString_AS_STRING(obj);
 	    len = PyString_GET_SIZE(obj);
     }
-    else if (PyBytes_Check(obj)) {
+    else if (PyByteArray_Check(obj)) {
         /* Python 2.x specific */
         PyErr_Format(PyExc_TypeError,
                      "decoding bytearray is not supported");
@@ -7311,11 +7316,11 @@ PyObject *PyUnicode_Replace(PyObject *obj,
 }
 
 PyDoc_STRVAR(replace__doc__,
-"S.replace (old, new[, maxsplit]) -> unicode\n\
+"S.replace (old, new[, count]) -> unicode\n\
 \n\
 Return a copy of S with all occurrences of substring\n\
-old replaced by new.  If the optional argument maxsplit is\n\
-given, only the first maxsplit occurrences are replaced.");
+old replaced by new.  If the optional argument count is\n\
+given, only the first count occurrences are replaced.");
 
 static PyObject*
 unicode_replace(PyUnicodeObject *self, PyObject *args)
@@ -7487,8 +7492,9 @@ PyDoc_STRVAR(split__doc__,
 \n\
 Return a list of the words in S, using sep as the\n\
 delimiter string.  If maxsplit is given, at most maxsplit\n\
-splits are done. If sep is not specified or is None,\n\
-any whitespace string is a separator.");
+splits are done. If sep is not specified or is None, any\n\
+whitespace string is a separator and empty strings are\n\
+removed from the result.");
 
 static PyObject*
 unicode_split(PyUnicodeObject *self, PyObject *args)
@@ -7855,11 +7861,63 @@ PyDoc_STRVAR(format__doc__,
 \n\
 ");
 
+static PyObject *
+unicode__format__(PyObject *self, PyObject *args)
+{
+    PyObject *format_spec;
+    PyObject *result = NULL;
+    PyObject *tmp = NULL;
+
+    /* If 2.x, convert format_spec to the same type as value */
+    /* This is to allow things like u''.format('') */
+    if (!PyArg_ParseTuple(args, "O:__format__", &format_spec))
+        goto done;
+    if (!(PyBytes_Check(format_spec) || PyUnicode_Check(format_spec))) {
+        PyErr_Format(PyExc_TypeError, "__format__ arg must be str "
+		     "or unicode, not %s", Py_TYPE(format_spec)->tp_name);
+        goto done;
+    }
+    tmp = PyObject_Unicode(format_spec);
+    if (tmp == NULL)
+        goto done;
+    format_spec = tmp;
+
+    result = _PyUnicode_FormatAdvanced(self,
+                                       PyUnicode_AS_UNICODE(format_spec),
+                                       PyUnicode_GET_SIZE(format_spec));
+done:
+    Py_XDECREF(tmp);
+    return result;
+}
+
 PyDoc_STRVAR(p_format__doc__,
 "S.__format__(format_spec) -> unicode\n\
 \n\
 ");
 
+static PyObject *
+unicode__sizeof__(PyUnicodeObject *v)
+{
+    PyObject *res = NULL, *defsize = NULL;
+
+    res = PyInt_FromSsize_t(sizeof(PyUnicodeObject) +
+                            sizeof(Py_UNICODE) * (v->length + 1));
+    if (v->defenc) {
+        defsize = PyObject_CallMethod(v->defenc, "__sizeof__", NULL);
+        if (defsize == NULL) {
+            Py_DECREF(res);
+            return NULL;
+        }
+        res = PyNumber_Add(res, defsize);
+        Py_DECREF(defsize);
+    }
+    return res;
+}
+
+PyDoc_STRVAR(sizeof__doc__,
+"S.__sizeof__() -> size of S in memory, in bytes\n\
+\n\
+");
 
 static PyObject *
 unicode_getnewargs(PyUnicodeObject *v)
@@ -7917,6 +7975,7 @@ static PyMethodDef unicode_methods[] = {
     {"__format__", (PyCFunction) unicode__format__, METH_VARARGS, p_format__doc__},
     {"_formatter_field_name_split", (PyCFunction) formatter_field_name_split, METH_NOARGS},
     {"_formatter_parser", (PyCFunction) formatter_parser, METH_NOARGS},
+    {"__sizeof__", (PyCFunction) unicode__sizeof__, METH_NOARGS, sizeof__doc__},
 #if 0
     {"capwords", (PyCFunction) unicode_capwords, METH_NOARGS, capwords__doc__},
 #endif
@@ -8644,7 +8703,7 @@ PyObject *PyUnicode_Format(PyObject *format,
 		if (!isnumok) {
 			PyErr_Format(PyExc_TypeError, 
 			    "%%%c format: a number is required, "
-			    "not %.200s", c, Py_TYPE(v)->tp_name);
+                                     "not %.200s", (char)c, Py_TYPE(v)->tp_name);
 			goto onError;
 		}
 		if (flags & F_ZERO)

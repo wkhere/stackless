@@ -380,6 +380,9 @@
 			RelativePath="..\..\Modules\_hotshot.c">
 		</File>
 		<File
+			RelativePath="..\..\Modules\json.c">
+		</File>
+		<File
 			RelativePath="..\..\Modules\_localemodule.c">
 		</File>
 		<File
@@ -398,9 +401,6 @@
 			RelativePath="..\..\Pc\_subprocess.c">
 		</File>
 		<File
-			RelativePath="..\..\Modules\_typesmodule.c">
-		</File>
-		<File
 			RelativePath="..\..\Modules\_weakref.c">
 		</File>
 		<File
@@ -414,6 +414,9 @@
 		</File>
 		<File
 			RelativePath="..\..\Modules\arraymodule.c">
+		</File>
+		<File
+			RelativePath="..\..\Python\_warnings.c">
 		</File>
 		<File
 			RelativePath="..\..\Python\asdl.c">
@@ -440,7 +443,10 @@
 			RelativePath="..\..\Objects\bufferobject.c">
 		</File>
 		<File
-			RelativePath="..\..\Objects\bytesobject.c">
+			RelativePath="..\..\Objects\bytearrayobject.c">
+		</File>
+		<File
+			RelativePath="..\..\Objects\stringobject.c">
 		</File>
 		<File
 			RelativePath="..\..\Objects\bytes_methods.c">
@@ -716,6 +722,9 @@
 			RelativePath="..\..\Python\pyfpe.c">
 		</File>
 		<File
+			RelativePath="..\..\Python\pymath.c">
+		</File>
+		<File
 			RelativePath="..\..\Python\pystate.c">
 		</File>
 		<File
@@ -756,9 +765,6 @@
 		</File>
 		<File
 			RelativePath="..\..\Objects\sliceobject.c">
-		</File>
-		<File
-			RelativePath="..\..\Objects\stringobject.c">
 		</File>
 		<File
 			RelativePath="..\..\Modules\stropmodule.c">

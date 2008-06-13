@@ -7,6 +7,11 @@
    :synopsis: Routines and objects for manipulating the Windows registry.
 .. sectionauthor:: Mark Hammond <MarkH@ActiveState.com>
 
+.. note::
+   The :mod:`_winreg` module has been renamed to :mod:`winreg` in Python 3.0.
+   The :term:`2to3` tool will automatically adapt imports when converting your
+   sources to 3.0.
+
 
 .. versionadded:: 2.0
 
@@ -150,7 +155,7 @@ This module offers the following functions:
    *key* is an already open key, or one of the predefined  :const:`HKEY_\*`
    constants.
 
-   It is not necessary to call RegFlushKey to change a key. Registry changes are
+   It is not necessary to call :func:`FlushKey` to change a key. Registry changes are
    flushed to disk by the registry using its lazy  flusher.  Registry changes are
    also flushed to disk at system  shutdown.  Unlike :func:`CloseKey`, the
    :func:`FlushKey` method  returns only when all the data has been written to the
@@ -163,7 +168,7 @@ This module offers the following functions:
       isn't.
 
 
-.. function:: RegLoadKey(key, sub_key, file_name)
+.. function:: LoadKey(key, sub_key, file_name)
 
    Creates a subkey under the specified key and stores registration  information
    from a specified file into that subkey.

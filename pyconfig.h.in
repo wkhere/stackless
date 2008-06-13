@@ -426,6 +426,9 @@
 /* Define to 1 if you have the `openpty' function. */
 #undef HAVE_OPENPTY
 
+/* Define if compiling using MacOS X 10.5 SDK or later. */
+#undef HAVE_OSX105_SDK
+
 /* Define to 1 if you have the `pathconf' function. */
 #undef HAVE_PATHCONF
 
@@ -688,6 +691,9 @@
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
+/* Define to 1 if you have the <sys/termio.h> header file. */
+#undef HAVE_SYS_TERMIO_H
+
 /* Define to 1 if you have the <sys/times.h> header file. */
 #undef HAVE_SYS_TIMES_H
 
@@ -921,6 +927,9 @@
    (which you can't on SCO ODT 3.0). */
 #undef SYS_SELECT_WITH_SYS_TIME
 
+/* Define if tanh(-0.) is -0., or if platform doesn't have signed zeros */
+#undef TANH_PRESERVES_ZERO_SIGN
+
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #undef TIME_WITH_SYS_TIME
 
@@ -967,22 +976,9 @@
 /* Define to profile with the Pentium timestamp counter */
 #undef WITH_TSC
 
-
- /* Define to 1 if your processor stores words with the most significant byte
-    first (like Motorola and SPARC, unlike Intel and VAX). 
-
-    The block below does compile-time checking for endianness on platforms
-    that use GCC and therefore allows compiling fat binaries on OSX by using 
-    '-arch ppc -arch i386' as the compile flags. The phrasing was choosen
-    such that the configure-result is used on systems that don't use GCC.
-  */
-#ifdef __BIG_ENDIAN__
-#define WORDS_BIGENDIAN 1
-#else
-#ifndef __LITTLE_ENDIAN__
+/* Define to 1 if your processor stores words with the most significant byte
+   first (like Motorola and SPARC, unlike Intel and VAX). */
 #undef WORDS_BIGENDIAN
-#endif
-#endif
 
 /* Define to 1 if on AIX 3.
    System headers sometimes define this.
@@ -996,6 +992,9 @@
 
 /* Define on Irix to enable u_int */
 #undef _BSD_TYPES
+
+/* Define on Darwin to activate all library features */
+#undef _DARWIN_C_SOURCE
 
 /* This must be set to 64 on some systems to enable large file support. */
 #undef _FILE_OFFSET_BITS

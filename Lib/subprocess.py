@@ -357,6 +357,7 @@ import os
 import types
 import traceback
 import gc
+import signal
 
 # Exception classes used by this module.
 class CalledProcessError(Exception):
@@ -384,6 +385,7 @@ if mswindows:
         from win32process import CreateProcess, STARTUPINFO, \
                                  GetExitCodeProcess, STARTF_USESTDHANDLES, \
                                  STARTF_USESHOWWINDOW, CREATE_NEW_CONSOLE
+        from win32process import TerminateProcess
         from win32event import WaitForSingleObject, INFINITE, WAIT_OBJECT_0
     else:
         from _subprocess import *
@@ -659,8 +661,10 @@ class Popen(object):
                 self.stdin.close()
             elif self.stdout:
                 stdout = self.stdout.read()
+                self.stdout.close()
             elif self.stderr:
                 stderr = self.stderr.read()
+                self.stderr.close()
             self.wait()
             return (stdout, stderr)
 
@@ -905,6 +909,21 @@ class Popen(object):
 
             self.wait()
             return (stdout, stderr)
+
+        def send_signal(self, sig):
+            """Send a signal to the process
+            """
+            if sig == signal.SIGTERM:
+                self.terminate()
+            else:
+                raise ValueError("Only SIGTERM is supported on Windows")
+
+        def terminate(self):
+            """Terminates the process
+            """
+            TerminateProcess(self._handle, 1)
+
+        kill = terminate
 
     else:
         #
@@ -1183,6 +1202,21 @@ class Popen(object):
 
             self.wait()
             return (stdout, stderr)
+
+        def send_signal(self, sig):
+            """Send a signal to the process
+            """
+            os.kill(self.pid, sig)
+
+        def terminate(self):
+            """Terminate the process with SIGTERM
+            """
+            self.send_signal(signal.SIGTERM)
+
+        def kill(self):
+            """Kill the process with SIGKILL
+            """
+            self.send_signal(signal.SIGKILL)
 
 
 def _demo_posix():

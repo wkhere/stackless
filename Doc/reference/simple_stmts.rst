@@ -375,8 +375,8 @@ The :keyword:`print` statement
 .. index:: statement: print
 
 .. productionlist::
-   print_stmt: "print" ([`expression` ("," `expression`)* [","]
-             : | ">>" `expression` [("," `expression`)+ [","])
+   print_stmt: "print" ([`expression` ("," `expression`)* [","]]
+             : | ">>" `expression` [("," `expression`)+ [","]])
 
 :keyword:`print` evaluates each expression in turn and writes the resulting
 object to standard output (see below).  If an object is not a string, it is
@@ -501,9 +501,9 @@ clauses to execute.
 
 .. note::
 
-   In Python 2.2, the :keyword:`yield` statement is only allowed when the
-   ``generators`` feature has been enabled.  It will always be enabled in Python
-   2.3.  This ``__future__`` import statement can be used to enable the feature::
+   In Python 2.2, the :keyword:`yield` statement was only allowed when the
+   ``generators`` feature has been enabled.  This ``__future__``
+   import statement was used to enable the feature::
 
       from __future__ import generators
 

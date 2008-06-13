@@ -1,9 +1,13 @@
-
-:mod:`Queue` --- A synchronized queue class
+:mod:`queue` --- A synchronized queue class
 ===========================================
 
 .. module:: Queue
    :synopsis: A synchronized queue class.
+
+.. note::
+   The :mod:`Queue` module has been renamed to :mod:`queue` in Python 3.0.  The
+   :term:`2to3` tool will automatically adapt imports when converting your
+   sources to 3.0.
 
 
 The :mod:`Queue` module implements multi-producer, multi-consumer queues.
@@ -69,7 +73,7 @@ Queue Objects
 -------------
 
 Queue objects (:class:`Queue`, :class:`LifoQueue`, or :class:`PriorityQueue`)
-provide the public methods described below.  
+provide the public methods described below.
 
 
 .. method:: Queue.qsize()
@@ -164,20 +168,20 @@ fully processed by daemon consumer threads.
 
 Example of how to wait for enqueued tasks to be completed::
 
-   def worker(): 
-       while True: 
-           item = q.get() 
-           do_work(item) 
-           q.task_done() 
+   def worker():
+       while True:
+           item = q.get()
+           do_work(item)
+           q.task_done()
 
-   q = Queue() 
-   for i in range(num_worker_threads): 
+   q = Queue()
+   for i in range(num_worker_threads):
         t = Thread(target=worker)
         t.setDaemon(True)
-        t.start() 
+        t.start()
 
    for item in source():
-       q.put(item) 
+       q.put(item)
 
    q.join()       # block until all tasks are done
 

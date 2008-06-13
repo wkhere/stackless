@@ -16,6 +16,14 @@ Glossary
       The typical Python prompt of the interactive shell when entering code for
       an indented code block.
 
+   2to3
+      A tool that tries to convert Python 2.x code to Python 3.x code by
+      handling most of the incompatibilites that can be detected by parsing the
+      source and traversing the parse tree.
+
+      2to3 is available in the standard library as :mod:`lib2to3`; a standalone
+      entry point is provided as :file:`Tools/scripts/2to3`.
+
    argument
       A value passed to a function or method, assigned to a name local to
       the body.  A function or method may have both positional arguments and
@@ -388,9 +396,10 @@ Glossary
       definition), or pass several arguments as a list to a function.  See
       :term:`argument`.
 
-   Python 3000
-      Nickname for the next major Python version, 3.0 (coined long ago when the
-      release of version 3 was something in the distant future.)
+   Python 3000 
+      Nickname for the next major Python version, 3.0 (coined long ago
+      when the release of version 3 was something in the distant future.)  This
+      is also abbreviated "Py3k".
 
    Pythonic
       An idea or piece of code which closely follows the most common idioms of

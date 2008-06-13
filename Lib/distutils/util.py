@@ -30,7 +30,7 @@ def get_platform ():
        irix64-6.2
 
     Windows will return one of:
-       win-x86_64 (64bit Windows on x86_64 (AMD64))
+       win-amd64 (64bit Windows on AMD64 (aka x86_64, Intel64, EM64T, etc)
        win-ia64 (64bit Windows on Itanium)
        win32 (all others - specifically, sys.platform is returned)
 
@@ -45,7 +45,7 @@ def get_platform ():
         j = string.find(sys.version, ")", i)
         look = sys.version[i+len(prefix):j].lower()
         if look=='amd64':
-            return 'win-x86_64'
+            return 'win-amd64'
         if look=='itanium':
             return 'win-ia64'
         return sys.platform
@@ -125,11 +125,18 @@ def get_platform ():
             osname = "macosx"
 
 
-            if (release + '.') < '10.4.' and \
-                    get_config_vars().get('UNIVERSALSDK', '').strip():
+            if (release + '.') >= '10.4.' and \
+                    '-arch' in get_config_vars().get('CFLAGS', '').strip():
                 # The universal build will build fat binaries, but not on
                 # systems before 10.4
+                #
+                # Try to detect 4-way universal builds, those have machine-type
+                # 'universal' instead of 'fat'.
+
                 machine = 'fat'
+
+                if '-arch x86_64' in get_config_vars().get('CFLAGS'):
+                    machine = 'universal'
 
             elif machine in ('PowerPC', 'Power_Macintosh'):
                 # Pick a sane name for the PPC architecture.

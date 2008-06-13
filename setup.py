@@ -5,6 +5,7 @@ __version__ = "$Revision$"
 
 import sys, os, imp, re, optparse
 from glob import glob
+from platform import machine as platform_machine
 
 from distutils import log
 from distutils import sysconfig
@@ -119,6 +120,8 @@ class PyBuildExt(build_ext):
             raise ValueError("No source directory; cannot proceed.")
 
         # Figure out the location of the source code for extension modules
+        # (This logic is copied in distutils.test.test_sysconfig,
+        # so building in a separate directory does not break test_distutils.)
         moddir = os.path.join(os.getcwd(), srcdir, 'Modules')
         moddir = os.path.normpath(moddir)
         srcdir, tail = os.path.split(moddir)
@@ -245,6 +248,19 @@ class PyBuildExt(build_ext):
                 'WARNING: skipping import check for Carbon-based "%s"' %
                 ext.name)
             return
+
+        if self.get_platform() == 'darwin' and (
+                sys.maxint > 2**32 and '-arch' in ext.extra_link_args):
+            # Don't bother doing an import check when an extension was
+            # build with an explicit '-arch' flag on OSX. That's currently
+            # only used to build 32-bit only extensions in a 4-way
+            # universal build and loading 32-bit code into a 64-bit
+            # process will fail.
+            self.announce(
+                'WARNING: skipping import check for "%s"' %
+                ext.name)
+            return
+
         # Workaround for Cygwin: Cygwin currently has fork issues when many
         # modules have been imported
         if self.get_platform() == 'cygwin':
@@ -434,8 +450,12 @@ class PyBuildExt(build_ext):
         exts.append( Extension('operator', ['operator.c']) )
         # Python 3.0 _fileio module
         exts.append( Extension("_fileio", ["_fileio.c"]) )
+        # Python 3.0 _bytesio module
+        exts.append( Extension("_bytesio", ["_bytesio.c"]) )
         # _functools
         exts.append( Extension("_functools", ["_functoolsmodule.c"]) )
+        # _json speedups
+        exts.append( Extension("_json", ["_json.c"]) )
         # Python C API test module
         exts.append( Extension('_testcapi', ['_testcapimodule.c']) )
         # profilers (_lsprof is for cProfile.py)
@@ -534,10 +554,12 @@ class PyBuildExt(build_ext):
 
         # readline
         do_readline = self.compiler.find_library_file(lib_dirs, 'readline')
-        if platform == 'darwin':
+        if platform == 'darwin': # and os.uname()[2] < '9.':
             # MacOSX 10.4 has a broken readline. Don't try to build
             # the readline module unless the user has installed a fixed
             # readline package
+            # FIXME: The readline emulation on 10.5 is better, but the
+            # readline module doesn't compile out of the box.
             if find_file('readline/rlconf.h', inc_dirs, []) is None:
                 do_readline = False
         if do_readline:
@@ -681,12 +703,38 @@ class PyBuildExt(build_ext):
         # a release.  Most open source OSes come with one or more
         # versions of BerkeleyDB already installed.
 
-        max_db_ver = (4, 5)  # XXX(gregory.p.smith): 4.6 "works" but seems to
-                             # have issues on many platforms.  I've temporarily
-                             # disabled 4.6 to see what the odd platform
-                             # buildbots say.
+        max_db_ver = (4, 7)
         min_db_ver = (3, 3)
         db_setup_debug = False   # verbose debug prints from this script?
+
+        def allow_db_ver(db_ver):
+            """Returns a boolean if the given BerkeleyDB version is acceptable.
+
+            Args:
+              db_ver: A tuple of the version to verify.
+            """
+            if not (min_db_ver <= db_ver <= max_db_ver):
+                return False
+            # Use this function to filter out known bad configurations.
+            if (4, 6) == db_ver[:2]:
+                # BerkeleyDB 4.6.x is not stable on many architectures.
+                arch = platform_machine()
+                if arch not in ('i386', 'i486', 'i586', 'i686',
+                                'x86_64', 'ia64'):
+                    return False
+            return True
+
+        def gen_db_minor_ver_nums(major):
+            if major == 4:
+                for x in range(max_db_ver[1]+1):
+                    if allow_db_ver((4, x)):
+                        yield x
+            elif major == 3:
+                for x in (3,):
+                    if allow_db_ver((3, x)):
+                        yield x
+            else:
+                raise ValueError("unknown major BerkeleyDB version", major)
 
         # construct a list of paths to look for the header file in on
         # top of the normal inc_dirs.
@@ -702,7 +750,7 @@ class PyBuildExt(build_ext):
             '/sw/include/db3',
         ]
         # 4.x minor number specific paths
-        for x in range(max_db_ver[1]+1):
+        for x in gen_db_minor_ver_nums(4):
             db_inc_paths.append('/usr/include/db4%d' % x)
             db_inc_paths.append('/usr/include/db4.%d' % x)
             db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
@@ -712,7 +760,7 @@ class PyBuildExt(build_ext):
             # MacPorts default (http://www.macports.org/)
             db_inc_paths.append('/opt/local/include/db4%d' % x)
         # 3.x minor number specific paths
-        for x in (3,):
+        for x in gen_db_minor_ver_nums(3):
             db_inc_paths.append('/usr/include/db3%d' % x)
             db_inc_paths.append('/usr/local/BerkeleyDB.3.%d/include' % x)
             db_inc_paths.append('/usr/local/include/db3%d' % x)
@@ -727,10 +775,10 @@ class PyBuildExt(build_ext):
         for dn in inc_dirs:
             std_variants.append(os.path.join(dn, 'db3'))
             std_variants.append(os.path.join(dn, 'db4'))
-            for x in range(max_db_ver[1]+1):
+            for x in gen_db_minor_ver_nums(4):
                 std_variants.append(os.path.join(dn, "db4%d"%x))
                 std_variants.append(os.path.join(dn, "db4.%d"%x))
-            for x in (3,):
+            for x in gen_db_minor_ver_nums(3):
                 std_variants.append(os.path.join(dn, "db3%d"%x))
                 std_variants.append(os.path.join(dn, "db3.%d"%x))
 
@@ -765,7 +813,7 @@ class PyBuildExt(build_ext):
                                 continue
 
                         if ( (not db_ver_inc_map.has_key(db_ver)) and
-                           (db_ver <= max_db_ver and db_ver >= min_db_ver) ):
+                            allow_db_ver(db_ver) ):
                             # save the include directory with the db.h version
                             # (first occurrence only)
                             db_ver_inc_map[db_ver] = d
@@ -810,8 +858,8 @@ class PyBuildExt(build_ext):
 
         except db_found:
             if db_setup_debug:
-                print "db lib: using", db_ver, dblib
-                print "db: lib dir", dblib_dir, "inc dir", db_incdir
+                print "bsddb using BerkeleyDB lib:", db_ver, dblib
+                print "bsddb lib dir:", dblib_dir, " inc dir:", db_incdir
             db_incs = [db_incdir]
             dblibs = [dblib]
             # We add the runtime_library_dirs argument because the
@@ -1003,7 +1051,7 @@ class PyBuildExt(build_ext):
                 missing.append('resource')
 
             # Sun yellow pages. Some systems have the functions in libc.
-            if platform not in ['cygwin', 'atheos']:
+            if platform not in ['cygwin', 'atheos', 'qnx6']:
                 if (self.compiler.find_library_file(lib_dirs, 'nsl')):
                     libs = ['nsl']
                 else:
@@ -1188,6 +1236,58 @@ class PyBuildExt(build_ext):
         # Thomas Heller's _ctypes module
         self.detect_ctypes(inc_dirs, lib_dirs)
 
+        # Richard Oudkerk's multiprocessing module
+        if platform == 'win32':             # Windows
+            macros = dict()
+            libraries = ['ws2_32']
+
+        elif platform == 'darwin':          # Mac OSX
+            macros = dict(
+                HAVE_SEM_OPEN=1,
+                HAVE_SEM_TIMEDWAIT=0,
+                HAVE_FD_TRANSFER=1,
+                HAVE_BROKEN_SEM_GETVALUE=1
+                )
+            libraries = []
+
+        elif platform == 'cygwin':          # Cygwin
+            macros = dict(
+                HAVE_SEM_OPEN=1,
+                HAVE_SEM_TIMEDWAIT=1,
+                HAVE_FD_TRANSFER=0,
+                HAVE_BROKEN_SEM_UNLINK=1
+                )
+            libraries = []
+        else:                                   # Linux and other unices
+            macros = dict(
+                HAVE_SEM_OPEN=1,
+                HAVE_SEM_TIMEDWAIT=1,
+                HAVE_FD_TRANSFER=1
+                )
+            libraries = ['rt']
+
+        if platform == 'win32':
+            multiprocessing_srcs = [ '_multiprocessing/multiprocessing.c',
+                                     '_multiprocessing/semaphore.c',
+                                     '_multiprocessing/pipe_connection.c',
+                                     '_multiprocessing/socket_connection.c',
+                                     '_multiprocessing/win32_functions.c'
+                                   ]
+
+        else:
+            multiprocessing_srcs = [ '_multiprocessing/multiprocessing.c',
+                                     '_multiprocessing/socket_connection.c'
+                                   ]
+
+            if macros.get('HAVE_SEM_OPEN', False):
+                multiprocessing_srcs.append('_multiprocessing/semaphore.c')
+
+        exts.append ( Extension('_multiprocessing', multiprocessing_srcs,
+                                 define_macros=macros.items(),
+                                 include_dirs=["Modules/_multiprocessing"]))
+        # End multiprocessing
+
+
         # Platform-specific libraries
         if platform == 'linux2':
             # Linux-specific modules
@@ -1271,10 +1371,23 @@ class PyBuildExt(build_ext):
                            '_Dlg', '_Drag', '_Evt', '_File', '_Folder', '_Fm',
                            '_Help', '_Icn', '_IBCarbon', '_List',
                            '_Menu', '_Mlte', '_OSA', '_Res', '_Qd', '_Qdoffs',
-                           '_Scrap', '_Snd', '_TE', '_Win',
+                           '_Scrap', '_Snd', '_TE',
                           ]
             for name in CARBON_EXTS:
                 addMacExtension(name, carbon_kwds)
+
+            # Workaround for a bug in the version of gcc shipped with Xcode 3.
+            # The _Win extension should build just like the other Carbon extensions, but
+            # this actually results in a hard crash of the linker.
+            #
+            if '-arch ppc64' in cflags and '-arch ppc' in cflags:
+                win_kwds = {'extra_compile_args': carbon_extra_compile_args + ['-arch', 'i386', '-arch', 'ppc'],
+                               'extra_link_args': ['-framework', 'Carbon', '-arch', 'i386', '-arch', 'ppc'],
+                           }
+                addMacExtension('_Win', win_kwds)
+            else:
+                addMacExtension('_Win', carbon_kwds)
+
 
             # Application Services & QuickTime
             app_kwds = {'extra_compile_args': carbon_extra_compile_args,
@@ -1342,11 +1455,29 @@ class PyBuildExt(build_ext):
         include_dirs.append('/usr/X11R6/include')
         frameworks = ['-framework', 'Tcl', '-framework', 'Tk']
 
+        # All existing framework builds of Tcl/Tk don't support 64-bit
+        # architectures.
+        cflags = sysconfig.get_config_vars('CFLAGS')[0]
+        archs = re.findall('-arch\s+(\w+)', cflags)
+        if 'x86_64' in archs or 'ppc64' in archs:
+            try:
+                archs.remove('x86_64')
+            except ValueError:
+                pass
+            try:
+                archs.remove('ppc64')
+            except ValueError:
+                pass
+
+            for a in archs:
+                frameworks.append('-arch')
+                frameworks.append(a)
+
         ext = Extension('_tkinter', ['_tkinter.c', 'tkappinit.c'],
                         define_macros=[('WITH_APPINIT', 1)],
                         include_dirs = include_dirs,
                         libraries = [],
-                        extra_compile_args = frameworks,
+                        extra_compile_args = frameworks[2:],
                         extra_link_args = frameworks,
                         )
         self.extensions.append(ext)
@@ -1477,6 +1608,7 @@ class PyBuildExt(build_ext):
                                                   '_ctypes', 'libffi_osx'))
         sources = [os.path.join(ffi_srcdir, p)
                    for p in ['ffi.c',
+                             'x86/darwin64.S',
                              'x86/x86-darwin.S',
                              'x86/x86-ffi_darwin.c',
                              'x86/x86-ffi64.c',
@@ -1573,6 +1705,9 @@ class PyBuildExt(build_ext):
             # compiler, please research a proper solution, instead of
             # finding some -z option for the Sun compiler.
             extra_link_args.append('-mimpure-text')
+
+        elif sys.platform.startswith('hp-ux'):
+            extra_link_args.append('-fPIC')
 
         ext = Extension('_ctypes',
                         include_dirs=include_dirs,

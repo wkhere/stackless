@@ -6,7 +6,6 @@
 
 #include "Python.h"
 #include "longintrepr.h"
-#include "formatter_string.h"
 
 #include <ctype.h>
 
@@ -99,20 +98,27 @@ PyObject *
 PyLong_FromLong(long ival)
 {
 	PyLongObject *v;
+        unsigned long abs_ival;
 	unsigned long t;  /* unsigned so >> doesn't propagate sign bit */
 	int ndigits = 0;
 	int negative = 0;
 
 	if (ival < 0) {
-		ival = -ival;
+		/* if LONG_MIN == -LONG_MAX-1 (true on most platforms) then
+		   ANSI C says that the result of -ival is undefined when ival
+		   == LONG_MIN.  Hence the following workaround. */
+		abs_ival = (unsigned long)(-1-ival) + 1;
 		negative = 1;
+	}
+	else {
+		abs_ival = (unsigned long)ival;
 	}
 
 	/* Count the number of Python digits.
 	   We used to pick 5 ("big enough for anything"), but that's a
 	   waste of time and space given that 5*15 = 75 bits are rarely
 	   needed. */
-	t = (unsigned long)ival;
+	t = abs_ival;
 	while (t) {
 		++ndigits;
 		t >>= PyLong_SHIFT;
@@ -121,7 +127,7 @@ PyLong_FromLong(long ival)
 	if (v != NULL) {
 		digit *p = v->ob_digit;
 		v->ob_size = negative ? -ndigits : ndigits;
-		t = (unsigned long)ival;
+		t = abs_ival;
 		while (t) {
 			*p++ = (digit)(t & PyLong_MASK);
 			t >>= PyLong_SHIFT;
@@ -830,20 +836,26 @@ PyObject *
 PyLong_FromLongLong(PY_LONG_LONG ival)
 {
 	PyLongObject *v;
+	unsigned PY_LONG_LONG abs_ival;
 	unsigned PY_LONG_LONG t;  /* unsigned so >> doesn't propagate sign bit */
 	int ndigits = 0;
 	int negative = 0;
 
 	if (ival < 0) {
-		ival = -ival;
+		/* avoid signed overflow on negation;  see comments
+		   in PyLong_FromLong above. */
+		abs_ival = (unsigned PY_LONG_LONG)(-1-ival) + 1;
 		negative = 1;
+	}
+	else {
+		abs_ival = (unsigned PY_LONG_LONG)ival;
 	}
 
 	/* Count the number of Python digits.
 	   We used to pick 5 ("big enough for anything"), but that's a
 	   waste of time and space given that 5*15 = 75 bits are rarely
 	   needed. */
-	t = (unsigned PY_LONG_LONG)ival;
+	t = abs_ival;
 	while (t) {
 		++ndigits;
 		t >>= PyLong_SHIFT;
@@ -852,7 +864,7 @@ PyLong_FromLongLong(PY_LONG_LONG ival)
 	if (v != NULL) {
 		digit *p = v->ob_digit;
 		Py_SIZE(v) = negative ? -ndigits : ndigits;
-		t = (unsigned PY_LONG_LONG)ival;
+		t = abs_ival;
 		while (t) {
 			*p++ = (digit)(t & PyLong_MASK);
 			t >>= PyLong_SHIFT;
@@ -3401,40 +3413,61 @@ long__format__(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "O:__format__", &format_spec))
 		return NULL;
-	if (PyString_Check(format_spec))
-		return string_long__format__(self, args);
+	if (PyBytes_Check(format_spec))
+		return _PyLong_FormatAdvanced(self,
+					      PyBytes_AS_STRING(format_spec),
+					      PyBytes_GET_SIZE(format_spec));
 	if (PyUnicode_Check(format_spec)) {
 		/* Convert format_spec to a str */
-		PyObject *result = NULL;
-		PyObject *newargs = NULL;
-		PyObject *string_format_spec = NULL;
+		PyObject *result;
+		PyObject *str_spec = PyObject_Str(format_spec);
 
-		string_format_spec = PyObject_Str(format_spec);
-		if (string_format_spec == NULL)
-			goto done;
+		if (str_spec == NULL)
+			return NULL;
 
-		newargs = Py_BuildValue("(O)", string_format_spec);
-		if (newargs == NULL)
-			goto done;
+		result = _PyLong_FormatAdvanced(self,
+						PyBytes_AS_STRING(str_spec),
+						PyBytes_GET_SIZE(str_spec));
 
-		result = string_long__format__(self, newargs);
-
-		done:
-		Py_XDECREF(string_format_spec);
-		Py_XDECREF(newargs);
+		Py_DECREF(str_spec);
 		return result;
 	}
 	PyErr_SetString(PyExc_TypeError, "__format__ requires str or unicode");
 	return NULL;
 }
 
+static PyObject *
+long_sizeof(PyLongObject *v)
+{
+	Py_ssize_t res;
+
+	res = sizeof(PyLongObject) + abs(v->ob_size) * sizeof(digit);
+        if (v->ob_size != 0)
+		res -=  sizeof(digit);
+	return PyInt_FromSsize_t(res);
+}
+
+#if 0
+static PyObject *
+long_is_finite(PyObject *v)
+{
+	Py_RETURN_TRUE;
+}
+#endif
+
 static PyMethodDef long_methods[] = {
 	{"conjugate",	(PyCFunction)long_long,	METH_NOARGS,
 	 "Returns self, the complex conjugate of any long."},
+#if 0
+	{"is_finite",	(PyCFunction)long_is_finite,	METH_NOARGS,
+	 "Returns always True."},
+#endif
 	{"__trunc__",	(PyCFunction)long_long,	METH_NOARGS,
          "Truncating an Integral returns itself."},
 	{"__getnewargs__",	(PyCFunction)long_getnewargs,	METH_NOARGS},
         {"__format__", (PyCFunction)long__format__, METH_VARARGS},
+	{"__sizeof__",	(PyCFunction)long_sizeof, METH_NOARGS,
+	 "Returns size in memory, in bytes"},
 	{NULL,		NULL}		/* sentinel */
 };
 

@@ -1044,7 +1044,7 @@ str(object)         printablerepresentation of an object. Class overridable
 super(type)         Create an unbound super object.  Used to call cooperative
                     superclass methods.
 sum(sequence,       Add the values in the sequence and return the sum.
-    [start]) 
+    [start])
 tuple(sequence)     Creates a tuple with same elements as sequence. If already
                     a tuple, return itself (not a copy).
                     Returns a type object [see module types] representing
@@ -2271,5 +2271,3 @@ Breakpoints are stored as filename, line number tuples. If a module is reloaded
 after editing, any remembered breakpoints are likely to be wrong.
 
 Always single-steps through top-most stack frame. That is, "c" acts like "n".
-
-

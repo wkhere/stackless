@@ -33,7 +33,6 @@ struct method_cache_entry {
 
 static struct method_cache_entry method_cache[1 << MCACHE_SIZE_EXP];
 static unsigned int next_version_tag = 0;
-static void type_modified(PyTypeObject *);
 
 unsigned int
 PyType_ClearCache(void)
@@ -48,12 +47,12 @@ PyType_ClearCache(void)
 	}
 	next_version_tag = 0;
 	/* mark all version tags as invalid */
-	type_modified(&PyBaseObject_Type);
+	PyType_Modified(&PyBaseObject_Type);
 	return cur_version_tag;
 }
 
-static void
-type_modified(PyTypeObject *type)
+void
+PyType_Modified(PyTypeObject *type)
 {
 	/* Invalidate any cached data for the specified type and all
 	   subclasses.  This function is called after the base
@@ -87,7 +86,7 @@ type_modified(PyTypeObject *type)
 			ref = PyList_GET_ITEM(raw, i);
 			ref = PyWeakref_GET_OBJECT(ref);
 			if (ref != Py_None) {
-				type_modified((PyTypeObject *)ref);
+				PyType_Modified((PyTypeObject *)ref);
 			}
 		}
 	}
@@ -173,7 +172,7 @@ assign_version_tag(PyTypeObject *type)
 			Py_INCREF(Py_None);
 		}
 		/* mark all version tags as invalid */
-		type_modified(&PyBaseObject_Type);
+		PyType_Modified(&PyBaseObject_Type);
 		return 1;
 	}
 	bases = type->tp_bases;
@@ -301,7 +300,7 @@ type_set_module(PyTypeObject *type, PyObject *value, void *context)
 		return -1;
 	}
 
-	type_modified(type);
+	PyType_Modified(type);
 
 	return PyDict_SetItemString(type->tp_dict, "__module__", value);
 }
@@ -329,7 +328,7 @@ type_set_abstractmethods(PyTypeObject *type, PyObject *value, void *context)
 	int res = PyDict_SetItemString(type->tp_dict,
 				       "__abstractmethods__", value);
 	if (res == 0) {
-		type_modified(type);
+		PyType_Modified(type);
 		if (value && PyObject_IsTrue(value)) {
 			type->tp_flags |= Py_TPFLAGS_IS_ABSTRACT;
 		}
@@ -609,9 +608,9 @@ type_richcompare(PyObject *v, PyObject *w, int op)
 
 	/* Py3K warning if comparison isn't == or !=  */
 	if (Py_Py3kWarningFlag && op != Py_EQ && op != Py_NE &&
-		PyErr_Warn(PyExc_DeprecationWarning,
+		PyErr_WarnEx(PyExc_DeprecationWarning,
 			   "type inequality comparisons not supported "
-			   "in 3.x") < 0) {
+			   "in 3.x", 1) < 0) {
 		return NULL;
 	}
 
@@ -1628,7 +1627,7 @@ mro_internal(PyTypeObject *type)
 	   from the custom MRO */
 	type_mro_modified(type, type->tp_bases);
 
-	type_modified(type);
+	PyType_Modified(type);
 
 	return 0;
 }
@@ -3104,24 +3103,24 @@ static PyGetSetDef object_getsets[] = {
 */
 
 static PyObject *
-import_copy_reg(void)
+import_copyreg(void)
 {
-	static PyObject *copy_reg_str;
+	static PyObject *copyreg_str;
 
-	if (!copy_reg_str) {
-		copy_reg_str = PyString_InternFromString("copy_reg");
-		if (copy_reg_str == NULL)
+	if (!copyreg_str) {
+		copyreg_str = PyString_InternFromString("copy_reg");
+		if (copyreg_str == NULL)
 			return NULL;
 	}
 
-	return PyImport_Import(copy_reg_str);
+	return PyImport_Import(copyreg_str);
 }
 
 static PyObject *
 slotnames(PyObject *cls)
 {
 	PyObject *clsdict;
-	PyObject *copy_reg;
+	PyObject *copyreg;
 	PyObject *slotnames;
 
 	if (!PyType_Check(cls)) {
@@ -3136,12 +3135,12 @@ slotnames(PyObject *cls)
 		return slotnames;
 	}
 
-	copy_reg = import_copy_reg();
-	if (copy_reg == NULL)
+	copyreg = import_copyreg();
+	if (copyreg == NULL)
 		return NULL;
 
-	slotnames = PyObject_CallMethod(copy_reg, "_slotnames", "O", cls);
-	Py_DECREF(copy_reg);
+	slotnames = PyObject_CallMethod(copyreg, "_slotnames", "O", cls);
+	Py_DECREF(copyreg);
 	if (slotnames != NULL &&
 	    slotnames != Py_None &&
 	    !PyList_Check(slotnames))
@@ -3162,7 +3161,7 @@ reduce_2(PyObject *obj)
 	PyObject *args = NULL, *args2 = NULL;
 	PyObject *getstate = NULL, *state = NULL, *names = NULL;
 	PyObject *slots = NULL, *listitems = NULL, *dictitems = NULL;
-	PyObject *copy_reg = NULL, *newobj = NULL, *res = NULL;
+	PyObject *copyreg = NULL, *newobj = NULL, *res = NULL;
 	Py_ssize_t i, n;
 
 	cls = PyObject_GetAttrString(obj, "__class__");
@@ -3257,10 +3256,10 @@ reduce_2(PyObject *obj)
 			goto end;
 	}
 
-	copy_reg = import_copy_reg();
-	if (copy_reg == NULL)
+	copyreg = import_copyreg();
+	if (copyreg == NULL)
 		goto end;
-	newobj = PyObject_GetAttrString(copy_reg, "__newobj__");
+	newobj = PyObject_GetAttrString(copyreg, "__newobj__");
 	if (newobj == NULL)
 		goto end;
 
@@ -3287,7 +3286,7 @@ reduce_2(PyObject *obj)
 	Py_XDECREF(names);
 	Py_XDECREF(listitems);
 	Py_XDECREF(dictitems);
-	Py_XDECREF(copy_reg);
+	Py_XDECREF(copyreg);
 	Py_XDECREF(newobj);
 	return res;
 }
@@ -3310,17 +3309,17 @@ reduce_2(PyObject *obj)
 static PyObject *
 _common_reduce(PyObject *self, int proto)
 {
-	PyObject *copy_reg, *res;
+	PyObject *copyreg, *res;
 
 	if (proto >= 2)
 		return reduce_2(self);
 
-	copy_reg = import_copy_reg();
-	if (!copy_reg)
+	copyreg = import_copyreg();
+	if (!copyreg)
 		return NULL;
 
-	res = PyEval_CallMethod(copy_reg, "_reduce_ex", "(Oi)", self, proto);
-	Py_DECREF(copy_reg);
+	res = PyEval_CallMethod(copyreg, "_reduce_ex", "(Oi)", self, proto);
+	Py_DECREF(copyreg);
 
 	return res;
 }
@@ -3437,6 +3436,20 @@ object_format(PyObject *self, PyObject *args)
         return result;
 }
 
+static PyObject *
+object_sizeof(PyObject *self, PyObject *args)
+{
+	Py_ssize_t res, isize;
+
+	res = 0;
+	isize = self->ob_type->tp_itemsize;
+	if (isize > 0)
+		res = self->ob_type->ob_size * isize;
+	res += self->ob_type->tp_basicsize;
+
+	return PyInt_FromSsize_t(res);	 
+}
+
 static PyMethodDef object_methods[] = {
 	{"__reduce_ex__", object_reduce_ex, METH_VARARGS,
 	 PyDoc_STR("helper for pickle")},
@@ -3446,6 +3459,8 @@ static PyMethodDef object_methods[] = {
 	 object_subclasshook_doc},
         {"__format__", object_format, METH_VARARGS,
          PyDoc_STR("default object formatter")},
+        {"__sizeof__", object_sizeof, METH_NOARGS,
+         PyDoc_STR("__sizeof__() -> size of object in memory, in bytes")},
 	{0}
 };
 
@@ -6257,7 +6272,7 @@ update_slot(PyTypeObject *type, PyObject *name)
 	   update_subclasses() recursion below, but carefully:
 	   they each have their own conditions on which to stop
 	   recursing into subclasses. */
-	type_modified(type);
+	PyType_Modified(type);
 
 	init_slotdefs();
 	pp = ptrs;

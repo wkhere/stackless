@@ -335,12 +335,13 @@ available.  They are listed here in alphabetical order.
       Using :func:`divmod` with complex numbers is deprecated.
 
 
-.. function:: enumerate(iterable)
+.. function:: enumerate(sequence[, start=0])
 
-   Return an enumerate object. *iterable* must be a sequence, an :term:`iterator`, or some
-   other object which supports iteration.  The :meth:`next` method of the iterator
-   returned by :func:`enumerate` returns a tuple containing a count (from zero) and
-   the corresponding value obtained from iterating over *iterable*.
+   Return an enumerate object. *sequence* must be a sequence, an
+   :term:`iterator`, or some other object which supports iteration.  The
+   :meth:`next` method of the iterator returned by :func:`enumerate` returns a
+   tuple containing a count (from *start* which defaults to 0) and the
+   corresponding value obtained from iterating over *iterable*.
    :func:`enumerate` is useful for obtaining an indexed series: ``(0, seq[0])``,
    ``(1, seq[1])``, ``(2, seq[2])``, .... For example:
 
@@ -352,6 +353,8 @@ available.  They are listed here in alphabetical order.
       3 Winter
 
    .. versionadded:: 2.3
+   .. versionadded:: 2.6
+      The *start* parameter.
 
 
 .. function:: eval(expression[, globals[, locals]])
@@ -710,6 +713,15 @@ available.  They are listed here in alphabetical order.
       Added support for the optional *key* argument.
 
 
+.. function:: next(iterator[, default])
+
+   Retrieve the next item from the *iterator* by calling its :meth:`next`
+   method.  If *default* is given, it is returned if the iterator is exhausted,
+   otherwise :exc:`StopIteration` is raised.
+
+   .. versionadded:: 2.6
+
+
 .. function:: object()
 
    Return a new featureless object.  :class:`object` is a base for all new style
@@ -865,10 +877,15 @@ available.  They are listed here in alphabetical order.
    use is to define a managed attribute x::
 
       class C(object):
-          def __init__(self): self._x = None
-          def getx(self): return self._x
-          def setx(self, value): self._x = value
-          def delx(self): del self._x
+          def __init__(self):
+              self._x = None
+
+          def getx(self):
+              return self._x
+          def setx(self, value):
+              self._x = value
+          def delx(self):
+              del self._x
           x = property(getx, setx, delx, "I'm the 'x' property.")
 
    If given, *doc* will be the docstring of the property attribute. Otherwise, the
@@ -884,13 +901,44 @@ available.  They are listed here in alphabetical order.
               """Get the current voltage."""
               return self._voltage
 
-   turns the :meth:`voltage` method into a "getter" for a read-only attribute with
-   the same name.
+   turns the :meth:`voltage` method into a "getter" for a read-only attribute
+   with the same name.
+
+   A property object has :attr:`getter`, :attr:`setter`, and :attr:`deleter`
+   methods usable as decorators that create a copy of the property with the
+   corresponding accessor function set to the decorated function.  This is
+   best explained with an example::
+
+      class C(object):
+          def __init__(self): self._x = None
+
+          @property
+          def x(self):
+              """I'm the 'x' property."""
+              return self._x
+
+          @x.setter
+          def x(self, value):
+              self._x = value
+
+          @x.deleter
+          def x(self):
+              del self._x
+
+   This code is exactly equivalent to the first example.  Be sure to give the
+   additional functions the same name as the original property (``x`` in this
+   case.)
+
+   The returned property also has the attributes ``fget``, ``fset``, and
+   ``fdel`` corresponding to the constructor arguments.
 
    .. versionadded:: 2.2
 
    .. versionchanged:: 2.5
       Use *fget*'s docstring if no *doc* given.
+
+   .. versionchanged:: 2.6 
+      The ``getter``, ``setter``, and ``deleter`` attributes were added.
 
 
 .. function:: range([start,] stop[, step])
@@ -1354,7 +1402,7 @@ bypass these functions without concerns about missing something important.
    present, it must be a dictionary whose keys are strings.  It specifies keyword
    arguments to be added to the end of the argument list. Calling :func:`apply` is
    different from just calling ``function(args)``, since in that case there is
-   always exactly one argument.  The use of :func:`apply` is exactly equivalent to
+   always exactly one argument.  The use of :func:`apply` is equivalent to
    ``function(*args, **keywords)``.
 
    .. deprecated:: 2.3

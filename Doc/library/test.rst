@@ -185,6 +185,14 @@ tests.
 .. module:: test.test_support
    :synopsis: Support for Python regression tests.
 
+.. note::
+
+   The :mod:`test.test_support` module has been renamed to :mod:`test.support`
+   in Python 3.0.  The :term:`2to3` tool will automatically adapt imports when
+   converting your sources to 3.0.
+
+
+
 
 The :mod:`test.test_support` module provides support for Python's regression
 tests.
@@ -283,13 +291,15 @@ The :mod:`test.test_support` module defines the following functions:
    This will run all tests defined in the named module.
 
 
-.. function:: catch_warning()
+.. function:: catch_warning(record=True)
 
-   This is a context manager that guards the warnings filter from being
+   Return a context manager that guards the warnings filter from being
    permanently changed and records the data of the last warning that has been
-   issued.
+   issued. The ``record`` argument specifies whether any raised warnings are
+   captured by the object returned by :func:`warnings.catch_warning` or allowed
+   to propagate as normal.
 
-   Use like this::
+   The context manager is typically used like this::
 
       with catch_warning() as w:
           warnings.warn("foo")

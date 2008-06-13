@@ -285,7 +285,8 @@ process and user.
 .. function:: strerror(code)
 
    Return the error message corresponding to the error code in *code*.
-   Availability: Unix, Windows.
+   On platforms where :cfunc:`strerror` returns ``NULL`` when given an unknown
+   error number, :exc:`ValueError` is raised.  Availability: Unix, Windows.
 
 
 .. function:: umask(mask)
@@ -716,7 +717,8 @@ platforms.  For descriptions of their availability and use, consult
    combined using the bitwise OR operator ``|``. Availability: Windows.
 
 
-.. data:: O_DIRECT
+.. data:: O_ASYNC
+          O_DIRECT
           O_DIRECTORY
           O_NOFOLLOW
           O_NOATIME
@@ -1464,7 +1466,8 @@ to be ignored.
 
    For :func:`execle`, :func:`execlpe`, :func:`execve`, and :func:`execvpe` (note
    that these all end in "e"), the *env* parameter must be a mapping which is
-   used to define the environment variables for the new process; the :func:`execl`,
+   used to define the environment variables for the new process (these are used
+   instead of the current process' environment); the functions :func:`execl`,
    :func:`execlp`, :func:`execv`, and :func:`execvp` all cause the new process to
    inherit the environment of the current process. Availability: Macintosh, Unix,
    Windows.
@@ -1733,7 +1736,8 @@ written in Python, such as a mail server's external command delivery program.
 
    For :func:`spawnle`, :func:`spawnlpe`, :func:`spawnve`, and :func:`spawnvpe`
    (note that these all end in "e"), the *env* parameter must be a mapping
-   which is used to define the environment variables for the new process; the
+   which is used to define the environment variables for the new process (they are
+   used instead of the current process' environment); the functions
    :func:`spawnl`, :func:`spawnlp`, :func:`spawnv`, and :func:`spawnvp` all cause
    the new process to inherit the environment of the current process.
 
@@ -2027,7 +2031,7 @@ Miscellaneous System Information
 
    Return the number of processes in the system run queue averaged over the last
    1, 5, and 15 minutes or raises :exc:`OSError` if the load average was
-   unobtainable.
+   unobtainable.  Availability: Unix.
 
    .. versionadded:: 2.3
 

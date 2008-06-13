@@ -1,8 +1,11 @@
 dnl Process this with autoconf to create configure
+#
+# file from libffi - slightly patched for ctypes
+#
 
 AC_PREREQ(2.59)
 
-AC_INIT([libffi], [3.0.4], [http://gcc.gnu.org/bugs.html])
+AC_INIT([libffi], [3.0.5], [http://gcc.gnu.org/bugs.html])
 AC_CONFIG_HEADERS([fficonfig.h])
 
 AC_CANONICAL_SYSTEM
@@ -83,6 +86,9 @@ case "$host" in
   i?86-*-solaris2.1[[0-9]]*)
 	TARGET=X86_64; TARGETDIR=x86
 	;;
+  i*86-*-nto-qnx*) 
+        TARGET=X86; TARGETDIR=x86
+        ;;
   i?86-*-*)
 	TARGET=X86; TARGETDIR=x86
 	;;
