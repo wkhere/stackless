@@ -52,7 +52,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="1"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories="..\PC\bdist_wininst;..\Include;..\Modules\zlib;..\Stackless"
+				AdditionalIncludeDirectories="..\PC\bdist_wininst;..\Include;..\Modules\zlib"
 				PreprocessorDefinitions="_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE"
 				StringPooling="true"
 				RuntimeLibrary="2"
@@ -67,7 +67,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="NDEBUG"
 				Culture="0"
-				AdditionalIncludeDirectories="..\PC;..\PC\bdist_wininst;..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\PC;..\PC\bdist_wininst;..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"

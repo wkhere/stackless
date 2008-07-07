@@ -43,7 +43,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
-				AdditionalIncludeDirectories="..\Python;..\Modules\zlib;..\Stackless"
+				AdditionalIncludeDirectories="..\Python;..\Modules\zlib"
 				PreprocessorDefinitions="_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;WIN32"
 				RuntimeLibrary="2"
 			/>
@@ -54,7 +54,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="NDEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -118,7 +118,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
-				AdditionalIncludeDirectories="..\Python;..\Modules\zlib;..\Stackless"
+				AdditionalIncludeDirectories="..\Python;..\Modules\zlib"
 				PreprocessorDefinitions="_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;WIN32"
 				RuntimeLibrary="2"
 			/>
@@ -129,7 +129,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="NDEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -193,7 +193,10 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
-				AdditionalIncludeDirectories="..\Python;..\Modules\zlib;..\Stackless"
+				Optimization="0"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="false"
+				AdditionalIncludeDirectories="..\Python;..\Modules\zlib"
 				PreprocessorDefinitions="_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;WIN32"
 				RuntimeLibrary="3"
 			/>
@@ -204,7 +207,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="_DEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -268,7 +271,10 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
-				AdditionalIncludeDirectories="..\Python;..\Modules\zlib;..\Stackless"
+				Optimization="0"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="false"
+				AdditionalIncludeDirectories="..\Python;..\Modules\zlib"
 				PreprocessorDefinitions="_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;WIN32"
 				RuntimeLibrary="3"
 			/>
@@ -279,7 +285,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="_DEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -342,7 +348,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
-				AdditionalIncludeDirectories="..\Python;..\Modules\zlib;..\Stackless"
+				AdditionalIncludeDirectories="..\Python;..\Modules\zlib"
 				PreprocessorDefinitions="_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;WIN32"
 				RuntimeLibrary="2"
 			/>
@@ -353,7 +359,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="NDEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -417,7 +423,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
-				AdditionalIncludeDirectories="..\Python;..\Modules\zlib;..\Stackless"
+				AdditionalIncludeDirectories="..\Python;..\Modules\zlib"
 				PreprocessorDefinitions="_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;WIN32"
 				RuntimeLibrary="2"
 			/>
@@ -428,7 +434,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="NDEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -492,7 +498,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
-				AdditionalIncludeDirectories="..\Python;..\Modules\zlib;..\Stackless"
+				AdditionalIncludeDirectories="..\Python;..\Modules\zlib"
 				PreprocessorDefinitions="_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;WIN32"
 				RuntimeLibrary="2"
 			/>
@@ -503,7 +509,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="NDEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -567,7 +573,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/Zm200 "
-				AdditionalIncludeDirectories="..\Python;..\Modules\zlib;..\Stackless"
+				AdditionalIncludeDirectories="..\Python;..\Modules\zlib"
 				PreprocessorDefinitions="_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;WIN32"
 				RuntimeLibrary="2"
 			/>
@@ -578,7 +584,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="NDEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="..\Include;..\Stackless"
+				AdditionalIncludeDirectories="..\Include"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
