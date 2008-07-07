@@ -70,7 +70,7 @@ class Fraction(Rational):
                 input = numerator
                 m = _RATIONAL_FORMAT.match(input)
                 if m is None:
-                    raise ValueError('Invalid literal for Fraction: ' + input)
+                    raise ValueError('Invalid literal for Fraction: %r' % input)
                 numerator = m.group('num')
                 decimal = m.group('decimal')
                 if decimal:
@@ -203,7 +203,7 @@ class Fraction(Rational):
 
     def __repr__(self):
         """repr(self)"""
-        return ('Fraction(%r, %r)' % (self._numerator, self._denominator))
+        return ('Fraction(%s, %s)' % (self._numerator, self._denominator))
 
     def __str__(self):
         """str(self)"""

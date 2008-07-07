@@ -91,6 +91,8 @@ resources to test.  Currently only the following are defined:
     curses -    Tests that use curses and will modify the terminal's
                 state and output modes.
 
+    lib2to3 -   Run the tests for 2to3 (They take a while.)
+
     largefile - It is okay to run some test that may create huge
                 files.  These tests can take a long time and may
                 consume >2GB of disk space temporarily.
@@ -165,8 +167,8 @@ if sys.platform == 'darwin':
 
 from test import test_support
 
-RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network', 'bsddb',
-                  'decimal', 'compiler', 'subprocess', 'urlfetch')
+RESOURCE_NAMES = ('audio', 'curses', 'lib2to3', 'largefile', 'network',
+                  'bsddb', 'decimal', 'compiler', 'subprocess', 'urlfetch')
 
 
 def usage(code, msg=''):
@@ -1128,11 +1130,14 @@ class _ExpectedSkips:
                 self.expected.add('test_imageop')
 
             if not sys.platform in ("mac", "darwin"):
-                MAC_ONLY = ["test_macostools", "test_aepack",
+                MAC_ONLY = ["test_macos", "test_macostools", "test_aepack",
                             "test_plistlib", "test_scriptpackages",
                             "test_applesingle"]
                 for skip in MAC_ONLY:
                     self.expected.add(skip)
+            elif len(u'\0'.encode('unicode-internal')) == 4:
+                self.expected.add("test_macostools")
+
 
             if sys.platform != "win32":
                 # test_sqlite is only reliable on Windows where the library

@@ -23,6 +23,10 @@ replace several other, older modules and functions, such as::
 Information about how the :mod:`subprocess` module can be used to replace these
 modules and functions can be found in the following sections.
 
+.. seealso::
+
+   :pep:`324` -- PEP proposing the subprocess module
+
 
 Using the subprocess Module
 ---------------------------
@@ -273,6 +277,8 @@ The following attributes are also available:
    ``N`` (Unix only).
 
 
+.. _subprocess-replacements:
+
 Replacing Older Functions with the subprocess Module
 ----------------------------------------------------
 
@@ -370,13 +376,13 @@ Replacing os.popen\*
 
 ::
 
-   pipe = os.popen(cmd, mode='r', bufsize)
+   pipe = os.popen(cmd, 'r', bufsize)
    ==>
    pipe = Popen(cmd, shell=True, bufsize=bufsize, stdout=PIPE).stdout
 
 ::
 
-   pipe = os.popen(cmd, mode='w', bufsize)
+   pipe = os.popen(cmd, 'w', bufsize)
    ==>
    pipe = Popen(cmd, shell=True, bufsize=bufsize, stdin=PIPE).stdin
 

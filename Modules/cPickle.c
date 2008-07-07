@@ -125,7 +125,7 @@ static PyObject *__class___str, *__getinitargs___str, *__dict___str,
   *__getstate___str, *__setstate___str, *__name___str, *__reduce___str,
   *__reduce_ex___str,
   *write_str, *append_str,
-  *read_str, *readline_str, *__main___str,
+  *read_str, *readline_str, *__main___str, 
   *copyreg_str, *dispatch_table_str;
 
 /*************************************************************************
@@ -341,7 +341,6 @@ typedef struct Picklerobject {
 	int bin;
 
 	int fast; /* Fast mode doesn't save in memo, don't use if circ ref */
-        int nesting;
 	int (*write_func)(struct Picklerobject *, const char *, Py_ssize_t);
 	char *write_buf;
 	int buf_size;
@@ -856,7 +855,7 @@ whichmodule(PyObject *global, PyObject *global_name)
 		*global_name_attr = 0, *name = 0;
 
 	module = PyObject_GetAttrString(global, "__module__");
-	if (module)
+	if (module) 
 		return module;
 	if (PyErr_ExceptionMatches(PyExc_AttributeError))
 		PyErr_Clear();
@@ -1635,7 +1634,12 @@ save_list(Picklerobject *self, PyObject *args)
 	iter = PyObject_GetIter(args);
 	if (iter == NULL)
 		goto finally;
-	res = batch_list(self, iter);
+
+	if (Py_EnterRecursiveCall(" while pickling an object") == 0)
+	{
+		res = batch_list(self, iter);
+		Py_LeaveRecursiveCall();
+	}
 	Py_DECREF(iter);
 
   finally:
@@ -1791,7 +1795,11 @@ save_dict(Picklerobject *self, PyObject *args)
 	iter = PyObject_CallMethod(args, "iteritems", "()");
 	if (iter == NULL)
 		goto finally;
-	res = batch_dict(self, iter);
+	if (Py_EnterRecursiveCall(" while pickling an object") == 0)
+	{
+		res = batch_dict(self, iter);
+		Py_LeaveRecursiveCall();
+	}
 	Py_DECREF(iter);
 
   finally:
@@ -2312,19 +2320,14 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 	int tmp, size;
 
 #ifdef STACKLESS
-	/* for debugging */
-	++self->nesting;
 	/* but we save the stack after a fixed watermark */
 	if (CSTACK_SAVE_NOW(PyThreadState_GET(), self)) {
 		res = slp_safe_pickling((void *)&save, (PyObject *)self, args, pers_save);
 		goto finally;
 	}
 #else
-        if (self->nesting++ > Py_GetRecursionLimit()){
-		PyErr_SetString(PyExc_RuntimeError,
-				"maximum recursion depth exceeded");
-		goto finally;
-	}
+	if (Py_EnterRecursiveCall(" while pickling an object"))
+		return -1;
 #endif
 
 	if (!pers_save && self->pers_func) {
@@ -2381,6 +2384,7 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 			res = save_string(self, args, 0);
 			goto finally;
 		}
+		break;
 
 #ifdef Py_USING_UNICODE
         case 'u':
@@ -2388,6 +2392,7 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 			res = save_unicode(self, args, 0);
 			goto finally;
 		}
+		break;
 #endif
 	}
 
@@ -2584,7 +2589,9 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 	res = save_reduce(self, t, args);
 
   finally:
-	self->nesting--;
+#ifndef STACKLESS
+	Py_LeaveRecursiveCall();
+#endif
 	Py_XDECREF(py_ob_id);
 	Py_XDECREF(__reduce__);
 	Py_XDECREF(t);
@@ -2826,7 +2833,6 @@ newPicklerobject(PyObject *file, int proto)
 	self->inst_pers_func = NULL;
 	self->write_buf = NULL;
 	self->fast = 0;
-        self->nesting = 0;
 	self->fast_container = 0;
 	self->fast_memo = NULL;
 	self->buf_size = 0;

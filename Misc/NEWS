@@ -4,13 +4,99 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.6 beta 1?
+What's New in Python 2.6 beta 2?
 ================================
-
-*Release date: XX-June-2008*
 
 Core and Builtins
 -----------------
+
+- Issue #3242: Fix a crash inside the print statement, if sys.stdout is
+  set to a custom object whose write() method happens to install
+  another file in sys.stdout.
+
+- Issue #3088: Corrected a race condition in classes derived from
+  threading.local: the first member set by a thread could be saved in
+  another thread's dictionary.
+
+- Issue #3004: Minor change to slice.indices(): the start and stop
+  arguments are now treated identically, making the behaviour easier
+  to describe and understand.  For example, slice(None, -10,
+  1).indices(9) now returns (0, 0, 1) instead of (0, -1, 1), and
+  slice(None, 10, -1).indices(10) returns (9, 9, -1) instead of (9,
+  10, -1).
+
+- Issue #3219: Calling a function with repeated keyword arguments, f(a=2, a=23),
+  would not cause a syntax error.  This was regression from 2.4 caused by the
+  switch to the new compiler.
+
+- Issue #2862: Make int and float freelist management consistent with other
+  freelists.  Changes their CompactFreeList apis into ClearFreeList apis and
+  calls them via gc.collect().
+
+Library
+-------
+
+- Issue #839496: SimpleHTTPServer used to open text files in text mode. This is
+  both unnecessary (HTTP allows text content to be sent in several forms) and
+  wrong because the actual transmitted size could differ with the
+  content-length.  The problem had been corrected in the 2.4 branch, but never
+  merged into trunk.
+
+- Issue #2663: add filtering capability to shutil.copytree().
+
+- Issue #1622: Correct interpretation of various ZIP header fields.
+
+- Issue #1526: Allow more than 64k files to be added to Zip64 file.
+
+- Issue #1746: Correct handling of zipfile archive comments (previously
+  archives with comments over 4k were flagged as invalid). Allow writing
+  Zip files with archives by setting the 'comment' attribute of a ZipFile.  
+
+- Issue #449227: Now with the rlcompleter module, callable objects are added
+  "(" when completed.
+
+- Issue #3190: Pydoc now hides the automatic module attribute __package__ (the
+  handling is now the same as that of other special attributes like __name__).
+
+- Issue #2885 (partial): The urllib.urlopen() function has been deprecated for
+  removal in Python 3.0 in favor of urllib2.urlopen().
+
+- Issue #2885 (partial): lib2to3 has been updated to handle the renaming of the
+  urllib module in Python 3.0 to urllib.request, urllib.parse, and
+  urllib.error.
+
+- Issue #2113: Fix error in subprocess.Popen if the select system call is
+  interrupted by a signal.
+
+- Issue #3309: Fix bz2.BZFile itererator to release its internal lock
+  properly when raising an exception due to the bz2file being closed.
+  Prevents a deadlock.
+
+- Issue #3094: httplib.HTTPSConnection Host: headers no longer include the
+  redundant ":443" port number designation when the connection is using the
+  default https port (443).
+
+Build
+-----
+
+- Issue #3215: Build sqlite3 as sqlite3.dll, not sqlite3.pyd.
+
+
+What's New in Python 2.6 beta 1?
+================================
+
+*Release date: 18-June-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3211: warnings.warn_explicit() did not guard against its 'registry'
+  argument being anything other than a dict or None. Also fixed a bug in error
+  handling when 'message' and 'category' were both set to None, triggering a
+  bus error.
+
+- Issue #3100: Corrected a crash on deallocation of a subclassed weakref which
+  holds the last (strong) reference to its referent.
 
 - Add future_builtins.ascii().
 
@@ -50,7 +136,9 @@ Core and Builtins
 Extension Modules
 -----------------
 
-- Issue #2138: Add factorial() the math module.
+- Issue #3116:  marshal.dumps() had quadratic behavior for strings > 32Mb.
+
+- Issue #2138: Add factorial() to the math module.
 
 - The heapq module does comparisons using LT instead of LE.  This
   makes its implementation match that used by list.sort().
@@ -84,6 +172,26 @@ Extension Modules
 Library
 -------
 
+- logging.config: Removed out-of-date comment in _install_handlers and
+  used issubclass in place of equality comparison of classes.
+
+- Issue #2722: Now the os.getcwd() supports very long path names.
+
+- Issue #2888: Fixed the behaviour of pprint when working with nested
+  structures, to match the behaviour of 2.5 and 3.0 (now follows the common
+  sense).
+
+- Issue #1817: cgi now correctly handles the querystring on POST requests
+
+- Issue #3136: fileConfig()'s disabling of old loggers is now conditional via
+  an optional disable_existing_loggers parameter, but the default value is
+  such that the old behaviour is preserved. Thanks to Leandro Lucarella for
+  the patch.
+
+- Issue #3126: StreamHandler and FileHandler check before calling "flush" and
+  "close" that the stream object has these, using hasattr (thanks to bobf for
+  the patch).
+
 - Issue #2912: platform.uname now tries to determine unknown information even if
   os.uname exists.
 
@@ -107,7 +215,7 @@ Library
 
 - Issue #2404: ctypes objects support the new pep3118 buffer interface.
 
-- Patch #2125: Add GetInteger and GetString methods for 
+- Patch #2125: Add GetInteger and GetString methods for
   msilib.Record objects.
 
 - Issue #2782: The datetime module's strftime methods now accept
@@ -294,7 +402,7 @@ Library
 - The Mac Modules (including Carbon) have been deprecated for removal
   in Python 3.0.
 
-- Library: on MacOS X you can now set ``ARCHFLAGS`` in the shell 
+- Library: on MacOS X you can now set ``ARCHFLAGS`` in the shell
   environment to control the '-arch' flags that are used to build
   an extension. This was added for compatibility with Apple's build
   of Python.
@@ -307,7 +415,7 @@ Library
 Build
 -----
 
-- The Windows installer now includes Tk 8.5.
+- The Windows installer now includes Tk 8.5, bzip2 1.0.5, and SQLite 3.5.9.
 
 - Patch #1722225: Support QNX 6.
 

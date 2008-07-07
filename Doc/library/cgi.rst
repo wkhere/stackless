@@ -165,6 +165,8 @@ data part of type :mimetype:`application/x-www-form-urlencoded`), the items will
 actually be instances of the class :class:`MiniFieldStorage`.  In this case, the
 :attr:`list`, :attr:`file`, and :attr:`filename` attributes are always ``None``.
 
+A form submitted via POST that also has a query string will contain both
+:class:`FieldStorage` and :class:`MiniFieldStorage` items.
 
 Higher Level Interface
 ----------------------
@@ -264,9 +266,7 @@ form items are lists of values).  Useful if your form contains multiple fields
 with the same name.
 
 Other classes (:class:`FormContent`, :class:`InterpFormContentDict`) are present
-for backwards compatibility with really old applications only. If you still use
-these and would be inconvenienced when they disappeared from a next version of
-this module, drop me a note.
+for backwards compatibility with really old applications only.
 
 
 .. _functions-in-cgi-module:

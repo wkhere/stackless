@@ -526,13 +526,27 @@ environment variable.
 PEP 371: The ``multiprocessing`` Package
 =====================================================
 
-XXX write this.
+.. XXX I think this still needs help
+
+:mod:`multiprocessing` makes it easy to distribute work over multiple processes.
+Its API is similiar to that of :mod:`threading`.  For example::
+
+    from multiprocessing import Process
+
+    def long_hard_task(n):
+        print n * 43
+
+    for i in range(10):
+        Process(target=long_hard_task, args=(i)).start()
+
+will multiply the numbers between 0 and 10 times 43 and print out the result
+concurrently.
 
 .. seealso::
 
-   :pep:`371` - Per-user ``site-packages`` Directory
+   :pep:`371` - Addition of the multiprocessing package
      PEP written by Jesse Noller and Richard Oudkerk; 
-     implemented by Jesse Noller.
+     implemented by Richard Oudkerk and Jesse Noller.
 
 .. ======================================================================
 
@@ -762,7 +776,7 @@ work.
 PEP 3112: Byte Literals
 =====================================================
 
-Python 3.0 adopts Unicode as the language's fundamental string type, and
+Python 3.0 adopts Unicode as the language's fundamental string type and
 denotes 8-bit literals differently, either as ``b'string'``
 or using a :class:`bytes` constructor.  For future compatibility,
 Python 2.6 adds :class:`bytes` as a synonym for the :class:`str` type,
@@ -780,7 +794,38 @@ can be used to include Unicode characters::
 
     print len(s)               # 12 Unicode characters
 
+At the C level, Python 3.0 will rename the existing 8-bit 
+string type, called :ctype:`PyStringObject` in Python 2.x, 
+to :ctype:`PyBytesObject`.  Python 2.6 uses ``#define``
+to support using the names :cfunc:`PyBytesObject`, 
+:cfunc:`PyBytes_Check`, :cfunc:`PyBytes_FromStringAndSize`,
+and all the other functions and macros used with strings.
 
+Instances of the :class:`bytes` type are immutable just 
+as strings are.  A new :class:`bytearray` type stores a mutable 
+sequence of bytes::
+
+    >>> bytearray([65, 66, 67])
+    bytearray(b'ABC')
+    >>> b = bytearray(u'\u21ef\u3244', 'utf-8')
+    >>> b
+    bytearray(b'\xe2\x87\xaf \xe3\x89\x84')
+    >>> b[0] = '\xe3'
+    >>> b
+    bytearray(b'\xe3\x87\xaf \xe3\x89\x84')
+    >>> unicode(str(b), 'utf-8')
+    u'\u31ef \u3244'
+
+Byte arrays support most of the methods of string types, such as 
+:meth:`startswith`/:meth:`endswith`, :meth:`find`/:meth:`rfind`,
+and some of the methods of lists, such as :meth:`append`, 
+:meth:`pop`,  and :meth:`reverse`.
+
+    >>> b = bytearray('ABC')
+    >>> b.append('d')
+    >>> b.append(ord('e'))
+    >>> b
+    bytearray(b'ABCde')
 
 .. seealso::
 
@@ -1205,11 +1250,11 @@ one, :func:`math.trunc`, that's been backported to Python 2.6.
 The :mod:`fractions` Module
 --------------------------------------------------
 
-To fill out the hierarchy of numeric types, a rational-number class
-has been added as the :mod:`fractions` module.  Rational numbers are
-represented as a fraction, and can exactly represent
-numbers such as two-thirds that floating-point numbers can only
-approximate.
+To fill out the hierarchy of numeric types, a rational-number class is
+provided by the :mod:`fractions` module.  Rational numbers store their
+values as a numerator and denominator forming a fraction, and can
+exactly represent numbers such as ``2/3`` that floating-point numbers
+can only approximate.
 
 The :class:`Fraction` constructor takes two :class:`Integral` values
 that will be the numerator and denominator of the resulting fraction. ::
@@ -1251,6 +1296,14 @@ Other Language Changes
 ======================
 
 Here are all of the changes that Python 2.6 makes to the core Python language.
+
+* The :func:`hasattr` function was catching and ignoring all errors,
+  under the assumption that they meant a :meth:`__getattr__` method
+  was failing somewhere and the return value of :func:`hasattr` would
+  therefore be ``False``.  This logic shouldn't be applied to
+  :exc:`KeyboardInterrupt` and :exc:`SystemExit`, however; Python 2.6
+  will no longer discard such exceptions when :func:`hasattr`
+  encounters them.  (Fixed by Benjamin Peterson; :issue:`2196`.)
 
 * When calling a function using the ``**`` syntax to provide keyword
   arguments, you are no longer required to use a Python dictionary;
@@ -1313,22 +1366,30 @@ Here are all of the changes that Python 2.6 makes to the core Python language.
         def x(self, value):
             self._x = value / 2
 
+* Several methods of the built-in set types now accept multiple iterables:
+  :meth:`intersection`, 
+  :meth:`intersection_update`, 
+  :meth:`union`, :meth:`update`,
+  :meth:`difference` and :meth:`difference_update`.
 
-* C functions and methods that use
-  :cfunc:`PyComplex_AsCComplex` will now accept arguments that
-  have a :meth:`__complex__` method.  In particular, the functions in the
-  :mod:`cmath` module will now accept objects with this method.
-  This is a backport of a Python 3.0 change.
-  (Contributed by Mark Dickinson; :issue:`1675423`.)
+  ::
 
-  A numerical nicety: when creating a complex number from two floats
+    >>> s=set('1234567890')
+    >>> s.intersection('abc123', 'cdf246')  # Intersection between all inputs
+    set(['2'])
+    >>> s.difference('246', '789')
+    set(['1', '0', '3', '5'])
+
+  (Contributed by Raymond Hettinger.)
+
+* A numerical nicety: when creating a complex number from two floats
   on systems that support signed zeros (-0 and +0), the
   :func:`complex` constructor will now preserve the sign
-  of the zero.  (:issue:`1507`)
+  of the zero.  (Fixed by Mark T. Dickinson; :issue:`1507`)
 
 * More floating-point features were also added.  The :func:`float` function
-  will now turn the strings ``+nan`` and ``-nan`` into the corresponding
-  IEEE 754 Not A Number values, and ``+inf`` and ``-inf`` into
+  will now turn the string ``nan`` into an
+  IEEE 754 Not A Number value, and ``+inf`` and ``-inf`` into
   positive or negative infinity.  This works on any platform with
   IEEE 754 semantics.  (Contributed by Christian Heimes; :issue:`1635`.)
 
@@ -1336,28 +1397,34 @@ Here are all of the changes that Python 2.6 makes to the core Python language.
   :func:`isnan`, return true if their floating-point argument is
   infinite or Not A Number.  (:issue:`1640`)
 
-* The :mod:`math` module has seven new functions, and the existing
+* The :mod:`math` module has a number of new functions, and the existing
   functions have been improved to give more consistent behaviour
   across platforms, especially with respect to handling of
   floating-point exceptions and IEEE 754 special values.
   The new functions are:
 
-  * :func:`isinf` and :func:`isnan` determine whether a given float is
-    a (positive or negative) infinity or a NaN (Not a Number),
-    respectively.
+  * :func:`~math.isinf` and :func:`~math.isnan` determine whether a given float
+    is a (positive or negative) infinity or a NaN (Not a Number), respectively.
 
-  * ``copysign(x, y)`` copies the sign bit of an IEEE 754 number,
+  * :func:`~math.copysign` copies the sign bit of an IEEE 754 number,
     returning the absolute value of *x* combined with the sign bit of
     *y*.  For example, ``math.copysign(1, -0.0)`` returns -1.0.
     (Contributed by Christian Heimes.)
 
-  * The inverse hyperbolic functions :func:`acosh`, :func:`asinh` and
-    :func:`atanh`.
+  * :func:`~math.factorial` computes the factorial of a number.
+    (Contributed by Raymond Hettinger; :issue:`2138`.)
 
-  * The function :func:`log1p`, returning the natural logarithm of
-    *1+x* (base *e*).
+  * :func:`~math.sum` adds up the stream of numbers from an iterable,
+    and is careful to avoid loss of precision by calculating partial sums.
+    (Contributed by Jean Brouwers; :issue:`2819`.)
 
-  There's also a new :func:`trunc` function as a result of the
+  * The inverse hyperbolic functions :func:`~math.acosh`, :func:`~math.asinh`
+    and :func:`~math.atanh`.
+
+  * The function :func:`~math.log1p`, returning the natural logarithm of *1+x*
+    (base *e*).
+
+  There's also a new :func:`trunc` built-in function as a result of the
   backport of `PEP 3141's type hierarchy for numbers <#pep-3141>`__.
 
   The existing math functions have been modified to follow the
@@ -1468,9 +1535,9 @@ benchmark around XX% faster than Python 2.5.
 
 .. ======================================================================
 
-.. _new-26-interactive:
+.. _new-26-interpreter:
 
-Interactive Interpreter Changes
+Interpreter Changes
 -------------------------------
 
 Two command-line options have been reserved for use by other Python
@@ -1480,6 +1547,25 @@ the underlying JVM.  :option:`-X` has been reserved for options
 specific to a particular implementation of Python such as CPython,
 Jython, or IronPython.  If either option is used with Python 2.6, the
 interpreter will report that the option isn't currently used.
+
+It's now possible to prevent Python from writing :file:`.pyc` or
+:file:`.pyo` files on importing a module by supplying the :option:`-B`
+switch to the Python interpreter, or by setting the
+:envvar:`PYTHONDONTWRITEBYTECODE` environment variable before running
+the interpreter.  This setting is available to Python programs as the
+``sys.dont_write_bytecode`` variable, and can be changed by Python
+code to modify the interpreter's behaviour.  (Contributed by Neal
+Norwitz and Georg Brandl.)
+
+The encoding used for standard input, output, and standard error can
+be specified by setting the :envvar:`PYTHONIOENCODING` environment
+variable before running the interpreter.  The value should be a string 
+in the form ``**encoding**`` or ``**encoding**:**errorhandler**``.  
+The **encoding** part specifies the encoding's name, e.g. ``utf-8`` or
+``latin-1``; the optional **errorhandler** part specifies 
+what to do with characters that can't be handled by the encoding,
+and  should be one of "error", "ignore", or "replace".   (Contributed
+by Martin von Loewis.)
 
 .. ======================================================================
 
@@ -1493,23 +1579,9 @@ complete list of changes, or look through the Subversion logs for all the
 details.
 
 * (3.0-warning mode) Python 3.0 will feature a reorganized standard
-  library; many outdated modules are being dropped,
-  and some modules are being renamed or moved into packages.
+  library; many outdated modules are being dropped.
   Python 2.6 running in 3.0-warning mode will warn about these modules
   when they are imported.
-
-  The modules that have been renamed are:
-
-  * :mod:`ConfigParser` has become :mod:`configparser`.
-  * :mod:`copy_reg` has become :mod:`copyreg`.
-  * :mod:`htmlentitydefs` has become :mod:`html.entities`.
-  * :mod:`HTMLParser` has become :mod:`html.parser`.
-  * :mod:`repr` (the module) has become :mod:`reprlib`.
-  * :mod:`SocketServer` has become :mod:`socketserver`.
-  * :mod:`Tkinter` has become the :mod:`tkinter` package.
-  * :mod:`Queue` has become :mod:`queue`.
-
-  .. XXX no warnings anymore for renamed modules!
 
   The list of deprecated modules is:
   :mod:`audiodev`,
@@ -1527,6 +1599,7 @@ details.
   :mod:`imgfile`,
   :mod:`linuxaudiodev`,
   :mod:`mhlib`,
+  :mod:`mimetools`,
   :mod:`multifile`,
   :mod:`new`,
   :mod:`popen2`,
@@ -1599,9 +1672,19 @@ details.
   :mod:`videoreader`,
   :mod:`WAIT`.
 
+* The :mod:`asyncore` and :mod:`asynchat` modules are 
+  being actively maintained again, and a number of patches and bugfixes 
+  were applied.  (Maintained by Josiah Carlson; see :issue:`1736190` for 
+  one patch.)
+
 * The :mod:`bsddb.dbshelve` module now uses the highest pickling protocol
   available, instead of restricting itself to protocol 1.
   (Contributed by W. Barnes; :issue:`1551443`.)
+
+* The :mod:`cgi` module will now read variables from the query string of an 
+  HTTP POST request.  This makes it possible to use form actions with 
+  URLs such as "/cgi-bin/add.py?category=1".  (Contributed by 
+  Alexandre Fiori and Nubis; :issue:`1817`.)
 
 * The :mod:`cmath` module underwent an extensive set of revisions,
   thanks to Mark Dickinson and Christian Heimes, that added some new
@@ -2033,10 +2116,14 @@ details.
 
 * Long regular expression searches carried out by the  :mod:`re`
   module will now check for signals being delivered, so especially
-  long searches can now be interrupted.
+  time-consuming searches can now be interrupted.
   (Contributed by Josh Hoyt and Ralf Schmitt; :issue:`846388`.)
 
 * The :mod:`rgbimg` module has been removed.
+
+* The :mod:`rlcompleter` module's :meth:`Completer.complete()` method
+  will now ignore exceptions triggered while evaluating a name.
+  (Fixed by Lorenz Quack; :issue:`2250`.)
 
 * The :mod:`sched` module's :class:`scheduler` instances now
   have a read-only :attr:`queue` attribute that returns the
@@ -2054,6 +2141,24 @@ details.
 
 * The :mod:`sets` module has been deprecated; it's better to
   use the built-in :class:`set` and :class:`frozenset` types.
+
+* The :func:`shutil.copytree` function now has an optional **ignore** argument
+  that takes a callable object.  This callable will receive each directory path
+  and a list of the directory's contents, and returns a list of names that
+  will be ignored, not copied.  
+
+  The :mod:`shutil` module also provides an :func:`ignore_patterns`
+  function for use with this new parameter.
+  :func:`ignore_patterns` takes an arbitrary number of glob-style patterns
+  and will ignore any files and directories that match this pattern.
+  The following example copies a directory tree, but skip both SVN's internal
+  :file:`.svn` directories and Emacs backup 
+  files, which have names ending with '~'::
+
+      shutil.copytree('Doc/library', '/tmp/library', 
+                      ignore=shutil.ignore_patterns('*~'))
+
+  (Contributed by Tarek Ziadé; :issue:`2663`.)
 
 * Integrating signal handling with GUI handling event loops
   like those used by Tkinter or GTk+ has long been a problem; most
@@ -2257,7 +2362,8 @@ details.
 
 * The :mod:`threading` module's :class:`Thread` objects 
   gained a :meth:`getIdent` method that returns the thread's 
-  identifier, a nonzero integer.  (Contributed by XXX; :issue:`2871`.)
+  identifier, a nonzero integer.  (Contributed by Gregory P. Smith; 
+  :issue:`2871`.)
 
 * The :mod:`timeit` module now accepts callables as well as strings
   for the statement being timed and for the setup code.
@@ -2267,6 +2373,11 @@ details.
   ``timeit(stmt, setup, time, number)`` create an instance and call
   the corresponding method. (Contributed by Erik Demaine;
   :issue:`1533909`.)
+
+* The :mod:`Tkinter` module now accepts lists and tuples for options,
+  separating the elements by spaces before passing the resulting value to 
+  Tcl/Tk.
+  (Contributed by Guilherme Polo; :issue:`2906`.)
 
 * The :mod:`turtle` module for turtle graphics was greatly enhanced by
   Gregor Lingl.  New features in the module include:
@@ -2330,7 +2441,7 @@ details.
   instances. (:issue:`1330538`)  The code can also handle
   dates before 1900 (contributed by Ralf Schmitt; :issue:`2014`)
   and 64-bit integers represented by using ``<i8>`` in XML-RPC responses
-  (contributed by XXX; :issue:`2985`).
+  (contributed by Riku Lindblad; :issue:`2985`).
   
 * The :mod:`zipfile` module's :class:`ZipFile` class now has
   :meth:`extract` and :meth:`extractall` methods that will unpack
@@ -2358,6 +2469,94 @@ details.
 .. ======================================================================
 .. whole new modules get described in subsections here
 
+The :mod:`ast` module
+----------------------
+
+The :mod:`ast` module provides an Abstract Syntax Tree representation
+of Python code.  For Python 2.6, Armin Ronacher contributed a set of
+helper functions that perform various common tasks.  These will be useful
+for HTML templating packages, code analyzers, and similar tools that
+process Python code. 
+
+The :func:`parse` function takes an expression and returns an AST.
+The :func:`dump` function outputs a representation of a tree, suitable
+for debugging::
+
+    import ast
+
+    t = ast.parse("""
+    d = {}
+    for i in 'abcdefghijklm':
+	d[i + i] = ord(i) - ord('a') + 1
+    print d
+    """)
+    print ast.dump(t)
+
+This outputs::
+
+    Module(body=[Assign(targets=[Name(id='d', ctx=Store())],
+    value=Dict(keys=[], values=[])), For(target=Name(id='i',
+    ctx=Store()), iter=Str(s='abcdefghijklm'),
+    body=[Assign(targets=[Subscript(value=Name(id='d', ctx=Load()),
+    slice=Index(value=BinOp(left=Name(id='i', ctx=Load()), op=Add(),
+    right=Name(id='i', ctx=Load()))), ctx=Store())],
+    value=BinOp(left=BinOp(left=Call(func=Name(id='ord', ctx=Load()),
+    args=[Name(id='i', ctx=Load())], keywords=[], starargs=None,
+    kwargs=None), op=Sub(), right=Call(func=Name(id='ord',
+    ctx=Load()), args=[Str(s='a')], keywords=[], starargs=None,
+    kwargs=None)), op=Add(), right=Num(n=1)))], orelse=[]),
+    Print(dest=None, values=[Name(id='d', ctx=Load())], nl=True)])
+
+The :func:`literal_eval` method takes a string or an AST
+representing a literal expression, one that contains a Python
+expression containing only strings, numbers, dictionaries, etc. but no
+statements or function calls, and returns the resulting value.  If you
+need to unserialize an expression but need to worry about security 
+and can't risk using an :func:`eval` call, :func:`literal_eval` will
+handle it safely::
+
+    >>> literal = '("a", "b", {2:4, 3:8, 1:2})'
+    >>> print ast.literal_eval(literal)
+    ('a', 'b', {1: 2, 2: 4, 3: 8})
+    >>> print ast.literal_eval('"a" + "b"')
+    Traceback (most recent call last):
+      ...
+    ValueError: malformed string
+
+The module also includes :class:`NodeVisitor` and
+:class:`NodeTransformer` classes for traversing and modifying an AST,
+and functions for common transformations such as changing line
+numbers.
+
+.. ======================================================================
+
+The :mod:`future_builtins` module
+--------------------------------------
+
+Python 3.0 makes various changes to the repertoire of built-in
+functions, and most of the changes can't be introduced in the Python
+2.x series because they would break compatibility.
+The :mod:`future_builtins` module provides versions 
+of these built-in functions that can be imported when writing 
+3.0-compatible code.
+
+The functions in this module currently include:
+
+* ``ascii(**obj**)``: equivalent to :func:`repr`.  In Python 3.0, 
+  :func:`repr` will return a Unicode string, while :func:`ascii` will 
+  return a pure ASCII bytestring.
+
+* ``filter(**predicate**, **iterable**)``, 
+  ``map(**func**, **iterable1**, ...)``: the 3.0 versions 
+  return iterators, differing from the 2.x built-ins that return lists.
+
+* ``hex(**value**)``, ``oct(**value**)``: instead of calling the 
+  :meth:`__hex__` or :meth:`__oct__` methods, these versions will 
+  call the :meth:`__index__` method and convert the result to hexadecimal
+  or octal.
+
+.. ======================================================================
+
 The :mod:`json` module
 ----------------------
 
@@ -2381,28 +2580,6 @@ It is also possible to write your own decoders and encoders to support more
 types. Pretty-printing of the JSON strings is also supported.
 
 :mod:`json` (originally called simplejson) was written by Bob Ippolito.
-
-
-Improved SSL Support
---------------------------------------------------
-
-Bill Janssen made extensive improvements to Python 2.6's support for
-the Secure Sockets Layer by adding a new module, :mod:`ssl`, on top of
-the `OpenSSL <http://www.openssl.org/>`__ library.  This new module
-provides more control over the protocol negotiated, the X.509
-certificates used, and has better support for writing SSL servers (as
-opposed to clients) in Python.  The existing SSL support in the
-:mod:`socket` module hasn't been removed and continues to work,
-though it will be removed in Python 3.0.
-
-To use the new module, first you must create a TCP connection in the
-usual way and then pass it to the :func:`ssl.wrap_socket` function.
-It's possible to specify whether a certificate is required, and to
-obtain certificate info by calling the :meth:`getpeercert` method.
-
-.. seealso::
-
-   The documentation for the :mod:`ssl` module.
 
 
 .. ======================================================================
@@ -2444,6 +2621,28 @@ Using the module is simple::
     # read/writePlist accepts file-like objects as well as paths.
     plistlib.writePlist(data_struct, sys.stdout)
 
+.. ======================================================================
+
+Improved SSL Support
+--------------------------------------------------
+
+Bill Janssen made extensive improvements to Python 2.6's support for
+the Secure Sockets Layer by adding a new module, :mod:`ssl`, on top of
+the `OpenSSL <http://www.openssl.org/>`__ library.  This new module
+provides more control over the protocol negotiated, the X.509
+certificates used, and has better support for writing SSL servers (as
+opposed to clients) in Python.  The existing SSL support in the
+:mod:`socket` module hasn't been removed and continues to work,
+though it will be removed in Python 3.0.
+
+To use the new module, first you must create a TCP connection in the
+usual way and then pass it to the :func:`ssl.wrap_socket` function.
+It's possible to specify whether a certificate is required, and to
+obtain certificate info by calling the :meth:`getpeercert` method.
+
+.. seealso::
+
+   The documentation for the :mod:`ssl` module.
 
 .. ======================================================================
 
@@ -2456,6 +2655,13 @@ Changes to Python's build process and to the C API include:
 * Python 2.6 can be built with Microsoft Visual Studio 2008.
   See the :file:`PCbuild9` directory for the build files.
   (Implemented by Christian Heimes.)
+
+* On MacOS X, Python 2.6 can be compiled as a 4-way universal build.
+  The :program:`configure` script 
+  can take a :option:`--with-universal-archs=[32-bit|64-bit|all]`
+  switch, controlling whether the binaries are built for 32-bit
+  architectures (x86, PowerPC), 64-bit (x86-64 and PPC-64), or both.
+  (Contributed by Ronald Oussoren.)
 
 * Python now can only be compiled with C89 compilers (after 19
   years!).  This means that the Python source tree can now drop its
@@ -2503,6 +2709,13 @@ Changes to Python's build process and to the C API include:
   (smallest difference between 1.0 and the next largest value
   representable), and several others.
   (Contributed by Christian Heimes; :issue:`1534`.)
+
+* C functions and methods that use
+  :cfunc:`PyComplex_AsCComplex` will now accept arguments that
+  have a :meth:`__complex__` method.  In particular, the functions in the
+  :mod:`cmath` module will now accept objects with this method.
+  This is a backport of a Python 3.0 change.
+  (Contributed by Mark Dickinson; :issue:`1675423`.)
 
 * Python's C API now includes two functions for case-insensitive string
   comparisons, ``PyOS_stricmp(char*, char*)``
@@ -2584,6 +2797,11 @@ Port-Specific Changes: Windows
   and :func:`QueryReflectionKey` functions, which enable and disable
   registry reflection for 32-bit processes running on 64-bit systems.
   (:issue:`1753245`)
+
+* The :mod:`msilib` module's :class:`Record` object 
+  gained :meth:`GetInteger` and :meth:`GetString` methods that 
+  return field values as an integer or a string.  
+  (Contributed by Floris Bruynooghe; :issue:`2125`.)
 
 * The new default compiler on Windows is Visual Studio 2008 (VS 9.0). The
   build directories for Visual Studio 2003 (VS7.1) and 2005 (VS8.0)

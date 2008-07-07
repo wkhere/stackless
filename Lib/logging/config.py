@@ -52,7 +52,7 @@ else:
 #   _listener holds the server object doing the listening
 _listener = None
 
-def fileConfig(fname, defaults=None):
+def fileConfig(fname, defaults=None, disable_existing_loggers=1):
     """
     Read the logging configuration from a ConfigParser-format file.
 
@@ -82,7 +82,7 @@ def fileConfig(fname, defaults=None):
         del logging._handlerList[:]
         # Handlers add themselves to logging._handlers
         handlers = _install_handlers(cp, formatters)
-        _install_loggers(cp, handlers)
+        _install_loggers(cp, handlers, disable_existing_loggers)
     finally:
         logging._releaseLock()
 
@@ -155,8 +155,7 @@ def _install_handlers(cp, formatters):
             h.setLevel(logging._levelNames[level])
         if len(fmt):
             h.setFormatter(formatters[fmt])
-        #temporary hack for FileHandler and MemoryHandler.
-        if klass == logging.handlers.MemoryHandler:
+        if issubclass(klass, logging.handlers.MemoryHandler):
             if "target" in opts:
                 target = cp.get(sectname,"target")
             else:
@@ -170,7 +169,7 @@ def _install_handlers(cp, formatters):
     return handlers
 
 
-def _install_loggers(cp, handlers):
+def _install_loggers(cp, handlers, disable_existing_loggers):
     """Create and install loggers"""
 
     # configure the root first
@@ -255,7 +254,7 @@ def _install_loggers(cp, handlers):
             logger.level = logging.NOTSET
             logger.handlers = []
             logger.propagate = 1
-        else:
+        elif disable_existing_loggers:
             logger.disabled = 1
 
 

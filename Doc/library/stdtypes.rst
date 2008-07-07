@@ -2055,8 +2055,12 @@ Files have the following methods:
    files, like ttys, it makes sense to continue reading after an EOF is hit.)  Note
    that this method may call the underlying C function :cfunc:`fread` more than
    once in an effort to acquire as close to *size* bytes as possible. Also note
-   that when in non-blocking mode, less data than what was requested may be
+   that when in non-blocking mode, less data than was requested may be
    returned, even if no *size* parameter was given.
+
+   .. note::
+      As this function depends on the underlying  :cfunc:`fread` C function,
+      it will behave the same in details such as caching EOF.
 
 
 .. method:: file.readline([size])
@@ -2185,7 +2189,7 @@ the particular object.
 
 .. attribute:: file.errors
 
-   The Unicode error handler used to along with the encoding.
+   The Unicode error handler used along with the encoding.
 
    .. versionadded:: 2.6
 
