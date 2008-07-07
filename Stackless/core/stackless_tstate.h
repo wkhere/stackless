@@ -32,6 +32,7 @@ typedef struct _sts {
 		PyObject *self_lock;
 		PyObject *unlock_lock;
 		int is_locked;
+		int runflags;				/* flags for stackless.run() behaviour */
 	} thread;
 #endif
 	/* number of nested interpreters (1.0/2.0 merge) */
@@ -74,7 +75,8 @@ void slp_kill_tasks_with_stacks(struct _ts *tstate);
 	__STACKLESS_PYSTATE_NEW \
 	tstate->st.thread.self_lock = NULL; \
 	tstate->st.thread.unlock_lock = NULL; \
-	tstate->st.thread.is_locked = 0;
+	tstate->st.thread.is_locked = 0; \
+	tstate->st.thread.runflags = 0;
 
 
 #define STACKLESS_PYSTATE_CLEAR \

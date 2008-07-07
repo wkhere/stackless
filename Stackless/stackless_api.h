@@ -304,8 +304,13 @@ PyAPI_FUNC(PyObject *) PyStackless_GetCurrent(void);
  * In case on a timeout (opcode count), the return value
  * will be the long-running tasklet, removed from the queue.
  * You might decide to kill it or to insert it again.
+ * The optional threadblocking argument, when non-zero enables
+ * the old thread-blocking behaviour when we run out of tasklets
+ * on this thread and there are other Python threads running.
  */
 PyAPI_FUNC(PyObject *) PyStackless_RunWatchdog(long timeout);
+PyAPI_FUNC(PyObject *) PyStackless_RunWatchdogEx(long timeout,
+											   long threadblocking);
 
 
 /******************************************************

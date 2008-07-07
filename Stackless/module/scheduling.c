@@ -597,10 +597,19 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 	PyObject *retval;
 	PyTaskletObject *next = NULL;
 	PyObject *unlocker_lock;
+	int revive_main = 0;
+	
+#ifdef WITH_THREAD
+	if (ts->st.thread.runflags == 0)
+		/* we also must never block if watchdog is running not in threadblocking mode */
+		revive_main = 1;
 
-	if (check_for_deadlock()) {
-		/* revive real main if floating */
-		if (ts == slp_initial_tstate && ts->st.main->next == NULL) {
+	if (revive_main)
+		assert(ts->st.main->next == NULL); /* main must be floating */
+#endif
+
+	if (revive_main || check_for_deadlock()) {
+		if (revive_main || (ts == slp_initial_tstate && ts->st.main->next == NULL)) {
 			/* emulate old revive_main behavior:
 			 * passing a value only if it is an exception
 			 */
