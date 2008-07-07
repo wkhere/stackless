@@ -24,6 +24,8 @@
 #include "switch_arm_thumb_gcc.h" /* gcc using arm thumb */
 #elif defined(__GNUC__) && defined(__arm32__)
 #include "switch_arm32_gcc.h" /* gcc using arm32 */
+#elif defined(__GNUC__) && defined(__mips__) && defined(__linux__)
+#include "switch_mips_unix.h" /* MIPS */
 #endif
 
 /* default definitions if not defined in above files */

@@ -57,6 +57,8 @@ extern "C" {
 	/* Linux/S390 */
 #elif defined(__GNUC__) && defined(__s390x__) && defined(__linux__)
 	/* Linux/S390 zSeries */
+#elif defined(__GNUC__) && defined(__mips__) && defined(__linux__)
+	/* MIPS */
 #else
 	/* no supported platform */
 #undef STACKLESS
