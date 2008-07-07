@@ -161,6 +161,10 @@ class build_ext (Command):
         if plat_py_include != py_include:
             self.include_dirs.append(plat_py_include)
 
+        slpy_include = os.path.join(py_include, "Stackless")
+        if os.path.exists(slpy_include):
+            self.include_dirs.append(slpy_include)
+
         if type(self.libraries) is StringType:
             self.libraries = [self.libraries]
 
