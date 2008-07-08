@@ -1101,7 +1101,7 @@ static struct PyModuleDef stacklessmodule = {
 	"stackless",
 	stackless_doc,
 	-1,
-	NULL,
+	stackless_methods,
 	NULL,
 	NULL,
 	NULL,
@@ -1113,6 +1113,7 @@ void
 _PyStackless_Init(void)
 {
 	PyObject *dict;
+	PyObject *modules;
 	char *name = "stackless";
 	PySlpModuleObject *m;
 	
@@ -1126,6 +1127,13 @@ _PyStackless_Init(void)
 	slp_module = PyModule_Create(&stacklessmodule);
 	if (slp_module == NULL)
 		return; /* errors handled by caller */
+
+	modules = PyImport_GetModuleDict();
+	if (PyDict_SetItemString(modules, name, slp_module)) {
+		Py_DECREF(slp_module);
+		return;
+	}
+	Py_DECREF(slp_module); /* Yes, it still exists, in modules! */
 
 	if (init_prickelpit()) return;
 

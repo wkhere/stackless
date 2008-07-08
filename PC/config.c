@@ -64,9 +64,6 @@ extern PyObject* PyInit__stringio(void);
 extern PyObject* PyInit__pickle(void);
 extern PyObject* PyInit_atexit(void);
 extern PyObject* _PyWarnings_Init(void);
-#ifdef STACKLESS
-extern PyObject* PyInit_stackless(void);
-#endif
 
 /* tools/freeze/makeconfig.py marker for additional "extern" */
 /* -- ADDMODULE MARKER 1 -- */
