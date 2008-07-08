@@ -63,6 +63,7 @@ class ExceptionClassTests(unittest.TestCase):
                     left_bracket = exc_name.index('[')
                     exc_name = exc_name[:left_bracket-1]  # cover space
                 if not haveStackless and exc_name == "TaskletExit":
+                    exc_set.discard(exc_name)
                     continue
                 try:
                     exc = getattr(builtins, exc_name)
