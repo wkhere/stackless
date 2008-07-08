@@ -157,6 +157,16 @@ class build_ext(Command):
         if plat_py_include != py_include:
             self.include_dirs.append(plat_py_include)
 
+        # Assume we are a build and not installed first.
+        slpy_include = os.path.join(sysconfig.PREFIX, "Stackless")
+        if os.path.exists(slpy_include):
+            self.include_dirs.append(slpy_include)
+        else:
+            # Fall back on the installed include directory.
+            slpy_include = os.path.join(py_include, "Stackless")
+            if os.path.exists(slpy_include):
+                self.include_dirs.append(slpy_include)
+
         if isinstance(self.libraries, str):
             self.libraries = [self.libraries]
 

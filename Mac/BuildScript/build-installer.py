@@ -629,7 +629,7 @@ def buildPython():
     version = getVersion()
 
     print("Running configure...")
-    runCommand("%s -C --enable-framework --enable-universalsdk=%s LDFLAGS='-g -L%s/libraries/usr/local/lib' OPT='-g -O3 -I%s/libraries/usr/local/include' 2>&1"%(
+    runCommand("%s -C --enable-framework --enable-stacklessfewerregisters --enable-universalsdk=%s LDFLAGS='-g -L%s/libraries/usr/local/lib' OPT='-g -O3 -I%s/libraries/usr/local/include' 2>&1"%(
         shellQuote(os.path.join(SRCDIR, 'configure')),
         shellQuote(SDKPATH), shellQuote(WORKDIR)[1:-1],
         shellQuote(WORKDIR)[1:-1]))
@@ -883,7 +883,7 @@ def buildInstaller():
 
     makeMpkgPlist(os.path.join(pkgroot, 'Info.plist'))
     pl = Plist(
-                IFPkgDescriptionTitle="Universal MacPython",
+                IFPkgDescriptionTitle="Universal Stackless MacPython",
                 IFPkgDescriptionVersion=getVersion(),
             )
 
@@ -917,13 +917,13 @@ def buildDMG():
         shutil.rmtree(outdir)
 
     imagepath = os.path.join(outdir,
-                    'python-%s-macosx'%(getFullVersion(),))
+                    'stackless-%s-macosx'%(getFullVersion(),))
     if INCLUDE_TIMESTAMP:
         imagepath = imagepath + '%04d-%02d-%02d'%(time.localtime()[:3])
     imagepath = imagepath + '.dmg'
 
     os.mkdir(outdir)
-    runCommand("hdiutil create -volname 'Universal MacPython %s' -srcfolder %s %s"%(
+    runCommand("hdiutil create -volname 'Universal Stackless MacPython %s' -srcfolder %s %s"%(
             getFullVersion(),
             shellQuote(os.path.join(WORKDIR, 'installer')),
             shellQuote(imagepath)))

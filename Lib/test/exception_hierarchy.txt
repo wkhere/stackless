@@ -1,5 +1,6 @@
 BaseException
  +-- SystemExit
+ |    +-- TaskletExit
  +-- KeyboardInterrupt
  +-- GeneratorExit
  +-- Exception

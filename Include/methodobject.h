@@ -68,6 +68,12 @@ PyAPI_FUNC(PyObject *) PyCFunction_NewEx(PyMethodDef *, PyObject *,
 
 #define METH_COEXIST   0x0040
 
+#ifdef STACKLESS
+#define METH_STACKLESS 0x0080
+#else
+#define METH_STACKLESS 0x0000
+#endif
+
 typedef struct {
     PyObject_HEAD
     PyMethodDef *m_ml; /* Description of the C function to call */

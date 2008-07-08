@@ -1,5 +1,7 @@
 /* Generator object implementation */
 
+#include "core/stackless_impl.h"
+
 #include "Python.h"
 #include "frameobject.h"
 #include "genobject.h"
@@ -40,7 +42,10 @@ gen_dealloc(PyGenObject *gen)
 	PyObject_GC_Del(gen);
 }
 
-
+#ifdef STACKLESS
+PyObject *slp_gen_send_ex(PyGenObject *gen, PyObject *arg, int exc);
+#define gen_send_ex slp_gen_send_ex
+#else
 static PyObject *
 gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
 {
@@ -108,6 +113,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc)
 
 	return result;
 }
+#endif
 
 PyDoc_STRVAR(send_doc,
 "send(arg) -> send 'arg' into generator,\n\
@@ -274,13 +280,11 @@ failed_throw:
 	return NULL;
 }
 
-
 static PyObject *
 gen_iternext(PyGenObject *gen)
 {
 	return gen_send_ex(gen, NULL, 0);
 }
-
 
 static PyObject *
 gen_repr(PyGenObject *gen)
@@ -374,8 +378,15 @@ PyTypeObject PyGen_Type = {
 	gen_del,				/* tp_del */
 };
 
+STACKLESS_DECLARE_METHOD(&PyGen_Type, tp_iternext);
+
+#ifdef STACKLESS
+PyObject *
+PyGenerator_New(PyFrameObject *f)
+#else
 PyObject *
 PyGen_New(PyFrameObject *f)
+#endif
 {
 	PyGenObject *gen = PyObject_GC_New(PyGenObject, &PyGen_Type);
 	if (gen == NULL) {
@@ -383,8 +394,19 @@ PyGen_New(PyFrameObject *f)
 		return NULL;
 	}
 	gen->gi_frame = f;
+#ifdef STACKLESS
+	/* Support for unpickling generators.  This will segmentation fault if
+	   called by pricklepit.c:gen_new as that passes Py_None as a placeholder. */
+	if (f == Py_None) {
+		Py_INCREF(Py_None);
+		gen->gi_code = Py_None;
+	} else {
+#endif
 	Py_INCREF(f->f_code);
 	gen->gi_code = (PyObject *)(f->f_code);
+#ifdef STACKLESS
+	}
+#endif
 	gen->gi_running = 0;
 	gen->gi_weakreflist = NULL;
 	_PyObject_GC_TRACK(gen);

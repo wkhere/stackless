@@ -210,6 +210,13 @@ class _Pickler:
         self.proto = int(protocol)
         self.bin = protocol >= 1
         self.fast = 0
+        ## Stackless addition BEGIN
+        try:
+            from stackless import _pickle_moduledict
+        except ImportError:
+            _pickle_moduledict = lambda self, obj:None
+        self._pickle_moduledict = _pickle_moduledict
+        ## Stackless addition END
 
     def clear_memo(self):
         """Clears the pickler's "memo".
@@ -604,6 +611,11 @@ class _Pickler:
             # else tmp is empty, and we're done
 
     def save_dict(self, obj):
+        ## Stackless addition BEGIN
+        modict_saver = self._pickle_moduledict(self, obj)
+        if modict_saver is not None:
+            return self.save_reduce(*modict_saver)
+        ## Stackless addition END
         write = self.write
 
         if self.bin:
@@ -705,7 +717,29 @@ class _Pickler:
 
         self.memoize(obj)
 
-    dispatch[FunctionType] = save_global
+    def save_function(self, obj):
+        try:
+            return self.save_global(obj)
+        except PicklingError, e:
+            pass
+        # Check copy_reg.dispatch_table
+        reduce = dispatch_table.get(type(obj))
+        if reduce:
+            rv = reduce(obj)
+        else:
+            # Check for a __reduce_ex__ method, fall back to __reduce__
+            reduce = getattr(obj, "__reduce_ex__", None)
+            if reduce:
+                rv = reduce(self.proto)
+            else:
+                reduce = getattr(obj, "__reduce__", None)
+                if reduce:
+                    rv = reduce()
+                else:
+                    raise e
+        return self.save_reduce(obj=obj, *rv)
+
+    dispatch[FunctionType] = save_function
     dispatch[BuiltinFunctionType] = save_global
     dispatch[type] = save_global
 
@@ -733,6 +767,7 @@ def _keep_alive(x, memo):
 
 classmap = {} # called classmap for backwards compatibility
 
+# This is no longer used to find classes, but still for functions
 def whichmodule(func, funcname):
     """Figure out the module in which a function occurs.
 

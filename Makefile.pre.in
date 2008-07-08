@@ -61,7 +61,7 @@ CFLAGS=		$(BASECFLAGS) $(OPT) $(EXTRA_CFLAGS)
 # Both CPPFLAGS and LDFLAGS need to contain the shell's value for setup.py to
 # be able to build extension modules using the directories specified in the
 # environment variables
-CPPFLAGS=	-I. -IInclude -I$(srcdir)/Include @CPPFLAGS@
+CPPFLAGS=	-I. -IInclude -I$(srcdir)/Include -I$(srcdir)/Stackless @CPPFLAGS@
 LDFLAGS=	@LDFLAGS@
 LDLAST=		@LDLAST@
 SGI_ABI=	@SGI_ABI@
@@ -71,7 +71,8 @@ LINKFORSHARED=	@LINKFORSHARED@
 CFLAGSFORSHARED=@CFLAGSFORSHARED@
 # C flags used for building the interpreter object files
 PY_CFLAGS=	$(CFLAGS) $(CPPFLAGS) $(CFLAGSFORSHARED) -DPy_BUILD_CORE
-
+# Special C flags for slp_transfer.c
+SLPFLAGS=	@SLPFLAGS@
 
 # Machine-dependent subdirectories
 MACHDEP=	@MACHDEP@
@@ -99,6 +100,12 @@ LIBDEST=	$(SCRIPTDIR)/python$(VERSION)
 INCLUDEPY=	$(INCLUDEDIR)/python$(VERSION)
 CONFINCLUDEPY=	$(CONFINCLUDEDIR)/python$(VERSION)
 LIBP=		$(LIBDIR)/python$(VERSION)
+STACKLESSINCLUDEDIRS=		\
+		core \
+		module \
+		pickling \
+		platf
+
 
 # Symbols used for using shared libraries
 SO=		@SO@
@@ -254,6 +261,16 @@ PYTHON_OBJS=	\
 		Python/ast.o \
 		Python/bltinmodule.o \
 		Python/ceval.o \
+		Stackless/core/cframeobject.o \
+		Stackless/core/slp_transfer.o \
+		Stackless/core/stacklesseval.o \
+		Stackless/core/stackless_util.o \
+		Stackless/module/channelobject.o \
+		Stackless/module/flextype.o \
+		Stackless/module/scheduling.o \
+		Stackless/module/stacklessmodule.o \
+		Stackless/module/taskletobject.o \
+		Stackless/pickling/prickelpit.o \
 		Python/compile.o \
 		Python/codecs.o \
 		Python/errors.o \
@@ -567,6 +584,9 @@ Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
                                              $(BYTESTR_DEPS)
 
 
+Stackless/core/slp_transfer.o: $(srcdir)/Stackless/core/slp_transfer.c
+		$(CC) -c $(PY_CFLAGS) $(SLPFLAGS) -I$(DLINCLDIR) -o $@ $(srcdir)/Stackless/core/slp_transfer.c
+
 ############################################################################
 # Header files
 
@@ -646,6 +666,25 @@ PYTHON_HEADERS= \
 		Include/unicodeobject.h \
 		Include/warnings.h \
 		Include/weakrefobject.h \
+		Stackless/stackless.h \
+		Stackless/stackless_api.h \
+		Stackless/stackless_version.h \
+		Stackless/core/cframeobject.h \
+		Stackless/core/stackless_impl.h \
+		Stackless/core/stackless_structs.h \
+		Stackless/core/stackless_tstate.h \
+		Stackless/module/channelobject.h \
+		Stackless/module/flextype.h \
+		Stackless/module/taskletobject.h \
+		Stackless/pickling/prickelpit.h \
+		Stackless/platf/slp_platformselect.h \
+		Stackless/platf/switch_ppc_macosx.h \
+		Stackless/platf/switch_ppc_unix.h \
+		Stackless/platf/switch_s390_unix.h \
+		Stackless/platf/switch_sparc_sun_gcc.h \
+		Stackless/platf/switch_arm32_gcc.h \
+		Stackless/platf/switch_x86_msvc.h \
+		Stackless/platf/switch_x86_unix.h \
 		pyconfig.h \
 		$(PARSER_HEADERS)
 
@@ -676,6 +715,9 @@ testall:	all platform
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
+
+teststackless:	all platform
+		pushd Stackless/unittests; $(RUNSHARED) ../../$(BUILDPYTHON) -E -tt runAll.py; popd
 
 #  Run the unitests for both architectures in a Universal build on OSX
 #  Must be run on an Intel box.
@@ -912,10 +954,23 @@ inclinstall:
 		else	true; \
 		fi; \
 	done
-	@for i in $(srcdir)/Include/*.h; \
+	@for i in $(srcdir)/Include/*.h $(srcdir)/Stackless/*.h; \
 	do \
 		echo $(INSTALL_DATA) $$i $(INCLUDEPY); \
 		$(INSTALL_DATA) $$i $(DESTDIR)$(INCLUDEPY); \
+	done
+	@for j in $(STACKLESSINCLUDEDIRS); \
+	do \
+		if test ! -d $(DESTDIR)$(INCLUDEPY)$$j; then \
+			echo "Creating directory $(DESTDIR)$(INCLUDEPY)/$$j"; \
+			$(INSTALL) -d -m $(DIRMODE) $(DESTDIR)$(INCLUDEPY)/$$j; \
+		else	true; \
+		fi; \
+		for i in $(srcdir)/Stackless/$$j/*.h; \
+		do \
+			echo $(INSTALL_DATA) $$i $(INCLUDEPY)/$$j; \
+			$(INSTALL_DATA) $$i $(DESTDIR)$(INCLUDEPY)/$$j; \
+		done \
 	done
 	$(INSTALL_DATA) pyconfig.h $(DESTDIR)$(CONFINCLUDEPY)/pyconfig.h
 

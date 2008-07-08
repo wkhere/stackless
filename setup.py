@@ -128,7 +128,7 @@ class PyBuildExt(build_ext):
         moddir = os.path.normpath(moddir)
 
         moddirlist = [moddir]
-        incdirlist = ['./Include']
+        incdirlist = ['./Include', './Stackless']
 
         # Platform-dependent module source and include directories
         platform = self.get_platform()
@@ -424,7 +424,7 @@ class PyBuildExt(build_ext):
         exts.append( Extension("_bytesio", ["_bytesio.c"]) )
         exts.append( Extension("_stringio", ["_stringio.c"]) )
         # C-optimized pickle replacement
-        exts.append( Extension("_pickle", ["_pickle.c"]) )
+        exts.append( Extension("_pickle", ["_pickle.c", '../Stackless/pickling/safe_pickle.c']) )
         # atexit
         exts.append( Extension("atexit", ["atexitmodule.c"]) )
         # _json speedups

@@ -15,7 +15,9 @@
 #define OFF(x) offsetof(PyFrameObject, x)
 
 static PyMemberDef frame_memberlist[] = {
+#ifndef STACKLESS
 	{"f_back",	T_OBJECT,	OFF(f_back),	READONLY},
+#endif
 	{"f_code",	T_OBJECT,	OFF(f_code),	READONLY},
 	{"f_builtins",	T_OBJECT,	OFF(f_builtins),READONLY},
 	{"f_globals",	T_OBJECT,	OFF(f_globals),	READONLY},
@@ -352,7 +354,29 @@ frame_settrace(PyFrameObject *f, PyObject* v, void *closure)
 }
 
 
+#ifdef STACKLESS
+
+static PyObject *
+frame_getback(PyFrameObject *f, void *nope)
+{
+	PyFrameObject *fb = f->f_back;
+	PyObject *ret;
+	while (fb != NULL && ! PyFrame_Check(fb))
+		fb = fb->f_back;
+	ret = (PyObject *) fb;
+	if (ret == NULL)
+		ret = Py_None;
+    Py_INCREF(ret);
+    return ret;
+}
+
+#endif
+
+
 static PyGetSetDef frame_getsetlist[] = {
+#ifdef STACKLESS
+	{"f_back",	(getter)frame_getback, NULL, NULL},
+#endif
 	{"f_locals",	(getter)frame_getlocals, NULL, NULL},
 	{"f_lineno",	(getter)frame_getlineno,
 			(setter)frame_setlineno, NULL},
@@ -374,7 +398,7 @@ static PyGetSetDef frame_getsetlist[] = {
    the following fields are still valid:
 
      * ob_type, ob_size, f_code, f_valuestack;
-       
+
      * f_locals, f_trace,
        f_exc_type, f_exc_value, f_exc_traceback are NULL;
 
@@ -444,7 +468,7 @@ frame_dealloc(PyFrameObject *f)
 		f->f_back = free_list;
 		free_list = f;
 	}
-	else 
+	else
 		PyObject_GC_Del(f);
 
 	Py_DECREF(co);
@@ -678,6 +702,9 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 	f->f_lineno = code->co_firstlineno;
 	f->f_iblock = 0;
 
+#ifdef STACKLESS
+	f->f_execute = NULL;
+#endif
 	_PyObject_GC_TRACK(f);
 	return f;
 }
@@ -887,7 +914,7 @@ PyFrame_LocalsToFast(PyFrameObject *f, int clear)
 		dict_to_map(co->co_cellvars, ncells,
 			    locals, fast + co->co_nlocals, 1, clear);
 		dict_to_map(co->co_freevars, nfreevars,
-			    locals, fast + co->co_nlocals + ncells, 1, 
+			    locals, fast + co->co_nlocals + ncells, 1,
 			    clear);
 	}
 	PyErr_Restore(error_type, error_value, error_traceback);

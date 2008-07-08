@@ -83,7 +83,7 @@ int main(int argc, char*argv[])
 		strcat_s(command, CMD_SIZE, "getbuildinfo2.c -DSUBWCREV ");
 	else
 		strcat_s(command, CMD_SIZE, "..\\Modules\\getbuildinfo.c");
-	strcat_s(command, CMD_SIZE, " -Fogetbuildinfo.o -I..\\Include -I..\\PC");
+	strcat_s(command, CMD_SIZE, " -Fogetbuildinfo.o -I..\\Include -I..\\PC -I..\\Stackless");
 	puts(command); fflush(stdout);
 	result = system(command);
 	if (do_unlink)

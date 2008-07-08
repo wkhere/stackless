@@ -376,6 +376,13 @@ static PyMethodDef rangeiter_methods[] = {
     {NULL,		NULL}		/* sentinel */
 };
 
+#ifdef STACKLESS
+PyTypeObject PyRangeIter_Type;
+#define Pyrangeiter_Type PyRangeIter_Type
+#else
+   PyTypeObject Pyrangeiter_Type;
+#endif
+
 PyTypeObject PyRangeIter_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"range_iterator",                        /* tp_name */
