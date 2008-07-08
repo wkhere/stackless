@@ -193,6 +193,8 @@ typedef struct _cframe {
 typedef struct _slpmodule {
 	PyObject_HEAD
 	PyObject *md_dict;
+	struct PyModuleDef *md_def;
+	void *md_state;
 	/* the above is a copy of private PyModuleObject */
 	PyTypeObject *__tasklet__;
 	PyTypeObject *__channel__;

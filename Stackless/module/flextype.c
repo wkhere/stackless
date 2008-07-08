@@ -120,7 +120,7 @@ flextype_new(PyTypeObject *meta, PyObject *args, PyObject *kwds)
 	int basicsize = meta->tp_basicsize;
 	int type_size = basicsize;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SO!O!:type", kwlist,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "UO!O!:type", kwlist,
 					 &name,
 					 &PyTuple_Type, &bases,
 					 &PyDict_Type, &dict))

@@ -790,7 +790,9 @@ builtin_exec(PyObject *self, PyObject *args)
 				"contain free variables");
 			return NULL;
 		}
+		STACKLESS_PROMOTE_ALL();
 		v = PyEval_EvalCode((PyCodeObject *) prog, globals, locals);
+		STACKLESS_ASSERT();
 	}
 	else {
 		char *str = source_as_string(prog);

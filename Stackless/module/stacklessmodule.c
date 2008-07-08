@@ -834,7 +834,7 @@ static PyTypeObject *PySlpModule_TypePtr;
 /* this is a modified clone of PyModule_New */
 
 static PyObject *
-slpmodule_new(char *name)
+slpmodule_new(const char *name)
 {
 	PySlpModuleObject *m;
 	PyObject *nameobj;
@@ -1105,33 +1105,22 @@ static struct PyModuleDef stacklessmodule = {
 	NULL,
 	NULL,
 	NULL,
-	NULL
+	NULL,
+	slpmodule_new
 };
 
 void
 _PyStackless_Init(void)
 {
 	PyObject *dict;
-	PyObject *modules;
 	char *name = "stackless";
 	PySlpModuleObject *m;
-
+	
 	if (init_slpmoduletype())
 		return;
 
 	/* record the thread state for thread support */
 	slp_initial_tstate = PyThreadState_GET();
-
-	/* smuggle an instance of our module type into modules */
-	/* this is a clone of PyImport_AddModule */
-
-	modules = PyImport_GetModuleDict();
-	slp_module = slpmodule_new(name);
-	if (slp_module == NULL || PyDict_SetItemString(modules, name, slp_module)) {
-		Py_DECREF(slp_module);
-		return;
-	}
-	Py_DECREF(slp_module); /* Yes, it still exists, in modules! */
 
 	/* Create the module and add the functions */
 	slp_module = PyModule_Create(&stacklessmodule);
