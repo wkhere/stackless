@@ -772,14 +772,14 @@ static char _gc_untrack__doc__[] =
 /* List of functions defined in the module */
 
 #define PCF PyCFunction
-#define METH_KS METH_KEYWORDS | METH_STACKLESS
+#define METH_KS METH_VARARGS | METH_KEYWORDS | METH_STACKLESS
 
 static PyMethodDef stackless_methods[] = {
 	{"schedule",		    (PCF)schedule,		METH_KS,
 	 schedule__doc__},
 	{"schedule_remove",	    (PCF)schedule_remove,	METH_KS,
 	 schedule__doc__},
-	{"run",			    (PCF)run_watchdog,		METH_KEYWORDS,
+	{"run",			    (PCF)run_watchdog,		METH_VARARGS | METH_KEYWORDS,
 	 run_watchdog__doc__},
 	{"getruncount",		    (PCF)getruncount,		METH_NOARGS,
 	 getruncount__doc__},
@@ -789,9 +789,9 @@ static PyMethodDef stackless_methods[] = {
 	 getmain__doc__},
 	{"enable_softswitch",	    (PCF)enable_softswitch,	METH_O,
 	 enable_soft__doc__},
-	{"test_cframe",		    (PCF)test_cframe,		METH_KEYWORDS,
+	{"test_cframe",		    (PCF)test_cframe,		METH_VARARGS | METH_KEYWORDS,
 	 test_cframe__doc__},
-	{"test_cframe_nr",	    (PCF)test_cframe_nr,	METH_KEYWORDS,
+	{"test_cframe_nr",	    (PCF)test_cframe_nr,	METH_VARARGS | METH_KEYWORDS,
 	test_cframe_nr__doc__},
 	{"test_outside",	    (PCF)test_outside,		METH_NOARGS,
 	test_outside__doc__},
