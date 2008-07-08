@@ -720,7 +720,7 @@ class _Pickler:
     def save_function(self, obj):
         try:
             return self.save_global(obj)
-        except PicklingError, e:
+        except PicklingError as e:
             pass
         # Check copy_reg.dispatch_table
         reduce = dispatch_table.get(type(obj))
