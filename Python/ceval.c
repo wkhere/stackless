@@ -881,7 +881,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 #ifdef DXPAIRS
 	int lastopcode = 0;
 #endif
-	register PyObject **stack_pointer;   /* Next free slot in value stack */
+	register PyObject **stack_pointer;  /* Next free slot in value stack */
 	register unsigned char *next_instr;
 	register int opcode;	/* Current opcode */
 	register int oparg;	/* Current opcode argument, if any */
@@ -892,8 +892,8 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 	register PyObject *w;
 	register PyObject *u;
 	register PyObject *t;
-	register PyObject *stream = NULL;    /* for PRINT opcodes */
 	register PyObject **fastlocals, **freevars;
+	PyObject *retval = NULL;	/* Return value */
 	PyThreadState *tstate = PyThreadState_GET();
 	PyCodeObject *co;
 
