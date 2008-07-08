@@ -893,7 +893,6 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 	register PyObject *u;
 	register PyObject *t;
 	register PyObject **fastlocals, **freevars;
-	PyObject *retval = NULL;	/* Return value */
 	PyThreadState *tstate = PyThreadState_GET();
 	PyCodeObject *co;
 
