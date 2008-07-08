@@ -28,8 +28,8 @@ def makeSuite(target):
         if use_it:
             suite.addTest(tests)
             if target > 0:
-                print "single test of '%s', switch=%s" % \
-                      (filename, ("hard", "soft")[getsoft()])
+                print("single test of '%s', switch=%s" % \
+                      (filename, ("hard", "soft")[getsoft()]))
 
     return suite
 

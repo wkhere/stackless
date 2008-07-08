@@ -10,26 +10,26 @@ VERBOSE = False
 class TestTaskletBecome(unittest.TestCase):
     def testSimpleTaskletBecome(self):
         def f(ch):
-            if VERBOSE: print "\tBecoming a tasklet inside f(ch)"
+            if VERBOSE: print("\tBecoming a tasklet inside f(ch)")
             #become_tasklet()
             got = tasklet().capture(42)
             yum = repr(got)
             res = ch.receive()
             if VERBOSE:
-                print "\tCaptured inside    f(ch):", yum
-                print "message received: " + res
-                print "\tFunction f(ch) finished"
+                print("\tCaptured inside    f(ch):", yum)
+                print("message received: " + res)
+                print("\tFunction f(ch) finished")
 
         ch = channel()
         if VERBOSE:
-            print
-            print "First in main(TestTaskletBecome):",
+            print()
+            print("First in main(TestTaskletBecome):", end=' ')
         foo =  getcurrent()
         if VERBOSE:
-            print foo
-            print "Now calling a function f(ch)"
+            print(foo)
+            print("Now calling a function f(ch)")
         bar = f(ch)
-        if VERBOSE: print "Back in  main(TestTaskletBecome):", bar
+        if VERBOSE: print("Back in  main(TestTaskletBecome):", bar)
         ch.send("Did it work out right?")
         self.assertEquals(42, bar)
 

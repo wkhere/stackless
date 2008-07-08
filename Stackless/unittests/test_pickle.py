@@ -1,7 +1,7 @@
 import sys
 import types
 import unittest
-import cPickle as pickle
+import pickle as pickle
 import gc
 
 from stackless import schedule, tasklet, stackless
@@ -52,7 +52,7 @@ def listtest(n, when):
     return i
 
 def xrangetest(n, when):
-    for i in xrange(n):
+    for i in range(n):
         if i == when:
             schedule()
     return i
@@ -64,19 +64,19 @@ def enumeratetest(n, when):
     return i
 
 def dicttestiterkeys(n, when):
-    for i in dict([ (i, i) for i in range(n) ]).iterkeys():
+    for i in dict([ (i, i) for i in range(n) ]).keys():
         if i == when:
             schedule()
     return n
 
 def dicttestitervalues(n, when):
-    for i in dict([ (i, i) for i in range(n) ]).itervalues():
+    for i in dict([ (i, i) for i in range(n) ]).values():
         if i == when:
             schedule()
     return n
 
 def dicttestiteritems(n, when):
-    for (i, j) in dict([ (i, i) for i in range(n) ]).iteritems():
+    for (i, j) in dict([ (i, i) for i in range(n) ]).items():
         if i == when:
             schedule()
     return n
@@ -133,7 +133,7 @@ class TestPickledTasklets(unittest.TestCase):
         # clear out old errors
         reset()
 
-        if self.verbose: print "starting tasklet"
+        if self.verbose: print("starting tasklet")
         t.run()
 
         self.assertEquals(is_empty(), True)
@@ -141,17 +141,17 @@ class TestPickledTasklets(unittest.TestCase):
         # do we want to do this??
         #t.tempval = None
 
-        if self.verbose: print "pickling"
+        if self.verbose: print("pickling")
         pi = pickle.dumps(t)
 
         # if self.verbose: print repr(pi)
         # why do we want to remove it?
         # t.remove()
 
-        if self.verbose: print "unpickling"
+        if self.verbose: print("unpickling")
         ip = pickle.loads(pi)
 
-        if self.verbose: print "starting unpickled tasklet"
+        if self.verbose: print("starting unpickled tasklet")
         if is_soft():
             ip.run()
         else:
@@ -235,7 +235,7 @@ class TestConcretePickledTasklets(TestPickledTasklets):
 
     def testRecursiveEmbedded(self):
         def rectest(nrec, lev=0):
-            if self.verbose: print nrec, lev
+            if self.verbose: print(nrec, lev)
             if lev < nrec:
                 rectest(nrec, lev+1)
             else:

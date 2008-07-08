@@ -5,14 +5,14 @@ problems in the future. This file only works in a debug build.
 """
 
 import sys, gc
-import cPickle as pickle
+import pickle as pickle
 from stackless import *
 
 try:
     genschedoutertest
 except NameError:
     try:
-        execfile("test_pickle.py")
+        exec(open("test_pickle.py").read())
     except SystemExit:
         pass
 
@@ -29,7 +29,7 @@ gc.collect()
 pre = stackless._get_all_objects()
 post = pre[:]
 
-print "refs before unpickling, objects", sys.gettotalrefcount(), len(pre)
+print("refs before unpickling, objects", sys.gettotalrefcount(), len(pre))
 pickle.loads(s).run()
 post = None
 gc.collect()
@@ -39,8 +39,8 @@ for i, ob in enumerate(post):
         del post[i]
 del i, ob
 gc.collect()
-print "refs after  unpickling, objects", sys.gettotalrefcount(), len(post)
+print("refs after  unpickling, objects", sys.gettotalrefcount(), len(post))
 newob = post[:len(post)-len(pre)]
-print "look into newob"
+print("look into newob")
 del pre, post
 gc.collect()

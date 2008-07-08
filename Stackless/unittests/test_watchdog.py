@@ -32,7 +32,7 @@ class SimpleScheduler(object):
             try:
                 returned = stackless.run(self.bytecodes)
                 
-            except Exception, e:
+            except Exception as e:
                                 
                 # Can't clear off exception easily... 
                 while stackless.runcount > 1:
@@ -48,14 +48,14 @@ def runtask6(name):
     me = stackless.getcurrent()
     cur_depth = me.recursion_depth
     
-    for ii in xrange(1000):
+    for ii in range(1000):
         assert cur_depth == me.recursion_depth
 
     
 
 def runtask_print(name):
     x = 0
-    for ii in xrange(1000):
+    for ii in range(1000):
         x += 1
 
     return name
@@ -63,7 +63,7 @@ def runtask_print(name):
 
 def runtask(name):
     x = 0
-    for ii in xrange(1000):
+    for ii in range(1000):
         if ii % 50 == 0:
             sys._getframe() # a dummy
             
@@ -74,7 +74,7 @@ def runtask(name):
 
 def runtask2(name):
     x = 0
-    for ii in xrange(1000):
+    for ii in range(1000):
         if ii % 50 == 0:
             stackless.schedule() # same time, but should give up timeslice
             
@@ -83,14 +83,14 @@ def runtask2(name):
     return name
 
 def runtask3(name):
-    exec """
+    exec("""
 for ii in xrange(1000):
     pass
-"""
+""")
 
 
 def runtask4(name, channel):
-    for ii in xrange(1000):
+    for ii in range(1000):
         if ii % 50 == 0:
             channel.send(name)
 
@@ -109,11 +109,11 @@ def runtask5(name):
 
 def runtask_atomic_helper(count):
     hold = stackless.current.set_atomic(1)
-    for ii in xrange(count): pass
+    for ii in range(count): pass
     stackless.current.set_atomic(hold)
 
 def runtask_atomic(name):
-    for ii in xrange(10):
+    for ii in range(10):
         for ii in [1, 10, 100, 500]:
             runtask_atomic_helper(ii)
 
@@ -161,7 +161,7 @@ class TestWatchdog(unittest.TestCase):
         for name in ["t1", "t2", "t3"]:
             tasklets.append(stackless.tasklet(fn)(name))
         # allow scheduling with hard switching
-        map(lambda t:t.set_ignore_nesting(1), tasklets)
+        list(map(lambda t:t.set_ignore_nesting(1), tasklets))
 
         scheduler.autoschedule()
         for ii in tasklets:
@@ -195,8 +195,8 @@ class TestWatchdog(unittest.TestCase):
 
         sys.setcheckinterval(hold)
         if self.verbose:
-            print
-            print 20*"*", "runtask:", n1, "runtask2:", n2
+            print()
+            print(20*"*", "runtask:", n1, "runtask2:", n2)
         self.failUnless(n1 > n2)
 
 
