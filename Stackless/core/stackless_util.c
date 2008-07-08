@@ -85,7 +85,7 @@ slp_int_wrapper(PyObject *retval)
 
 	STACKLESS_ASSERT();
 	if (retval != NULL) {
-		ret = PyInt_AsLong(retval);
+		ret = PyLong_AsLong(retval);
 		Py_DECREF(retval);
 	}
 	return ret;

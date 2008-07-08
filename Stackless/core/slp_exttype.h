@@ -47,6 +47,7 @@ typedef struct _slp_methodflags {
 	signed char nb_inplace_true_divide;
 	signed char nb_inplace_floor_divide;
 	signed char nb_index;
+	signed char nb_bool;
 	signed char sq_length;
 	signed char sq_concat;
 	signed char sq_repeat;

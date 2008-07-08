@@ -135,7 +135,6 @@ static PyMethodDef prefix##_methods[] = { \
  \
 static struct _typeobject wrap_##type = { \
 	PyObject_HEAD_INIT(&PyType_Type) \
-	0, \
 	"stackless._wrap." name, \
 	0, \
 	0, \
@@ -277,7 +276,7 @@ slp_cannot_execute(PyFrameObject *f, char *exec_name, PyObject *retval)
 	if (retval == NULL)
 		goto err_exit;
 
-	message = PyString_FromFormat("cannot execute invalid frame with "
+	message = PyUnicode_FromFormat("cannot execute invalid frame with "
 				      "'%.100s': frame had a C state that"
 				      " can't be restored.",
 				      exec_name);
@@ -325,7 +324,7 @@ slp_register_execute(PyTypeObject *t, char *name, PyFrame_ExecFunc *good,
 */
 	if (0
 	    || PyType_Ready(t) || name == NULL
-	    || (nameobj = PyString_FromString(name)) == NULL
+	    || (nameobj = PyUnicode_FromString(name)) == NULL
 	    || (g = PyLong_FromVoidPtr(good)) == NULL
 	    || (b = PyLong_FromVoidPtr(bad)) == NULL
 	    || (tup = Py_BuildValue("OO", g, b)) == NULL
@@ -391,7 +390,7 @@ slp_find_execfuncs(PyTypeObject *type, PyObject *exec_name,
 
 		PyErr_Clear();
 		sprintf(msg, "Frame exec function '%.20s' not defined for %s",
-			PyString_AS_STRING(exec_name), type->tp_name);
+			PyUnicode_AsString(exec_name), type->tp_name);
 		PyErr_SetString(PyExc_ValueError, msg);
 		return -1;
 	}
@@ -403,7 +402,7 @@ slp_find_execname(PyFrameObject *f, int *valid)
 {
 	PyObject *exec_name = NULL;
 	proxyobject *dp = (proxyobject *)
-			  PyDict_GetItemString(f->ob_type->tp_dict, "_exec_map");
+			  PyDict_GetItemString(Py_TYPE(f)->tp_dict, "_exec_map");
 	PyObject *dic = dp ? dp->dict : NULL;
 	PyObject *exec_addr = PyLong_FromVoidPtr(f->f_execute);
 
@@ -419,7 +418,7 @@ slp_find_execname(PyFrameObject *f, int *valid)
 	}
 	else {
 		PyFrame_ExecFunc *good, *bad;
-		if (slp_find_execfuncs(f->ob_type, exec_name, &good, &bad)) {
+		if (slp_find_execfuncs(Py_TYPE(f), exec_name, &good, &bad)) {
 			exec_name = NULL;
 			goto err_exit;
 		}
@@ -461,7 +460,7 @@ slp_into_tuple_with_nulls(PyObject **start, int length)
 		PyObject *ob = start[i];
 		if (ob == NULL) {
 			/* store None, and add the position to nulls */
-			PyObject *pos = PyInt_FromLong(i);
+			PyObject *pos = PyLong_FromLong(i);
 			if (pos == NULL)
 				return NULL;
 			ob = Py_None;
@@ -498,8 +497,8 @@ slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
 	/* wipe the NULL positions */
 	for (i=0; i<PyTuple_GET_SIZE(nulls); ++i) {
 		PyObject *pos = PyTuple_GET_ITEM(nulls, i);
-		if (PyInt_CheckExact(pos)) {
-			int p = PyInt_AS_LONG(pos);
+		if (PyLong_CheckExact(pos)) {
+			int p = PyLong_AS_LONG(pos);
 			if (p >= 0 && p < length) {
 				PyObject *hold = start[p];
 				start[p] = NULL;
@@ -848,7 +847,7 @@ frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	f = PyFrame_New(ts, (PyCodeObject *) f_code, globals, globals);
 	if (f != NULL)
-		f->ob_type = &wrap_PyFrame_Type;
+		Py_TYPE(f) = &wrap_PyFrame_Type;
 	Py_DECREF(globals);
 	return (PyObject *) f;
 }
@@ -864,7 +863,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	PyFrame_ExecFunc *good_func, *bad_func;
 	int valid, have_locals;
 
-	if (is_wrong_type(f->ob_type)) return NULL;
+	if (is_wrong_type(Py_TYPE(f))) return NULL;
 
 	if (f->f_globals != NULL) {
 		Py_DECREF(f->f_globals);
@@ -897,7 +896,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 				"invalid code object for frame_setstate");
 		return NULL;
 	}
-	if (slp_find_execfuncs(f->ob_type->tp_base, exec_name, &good_func,
+	if (slp_find_execfuncs(Py_TYPE(f)->tp_base, exec_name, &good_func,
 			       &bad_func))
 		return NULL;
 
@@ -981,7 +980,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	/* see if this frame is valid to be run */
 	f->f_execute = valid ? good_func : bad_func;
 
-	f->ob_type = &PyFrame_Type;
+	Py_TYPE(f) = &PyFrame_Type;
 	Py_INCREF(f);
 	return (PyObject *) f;
 err_exit:
@@ -1115,7 +1114,7 @@ tb_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		tb->tb_next = NULL;
 		tb->tb_frame = NULL;
 		PyObject_GC_Track(tb);
-		tb->ob_type = type;
+		Py_TYPE(tb) = type;
 	}
 	return (PyObject *) tb;
 }
@@ -1128,7 +1127,7 @@ tb_setstate(PyObject *self, PyObject *args)
 	PyFrameObject *frame;
 	int lasti, lineno;
 
-	if (is_wrong_type(tb->ob_type)) return NULL;
+	if (is_wrong_type(Py_TYPE(tb))) return NULL;
 
 	if (!PyArg_ParseTuple(args,
 			      "O!ii|O!:traceback",
@@ -1142,7 +1141,7 @@ tb_setstate(PyObject *self, PyObject *args)
 	tb->tb_frame = frame;
 	tb->tb_lasti = lasti;
 	tb->tb_lineno = lineno;
-	tb->ob_type = tb->ob_type->tp_base;
+	Py_TYPE(tb) = Py_TYPE(tb)->tp_base;
 
 	Py_INCREF(self);
 	return self;
@@ -1172,7 +1171,7 @@ module_reduce(PyObject * m)
 {
 	static PyObject *import = NULL;
 	PyObject *modules = PyImport_GetModuleDict();
-	char *name = PyModule_GetName(m);
+	const char *name = PyModule_GetName(m);
 
 	if (name == NULL) return NULL;
 
@@ -1321,7 +1320,7 @@ calliter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	it = (calliterobject *) PyCallIter_New(it_callable, it_sentinel);
 	if (it != NULL)
-		it->ob_type = type;
+		Py_TYPE(it) = type;
 	return (PyObject *) it;
 }
 
@@ -1348,17 +1347,14 @@ static PyTypeObject wrap_PyMethod_Type;
 static PyObject *
 method_reduce(PyObject *m)
 {
-	PyObject *tup, *func, *self, *clas;
-	char *fmt = "(O(OOO)())";
+	PyObject *tup, *func, *self;
+	char *fmt = "(O(OO)())";
 
 	func = PyMethod_GET_FUNCTION(m);
 	self = PyMethod_GET_SELF(m);
-	clas = PyMethod_GET_CLASS(m);
 	if (self == NULL)
 		self = Py_None;
-	if (clas == NULL)
-		fmt = "(O(OO)())";
-	tup = Py_BuildValue(fmt, &wrap_PyMethod_Type, func, self, clas);
+	tup = Py_BuildValue(fmt, &wrap_PyMethod_Type, func, self);
 	return tup;
 }
 
@@ -1591,6 +1587,7 @@ setiter_reduce(setiterobject *it)
 {
     PyObject *list, *set, *elem;
     Py_ssize_t i;
+	long hash;
 
     list = PyList_New(0);
     if (list == NULL)
@@ -1605,7 +1602,7 @@ setiter_reduce(setiterobject *it)
             return NULL;
         }
         i = it->si_pos;
-        while (_PySet_Next((PyObject *)it->si_set, &i, &elem)) {
+        while (_PySet_NextEntry((PyObject *)it->si_set, &i, &elem, &hash)) {
             if (PyList_Append(list, elem) == -1) {
                 return NULL;
             }
@@ -1981,7 +1978,7 @@ methw_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	Py_XDECREF(w);
 	Py_XDECREF(it);
 	if (neww != NULL)
-		neww->ob_type = type;
+		Py_TYPE(neww) = type;
 	return (PyObject *) neww;
 }
 
@@ -1993,7 +1990,7 @@ methw_setstate(PyObject *self, PyObject *args)
 
 	if (is_wrong_type(self->ob_type)) return NULL;
 	if (!PyArg_ParseTuple(args, "O!O:method-wrapper",
-			      &PyString_Type, &name,
+			      &PyUnicode_Type, &name,
 			      &inst))
 		return NULL;
 	/* now let's see if we can retrieve a wrapper, again */
@@ -2085,7 +2082,7 @@ gen_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	gen = (genobject *) PyGenerator_New((PyFrameObject *) Py_None);
 	if (gen == NULL)
 		return NULL;
-	gen->ob_type = type;
+	Py_TYPE(gen) = type;
 	return (PyObject *) gen;
 }
 
@@ -2125,7 +2122,7 @@ gen_setstate(PyObject *self, PyObject *args)
 			Py_CLEAR(((PyGenObject *)tmpgen)->gi_frame);
 			Py_DECREF(tmpgen);
 			Py_INCREF(gen);
-			gen->ob_type = gen->ob_type->tp_base;
+			Py_TYPE(gen) = Py_TYPE(gen)->tp_base;
 		}
 		else
 			gen = NULL;
@@ -2146,7 +2143,7 @@ gen_setstate(PyObject *self, PyObject *args)
 	Py_DECREF(gen->gi_code);
 	gen->gi_code = (PyObject *)f->f_code;
 	gen->gi_running = gi_running;
-	gen->ob_type = gen->ob_type->tp_base;
+	Py_TYPE(gen) = Py_TYPE(gen)->tp_base;
 	Py_INCREF(gen);
 	return (PyObject *)gen;
 }
@@ -2168,7 +2165,7 @@ static int init_generatortype(void)
 	if (gen == NULL || gen->gi_frame->f_back == NULL)
 		return -1;
 	cbframe = gen->gi_frame->f_back;
-	res = slp_register_execute(cbframe->ob_type, "gen_iternext_callback",
+	res = slp_register_execute(Py_TYPE(cbframe), "gen_iternext_callback",
 		  gen->gi_frame->f_back->f_execute,
 		  REF_INVALID_EXEC(gen_iternext_callback))
 	      || init_type(&wrap_PyGen_Type, initchain);
@@ -2272,13 +2269,23 @@ slp_pickle_moduledict(PyObject *self, PyObject *args)
   source module initialization
 
  ******************************************************/
-
+static struct PyModuleDef _wrapmodule = {
+	PyModuleDef_HEAD_INIT,
+	"stackless._wrap",
+	NULL,
+	-1,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
 int init_prickelpit(void)
 {
 	PyObject *copy_reg;
 	int ret = 0;
 
-	types_mod = Py_InitModule("stackless._wrap", NULL);
+	types_mod = PyModule_Create(&_wrapmodule);
 	if (types_mod == NULL) return -1;
 	if (PyObject_SetAttrString(slp_module, "_wrap", types_mod)) return -1;
 	copy_reg = PyImport_ImportModule("copy_reg");

@@ -393,8 +393,6 @@ typedef struct _typeobject {
 /* in Stackless, this is just a synonym */
 #define PyHeapTypeObject PyTypeObject
 
-#define PyHeapType_GET_MEMBERS(etype) \
-    ((PyMemberDef *)(((char *)etype) + (etype)->ob_type->tp_basicsize))
 #else
 
 /* The *real* layout of a type object when allocated on the heap */
@@ -414,11 +412,11 @@ typedef struct _heaptypeobject {
 	/* here are optional user slots, followed by the members. */
 } PyHeapTypeObject;
 
+#endif
+
 /* access macro to the members which are floating "behind" the object */
 #define PyHeapType_GET_MEMBERS(etype) \
     ((PyMemberDef *)(((char *)etype) + Py_TYPE(etype)->tp_basicsize))
-
-#endif
 
 /* Generic type check */
 PyAPI_FUNC(int) PyType_IsSubtype(PyTypeObject *, PyTypeObject *);

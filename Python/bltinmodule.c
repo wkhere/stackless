@@ -3,6 +3,7 @@
 #include "Python.h"
 #include "Python-ast.h"
 
+#undef Yield /* conflicts with windows headers */
 #include "core/stackless_impl.h"
 
 #include "node.h"

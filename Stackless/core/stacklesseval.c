@@ -67,14 +67,14 @@ cstack_dealloc(PyCStackObject *cst)
 	slp_cstack_chain = cst;
 	SLP_CHAIN_REMOVE(PyCStackObject, &slp_cstack_chain, cst, next, 
 			 prev);
-	if (cst->ob_size >= CSTACK_SLOTS) {
+	if (Py_SIZE(cst) >= CSTACK_SLOTS) {
 		PyObject_Del(cst);
 	}
 	else {
 		if (cstack_cachecount >= CSTACK_MAXCACHE)
 			slp_cstack_cacheclear();
-        cst->startaddr = (intptr_t *) cstack_cache[cst->ob_size];
-		cstack_cache[cst->ob_size] = cst;
+        cst->startaddr = (intptr_t *) cstack_cache[Py_SIZE(cst)];
+		cstack_cache[Py_SIZE(cst)] = cst;
 		++cstack_cachecount;
 	}
 }
@@ -122,10 +122,10 @@ slp_cstack_new(PyCStackObject **cst, intptr_t *stackref, PyTaskletObject *task)
 size_t
 slp_cstack_save(PyCStackObject *cstprev)
 {
-    size_t stsizeb = (cstprev)->ob_size * sizeof(intptr_t);
+    size_t stsizeb = Py_SIZE(cstprev) * sizeof(intptr_t);
 
 	memcpy((cstprev)->stack, (cstprev)->startaddr - 
-				 (cstprev)->ob_size, stsizeb);
+				 Py_SIZE(cstprev), stsizeb);
 #ifdef _SEH32
 	//save the SEH handler
 	cstprev->exception_list = (DWORD)
@@ -143,8 +143,8 @@ slp_cstack_restore(PyCStackObject *cst)
 	cst->tstate->st.nesting_level = cst->nesting_level;
 	/* mark task as no longer responsible for cstack instance */
 	cst->task = NULL;
-	memcpy(cst->startaddr - cst->ob_size, &cst->stack,
-	       (cst->ob_size) * sizeof(intptr_t));
+	memcpy(cst->startaddr - Py_SIZE(cst), &cst->stack,
+	       Py_SIZE(cst) * sizeof(intptr_t));
 #ifdef _SEH32
 	//restore the SEH handler
 	__writefsdword(FIELD_OFFSET(NT_TIB, ExceptionList), (DWORD)(cst->exception_list));
@@ -168,7 +168,7 @@ Note: For inspection, str() can dump it as a string.\
 
 
 static PyMemberDef cstack_members[] = {
-	{"size", T_INT, offsetof(PyCStackObject, ob_size), READONLY},
+	{"size", T_INT, offsetof(PyCStackObject, ob_base.ob_size), READONLY},
 	{"next", T_OBJECT, offsetof(PyCStackObject, next), READONLY},
 	{"prev", T_OBJECT, offsetof(PyCStackObject, prev), READONLY},
 	{"task", T_OBJECT, offsetof(PyCStackObject, task), READONLY},
@@ -182,13 +182,12 @@ static PyObject *
 cstack_str(PyObject *o)
 {
 	PyCStackObject *cst = (PyCStackObject*)o;
-	return PyString_FromStringAndSize((char*)&cst->stack,
-	    cst->ob_size*sizeof(cst->stack[0]));
+	return PyUnicode_FromStringAndSize((char*)&cst->stack,
+	    Py_SIZE(cst)*sizeof(cst->stack[0]));
 }
 
 PyTypeObject PyCStack_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,
 	"stackless.cstack",
 	sizeof(PyCStackObject),
 	sizeof(PyObject *),
@@ -369,7 +368,7 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 
 	if (ts->st.main == NULL) {
 		if (initialize_main_and_current()) {
-			PyObject *s = PyString_FromString("tasklet cleanup");
+			PyObject *s = PyUnicode_FromString("tasklet cleanup");
 			PyErr_WriteUnraisable(s);
 			Py_XDECREF(s);
 			return;
@@ -608,7 +607,7 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 static PyObject *
 unwind_repr(PyObject *op)
 {
-	return PyString_FromString(
+	return PyUnicode_FromString(
 		"The invisible unwind token. If you ever should see this,\n"
 		"please report the error to tismer@tismer.com"
 	);
@@ -620,7 +619,6 @@ static void unwind_dealloc(PyObject *op) {
 
 static PyTypeObject PyUnwindToken_Type = {
 	PyObject_HEAD_INIT(&PyUnwindToken_Type)
-	0,
 	"UnwindToken",
 	0,
 	0,

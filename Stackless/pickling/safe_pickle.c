@@ -84,7 +84,7 @@ pickle_runmain(PyFrameObject *f, int exc, PyObject *retval)
 	Py_XDECREF(retval);
 	ts->frame = f->f_back;
 	Py_DECREF(f);
-	return PyInt_FromLong(cPickle_save(_self, _args, _pers_save));
+	return PyLong_FromLong(cPickle_save(_self, _args, _pers_save));
 }
 
 static int

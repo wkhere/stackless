@@ -34,7 +34,7 @@ static PyTaskletObject *_prev;
 	else \
         stsizeb = (_cst->startaddr - (intptr_t *)stackref) * sizeof(intptr_t); \
     if (_cst == NULL) __return(0); \
-    stsizediff = stsizeb - (_cst->ob_size * sizeof(intptr_t));
+    stsizediff = stsizeb - (Py_SIZE(_cst) * sizeof(intptr_t));
 
 #define SLP_RESTORE_STATE() \
 	if (_cst != NULL) { \
@@ -120,7 +120,7 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
 
     if ((intptr_t *) &ts > ts->st.cstack_base)
 		return climb_stack_and_transfer(cstprev, cst, prev);
-	if (cst == NULL || cst->ob_size == 0)
+	if (cst == NULL || Py_SIZE(cst) == 0)
 		cst = ts->st.initial_stub;
 	if (cst != NULL) {
 		if (cst->tstate != ts) {
@@ -140,7 +140,7 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
 		 * task. In this case, we would destroy the target before
 		 * switching. Therefore, we simply don't switch, just save.
 		 */
-		if (cstprev && *cstprev == cst && cst->ob_refcnt == 1)
+		if (cstprev && *cstprev == cst && Py_REFCNT(cst) == 1)
 			cst = NULL;
 	}
 	_cstprev = cstprev;

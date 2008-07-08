@@ -202,23 +202,23 @@ typedef struct _slpmodule {
 /*** associated type objects ***/
 
 PyAPI_DATA(PyTypeObject) PyCFrame_Type;
-#define PyCFrame_Check(op) ((op)->ob_type == &PyCFrame_Type)
+#define PyCFrame_Check(op) (Py_TYPE(op) == &PyCFrame_Type)
 
 PyAPI_DATA(PyTypeObject) PyCStack_Type;
-#define PyCStack_Check(op) ((op)->ob_type == &PyCStack_Type)
+#define PyCStack_Check(op) (Py_TYPE(op) == &PyCStack_Type)
 
 PyAPI_DATA(PyTypeObject) PyBomb_Type;
-#define PyBomb_Check(op) ((op)->ob_type == &PyBomb_Type)
+#define PyBomb_Check(op) (Py_TYPE(op) == &PyBomb_Type)
 
 PyAPI_DATA(PyTypeObject*) PyTasklet_TypePtr;
 #define PyTasklet_Type (*PyTasklet_TypePtr)
 #define PyTasklet_Check(op) PyObject_TypeCheck(op, PyTasklet_TypePtr)
-#define PyTasklet_CheckExact(op) ((op)->ob_type == PyTasklet_TypePtr)
+#define PyTasklet_CheckExact(op) (Py_TYPE(op) == PyTasklet_TypePtr)
 
 PyAPI_DATA(PyTypeObject*) PyChannel_TypePtr;
 #define PyChannel_Type (*PyChannel_TypePtr)
 #define PyChannel_Check(op) PyObject_TypeCheck(op, PyChannel_TypePtr)
-#define PyChannel_CheckExact(op) ((op)->ob_type == PyChannel_TypePtr)
+#define PyChannel_CheckExact(op) (Py_TYPE(op) == PyChannel_TypePtr)
 
 /*** these are in other bits of Python ***/
 PyAPI_DATA(PyTypeObject) PyDictIterKey_Type;

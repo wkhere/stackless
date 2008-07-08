@@ -15,7 +15,6 @@ typedef struct {
 
 static _stackless_method _stackless_methtable[] = {
 	/* from classobject.c */
-	{&PyInstance_Type,		MFLAG_OFS(tp_call)},
 	{&PyMethod_Type,		MFLAG_OFS(tp_call)},
 	/* from descrobject.c */
 	{&PyMethodDescr_Type,		MFLAG_OFS(tp_call)},

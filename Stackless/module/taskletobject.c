@@ -139,12 +139,12 @@ tasklet_dealloc(PyTaskletObject *t)
 		PyObject_ClearWeakRefs((PyObject *)t);
 	assert(t->f.frame == NULL);
 	if (t->cstate != NULL) {
-		assert(t->cstate->task != t || t->cstate->ob_size == 0);
+		assert(t->cstate->task != t || Py_SIZE(t->cstate) == 0);
 		Py_DECREF(t->cstate);
 	}
 	Py_DECREF(t->tempval);
 	Py_XDECREF(t->def_globals);
-	t->ob_type->tp_free((PyObject*)t);
+	Py_TYPE(t)->tp_free((PyObject*)t);
 }
 
 
@@ -282,7 +282,7 @@ tasklet_reduce(PyTaskletObject * t)
 	if (PyList_Reverse(lis)) goto err_exit;
 	assert(t->cstate != NULL);
 	tup = Py_BuildValue("(O()(" TASKLET_TUPLEFMT "))",
-			    t->ob_type,
+			    Py_TYPE(t),
 			    t->flags,
 			    t->tempval,
 			    t->cstate->nesting_level,
@@ -402,7 +402,7 @@ PyTasklet_Remove_M(PyTaskletObject *task)
 int 
 PyTasklet_Remove(PyTaskletObject *task)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	return t->remove(task);
 }
@@ -455,7 +455,7 @@ Blocked tasklets need to be reactivated by channels.";
 int 
 PyTasklet_Insert(PyTaskletObject *task)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	return t->insert(task);
 }
@@ -509,7 +509,7 @@ PyTasklet_Run_M(PyTaskletObject *task)
 int 
 PyTasklet_Run_nr(PyTaskletObject *task)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	slp_try_stackless = 1;
 	return slp_return_wrapper(t->run(task));
@@ -518,7 +518,7 @@ PyTasklet_Run_nr(PyTaskletObject *task)
 int 
 PyTasklet_Run(PyTaskletObject *task)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	return slp_return_wrapper(t->run(task));
 }
@@ -565,7 +565,7 @@ See set_ignore_nesting.\
 int 
 PyTasklet_SetAtomic(PyTaskletObject *task, int flag)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	return t->set_atomic(task, flag);
 }
@@ -591,11 +591,11 @@ static TASKLET_SETATOMIC_HEAD(wrap_tasklet_set_atomic)
 static PyObject *
 tasklet_set_atomic(PyObject *self, PyObject *flag)
 {
-	if (! (flag && PyInt_Check(flag)) )
+	if (! (flag && PyLong_Check(flag)) )
 		TYPE_ERROR("set_atomic needs exactly one bool or integer",
 			   NULL);
 	return PyBool_FromLong(impl_tasklet_set_atomic(
-	    (PyTaskletObject*)self, PyInt_AS_LONG(flag)));
+	    (PyTaskletObject*)self, PyLong_AsLong(flag)));
 }
 
 
@@ -614,7 +614,7 @@ usage:\n\
 int 
 PyTasklet_SetIgnoreNesting(PyTaskletObject *task, int flag)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	return t->set_ignore_nesting(task, flag);
 }
@@ -640,11 +640,11 @@ static TASKLET_SETIGNORENESTING_HEAD(wrap_tasklet_set_ignore_nesting)
 static PyObject *
 tasklet_set_ignore_nesting(PyObject *self, PyObject *flag)
 {
-    if (! (flag && PyInt_Check(flag)) )
+    if (! (flag && PyLong_Check(flag)) )
 	    TYPE_ERROR("set_ignore_nesting needs exactly one bool or integer",
 		       NULL);
     return PyBool_FromLong(impl_tasklet_set_ignore_nesting(
-	(PyTaskletObject*)self, PyInt_AS_LONG(flag)));
+	(PyTaskletObject*)self, PyLong_AsLong(flag)));
 }
 
 
@@ -681,7 +681,7 @@ If retval is not given, the tasklet is used as default.\
 PyObject *
 PyTasklet_Become(PyTaskletObject *task, PyObject *retval)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	return t->become(task, retval);
 }
@@ -728,7 +728,7 @@ parent tasklet is removed from the runnables and returned as the value.\
 PyObject *
 PyTasklet_Capture(PyTaskletObject *task, PyObject *retval)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	return t->capture(task, retval);
 }
@@ -817,7 +817,7 @@ PyTasklet_Setup_M(PyTaskletObject *task, PyObject *args, PyObject *kwds)
 
 int PyTasklet_Setup(PyTaskletObject *task, PyObject *args, PyObject *kwds)
 {
-	PyObject *ret = task->ob_type->tp_call((PyObject *) task, args, kwds);
+	PyObject *ret = Py_TYPE(task)->tp_call((PyObject *) task, args, kwds);
 
 	return slp_return_wrapper(ret);
 }
@@ -877,7 +877,7 @@ PyTasklet_RaiseException_M(PyTaskletObject *self, PyObject *klass,
 int PyTasklet_RaiseException(PyTaskletObject *self, PyObject *klass,
 			     PyObject *args)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)self->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(self);
 
     return slp_return_wrapper(t->raise_exception(self, klass, args));
 }
@@ -940,7 +940,7 @@ the tasklet will silently die.";
 
 int PyTasklet_Kill(PyTaskletObject *task)
 {
-	PyTasklet_HeapType *t = (PyTasklet_HeapType *)task->ob_type;
+	PyTasklet_HeapType *t = (PyTasklet_HeapType *)Py_TYPE(task);
 
 	return slp_return_wrapper(t->kill(task));
 }
@@ -958,13 +958,13 @@ static TASKLET_KILL_HEAD(impl_tasklet_kill)
 	if (slp_get_frame(task) == NULL) {
 		/* just clear it, typically a thread's main */
 		/* XXX not clear why this isn't covered in tasklet_end */
-		task->ob_type->tp_clear((PyObject *)task);
+		Py_TYPE(task)->tp_clear((PyObject *)task);
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
 	/* we might be called after exceptions are gone */
 	if (PyExc_TaskletExit == NULL) {
-		PyExc_TaskletExit = PyString_FromString("zombie");
+		PyExc_TaskletExit = PyUnicode_FromString("zombie");
 		if (PyExc_TaskletExit == NULL)
 			return NULL; /* give up */
 	}
@@ -1062,9 +1062,9 @@ int PyTasklet_GetBlockTrap(PyTaskletObject *task)
 static int
 tasklet_set_block_trap(PyTaskletObject *task, PyObject *value)
 {
-	if (!PyInt_Check(value))
+	if (!PyLong_Check(value))
 		TYPE_ERROR("block_trap must be set to a bool or integer", -1);
-	task->flags.block_trap = PyInt_AsLong(value) ? 1 : 0;
+	task->flags.block_trap = PyLong_AsLong(value) ? 1 : 0;
 	return 0;
 }
 
@@ -1107,7 +1107,7 @@ tasklet_get_recursion_depth(PyTaskletObject *task)
 
 	assert(task->cstate != NULL);
 	ts = task->cstate->tstate;
-	return PyInt_FromLong(ts->st.current == task ? ts->recursion_depth
+	return PyLong_FromLong(ts->st.current == task ? ts->recursion_depth
 						     : task->recursion_depth);
 }
 
@@ -1130,7 +1130,7 @@ tasklet_get_nesting_level(PyTaskletObject *task)
 
 	assert(task->cstate != NULL);
 	ts = task->cstate->tstate;
-	return PyInt_FromLong(
+	return PyLong_FromLong(
 	    ts->st.current == task ? ts->st.nesting_level
 				   : task->cstate->nesting_level);
 }
@@ -1251,7 +1251,7 @@ tasklet_get_prev(PyTaskletObject *task)
 static PyObject *
 tasklet_thread_id(PyTaskletObject *task)
 {
-	return PyInt_FromLong(task->cstate->tstate->thread_id);
+	return PyLong_FromLong(task->cstate->tstate->thread_id);
 }
 
 static PyMemberDef tasklet_members[] = {
@@ -1403,7 +1403,6 @@ module.\n\
 
 PyTypeObject _PyTasklet_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,
 	"tasklet",
 	sizeof(PyTaskletObject),
 	0,

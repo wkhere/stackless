@@ -58,7 +58,7 @@ static int bind_last_to_first( PyTypeObject *type, PyTypeObject *current)
 {
 	PyCMethodDef *ml;
 	if (current->tp_base != NULL &&
-	    PyType_IsSubtype(current->tp_base->ob_type, &PyFlexType_Type))
+	    PyType_IsSubtype(Py_TYPE(current->tp_base), &PyFlexType_Type))
 		if (bind_last_to_first(type, current->tp_base))
 			return -1;
 	ml = ((PyFlexTypeObject *) current)->tp_cmethods;

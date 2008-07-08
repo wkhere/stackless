@@ -137,7 +137,7 @@ cframe_reduce(PyCFrameObject *cf)
     if (params == NULL) goto err_exit;
 
     res = Py_BuildValue ("(O()(" cframetuplefmt "))",
-			 cf->ob_type,
+			 Py_TYPE(cf),
 			 valid,
 			 exec_name,
 			 params,
@@ -180,7 +180,7 @@ cframe_setstate(PyObject *self, PyObject *args)
 			       &n))
 	        return NULL;
     
-	if (slp_find_execfuncs(cf->ob_type, exec_name, &good_func, &bad_func))
+	if (slp_find_execfuncs(Py_TYPE(cf), exec_name, &good_func, &bad_func))
 		return NULL;
 
         if (PyTuple_GET_SIZE(params)-1 != 3)
@@ -264,18 +264,17 @@ slp_cframe_newfunc(PyObject *func, PyObject *args, PyObject *kwds, unsigned int 
 }
 
 static PyMemberDef cframe_memberlist[] = {
-	{"f_back",	T_OBJECT,   offsetof(PyCFrameObject, f_back),	RO},
-	{"ob1",		T_OBJECT,   offsetof(PyCFrameObject, ob1),	RO},
-	{"ob2",		T_OBJECT,   offsetof(PyCFrameObject, ob2),	RO},
-	{"ob3",		T_OBJECT,   offsetof(PyCFrameObject, ob3),	RO},
-	{"i",		T_LONG,	    offsetof(PyCFrameObject, i),	RO},
-	{"n",		T_LONG,	    offsetof(PyCFrameObject, n),	RO},
+	{"f_back",	T_OBJECT,   offsetof(PyCFrameObject, f_back),	READONLY},
+	{"ob1",		T_OBJECT,   offsetof(PyCFrameObject, ob1),	READONLY},
+	{"ob2",		T_OBJECT,   offsetof(PyCFrameObject, ob2),	READONLY},
+	{"ob3",		T_OBJECT,   offsetof(PyCFrameObject, ob3),	READONLY},
+	{"i",		T_LONG,	    offsetof(PyCFrameObject, i),	READONLY},
+	{"n",		T_LONG,	    offsetof(PyCFrameObject, n),	READONLY},
 	{NULL}  /* Sentinel */
 };
 
 PyTypeObject PyCFrame_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,
 	"stackless.cframe",
 	sizeof(PyCFrameObject),
 	0,
@@ -313,7 +312,6 @@ PyTypeObject PyCFrame_Type = {
 	0,					/* tp_init */
 	0,					/* tp_alloc */
 	cframe_new,				/* tp_new */
-	_PyObject_Del,				/* tp_free */
 };
 
 int init_cframetype(void)

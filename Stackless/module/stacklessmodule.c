@@ -108,7 +108,7 @@ static PyObject *
 getruncount(PyObject *self)
 {
 	PyThreadState *ts = PyThreadState_GET();
-	return PyInt_FromLong(ts->st.runcount);
+	return PyLong_FromLong(ts->st.runcount);
 }
 
 
@@ -157,13 +157,13 @@ static PyObject *
 enable_softswitch(PyObject *self, PyObject *flag)
 {
 	PyObject *ret;
-	if (! (flag && PyInt_Check(flag)) ) {
+	if (! (flag && PyLong_Check(flag)) ) {
 		PyErr_SetString(PyExc_TypeError,
 		    "enable_softswitch needs exactly one bool or integer");
 		return NULL;
 	}
 	ret = PyBool_FromLong(slp_enable_softswitch);
-	slp_enable_softswitch = PyInt_AS_LONG(flag);
+	slp_enable_softswitch = PyLong_AsLong(flag);
 	return ret;
 }
 
@@ -640,16 +640,16 @@ _peek(PyObject *self, PyObject *v)
 	int i;
 
 	if (v == Py_None) {
-		return PyInt_FromLong((int)_peek);
+		return PyLong_FromLong((int)_peek);
 	}
 	if (PyCode_Check(v)) {
-		return PyInt_FromLong((int)(((PyCodeObject*)v)->co_code));
+		return PyLong_FromLong((int)(((PyCodeObject*)v)->co_code));
 	}
-	if (PyInt_Check(v) && PyInt_AS_LONG(v) == 0) {
-		return PyInt_FromLong((int)(&PyEval_EvalFrameEx_slp));
+	if (PyLong_Check(v) && PyLong_AsLong(v) == 0) {
+		return PyLong_FromLong((int)(&PyEval_EvalFrameEx_slp));
 	}
-	if (!PyInt_Check(v)) goto noobject;
-	o = (PyObject*) PyInt_AS_LONG(v);
+	if (!PyLong_Check(v)) goto noobject;
+	o = (PyObject*) PyLong_AsLong(v);
 	/* this is plain heuristics, use for now */
 	if (CANNOT_READ_MEM(o, sizeof(PyObject))) goto noobject;
 	if (IS_ON_STACK(o)) goto noobject;
@@ -660,10 +660,10 @@ _peek(PyObject *self, PyObject *v)
 			break;
 		if (CANNOT_READ_MEM(t, sizeof(PyTypeObject))) goto noobject;
 		if (IS_ON_STACK(o)) goto noobject;
-		if (t->ob_refcnt < 1 || t->ob_refcnt > 10000) goto noobject;
+		if (Py_REFCNT(t) < 1 || Py_REFCNT(t) > 10000) goto noobject;
 		if (!(isalpha(t->tp_name[0])||t->tp_name[0]=='_'))
 			goto noobject;
-		t = t->ob_type;
+		t = Py_TYPE(t);
 	}
 	Py_INCREF(o);
 	return o;
@@ -823,10 +823,11 @@ static PyMethodDef stackless_methods[] = {
 };
 
 
-static char stackless__doc__[] =
+PyDoc_STRVAR(stackless_doc,
 "The Stackless module allows you to do multitasking without using threads.\n\
 The essential objects are tasklets and channels.\n\
-Please refer to their documentation.";
+Please refer to their documentation.\n\
+");
 
 static PyTypeObject *PySlpModule_TypePtr;
 
@@ -843,7 +844,7 @@ slpmodule_new(char *name)
 		return NULL;
 	m->__channel__ = NULL;
 	m->__tasklet__ = NULL;
-	nameobj = PyString_FromString(name);
+	nameobj = PyUnicode_FromString(name);
 	m->md_dict = PyDict_New();
 	if (m->md_dict == NULL || nameobj == NULL)
 		goto fail;
@@ -871,7 +872,7 @@ slpmodule_dealloc(PySlpModuleObject *m)
 	}
 	Py_XDECREF(m->__channel__);
 	Py_XDECREF(m->__tasklet__);
-	m->ob_type->tp_free((PyObject *)m);
+	Py_TYPE(m)->tp_free((PyObject *)m);
 }
 
 
@@ -960,7 +961,7 @@ slpmodule_getthreads(PySlpModuleObject *mod, void *context)
 		return NULL;
 
 	for (ts = interp->tstate_head; ts != NULL; ts = ts->next) {
-		PyObject *id = PyInt_FromLong(ts->thread_id);
+		PyObject *id = PyLong_FromLong(ts->thread_id);
 
 		if (id == NULL || PyList_Append(lis, id))
 			return NULL;
@@ -1005,7 +1006,6 @@ for the getruncount, getcurrent and getmain module functions.\n\
 
 static PyTypeObject PySlpModule_TypeTemplate = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,
 	"slpmodule",
 	sizeof(PySlpModuleObject),
 	0,
@@ -1096,6 +1096,18 @@ _PyStackless_InitTypes(void)
 }
 
 
+static struct PyModuleDef stacklessmodule = {
+	PyModuleDef_HEAD_INIT,
+	"stackless",
+	stackless_doc,
+	-1,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+
 void
 _PyStackless_Init(void)
 {
@@ -1122,7 +1134,7 @@ _PyStackless_Init(void)
 	Py_DECREF(slp_module); /* Yes, it still exists, in modules! */
 
 	/* Create the module and add the functions */
-	slp_module = Py_InitModule3("stackless", stackless_methods, stackless__doc__);
+	slp_module = PyModule_Create(&stacklessmodule);
 	if (slp_module == NULL)
 		return; /* errors handled by caller */
 

@@ -190,7 +190,7 @@ PyChannel_GetClosed(PyChannelObject *self)
 static PyObject *
 channel_get_preference(PyChannelObject *self)
 {
-	return PyInt_FromLong(self->flags.preference);
+	return PyLong_FromLong(self->flags.preference);
 }
 
 static int
@@ -198,9 +198,9 @@ channel_set_preference(PyChannelObject *self, PyObject *value)
 {
 	int val;
 
-	if (!PyInt_Check(value))
+	if (!PyLong_Check(value))
 		TYPE_ERROR("preference must be set to an integer", -1);
-	val = PyInt_AS_LONG(value);
+	val = PyLong_AsLong(value);
 	self->flags.preference = val > 0 ? 1 : val < 0 ? -1 : 0;
 	return 0;
 }
@@ -220,15 +220,15 @@ PyChannel_SetPreference(PyChannelObject *self, int val)
 static PyObject *
 channel_get_schedule_all(PyChannelObject *self)
 {
-	return PyInt_FromLong(self->flags.schedule_all);
+	return PyLong_FromLong(self->flags.schedule_all);
 }
 
 static int
 channel_set_schedule_all(PyChannelObject *self, PyObject *value)
 {
-	if (!PyInt_Check(value))
+	if (!PyLong_Check(value))
 		TYPE_ERROR("preference must be set to a bool or integer", -1);
-	self->flags.schedule_all = PyInt_AsLong(value) ? 1 : 0;
+	self->flags.schedule_all = PyLong_AsLong(value) ? 1 : 0;
 	return 0;
 }
 
@@ -375,7 +375,7 @@ PyChannel_Send_M(PyChannelObject *self, PyObject *arg)
 int
 PyChannel_Send_nr(PyChannelObject *self, PyObject *arg)
 {
-	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
+	PyChannel_HeapType *t = (PyChannel_HeapType *) Py_TYPE(self);
 
 	slp_try_stackless = slp_enable_softswitch;
 	return slp_return_wrapper(t->send(self, arg));
@@ -384,7 +384,7 @@ PyChannel_Send_nr(PyChannelObject *self, PyObject *arg)
 int
 PyChannel_Send(PyChannelObject *self, PyObject *arg)
 {
-	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
+	PyChannel_HeapType *t = (PyChannel_HeapType *) Py_TYPE(self);
 
 	return slp_return_wrapper(t->send(self, arg));
 }
@@ -507,7 +507,7 @@ PyChannel_SendException_M(PyChannelObject *self, PyObject *klass,
 int
 PyChannel_SendException(PyChannelObject *self, PyObject *klass, PyObject *args)
 {
-	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
+	PyChannel_HeapType *t = (PyChannel_HeapType *) Py_TYPE(self);
 
 	return slp_return_wrapper(t->send_exception(self, klass, args));
 }
@@ -581,7 +581,7 @@ PyChannel_Receive_M(PyChannelObject *self)
 PyObject *
 PyChannel_Receive_nr(PyChannelObject *self)
 {
-	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
+	PyChannel_HeapType *t = (PyChannel_HeapType *) Py_TYPE(self);
 	PyObject *ret;
 
 	slp_try_stackless = 1;
@@ -593,7 +593,7 @@ PyChannel_Receive_nr(PyChannelObject *self)
 PyObject *
 PyChannel_Receive(PyChannelObject *self)
 {
-	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
+	PyChannel_HeapType *t = (PyChannel_HeapType *) Py_TYPE(self);
 	return t->receive(self);
 }
 
@@ -711,7 +711,7 @@ a very efficient way to build fast pipes.";
 static PyObject *
 _channel_send_sequence(PyChannelObject *self, PyObject *v)
 {
-	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
+	PyChannel_HeapType *t = (PyChannel_HeapType *) Py_TYPE(self);
 	PyObject *it;
 	int i;
 	PyObject *ret;
@@ -736,7 +736,7 @@ _channel_send_sequence(PyChannelObject *self, PyObject *v)
 	}
 
 	Py_DECREF(it);
-	return PyInt_FromLong(i);
+	return PyLong_FromLong(i);
 
   error:
 	Py_DECREF(it);
@@ -800,7 +800,7 @@ back_with_data:
 
 		/* send the data */
 		ch = (PyChannelObject *) f->ob2;
-		t = (PyChannel_HeapType *) ch->ob_type;
+		t = (PyChannel_HeapType *) Py_TYPE(ch);
 		STACKLESS_PROPOSE_ALL();
 		retval = t->send(ch, item);
 		Py_DECREF(item);
@@ -815,7 +815,7 @@ back_from_send:
 		;
 	}
 
-	retval = PyInt_FromLong(f->i);
+	retval = PyLong_FromLong(f->i);
 exit_frame:
 
 	/* epilog to return from the frame */
@@ -905,7 +905,7 @@ channel_reduce(PyChannelObject * ch)
 		t = t->next;
 	}
 	tup = Py_BuildValue("(O()(iiO))",
-			    ch->ob_type,
+			    Py_TYPE(ch),
 			    ch->balance,
 			    ch->flags,
 			    lis
@@ -1000,7 +1000,6 @@ is resumed. If there is no waiting sender, the receiver is suspended.\
 
 PyTypeObject _PyChannel_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,
 	"channel",
 	sizeof(PyChannelObject),
 	0,

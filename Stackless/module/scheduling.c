@@ -121,7 +121,7 @@ slp_make_bomb(PyObject *klass, PyObject *args, char *msg)
 	PyObject *tup;
 
 	if (! (PyObject_IsSubclass(klass, PyExc_BaseException) == 1 ||
-	       PyString_Check(klass) ) ) {
+	       PyUnicode_Check(klass) ) ) {
 		char s[256];
 
 		sprintf(s, "%.128s needs Exception or string"
@@ -226,7 +226,6 @@ t.run()  # let the bomb explode";
 
 PyTypeObject PyBomb_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,
 	"stackless.bomb",
 	sizeof(PyBombObject),
 	0,
@@ -1024,7 +1023,7 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 			retval = slp_bomb_explode(prev);
 	}
 
-	prev->ob_type->tp_clear((PyObject *)prev);
+	Py_TYPE(prev)->tp_clear((PyObject *)prev);
 	/* now it is safe to derefence prev */
 	Py_DECREF(prev);
 	return retval;

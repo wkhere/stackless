@@ -2260,7 +2260,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		static PyObject *call_str;
 
 		if (!call_str) {
-			call_str = PyString_InternFromString("__call__");
+			call_str = PyUnicode_InternFromString("__call__");
 			if (call_str == NULL)
 				return NULL;
 		}
