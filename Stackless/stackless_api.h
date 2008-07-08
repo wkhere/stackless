@@ -36,7 +36,7 @@ extern "C" {
 
 #include "core/stackless_impl.h"
 
-/* 
+/*
  * create a new tasklet object.
  * type must be derived from PyTasklet_Type or NULL.
  * func must (yet) be a callable object (normal usecase)
@@ -45,7 +45,7 @@ extern "C" {
 PyAPI_FUNC(PyTaskletObject *) PyTasklet_New(PyTypeObject *type, PyObject *func);
 /* 0 = success	-1 = failure */
 
-/* 
+/*
  * bind a tasklet function to parameters, making it ready to run,
  * and insert in into the runnables queue.
  */
@@ -70,7 +70,7 @@ PyAPI_FUNC(int) PyTasklet_Remove(PyTaskletObject *task);
 
 /*
  * insert a tasklet into the runnables queue, if it isn't
- * already in. Results in a runtime error if the tasklet is 
+ * already in. Results in a runtime error if the tasklet is
  * blocked or dead.
  */
 PyAPI_FUNC(int) PyTasklet_Insert(PyTaskletObject *task);
@@ -108,7 +108,7 @@ PyAPI_FUNC(PyObject *) PyTasklet_Capture(PyTaskletObject *self,
  * see PyTasklet_Kill.
  */
 
-PyAPI_FUNC(int) PyTasklet_RaiseException(PyTaskletObject *self, 
+PyAPI_FUNC(int) PyTasklet_RaiseException(PyTaskletObject *self,
 					 PyObject *klass, PyObject *args);
 /* 0 = success	-1 = failure.
  * Note that this call always ends in some exception, so the
@@ -175,7 +175,7 @@ PyAPI_FUNC(int) PyTasklet_GetRecursionDepth(PyTaskletObject *task);
 /* returns the recursion depth of task */
 
 PyAPI_FUNC(int) PyTasklet_GetNestingLevel(PyTaskletObject *task);
-/* returns the nesting level of task, 
+/* returns the nesting level of task,
  * i.e. the number of nested interpreters.
  */
 
@@ -197,7 +197,7 @@ PyAPI_FUNC(int) PyTasklet_Restorable(PyTaskletObject *task);
 
  ******************************************************/
 
-/* 
+/*
  * create a new channel object.
  * type must be derived from PyChannel_Type or NULL.
  */
@@ -237,6 +237,12 @@ PyAPI_FUNC(int) PyChannel_SendException_nr(PyChannelObject *self,
 /* the next tasklet in the queue or None */
 PyAPI_FUNC(PyObject *) PyChannel_GetQueue(PyChannelObject *self);
 
+/* close() the channel */
+PyAPI_FUNC(void) PyChannel_Close(PyChannelObject *self);
+
+/* open() the channel */
+PyAPI_FUNC(void) PyChannel_Open(PyChannelObject *self);
+
 /* whether close() was called */
 PyAPI_FUNC(int) PyChannel_GetClosing(PyChannelObject *self);
 
@@ -244,7 +250,7 @@ PyAPI_FUNC(int) PyChannel_GetClosing(PyChannelObject *self);
 
 PyAPI_FUNC(int) PyChannel_GetClosed(PyChannelObject *self);
 
-/* 
+/*
  * preferred scheduling policy.
  * Note: the scheduling settings have no effect on interthread communication.
  * When threads are involved, we only transfer between the threads.
@@ -267,7 +273,7 @@ PyAPI_FUNC(void) PyChannel_SetScheduleAll(PyChannelObject *self, int val);
 
  ******************************************************/
 
-/* 
+/*
  * suspend the current tasklet and schedule the next one in the cyclic chain.
  * if remove is nonzero, the current tasklet will be removed from the chain.
  */
@@ -281,13 +287,13 @@ PyAPI_FUNC(PyObject *) PyStackless_Schedule_nr(PyObject *retval, int remove);
  * retval == Py_UnwindToken: soft switched
  */
 
-/* 
+/*
  * get the number of runnable tasks, including the current one.
  */
 PyAPI_FUNC(int) PyStackless_GetRunCount(void);
 /* -1 = failure */
 
-/* 
+/*
  * get the currently running tasklet, that is, "yourself".
  */
 PyAPI_FUNC(PyObject *) PyStackless_GetCurrent(void);

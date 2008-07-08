@@ -424,7 +424,7 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
 
 		if (interthread) {
 			;
-			/* interthread, always keep target! 
+			/* interthread, always keep target!
 			slp_current_insert(target);*/
 		}
 		else {
@@ -874,6 +874,12 @@ channel_close(PyChannelObject *self)
 	return Py_None;
 }
 
+void
+PyChannel_Close(PyChannelObject *self)
+{
+	self->flags.closing = 1;
+}
+
 static char channel_open__doc__[] =
 "channel.open() -- reopen a channel. See channel.close.";
 
@@ -884,6 +890,12 @@ channel_open(PyChannelObject *self)
 
 	Py_INCREF(Py_None);
 	return Py_None;
+}
+
+void
+PyChannel_Open(PyChannelObject *self)
+{
+	self->flags.closing = 0;
 }
 
 static char channel_reduce__doc__[] =
