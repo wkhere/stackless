@@ -84,7 +84,7 @@ def runtask2(name):
 
 def runtask3(name):
     exec("""
-for ii in xrange(1000):
+for ii in range(1000):
     pass
 """)
 
