@@ -632,7 +632,7 @@ sys_getsizeof(PyObject *self, PyObject *args)
 			return NULL;
 		}
 		return PyObject_CallFunctionObjArgs(method, args, NULL);
-	} 
+	}
 	else
 		return PyObject_CallMethod(args, "__sizeof__", NULL);
 }
@@ -1056,8 +1056,6 @@ svnversion_init(void)
 #else
 	python = strstr(headurl, "/python/");
 #endif
-	if (!python)
-		Py_FatalError("subversion keywords missing");
 	if (!python) {
 		strcpy(branch, "unknown branch");
 		strcpy(shortbranch, "unknown");
