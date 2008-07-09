@@ -305,6 +305,24 @@ class TestConcretePickledTasklets(TestPickledTasklets):
         f2 = pickle.loads(pickle.dumps(f1))
         self.assertEquals(f1.__module__, f2.__module__)
 
+class TestDictViewPickling(TestPickledTasklets):
+    def testDictKeyViewPickling(self):
+        d = { 1: 2 }
+        view1 = d.keys()
+        view2 = pickle.loads(pickle.dumps(view1))
+        self.assertEquals(list(view1), list(view2))
+
+    def testDictItemViewPickling(self):
+        d = { 1: 2 }
+        view1 = d.items()
+        view2 = pickle.loads(pickle.dumps(view1))
+        self.assertEquals(list(view1), list(view2))
+
+    def testDictValueViewPickling(self):
+        d = { 1: 2 }
+        view1 = d.values()
+        view2 = pickle.loads(pickle.dumps(view1))
+        self.assertEquals(list(view1), list(view2))
 
 if __name__ == '__main__':
     if not sys.argv[1:]:
