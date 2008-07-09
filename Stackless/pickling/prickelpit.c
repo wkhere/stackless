@@ -1360,6 +1360,97 @@ static int init_methodtype(void)
 }
 #undef initchain
 #define initchain init_methodtype
+/******************************************************
+
+  pickling of dictviews
+
+ ******************************************************/
+
+/*
+ * unfortunately we have to copy here.
+ * XXX automate checking such situations.
+ */
+
+
+typedef struct {
+	PyObject_HEAD
+	PyDictObject *dv_dict;
+} dictviewobject;
+
+static PyTypeObject wrap_PyDictKeys_Type;
+
+static PyObject *
+dictkeysview_reduce(dictviewobject *di)
+{
+	PyObject *tup;
+
+	assert(di != NULL);
+	tup = Py_BuildValue("(O(O)())",
+			    &wrap_PyDictKeys_Type,
+			    di->dv_dict
+			    );
+	return tup;
+}
+
+static PyTypeObject wrap_PyDictValues_Type;
+
+static PyObject *
+dictvaluesview_reduce(dictviewobject *di)
+{
+	PyObject *tup;
+
+	assert(di != NULL);
+	tup = Py_BuildValue("(O(O)())",
+			    &wrap_PyDictValues_Type,
+			    di->dv_dict
+			    );
+	return tup;
+}
+
+static PyTypeObject wrap_PyDictItems_Type;
+
+static PyObject *
+dictitemsview_reduce(dictviewobject *di)
+{
+	PyObject *tup;
+
+	assert(di != NULL);
+	tup = Py_BuildValue("(O(O)())",
+			    &wrap_PyDictItems_Type,
+			    di->dv_dict
+			    );
+	return tup;
+}
+
+MAKE_WRAPPERTYPE(PyDictKeys_Type, dictkeysview, "dict_keys",
+		 dictkeysview_reduce, generic_new, generic_setstate)
+
+static int init_dictkeysviewtype(void)
+{
+	return init_type(&wrap_PyDictKeys_Type, initchain);
+}
+#undef initchain
+#define initchain init_dictkeysviewtype
+
+MAKE_WRAPPERTYPE(PyDictValues_Type, dictvaluesview, "dict_values",
+		 dictvaluesview_reduce, generic_new, generic_setstate)
+
+static int init_dictvaluesviewtype(void)
+{
+	return init_type(&wrap_PyDictValues_Type, initchain);
+}
+#undef initchain
+#define initchain init_dictvaluesviewtype
+
+MAKE_WRAPPERTYPE(PyDictItems_Type, dictitemsview, "dict_items",
+		 dictitemsview_reduce, generic_new, generic_setstate)
+
+static int init_dictitemsviewtype(void)
+{
+	return init_type(&wrap_PyDictItems_Type, initchain);
+}
+#undef initchain
+#define initchain init_dictitemsviewtype
 
 
 /******************************************************
