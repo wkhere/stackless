@@ -119,8 +119,8 @@ slp_cframe_new(PyFrame_ExecFunc *exec, unsigned int linked)
 
 /* pickling support for cframes */
 
-#define cframetuplefmt "iSOll"
-#define cframetuplenewfmt "iSO!ll:cframe"
+#define cframetuplefmt "iOOll"
+#define cframetuplenewfmt "iUO!ll:cframe"
 
 
 static PyObject *

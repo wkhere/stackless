@@ -189,7 +189,7 @@ static int init_type(PyTypeObject *t, int (*initchain)(void))
 {
 	PyMethodDescrObject *reduce;
 	PyWrapperDescrObject *init;
-	PyObject *args, *retval = NULL, *func;
+	PyObject *retval = NULL, *func;
 	int ret = 0;
 	char *name = strrchr(t->tp_name, '.')+1;
 
@@ -214,12 +214,11 @@ static int init_type(PyTypeObject *t, int (*initchain)(void))
 	if (func == NULL || PyDict_SetItemString(t->tp_dict, "__new__", func))
 		return -1;
 	/* register with copy_reg */
-	args = Py_BuildValue("(OO)", t->tp_base, reduce);
 	if (pickle_reg != NULL &&
-	    (retval = PyObject_Call(pickle_reg, args, NULL)) == NULL)
+		(retval = PyObject_CallFunction(pickle_reg, "OO", 
+										t->tp_base, reduce)) == NULL)
 		ret = -1;
 	Py_XDECREF(retval);
-	Py_XDECREF(args);
 	if (ret == 0 && initchain != NULL)
 		ret = initchain();
 	return ret;
@@ -1324,7 +1323,7 @@ calliter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return (PyObject *) it;
 }
 
-MAKE_WRAPPERTYPE(PyCallIter_Type, calliter, "callable-iterator",
+MAKE_WRAPPERTYPE(PyCallIter_Type, calliter, "callable_iterator",
 		 calliter_reduce, calliter_new, generic_setstate)
 
 static int init_itertype(void)
@@ -1358,7 +1357,7 @@ method_reduce(PyObject *m)
 	return tup;
 }
 
-MAKE_WRAPPERTYPE(PyMethod_Type, method, "instancemethod", method_reduce,
+MAKE_WRAPPERTYPE(PyMethod_Type, method, "method", method_reduce,
 		 generic_new, generic_setstate)
 
 static int init_methodtype(void)
@@ -1525,7 +1524,7 @@ dictiteritem_reduce(dictiterobject *di)
 
 static PyTypeObject wrap_PyDictIterKey_Type;
 
-MAKE_WRAPPERTYPE(PyDictIterKey_Type, dictiterkey, "dictionary-keyiterator",
+MAKE_WRAPPERTYPE(PyDictIterKey_Type, dictiterkey, "dict_keyiterator",
 		 dictiterkey_reduce, generic_new, generic_setstate)
 
 static int init_dictiterkeytype(void)
@@ -1537,7 +1536,7 @@ static int init_dictiterkeytype(void)
 
 static PyTypeObject wrap_PyDictIterValue_Type;
 
-MAKE_WRAPPERTYPE(PyDictIterValue_Type, dictitervalue, "dictionary-valueiterator",
+MAKE_WRAPPERTYPE(PyDictIterValue_Type, dictitervalue, "dict_valueiterator",
 		 dictitervalue_reduce, generic_new, generic_setstate)
 
 static int init_dictitervaluetype(void)
@@ -1549,7 +1548,7 @@ static int init_dictitervaluetype(void)
 
 static PyTypeObject wrap_PyDictIterItem_Type;
 
-MAKE_WRAPPERTYPE(PyDictIterItem_Type, dictiteritem, "dictionary-itemiterator",
+MAKE_WRAPPERTYPE(PyDictIterItem_Type, dictiteritem, "dict_itemiterator",
 		 dictiteritem_reduce, generic_new, generic_setstate)
 
 static int init_dictiteritemtype(void)
@@ -1618,7 +1617,7 @@ setiter_reduce(setiterobject *it)
     return set;
 }
 
-MAKE_WRAPPERTYPE(PySetIter_Type, setiter, "setiterator", setiter_reduce, generic_new, generic_setstate)
+MAKE_WRAPPERTYPE(PySetIter_Type, setiter, "set_iterator", setiter_reduce, generic_new, generic_setstate)
 
 static int init_setitertype(void)
 {
@@ -1733,7 +1732,7 @@ listiter_reduce(listiterobject *it)
 	return tup;
 }
 
-MAKE_WRAPPERTYPE(PyListIter_Type, listiter, "listiterator", listiter_reduce, generic_new, generic_setstate)
+MAKE_WRAPPERTYPE(PyListIter_Type, listiter, "list_iterator", listiter_reduce, generic_new, generic_setstate)
 
 static int init_listitertype(void)
 {
@@ -1793,7 +1792,7 @@ rangeiter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	it = PyObject_New(rangeiterobject, type);
 	if (it == NULL)
 		return NULL;
-	if (!PyArg_ParseTuple(args, "iiii:rangeiterator",
+	if (!PyArg_ParseTuple(args, "iiii:range_iterator",
 				    &it->index,
 				    &it->start,
 				    &it->step,
@@ -1802,7 +1801,7 @@ rangeiter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return (PyObject *)it;
 }
 
-MAKE_WRAPPERTYPE(PyRangeIter_Type, rangeiter, "rangeiterator",
+MAKE_WRAPPERTYPE(PyRangeIter_Type, rangeiter, "range_iterator",
 		 rangeiter_reduce, rangeiter_new, generic_setstate)
 
 static int init_rangeitertype(void)
@@ -1863,7 +1862,7 @@ tupleiter_reduce(tupleiterobject *it)
 	return tup;
 }
 
-MAKE_WRAPPERTYPE(PyTupleIter_Type, tupleiter, "tupleiterator", tupleiter_reduce, generic_new, generic_setstate)
+MAKE_WRAPPERTYPE(PyTupleIter_Type, tupleiter, "tuple_iterator", tupleiter_reduce, generic_new, generic_setstate)
 
 static int init_tupleitertype(void)
 {
@@ -1909,7 +1908,7 @@ range_reduce(rangeobject *r)
 	return tup;
 }
 
-MAKE_WRAPPERTYPE(PyRange_Type, range, "xrange", range_reduce,
+MAKE_WRAPPERTYPE(PyRange_Type, range, "range", range_reduce,
 		 generic_new, generic_setstate)
 
 static int init_rangetype(void)
@@ -2159,7 +2158,7 @@ static int init_generatortype(void)
 	genobject *gen = (genobject *) run_script(
 		"def f(): yield 42\n"	/* define a generator */
 		"g = f()\n"		/* instanciate it */
-		"g.next()\n", "g");	/* force callback frame creation */
+		"g.__next__()\n", "g");	/* force callback frame creation */
 	PyFrameObject *cbframe;
 
 	if (gen == NULL || gen->gi_frame->f_back == NULL)
@@ -2288,16 +2287,17 @@ int init_prickelpit(void)
 	types_mod = PyModule_Create(&_wrapmodule);
 	if (types_mod == NULL) return -1;
 	if (PyObject_SetAttrString(slp_module, "_wrap", types_mod)) return -1;
-	copy_reg = PyImport_ImportModule("copy_reg");
+	copy_reg = PyImport_ImportModule("copyreg");
 	if (copy_reg != NULL) {
 		pickle_reg = PyObject_GetAttrString(copy_reg, "pickle");
+		Py_CLEAR(copy_reg);
 	}
 	PyErr_Clear();
-	if (initchain())
+	if (initchain()) {
+		Py_CLEAR(pickle_reg);
 		ret = -1;
-
-	Py_XDECREF(pickle_reg);
-	Py_XDECREF(copy_reg);
+	}
+	Py_CLEAR(pickle_reg);
 	return 0;
 }
 
