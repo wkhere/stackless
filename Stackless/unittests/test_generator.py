@@ -8,7 +8,7 @@ class TestGarbageCollection(unittest.TestCase):
         leakage = []
 
         gc.collect(2)
-        before  = gc.get_objects()
+        before  = set(id(o) for o in gc.get_objects())
 
         for i in f():
             pass
@@ -17,8 +17,11 @@ class TestGarbageCollection(unittest.TestCase):
         after = gc.get_objects()
 
         for x in after:
-            if x is not before and x is not after and x not in before:
+            if x is not before and id(x) not in before:
                 leakage.append(x)
 
         if len(leakage):
             self.failUnless(len(leakage) == 0, "Leaked %s" % repr(leakage))
+
+if __name__ == '__main__':
+    unittest.main()
