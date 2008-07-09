@@ -2269,7 +2269,7 @@ static int init_generatortype(void)
 PyObject *
 PyStackless_Pickle_ModuleDict(PyObject *pickler, PyObject *self)
 {
-	PyObject *modict, *retval = NULL, *values = NULL;
+	PyObject *modict, *retval = NULL, *valuesview = NULL, *values = NULL;
 	PyObject *mod = NULL, *id = NULL;
 
 	modict = PyObject_GetAttrString(pickler, "module_dict_ids");
@@ -2279,7 +2279,8 @@ PyStackless_Pickle_ModuleDict(PyObject *pickler, PyObject *self)
 		PyErr_Clear();
 		if ((modict = PyDict_New()) == NULL) goto finally;
 		modules = PyImport_GetModuleDict();
-		values = PyObject_CallMethod(modules, "values", "()");
+		valuesview = PyDict_Values(modules);
+		values = PyObject_CallMethod(valuesview, "__iter__", "()");
 		for (;;) {
 			mod = PyIter_Next(values);
 			if (mod == NULL) {
@@ -2327,6 +2328,7 @@ PyStackless_Pickle_ModuleDict(PyObject *pickler, PyObject *self)
 finally:
 	Py_XDECREF(modict);
 	Py_XDECREF(values);
+	Py_XDECREF(valuesview);
 	return retval;
 }
 
