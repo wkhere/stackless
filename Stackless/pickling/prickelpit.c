@@ -1068,15 +1068,7 @@ static int init_frametype(void)
  * This is fine, since we are making cPickle stackless.
  */
 
-/* XXX automate checking these double definitions: */
-
-typedef struct _tracebackobject {
-	PyObject_HEAD
-	struct _tracebackobject *tb_next;
-	PyFrameObject *tb_frame;
-	int tb_lasti;
-	int tb_lineno;
-} tracebackobject;
+typedef PyTracebackObject tracebackobject;
 
 static PyTypeObject wrap_PyTraceBack_Type;
 
@@ -1189,6 +1181,8 @@ module_reduce(PyObject * m)
 typedef struct {
 	PyObject_HEAD
 	PyObject *md_dict;
+	struct PyModuleDef *md_def;
+	void *md_state;
 } PyModuleObject;
 
 static PyObject *
@@ -1280,8 +1274,8 @@ MAKE_WRAPPERTYPE(PySeqIter_Type, iter, "iterator", iter_reduce, iter_new,
 /* XXX make sure this copy is always up to date */
 typedef struct {
 	PyObject_HEAD
-	PyObject *it_callable;
-	PyObject *it_sentinel;
+	PyObject *it_callable; /* Set to NULL when iterator is exhausted */
+	PyObject *it_sentinel; /* Set to NULL when iterator is exhausted */
 } calliterobject;
 
 static PyTypeObject wrap_PyCallIter_Type;
@@ -1293,8 +1287,8 @@ calliter_reduce(calliterobject *iterator)
 
 	tup = Py_BuildValue("(O(OO))",
 			    &wrap_PyCallIter_Type,
-			    iterator->it_callable,
-			    iterator->it_sentinel);
+			    iterator->it_callable ? iterator->it_callable : Py_None,
+			    iterator->it_sentinel ? iterator->it_sentinel : Py_None);
 	return tup;
 }
 
@@ -1310,6 +1304,9 @@ calliter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (!PyArg_ParseTuple(args, "OO:calliter", &it_callable,
 			      &it_sentinel))
 		return NULL;
+
+	if (it_callable == Py_None) Py_CLEAR(it_callable);
+	if (it_sentinel == Py_None) Py_CLEAR(it_sentinel);
 
 	it = (calliterobject *) PyCallIter_New(it_callable, it_sentinel);
 	if (it != NULL)
@@ -1487,12 +1484,13 @@ typedef struct {
 	PyDictObject *di_dict; /* Set to NULL when iterator is exhausted */
 	Py_ssize_t di_used;
 	Py_ssize_t di_pos;
-	binaryfunc di_select;
+	PyObject* di_result; /* reusable result tuple for iteritems */
+	Py_ssize_t len;
 } dictiterobject;
 
 /*
-    binaryfunc is a big problem.  we don't have access to the
-    function pointers, so what we have to do is exhaust the
+    Sequence is unordered and we may be in the middle of it.
+	so what we have to do is exhaust the
     dictionary iterator by copying it.
 
     when we unpickle, we return an entirely different kind of object.
@@ -1501,12 +1499,14 @@ typedef struct {
 static PyObject *
 dictiterkey_reduce(dictiterobject *di)
 {
-    PyObject *tup, *list, *key;
-    Py_ssize_t i;
+    PyObject *list, *key;
+    Py_ssize_t i, mask;
+	register PyDictEntry *ep;
+	PyDictObject *d = di->di_dict;
 
     list = PyList_New(0);
     if (list == NULL)
-        return PyErr_NoMemory();
+        return NULL;
 
     /* is this dictiter is already exhausted? */
     if (di->di_dict != NULL) {
@@ -1514,39 +1514,44 @@ dictiterkey_reduce(dictiterobject *di)
             PyErr_SetString(PyExc_RuntimeError,
                 "dictionary changed size during iteration");
             di->di_used = -1; /* Make this state sticky */
-            return NULL;
+            goto fail;
         }
-        i = di->di_pos;
-        while (PyDict_Next((PyObject *)di->di_dict, &i, &key, NULL)) {
-	    Py_INCREF(key);
-            if (key == NULL) {
-                Py_DECREF(list);
-                return NULL;
-            }
-            if (PyList_Append(list, key) == -1) {
-                return NULL;
-            }
+		if (di->di_pos < 0)
+			goto fail;
+		ep = d->ma_table;
+		mask = d->ma_mask;
+		for(i = di->di_pos; i <= mask; ++i) {
+			while (i <= mask && ep[i].me_value == NULL)
+				++i;
+			if (i > mask)
+				break;
+			key = ep[i].me_key;
+            if (PyList_Append(list, key) == -1)
+				goto fail;
         }
     }
     /* masquerade as a PySeqIter */
-    tup = Py_BuildValue("(O(Ol)())",
-	&wrap_PySeqIter_Type,
-	list,
-	0
-	);
-    Py_DECREF(list);
-    return tup;
+    return Py_BuildValue("(O(Nl)())",
+						&wrap_PySeqIter_Type,
+						list,
+						0
+						);
+fail:
+	Py_DECREF(list);
+	return NULL;
 }
 
 static PyObject *
 dictitervalue_reduce(dictiterobject *di)
 {
-    PyObject *tup, *list, *value;
-    Py_ssize_t i;
+    PyObject *list, *value;
+    Py_ssize_t i, mask;
+	register PyDictEntry *ep;
+	PyDictObject *d = di->di_dict;
 
     list = PyList_New(0);
     if (list == NULL)
-        return PyErr_NoMemory();
+        return NULL;
 
     /* is this dictiter is already exhausted? */
     if (di->di_dict != NULL) {
@@ -1554,75 +1559,80 @@ dictitervalue_reduce(dictiterobject *di)
             PyErr_SetString(PyExc_RuntimeError,
                 "dictionary changed size during iteration");
             di->di_used = -1; /* Make this state sticky */
-            return NULL;
+            goto fail;
         }
-        i = di->di_pos;
-        while (PyDict_Next((PyObject *)di->di_dict, &i, NULL, &value)) {
-	    Py_INCREF(value);
-            if (value == NULL) {
-                Py_DECREF(list);
-                return NULL;
-            }
-            if (PyList_Append(list, value) == -1) {
-                return NULL;
-            }
+		if (di->di_pos < 0)
+			goto fail;
+		ep = d->ma_table;
+		mask = d->ma_mask;
+		for(i = di->di_pos; i <= mask; ++i) {
+			while (i <= mask && (value=ep[i].me_value) == NULL)
+				++i;
+			if (i > mask)
+				break;
+			if (PyList_Append(list, value) == -1)
+				goto fail;
         }
     }
     /* masquerade as a PySeqIter */
-    tup = Py_BuildValue("(O(Ol)())",
-	&wrap_PySeqIter_Type,
-	list,
-	0
-	);
-    Py_DECREF(list);
-    return tup;
+    return Py_BuildValue("(O(Nl)())",
+						&wrap_PySeqIter_Type,
+						list,
+						0
+						);
+fail:
+	Py_DECREF(list);
+	return NULL;
 }
 
 static PyObject *
 dictiteritem_reduce(dictiterobject *di)
 {
-    PyObject *tup, *list, *key, *value, *res;
-    Py_ssize_t i;
+    PyObject *list, *tup;
+    Py_ssize_t i, mask;
+    register PyDictEntry *ep;
+    PyDictObject *d = di->di_dict;
 
     list = PyList_New(0);
     if (list == NULL)
-        return PyErr_NoMemory();
+        return NULL;
 
     /* is this dictiter is already exhausted? */
-    if (di->di_dict != NULL) {
-        if (di->di_used != di->di_dict->ma_used) {
+    if (d != NULL) {
+        if (di->di_used != d->ma_used) {
             PyErr_SetString(PyExc_RuntimeError,
                 "dictionary changed size during iteration");
             di->di_used = -1; /* Make this state sticky */
-            return NULL;
+            goto fail;
         }
-        i = di->di_pos;
-        while (PyDict_Next((PyObject *)di->di_dict, &i, &key, &value)) {
-	    res = PyTuple_New(2);
-
-	    if (res != NULL) {
-		Py_INCREF(key);
-		Py_INCREF(value);
-		PyTuple_SET_ITEM(res, 0, key);
-		PyTuple_SET_ITEM(res, 1, value);
-	    }
-            if (res == NULL) {
-                Py_DECREF(list);
-                return NULL;
+		if (di->di_pos < 0)
+			goto fail;
+		ep = d->ma_table;
+		mask = d->ma_mask;	
+        for(i = di->di_pos; i <= mask; ++i) {
+			while (i <= mask && ep[i].me_value == NULL)
+				++i;
+			if (i>mask)
+				break;
+			tup = Py_BuildValue("(OO)", ep[i].me_key, ep[i].me_value);
+			if (!tup)
+				goto fail;
+            if (PyList_Append(list, tup) == -1) {
+				Py_DECREF(tup);
+                goto fail;
             }
-            if (PyList_Append(list, res) == -1) {
-                return NULL;
-            }
+			Py_DECREF(tup);
         }
     }
     /* masquerade as a PySeqIter */
-    tup = Py_BuildValue("(O(Ol)())",
-	&wrap_PySeqIter_Type,
-	list,
-	0
-	);
-    Py_DECREF(list);
-    return tup;
+    return Py_BuildValue("(O(Nl)())",
+						&wrap_PySeqIter_Type,
+						list,
+						0
+						);
+fail:
+	Py_DECREF(list);
+	return NULL;
 }
 
 static PyTypeObject wrap_PyDictIterKey_Type;
@@ -1747,6 +1757,7 @@ typedef struct {
 	long      en_index;        /* current index of enumeration */
 	PyObject* en_sit;          /* secondary iterator of enumeration */
 	PyObject* en_result;       /* result tuple  */
+	PyObject* en_longindex;	   /* index for sequences >= LONG_MAX */
 } enumobject;
 
 static PyTypeObject wrap_PyEnum_Type;
@@ -1756,10 +1767,11 @@ enum_reduce(enumobject *en)
 {
 	PyObject *tup;
 
-	tup = Py_BuildValue("(O(O)(l))",
+	tup = Py_BuildValue("(O(O)(lO))",
 			    &wrap_PyEnum_Type,
 			    en->en_sit,
-			    en->en_index
+			    en->en_index,
+			    en->en_longindex ? en->en_longindex : Py_None
 			    );
 	return tup;
 }
@@ -1768,9 +1780,12 @@ static PyObject *
 enum_setstate(PyObject *self, PyObject *args)
 {
 	if (is_wrong_type(self->ob_type)) return NULL;
-	if (!PyArg_ParseTuple (args, "l:enumerate",
-			       &((enumobject *)self)->en_index))
+	if (!PyArg_ParseTuple (args, "lO:enumerate",
+			       &((enumobject *)self)->en_index,
+			       &((enumobject *)self)->en_longindex))
 		return NULL;
+	if (((enumobject *)self)->en_longindex == Py_None)
+		Py_CLEAR(((enumobject *)self)->en_longindex);
 	self->ob_type = self->ob_type->tp_base;
 	Py_INCREF(self);
 	return self;
@@ -1989,9 +2004,9 @@ static int init_tupleitertype(void)
 
 typedef struct {
 	PyObject_HEAD
-	long	start;
-	long	step;
-	long	len;
+	PyObject	*start;
+	PyObject	*stop;
+	PyObject	*step;
 } rangeobject;
 
 static PyTypeObject wrap_PyRange_Type;
@@ -2002,10 +2017,10 @@ range_reduce(rangeobject *r)
 	PyObject *tup;
 
 	assert(r != NULL);
-	tup = Py_BuildValue("(O(lll)())",
+	tup = Py_BuildValue("(O(OOO)())",
 			    &wrap_PyRange_Type,
 			    r->start,
-			    r->start + r->len * r->step,
+			    r->stop,
 			    r->step
 			    );
 	return tup;
@@ -2153,9 +2168,6 @@ typedef struct {
 	/* True if generator is being executed. */
 	int gi_running;
 
-	/* The code object backing the generator */
-	PyObject *gi_code;
-
 	/* List of weak reference. */
 	PyObject *gi_weakreflist;
 } genobject;
@@ -2213,9 +2225,6 @@ gen_setstate(PyObject *self, PyObject *args)
 			Py_INCREF(f);
 			Py_DECREF(gen->gi_frame);
 			gen->gi_frame = f;
-			Py_INCREF(f->f_code);
-			Py_DECREF(gen->gi_code);
-			gen->gi_code = (PyObject *)f->f_code;
 			/* The frame the temporary generator references
 			   will have GeneratorExit raised on it, when the
 			   temporary generator is torn down.  So clearing
@@ -2241,9 +2250,6 @@ gen_setstate(PyObject *self, PyObject *args)
 	Py_INCREF(f);
 	Py_DECREF(gen->gi_frame);
 	gen->gi_frame = f;
-	Py_INCREF(f->f_code);
-	Py_DECREF(gen->gi_code);
-	gen->gi_code = (PyObject *)f->f_code;
 	gen->gi_running = gi_running;
 	Py_TYPE(gen) = Py_TYPE(gen)->tp_base;
 	Py_INCREF(gen);
