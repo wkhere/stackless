@@ -2188,7 +2188,7 @@ PyStackless_Pickle_ModuleDict(PyObject *pickler, PyObject *self)
 		PyErr_Clear();
 		if ((modict = PyDict_New()) == NULL) goto finally;
 		modules = PyImport_GetModuleDict();
-		values = PyObject_CallMethod(modules, "itervalues", "()");
+		values = PyObject_CallMethod(modules, "values", "()");
 		for (;;) {
 			mod = PyIter_Next(values);
 			if (mod == NULL) {
