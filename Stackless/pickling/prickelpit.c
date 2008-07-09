@@ -804,7 +804,6 @@ frameobject_reduce(PyFrameObject *f)
 			     have_locals,
 			     have_locals ? f->f_locals : dummy_locals,
 			     f->f_trace != NULL ? f->f_trace : Py_None,
-/*			     f->f_restricted, */
 			     exc_as_tuple,
 			     f->f_lasti,
 			     f->f_lineno,
@@ -855,7 +854,7 @@ frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject *
 frame_setstate(PyFrameObject *f, PyObject *args)
 {
-	int /*f_restricted, */ f_lasti, f_lineno, i;
+	int f_lasti, f_lineno, i;
 	PyObject *f_globals, *f_locals, *blockstack_as_tuple;
         PyObject *localsplus_as_tuple, *exc_as_tuple, *trace, *f_code;
 	PyObject *exec_name = NULL;
@@ -872,7 +871,6 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 			       &have_locals,
 			       &PyDict_Type, &f_locals,
 			       &trace,
-/*			       &f_restricted, */
 			       &exc_as_tuple,
 			       &f_lasti,
 			       &f_lineno,
@@ -909,8 +907,6 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 		Py_INCREF(trace);
 		f->f_trace = trace;
 	}
-
-/*	f->f_restricted = f_restricted; */
 
 	if (exc_as_tuple != Py_None) {
 		if (PyTuple_GET_SIZE(exc_as_tuple) != 4) {

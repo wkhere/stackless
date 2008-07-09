@@ -198,6 +198,7 @@ PyList_SetItem(register PyObject *op, register Py_ssize_t i,
 {
 	register PyObject *olditem;
 	register PyObject **p;
+	_ASSERTE(newitem);
 	if (!PyList_Check(op)) {
 		Py_XDECREF(newitem);
 		PyErr_BadInternalCall();
