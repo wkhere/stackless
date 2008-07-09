@@ -1392,6 +1392,8 @@ dictview_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
     Py_INCREF(dict);	
 	inst->dv_dict = (PyDictObject *)dict;
+	if (inst != NULL)
+		Py_TYPE(inst) = type;
 	return (PyObject *)inst;
 }
 
