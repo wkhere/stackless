@@ -1,5 +1,11 @@
 #include "Python.h"
 #include "structmember.h"
+#define _NO_WINDOWS_H_
+#include "platf/slp_platformselect.h"
+/* must declare this here because we don't want some includes */
+PyAPI_FUNC(int) slp_safe_pickling(int(*save)(PyObject *, PyObject *, int), 
+				  PyObject *self, PyObject *args,
+				  int pers_save);
 
 PyDoc_STRVAR(pickle_module_doc,
 "Optimized C implementation for the Python pickle module.");
@@ -2075,12 +2081,20 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
     PyObject *memo_key = NULL;
     int status = 0;
 
+#ifdef STACKLESS
+	/* but we save the stack after a fixed watermark */
+	if (CSTACK_SAVE_NOW(PyThreadState_GET(), self)) {
+		status = slp_safe_pickling((void *)&save, (PyObject *)self, obj, pers_save);
+		goto done;
+	}
+#else
     /* XXX: Use Py_EnterRecursiveCall()? */
     if (++self->nesting > Py_GetRecursionLimit()) {
         PyErr_SetString(PyExc_RuntimeError,
                         "maximum recursion depth exceeded");
         goto error;
     }
+#endif
 
     /* The extra pers_save argument is necessary to avoid calling save_pers()
        on its returned object. */
