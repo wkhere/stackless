@@ -1379,6 +1379,22 @@ typedef struct {
 
 static PyTypeObject wrap_PyDictKeys_Type;
 
+PyObject *
+dictview_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	dictviewobject *inst;
+	PyObject *dict;
+	if (PyTuple_Size(args) != 1)
+		return NULL;
+	dict = PyTuple_GetItem(args, 0);
+	inst = PyObject_New(dictviewobject, type->tp_base);
+	if (inst == NULL)
+		return NULL;
+    Py_INCREF(dict);	
+	inst->dv_dict = (PyDictObject *)dict;
+	return (PyObject *)inst;
+}
+
 static PyObject *
 dictkeysview_reduce(dictviewobject *di)
 {
@@ -1423,7 +1439,7 @@ dictitemsview_reduce(dictviewobject *di)
 }
 
 MAKE_WRAPPERTYPE(PyDictKeys_Type, dictkeysview, "dict_keys",
-		 dictkeysview_reduce, generic_new, generic_setstate)
+		 dictkeysview_reduce, dictview_new, generic_setstate)
 
 static int init_dictkeysviewtype(void)
 {
@@ -1433,7 +1449,7 @@ static int init_dictkeysviewtype(void)
 #define initchain init_dictkeysviewtype
 
 MAKE_WRAPPERTYPE(PyDictValues_Type, dictvaluesview, "dict_values",
-		 dictvaluesview_reduce, generic_new, generic_setstate)
+		 dictvaluesview_reduce, dictview_new, generic_setstate)
 
 static int init_dictvaluesviewtype(void)
 {
@@ -1443,7 +1459,7 @@ static int init_dictvaluesviewtype(void)
 #define initchain init_dictvaluesviewtype
 
 MAKE_WRAPPERTYPE(PyDictItems_Type, dictitemsview, "dict_items",
-		 dictitemsview_reduce, generic_new, generic_setstate)
+		 dictitemsview_reduce, dictview_new, generic_setstate)
 
 static int init_dictitemsviewtype(void)
 {
