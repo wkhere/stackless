@@ -810,8 +810,10 @@ builtin_exec(PyObject *self, PyObject *args)
 	}
 	if (v == NULL)
 		return NULL;
+#ifdef STACKLESS
 	if (STACKLESS_UNWINDING(v))
 		return v;
+#endif
 	Py_DECREF(v);
 	Py_RETURN_NONE;
 }
