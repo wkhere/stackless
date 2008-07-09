@@ -31,15 +31,15 @@ class SimpleScheduler(object):
         while stackless.runcount > 1:
             try:
                 returned = stackless.run(self.bytecodes)
-                
+
             except Exception as e:
-                                
-                # Can't clear off exception easily... 
+
+                # Can't clear off exception easily...
                 while stackless.runcount > 1:
                     stackless.current.next.kill()
 
                 raise e
-                        
+
             else:
                 if returned:
                     self.schedule_cb(returned)
@@ -47,11 +47,11 @@ class SimpleScheduler(object):
 def runtask6(name):
     me = stackless.getcurrent()
     cur_depth = me.recursion_depth
-    
+
     for ii in range(1000):
         assert cur_depth == me.recursion_depth
 
-    
+
 
 def runtask_print(name):
     x = 0
@@ -66,7 +66,7 @@ def runtask(name):
     for ii in range(1000):
         if ii % 50 == 0:
             sys._getframe() # a dummy
-            
+
         x += 1
 
     return name
@@ -77,7 +77,7 @@ def runtask2(name):
     for ii in range(1000):
         if ii % 50 == 0:
             stackless.schedule() # same time, but should give up timeslice
-            
+
         x += 1
 
     return name
@@ -101,7 +101,7 @@ def recurse_level_then_do_schedule(count):
     else:
         recurse_level_then_do_schedule(count - 1)
 
-        
+
 def runtask5(name):
     for ii in [1, 10, 100, 500]:
         recurse_level_then_do_schedule(ii)
@@ -123,9 +123,8 @@ def runtask_bad(name):
 
 
 class ServerTasklet(stackless.tasklet):
-    
+
     def __init__(self, func, name=None):
-        stackless.tasklet.__init__(self, func)
         if not name:
             name = "at %08x" % (id(self))
         self.name = name
@@ -146,7 +145,7 @@ def servertask(name, chan):
         r = chan.receive()
         self.count += 1
 
-    
+
 class TestWatchdog(unittest.TestCase):
     def setUp(self):
         self.verbose = __name__ == "__main__"
@@ -154,7 +153,7 @@ class TestWatchdog(unittest.TestCase):
     def tearDown(self):
         del self.verbose
 
-        
+
     def run_tasklets(self, fn):
         scheduler = SimpleScheduler(100)
         tasklets = []
@@ -165,7 +164,7 @@ class TestWatchdog(unittest.TestCase):
 
         scheduler.autoschedule()
         for ii in tasklets:
-            self.failIf(ii.alive) 
+            self.failIf(ii.alive)
 
         return scheduler.get_schedule_count()
 
@@ -207,12 +206,12 @@ class TestWatchdog(unittest.TestCase):
         chan = stackless.channel()
         server = ServerTasklet(servertask)
         server_task = server("server", chan)
-        
+
         scheduler = SimpleScheduler(100)
-        
+
         tasklets = [stackless.tasklet(runtask4)(name, chan)
-                     for name in ["client1", "client2", "client3"]] 
-    
+                     for name in ["client1", "client2", "client3"]]
+
         scheduler.autoschedule()
         self.assertEquals(server.count, 60)
 
@@ -232,7 +231,7 @@ class TestWatchdog(unittest.TestCase):
         not_finished = stackless.run(100)
         self.assertEqual(not_finished, orig)
         return pickle.dumps(not_finished)
-    
+
     def test_pickle(self):
         # Run global
         t = pickle.loads(self.get_pickled_tasklet())
@@ -256,7 +255,7 @@ class TestWatchdog(unittest.TestCase):
         t.insert()
         while stackless.runcount > 1:
             returned = stackless.run(100)
-        
+
 if __name__ == '__main__':
     import sys
     if not sys.argv[1:]:
