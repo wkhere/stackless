@@ -514,7 +514,7 @@ slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
 
  ******************************************************/
 
-#define codetuplefmt "iiiiSOOOSSiSOO"
+#define codetuplefmt "iiiiiSOOOSSiSOO"
 
 static struct _typeobject wrap_PyCode_Type;
 
@@ -525,6 +525,7 @@ code_reduce(PyCodeObject * co)
 	    "(O(" codetuplefmt ")())",
 	    &wrap_PyCode_Type,
 	    co->co_argcount,
+	    co->co_kwonlyargcount,
 	    co->co_nlocals,
 	    co->co_stacksize,
 	    co->co_flags,
@@ -821,8 +822,7 @@ err_exit:
 }
 
 #define frametuplenewfmt "O!"
-#define frametuplesetstatefmt "O!iSO!iO!OOiiO!O:frame_new"
-/*#define frametuplesetstatefmt "O!iSO!iO!OiOiiO!O:frame_new"*/
+#define frametuplesetstatefmt "O!iUO!iO!OOiiO!O:frame_new"
 
 static PyObject *
 frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -863,16 +863,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	int valid, have_locals;
 
 	if (is_wrong_type(Py_TYPE(f))) return NULL;
-
-	if (f->f_globals != NULL) {
-		Py_DECREF(f->f_globals);
-		f->f_globals = NULL;
-	}
-	if (f->f_locals != NULL) {
-		Py_DECREF(f->f_locals);
-		f->f_locals = NULL;
-	}
-
+	
 	if (!PyArg_ParseTuple (args, frametuplesetstatefmt,
 			       &PyCode_Type, &f_code,
 			       &valid,
@@ -898,6 +889,9 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	if (slp_find_execfuncs(Py_TYPE(f)->tp_base, exec_name, &good_func,
 			       &bad_func))
 		return NULL;
+
+	Py_CLEAR(f->f_locals);
+	Py_CLEAR(f->f_globals);
 
 	if (have_locals) {
 		Py_INCREF(f_locals);
