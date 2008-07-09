@@ -26,7 +26,7 @@ def cfiles(rootpath):
 
 def parse(fname):
     find = "STACKLESS_DECLARE_METHOD"
-    txt = file(fname).read()
+    txt = open(fname).read()
     if txt.find(find) < 0:
         return
 
@@ -35,8 +35,8 @@ def parse(fname):
     return res
 
 def generate():
-    f = file(dstname, "w")
-    print >> f, """\
+    f = open(dstname, "w")
+    print("""\
 /*
  * this file was generated from the Python C sources using the script
  * Stackless/core/extract_slp_methods.py .
@@ -53,13 +53,13 @@ typedef struct {
 #define MFLAG_OFS_IND(meth) MFLAG_OFS(meth) + MFLAG_IND
 
 static _stackless_method _stackless_methtable[] = {\
-"""
+""", file=f)
     for fname in cfiles(srcname):
         found = parse(fname);
         if not found:
             continue
         name = os.path.split(fname)[-1]
-        print >> f, "\t/* from %s */" % name
+        print("\t/* from %s */" % name, file=f)
         for line in found:
             typ, meth = line.split("(")[-1].split(")")[0].split(", ")
             tabs = "\t"
@@ -72,10 +72,10 @@ static _stackless_method _stackless_methtable[] = {\
                 # indirection flag
                 ind = "_IND"
                 typ = "&" + typ
-            print >> f, "\t{%s,%sMFLAG_OFS%s(%s)}," % \
-                  (typ, tabs, ind, meth)
-    print >> f, "\t{0, 0} /* sentinel */"
-    print >> f, "};"
+            print("\t{%s,%sMFLAG_OFS%s(%s)}," % \
+                  (typ, tabs, ind, meth), file=f)
+    print("\t{0, 0} /* sentinel */", file=f)
+    print("};", file=f)
 
 if __name__ == "__main__":
     generate()

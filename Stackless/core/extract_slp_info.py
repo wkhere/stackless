@@ -11,7 +11,7 @@ srcname = "../../Objects/typeobject.c"
 dstname = "slp_exttype.h"
 
 def parse():
-    f = file(srcname)
+    f = open(srcname)
     line = ""
     slots = []
     buf = ""
@@ -31,10 +31,10 @@ def feed(line, slots):
     if len(first.split()) > 1:
         return
     if first.startswith("COPY"):
-        print line
+        print(line)
         slot = pieces[1].split(")")[0].strip()
     elif first.endswith("SLOT"):
-        print line
+        print(line)
         slot = pieces[1].split(",")[1].strip()
     else:
         return
@@ -43,8 +43,8 @@ def feed(line, slots):
 
 def generate():
     slotnames = parse()
-    f = file(dstname, "w")
-    print >> f, """\
+    f = open(dstname, "w")
+    print("""\
 /*
  * this file was generated from typeobject.c using the script
  * Stackless/core/extract_slp_info.py .
@@ -52,10 +52,10 @@ def generate():
  */
 
 typedef struct _slp_methodflags {\
-"""
+""", file=f)
     for slot in slotnames:
-        print >> f, "\tsigned char %s;" % slot
-    print >> f, "} slp_methodflags;"
+        print("\tsigned char %s;" % slot, file=f)
+    print("} slp_methodflags;", file=f)
 
 if __name__ == "__main__":
     generate()
