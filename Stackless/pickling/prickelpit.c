@@ -2287,17 +2287,18 @@ int init_prickelpit(void)
 	types_mod = PyModule_Create(&_wrapmodule);
 	if (types_mod == NULL) return -1;
 	if (PyObject_SetAttrString(slp_module, "_wrap", types_mod)) return -1;
+	if (PyDict_SetItemString(PyImport_GetModuleDict(),
+							 _wrapmodule.m_name, types_mod))
+		return -1;
 	copy_reg = PyImport_ImportModule("copyreg");
 	if (copy_reg != NULL) {
 		pickle_reg = PyObject_GetAttrString(copy_reg, "pickle");
 		Py_CLEAR(copy_reg);
 	}
 	PyErr_Clear();
-	if (initchain()) {
-		Py_CLEAR(pickle_reg);
-		ret = -1;
-	}
+	ret = initchain();
 	Py_CLEAR(pickle_reg);
+	Py_CLEAR(types_mod);
 	return 0;
 }
 

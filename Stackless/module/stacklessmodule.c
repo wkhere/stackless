@@ -838,10 +838,11 @@ slpmodule_new(const char *name)
 {
 	PySlpModuleObject *m;
 	PyObject *nameobj;
-
 	m = PyObject_GC_New(PySlpModuleObject, PySlpModule_TypePtr);
 	if (m == NULL)
 		return NULL;
+	m->md_def = NULL;
+	m->md_state = NULL;
 	m->__channel__ = NULL;
 	m->__tasklet__ = NULL;
 	nameobj = PyUnicode_FromString(name);
@@ -852,11 +853,13 @@ slpmodule_new(const char *name)
 		goto fail;
 	if (PyDict_SetItemString(m->md_dict, "__doc__", Py_None) != 0)
 		goto fail;
+	if (PyDict_SetItemString(m->md_dict, "__package__", Py_None) != 0)
+		goto fail;
 	Py_DECREF(nameobj);
 	PyObject_GC_Track(m);
 	return (PyObject *)m;
 
-fail:
+ fail:
 	Py_XDECREF(nameobj);
 	Py_DECREF(m);
 	return NULL;
