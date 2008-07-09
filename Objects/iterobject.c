@@ -141,9 +141,9 @@ PyCallIter_New(PyObject *callable, PyObject *sentinel)
 	it = PyObject_GC_New(calliterobject, &PyCallIter_Type);
 	if (it == NULL)
 		return NULL;
-	Py_INCREF(callable);
+	Py_XINCREF(callable); /* stackless: these can be NULL from pickling*/
 	it->it_callable = callable;
-	Py_INCREF(sentinel);
+	Py_XINCREF(sentinel);
 	it->it_sentinel = sentinel;
 	_PyObject_GC_TRACK(it);
 	return (PyObject *)it;
