@@ -494,8 +494,17 @@ class SizeofTest(unittest.TestCase):
                 pass
         # type (PyTypeObject + PyNumberMethods +  PyMappingMethods +
         #       PySequenceMethods + PyBufferProcs)
+        try:
+            import stackless
+            # The number of byte entries in the generated 'slp_methodflags'.
+            stacklessSize = 83
+            # Make it a multiple of two.
+            stacklessSize = stacklessSize + stacklessSize % 2
+        except:
+            stacklessSize = 0
         self.check_sizeof(class_newstyle, size('P2P15Pl4PP9PP11PI') +\
-                                          size(h + '41P 10P 3P 6P'))
+                                          size(h + '41P 10P 3P 6P') +\
+                                          stacklessSize)
 
     def test_specialtypes(self):
         h = self.header
