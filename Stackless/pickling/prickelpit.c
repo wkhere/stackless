@@ -1301,8 +1301,8 @@ calliter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 			      &it_sentinel))
 		return NULL;
 
-	if (it_callable == Py_None) Py_CLEAR(it_callable);
-	if (it_sentinel == Py_None) Py_CLEAR(it_sentinel);
+	if (it_callable == Py_None) it_callable = NULL;
+	if (it_sentinel == Py_None) it_sentinel = NULL;
 
 	it = (calliterobject *) PyCallIter_New(it_callable, it_sentinel);
 	if (it != NULL)
@@ -1781,7 +1781,9 @@ enum_setstate(PyObject *self, PyObject *args)
 			       &((enumobject *)self)->en_longindex))
 		return NULL;
 	if (((enumobject *)self)->en_longindex == Py_None)
-		Py_CLEAR(((enumobject *)self)->en_longindex);
+		((enumobject *)self)->en_longindex = NULL;
+	else
+		Py_INCREF(((enumobject *)self)->en_longindex);
 	self->ob_type = self->ob_type->tp_base;
 	Py_INCREF(self);
 	return self;
