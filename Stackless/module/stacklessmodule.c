@@ -420,7 +420,7 @@ test_outside(PyObject *self)
 		}
 	}
 	ts->st.main = stmain;
-	Py_XDECREF(ts->st.initial_stub);
+	Py_CLEAR(ts->st.initial_stub);
 	ts->st.initial_stub = cst;
 	ts->frame = f;
 	slp_current_insert(stmain);
@@ -553,7 +553,6 @@ PyStackless_CallMethod_Main(PyObject *o, char *name, char *format, ...)
 		args = a;
 	}
 
-	/* retval = PyObject_CallObject(func, args); */
 	retval = PyStackless_Call_Main(func, args, NULL);
 
 	Py_DECREF(args);
@@ -571,8 +570,8 @@ int PyStackless_SetScheduleCallback(PyObject *callable)
 {
 	if(callable != NULL && !PyCallable_Check(callable))
 		TYPE_ERROR("schedule callback must be callable", -1);
-	Py_XDECREF(_slp_schedule_hook);
 	Py_XINCREF(callable);
+	Py_CLEAR(_slp_schedule_hook);
 	_slp_schedule_hook = callable;
 	if (callable!=NULL)
 		PyStackless_SetScheduleFastcallback(slp_schedule_callback);
@@ -892,7 +891,7 @@ slpmodule_set__tasklet__(PySlpModuleObject *mod, PyTypeObject *type, void *conte
 	if (!PyType_IsSubtype(type, &PyTasklet_Type))
 		TYPE_ERROR("__tasklet__ must be a tasklet subtype", -1);
 	Py_INCREF(type);
-	Py_XDECREF(mod->__tasklet__);
+	Py_CLEAR(mod->__tasklet__);
 	mod->__tasklet__ = type;
 	return 0;
 }
@@ -910,7 +909,7 @@ slpmodule_set__channel__(PySlpModuleObject *mod, PyTypeObject *type, void *conte
 	if (!PyType_IsSubtype(type, &PyChannel_Type))
 		TYPE_ERROR("__channel__ must be a channel subtype", -1);
 	Py_INCREF(type);
-	Py_XDECREF(mod->__channel__);
+	Py_CLEAR(mod->__channel__);
 	mod->__channel__ = type;
 	return 0;
 }

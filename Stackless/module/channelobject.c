@@ -312,28 +312,22 @@ static PyObject * channel_hook = NULL;
 static void
 channel_callback(PyChannelObject *channel, PyTaskletObject *task, int sending, int willblock)
 {
-	PyObject *args, *ret;
+	PyObject *ret;
 	PyObject *type, *value, *traceback;
-	args = ret = NULL;
-
-	args = Py_BuildValue("(OOii)", channel, task, sending, willblock);
-	if (args != NULL) {
-
-		PyErr_Fetch(&type, &value, &traceback);
-		ret = PyObject_Call(channel_hook, args, NULL);
-
-		if (ret != NULL) {
-			PyErr_Restore(type, value, traceback);
-		}
-		else {
-			Py_XDECREF(type);
-			Py_XDECREF(value);
-			Py_XDECREF(traceback);
-		}
-
-		Py_XDECREF(ret);
-		Py_DECREF(args);
+	
+	PyErr_Fetch(&type, &value, &traceback);
+	ret = PyObject_CallFunction(channel_hook, "(OOii)", channel,
+								task, sending, willblock);
+	if (ret != NULL) {
+		PyErr_Restore(type, value, traceback);
 	}
+	else {
+		Py_XDECREF(type);
+		Py_XDECREF(value);
+		Py_XDECREF(traceback);
+	}
+
+	Py_XDECREF(ret);
 }
 
 #define NOTIFY_CHANNEL(channel, task, dir, cando, res) \

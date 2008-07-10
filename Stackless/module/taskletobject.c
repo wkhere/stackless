@@ -100,13 +100,6 @@ kill_finally (PyObject *ob)
 static void
 tasklet_clear(PyTaskletObject *t)
 {
-#define ZAP(x) \
-	if (x != NULL) { \
-		PyObject *_hold = (PyObject *) x; \
-		x = NULL; \
-		Py_XDECREF(_hold); \
-	}
-
 	/* if (slp_get_frame(t) != NULL) */
 	if (t->f.frame != NULL)
 		kill_finally((PyObject *) t);
@@ -114,8 +107,6 @@ tasklet_clear(PyTaskletObject *t)
 	/* unlink task from cstate */
 	if (t->cstate != NULL && t->cstate->task == t)
 		t->cstate->task = NULL;
-
-#undef ZAP
 }
 
 

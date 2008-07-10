@@ -51,18 +51,9 @@ bomb_traverse(PyBombObject *bomb, visitproc visit, void *arg)
 static void
 bomb_clear(PyBombObject *bomb)
 {
-#define ZAP(x) \
-	if (x != NULL) { \
-		PyObject *_hold = (PyObject *) x; \
-		x = NULL; \
-		Py_XDECREF(_hold); \
-	}
-
-	ZAP(bomb->curexc_type);
-	ZAP(bomb->curexc_value);
-	ZAP(bomb->curexc_traceback);
-
-#undef ZAP
+	Py_CLEAR(bomb->curexc_type);
+	Py_CLEAR(bomb->curexc_value);
+	Py_CLEAR(bomb->curexc_traceback);
 }
 
 static PyBombObject *
@@ -351,29 +342,22 @@ transfer_with_exc(PyCStackObject **cstprev, PyCStackObject *cst, PyTaskletObject
 int
 slp_schedule_callback(PyTaskletObject *prev, PyTaskletObject *next)
 {
-	PyObject *args;
+	PyObject *type, *value, *traceback, *ret;
 
 	if (prev == NULL) prev = (PyTaskletObject *)Py_None;
 	if (next == NULL) next = (PyTaskletObject *)Py_None;
-	args = Py_BuildValue("(OO)", prev, next);
-	if (args != NULL) {
-		PyObject *type, *value, *traceback, *ret;
 
-		PyErr_Fetch(&type, &value, &traceback);
-		ret = PyObject_Call(_slp_schedule_hook, args, NULL);
-		if (ret != NULL)
-			PyErr_Restore(type, value, traceback);
-		else {
-			Py_XDECREF(type);
-			Py_XDECREF(value);
-			Py_XDECREF(traceback);
-		}
-		Py_XDECREF(ret);
-		Py_DECREF(args);
-		return ret ? 0 : -1;
+	PyErr_Fetch(&type, &value, &traceback);
+	ret = PyObject_CallFunction(_slp_schedule_hook, "(OO)", prev, next);
+	if (ret != NULL)
+		PyErr_Restore(type, value, traceback);
+	else {
+		Py_XDECREF(type);
+		Py_XDECREF(value);
+		Py_XDECREF(traceback);
 	}
-	else
-		return -1;
+	Py_XDECREF(ret);
+	return ret ? 0 : -1;
 }
 
 #define NOTIFY_SCHEDULE(prev, next, errflag) \
@@ -826,9 +810,9 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 	/* start of soft switching code */
 
 	if (prev->cstate != ts->st.initial_stub) {
-		Py_DECREF(prev->cstate);
+		Py_INCREF(ts->st.initial_stub);
+		Py_CLEAR(prev->cstate);
 		prev->cstate = ts->st.initial_stub;
-		Py_INCREF(prev->cstate);
 	}
 	if (ts != slp_initial_tstate) {
 		/* ensure to get all tasklets into the other thread's chain */
@@ -837,10 +821,8 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 	}
 
 	/* handle exception */
-	if (ts->exc_type == Py_None) {
-		Py_XDECREF(ts->exc_type);
-		ts->exc_type = NULL;
-	}
+	if (ts->exc_type == Py_None)
+		Py_CLEAR(ts->exc_type);
 	if (ts->exc_type != NULL) {
 		/* build a shadow frame */
 		PyCFrameObject *f = slp_cframe_new(restore_exception, 1);
@@ -908,10 +890,8 @@ hard_switching:
 
 	ts->st.current = next;
 
-	if (ts->exc_type == Py_None) {
-		Py_XDECREF(ts->exc_type);
-		ts->exc_type = NULL;
-	}
+	if (ts->exc_type == Py_None)
+		Py_CLEAR(ts->exc_type);
 	ts->recursion_depth = next->recursion_depth;
 	ts->frame = next->f.frame;
 	next->f.frame = NULL;
@@ -1094,10 +1074,9 @@ tasklet_end(PyObject *retval)
 	 * of their execution.
          */
 	if (ts->exc_type != NULL && ts->exc_type != Py_None) {
-		Py_DECREF(ts->exc_type);
-		Py_XDECREF(ts->exc_value);
-		Py_XDECREF(ts->exc_traceback);
-		ts->exc_type = ts->exc_value = ts->exc_traceback = NULL;
+		Py_CLEAR(ts->exc_type);
+		Py_CLEAR(ts->exc_value);
+		Py_CLEAR(ts->exc_traceback);
 	}
 
 	/* capture all exceptions */

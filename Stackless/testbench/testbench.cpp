@@ -117,15 +117,13 @@ int TestConditionFunction( PyObject *condf )
   if (condf && PyCallable_Check(condf))
   {
     int cret = 0;
-    PyObject *fargs = PyTuple_New(0);
-    PyObject *pValue = PyObject_CallObject(condf, fargs);
+    PyObject *pValue = PyObject_CallObject(condf, NULL);
     if (pValue != NULL)
 	{
       cret = PyInt_AsLong(pValue);
       Py_DECREF(pValue);
 	}
-    Py_DECREF(fargs);
-	return cret;
+    return cret;
   }
   return -1;
 }
@@ -231,8 +229,7 @@ public:
 	  {
 //		PyThreadState_Swap(m_interp);
 		CPCE(PySW_CleanupTasklet( m_tasklet ), msg);
-		Py_XDECREF(m_tasklet);
-		m_tasklet = NULL;
+		Py_CLEAR(m_tasklet);
 	  }
 	}
 

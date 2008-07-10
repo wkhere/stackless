@@ -224,10 +224,7 @@ make_initial_stub(void)
 {
 	PyThreadState *ts = PyThreadState_GET();
 
-	if (ts->st.initial_stub != NULL) {
-		Py_DECREF(ts->st.initial_stub);
-		ts->st.initial_stub = NULL;
-	}
+	Py_CLEAR(ts->st.initial_stub);
 	ts->st.serial_last_jump = ++ts->st.serial;
 	if (slp_transfer(&ts->st.initial_stub, NULL, NULL)) return -1;
 	/* 
@@ -399,7 +396,7 @@ eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
 		return NULL;
 	TASKLET_SETVAL_OWN(cur, retval);
 	/* jump back */
-	Py_XDECREF(cur->cstate);
+	Py_CLEAR(cur->cstate);
 	cur->cstate = cst;
 	slp_transfer_return(cst);
 	/* never come here */
@@ -432,7 +429,7 @@ slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
 	Py_XDECREF(retval);
 	if (slp_transfer(&cur->cstate, NULL, cur))
 		goto finally; /* fatal */
-	Py_XDECREF(cur->cstate);
+	Py_CLEAR(cur->cstate);
 	retval = cur->tempval;
 	Py_INCREF(retval);
 	if (PyBomb_Check(retval))
@@ -559,9 +556,8 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
 	 * may keep a chain of frames alive or it could create a reference
 	 * cycle. */
 	ts->frame = f->f_back;
-	Py_XDECREF(f->f_back);
-	f->f_back = NULL;
-
+	Py_CLEAR(f->f_back);
+	
 	f = gen->gi_frame;
 	/* If the generator just returned (as opposed to yielding), signal
 	 * that the generator is exhausted. */

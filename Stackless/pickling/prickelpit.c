@@ -608,9 +608,9 @@ cell_setstate(PyObject *self, PyObject *args)
 	if (is_wrong_type(self->ob_type)) return NULL;
 	if (!PyArg_ParseTuple (args, "|O", &ob))
 		return NULL;
-	Py_XDECREF(cell->ob_ref);
+	Py_XINCREF(ob);
+	Py_CLEAR(cell->ob_ref);
 	cell->ob_ref = ob;
-	Py_XINCREF(cell->ob_ref);
 	Py_INCREF(self);
 	self->ob_type = self->ob_type->tp_base;
 	return self;
@@ -670,7 +670,7 @@ func_new(PyTypeObject *type, PyObject *args, PyObject *kewd)
 	return ob;
 }
 
-#define COPY(src, dest, attr) Py_XINCREF(src->attr); Py_XDECREF(dest->attr); \
+#define COPY(src, dest, attr) Py_XINCREF(src->attr); Py_CLEAR(dest->attr); \
 			      dest->attr = src->attr
 
 static PyObject *
@@ -937,9 +937,9 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 		goto err_exit;
 	}
 
-	Py_XDECREF(f->f_back);
 	/* mark this frame as coming from unpickling */
 	Py_INCREF(Py_None);
+	Py_CLEAR(f->f_back);
 	f->f_back = (PyFrameObject *) Py_None;
 
 	f->f_lasti = f_lasti;
@@ -1028,8 +1028,7 @@ slp_ensure_new_frame(PyFrameObject *f)
 	else {
 		Py_INCREF(f);
 	}
-	Py_XDECREF(f->f_back);
-	f->f_back = NULL;
+	Py_CLEAR(f->f_back);
 	return f;
 }
 
@@ -2120,11 +2119,11 @@ methw_setstate(PyObject *self, PyObject *args)
 	{
 		wrapperobject *neww = (wrapperobject *) self;
 		wrapperobject *oldw = (wrapperobject *) w;
-		Py_DECREF(neww->descr);
 		Py_INCREF(oldw->descr);
+		Py_CLEAR(neww->descr);
 		neww->descr = oldw->descr;
-		Py_DECREF(neww->self);
 		Py_INCREF(oldw->self);
+		Py_CLEAR(neww->self);
 		neww->self = oldw->self;
 	}
 	Py_DECREF(w);
@@ -2221,7 +2220,7 @@ gen_setstate(PyObject *self, PyObject *args)
 				return NULL;
 			}
 			Py_INCREF(f);
-			Py_DECREF(gen->gi_frame);
+			Py_CLEAR(gen->gi_frame);
 			gen->gi_frame = f;
 			/* The frame the temporary generator references
 			   will have GeneratorExit raised on it, when the
@@ -2246,7 +2245,7 @@ gen_setstate(PyObject *self, PyObject *args)
 	 * generator without the corresponding tasklet.
 	 */
 	Py_INCREF(f);
-	Py_DECREF(gen->gi_frame);
+	Py_CLEAR(gen->gi_frame);
 	gen->gi_frame = f;
 	gen->gi_running = gi_running;
 	Py_TYPE(gen) = Py_TYPE(gen)->tp_base;

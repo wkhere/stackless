@@ -57,7 +57,7 @@ slp_safe_pickling(int(*save)(PyObject *, PyObject *, int),
 	cur->cstate = NULL;
 	if (slp_transfer(&cur->cstate, NULL, cur))
 		return -1; /* fatal */
-	Py_XDECREF(cur->cstate);
+	Py_CLEAR(cur->cstate);
 	cur->cstate = cst;
 	ret = cf->i;
 finally:
