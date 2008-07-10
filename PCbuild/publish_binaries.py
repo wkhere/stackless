@@ -17,7 +17,6 @@ fileList = [
     r"..\Lib\distutils\command\build_ext.py",
     r"..\Lib\pickle.py",
     r"..\Lib\platform.py",
-    r"..\Lib\site.py",
     r"..\Lib\test\exception_hierarchy.txt",
     r"..\Lib\test\test_pep352.py",
 ]

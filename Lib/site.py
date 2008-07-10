@@ -300,27 +300,6 @@ def setBEGINLIBPATH():
     os.environ['BEGINLIBPATH'] = ';'.join(libpath)
 
 
-# This needs to be placed in the global scope so that anything which pickles
-# it can find it and unpickle it (for Stackless).
-class Quitter(object):
-    def __init__(self, name):
-        self.name = name
-    def __repr__(self):
-        return 'Use %s() or %s to exit' % (self.name, eof)
-    def __call__(self, code=None):
-        # Shells like IDLE catch the SystemExit, but listen when their
-        # stdin wrapper is closed.
-        try:
-            fd = -1
-            if hasattr(sys.stdin, "fileno"):
-                fd = sys.stdin.fileno()
-            if fd != 0:
-                # Don't close stdin if it wraps fd 0
-                sys.stdin.close()
-        except:
-            pass
-        raise SystemExit(code)
-
 def setquit():
     """Define new built-ins 'quit' and 'exit'.
     These are simply strings that display a hint on how to exit.
@@ -333,6 +312,24 @@ def setquit():
     else:
         eof = 'Ctrl-D (i.e. EOF)'
 
+    class Quitter(object):
+        def __init__(self, name):
+            self.name = name
+        def __repr__(self):
+            return 'Use %s() or %s to exit' % (self.name, eof)
+        def __call__(self, code=None):
+            # Shells like IDLE catch the SystemExit, but listen when their
+            # stdin wrapper is closed.
+            try:
+                fd = -1
+                if hasattr(sys.stdin, "fileno"):
+                    fd = sys.stdin.fileno()
+                if fd != 0:
+                    # Don't close stdin if it wraps fd 0
+                    sys.stdin.close()
+            except:
+                pass
+            raise SystemExit(code)
     builtins.quit = Quitter('quit')
     builtins.exit = Quitter('exit')
 
