@@ -14,18 +14,17 @@ raw_input("press enter to continue")
 """
 
 fileList = [
-    r"..\Lib\copy_reg.py",
     r"..\Lib\distutils\command\build_ext.py",
     r"..\Lib\pickle.py",
     r"..\Lib\platform.py",
+    r"..\Lib\site.py",
     r"..\Lib\test\exception_hierarchy.txt",
-    r"..\Lib\test\test_platform.py",
     r"..\Lib\test\test_pep352.py",
 ]
 
 for debug in ("", "_d"):
     for suffix in ("dll", "lib", "exp"):
-        fileList.append("python26%s.%s" % (debug, suffix))
+        fileList.append("python30%s.%s" % (debug, suffix))
 
 pathBySuffix = {
     "dll":  "",
@@ -48,7 +47,7 @@ for f in os.listdir(slpdir):
     elif f.endswith(".h"):
         includeFileList.append([ "include/Stackless/"+ f, os.path.join(slpdir, f) ])
 
-zname = os.path.join(exp_path, "python26.zip")
+zname = os.path.join(exp_path, "python30.zip")
 z = ZipFile(zname, "w", ZIP_DEFLATED)
 for fileName in fileList:
     if os.path.exists(fileName):
