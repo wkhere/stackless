@@ -125,7 +125,6 @@ def runtask_bad(name):
 class ServerTasklet(stackless.tasklet):
     
     def __init__(self, func, name=None):
-        stackless.tasklet.__init__(self, func)
         if not name:
             name = "at %08x" % (id(self))
         self.name = name
