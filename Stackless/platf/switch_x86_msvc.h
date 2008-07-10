@@ -28,9 +28,7 @@
 #ifdef BYTE
 #undef BYTE
 #endif
-#ifndef _NO_WINDOWS_H_ /* used by _pickle.c */
 #include <windows.h>
-#endif
 #endif
 #define _SEH32
 

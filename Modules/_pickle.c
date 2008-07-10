@@ -2,16 +2,11 @@
 #include "structmember.h"
 
 #ifdef STACKLESS
-#define _NO_WINDOWS_H_
-#include "platf/slp_platformselect.h"
-
-/* must declare this here because we don't want some includes */
-PyAPI_FUNC(int) slp_safe_pickling(int(*save)(PyObject *, PyObject *, int), 
-				  PyObject *self, PyObject *args,
-				  int pers_save);
-
-PyAPI_FUNC(PyObject *) PyStackless_Pickle_ModuleDict(PyObject *pickler,
-						     PyObject *self);
+#include "core/stackless_impl.h"
+/* rename these because otherwise we will conflict with windows.h */
+#define FLOAT OP_FLOAT
+#define INT OP_INT
+#define LONG OP_LONG
 #endif
 
 PyDoc_STRVAR(pickle_module_doc,
