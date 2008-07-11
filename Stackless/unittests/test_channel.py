@@ -2,6 +2,12 @@ import unittest
 import stackless
 
 class TestChannels(unittest.TestCase):
+    def setUp(self):
+        self.failUnless(stackless.getruncount() == 1, "Leakage from other tests, with %d tasklets still in the scheduler" % (stackless.getruncount() - 1))
+
+    def tearDown(self):
+        self.failUnless(stackless.getruncount() == 1, "Leakage from this test, with %d tasklets still in the scheduler" % (stackless.getruncount() - 1))        
+
     def testBlockingSend(self):
         ''' Test that when a tasklet sends to a channel without waiting receivers, the tasklet is blocked. '''
 
@@ -87,6 +93,8 @@ class TestChannels(unittest.TestCase):
             value = channel.receive()
         finally:
             stackless.getcurrent().block_trap = oldBlockTrap
+
+        tasklet.kill()
         
         self.failUnless(value == originalValue, "We received a value, but it was not the one we sent.  Completely unexpected.")
 

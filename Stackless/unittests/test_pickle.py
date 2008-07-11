@@ -123,7 +123,19 @@ class TestPickledTasklets(unittest.TestCase):
     def setUp(self):
         self.verbose = VERBOSE
 
+        # A useful check to make sure that crap doesn't roll downhill to us from other test suites.
+        self.failUnless(stackless.getruncount() == 1, "Leakage from other tests, with tasklets still in the scheduler")
+
     def tearDown(self):
+        # Tasklets created in pickling tests can be left in the scheduler when they finish.  We can feel free to
+        # clean them up for the tests.
+        mainTasklet = stackless.getmain()
+        current = mainTasklet.next
+        while current is not mainTasklet:
+            next = current.next
+            current.kill()
+            current = next
+    
         del self.verbose
 
     def run_pickled(self, func, *args):
