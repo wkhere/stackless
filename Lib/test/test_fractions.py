@@ -62,11 +62,11 @@ class FractionTest(unittest.TestCase):
 
         self.assertRaisesMessage(ZeroDivisionError, "Fraction(12, 0)",
                                  F, 12, 0)
-        self.assertRaises(AttributeError, F, 1.5)
-        self.assertRaises(AttributeError, F, 1.5 + 3j)
+        self.assertRaises(TypeError, F, 1.5)
+        self.assertRaises(TypeError, F, 1.5 + 3j)
 
-        self.assertRaises(AttributeError, F, F(1, 2), 3)
-        self.assertRaises(AttributeError, F, "3/2", 3)
+        self.assertRaises(TypeError, F, F(1, 2), 3)
+        self.assertRaises(TypeError, F, "3/2", 3)
 
     def testFromString(self):
         self.assertEquals((5, 1), _components(F("5")))
@@ -137,10 +137,8 @@ class FractionTest(unittest.TestCase):
         self.assertNotEquals(F(4, 2), r)
 
     def testFromFloat(self):
-        self.assertRaisesMessage(
-            TypeError, "Fraction.from_float() only takes floats, not 3 (int)",
-            F.from_float, 3)
-
+        self.assertRaises(TypeError, F.from_float, 3+4j)
+        self.assertEquals((10, 1), _components(F.from_float(10)))
         self.assertEquals((0, 1), _components(F.from_float(-0.0)))
         self.assertEquals((10, 1), _components(F.from_float(10.0)))
         self.assertEquals((-5, 2), _components(F.from_float(-2.5)))
@@ -164,10 +162,8 @@ class FractionTest(unittest.TestCase):
             F.from_float, nan)
 
     def testFromDecimal(self):
-        self.assertRaisesMessage(
-            TypeError,
-            "Fraction.from_decimal() only takes Decimals, not 3 (int)",
-            F.from_decimal, 3)
+        self.assertRaises(TypeError, F.from_decimal, 3+4j)
+        self.assertEquals(F(10, 1), F.from_decimal(10))
         self.assertEquals(F(0), F.from_decimal(Decimal("-0")))
         self.assertEquals(F(5, 10), F.from_decimal(Decimal("0.5")))
         self.assertEquals(F(5, 1000), F.from_decimal(Decimal("5e-3")))

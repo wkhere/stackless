@@ -56,6 +56,7 @@ typedef struct _slp_methodflags {\
     for slot in slotnames:
         print >> f, "\tsigned char %s;" % slot
     print >> f, "} slp_methodflags;"
+    print len(slotnames), "methods found"
 
 if __name__ == "__main__":
     generate()

@@ -133,7 +133,7 @@ getcurrent(PyObject *self)
 
 static char getmain__doc__[] =
 "getmain() -- return the main tasklet of this thread.";
- 
+
 static PyObject *
 getmain(PyObject *self)
 {
@@ -186,10 +186,10 @@ interrupt_timeout_return(void)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *current = ts->st.current;
-	
+
 	/*
 	 * Tasklet has to be prevented from returning if atomic or
-	 * if nesting_level is relevant 
+	 * if nesting_level is relevant
 	 */
 	if (current->flags.atomic || ts->st.schedlock ||
 	    ( ts->st.nesting_level && !current->flags.ignore_nesting ) ) {
@@ -233,10 +233,10 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 		RUNTIME_ERROR(
 		    "run() must be run from the main tasklet.",
 		    NULL);
-	
+
 	if (timeout <= 0) {
 		ts->st.interrupt = NULL;
-	} 
+	}
 	else {
 		ts->st.interrupt = interrupt_timeout_return;
 	}
@@ -263,7 +263,7 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 	if (err) /* an exception has occoured */
 		return NULL;
 
-	/* 
+	/*
 	 * back in main.
 	 * We were either revived by slp_tasklet_end or the interrupt.
 	 */
@@ -491,7 +491,7 @@ test_cframe_nr(PyObject *self, PyObject *args, PyObject *kwds)
 
  ******************************************************/
 
-PyObject * 
+PyObject *
 PyStackless_Call_Main(PyObject *func, PyObject *args, PyObject *kwds)
 {
 	PyThreadState *ts = PyThreadState_GET();
@@ -1024,7 +1024,7 @@ static PyTypeObject PySlpModule_TypeTemplate = {
 	PyObject_GenericGetAttr,	/* tp_getattro */
 	PyObject_GenericSetAttr,	/* tp_setattro */
 	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | 
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
 		Py_TPFLAGS_HAVE_GC,	/* tp_flags */
 	PySlpModule_Type__doc__,	/* tp_doc */
 	0,				/* tp_traverse */
