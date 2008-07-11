@@ -11,7 +11,6 @@ class TestExceptionState(unittest.TestCase):
             1/0
         except Exception as e:
             ei = sys.exc_info()
-            print(ei)
             self.assertEquals(ei[0], ZeroDivisionError)
             schedule()
             ei = sys.exc_info()
