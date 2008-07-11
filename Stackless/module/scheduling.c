@@ -845,35 +845,39 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 		ts->exc_type = NULL;
 	}
 	if (ts->exc_type != NULL) {
-		/* build a shadow frame */
-		PyCFrameObject *f = slp_cframe_new(restore_exception, 1);
-		if (f == NULL)
-			return NULL;
-		f->ob1 = ts->exc_type;
-		f->ob2 = ts->exc_value;
-		f->ob3 = ts->exc_traceback;
-		prev->f.frame = (PyFrameObject *) f;
+		/* build a shadow frame if we are returning here*/
+		if (ts->frame != NULL) {
+			PyCFrameObject *f = slp_cframe_new(restore_exception, 1);
+			if (f == NULL)
+				return NULL;
+			f->ob1 = ts->exc_type;
+			f->ob2 = ts->exc_value;
+			f->ob3 = ts->exc_traceback;
+			prev->f.frame = (PyFrameObject *) f;
+		}
 		ts->exc_type = ts->exc_value =
-			       ts->exc_traceback = NULL;
+				   ts->exc_traceback = NULL;
 	}
 	if (ts->use_tracing || ts->tracing) {
-		/* build a shadow frame */
-		PyCFrameObject *f = slp_cframe_new(restore_tracing, 1);
-		if (f == NULL)
-			return NULL;
-		f->any1 = ts->c_tracefunc;
-		f->any2 = ts->c_profilefunc;
+		/* build a shadow frame if we are returning here */
+		if (ts->frame != NULL) {
+			PyCFrameObject *f = slp_cframe_new(restore_tracing, 1);
+			if (f == NULL)
+				return NULL;
+			f->any1 = ts->c_tracefunc;
+			f->any2 = ts->c_profilefunc;
+			f->ob1 = ts->c_traceobj;
+			f->ob2 = ts->c_profileobj;
+			/* trace/profile does not add references */
+			Py_XINCREF(f->ob1);
+			Py_XINCREF(f->ob2);
+			f->i = ts->tracing;
+			f->n = ts->use_tracing;
+			prev->f.frame = (PyFrameObject *) f;
+		}
 		ts->c_tracefunc = ts->c_profilefunc = NULL;
-		f->ob1 = ts->c_traceobj;
-		f->ob2 = ts->c_profileobj;
-		/* trace/profile does not add references */
-		Py_XINCREF(f->ob1);
-		Py_XINCREF(f->ob2);
 		ts->c_traceobj = ts->c_profileobj = NULL;
-		f->i = ts->tracing;
-		f->n = ts->use_tracing;
 		ts->tracing = ts->use_tracing = 0;
-		prev->f.frame = (PyFrameObject *) f;
 	}
 	ts->frame = next->f.frame;
 	next->f.frame = NULL;

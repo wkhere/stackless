@@ -105,16 +105,17 @@ slp_cframe_new(PyFrame_ExecFunc *exec, unsigned int linked)
 		_Py_NewReference((PyObject *) cf);
 	}
 
-        back = ts->frame;
-	if (!linked)
+	if (linked)
+		back = ts->frame;
+	else
 		back = NULL;
-        Py_XINCREF(back);
+	Py_XINCREF(back);
 	cf->f_execute = exec;
 	cf->f_back = back;
 	cf->ob1 = cf->ob2 = cf->ob3 = NULL;
 	cf->i = cf->n = 0;
 	_PyObject_GC_TRACK(cf);
-        return cf;
+	return cf;
 }
 
 /* pickling support for cframes */
