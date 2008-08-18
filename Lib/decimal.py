@@ -549,17 +549,17 @@ class Decimal(object):
                 fracpart = m.group('frac')
                 exp = int(m.group('exp') or '0')
                 if fracpart is not None:
-                    self._int = (intpart+fracpart).lstrip('0') or '0'
+                    self._int = str((intpart+fracpart).lstrip('0') or '0')
                     self._exp = exp - len(fracpart)
                 else:
-                    self._int = intpart.lstrip('0') or '0'
+                    self._int = str(intpart.lstrip('0') or '0')
                     self._exp = exp
                 self._is_special = False
             else:
                 diag = m.group('diag')
                 if diag is not None:
                     # NaN
-                    self._int = diag.lstrip('0')
+                    self._int = str(diag.lstrip('0'))
                     if m.group('signal'):
                         self._exp = 'N'
                     else:
@@ -2316,6 +2316,9 @@ class Decimal(object):
 
     def sqrt(self, context=None):
         """Return the square root of self."""
+        if context is None:
+            context = getcontext()
+
         if self._is_special:
             ans = self._check_nans(context=context)
             if ans:
@@ -2328,9 +2331,6 @@ class Decimal(object):
             # exponent = self._exp // 2.  sqrt(-0) = -0
             ans = _dec_from_triple(self._sign, '0', self._exp // 2)
             return ans._fix(context)
-
-        if context is None:
-            context = getcontext()
 
         if self._sign == 1:
             return context._raise_error(InvalidOperation, 'sqrt(-x), x > 0')

@@ -1055,23 +1055,35 @@ class Misc:
                 if k[-1] == '_': k = k[:-1]
                 if callable(v):
                     v = self._register(v)
+                elif isinstance(v, (tuple, list)):
+                    nv = []
+                    for item in v:
+                        if not isinstance(item, (basestring, int)):
+                            break
+                        elif isinstance(item, int):
+                            nv.append('%d' % item)
+                        else:
+                            # format it to proper Tcl code if it contains space
+                            nv.append(('{%s}' if ' ' in item else '%s') % item)
+                    else:
+                        v = ' '.join(nv)
                 res = res + ('-'+k, v)
         return res
     def nametowidget(self, name):
         """Return the Tkinter instance of a widget identified by
         its Tcl name NAME."""
+        name = str(name).split('.')
         w = self
-        if name[0] == '.':
+
+        if not name[0]:
             w = w._root()
             name = name[1:]
-        while name:
-            i = name.find('.')
-            if i >= 0:
-                name, tail = name[:i], name[i+1:]
-            else:
-                tail = ''
-            w = w.children[name]
-            name = tail
+
+        for n in name:
+            if not n:
+                break
+            w = w.children[n]
+
         return w
     _nametowidget = nametowidget
     def _register(self, func, subst=None, needcleanup=1):
@@ -1094,7 +1106,6 @@ class Misc:
             if self._tclCommands is None:
                 self._tclCommands = []
             self._tclCommands.append(name)
-        #print '+ Tkinter created command', name
         return name
     register = _register
     def _root(self):
@@ -1747,10 +1758,11 @@ class Pack:
         after=widget - pack it after you have packed widget
         anchor=NSEW (or subset) - position widget according to
                                   given direction
-                before=widget - pack it before you will pack widget
+        before=widget - pack it before you will pack widget
         expand=bool - expand widget if parent size grows
         fill=NONE or X or Y or BOTH - fill widget if widget grows
         in=master - use master to contain this widget
+        in_=master - see 'in' option description
         ipadx=amount - add internal padding in x direction
         ipady=amount - add internal padding in y direction
         padx=amount - add padding in x direction
@@ -1788,29 +1800,26 @@ class Place:
     Base class to use the methods place_* in every widget."""
     def place_configure(self, cnf={}, **kw):
         """Place a widget in the parent widget. Use as options:
-        in=master - master relative to which the widget is placed.
+        in=master - master relative to which the widget is placed
+        in_=master - see 'in' option description
         x=amount - locate anchor of this widget at position x of master
         y=amount - locate anchor of this widget at position y of master
         relx=amount - locate anchor of this widget between 0.0 and 1.0
                       relative to width of master (1.0 is right edge)
-            rely=amount - locate anchor of this widget between 0.0 and 1.0
+        rely=amount - locate anchor of this widget between 0.0 and 1.0
                       relative to height of master (1.0 is bottom edge)
-            anchor=NSEW (or subset) - position anchor according to given direction
+        anchor=NSEW (or subset) - position anchor according to given direction
         width=amount - width of this widget in pixel
         height=amount - height of this widget in pixel
         relwidth=amount - width of this widget between 0.0 and 1.0
                           relative to width of master (1.0 is the same width
-                  as the master)
-            relheight=amount - height of this widget between 0.0 and 1.0
+                          as the master)
+        relheight=amount - height of this widget between 0.0 and 1.0
                            relative to height of master (1.0 is the same
-                   height as the master)
-            bordermode="inside" or "outside" - whether to take border width of master widget
-                                               into account
-            """
-        for k in ['in_']:
-            if kw.has_key(k):
-                kw[k[:-1]] = kw[k]
-                del kw[k]
+                           height as the master)
+        bordermode="inside" or "outside" - whether to take border width of
+                                           master widget into account
+        """
         self.tk.call(
               ('place', 'configure', self._w)
               + self._options(cnf, kw))
@@ -1845,6 +1854,7 @@ class Grid:
         column=number - use cell identified with given column (starting with 0)
         columnspan=number - this widget will span several columns
         in=master - use master to contain this widget
+        in_=master - see 'in' option description
         ipadx=amount - add internal padding in x direction
         ipady=amount - add internal padding in y direction
         padx=amount - add padding in x direction
@@ -2659,7 +2669,17 @@ class Menu(Widget):
         self.insert(index, 'separator', cnf or kw)
     def delete(self, index1, index2=None):
         """Delete menu items between INDEX1 and INDEX2 (not included)."""
+        if index2 is None:
+            index2 = index1
+        cmds = []
+        for i in range(self.index(index1), self.index(index2)+1):
+            if 'command' in self.entryconfig(i):
+                c = str(self.entrycget(i, 'command'))
+                if c in self._tclCommands:
+                    cmds.append(c)
         self.tk.call(self._w, 'delete', index1, index2)
+        for c in cmds:
+            self.deletecommand(c)
     def entrycget(self, index, option):
         """Return the resource value of an menu item for OPTION at INDEX."""
         return self.tk.call(self._w, 'entrycget', index, '-' + option)

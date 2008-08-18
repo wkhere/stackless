@@ -421,7 +421,7 @@ _active = []
 
 def _cleanup():
     for inst in _active[:]:
-        if inst.poll(_deadstate=sys.maxint) >= 0:
+        if inst._internal_poll(_deadstate=sys.maxint) >= 0:
             try:
                 _active.remove(inst)
             except ValueError:
@@ -634,7 +634,7 @@ class Popen(object):
             # We didn't get to successfully create a child process.
             return
         # In case the child hasn't been waited on, check if it's done.
-        self.poll(_deadstate=sys.maxint)
+        self._internal_poll(_deadstate=sys.maxint)
         if self.returncode is None and _active is not None:
             # Child is still running, keep us alive until we can wait on it.
             _active.append(self)
@@ -660,12 +660,18 @@ class Popen(object):
                 self.stdin.close()
             elif self.stdout:
                 stdout = self.stdout.read()
+                self.stdout.close()
             elif self.stderr:
                 stderr = self.stderr.read()
+                self.stderr.close()
             self.wait()
             return (stdout, stderr)
 
         return self._communicate(input)
+
+
+    def poll(self):
+        return self._internal_poll()
 
 
     if mswindows:
@@ -841,7 +847,7 @@ class Popen(object):
                 errwrite.Close()
 
 
-        def poll(self, _deadstate=None):
+        def _internal_poll(self, _deadstate=None):
             """Check if child process has terminated.  Returns returncode
             attribute."""
             if self.returncode is None:
@@ -1101,7 +1107,7 @@ class Popen(object):
                 raise RuntimeError("Unknown child exit status!")
 
 
-        def poll(self, _deadstate=None):
+        def _internal_poll(self, _deadstate=None):
             """Check if child process has terminated.  Returns returncode
             attribute."""
             if self.returncode is None:
@@ -1147,7 +1153,12 @@ class Popen(object):
 
             input_offset = 0
             while read_set or write_set:
-                rlist, wlist, xlist = select.select(read_set, write_set, [])
+                try:
+                    rlist, wlist, xlist = select.select(read_set, write_set, [])
+                except select.error, e:
+                    if e.args[0] == errno.EINTR:
+                        continue
+                    raise
 
                 if self.stdin in wlist:
                     # When select has indicated that the file is writable,

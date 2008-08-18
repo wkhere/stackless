@@ -4,8 +4,195 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.5.2?
+What's New in Python 2.5.3?
 =============================
+
+*Release date: XX-XXX-20XX*
+
+Core and builtins
+-----------------
+
+- Issue #3537: Fix an assertion failure when an empty but presized dict
+  object was stored in the freelist.
+
+- Apply security patches from Apple.
+
+- Issue #2620: Overflow checking when allocating or reallocating memory
+  was not always being done properly in some python types and extension
+  modules.  PyMem_MALLOC, PyMem_REALLOC, PyMem_NEW and PyMem_RESIZE have
+  all been updated to perform better checks and places in the code that
+  would previously leak memory on the error path when such an allocation
+  failed have been fixed.
+
+- Issue #2242: Fix a crash when decoding invalid utf-7 input on certain
+  Windows / Visual Studio versions.
+
+- Issue #3360: Fix incorrect parsing of '020000000000.0', which
+  produced a ValueError instead of giving the correct float.
+
+- Issue #3242: Fix a crash inside the print statement, if sys.stdout is
+  set to a custom object whose write() method happens to install
+  another file in sys.stdout.
+
+- Issue #3088: Corrected a race condition in classes derived from
+  threading.local: the first member set by a thread could be saved in
+  another thread's dictionary.
+
+- Issue #3100: Corrected a crash on deallocation of a subclassed weakref which
+  holds the last (strong) reference to its referent.
+
+- Issue #1686386: Tuple's tp_repr did not take into account the possibility of
+  having a self-referential tuple, which is possible from C code.  Nor did
+  object's tp_str consider that a type's tp_str could do something that could
+  lead to an inifinite recursion.  Py_ReprEnter() and Py_EnterRecursiveCall(),
+  respectively, fixed the issues.  (Backport of r58288 from trunk.)
+
+- Patch #1442: properly report exceptions when the PYTHONSTARTUP file
+  cannot be executed.
+
+- The compilation of a class nested in another class used to leak one
+  reference on the outer class name.
+
+- Issue #1477: With narrow Unicode builds, the unicode escape sequence
+  \Uxxxxxxxx did not accept values outside the Basic Multilingual Plane.  This
+  affected raw unicode literals and the 'raw-unicode-escape' codec.  Now
+  UTF-16 surrogates are generated in this case, like normal unicode literals
+  and the 'unicode-escape' codec.
+
+- Issue #2321: use pymalloc for unicode object string data to reduce
+  memory usage in some circumstances.
+
+- Issue #2238: Some syntax errors in *args and **kwargs expressions could give
+  bogus error messages.
+
+- Issue #2587: In the C API, PyString_FromStringAndSize() takes a signed size
+  parameter but was not verifying that it was greater than zero.  Values
+  less than zero will now raise a SystemError and return NULL to indicate a
+  bug in the calling C code.
+
+- Issue #2588, #2589: Fix potential integer underflow and overflow
+  conditions in the PyOS_vsnprintf C API function.
+
+
+Library
+-------
+
+- Issue #2222: Fixed reference leak when occured os.rename()
+  fails unicode conversion on 2nd parameter. (windows only)
+
+- Issue #3134: shutil referenced undefined WindowsError symbol.
+
+- Issue #1342811: Fix leak in Tkinter.Menu.delete. Commands associated to
+  menu entries were not deleted.
+
+- Issue #799428: Fix Tkinter.Misc._nametowidget to unwrap Tcl command objects.
+
+- Issue #3339: dummy_thread.acquire() could return None which is not a valid
+  return value.
+
+- Issue #3116 and #1792:  Fix quadratic behavior in marshal.dumps().
+
+- Issue #2682: ctypes callback functions no longer contain a cyclic
+  reference to themselves.
+
+- Issue #2670:  Fix a failure in urllib2.build_opener(), when passed two
+  handlers that derive the same default base class.
+
+- Issue #2495: tokenize.untokenize now inserts a space between two consecutive
+  string literals; previously, ["" ""] was rendered as [""""], which is
+  incorrect python code.
+
+- Issue #2482: Make sure that the coefficient of a Decimal is always
+  stored as a str instance, not as a unicode instance.  This ensures
+  that str(Decimal) is always an instance of str.  This fixes a
+  regression from Python 2.5.1 to Python 2.5.2.
+
+- Issue #2478: fix failure of decimal.Decimal(0).sqrt()
+
+- Issue #2432: give DictReader the dialect and line_num attributes
+  advertised in the docs.
+
+- Issue #1747858: Fix chown to work with large uid's and gid's on 64-bit
+  platforms.
+
+- Bug #2220: handle rlcompleter attribute match failure more gracefully.
+
+- Bug #1725737: In distutil's sdist, exclude RCS, CVS etc. also in the
+  root directory, and also exclude .hg, .git, .bzr, and _darcs.
+
+- Bug #1389051: imaplib causes excessive memory fragmentation when reading
+  large messages.
+
+- Bug #1389051, 1092502: fix excessively large memory allocations when
+  calling .read() on a socket object wrapped with makefile().
+
+- Bug #1433694: minidom's .normalize() failed to set .nextSibling for
+  last child element.
+
+- Issue #2791: subprocess.Popen.communicate explicitly closes its
+  stdout and stderr fds rather than leaving them open until the
+  instance is destroyed.
+
+- Issue #2632: Prevent socket.read(bignumber) from over allocating memory
+  in the common case when the data is returned from the underlying socket
+  in increments much smaller than bignumber.
+
+- Issue #1857: subprocess.Popen.poll gained an additional _deadstate keyword
+  argument in python 2.5, this broke code that subclassed Popen to include its
+  own poll method.  Fixed my moving _deadstate to an _internal_poll method.
+
+- Issue #2113: Fix error in subprocess.Popen if the select system call is
+  interrupted by a signal.
+
+- Issue #874900: after an os.fork() call the threading module state is cleaned
+  up in the child process to prevent deadlock and report proper thread counts
+  if the new process uses the threading module.
+
+- Issue #3309: Fix bz2.BZFile iterator to release its internal lock
+  properly when raising an exception due to the bz2file being closed.
+  Prevents a deadlock.
+
+
+Extension Modules
+-----------------
+
+- Issue #3205: When iterating over a BZ2File fails allocating memory, raise
+  a MemoryError rather than silently stop the iteration.
+
+- Patch #2111: Avoid mmap segfault when modifying a PROT_READ block.
+
+- zlib.decompressobj().flush(value) no longer crashes the interpreter when
+  passed a value less than or equal to zero.
+
+- issue2858: Fix potential memory corruption when bsddb.db.DBEnv.lock_get
+  and other bsddb.db object constructors raised an exception.
+
+- Issue #3120: On 64-bit Windows the subprocess module was truncating handles.
+
+- Issue #1471: Arguments to fcntl.ioctl are no longer broken on 64-bit OpenBSD
+  and similar platforms due to sign extension.
+
+Tests
+-----
+
+- Issue #3261: test_cookielib had an improper file encoding specified.
+
+- Patch #2232: os.tmpfile might fail on Windows if the user has no
+  permission to create files in the root directory.
+
+
+Documentation
+-------------
+
+Build
+-----
+
+Windows
+-------
+
+
+What's New in Python 2.5.2?
+===========================
 
 *Release date: 21-Feb-2008*
 
@@ -35,7 +222,7 @@ Core and builtins
   collections.defaultdict, if its default_factory is set to a bound method.
 
 - Issue #1920: "while 0" statements were completely removed by the compiler,
-  even in the presence of an "else" clause, which is supposed to be run when 
+  even in the presence of an "else" clause, which is supposed to be run when
   the condition is false. Now the compiler correctly emits bytecode for the
   "else" suite.
 
@@ -69,7 +256,7 @@ Core and builtins
   PY_SSIZE_T_CLEAN is set.  The str.decode method used to return incorrect
   results with huge strings.
 
-- Issue #1445: Fix a SystemError when accessing the ``cell_contents`` 
+- Issue #1445: Fix a SystemError when accessing the ``cell_contents``
   attribute of an empty cell object.
 
 - Issue #1265: Fix a problem with sys.settrace, if the tracing function uses a
@@ -101,6 +288,9 @@ Core and builtins
 
 Library
 -------
+
+- curses.textpad: Fix off-by-one error that resulted in characters
+  being missed from the contents of a Textbox.
 
 - Patch #1966: Break infinite loop in httplib when the servers
   implements the chunked encoding incorrectly.
@@ -245,7 +435,7 @@ Library
 - Issue1385: The hmac module now computes the correct hmac when using hashes
   with a block size other than 64 bytes (such as sha384 and sha512).
 
-- Issue829951: In the smtplib module, SMTP.starttls() now complies with 
+- Issue829951: In the smtplib module, SMTP.starttls() now complies with
   RFC 3207 and forgets any knowledge obtained from the server not obtained
   from the TLS negotiation itself.  Patch contributed by Bill Fenner.
 
@@ -265,7 +455,7 @@ Extension Modules
 - Bug #1301: Bad assert in _tkinter fixed.
 
 - Patch #1114: fix curses module compilation on 64-bit AIX, & possibly
-  other 64-bit LP64 platforms where attr_t is not the same size as a long.  
+  other 64-bit LP64 platforms where attr_t is not the same size as a long.
   (Contributed by Luke Mewburn.)
 
 - Bug #1649098: Avoid declaration of zero-sized array declaration in
@@ -328,7 +518,7 @@ Build
 
 - Define _BSD_SOURCE, to get access to POSIX extensions on OpenBSD 4.1+.
 
-- Patch #1673122: Use an explicit path to libtool when building a framework. 
+- Patch #1673122: Use an explicit path to libtool when building a framework.
   This avoids picking up GNU libtool from a users PATH.
 
 - Allow Emacs 22 for building the documentation in info format.
@@ -402,7 +592,7 @@ Core and builtins
   a weakref on itself during a __del__ call for new-style classes (classic
   classes still have the bug).
 
-- Bug #1648179:  set.update() did not recognize an overridden __iter__ 
+- Bug #1648179:  set.update() did not recognize an overridden __iter__
   method in subclasses of dict.
 
 - Bug #1579370: Make PyTraceBack_Here use the current thread, not the
@@ -537,7 +727,7 @@ Extension Modules
 - Bug #1563807: _ctypes built on AIX fails with ld ffi error.
 
 - Bug #1598620: A ctypes Structure cannot contain itself.
- 
+
 - Bug #1588217: don't parse "= " as a soft line break in binascii's
   a2b_qp() function, instead leave it in the string as quopri.decode()
   does.
@@ -649,7 +839,7 @@ Library
   on "linux" and "gnu" systems.
 
 - Bug #1124861: Automatically create pipes if GetStdHandle fails in
-  subprocess. 
+  subprocess.
 
 - Patch #783050: the pty.fork() function now closes the slave fd
   correctly.
@@ -660,7 +850,7 @@ Library
 
 - Bug #1643943: Fix %U handling for time.strptime.
 
-- Bug #1598181: Avoid O(N**2) bottleneck in subprocess communicate(). 
+- Bug #1598181: Avoid O(N**2) bottleneck in subprocess communicate().
 
 - Patch #1627441: close sockets properly in urllib2.
 
@@ -724,7 +914,7 @@ Library
 - Bug #1446043: correctly raise a LookupError if an encoding name given
   to encodings.search_function() contains a dot.
 
-- Bug #1545341: The 'classifier' keyword argument to the Distutils setup() 
+- Bug #1545341: The 'classifier' keyword argument to the Distutils setup()
   function now accepts tuples as well as lists.
 
 - Bug #1560617: in pyclbr, return full module name not only for classes,
@@ -743,7 +933,7 @@ Library
 - Bug #1575506: mailbox.py: Single-file mailboxes didn't re-lock
   properly in their flush() method.
 
-- Patch #1514543: mailbox.py: In the Maildir class, report errors if there's 
+- Patch #1514543: mailbox.py: In the Maildir class, report errors if there's
   a filename clash instead of possibly losing a message.  (Patch by David
   Watson.)
 
@@ -755,7 +945,7 @@ Library
   wasn't consistent with existing implementations of message packing, and
   was buggy on some platforms.
 
-- Bug #1633678: change old mailbox.UnixMailbox class to parse 
+- Bug #1633678: change old mailbox.UnixMailbox class to parse
   'From' lines less strictly.
 
 - Bug #1576241: fix functools.wraps() to work on built-in functions.

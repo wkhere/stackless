@@ -429,6 +429,12 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
         #just not a number
         self.assertEqual(str(Decimal('ugly')), 'NaN')
 
+        #unicode strings should be permitted
+        self.assertEqual(str(Decimal(u'0E-017')), '0E-17')
+        self.assertEqual(str(Decimal(u'45')), '45')
+        self.assertEqual(str(Decimal(u'-Inf')), '-Infinity')
+        self.assertEqual(str(Decimal(u'NaN123')), 'NaN123')
+
     def test_explicit_from_tuples(self):
 
         #zero
@@ -1032,6 +1038,16 @@ class DecimalUsabilityTest(unittest.TestCase):
         self.assertEqual(str(d), '15.32')               # str
         self.assertEqual(repr(d), 'Decimal("15.32")')   # repr
 
+        # result type of string methods should be str, not unicode
+        unicode_inputs = [u'123.4', u'0.5E2', u'Infinity', u'sNaN',
+                          u'-0.0E100', u'-NaN001', u'-Inf']
+
+        for u in unicode_inputs:
+            d = Decimal(u)
+            self.assertEqual(type(str(d)), str)
+            self.assertEqual(type(repr(d)), str)
+            self.assertEqual(type(d.to_eng_string()), str)
+
     def test_tonum_methods(self):
         #Test float, int and long methods.
 
@@ -1191,6 +1207,12 @@ class DecimalUsabilityTest(unittest.TestCase):
 
         d = d1.max(d2)
         self.assertTrue(type(d) is Decimal)
+
+    def test_implicit_context(self):
+        # Check results when context given implicitly.  (Issue 2478)
+        c = getcontext()
+        self.assertEqual(str(Decimal(0).sqrt()),
+                         str(c.sqrt(Decimal(0))))
 
 
 class DecimalPythonAPItests(unittest.TestCase):

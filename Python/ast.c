@@ -249,6 +249,8 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
 		    goto error;
                 asdl_seq_SET(stmts, 0, Pass(n->n_lineno, n->n_col_offset,
                                             arena));
+                if (!asdl_seq_GET(stmts, 0))
+                    goto error;
                 return Interactive(stmts, arena);
             }
             else {
@@ -679,6 +681,8 @@ ast_for_arguments(struct compiling *c, const node *n)
 		    if (NCH(ch) != 1) {
 			/* We have complex arguments, setup for unpacking. */
 			asdl_seq_SET(args, k++, compiler_complex_args(c, ch));
+			if (!asdl_seq_GET(args, k-1))
+			    goto error;
 		    } else {
 			/* def foo((x)): setup for checking NAME below. */
 			/* Loop because there can be many parens and tuple
@@ -1878,10 +1882,14 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 	}
 	else if (TYPE(ch) == STAR) {
 	    vararg = ast_for_expr(c, CHILD(n, i+1));
+	    if (!vararg)
+	        return NULL;
 	    i++;
 	}
 	else if (TYPE(ch) == DOUBLESTAR) {
 	    kwarg = ast_for_expr(c, CHILD(n, i+1));
+	    if (!kwarg)
+	        return NULL;
 	    i++;
 	}
     }
@@ -3059,16 +3067,7 @@ parsenumber(const char *s)
 #endif
 	if (*end == 'l' || *end == 'L')
 		return PyLong_FromString((char *)s, (char **)0, 0);
-	if (s[0] == '0') {
-		x = (long) PyOS_strtoul((char *)s, (char **)&end, 0);
- 		if (x < 0 && errno == 0) {
-	 			return PyLong_FromString((char *)s,
-							 (char **)0,
-							 0);
-		}
-	}
-	else
-		x = PyOS_strtol((char *)s, (char **)&end, 0);
+	x = PyOS_strtol((char *)s, (char **)&end, 0);
 	if (*end == '\0') {
 		if (errno != 0)
 			return PyLong_FromString((char *)s, (char **)0, 0);

@@ -260,6 +260,10 @@ d31v(1)
 def d32v((x,)): pass
 d32v((1,))
 
+# Check ast errors in *args and *kwargs
+check_syntax("f(*g(1=2))")
+check_syntax("f(**g(1=2))")
+
 ### lambdef: 'lambda' [varargslist] ':' test
 print 'lambdef'
 l1 = lambda : 0
@@ -273,6 +277,7 @@ l5 = lambda x, y, z=2: x + y + z
 verify(l5(1, 2) == 5)
 verify(l5(1, 2, 3) == 6)
 check_syntax("lambda x: x = 2")
+check_syntax("lambda (None,): None")
 
 ### stmt: simple_stmt | compound_stmt
 # Tested below

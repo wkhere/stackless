@@ -851,15 +851,17 @@ PyObject* cursor_iternext(Cursor *self)
         next_row = next_row_tuple;
     }
 
-    rc = _sqlite_step_with_busyhandler(self->statement->st, self->connection);
-    if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
-        Py_DECREF(next_row);
-        _seterror(self->connection->db);
-        return NULL;
-    }
+    if (self->statement) {
+        rc = _sqlite_step_with_busyhandler(self->statement->st, self->connection);
+        if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+            Py_DECREF(next_row);
+            _seterror(self->connection->db);
+            return NULL;
+        }
 
-    if (rc == SQLITE_ROW) {
-        self->next_row = _fetch_one_row(self);
+        if (rc == SQLITE_ROW) {
+            self->next_row = _fetch_one_row(self);
+        }
     }
 
     return next_row;
@@ -979,11 +981,11 @@ static PyMethodDef cursor_methods[] = {
     {"executescript", (PyCFunction)cursor_executescript, METH_VARARGS,
         PyDoc_STR("Executes a multiple SQL statements at once. Non-standard.")},
     {"fetchone", (PyCFunction)cursor_fetchone, METH_NOARGS,
-        PyDoc_STR("Fetches several rows from the resultset.")},
-    {"fetchmany", (PyCFunction)cursor_fetchmany, METH_VARARGS,
-        PyDoc_STR("Fetches all rows from the resultset.")},
-    {"fetchall", (PyCFunction)cursor_fetchall, METH_NOARGS,
         PyDoc_STR("Fetches one row from the resultset.")},
+    {"fetchmany", (PyCFunction)cursor_fetchmany, METH_VARARGS,
+        PyDoc_STR("Fetches several rows from the resultset.")},
+    {"fetchall", (PyCFunction)cursor_fetchall, METH_NOARGS,
+        PyDoc_STR("Fetches all rows from the resultset.")},
     {"close", (PyCFunction)cursor_close, METH_NOARGS,
         PyDoc_STR("Closes the cursor.")},
     {"setinputsizes", (PyCFunction)pysqlite_noop, METH_VARARGS,

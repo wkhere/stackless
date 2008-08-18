@@ -416,6 +416,7 @@ Util_ReadAhead(BZ2FileObject *f, int bufsize)
 		return 0;
 	}
 	if ((f->f_buf = PyMem_Malloc(bufsize)) == NULL) {
+		PyErr_NoMemory();
 		return -1;
 	}
 	Py_BEGIN_ALLOW_THREADS
@@ -1436,6 +1437,7 @@ BZ2File_iternext(BZ2FileObject *self)
 	PyStringObject* ret;
 	ACQUIRE_LOCK(self);
 	if (self->mode == MODE_CLOSED) {
+                RELEASE_LOCK(self);
 		PyErr_SetString(PyExc_ValueError,
 				"I/O operation on closed file");
 		return NULL;

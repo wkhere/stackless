@@ -223,7 +223,7 @@ mmap_read_method(mmap_object *self,
 		return(NULL);
 
 	/* silently 'adjust' out-of-range requests */
-	if ((self->pos + num_bytes) > self->size) {
+	if (num_bytes > self->size - self->pos) {
 		num_bytes -= (self->pos+num_bytes) - self->size;
 	}
 	result = Py_BuildValue("s#", self->data+self->pos, num_bytes);
@@ -880,6 +880,10 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 		return PyErr_Format(PyExc_ValueError,
 				    "mmap invalid access parameter.");
 	}
+
+    if (prot == PROT_READ) {
+        access = ACCESS_READ;
+    }
 
 #ifdef HAVE_FSTAT
 #  ifdef __VMS

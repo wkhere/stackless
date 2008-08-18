@@ -209,6 +209,10 @@ if 1:
         self.assertEqual(eval("000000000000007"), 7)
         self.assertEqual(eval("000000000000008."), 8.)
         self.assertEqual(eval("000000000000009."), 9.)
+        self.assertEqual(eval("020000000000.0"), 20000000000.0)
+        self.assertEqual(eval("037777777777e0"), 37777777777.0)
+        self.assertEqual(eval("01000000000000000000000.0"),
+                         1000000000000000000000.0)
 
     def test_unary_minus(self):
         # Verify treatment of unary minus on negative numbers SF bug #660455
@@ -397,6 +401,10 @@ if 1:
         self.assertEqual(d[..., ...], 2)
         del d[..., ...]
         self.assertEqual((Ellipsis, Ellipsis) in d, False)
+
+    def test_nested_classes(self):
+        # Verify that it does not leak
+        compile("class A:\n    class B: pass", 'tmp', 'exec')
 
 def test_main():
     test_support.run_unittest(TestSpecifics)
