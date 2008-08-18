@@ -531,9 +531,8 @@ Python has two builtin functions that work with inheritance:
 
 * Use :func:`issubclass` to check class inheritance: ``issubclass(bool, int)``
   is ``True`` since :class:`bool` is a subclass of :class:`int`.  However,
-  ``issubclass(unicode, str)`` is ``False`` since :class:`unicode` is not a
-  subclass of :class:`str` (they only share a common ancestor,
-  :class:`basestring`).
+  ``issubclass(float, int)`` is ``False`` since :class:`float` is not a
+  subclass of :class:`int`.
   
 
 
@@ -672,7 +671,7 @@ class or a base class thereof (but not the other way around --- an except clause
 listing a derived class is not compatible with a base class).  For example, the
 following code will print B, C, D in that order::
 
-   class B:
+   class B(Exception):
        pass
    class C(B):
        pass

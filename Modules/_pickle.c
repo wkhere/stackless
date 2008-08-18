@@ -312,9 +312,6 @@ typedef struct PicklerObject {
     PyObject *arg;
     int proto;                  /* Pickle protocol number, >= 0 */
     int bin;                    /* Boolean, true if proto > 0 */
-    int nesting;                /* Current nesting level, this is to guard
-                                   save() from going into infinite recursion
-                                   and segfaulting. */
     int buf_size;               /* Size of the current buffered pickle data */
     char *write_buf;            /* Write buffer, this is to avoid calling the
                                    write() method of the output stream too
@@ -941,7 +938,7 @@ save_long(PicklerObject *self, PyObject *obj)
         repr = PyUnicode_FromStringAndSize(NULL, (int)nbytes);
         if (repr == NULL)
             goto error;
-        pdata = (unsigned char *)PyUnicode_AsString(repr);
+        pdata = (unsigned char *)_PyUnicode_AsString(repr);
         i = _PyLong_AsByteArray((PyLongObject *)obj,
                                 pdata, nbytes,
                                 1 /* little endian */ , 1 /* signed */ );
@@ -986,7 +983,7 @@ save_long(PicklerObject *self, PyObject *obj)
         if (repr == NULL)
             goto error;
 
-        string = PyUnicode_AsStringAndSize(repr, &size);
+        string = _PyUnicode_AsStringAndSize(repr, &size);
         if (string == NULL)
             goto error;
 
@@ -1883,7 +1880,7 @@ save_pers(PicklerObject *self, PyObject *obj, PyObject *func)
             /* XXX: Should it check whether the persistent id only contains
                ASCII characters? And what if the pid contains embedded
                newlines? */
-            pid_ascii_bytes = PyUnicode_AsStringAndSize(pid_str, &size);
+            pid_ascii_bytes = _PyUnicode_AsStringAndSize(pid_str, &size);
             Py_DECREF(pid_str);
             if (pid_ascii_bytes == NULL)
                 goto error;
@@ -2087,18 +2084,14 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
     int status = 0;
 
 #ifdef STACKLESS
-	/* but we save the stack after a fixed watermark */
-	if (CSTACK_SAVE_NOW(PyThreadState_GET(), self)) {
-		status = slp_safe_pickling((void *)&save, (PyObject *)self, obj, pers_save);
-		goto done;
-	}
-#else
-    /* XXX: Use Py_EnterRecursiveCall()? */
-    if (++self->nesting > Py_GetRecursionLimit()) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "maximum recursion depth exceeded");
-        goto error;
+    /* but we save the stack after a fixed watermark */
+    if (CSTACK_SAVE_NOW(PyThreadState_GET(), self)) {
+        status = slp_safe_pickling((void *)&save, (PyObject *)self, obj, pers_save);
+        goto done;
     }
+#else
+    if (Py_EnterRecursiveCall(" while pickling an object") < 0)
+        return -1;
 #endif
 
     /* The extra pers_save argument is necessary to avoid calling save_pers()
@@ -2304,7 +2297,7 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
         status = -1;
     }
   done:
-    self->nesting--;
+    Py_LeaveRecursiveCall();
     Py_XDECREF(memo_key);
     Py_XDECREF(reduce_func);
     Py_XDECREF(reduce_value);
@@ -2480,7 +2473,6 @@ Pickler_init(PicklerObject *self, PyObject *args, PyObject *kwds)
 	self->proto = proto;
 	self->bin = proto > 0;
 	self->arg = NULL;
-    self->nesting = 0;
 	self->fast = 0;
 	self->fast_nesting = 0;
 	self->fast_memo = NULL;
@@ -3919,8 +3911,11 @@ load_build(UnpicklerObject *self)
     inst = self->stack->data[self->stack->length - 1];
 
     setstate = PyObject_GetAttrString(inst, "__setstate__");
-    if (setstate == NULL && PyErr_ExceptionMatches(PyExc_AttributeError)) {
-        PyErr_Clear();
+    if (setstate == NULL) {
+        if (PyErr_ExceptionMatches(PyExc_AttributeError))
+            PyErr_Clear();
+        else
+            return -1;
     }
     else {
         PyObject *result;

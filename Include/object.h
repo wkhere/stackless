@@ -145,7 +145,8 @@ typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
 
 /* buffer interface */
 typedef struct bufferinfo {
-	void *buf;         
+	void *buf;   
+	PyObject *obj;        /* borrowed reference */
         Py_ssize_t len;
         Py_ssize_t itemsize;  /* This is Py_ssize_t so it can be 
                                  pointed to by strides in simple case.*/
@@ -462,6 +463,7 @@ PyAPI_FUNC(PyObject *) PyObject_GenericGetAttr(PyObject *, PyObject *);
 PyAPI_FUNC(int) PyObject_GenericSetAttr(PyObject *,
 					      PyObject *, PyObject *);
 PyAPI_FUNC(long) PyObject_Hash(PyObject *);
+PyAPI_FUNC(long) PyObject_HashNotImplemented(PyObject *);
 PyAPI_FUNC(int) PyObject_IsTrue(PyObject *);
 PyAPI_FUNC(int) PyObject_Not(PyObject *);
 PyAPI_FUNC(int) PyCallable_Check(PyObject *);
@@ -489,7 +491,7 @@ PyAPI_FUNC(long) _Py_HashDouble(double);
 PyAPI_FUNC(long) _Py_HashPointer(void*);
 
 /* Helper for passing objects to printf and the like */
-#define PyObject_REPR(obj) PyUnicode_AsString(PyObject_Repr(obj))
+#define PyObject_REPR(obj) _PyUnicode_AsString(PyObject_Repr(obj))
 
 /* Flag bits for printing: */
 #define Py_PRINT_RAW	1	/* No string quotes etc. */
@@ -719,9 +721,9 @@ PyAPI_FUNC(void) _Py_AddToAllObjects(PyObject *, int force);
 #define Py_CLEAR(op)				\
         do {                            	\
                 if (op) {			\
-                        PyObject *tmp = (PyObject *)(op);	\
+                        PyObject *_py_tmp = (PyObject *)(op);	\
                         (op) = NULL;		\
-                        Py_DECREF(tmp);		\
+                        Py_DECREF(_py_tmp);	\
                 }				\
         } while (0)
 

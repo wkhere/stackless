@@ -293,6 +293,51 @@ class TypesTests(unittest.TestCase):
         test(1234, "+b", "+10011010010")
         test(-1234, "+b", "-10011010010")
 
+        # alternate (#) formatting
+        test(0, "#b", '0b0')
+        test(0, "-#b", '0b0')
+        test(1, "-#b", '0b1')
+        test(-1, "-#b", '-0b1')
+        test(-1, "-#5b", ' -0b1')
+        test(1, "+#5b", ' +0b1')
+        test(100, "+#b", '+0b1100100')
+        test(100, "#012b", '0b0001100100')
+        test(-100, "#012b", '-0b001100100')
+
+        test(0, "#o", '0o0')
+        test(0, "-#o", '0o0')
+        test(1, "-#o", '0o1')
+        test(-1, "-#o", '-0o1')
+        test(-1, "-#5o", ' -0o1')
+        test(1, "+#5o", ' +0o1')
+        test(100, "+#o", '+0o144')
+        test(100, "#012o", '0o0000000144')
+        test(-100, "#012o", '-0o000000144')
+
+        test(0, "#x", '0x0')
+        test(0, "-#x", '0x0')
+        test(1, "-#x", '0x1')
+        test(-1, "-#x", '-0x1')
+        test(-1, "-#5x", ' -0x1')
+        test(1, "+#5x", ' +0x1')
+        test(100, "+#x", '+0x64')
+        test(100, "#012x", '0x0000000064')
+        test(-100, "#012x", '-0x000000064')
+        test(123456, "#012x", '0x000001e240')
+        test(-123456, "#012x", '-0x00001e240')
+
+        test(0, "#X", '0X0')
+        test(0, "-#X", '0X0')
+        test(1, "-#X", '0X1')
+        test(-1, "-#X", '-0X1')
+        test(-1, "-#5X", ' -0X1')
+        test(1, "+#5X", ' +0X1')
+        test(100, "+#X", '+0X64')
+        test(100, "#012X", '0X0000000064')
+        test(-100, "#012X", '-0X000000064')
+        test(123456, "#012X", '0X000001E240')
+        test(-123456, "#012X", '-0X00001E240')
+
         # make sure these are errors
 
         # precision disallowed
@@ -452,6 +497,12 @@ class TypesTests(unittest.TestCase):
         test(0.01, '', '0.01')
         test(0.01, 'g', '0.01')
 
+        # test for issue 3411
+        test(1.23, '1', '1.23')
+        test(-1.23, '1', '-1.23')
+        test(1.23, '1g', '1.23')
+        test(-1.23, '1g', '-1.23')
+
         test( 1.0, ' g', ' 1')
         test(-1.0, ' g', '-1')
         test( 1.0, '+g', '+1')
@@ -508,6 +559,10 @@ class TypesTests(unittest.TestCase):
                 self.assertRaises(ValueError, format, -1e100, format_spec)
                 self.assertRaises(ValueError, format, 1e-100, format_spec)
                 self.assertRaises(ValueError, format, -1e-100, format_spec)
+
+        # Alternate formatting is not supported
+        self.assertRaises(ValueError, format, 0.0, '#')
+        self.assertRaises(ValueError, format, 0.0, '#20f')
 
 
 def test_main():

@@ -84,8 +84,23 @@ PyErr_SetObject(PyObject *exception, PyObject *value)
 				return;
 			value = fixed_value;
 		}
-		Py_INCREF(tstate->exc_value);
-		PyException_SetContext(value, tstate->exc_value);
+		/* Avoid reference cycles through the context chain.
+		   This is O(chain length) but context chains are
+		   usually very short. Sensitive readers may try
+		   to inline the call to PyException_GetContext. */
+		if (tstate->exc_value != value) {
+			PyObject *o = tstate->exc_value, *context;
+			while ((context = PyException_GetContext(o))) {
+				Py_DECREF(context);
+				if (context == value) {
+					PyException_SetContext(o, NULL);
+					break;
+				}
+				o = context;
+			}
+			Py_INCREF(tstate->exc_value);
+			PyException_SetContext(value, tstate->exc_value);
+		}
 	}
 	if (value != NULL && PyExceptionInstance_Check(value))
 		tb = PyException_GetTraceback(value);
@@ -142,9 +157,18 @@ PyErr_GivenExceptionMatches(PyObject *err, PyObject *exc)
 		err = PyExceptionInstance_Class(err);
 
 	if (PyExceptionClass_Check(err) && PyExceptionClass_Check(exc)) {
-		/* problems here!?  not sure PyObject_IsSubclass expects to
-		   be called with an exception pending... */
-		return PyObject_IsSubclass(err, exc);
+		int res = 0;
+		PyObject *exception, *value, *tb;
+		PyErr_Fetch(&exception, &value, &tb);
+		res = PyObject_IsSubclass(err, exc);
+		/* This function must not fail, so print the error here */
+		if (res == -1) {
+			PyErr_WriteUnraisable(err);
+			/* issubclass did not succeed */
+			res = 0;
+		}
+		PyErr_Restore(exception, value, tb);
+		return res;
 	}
 
 	return err == exc;
@@ -160,6 +184,9 @@ PyErr_ExceptionMatches(PyObject *exc)
 
 /* Used in many places to normalize a raised exception, including in
    eval_code2(), do_raise(), and PyErr_Print()
+
+   XXX: should PyErr_NormalizeException() also call
+	    PyException_SetTraceback() with the resulting value and tb?
 */
 void
 PyErr_NormalizeException(PyObject **exc, PyObject **val, PyObject **tb)
@@ -294,7 +321,17 @@ PyErr_NoMemory(void)
 
 	/* raise the pre-allocated instance if it still exists */
 	if (PyExc_MemoryErrorInst)
+	{
+		/* Clear the previous traceback, otherwise it will be appended
+		 * to the current one.
+		 *
+		 * The following statement is not likely to raise any error;
+		 * if it does, we simply discard it.
+		 */
+		PyException_SetTraceback(PyExc_MemoryErrorInst, Py_None);
+
 		PyErr_SetObject(PyExc_MemoryError, PyExc_MemoryErrorInst);
+	}
 	else
 		/* this will probably fail since there's no memory and hee,
 		   hee, we have to instantiate this class
@@ -672,7 +709,7 @@ PyErr_WriteUnraisable(PyObject *obj)
 			if (moduleName == NULL)
 				PyFile_WriteString("<unknown>", f);
 			else {
-				char* modstr = PyUnicode_AsString(moduleName);
+				char* modstr = _PyUnicode_AsString(moduleName);
 				if (modstr &&
 				    strcmp(modstr, "builtins") != 0)
 				{

@@ -242,6 +242,10 @@ PyDict_New(void)
 		_Py_NewReference((PyObject *)mp);
 		if (mp->ma_fill) {
 			EMPTY_TO_MINSIZE(mp);
+		} else {
+			/* At least set ma_table and ma_mask; these are wrong
+			   if an empty but presized dict is added to freelist */
+			INIT_NONZERO_DICT_SLOTS(mp);
 		}
 		assert (mp->ma_used == 0);
 		assert (mp->ma_table == mp->ma_smalltable);
@@ -2031,7 +2035,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_as_number */
 	&dict_as_sequence,			/* tp_as_sequence */
 	&dict_as_mapping,			/* tp_as_mapping */
-	0,					/* tp_hash */
+	(hashfunc)PyObject_HashNotImplemented,	/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */

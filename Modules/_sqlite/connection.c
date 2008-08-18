@@ -434,7 +434,7 @@ void _pysqlite_set_result(sqlite3_context* context, PyObject* py_val)
     } else if (PyFloat_Check(py_val)) {
         sqlite3_result_double(context, PyFloat_AsDouble(py_val));
     } else if (PyUnicode_Check(py_val)) {
-        sqlite3_result_text(context, PyUnicode_AsString(py_val), -1, SQLITE_TRANSIENT);
+        sqlite3_result_text(context, _PyUnicode_AsString(py_val), -1, SQLITE_TRANSIENT);
     } else if (PyObject_CheckBuffer(py_val)) {
         if (PyObject_AsCharBuffer(py_val, &buffer, &buflen) != 0) {
             PyErr_SetString(PyExc_ValueError, "could not convert BLOB to buffer");
@@ -901,9 +901,14 @@ static int pysqlite_connection_set_isolation_level(pysqlite_Connection* self, Py
             return -1;
         }
 
-        statement = PyUnicode_AsStringAndSize(begin_statement, &size);
+        statement = _PyUnicode_AsStringAndSize(begin_statement, &size);
+        if (!statement) {
+            Py_DECREF(statement);
+            return -1;
+        }
         self->begin_statement = PyMem_Malloc(size + 2);
         if (!self->begin_statement) {
+            Py_DECREF(begin_statement);
             return -1;
         }
 
@@ -944,19 +949,16 @@ PyObject* pysqlite_connection_call(pysqlite_Connection* self, PyObject* args, Py
             _pysqlite_seterror(self->db, NULL);
         }
 
-        Py_DECREF(statement);
-        statement = 0;
+        Py_CLEAR(statement);
     } else {
         weakref = PyWeakref_NewRef((PyObject*)statement, NULL);
         if (!weakref) {
-            Py_DECREF(statement);
-            statement = 0;
+            Py_CLEAR(statement);
             goto error;
         }
 
         if (PyList_Append(self->statements, weakref) != 0) {
-            Py_DECREF(weakref);
-            statement = 0;
+            Py_CLEAR(weakref);
             goto error;
         }
 
@@ -980,15 +982,13 @@ PyObject* pysqlite_connection_execute(pysqlite_Connection* self, PyObject* args,
 
     method = PyObject_GetAttrString(cursor, "execute");
     if (!method) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
         goto error;
     }
 
     result = PyObject_CallObject(method, args);
     if (!result) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
     }
 
 error:
@@ -1011,15 +1011,13 @@ PyObject* pysqlite_connection_executemany(pysqlite_Connection* self, PyObject* a
 
     method = PyObject_GetAttrString(cursor, "executemany");
     if (!method) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
         goto error;
     }
 
     result = PyObject_CallObject(method, args);
     if (!result) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
     }
 
 error:
@@ -1042,15 +1040,13 @@ PyObject* pysqlite_connection_executescript(pysqlite_Connection* self, PyObject*
 
     method = PyObject_GetAttrString(cursor, "executescript");
     if (!method) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
         goto error;
     }
 
     result = PyObject_CallObject(method, args);
     if (!result) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
     }
 
 error:
@@ -1198,7 +1194,7 @@ pysqlite_connection_create_collation(pysqlite_Connection* self, PyObject* args)
         goto finally;
     }
 
-    chk = PyUnicode_AsString(uppercase_name);
+    chk = _PyUnicode_AsString(uppercase_name);
     while (*chk) {
         if ((*chk >= '0' && *chk <= '9')
          || (*chk >= 'A' && *chk <= 'Z')
@@ -1223,7 +1219,7 @@ pysqlite_connection_create_collation(pysqlite_Connection* self, PyObject* args)
     }
 
     rc = sqlite3_create_collation(self->db,
-                                  PyUnicode_AsString(uppercase_name),
+                                  _PyUnicode_AsString(uppercase_name),
                                   SQLITE_UTF8,
                                   (callable != Py_None) ? callable : NULL,
                                   (callable != Py_None) ? pysqlite_collation_callback : NULL);

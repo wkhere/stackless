@@ -60,7 +60,8 @@ class RobotFileParser:
             elif err.code >= 400:
                 self.allow_all = True
         else:
-            self.parse(f.read().splitlines())
+            raw = f.read()
+            self.parse(raw.decode("utf-8").splitlines())
 
     def _add_entry(self, entry):
         if "*" in entry.useragents:
@@ -75,6 +76,10 @@ class RobotFileParser:
         We allow that a user-agent: line is not preceded by
         one or more blank lines.
         """
+        # states:
+        #   0: start state
+        #   1: saw user-agent line
+        #   2: saw an allow or disallow line
         state = 0
         entry = Entry()
 
@@ -111,6 +116,7 @@ class RobotFileParser:
                 elif line[0] == "allow":
                     if state != 0:
                         entry.rulelines.append(RuleLine(line[1], True))
+                        state = 2
         if state == 2:
             self.entries.append(entry)
 
@@ -123,7 +129,10 @@ class RobotFileParser:
             return True
         # search for given user agent matches
         # the first match counts
-        url = urllib.parse.quote(urllib.parse.urlparse(urllib.parse.unquote(url))[2]) or "/"
+        url = urllib.parse.quote(
+            urllib.parse.urlparse(urllib.parse.unquote(url))[2])
+        if not url:
+            url = "/"
         for entry in self.entries:
             if entry.applies_to(useragent):
                 return entry.allowance(url)

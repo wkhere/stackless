@@ -788,7 +788,7 @@ test_string_from_format(PyObject *self, PyObject *args)
 	result = PyUnicode_FromFormat(FORMAT, (TYPE)1);	\
 	if (result == NULL)				\
 		return NULL;				\
-	if (strcmp(PyUnicode_AsString(result), "1")) {	\
+	if (strcmp(_PyUnicode_AsString(result), "1")) {	\
 		msg = FORMAT " failed at 1";		\
 		goto Fail;				\
 	}						\
@@ -951,8 +951,39 @@ traceback_print(PyObject *self, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+/* To test the format of exceptions as printed out. */
+static PyObject *
+exception_print(PyObject *self, PyObject *args)
+{
+	PyObject *value;
+	PyObject *tb;
+
+	if (!PyArg_ParseTuple(args, "O:exception_print",
+				&value))
+		return NULL;
+
+	tb = PyException_GetTraceback(value);
+	PyErr_Display((PyObject *) Py_TYPE(value), value, tb);
+	Py_XDECREF(tb);
+
+	Py_RETURN_NONE;
+}
+
+
+
+
+/* reliably raise a MemoryError */
+static PyObject *
+raise_memoryerror(PyObject *self)
+{
+	PyErr_NoMemory();
+	return NULL;
+}
+
+
 static PyMethodDef TestMethods[] = {
 	{"raise_exception",	raise_exception,		 METH_VARARGS},
+	{"raise_memoryerror",   (PyCFunction)raise_memoryerror,  METH_NOARGS},
 	{"test_config",		(PyCFunction)test_config,	 METH_NOARGS},
 	{"test_list_api",	(PyCFunction)test_list_api,	 METH_NOARGS},
 	{"test_dict_iteration",	(PyCFunction)test_dict_iteration,METH_NOARGS},
@@ -995,6 +1026,7 @@ static PyMethodDef TestMethods[] = {
 	{"profile_int",		profile_int,			METH_NOARGS},
 #endif
 	{"traceback_print", traceback_print, 	         METH_VARARGS},
+	{"exception_print", exception_print, 	         METH_VARARGS},
 	{NULL, NULL} /* sentinel */
 };
 
@@ -1182,6 +1214,7 @@ PyInit__testcapi(void)
 	PyModule_AddObject(m, "ULLONG_MAX", PyLong_FromUnsignedLongLong(PY_ULLONG_MAX));
 	PyModule_AddObject(m, "PY_SSIZE_T_MAX", PyLong_FromSsize_t(PY_SSIZE_T_MAX));
 	PyModule_AddObject(m, "PY_SSIZE_T_MIN", PyLong_FromSsize_t(PY_SSIZE_T_MIN));
+	PyModule_AddObject(m, "SIZEOF_PYGC_HEAD", PyLong_FromSsize_t(sizeof(PyGC_Head)));
 
 	TestError = PyErr_NewException("_testcapi.error", NULL, NULL);
 	Py_INCREF(TestError);

@@ -768,7 +768,61 @@ class LongTest(unittest.TestCase):
 
     def test_nan_inf(self):
         self.assertRaises(OverflowError, int, float('inf'))
-        self.assertRaises(OverflowError, int, float('nan'))
+        self.assertRaises(OverflowError, int, float('-inf'))
+        self.assertRaises(ValueError, int, float('nan'))
+
+    def test_true_division(self):
+        huge = 1 << 40000
+        mhuge = -huge
+        self.assertEqual(huge / huge, 1.0)
+        self.assertEqual(mhuge / mhuge, 1.0)
+        self.assertEqual(huge / mhuge, -1.0)
+        self.assertEqual(mhuge / huge, -1.0)
+        self.assertEqual(1 / huge, 0.0)
+        self.assertEqual(1 / huge, 0.0)
+        self.assertEqual(1 / mhuge, 0.0)
+        self.assertEqual(1 / mhuge, 0.0)
+        self.assertEqual((666 * huge + (huge >> 1)) / huge, 666.5)
+        self.assertEqual((666 * mhuge + (mhuge >> 1)) / mhuge, 666.5)
+        self.assertEqual((666 * huge + (huge >> 1)) / mhuge, -666.5)
+        self.assertEqual((666 * mhuge + (mhuge >> 1)) / huge, -666.5)
+        self.assertEqual(huge / (huge << 1), 0.5)
+        self.assertEqual((1000000 * huge) / huge, 1000000)
+
+        namespace = {'huge': huge, 'mhuge': mhuge}
+
+        for overflow in ["float(huge)", "float(mhuge)",
+                         "huge / 1", "huge / 2", "huge / -1", "huge / -2",
+                         "mhuge / 100", "mhuge / 200"]:
+            self.assertRaises(OverflowError, eval, overflow, namespace)
+
+        for underflow in ["1 / huge", "2 / huge", "-1 / huge", "-2 / huge",
+                         "100 / mhuge", "200 / mhuge"]:
+            result = eval(underflow, namespace)
+            self.assertEqual(result, 0.0,
+                             "expected underflow to 0 from %r" % underflow)
+
+        for zero in ["huge / 0", "mhuge / 0"]:
+            self.assertRaises(ZeroDivisionError, eval, zero, namespace)
+
+
+    def test_small_ints(self):
+        for i in range(-5, 257):
+            self.assertTrue(i is i + 0)
+            self.assertTrue(i is i * 1)
+            self.assertTrue(i is i - 0)
+            self.assertTrue(i is i // 1)
+            self.assertTrue(i is i & -1)
+            self.assertTrue(i is i | 0)
+            self.assertTrue(i is i ^ 0)
+            self.assertTrue(i is ~~i)
+            self.assertTrue(i is i**1)
+            self.assertTrue(i is int(str(i)))
+            self.assertTrue(i is i<<2>>2, str(i))
+        # corner cases
+        i = 1 << 70
+        self.assertTrue(i - i is 0)
+        self.assertTrue(0 * i is 0)
 
 def test_main():
     support.run_unittest(LongTest)

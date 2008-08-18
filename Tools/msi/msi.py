@@ -210,7 +210,7 @@ def build_database():
                   schema, ProductName="Python "+full_current_version+" (Stackless)",
                   ProductCode=product_code,
                   ProductVersion=current_version,
-                  Manufacturer="Richard Tew")
+                  Manufacturer=u"Richard Tew")
     # The default sequencing of the RemoveExistingProducts action causes
     # removal of files that got just installed. Place it after
     # InstallInitialize, so we first uninstall everything, but still roll

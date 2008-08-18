@@ -16,7 +16,16 @@ Glossary
       The typical Python prompt of the interactive shell when entering code for
       an indented code block.
 
-   Abstract Base Class
+   2to3
+      A tool that tries to convert Python 2.x code to Python 3.x code by
+      handling most of the incompatibilites that can be detected by parsing the
+      source and traversing the parse tree.
+
+      2to3 is available in the standard library as :mod:`lib2to3`; a standalone
+      entry point is provided as :file:`Tools/scripts/2to3`.  See
+      :ref:`2to3-reference`.
+
+   abstract base class
       Abstract Base Classes (abbreviated ABCs) complement :term:`duck-typing` by
       providing a way to define interfaces when other techniques like :func:`hasattr`
       would be clumsy. Python comes with many builtin ABCs for data structures
@@ -100,6 +109,14 @@ Glossary
       of :class:`dict` much resembles that for :class:`list`, but the keys can
       be any object with a :meth:`__hash__` function, not just integers starting
       from zero.  Called a hash in Perl.
+
+   docstring
+      A docstring ("documentation string") is a string literal that appears as
+      the first thing in a class or function suite.  While ignored when the
+      suite is executed, it is recognized by the compiler and put into the
+      :attr:`__doc__` attribute of the class or function.  Since it is available
+      via introspection, it is the canonical place for documentation of the
+      object.
     
    duck-typing 
       Pythonic programming style that determines an object's type by inspection

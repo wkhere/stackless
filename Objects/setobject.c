@@ -1944,6 +1944,18 @@ done:
 
 PyDoc_STRVAR(reduce_doc, "Return state information for pickling.");
 
+static PyObject *
+set_sizeof(PySetObject *so)
+{
+	Py_ssize_t res;
+
+	res = sizeof(PySetObject);
+	if (so->table != so->smalltable)
+		res = res + (so->mask + 1) * sizeof(setentry);
+	return PyLong_FromSsize_t(res);
+}
+
+PyDoc_STRVAR(sizeof_doc, "S.__sizeof__() -> size of S in memory, in bytes");
 static int
 set_init(PySetObject *self, PyObject *args, PyObject *kwds)
 {
@@ -2011,6 +2023,8 @@ static PyMethodDef set_methods[] = {
 	 reduce_doc},
 	{"remove",	(PyCFunction)set_remove,	METH_O,
 	 remove_doc},
+	{"__sizeof__",	(PyCFunction)set_sizeof,	METH_NOARGS,
+	 sizeof_doc},
 	{"symmetric_difference",(PyCFunction)set_symmetric_difference,	METH_O,
 	 symmetric_difference_doc},
 	{"symmetric_difference_update",(PyCFunction)set_symmetric_difference_update,	METH_O,
@@ -2078,7 +2092,7 @@ PyTypeObject PySet_Type = {
 	&set_as_number,			/* tp_as_number */
 	&set_as_sequence,		/* tp_as_sequence */
 	0,				/* tp_as_mapping */
-	0,				/* tp_hash */
+	(hashfunc)PyObject_HashNotImplemented,	/* tp_hash */
 	0,				/* tp_call */
 	0,				/* tp_str */
 	PyObject_GenericGetAttr,	/* tp_getattro */
@@ -2127,6 +2141,8 @@ static PyMethodDef frozenset_methods[] = {
 	 issuperset_doc},
 	{"__reduce__",	(PyCFunction)set_reduce,	METH_NOARGS,
 	 reduce_doc},
+	{"__sizeof__",	(PyCFunction)set_sizeof,	METH_NOARGS,
+	 sizeof_doc},
 	{"symmetric_difference",(PyCFunction)set_symmetric_difference,	METH_O,
 	 symmetric_difference_doc},
 	{"union",	(PyCFunction)set_union,		METH_VARARGS,
@@ -2374,7 +2390,7 @@ test_c_api(PySetObject *so)
 	/* Exercise direct iteration */
 	i = 0, count = 0;
 	while (_PySet_NextEntry((PyObject *)dup, &i, &x, &hash)) {
-		s = PyUnicode_AsString(x);
+		s = _PyUnicode_AsString(x);
 		assert(s && (s[0] == 'a' || s[0] == 'b' || s[0] == 'c'));
 		count++;
 	}

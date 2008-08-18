@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #
 # Unit tests for the multiprocessing package
 #
@@ -20,7 +22,6 @@ import multiprocessing.dummy
 import multiprocessing.connection
 import multiprocessing.managers
 import multiprocessing.heap
-import multiprocessing.managers
 import multiprocessing.pool
 import _multiprocessing
 
@@ -30,18 +31,8 @@ from multiprocessing import util
 #
 #
 
-if sys.version_info >= (3, 0):
-    def latin(s):
-        return s.encode('latin')
-else:
-    latin = str
-
-try:
-    bytes
-except NameError:
-    bytes = str
-    def bytearray(seq):
-        return array.array('c', seq)
+def latin(s):
+    return s.encode('latin')
 
 #
 # Constants
@@ -1046,7 +1037,7 @@ class _TestZZZNumberOfObjects(BaseTestCase):
         gc.collect()                       # do garbage collection
         refs = self.manager._number_of_objects()
         if refs != EXPECTED_NUMBER:
-            print(self.manager._debugInfo())
+            print(self.manager._debug_info())
 
         self.assertEqual(refs, EXPECTED_NUMBER)
 

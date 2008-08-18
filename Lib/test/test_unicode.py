@@ -700,6 +700,10 @@ class UnicodeTest(
         self.assertRaises(ValueError, format, "", "-")
         self.assertRaises(ValueError, "{0:=s}".format, '')
 
+        # Alternate formatting is not supported
+        self.assertRaises(ValueError, format, '', '#')
+        self.assertRaises(ValueError, format, '', '#20')
+
     def test_formatting(self):
         string_tests.MixinStrUnicodeUserStringTest.test_formatting(self)
         # Testing Unicode formatting strings...
@@ -842,6 +846,9 @@ class UnicodeTest(
         self.assertRaises(UnicodeError, str, b'+3ADYAA-', 'utf-7')
 
         self.assertEqual(str(b'+3ADYAA-', 'utf-7', 'replace'), '\ufffd')
+
+        # Issue #2242: crash on some Windows/MSVC versions
+        self.assertRaises(UnicodeDecodeError, b'+\xc1'.decode, 'utf-7')
 
     def test_codecs_utf8(self):
         self.assertEqual(''.encode('utf-8'), b'')
@@ -1147,6 +1154,15 @@ class UnicodeTest(
         if sys.maxsize > (1 << 32) or struct.calcsize('P') != 4:
             return
         self.assertRaises(OverflowError, 't\tt\t'.expandtabs, sys.maxsize)
+
+    def test_raiseMemError(self):
+        # Ensure that the freelist contains a consistent object, even
+        # when a string allocation fails with a MemoryError.
+        # This used to crash the interpreter,
+        # or leak references when the number was smaller.
+        alloc = lambda: "a" * (sys.maxsize - 100)
+        self.assertRaises(MemoryError, alloc)
+        self.assertRaises(MemoryError, alloc)
 
 
 def test_main():

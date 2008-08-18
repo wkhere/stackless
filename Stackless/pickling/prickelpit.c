@@ -389,7 +389,7 @@ slp_find_execfuncs(PyTypeObject *type, PyObject *exec_name,
 
 		PyErr_Clear();
 		sprintf(msg, "Frame exec function '%.20s' not defined for %s",
-			PyUnicode_AsString(exec_name), type->tp_name);
+			_PyUnicode_AsString(exec_name), type->tp_name);
 		PyErr_SetString(PyExc_ValueError, msg);
 		return -1;
 	}

@@ -457,9 +457,9 @@ format_spec defaults to \"\"");
 static PyObject *
 builtin_chr(PyObject *self, PyObject *args)
 {
-	long x;
+	int x;
 
-	if (!PyArg_ParseTuple(args, "l:chr", &x))
+	if (!PyArg_ParseTuple(args, "i:chr", &x))
 		return NULL;
 
 	return PyUnicode_FromOrdinal(x);
@@ -1622,7 +1622,7 @@ builtin_input(PyObject *self, PyObject *args)
 				Py_DECREF(stdin_encoding);
 				return NULL;
 			}
-			prompt = PyUnicode_AsString(po);
+			prompt = _PyUnicode_AsString(po);
 			if (prompt == NULL) {
 				Py_DECREF(stdin_encoding);
 				Py_DECREF(po);
@@ -1655,7 +1655,7 @@ builtin_input(PyObject *self, PyObject *args)
 			else {
 				result = PyUnicode_Decode
 					(s, len-1,
-					 PyUnicode_AsString(stdin_encoding),
+					 _PyUnicode_AsString(stdin_encoding),
 					 NULL);
 			}
 		}

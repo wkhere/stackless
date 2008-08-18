@@ -119,21 +119,7 @@ Some facts and figures:
    module can read.
 
 
-.. class:: TarFileCompat(filename, mode='r', compression=TAR_PLAIN)
-
-   Class for limited access to tar archives with a :mod:`zipfile`\ -like interface.
-   Please consult the documentation of the :mod:`zipfile` module for more details.
-   *compression* must be one of the following constants:
-
-
-   .. data:: TAR_PLAIN
-
-      Constant for an uncompressed tar archive.
-
-
-   .. data:: TAR_GZIPPED
-
-      Constant for a :mod:`gzip` compressed tar archive.
+The :mod:`tarfile` module defines the following exceptions:
 
 
 .. exception:: TarError
@@ -405,18 +391,6 @@ object, see :ref:`tarinfo-objects` for details.
 
    Close the :class:`TarFile`. In write mode, two finishing zero blocks are
    appended to the archive.
-
-
-.. attribute:: TarFile.posix
-
-   Setting this to :const:`True` is equivalent to setting the :attr:`format`
-   attribute to :const:`USTAR_FORMAT`, :const:`False` is equivalent to
-   :const:`GNU_FORMAT`.
-
-   *posix* defaults to :const:`False`.
-
-   .. deprecated:: 2.6
-      Use the :attr:`format` attribute instead.
 
 
 .. attribute:: TarFile.pax_headers

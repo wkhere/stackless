@@ -11,6 +11,7 @@ __all__ = [ 'Client', 'Listener', 'Pipe' ]
 import os
 import sys
 import socket
+import errno
 import time
 import tempfile
 import itertools
@@ -209,24 +210,19 @@ else:
 
 class SocketListener(object):
     '''
-    Represtation of a socket which is bound to an address and listening
+    Representation of a socket which is bound to an address and listening
     '''
     def __init__(self, address, family, backlog=1):
         self._socket = socket.socket(getattr(socket, family))
         self._socket.bind(address)
         self._socket.listen(backlog)
-        address = self._socket.getsockname()
-        if type(address) is tuple:
-            address = (socket.getfqdn(address[0]),) + address[1:]
-        self._address = address
+        self._address = self._socket.getsockname()
         self._family = family
         self._last_accepted = None
 
-        sub_debug('listener bound to address %r', self._address)
-
         if family == 'AF_UNIX':
             self._unlink = Finalize(
-                self, os.unlink, args=(self._address,), exitpriority=0
+                self, os.unlink, args=(address,), exitpriority=0
                 )
         else:
             self._unlink = None
@@ -255,7 +251,7 @@ def SocketClient(address):
         try:
             s.connect(address)
         except socket.error as e:
-            if e.args[0] != 10061:    # 10061 => connection refused
+            if e.args[0] != errno.ECONNREFUSED: # connection refused
                 debug('failed to connect to address %s', address)
                 raise
             time.sleep(0.01)

@@ -76,6 +76,19 @@ Number-theoretic and representation functions:
    apart" the internal representation of a float in a portable way.
 
 
+.. function:: fsum(iterable)
+
+   Return an accurate floating point sum of values in the iterable.  Avoids
+   loss of precision by tracking multiple intermediate partial sums.  The
+   algorithm's accuracy depends on IEEE-754 arithmetic guarantees and the
+   typical case where the rounding mode is half-even.
+
+   .. note::
+
+      The accuracy of fsum() may be impaired on builds that use
+      extended precision addition and then double-round the results.
+
+
 .. function:: isinf(x)
 
    Checks if the float *x* is positive or negative infinite.
@@ -100,12 +113,6 @@ Number-theoretic and representation functions:
    Return the fractional and integer parts of *x*.  Both results carry the sign of
    *x*, and both are floats.
 
-.. function:: sum(iterable)
-
-   Return an accurate floating point sum of values in the iterable.  Avoids
-   loss of precision by tracking multiple intermediate partial sums.  The
-   algorithm's accuracy depends on IEEE-754 arithmetic guarantees and the
-   typical case where the rounding mode is half-even.
 
 .. function:: trunc(x)
 

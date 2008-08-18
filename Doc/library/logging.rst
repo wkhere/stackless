@@ -1647,7 +1647,7 @@ timed intervals.
    The system will save old log files by appending extensions to the filename.
    The extensions are date-and-time based, using the strftime format
    ``%Y-%m-%d_%H-%M-%S`` or a leading portion thereof, depending on the
-   rollover interval. 
+   rollover interval.
    If the *utc* argument is true, times in UTC will be used; otherwise
    local time is used.
 

@@ -100,7 +100,7 @@ from urllib.error import URLError, HTTPError, ContentTooShortError
 from urllib.parse import (
     urlparse, urlsplit, urljoin, unwrap, quote, unquote,
     splittype, splithost, splitport, splituser, splitpasswd,
-    splitattr, splitquery, splitvalue, to_bytes)
+    splitattr, splitquery, splitvalue, to_bytes, urlunparse)
 from urllib.response import addinfourl, addclosehook
 
 # check for SSL
@@ -230,6 +230,9 @@ class Request:
     def set_proxy(self, host, type):
         self.host, self.type = host, type
         self.__r_host = self.__original
+
+    def has_proxy(self):
+        return self.__r_host == self.__original
 
     def get_origin_req_host(self):
         return self.origin_req_host
@@ -532,6 +535,14 @@ class HTTPRedirectHandler(BaseHandler):
             newurl = headers["uri"]
         else:
             return
+
+        # fix a possible malformed URL
+        urlparts = urlparse(newurl)
+        if not urlparts.path:
+            urlparts = list(urlparts)
+            urlparts[2] = "/"
+        newurl = urlunparse(urlparts)
+
         newurl = urljoin(req.get_full_url(), newurl)
 
         # XXX Probably want to forget about the state of the current
@@ -1010,10 +1021,12 @@ class AbstractHTTPHandler(BaseHandler):
                 request.add_unredirected_header(
                     'Content-length', '%d' % len(data))
 
-        scheme, sel = splittype(request.get_selector())
-        sel_host, sel_path = splithost(sel)
+        sel_host = host
+        if request.has_proxy():
+            scheme, sel = splittype(request.get_selector())
+            sel_host, sel_path = splithost(sel)
         if not request.has_header('Host'):
-            request.add_unredirected_header('Host', sel_host or host)
+            request.add_unredirected_header('Host', sel_host)
         for name, value in self.parent.addheaders:
             name = name.capitalize()
             if not request.has_header(name):

@@ -4,13 +4,74 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's new in Python 3.0b2?
+What's new in Python 3.0b3?
 ===========================
 
 *Release date: XX-XXX-2008*
 
 Core and Builtins
 -----------------
+
+- Issue #1819: function calls with several named parameters are now on
+  average 35% faster (as measured by pybench).
+
+- The undocumented C APIs PyUnicode_AsString() and
+  PyUnicode_AsStringAndSize() were made private to the interpreter, in
+  order to be able to refine their interfaces for Python 3.1.
+
+  If you need to access the UTF-8 representation of a Unicode object
+  as bytes string, please use PyUnicode_AsUTF8String() instead.
+
+- Issue #3460: PyUnicode_Join() implementation is 10% to 80% faster thanks
+  to Python 3.0's stricter semantics which allow to avoid successive
+  reallocations of the result string (this also affects str.join()).
+
+
+Library
+-------
+
+- Issue #2676: in the email package, content-type parsing was hanging on
+  pathological input because of quadratic or exponential behaviour of a
+  regular expression.
+
+- Issue #3476: binary buffered reading through the new "io" library is now
+  thread-safe.
+
+- Issue #1342811: Fix leak in Tkinter.Menu.delete. Commands associated to
+  menu entries were not deleted.
+
+- Remove the TarFileCompat class from tarfile.py.
+
+- Issue #2491: os.fdopen is now almost an alias for the built-in open(), and
+  accepts the same parameters.  It just checks that its first argument is an
+  integer.
+
+- Issue #3394: zipfile.writestr sets external attributes when passed a
+  file name rather than a ZipInfo instance, so files are extracted with
+  mode 0600 rather than 000 under Unix.
+
+- Issue #2523: Fix quadratic behaviour when read()ing a binary file without
+  asking for a specific length.
+
+Extension Modules
+-----------------
+
+- Bug #3542: Support Unicode strings in _msi module.
+
+What's new in Python 3.0b2?
+===========================
+
+*Release date: 17-Jul-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3008: the float type has a new instance method 'float.hex'
+  and a new class method 'float.fromhex' to convert floating-point
+  numbers to and from hexadecimal strings, respectively.
+
+- Issue #3083: Add alternate (#) formatting for bin, oct, hex output
+  for str.format().  This adds the prefix 0b, 0o, or 0x, respectively.
 
 - Issue #3280: like chr(), the "%c" format now accepts unicode code points
   beyond the Basic Multilingual Plane (above 0xffff) on all configurations. On
@@ -22,8 +83,20 @@ Core and Builtins
 
 - Issue #3236: Return small longs from PyLong_FromString.
 
+- Exception tracebacks now support exception chaining.
+
 Library
 -------
+
+- Removed the sunaudio module. Use sunau instead.
+
+- Removed "ast" function aliases from the parser module.
+
+- Issue #3313: Fixed a crash when a failed dlopen() call does not set
+  a valid dlerror() message.
+
+- Issue #3258: Fixed a crash when a ctypes POINTER type to an
+  incomplete structure was created.
 
 - Issue #2683: Fix inconsistency in subprocess.Popen.communicate(): the
   argument now must be a bytes object in any case.
@@ -31,6 +104,11 @@ Library
 - Issue #3145: help("modules whatever") failed when trying to load the source
   code of every single module of the standard library, including invalid files
   used in the test suite.
+
+- The gettext library now consistently uses Unicode strings for message ids
+  and message strings, and ``ugettext()`` and the like don't exist anymore.
+
+- The traceback module has been expanded to handle chained exceptions.
 
 C API
 -----
@@ -167,7 +245,7 @@ Library
 - The ``xmlrpc`` package was created; it contains the old
   ``xmlrpclib`` module as ``xmlrpc.client`` and the content of
   the old ``SimpleXMLRPCServer`` and ``DocXMLRPCServer`` modules
-  as ``xmlrpc.server``.  
+  as ``xmlrpc.server``.
 
 - The ``dbm`` package was created, containing the old modules
   ``anydbm`` and ``whichdb`` in its ``__init__.py``, and having
@@ -538,7 +616,7 @@ Core and Builtins
 - Fixed `imp.find_module()` to obey the -*- coding: -*- header.
 
 - Changed `__file__` and `co_filename` to unicode. The path names are decoded
-  with `Py_FileSystemDefaultEncoding` and a new API method 
+  with `Py_FileSystemDefaultEncoding` and a new API method
   `PyUnicode_DecodeFSDefault(char*)` was added.
 
 - io.open() and _fileio.FileIO have grown a new argument closefd. A

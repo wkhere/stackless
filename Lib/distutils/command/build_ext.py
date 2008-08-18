@@ -223,9 +223,12 @@ class build_ext(Command):
             elif MSVC_VERSION == 8:
                 self.library_dirs.append(os.path.join(sys.exec_prefix,
                                          'PC', 'VS8.0', 'win32release'))
-            else:
+            elif MSVC_VERSION == 7:
                 self.library_dirs.append(os.path.join(sys.exec_prefix,
                                          'PC', 'VS7.1'))
+            else:
+                self.library_dirs.append(os.path.join(sys.exec_prefix,
+                                         'PC', 'VC6'))
 
         # OS/2 (EMX) doesn't support Debug vs Release builds, but has the
         # import libraries in its "Config" subdirectory
@@ -262,7 +265,7 @@ class build_ext(Command):
 
         if self.define:
             defines = self.define.split(',')
-            self.define = map(lambda symbol: (symbol, '1'), defines)
+            self.define = [(symbol, '1') for symbol in defines]
 
         # The option for macros to undefine is also a string from the
         # option parsing, but has to be a list.  Multiple symbols can also

@@ -66,8 +66,8 @@ class-based API instead.
 
 .. function:: lgettext(message)
 
-   Equivalent to :func:`gettext`, but the translation is returned in the preferred
-   system encoding, if no other encoding was explicitly set with
+   Equivalent to :func:`gettext`, but the translation is returned in the
+   preferred system encoding, if no other encoding was explicitly set with
    :func:`bind_textdomain_codeset`.
 
 
@@ -78,8 +78,8 @@ class-based API instead.
 
 .. function:: ldgettext(domain, message)
 
-   Equivalent to :func:`dgettext`, but the translation is returned in the preferred
-   system encoding, if no other encoding was explicitly set with
+   Equivalent to :func:`dgettext`, but the translation is returned in the
+   preferred system encoding, if no other encoding was explicitly set with
    :func:`bind_textdomain_codeset`.
 
 
@@ -99,8 +99,8 @@ class-based API instead.
 
 .. function:: lngettext(singular, plural, n)
 
-   Equivalent to :func:`ngettext`, but the translation is returned in the preferred
-   system encoding, if no other encoding was explicitly set with
+   Equivalent to :func:`ngettext`, but the translation is returned in the
+   preferred system encoding, if no other encoding was explicitly set with
    :func:`bind_textdomain_codeset`.
 
 
@@ -169,13 +169,14 @@ class can also install themselves in the built-in namespace as the function
 
 .. function:: translation(domain[, localedir[, languages[, class_[, fallback[, codeset]]]]])
 
-   Return a :class:`Translations` instance based on the *domain*, *localedir*, and
-   *languages*, which are first passed to :func:`find` to get a list of the
+   Return a :class:`Translations` instance based on the *domain*, *localedir*,
+   and *languages*, which are first passed to :func:`find` to get a list of the
    associated :file:`.mo` file paths.  Instances with identical :file:`.mo` file
-   names are cached.  The actual class instantiated is either *class_* if provided,
-   otherwise :class:`GNUTranslations`.  The class's constructor must take a single
-   file object argument. If provided, *codeset* will change the charset used to
-   encode translated strings.
+   names are cached.  The actual class instantiated is either *class_* if
+   provided, otherwise :class:`GNUTranslations`.  The class's constructor must
+   take a single file object argument.  If provided, *codeset* will change the
+   charset used to encode translated strings in the :meth:`lgettext` and
+   :meth:`lngettext` methods.
 
    If multiple files are found, later files are used as fallbacks for earlier ones.
    To allow setting the fallback, :func:`copy.copy` is used to clone each
@@ -187,12 +188,11 @@ class can also install themselves in the built-in namespace as the function
    :class:`NullTranslations` instance if *fallback* is true.
 
 
-.. function:: install(domain[, localedir[, unicode [, codeset[, names]]]])
+.. function:: install(domain[, localedir[, codeset[, names]]]])
 
    This installs the function :func:`_` in Python's builtin namespace, based on
    *domain*, *localedir*, and *codeset* which are passed to the function
-   :func:`translation`.  The *unicode* flag is passed to the resulting translation
-   object's :meth:`install` method.
+   :func:`translation`.
 
    For the *names* parameter, please see the description of the translation
    object's :meth:`install` method.
@@ -226,7 +226,6 @@ are the methods of :class:`NullTranslations`:
    :meth:`add_fallback`.  It then calls ``self._parse(fp)`` if *fp* is not
    ``None``.
 
-
    .. method:: _parse(fp)
 
       No-op'd in the base class, this method takes file object *fp*, and reads
@@ -237,48 +236,34 @@ are the methods of :class:`NullTranslations`:
 
    .. method:: add_fallback(fallback)
 
-      Add *fallback* as the fallback object for the current translation
-      object. A translation object should consult the fallback if it cannot provide a
+      Add *fallback* as the fallback object for the current translation object.
+      A translation object should consult the fallback if it cannot provide a
       translation for a given message.
 
 
    .. method:: gettext(message)
 
-      If a fallback has been set, forward :meth:`gettext` to the
-      fallback. Otherwise, return the translated message.  Overridden in derived
-      classes.
+      If a fallback has been set, forward :meth:`gettext` to the fallback.
+      Otherwise, return the translated message.  Overridden in derived classes.
 
 
    .. method:: lgettext(message)
 
-      If a fallback has been set, forward :meth:`lgettext` to the
-      fallback. Otherwise, return the translated message.  Overridden in derived
-      classes.
-
-   .. method:: ugettext(message)
-
-      If a fallback has been set, forward :meth:`ugettext` to the
-      fallback. Otherwise, return the translated message as a string. Overridden
-      in derived classes.
+      If a fallback has been set, forward :meth:`lgettext` to the fallback.
+      Otherwise, return the translated message.  Overridden in derived classes.
 
 
    .. method:: ngettext(singular, plural, n)
 
-      If a fallback has been set, forward :meth:`ngettext` to the
-      fallback. Otherwise, return the translated message.  Overridden in derived
-      classes.
+      If a fallback has been set, forward :meth:`ngettext` to the fallback.
+      Otherwise, return the translated message.  Overridden in derived classes.
+
 
    .. method:: lngettext(singular, plural, n)
 
-      If a fallback has been set, forward :meth:`ngettext` to the
-      fallback. Otherwise, return the translated message.  Overridden in derived
-      classes.
+      If a fallback has been set, forward :meth:`ngettext` to the fallback.
+      Otherwise, return the translated message.  Overridden in derived classes.
 
-   .. method:: ungettext(singular, plural, n)
-
-      If a fallback has been set, forward :meth:`ungettext` to the fallback.
-      Otherwise, return the translated message as a string. Overridden in
-      derived classes.
 
    .. method:: info()
 
@@ -287,13 +272,15 @@ are the methods of :class:`NullTranslations`:
 
    .. method:: charset()
 
-      Return the "protected" :attr:`_charset` variable.
+      Return the "protected" :attr:`_charset` variable, which is the encoding of
+      the message catalog file.
 
 
    .. method:: output_charset()
 
       Return the "protected" :attr:`_output_charset` variable, which defines the
-      encoding used to return translated messages.
+      encoding used to return translated messages in :meth:`lgettext` and
+      :meth:`lngettext`.
 
 
    .. method:: set_output_charset(charset)
@@ -302,19 +289,16 @@ are the methods of :class:`NullTranslations`:
       encoding used to return translated messages.
 
 
-   .. method:: install([unicode [, names]])
+   .. method:: install([names])
 
-      If the *unicode* flag is false, this method installs :meth:`self.gettext`
-      into the built-in namespace, binding it to ``_``.  If *unicode* is true,
-      it binds :meth:`self.ugettext` instead.  By default, *unicode* is false.
+      This method installs :meth:`self.gettext` into the built-in namespace,
+      binding it to ``_``.
 
       If the *names* parameter is given, it must be a sequence containing the
       names of functions you want to install in the builtin namespace in
       addition to :func:`_`.  Supported names are ``'gettext'`` (bound to
-      :meth:`self.gettext` or :meth:`self.ugettext` according to the *unicode*
-      flag), ``'ngettext'`` (bound to :meth:`self.ngettext` or
-      :meth:`self.ungettext` according to the *unicode* flag), ``'lgettext'``
-      and ``'lngettext'``.
+      :meth:`self.gettext`), ``'ngettext'`` (bound to :meth:`self.ngettext`),
+      ``'lgettext'`` and ``'lngettext'``.
 
       Note that this is only one way, albeit the most convenient way, to make
       the :func:`_` function available to your application.  Because it affects
@@ -336,8 +320,7 @@ The :class:`GNUTranslations` class
 The :mod:`gettext` module provides one additional class derived from
 :class:`NullTranslations`: :class:`GNUTranslations`.  This class overrides
 :meth:`_parse` to enable reading GNU :program:`gettext` format :file:`.mo` files
-in both big-endian and little-endian format. It also coerces both message ids
-and message strings to Unicode.
+in both big-endian and little-endian format.
 
 :class:`GNUTranslations` parses optional meta-data out of the translation
 catalog.  It is convention with GNU :program:`gettext` to include meta-data as
@@ -347,12 +330,10 @@ key ``Content-Type`` is found, then the ``charset`` property is used to
 initialize the "protected" :attr:`_charset` instance variable, defaulting to
 ``None`` if not found.  If the charset encoding is specified, then all message
 ids and message strings read from the catalog are converted to Unicode using
-this encoding.  The :meth:`ugettext` method always returns a Unicode, while the
-:meth:`gettext` returns an encoded bytestring.  For the message id arguments
-of both methods, either Unicode strings or bytestrings containing only
-US-ASCII characters are acceptable.  Note that the Unicode version of the
-methods (i.e. :meth:`ugettext` and :meth:`ungettext`) are the recommended
-interface to use for internationalized Python programs.
+this encoding, else ASCII encoding is assumed.
+
+Since message ids are read as Unicode strings too, all :meth:`*gettext` methods
+will assume message ids as Unicode strings, not byte strings.
 
 The entire set of key/value pairs are placed into a dictionary and set as the
 "protected" :attr:`_info` instance variable.
@@ -367,65 +348,43 @@ The following methods are overridden from the base class implementation:
 .. method:: GNUTranslations.gettext(message)
 
    Look up the *message* id in the catalog and return the corresponding message
-   string, as a bytestring encoded with the catalog's charset encoding, if
-   known.  If there is no entry in the catalog for the *message* id, and a fallback
-   has been set, the look up is forwarded to the fallback's :meth:`gettext` method.
-   Otherwise, the *message* id is returned.
+   string, as a Unicode string.  If there is no entry in the catalog for the
+   *message* id, and a fallback has been set, the look up is forwarded to the
+   fallback's :meth:`gettext` method.  Otherwise, the *message* id is returned.
 
 
 .. method:: GNUTranslations.lgettext(message)
 
-   Equivalent to :meth:`gettext`, but the translation is returned in the preferred
-   system encoding, if no other encoding was explicitly set with
-   :meth:`set_output_charset`.
-
-
-.. method:: GNUTranslations.ugettext(message)
-
-   Look up the *message* id in the catalog and return the corresponding message
-   string, as a string.  If there is no entry in the catalog for the
-   *message* id, and a fallback has been set, the look up is forwarded to the
-   fallback's :meth:`ugettext` method.  Otherwise, the *message* id is returned.
+   Equivalent to :meth:`gettext`, but the translation is returned as a
+   bytestring encoded in the selected output charset, or in the preferred system
+   encoding if no encoding was explicitly set with :meth:`set_output_charset`.
 
 
 .. method:: GNUTranslations.ngettext(singular, plural, n)
 
    Do a plural-forms lookup of a message id.  *singular* is used as the message id
    for purposes of lookup in the catalog, while *n* is used to determine which
-   plural form to use.  The returned message string is a bytestring encoded with
-   the catalog's charset encoding, if known.
+   plural form to use.  The returned message string is a Unicode string.
 
    If the message id is not found in the catalog, and a fallback is specified, the
    request is forwarded to the fallback's :meth:`ngettext` method.  Otherwise, when
    *n* is 1 *singular* is returned, and *plural* is returned in all other cases.
-
-
-.. method:: GNUTranslations.lngettext(singular, plural, n)
-
-   Equivalent to :meth:`gettext`, but the translation is returned in the preferred
-   system encoding, if no other encoding was explicitly set with
-   :meth:`set_output_charset`.
-
-
-.. method:: GNUTranslations.ungettext(singular, plural, n)
-
-   Do a plural-forms lookup of a message id.  *singular* is used as the message id
-   for purposes of lookup in the catalog, while *n* is used to determine which
-   plural form to use.  The returned message string is a string.
-
-   If the message id is not found in the catalog, and a fallback is specified, the
-   request is forwarded to the fallback's :meth:`ungettext` method.  Otherwise,
-   when *n* is 1 *singular* is returned, and *plural* is returned in all other
-   cases.
-
+   
    Here is an example::
 
       n = len(os.listdir('.'))
       cat = GNUTranslations(somefile)
-      message = cat.ungettext(
+      message = cat.ngettext(
           'There is %(num)d file in this directory',
           'There are %(num)d files in this directory',
           n) % {'num': n}
+
+
+.. method:: GNUTranslations.lngettext(singular, plural, n)
+
+   Equivalent to :meth:`gettext`, but the translation is returned as a
+   bytestring encoded in the selected output charset, or in the preferred system
+   encoding if no encoding was explicitly set with :meth:`set_output_charset`.
 
 
 Solaris message catalog support
@@ -538,13 +497,6 @@ module::
    t = gettext.translation('spam', '/usr/share/locale')
    _ = t.lgettext
 
-If your translators were providing you with Unicode strings in their :file:`.po`
-files, you'd instead do::
-
-   import gettext
-   t = gettext.translation('spam', '/usr/share/locale')
-   _ = t.ugettext
-
 
 Localizing your application
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -560,11 +512,11 @@ driver file of your application::
    import gettext
    gettext.install('myapplication')
 
-If you need to set the locale directory or the *unicode* flag, you can pass
-these into the :func:`install` function::
+If you need to set the locale directory, you can pass these into the
+:func:`install` function::
 
    import gettext
-   gettext.install('myapplication', '/usr/share/locale', unicode=1)
+   gettext.install('myapplication', '/usr/share/locale')
 
 
 Changing languages on the fly
@@ -657,21 +609,6 @@ In this case, you are marking translatable strings with the function :func:`N_`,
 need to teach your message extraction program to look for translatable strings
 marked with :func:`N_`. :program:`pygettext` and :program:`xpot` both support
 this through the use of command line switches.
-
-
-:func:`gettext` vs. :func:`lgettext`
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-In Python 2.4 the :func:`lgettext` family of functions were introduced. The
-intention of these functions is to provide an alternative which is more
-compliant with the current implementation of GNU gettext. Unlike
-:func:`gettext`, which returns strings encoded with the same codeset used in the
-translation file, :func:`lgettext` will return strings encoded with the
-preferred system encoding, as returned by :func:`locale.getpreferredencoding`.
-Also notice that Python 2.4 introduces new functions to explicitly choose the
-codeset used in translated strings. If a codeset is explicitly set, even
-:func:`lgettext` will return translated strings in the requested codeset, as
-would be expected in the GNU gettext implementation.
 
 
 Acknowledgements

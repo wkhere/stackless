@@ -259,7 +259,7 @@ type_set_name(PyTypeObject *type, PyObject *value, void *context)
 	}
 	Py_DECREF(tmp);
 
-	tp_name = PyUnicode_AsString(value);
+	tp_name = _PyUnicode_AsString(value);
 	if (tp_name == NULL)
 		return -1;
 
@@ -1262,7 +1262,7 @@ check_duplicates(PyObject *list)
 				o = class_name(o);
 				PyErr_Format(PyExc_TypeError,
 					     "duplicate base class %.400s",
-					     o ? PyUnicode_AsString(o) : "?");
+					     o ? _PyUnicode_AsString(o) : "?");
 				Py_XDECREF(o);
 				return -1;
 			}
@@ -1308,7 +1308,7 @@ consistent method resolution\norder (MRO) for bases");
 	while (PyDict_Next(set, &i, &k, &v) && (size_t)off < sizeof(buf)) {
 		PyObject *name = class_name(k);
 		off += PyOS_snprintf(buf + off, sizeof(buf) - off, " %s",
-				     name ? PyUnicode_AsString(name) : "?");
+				     name ? _PyUnicode_AsString(name) : "?");
 		Py_XDECREF(name);
 		if (--n && (size_t)(off+1) < sizeof(buf)) {
 			buf[off++] = ',';
@@ -2101,7 +2101,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	type->tp_as_sequence = &et->as_sequence;
 	type->tp_as_mapping = &et->as_mapping;
 	type->tp_as_buffer = &et->as_buffer;
-	type->tp_name = PyUnicode_AsString(name);
+	type->tp_name = _PyUnicode_AsString(name);
 	if (!type->tp_name) {
 		Py_DECREF(type);
 		return NULL;
@@ -2143,7 +2143,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 			char *doc_str;
 			char *tp_doc;
 
-			doc_str = PyUnicode_AsStringAndSize(doc, &len);
+			doc_str = _PyUnicode_AsStringAndSize(doc, &len);
 			if (doc_str == NULL) {
 				Py_DECREF(type);
 				return NULL;
@@ -2182,7 +2182,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	slotoffset = base->tp_basicsize;
 	if (slots != NULL) {
 		for (i = 0; i < nslots; i++, mp++) {
-			mp->name = PyUnicode_AsString(
+			mp->name = _PyUnicode_AsString(
 				PyTuple_GET_ITEM(slots, i));
 			mp->type = T_OBJECT_EX;
 			mp->offset = slotoffset;
@@ -3879,13 +3879,15 @@ PyType_Ready(PyTypeObject *type)
 
 	/* Hack for tp_hash and __hash__.
 	   If after all that, tp_hash is still NULL, and __hash__ is not in
-	   tp_dict, set tp_dict['__hash__'] equal to None.
+	   tp_dict, set tp_hash to PyObject_HashNotImplemented and
+	   tp_dict['__hash__'] equal to None.
 	   This signals that __hash__ is not inherited.
 	 */
 	if (type->tp_hash == NULL) {
 		if (PyDict_GetItemString(type->tp_dict, "__hash__") == NULL) {
 			if (PyDict_SetItemString(type->tp_dict, "__hash__", Py_None) < 0)
 				goto error;
+			type->tp_hash = PyObject_HashNotImplemented;
 		}
 	}
 
@@ -5021,9 +5023,7 @@ slot_tp_hash(PyObject *self)
 	}
 
 	if (func == NULL) {
-		PyErr_Format(PyExc_TypeError, "unhashable type: '%.200s'",
-			     Py_TYPE(self)->tp_name);
-		return -1;
+		return PyObject_HashNotImplemented(self);
         }
 
 	res = PyEval_CallObject(func, NULL);
@@ -5840,6 +5840,13 @@ update_one_slot(PyTypeObject *type, slotdef *p)
 			   sanity checks.  I'll buy the first person to
 			   point out a bug in this reasoning a beer. */
 		}
+		else if (descr == Py_None &&
+			 strcmp(p->name, "__hash__") == 0) {
+			/* We specifically allow __hash__ to be set to None
+			   to prevent inheritance of the default
+			   implementation from object.__hash__ */
+			specific = PyObject_HashNotImplemented;
+		}
 		else {
 			use_generic = 1;
 			generic = p->function;
@@ -6053,19 +6060,28 @@ add_operators(PyTypeObject *type)
 			continue;
 		if (PyDict_GetItem(dict, p->name_strobj))
 			continue;
-		descr = PyDescr_NewWrapper(type, p, *ptr);
-		if (descr == NULL)
-			return -1;
-#ifdef STACKLESS
-		if (type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION) {
-			PyWrapperDescrObject * d =
-				(PyWrapperDescrObject *) descr;
-			d->d_slpmask = ((signed char *) type)[p->slp_offset];
+		if (*ptr == PyObject_HashNotImplemented) {
+			/* Classes may prevent the inheritance of the tp_hash
+			   slot by storing PyObject_HashNotImplemented in it. Make it
+ 			   visible as a None value for the __hash__ attribute. */
+			if (PyDict_SetItem(dict, p->name_strobj, Py_None) < 0)
+				return -1;
 		}
+		else {
+			descr = PyDescr_NewWrapper(type, p, *ptr);
+			if (descr == NULL)
+				return -1;
+#ifdef STACKLESS
+			if (type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION) {
+				PyWrapperDescrObject * d =
+					(PyWrapperDescrObject *) descr;
+				d->d_slpmask = ((signed char *) type)[p->slp_offset];
+			}
 #endif
-		if (PyDict_SetItem(dict, p->name_strobj, descr) < 0)
-			return -1;
-		Py_DECREF(descr);
+			if (PyDict_SetItem(dict, p->name_strobj, descr) < 0)
+				return -1;
+			Py_DECREF(descr);
+		}
 	}
 	if (type->tp_new != NULL) {
 		if (add_tp_new_wrapper(type) < 0)

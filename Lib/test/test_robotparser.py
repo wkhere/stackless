@@ -136,9 +136,80 @@ bad = [] # Bug report says "/" should be denied, but that is not in the RFC
 
 RobotTest(7, doc, good, bad)
 
-class TestCase(unittest.TestCase):
-    def runTest(self):
-        support.requires('network')
+# From Google: http://www.google.com/support/webmasters/bin/answer.py?hl=en&answer=40364
+
+# 8.
+doc = """
+User-agent: Googlebot
+Allow: /folder1/myfile.html
+Disallow: /folder1/
+"""
+
+good = ['/folder1/myfile.html']
+bad = ['/folder1/anotherfile.html']
+
+RobotTest(8, doc, good, bad, agent="Googlebot")
+
+# 9.  This file is incorrect because "Googlebot" is a substring of
+#     "Googlebot-Mobile", so test 10 works just like test 9.
+doc = """
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Googlebot-Mobile
+Allow: /
+"""
+
+good = []
+bad = ['/something.jpg']
+
+RobotTest(9, doc, good, bad, agent="Googlebot")
+
+good = []
+bad = ['/something.jpg']
+
+RobotTest(10, doc, good, bad, agent="Googlebot-Mobile")
+
+# 11.  Get the order correct.
+doc = """
+User-agent: Googlebot-Mobile
+Allow: /
+
+User-agent: Googlebot
+Disallow: /
+"""
+
+good = []
+bad = ['/something.jpg']
+
+RobotTest(11, doc, good, bad, agent="Googlebot")
+
+good = ['/something.jpg']
+bad = []
+
+RobotTest(12, doc, good, bad, agent="Googlebot-Mobile")
+
+
+# 13.  Google also got the order wrong in #8.  You need to specify the
+#      URLs from more specific to more general.
+doc = """
+User-agent: Googlebot
+Allow: /folder1/myfile.html
+Disallow: /folder1/
+"""
+
+good = ['/folder1/myfile.html']
+bad = ['/folder1/anotherfile.html']
+
+RobotTest(13, doc, good, bad, agent="googlebot")
+
+
+
+class NetworkTestCase(unittest.TestCase):
+
+    def testPasswordProtectedSite(self):
+        if not support.is_resource_enabled('network'):
+            return
         # whole site is password-protected.
         url = 'http://mueblesmoraleda.com'
         parser = urllib.robotparser.RobotFileParser()
@@ -146,10 +217,19 @@ class TestCase(unittest.TestCase):
         parser.read()
         self.assertEqual(parser.can_fetch("*", url+"/robots.txt"), False)
 
+    def testPythonOrg(self):
+        if not support.is_resource_enabled('network'):
+            return
+        parser = urllib.robotparser.RobotFileParser(
+            "http://www.python.org/robots.txt")
+        parser.read()
+        self.assertTrue(parser.can_fetch("*",
+                                         "http://www.python.org/robots.txt"))
+
 def test_main():
+    support.run_unittest(NetworkTestCase)
     support.run_unittest(tests)
-    TestCase().run()
 
 if __name__=='__main__':
-    support.Verbose = 1
+    support.verbose = 1
     test_main()

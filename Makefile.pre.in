@@ -445,7 +445,7 @@ $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK): \
 		$(RESSRCDIR)/Info.plist
 	$(INSTALL) -d -m $(DIRMODE) $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)
 	if test "${UNIVERSALSDK}"; then \
-		$(CC) -o $(LDLIBRARY) -arch i386 -arch ppc -dynamiclib \
+		$(CC) -o $(LDLIBRARY) @UNIVERSAL_ARCH_FLAGS@ -dynamiclib \
 			-isysroot "${UNIVERSALSDK}" \
 			-all_load $(LIBRARY) -Wl,-single_module \
 			-install_name $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK) \
@@ -578,7 +578,8 @@ Objects/stringobject.o: $(srcdir)/Objects/stringobject.c $(BYTESTR_DEPS)
 Objects/bytesobject.o: $(srcdir)/Objects/bytesobject.c $(BYTESTR_DEPS) 
 
 Objects/unicodeobject.o: $(srcdir)/Objects/unicodeobject.c \
-                                             $(BYTESTR_DEPS)
+                                             $(BYTESTR_DEPS) \
+                                             $(srcdir)/Objects/stringlib/formatter.h
 
 Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
                                              $(BYTESTR_DEPS)
@@ -931,7 +932,7 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 		-d $(LIBDEST)/site-packages -f \
 		-x badsyntax $(DESTDIR)$(LIBDEST)/site-packages
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
-		./$(BUILDPYTHON) -Wi -c "import lib2to3.pygram"
+		./$(BUILDPYTHON) -Wi -c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"
 
 # Create the PLATDIR source directory, if one wasn't distributed..
 $(srcdir)/Lib/$(PLATDIR):
@@ -1086,12 +1087,21 @@ frameworkinstallmaclib:
 frameworkinstallapps:
 	cd Mac && $(MAKE) installapps DESTDIR="$(DESTDIR)"
 
+frameworkinstallapps4way:
+	cd Mac && $(MAKE) installapps4way DESTDIR="$(DESTDIR)"
+
 # This install the unix python and pythonw tools in /usr/local/bin
 frameworkinstallunixtools:
 	cd Mac && $(MAKE) installunixtools DESTDIR="$(DESTDIR)"
 
+frameworkinstallunixtools4way:
+	cd Mac && $(MAKE) installunixtools4way DESTDIR="$(DESTDIR)"
+
 frameworkaltinstallunixtools:
 	cd Mac && $(MAKE) altinstallunixtools DESTDIR="$(DESTDIR)"
+
+frameworkaltinstallunixtools4way:
+	cd Mac && $(MAKE) altinstallunixtools4way DESTDIR="$(DESTDIR)"
 
 # This installs the Demos and Tools into the applications directory.
 # It is not part of a normal frameworkinstall
@@ -1237,7 +1247,7 @@ funny:
 
 # Perform some verification checks on any modified files.
 check:
-	./$(BUILDPYTHON) $(srcdir)/Tools/scripts/patchcheck.py
+	$(RUNSHARED) ./$(BUILDPYTHON) $(srcdir)/Tools/scripts/patchcheck.py
 
 # Dependencies
 

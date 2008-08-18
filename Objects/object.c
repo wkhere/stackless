@@ -781,17 +781,22 @@ finally:
 #endif
 }
 
+long
+PyObject_HashNotImplemented(PyObject *v)
+{
+	PyErr_Format(PyExc_TypeError, "unhashable type: '%.200s'",
+		     Py_TYPE(v)->tp_name);
+	return -1;
+}
 
 long
 PyObject_Hash(PyObject *v)
 {
-	PyTypeObject *tp = v->ob_type;
+	PyTypeObject *tp = Py_TYPE(v);
 	if (tp->tp_hash != NULL)
 		return (*tp->tp_hash)(v);
 	/* Otherwise, the object can't be hashed */
-	PyErr_Format(PyExc_TypeError, "unhashable type: '%.200s'",
-		     v->ob_type->tp_name);
-	return -1;
+	return PyObject_HashNotImplemented(v);
 }
 
 PyObject *
@@ -851,7 +856,7 @@ PyObject_GetAttr(PyObject *v, PyObject *name)
 	if (tp->tp_getattro != NULL)
 		return (*tp->tp_getattro)(v, name);
 	if (tp->tp_getattr != NULL)
-		return (*tp->tp_getattr)(v, PyUnicode_AsString(name));
+		return (*tp->tp_getattr)(v, _PyUnicode_AsString(name));
 	PyErr_Format(PyExc_AttributeError,
 		     "'%.50s' object has no attribute '%U'",
 		     tp->tp_name, name);
@@ -891,7 +896,7 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 		return err;
 	}
 	if (tp->tp_setattr != NULL) {
-		err = (*tp->tp_setattr)(v, PyUnicode_AsString(name), value);
+		err = (*tp->tp_setattr)(v, _PyUnicode_AsString(name), value);
 		Py_DECREF(name);
 		return err;
 	}
@@ -1057,7 +1062,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 
 	PyErr_Format(PyExc_AttributeError,
 		     "'%.50s' object has no attribute '%.400s'",
-		     tp->tp_name, PyUnicode_AsString(name));
+		     tp->tp_name, _PyUnicode_AsString(name));
   done:
 	Py_DECREF(name);
 	return res;

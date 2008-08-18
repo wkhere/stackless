@@ -268,6 +268,9 @@ PyEval_ReleaseThread(PyThreadState *tstate)
 void
 PyEval_ReInitThreads(void)
 {
+	PyObject *threading, *result;
+	PyThreadState *tstate;
+
 	if (!interpreter_lock)
 		return;
 	/*XXX Can't use PyThread_free_lock here because it does too
@@ -277,6 +280,23 @@ PyEval_ReInitThreads(void)
 	interpreter_lock = PyThread_allocate_lock();
 	PyThread_acquire_lock(interpreter_lock, 1);
 	main_thread = PyThread_get_thread_ident();
+
+	/* Update the threading module with the new state.
+	 */
+	tstate = PyThreadState_GET();
+	threading = PyMapping_GetItemString(tstate->interp->modules,
+					    "threading");
+	if (threading == NULL) {
+		/* threading not imported */
+		PyErr_Clear();
+		return;
+	}
+	result = PyObject_CallMethod(threading, "_after_fork", NULL);
+	if (result == NULL)
+		PyErr_WriteUnraisable(threading);
+	else
+		Py_DECREF(result);
+	Py_DECREF(threading);
 }
 #endif
 
@@ -640,18 +660,20 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 	COMPARE_OP is often followed by JUMP_IF_FALSE or JUMP_IF_TRUE.  And,
 	those opcodes are often followed by a POP_TOP.
 
-	Verifying the prediction costs a single high-speed test of register
+	Verifying the prediction costs a single high-speed test of a register
 	variable against a constant.  If the pairing was good, then the
-	processor has a high likelihood of making its own successful branch
-	prediction which results in a nearly zero overhead transition to the
-	next opcode.
+	processor's own internal branch predication has a high likelihood of
+	success, resulting in a nearly zero-overhead transition to the
+	next opcode.  A successful prediction saves a trip through the eval-loop
+	including its two unpredictable branches, the HAS_ARG test and the
+	switch-case.  Combined with the processor's internal branch prediction,
+	a successful PREDICT has the effect of making the two opcodes run as if
+	they were a single new opcode with the bodies combined.
 
-	A successful prediction saves a trip through the eval-loop including
-	its two unpredictable branches, the HAS_ARG test and the switch-case.
-
-        If collecting opcode statistics, turn off prediction so that
-	statistics are accurately maintained (the predictions bypass
-	the opcode frequency counter updates).
+    If collecting opcode statistics, your choices are to either keep the
+	predictions turned-on and interpret the results as if some opcodes
+	had been combined or turn-off predictions so that the opcode frequency
+	counter updates for both opcodes.
 */
 
 #ifdef DYNAMIC_EXECUTION_PROFILE
@@ -822,7 +844,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			   an argument which depends on the situation.
 			   The global trace function is also called
 			   whenever an exception is detected. */
-			if (call_trace_protected(tstate->c_tracefunc, 
+			if (call_trace_protected(tstate->c_tracefunc,
 						 tstate->c_traceobj,
 						 f, PyTrace_CALL, Py_None)) {
 				/* Trace function raised an error */
@@ -928,10 +950,10 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 	   this wasn't always true before 2.3!  PyFrame_New now sets
 	   f->f_lasti to -1 (i.e. the index *before* the first instruction)
 	   and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
-	   does work.  Promise. 
+	   does work.  Promise.
 
 	   When the PREDICT() macros are enabled, some opcode pairs follow in
-           direct succession without updating f->f_lasti.  A successful 
+           direct succession without updating f->f_lasti.  A successful
            prediction effectively links the two codes together as if they
            were a single new opcode; accordingly,f->f_lasti will point to
            the first code in the pair (for instance, GET_ITER followed by
@@ -959,7 +981,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 	lltrace = PyDict_GetItemString(f->f_globals, "__lltrace__") != NULL;
 #endif
 #if defined(Py_DEBUG) || defined(LLTRACE)
-	filename = PyUnicode_AsString(co->co_filename);
+	filename = _PyUnicode_AsString(co->co_filename);
 #endif
 
 	why = WHY_NOT;
@@ -1853,7 +1875,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 		{
 			int totalargs = 1 + (oparg & 0xFF) + (oparg >> 8);
 			v = POP();
-			
+
 			if (unpack_iterable(v, oparg & 0xFF, oparg >> 8,
 					    stack_pointer + totalargs)) {
 				stack_pointer += totalargs;
@@ -2246,7 +2268,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
                            because it prevents detection of a control-break in tight loops like
                            "while 1: pass".  Compile with this option turned-on when you need
                            the speed-up and do not need break checking inside tight loops (ones
-                           that contain only instructions ending with goto fast_next_opcode). 
+                           that contain only instructions ending with goto fast_next_opcode).
                         */
 			goto fast_next_opcode;
 #else
@@ -2454,7 +2476,7 @@ stackless_call_return:
 		    break;
 		}
 
-		case MAKE_CLOSURE:		
+		case MAKE_CLOSURE:
 		case MAKE_FUNCTION:
 		{
 		    int posdefaults = oparg & 0xff;
@@ -2464,7 +2486,7 @@ stackless_call_return:
 			v = POP(); /* code object */
 			x = PyFunction_New(v, f->f_globals);
 			Py_DECREF(v);
-			
+
 			if (x != NULL && opcode == MAKE_CLOSURE) {
 				v = POP();
 				err = PyFunction_SetClosure(x, v);
@@ -2908,6 +2930,7 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 			}
 		}
 		for (i = 0; i < kwcount; i++) {
+			PyObject **co_varnames;
 			PyObject *keyword = kws[2*i];
 			PyObject *value = kws[2*i + 1];
 			int j;
@@ -2917,16 +2940,25 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 				    co->co_name);
 				goto fail;
 			}
-			/* XXX slow -- speed up using dictionary? */
+			/* Speed hack: do raw pointer compares. As names are
+			   normally interned this should almost always hit. */
+			co_varnames = PySequence_Fast_ITEMS(co->co_varnames);
 			for (j = 0;
 			     j < co->co_argcount + co->co_kwonlyargcount;
 			     j++) {
-				PyObject *nm = PyTuple_GET_ITEM(
-					co->co_varnames, j);
+				PyObject *nm = co_varnames[j];
+				if (nm == keyword)
+					goto kw_found;
+			}
+			/* Slow fallback, just in case */
+			for (j = 0;
+			     j < co->co_argcount + co->co_kwonlyargcount;
+			     j++) {
+				PyObject *nm = co_varnames[j];
 				int cmp = PyObject_RichCompareBool(
 					keyword, nm, Py_EQ);
 				if (cmp > 0)
-					break;
+					goto kw_found;
 				else if (cmp < 0)
 					goto fail;
 			}
@@ -2943,20 +2975,20 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 					goto fail;
 				}
 				PyDict_SetItem(kwdict, keyword, value);
+				continue;
 			}
-			else {
-				if (GETLOCAL(j) != NULL) {
-					PyErr_Format(PyExc_TypeError,
-					     "%U() got multiple "
-					     "values for keyword "
-					     "argument '%S'",
-					     co->co_name,
-					     keyword);
-					goto fail;
-				}
-				Py_INCREF(value);
-				SETLOCAL(j, value);
+kw_found:
+			if (GETLOCAL(j) != NULL) {
+				PyErr_Format(PyExc_TypeError,
+					 "%U() got multiple "
+					 "values for keyword "
+					 "argument '%S'",
+					 co->co_name,
+					 keyword);
+				goto fail;
 			}
+			Py_INCREF(value);
+			SETLOCAL(j, value);
 		}
 		if (co->co_kwonlyargcount > 0) {
 			for (i = co->co_argcount;
@@ -3207,7 +3239,7 @@ raise_error:
 
 /* Iterate v argcnt times and store the results on the stack (via decreasing
    sp).  Return 1 for success, 0 if error.
-   
+
    If argcntafter == -1, do a simple unpack. If it is >= 0, do an unpack
    with a variable target.
 */
@@ -3571,7 +3603,7 @@ PyEval_GetFuncName(PyObject *func)
 	if (PyMethod_Check(func))
 		return PyEval_GetFuncName(PyMethod_GET_FUNCTION(func));
 	else if (PyFunction_Check(func))
-		return PyUnicode_AsString(((PyFunctionObject*)func)->func_name);
+		return _PyUnicode_AsString(((PyFunctionObject*)func)->func_name);
 	else if (PyCFunction_Check(func))
 		return ((PyCFunctionObject*)func)->m_ml->ml_name;
 	else
@@ -3824,7 +3856,7 @@ update_keyword_args(PyObject *orig_kwdict, int nk, PyObject ***pp_stack,
 				     "for keyword argument '%.200s'",
 				     PyEval_GetFuncName(func),
 				     PyEval_GetFuncDesc(func),
-				     PyUnicode_AsString(key));
+				     _PyUnicode_AsString(key));
 			Py_DECREF(key);
 			Py_DECREF(value);
 			Py_DECREF(kwdict);
@@ -4177,7 +4209,7 @@ format_exc_check_arg(PyObject *exc, const char *format_str, PyObject *obj)
 	if (!obj)
 		return;
 
-	obj_str = PyUnicode_AsString(obj);
+	obj_str = _PyUnicode_AsString(obj);
 	if (!obj_str)
 		return;
 

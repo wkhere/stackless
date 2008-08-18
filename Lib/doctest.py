@@ -1360,6 +1360,8 @@ class DocTestRunner:
             linecache.getlines = self.save_linecache_getlines
             if clear_globs:
                 test.globs.clear()
+                import builtins
+                builtins._ = None
 
     #/////////////////////////////////////////////////////////////////
     # Summarization

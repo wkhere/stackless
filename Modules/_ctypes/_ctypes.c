@@ -353,6 +353,11 @@ StructUnionType_new(PyTypeObject *type, PyObject *args, PyObject *kwds, int isSt
 	}
 	Py_DECREF(result->tp_dict);
 	result->tp_dict = (PyObject *)dict;
+	dict->format = alloc_format_string(NULL, "B");
+	if (dict->format == NULL) {
+		Py_DECREF(result);
+		return NULL;
+	}
 
 	dict->paramfunc = StructUnionType_paramfunc;
 
@@ -678,8 +683,8 @@ StructType_setattro(PyObject *self, PyObject *key, PyObject *value)
 		return -1;
 	
 	if (value && PyUnicode_Check(key) &&
-	    /* XXX struni PyUnicode_AsString can fail (also in other places)! */
-	    0 == strcmp(PyUnicode_AsString(key), "_fields_"))
+	    /* XXX struni _PyUnicode_AsString can fail (also in other places)! */
+	    0 == strcmp(_PyUnicode_AsString(key), "_fields_"))
 		return StructUnionType_update_stgdict(self, value, 1);
 	return 0;
 }
@@ -693,7 +698,7 @@ UnionType_setattro(PyObject *self, PyObject *key, PyObject *value)
 		return -1;
 	
 	if (PyUnicode_Check(key) &&
-	    0 == strcmp(PyUnicode_AsString(key), "_fields_"))
+	    0 == strcmp(_PyUnicode_AsString(key), "_fields_"))
 		return StructUnionType_update_stgdict(self, value, 0);
 	return 0;
 }
@@ -871,7 +876,13 @@ PointerType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (proto) {
 		StgDictObject *itemdict = PyType_stgdict(proto);
 		assert(itemdict);
-		stgdict->format = alloc_format_string("&", itemdict->format);
+		/* If itemdict->format is NULL, then this is a pointer to an
+		   incomplete type.  We create a generic format string
+		   'pointer to bytes' in this case.  XXX Better would be to
+		   fix the format string later...
+		*/
+		stgdict->format = alloc_format_string("&",
+			      itemdict->format ? itemdict->format : "B");
 		if (stgdict->format == NULL) {
 			Py_DECREF((PyObject *)stgdict);
 			return NULL;
@@ -1039,10 +1050,10 @@ CharArray_set_raw(CDataObject *self, PyObject *value)
 
 	memcpy(self->b_ptr, ptr, size);
 
-	PyObject_ReleaseBuffer(value, &view);
+	PyBuffer_Release(&view);
 	return 0;
  fail:
-	PyObject_ReleaseBuffer(value, &view);
+	PyBuffer_Release(&view);
         return -1;
 }
 
@@ -1670,7 +1681,7 @@ c_void_p_from_param(PyObject *type, PyObject *value)
 	if (stgd && CDataObject_Check(value) && stgd->proto && PyUnicode_Check(stgd->proto)) {
 		PyCArgObject *parg;
 
-		switch (PyUnicode_AsString(stgd->proto)[0]) {
+		switch (_PyUnicode_AsString(stgd->proto)[0]) {
 		case 'z': /* c_char_p */
 		case 'Z': /* c_wchar_p */
 			parg = new_CArgObject();
@@ -1780,7 +1791,7 @@ SimpleType_paramfunc(CDataObject *self)
 	
 	dict = PyObject_stgdict((PyObject *)self);
 	assert(dict); /* Cannot be NULL for CDataObject instances */
-	fmt = PyUnicode_AsString(dict->proto);
+	fmt = _PyUnicode_AsString(dict->proto);
 	assert(fmt);
 
 	fd = getentry(fmt);
@@ -2001,7 +2012,7 @@ SimpleType_from_param(PyObject *type, PyObject *value)
 	assert(dict);
 
 	/* I think we can rely on this being a one-character string */
-	fmt = PyUnicode_AsString(dict->proto);
+	fmt = _PyUnicode_AsString(dict->proto);
 	assert(fmt);
 	
 	fd = getentry(fmt);
@@ -2451,6 +2462,8 @@ static int CData_GetBuffer(PyObject *_self, Py_buffer *view, int flags)
 	if (view == NULL) return 0;
 
 	view->buf = self->b_ptr;
+	view->obj = _self;
+	Py_INCREF(_self);
 	view->len = self->b_size;
 	view->readonly = 0;
 	/* use default format character if not set */
@@ -3047,7 +3060,7 @@ _check_outarg_type(PyObject *arg, Py_ssize_t index)
 	    /* simple pointer types, c_void_p, c_wchar_p, BSTR, ... */
 	    && PyUnicode_Check(dict->proto)
 /* We only allow c_void_p, c_char_p and c_wchar_p as a simple output parameter type */
-	    && (strchr("PzZ", PyUnicode_AsString(dict->proto)[0]))) {
+	    && (strchr("PzZ", _PyUnicode_AsString(dict->proto)[0]))) {
 		return 1;
 	}
 
@@ -3137,7 +3150,7 @@ _get_name(PyObject *obj, char **pname)
 		return *pname ? 1 : 0;
 	}
 	if (PyUnicode_Check(obj)) {
-		*pname = PyUnicode_AsString(obj);
+		*pname = _PyUnicode_AsString(obj);
 		return *pname ? 1 : 0;
 	}
 	PyErr_SetString(PyExc_TypeError,
@@ -5116,7 +5129,7 @@ cast_check_pointertype(PyObject *arg)
 	dict = PyType_stgdict(arg);
 	if (dict) {
 		if (PyUnicode_Check(dict->proto)
-		    && (strchr("sPzUZXO", PyUnicode_AsString(dict->proto)[0]))) {
+		    && (strchr("sPzUZXO", _PyUnicode_AsString(dict->proto)[0]))) {
 			/* simple pointer types, c_void_p, c_wchar_p, BSTR, ... */
 			return 1;
 		}

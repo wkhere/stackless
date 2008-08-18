@@ -509,7 +509,7 @@ time_strftime(PyObject *self, PyObject *args)
         }
 
     /* Convert the unicode string to an ascii one */
-    fmt = PyUnicode_AsString(format);
+    fmt = _PyUnicode_AsString(format);
 
 	fmtlen = strlen(fmt);
 
@@ -641,8 +641,6 @@ time_mktime(PyObject *self, PyObject *tup)
 {
 	struct tm buf;
 	time_t tt;
-	tt = time(&tt);
-	buf = *localtime(&tt);
 	if (!gettmarg(tup, &buf))
 		return NULL;
 	tt = mktime(&buf);
