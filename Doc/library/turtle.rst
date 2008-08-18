@@ -2,6 +2,10 @@
 :mod:`turtle` --- Turtle graphics for Tk
 ========================================
 
+.. module:: turtle
+   :synopsis: Turtle graphics for Tk
+.. sectionauthor:: Gregor Lingl <gregor.lingl@aon.at>
+
 Introduction
 ============
 
@@ -1275,7 +1279,7 @@ Window control
    ...     left(10)
    ...
    >>> for _ in range(8):
-   ...     left(45); fd(2)   # a regular octogon
+   ...     left(45); fd(2)   # a regular octagon
 
 
 Animation control
@@ -1286,7 +1290,7 @@ Animation control
    :param delay: positive integer
 
    Set or return the drawing *delay* in milliseconds.  (This is approximately
-   the time interval between two consecutived canvas updates.)  The longer the
+   the time interval between two consecutive canvas updates.)  The longer the
    drawing delay, the slower the animation.
 
    Optional argument:

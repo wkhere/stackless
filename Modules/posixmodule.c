@@ -478,24 +478,18 @@ static PyObject *_PyUnicode_FromFileSystemEncodedObject(register PyObject *obj)
 {
 }
 
-/* Function suitable for O& conversion */
 static int
-convert_to_unicode(PyObject *arg, void* _param)
+convert_to_unicode(PyObject **param)
 {
-	PyObject **param = (PyObject**)_param;
-	if (PyUnicode_CheckExact(arg)) {
-		Py_INCREF(arg);
-		*param = arg;
-	} 
-	else if (PyUnicode_Check(arg)) {
+	if (PyUnicode_CheckExact(*param))
+		Py_INCREF(*param);
+	else if (PyUnicode_Check(*param))
 		/* For a Unicode subtype that's not a Unicode object,
 		   return a true Unicode object with the same data. */
-		*param = PyUnicode_FromUnicode(PyUnicode_AS_UNICODE(arg),
-					       PyUnicode_GET_SIZE(arg));
-		return *param != NULL;
-	}
+		*param = PyUnicode_FromUnicode(PyUnicode_AS_UNICODE(*param),
+					       PyUnicode_GET_SIZE(*param));
 	else
-		*param = PyUnicode_FromEncodedObject(arg,
+		*param = PyUnicode_FromEncodedObject(*param,
 				                     Py_FileSystemDefaultEncoding,
 					             "strict");
 	return (*param) != NULL;
@@ -2322,11 +2316,19 @@ posix_listdir(PyObject *self, PyObject *args)
 		return NULL;
 	}
 	for (;;) {
+		errno = 0;
 		Py_BEGIN_ALLOW_THREADS
 		ep = readdir(dirp);
 		Py_END_ALLOW_THREADS
-		if (ep == NULL)
-			break;
+		if (ep == NULL) {
+			if (errno == 0) {
+				break;
+			} else {
+				closedir(dirp);
+				Py_DECREF(d);
+				return posix_error_with_allocated_filename(name);
+			}
+		}
 		if (ep->d_name[0] == '.' &&
 		    (NAMLEN(ep) == 1 ||
 		     (ep->d_name[1] == '.' && NAMLEN(ep) == 2)))
@@ -2362,12 +2364,6 @@ posix_listdir(PyObject *self, PyObject *args)
 			break;
 		}
 		Py_DECREF(v);
-	}
-	if (errno != 0 && d != NULL) {
-		/* readdir() returned NULL and set errno */
-		closedir(dirp);
-		Py_DECREF(d);
-		return posix_error_with_allocated_filename(name); 
 	}
 	closedir(dirp);
 	PyMem_Free(name);
@@ -2540,22 +2536,26 @@ posix_rename(PyObject *self, PyObject *args)
 	char *p1, *p2;
 	BOOL result;
 	if (unicode_file_names()) {
-	    if (!PyArg_ParseTuple(args, "O&O&:rename", 
-		convert_to_unicode, &o1,
-		convert_to_unicode, &o2))
-		    PyErr_Clear();
-	    else {
-		    Py_BEGIN_ALLOW_THREADS
-		    result = MoveFileW(PyUnicode_AsUnicode(o1),
-				       PyUnicode_AsUnicode(o2));
-		    Py_END_ALLOW_THREADS
-		    Py_DECREF(o1);
-		    Py_DECREF(o2);
-		    if (!result)
-			    return win32_error("rename", NULL);
-		    Py_INCREF(Py_None);
-		    return Py_None;
+	    if (!PyArg_ParseTuple(args, "OO:rename", &o1, &o2))
+		goto error;
+	    if (!convert_to_unicode(&o1))
+		goto error;
+	    if (!convert_to_unicode(&o2)) {
+		Py_DECREF(o1);
+		goto error;
 	    }
+	    Py_BEGIN_ALLOW_THREADS
+	    result = MoveFileW(PyUnicode_AsUnicode(o1),
+			       PyUnicode_AsUnicode(o2));
+	    Py_END_ALLOW_THREADS
+	    Py_DECREF(o1);
+	    Py_DECREF(o2);
+	    if (!result)
+		    return win32_error("rename", NULL);
+	    Py_INCREF(Py_None);
+	    return Py_None;
+error:
+	    PyErr_Clear();
 	}
 	if (!PyArg_ParseTuple(args, "ss:rename", &p1, &p2))
 		return NULL;
@@ -3597,7 +3597,8 @@ posix_fork1(PyObject *self, PyObject *noargs)
 	pid_t pid = fork1();
 	if (pid == -1)
 		return posix_error();
-	PyOS_AfterFork();
+	if (pid == 0)
+		PyOS_AfterFork();
 	return PyInt_FromLong(pid);
 }
 #endif
@@ -6331,15 +6332,16 @@ Write a string to a file descriptor.");
 static PyObject *
 posix_write(PyObject *self, PyObject *args)
 {
+	Py_buffer pbuf;
 	int fd;
 	Py_ssize_t size;
-	char *buffer;
 
-	if (!PyArg_ParseTuple(args, "is#:write", &fd, &buffer, &size))
+	if (!PyArg_ParseTuple(args, "is*:write", &fd, &pbuf))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
-	size = write(fd, buffer, (size_t)size);
+	size = write(fd, pbuf.buf, (size_t)pbuf.len);
 	Py_END_ALLOW_THREADS
+		PyBuffer_Release(&pbuf);
 	if (size < 0)
 		return posix_error();
 	return PyInt_FromSsize_t(size);
@@ -8247,6 +8249,7 @@ win32_urandom(PyObject *self, PyObject *args)
 	result = PyString_FromStringAndSize(NULL, howMany);
 	if (result != NULL) {
 		/* Get random data */
+		memset(PyString_AS_STRING(result), 0, howMany); /* zero seed */
 		if (! pCryptGenRandom(hCryptProv, howMany, (unsigned char*)
 				      PyString_AS_STRING(result))) {
 			Py_DECREF(result);

@@ -219,9 +219,12 @@ class build_ext (Command):
             elif MSVC_VERSION == 8:
                 self.library_dirs.append(os.path.join(sys.exec_prefix,
                                          'PC', 'VS8.0', 'win32release'))
-            else:
+            elif MSVC_VERSION == 7:
                 self.library_dirs.append(os.path.join(sys.exec_prefix,
                                          'PC', 'VS7.1'))
+            else:
+                self.library_dirs.append(os.path.join(sys.exec_prefix,
+                                         'PC', 'VC6'))
 
         # OS/2 (EMX) doesn't support Debug vs Release builds, but has the
         # import libraries in its "Config" subdirectory
@@ -686,7 +689,7 @@ class build_ext (Command):
         so_ext = get_config_var('SO')
         if os.name == 'nt' and self.debug:
             return apply(os.path.join, ext_path) + '_d' + so_ext
-        return apply(os.path.join, ext_path) + so_ext
+        return os.path.join(*ext_path) + so_ext
 
     def get_export_symbols (self, ext):
         """Return the list of symbols that a shared extension has to

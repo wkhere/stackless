@@ -742,12 +742,23 @@ Modules
    of the shared library file.
 
 Classes
-   Class objects are created by class definitions (see section :ref:`class`).  A
-   class has a namespace implemented by a dictionary object. Class attribute
-   references are translated to lookups in this dictionary, e.g., ``C.x`` is
-   translated to ``C.__dict__["x"]``. When the attribute name is not found
-   there, the attribute search continues in the base classes.  The search is
-   depth-first, left-to-right in the order of occurrence in the base class list.
+   Both class types (new-style classes) and class objects (old-style/classic
+   classes) are typically created by class definitions (see section
+   :ref:`class`).  A class has a namespace implemented by a dictionary object.
+   Class attribute references are translated to lookups in this dictionary, e.g.,
+   ``C.x`` is translated to ``C.__dict__["x"]`` (although for new-style classes
+   in particular there are a number of hooks which allow for other means of
+   locating attributes). When the attribute name is not found there, the
+   attribute search continues in the base classes.  For old-style classes, the
+   search is depth-first, left-to-right in the order of occurrence in the base
+   class list. New-style classes use the more complex C3 method resolution
+   order which behaves correctly even in the presence of 'diamond'
+   inheritance structures where there are multiple inheritance paths
+   leading back to a common ancestor. Additional details on the C3 MRO used by
+   new-style classes can be found in the documentation accompanying the
+   2.3 release at http://www.python.org/download/releases/2.3/mro/.
+
+   .. XXX: Could we add that MRO doc as an appendix to the language ref?
 
    .. index::
       object: class
@@ -768,7 +779,7 @@ Classes
    static method object, it is transformed into the object wrapped by the static
    method object. See section :ref:`descriptors` for another way in which
    attributes retrieved from a class may differ from those actually contained in
-   its :attr:`__dict__`.
+   its :attr:`__dict__` (note that only new-style classes support descriptors).
 
    .. index:: triple: class; attribute; assignment
 
@@ -1075,7 +1086,7 @@ Internal types
 New-style and classic classes
 =============================
 
-Classes and instances come in two flavors: old-style or classic, and new-style.
+Classes and instances come in two flavors: old-style (or classic) and new-style.
 
 Up to Python 2.1, old-style classes were the only flavour available to the user.
 The concept of (old-style) class is unrelated to the concept of type: if *x* is
@@ -1086,10 +1097,12 @@ a single built-in type, called ``instance``.
 
 New-style classes were introduced in Python 2.2 to unify classes and types.  A
 new-style class is neither more nor less than a user-defined type.  If *x* is an
-instance of a new-style class, then ``type(x)`` is the same as ``x.__class__``.
+instance of a new-style class, then ``type(x)`` is typically the same as
+``x.__class__`` (although this is not guaranteed - a new-style class instance is
+permitted to override the value returned for ``x.__class__``).
 
 The major motivation for introducing new-style classes is to provide a unified
-object model with a full meta-model.  It also has a number of immediate
+object model with a full meta-model.  It also has a number of practical
 benefits, like the ability to subclass most built-in types, or the introduction
 of "descriptors", which enable computed properties.
 
@@ -1103,16 +1116,18 @@ the way special methods are invoked.  Others are "fixes" that could not be
 implemented before for compatibility concerns, like the method resolution order
 in case of multiple inheritance.
 
-This manual is not up-to-date with respect to new-style classes.  For now,
-please see http://www.python.org/doc/newstyle/ for more information.
+While this manual aims to provide comprehensive coverage of Python's class
+mechanics, it may still be lacking in some areas when it comes to its coverage
+of new-style classes. Please see http://www.python.org/doc/newstyle/ for
+sources of additional information.
 
 .. index::
    single: class; new-style
    single: class; classic
    single: class; old-style
 
-The plan is to eventually drop old-style classes, leaving only the semantics of
-new-style classes.  This change will probably only be feasible in Python 3.0.
+Old-style classes are removed in Python 3.0, leaving only the semantics of
+new-style classes.
 
 
 .. _specialnames:
@@ -1129,24 +1144,11 @@ A class can implement certain operations that are invoked by special syntax
 with special names. This is Python's approach to :dfn:`operator overloading`,
 allowing classes to define their own behavior with respect to language
 operators.  For instance, if a class defines a method named :meth:`__getitem__`,
-and ``x`` is an instance of this class, then ``x[i]`` is equivalent [#]_ to
-``x.__getitem__(i)``.  Except where mentioned, attempts to execute an operation
-raise an exception when no appropriate method is defined.
-
-For new-style classes, special methods are only guaranteed to work if defined in
-an object's class, not in the object's instance dictionary.  That explains why
-this won't work::
-
-   >>> class C:
-   ...     pass
-   ...
-   >>> c = C()
-   >>> c.__len__ = lambda: 5
-   >>> len(c)
-   Traceback (most recent call last):
-     File "<stdin>", line 1, in <module>
-   TypeError: object of type 'C' has no len()
-
+and ``x`` is an instance of this class, then ``x[i]`` is roughly equivalent
+to ``x.__getitem__(i)`` for old-style classes and ``type(x).__getitem__(x, i)``
+for new-style classes.  Except where mentioned, attempts to execute an
+operation raise an exception when no appropriate method is defined (typically
+:exc:`AttributeError` or :exc:`TypeError`).
 
 When implementing a class that emulates any built-in type, it is important that
 the emulation only be implemented to the degree that it makes sense for the
@@ -1479,6 +1481,12 @@ The following methods only apply to new-style classes.
    method with the same name to access any attributes it needs, for example,
    ``object.__getattribute__(self, name)``.
 
+   .. note::
+
+      This method may still be bypassed when looking up special methods as the
+      result of implicit invocation via language syntax or builtin functions.
+      See :ref:`new-style-special-lookup`.
+
 
 .. _descriptors:
 
@@ -1599,6 +1607,10 @@ variable.  Space is saved because *__dict__* is not created for each instance.
    .. versionadded:: 2.2
 
 Notes on using *__slots__*
+
+* When inheriting from a class without *__slots__*, the *__dict__* attribute of
+  that class will always be accessible, so a *__slots__* definition in the
+  subclass is meaningless.
 
 * Without a *__dict__* variable, instances cannot be assigned new variables not
   listed in the *__slots__* definition.  Attempts to assign to an unlisted
@@ -1971,7 +1983,7 @@ left undefined.
    These methods are called to implement the binary arithmetic operations (``+``,
    ``-``, ``*``, ``//``, ``%``, :func:`divmod`, :func:`pow`, ``**``, ``<<``,
    ``>>``, ``&``, ``^``, ``|``).  For instance, to evaluate the expression
-   *x*``+``*y*, where *x* is an instance of a class that has an :meth:`__add__`
+   ``x + y``, where *x* is an instance of a class that has an :meth:`__add__`
    method, ``x.__add__(y)`` is called.  The :meth:`__divmod__` method should be the
    equivalent to using :meth:`__floordiv__` and :meth:`__mod__`; it should not be
    related to :meth:`__truediv__` (described below).  Note that :meth:`__pow__`
@@ -2016,7 +2028,7 @@ left undefined.
    ``&``, ``^``, ``|``) with reflected (swapped) operands.  These functions are
    only called if the left operand does not support the corresponding operation and
    the operands are of different types. [#]_ For instance, to evaluate the
-   expression *x*``-``*y*, where *y* is an instance of a class that has an
+   expression ``x - y``, where *y* is an instance of a class that has an
    :meth:`__rsub__` method, ``y.__rsub__(x)`` is called if ``x.__sub__(y)`` returns
    *NotImplemented*.
 
@@ -2053,10 +2065,10 @@ left undefined.
    in-place (modifying *self*) and return the result (which could be, but does
    not have to be, *self*).  If a specific method is not defined, the augmented
    operation falls back to the normal methods.  For instance, to evaluate the
-   expression *x*``+=``*y*, where *x* is an instance of a class that has an
+   expression ``x += y``, where *x* is an instance of a class that has an
    :meth:`__iadd__` method, ``x.__iadd__(y)`` is called.  If *x* is an instance
    of a class that does not define a :meth:`__iadd__` method, ``x.__add__(y)``
-   and ``y.__radd__(x)`` are considered, as with the evaluation of *x*``+``*y*.
+   and ``y.__radd__(x)`` are considered, as with the evaluation of ``x + y``.
 
 
 .. method:: object.__neg__(self)
@@ -2194,12 +2206,12 @@ will not be supported.
 
 *
 
-  In *x*``+``*y*, if *x* is a sequence that implements sequence concatenation,
+  In ``x + y``, if *x* is a sequence that implements sequence concatenation,
   sequence concatenation is invoked.
 
 *
 
-  In *x*``*``*y*, if one operator is a sequence that implements sequence
+  In ``x * y``, if one operator is a sequence that implements sequence
   repetition, and the other is an integer (:class:`int` or :class:`long`),
   sequence repetition is invoked.
 
@@ -2270,19 +2282,115 @@ For more information on context managers, see :ref:`typecontextmanager`.
       The specification, background, and examples for the Python :keyword:`with`
       statement.
 
+
+.. _old-style-special-lookup:
+
+Special method lookup for old-style classes
+-------------------------------------------
+
+For old-style classes, special methods are always looked up in exactly the
+same way as any other method or attribute. This is the case regardless of
+whether the method is being looked up explicitly as in ``x.__getitem__(i)``
+or implicitly as in ``x[i]``.
+
+This behaviour means that special methods may exhibit different behaviour
+for different instances of a single old-style class if the appropriate
+special attributes are set differently::
+
+   >>> class C:
+   ...     pass
+   ...
+   >>> c1 = C()
+   >>> c2 = C()
+   >>> c1.__len__ = lambda: 5
+   >>> c2.__len__ = lambda: 9
+   >>> len(c1)
+   5
+   >>> len(c2)
+   9
+
+
+.. _new-style-special-lookup:
+
+Special method lookup for new-style classes
+-------------------------------------------
+
+For new-style classes, implicit invocations of special methods are only guaranteed
+to work correctly if defined on an object's type, not in the object's instance
+dictionary.  That behaviour is the reason why the following code raises an
+exception (unlike the equivalent example with old-style classes)::
+
+   >>> class C(object):
+   ...     pass
+   ...
+   >>> c = C()
+   >>> c.__len__ = lambda: 5
+   >>> len(c)
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
+   TypeError: object of type 'C' has no len()
+
+The rationale behind this behaviour lies with a number of special methods such
+as :meth:`__hash__` and :meth:`__repr__` that are implemented by all objects,
+including type objects. If the implicit lookup of these methods used the
+conventional lookup process, they would fail when invoked on the type object
+itself::
+
+   >>> 1 .__hash__() == hash(1)
+   True
+   >>> int.__hash__() == hash(int)
+   Traceback (most recent call last):
+     File "<stdin>", line 1, in <module>
+   TypeError: descriptor '__hash__' of 'int' object needs an argument
+
+Incorrectly attempting to invoke an unbound method of a class in this way is
+sometimes referred to as 'metaclass confusion', and is avoided by bypassing
+the instance when looking up special methods::
+
+   >>> type(1).__hash__(1) == hash(1)
+   True
+   >>> type(int).__hash__(int) == hash(int)
+   True
+
+In addition to bypassing any instance attributes in the interest of
+correctness, implicit special method lookup may also bypass the
+:meth:`__getattribute__` method even of the object's metaclass::
+
+   >>> class Meta(type):
+   ...    def __getattribute__(*args):
+   ...       print "Metaclass getattribute invoked"
+   ...       return type.__getattribute__(*args)
+   ...
+   >>> class C(object):
+   ...     __metaclass__ = Meta
+   ...     def __len__(self):
+   ...         return 10
+   ...     def __getattribute__(*args):
+   ...         print "Class getattribute invoked"
+   ...         return object.__getattribute__(*args)
+   ...
+   >>> c = C()
+   >>> c.__len__()                 # Explicit lookup via instance
+   Class getattribute invoked
+   10
+   >>> type(c).__len__(c)          # Explicit lookup via type
+   Metaclass getattribute invoked
+   10
+   >>> len(c)                      # Implicit lookup
+   10
+
+Bypassing the :meth:`__getattribute__` machinery in this fashion
+provides significant scope for speed optimisations within the
+interpreter, at the cost of some flexibility in the handling of
+special methods (the special method *must* be set on the class
+object itself in order to be consistently invoked by the interpreter).
+
+
 .. rubric:: Footnotes
 
-.. [#] Since Python 2.2, a gradual merging of types and classes has been started that
-   makes this and a few other assertions made in this manual not 100% accurate and
-   complete: for example, it *is* now possible in some cases to change an object's
-   type, under certain controlled conditions.  Until this manual undergoes
-   extensive revision, it must now be taken as authoritative only regarding
-   "classic classes", that are still the default, for compatibility purposes, in
-   Python 2.2 and 2.3.  For more information, see
-   http://www.python.org/doc/newstyle/.
-
-.. [#] This, and other statements, are only roughly true for instances of new-style
-   classes.
+.. [#] It *is* possible in some cases to change an object's type, under certain
+   controlled conditions. It generally isn't a good idea though, since it can
+   lead to some very strange behaviour if it is handled incorrectly.
 
 .. [#] A descriptor can define any combination of :meth:`__get__`,
    :meth:`__set__` and :meth:`__delete__`.  If it does not define :meth:`__get__`,

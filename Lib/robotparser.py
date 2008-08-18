@@ -55,11 +55,8 @@ class RobotFileParser:
         """Reads the robots.txt URL and feeds it to the parser."""
         opener = URLopener()
         f = opener.open(self.url)
-        lines = []
-        line = f.readline()
-        while line:
-            lines.append(line.strip())
-            line = f.readline()
+        lines = [line.strip() for line in f]
+        f.close()
         self.errcode = opener.errcode
         if self.errcode in (401, 403):
             self.disallow_all = True
@@ -79,12 +76,16 @@ class RobotFileParser:
         """parse the input lines from a robots.txt file.
            We allow that a user-agent: line is not preceded by
            one or more blank lines."""
+        # states:
+        #   0: start state
+        #   1: saw user-agent line
+        #   2: saw an allow or disallow line
         state = 0
         linenumber = 0
         entry = Entry()
 
         for line in lines:
-            linenumber = linenumber + 1
+            linenumber += 1
             if not line:
                 if state == 1:
                     entry = Entry()
@@ -117,6 +118,7 @@ class RobotFileParser:
                 elif line[0] == "allow":
                     if state != 0:
                         entry.rulelines.append(RuleLine(line[1], True))
+                        state = 2
         if state == 2:
             self.entries.append(entry)
 

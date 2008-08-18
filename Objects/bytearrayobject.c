@@ -34,22 +34,31 @@ _getbytevalue(PyObject* arg, int *value)
 {
     long face_value;
 
-    if (PyInt_Check(arg)) {
-        face_value = PyInt_AsLong(arg);
-        if (face_value < 0 || face_value >= 256) {
-            PyErr_SetString(PyExc_ValueError, "byte must be in range(0, 256)");
-            return 0;
-        }
-    }
-    else if (PyBytes_CheckExact(arg)) {
+    if (PyBytes_CheckExact(arg)) {
         if (Py_SIZE(arg) != 1) {
             PyErr_SetString(PyExc_ValueError, "string must be of size 1");
             return 0;
         }
-        face_value = Py_CHARMASK(((PyBytesObject*)arg)->ob_sval[0]);
+        *value = Py_CHARMASK(((PyBytesObject*)arg)->ob_sval[0]);
+        return 1;
+    }
+    else if (PyInt_Check(arg) || PyLong_Check(arg)) {
+        face_value = PyLong_AsLong(arg);
     }
     else {
-        PyErr_Format(PyExc_TypeError, "an integer or string of size 1 is required");
+        PyObject *index = PyNumber_Index(arg);
+        if (index == NULL) {
+            PyErr_Format(PyExc_TypeError,
+                         "an integer or string of size 1 is required");
+            return 0;
+        }
+        face_value = PyLong_AsLong(index);
+        Py_DECREF(index);
+    }
+
+    if (face_value < 0 || face_value >= 256) {
+        /* this includes the OverflowError in case the long is too large */
+        PyErr_SetString(PyExc_ValueError, "byte must be in range(0, 256)");
         return 0;
     }
 
@@ -114,7 +123,7 @@ bytes_getbuffer(PyByteArrayObject *obj, Py_buffer *view, int flags)
                 ptr = "";
         else
                 ptr = obj->ob_bytes;
-        ret = PyBuffer_FillInfo(view, ptr, Py_SIZE(obj), 0, flags);
+        ret = PyBuffer_FillInfo(view, (PyObject*)obj, ptr, Py_SIZE(obj), 0, flags);
         if (ret >= 0) {
                 obj->ob_exports++;
         }
@@ -293,9 +302,9 @@ PyByteArray_Concat(PyObject *a, PyObject *b)
 
   done:
     if (va.len != -1)
-        PyObject_ReleaseBuffer(a, &va);
+        PyBuffer_Release(&va);
     if (vb.len != -1)
-        PyObject_ReleaseBuffer(b, &vb);
+        PyBuffer_Release(&vb);
     return (PyObject *)result;
 }
 
@@ -323,7 +332,7 @@ bytes_iconcat(PyByteArrayObject *self, PyObject *other)
     mysize = Py_SIZE(self);
     size = mysize + vo.len;
     if (size < 0) {
-        PyObject_ReleaseBuffer(other, &vo);
+        PyBuffer_Release(&vo);
         return PyErr_NoMemory();
     }
     if (size < self->ob_alloc) {
@@ -331,11 +340,11 @@ bytes_iconcat(PyByteArrayObject *self, PyObject *other)
         self->ob_bytes[Py_SIZE(self)] = '\0'; /* Trailing null byte */
     }
     else if (PyByteArray_Resize((PyObject *)self, size) < 0) {
-        PyObject_ReleaseBuffer(other, &vo);
+        PyBuffer_Release(&vo);
         return NULL;
     }
     memcpy(self->ob_bytes + mysize, vo.buf, vo.len);
-    PyObject_ReleaseBuffer(other, &vo);
+    PyBuffer_Release(&vo);
     Py_INCREF(self);
     return (PyObject *)self;
 }
@@ -410,10 +419,10 @@ bytes_getitem(PyByteArrayObject *self, Py_ssize_t i)
 }
 
 static PyObject *
-bytes_subscript(PyByteArrayObject *self, PyObject *item)
+bytes_subscript(PyByteArrayObject *self, PyObject *index)
 {
-    if (PyIndex_Check(item)) {
-        Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
+    if (PyIndex_Check(index)) {
+        Py_ssize_t i = PyNumber_AsSsize_t(index, PyExc_IndexError);
 
         if (i == -1 && PyErr_Occurred())
             return NULL;
@@ -427,9 +436,9 @@ bytes_subscript(PyByteArrayObject *self, PyObject *item)
         }
         return PyInt_FromLong((unsigned char)(self->ob_bytes[i]));
     }
-    else if (PySlice_Check(item)) {
+    else if (PySlice_Check(index)) {
         Py_ssize_t start, stop, step, slicelength, cur, i;
-        if (PySlice_GetIndicesEx((PySliceObject *)item,
+        if (PySlice_GetIndicesEx((PySliceObject *)index,
                                  PyByteArray_GET_SIZE(self),
                                  &start, &stop, &step, &slicelength) < 0) {
             return NULL;
@@ -492,7 +501,7 @@ bytes_setslice(PyByteArrayObject *self, Py_ssize_t lo, Py_ssize_t hi,
     else {
             if (_getbuffer(values, &vbytes) < 0) {
                     PyErr_Format(PyExc_TypeError,
-                                 "can't set bytes slice from %.100s",
+                                 "can't set bytearray slice from %.100s",
                                  Py_TYPE(values)->tp_name);
                     return -1;
             }
@@ -546,7 +555,7 @@ bytes_setslice(PyByteArrayObject *self, Py_ssize_t lo, Py_ssize_t hi,
 
  finish:
     if (vbytes.len != -1)
-            PyObject_ReleaseBuffer(values, &vbytes);
+            PyBuffer_Release(&vbytes);
     return res;
 }
 
@@ -574,13 +583,13 @@ bytes_setitem(PyByteArrayObject *self, Py_ssize_t i, PyObject *value)
 }
 
 static int
-bytes_ass_subscript(PyByteArrayObject *self, PyObject *item, PyObject *values)
+bytes_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *values)
 {
     Py_ssize_t start, stop, step, slicelen, needed;
     char *bytes;
 
-    if (PyIndex_Check(item)) {
-        Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
+    if (PyIndex_Check(index)) {
+        Py_ssize_t i = PyNumber_AsSsize_t(index, PyExc_IndexError);
 
         if (i == -1 && PyErr_Occurred())
             return -1;
@@ -601,25 +610,15 @@ bytes_ass_subscript(PyByteArrayObject *self, PyObject *item, PyObject *values)
             slicelen = 1;
         }
         else {
-            Py_ssize_t ival = PyNumber_AsSsize_t(values, PyExc_ValueError);
-            if (ival == -1 && PyErr_Occurred()) {
-                int int_value;
-                /* Also accept str of size 1 in 2.x */
-                PyErr_Clear();
-                if (!_getbytevalue(values, &int_value))
-                    return -1;
-                ival = (int) int_value;
-            } else if (ival < 0 || ival >= 256) {
-                PyErr_SetString(PyExc_ValueError,
-                                "byte must be in range(0, 256)");
+            int ival;
+            if (!_getbytevalue(values, &ival))
                 return -1;
-            }
             self->ob_bytes[i] = (char)ival;
             return 0;
         }
     }
-    else if (PySlice_Check(item)) {
-        if (PySlice_GetIndicesEx((PySliceObject *)item,
+    else if (PySlice_Check(index)) {
+        if (PySlice_GetIndicesEx((PySliceObject *)index,
                                  PyByteArray_GET_SIZE(self),
                                  &start, &stop, &step, &slicelen) < 0) {
             return -1;
@@ -640,7 +639,7 @@ bytes_ass_subscript(PyByteArrayObject *self, PyObject *item, PyObject *values)
         values = PyByteArray_FromObject(values);
         if (values == NULL)
             return -1;
-        err = bytes_ass_subscript(self, item, values);
+        err = bytes_ass_subscript(self, index, values);
         Py_DECREF(values);
         return err;
     }
@@ -754,7 +753,7 @@ bytes_init(PyByteArrayObject *self, PyObject *args, PyObject *kwds)
     }
 
     /* Parse arguments */
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oss:bytes", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oss:bytearray", kwlist,
                                      &arg, &encoding, &errors))
         return -1;
 
@@ -842,10 +841,10 @@ bytes_init(PyByteArrayObject *self, PyObject *args, PyObject *kwds)
         if (PyByteArray_Resize((PyObject *)self, size) < 0) goto fail;
         if (PyBuffer_ToContiguous(self->ob_bytes, &view, size, 'C') < 0)
                 goto fail;
-        PyObject_ReleaseBuffer(arg, &view);
+        PyBuffer_Release(&view);
         return 0;
     fail:
-        PyObject_ReleaseBuffer(arg, &view);
+        PyBuffer_Release(&view);
         return -1;
     }
 
@@ -860,7 +859,7 @@ bytes_init(PyByteArrayObject *self, PyObject *args, PyObject *kwds)
     /* Run the iterator to exhaustion */
     for (;;) {
         PyObject *item;
-        Py_ssize_t value;
+        int rc, value;
 
         /* Get the next item */
         item = iternext(it);
@@ -874,17 +873,10 @@ bytes_init(PyByteArrayObject *self, PyObject *args, PyObject *kwds)
         }
 
         /* Interpret it as an int (__index__) */
-        value = PyNumber_AsSsize_t(item, PyExc_ValueError);
+        rc = _getbytevalue(item, &value);
         Py_DECREF(item);
-        if (value == -1 && PyErr_Occurred())
+        if (!rc)
             goto error;
-
-        /* Range check */
-        if (value < 0 || value >= 256) {
-            PyErr_SetString(PyExc_ValueError,
-                            "bytes must be in range(0, 256)");
-            goto error;
-        }
 
         /* Append the byte */
         if (Py_SIZE(self) < self->ob_alloc)
@@ -1039,7 +1031,7 @@ bytes_richcompare(PyObject *self, PyObject *other, int op)
     other_size = _getbuffer(other, &other_bytes);
     if (other_size < 0) {
         PyErr_Clear();
-        PyObject_ReleaseBuffer(self, &self_bytes);
+        PyBuffer_Release(&self_bytes);
         Py_INCREF(Py_NotImplemented);
         return Py_NotImplemented;
     }
@@ -1074,8 +1066,8 @@ bytes_richcompare(PyObject *self, PyObject *other, int op)
     }
 
     res = cmp ? Py_True : Py_False;
-    PyObject_ReleaseBuffer(self, &self_bytes);
-    PyObject_ReleaseBuffer(other, &other_bytes);
+    PyBuffer_Release(&self_bytes);
+    PyBuffer_Release(&other_bytes);
     Py_INCREF(res);
     return res;
 }
@@ -1083,6 +1075,11 @@ bytes_richcompare(PyObject *self, PyObject *other, int op)
 static void
 bytes_dealloc(PyByteArrayObject *self)
 {
+	if (self->ob_exports > 0) {
+		PyErr_SetString(PyExc_SystemError,
+			"deallocated bytearray object has exported buffers");
+		PyErr_Print();
+	}
     if (self->ob_bytes != 0) {
         PyMem_Free(self->ob_bytes);
     }
@@ -1150,7 +1147,7 @@ bytes_find_internal(PyByteArrayObject *self, PyObject *args, int dir)
         res = stringlib_rfind_slice(
             PyByteArray_AS_STRING(self), PyByteArray_GET_SIZE(self),
             subbuf.buf, subbuf.len, start, end);
-    PyObject_ReleaseBuffer(subobj, &subbuf);
+    PyBuffer_Release(&subbuf);
     return res;
 }
 
@@ -1200,7 +1197,7 @@ bytes_count(PyByteArrayObject *self, PyObject *args)
     count_obj = PyInt_FromSsize_t(
         stringlib_count(str + start, end - start, vsub.buf, vsub.len)
         );
-    PyObject_ReleaseBuffer(sub_obj, &vsub);
+    PyBuffer_Release(&vsub);
     return count_obj;
 }
 
@@ -1276,7 +1273,7 @@ bytes_contains(PyObject *self, PyObject *arg)
             return -1;
         pos = stringlib_find(PyByteArray_AS_STRING(self), Py_SIZE(self),
                              varg.buf, varg.len, 0);
-        PyObject_ReleaseBuffer(arg, &varg);
+        PyBuffer_Release(&varg);
         return pos >= 0;
     }
     if (ival < 0 || ival >= 256) {
@@ -1326,7 +1323,7 @@ _bytes_tailmatch(PyByteArrayObject *self, PyObject *substr, Py_ssize_t start,
         rv = ! memcmp(str+start, vsubstr.buf, vsubstr.len);
 
 done:
-    PyObject_ReleaseBuffer(substr, &vsubstr);
+    PyBuffer_Release(&vsubstr);
     return rv;
 }
 
@@ -1506,9 +1503,9 @@ bytes_translate(PyByteArrayObject *self, PyObject *args)
         PyByteArray_Resize(result, output - output_start);
 
 done:
-    PyObject_ReleaseBuffer(tableobj, &vtable);
+    PyBuffer_Release(&vtable);
     if (delobj != NULL)
-        PyObject_ReleaseBuffer(delobj, &vdel);
+        PyBuffer_Release(&vdel);
     return result;
 }
 
@@ -2130,7 +2127,7 @@ bytes_replace(PyByteArrayObject *self, PyObject *args)
     if (_getbuffer(from, &vfrom) < 0)
         return NULL;
     if (_getbuffer(to, &vto) < 0) {
-        PyObject_ReleaseBuffer(from, &vfrom);
+        PyBuffer_Release(&vfrom);
         return NULL;
     }
 
@@ -2138,8 +2135,8 @@ bytes_replace(PyByteArrayObject *self, PyObject *args)
                               vfrom.buf, vfrom.len,
                               vto.buf, vto.len, count);
 
-    PyObject_ReleaseBuffer(from, &vfrom);
-    PyObject_ReleaseBuffer(to, &vto);
+    PyBuffer_Release(&vfrom);
+    PyBuffer_Release(&vto);
     return res;
 }
 
@@ -2295,15 +2292,18 @@ bytes_split(PyByteArrayObject *self, PyObject *args)
 
     if (n == 0) {
         PyErr_SetString(PyExc_ValueError, "empty separator");
-        PyObject_ReleaseBuffer(subobj, &vsub);
+        PyBuffer_Release(&vsub);
         return NULL;
     }
-    if (n == 1)
-        return split_char(s, len, sub[0], maxsplit);
+    if (n == 1) {
+        list = split_char(s, len, sub[0], maxsplit);
+        PyBuffer_Release(&vsub);
+        return list;
+    }
 
     list = PyList_New(PREALLOC_SIZE(maxsplit));
     if (list == NULL) {
-        PyObject_ReleaseBuffer(subobj, &vsub);
+        PyBuffer_Release(&vsub);
         return NULL;
     }
 
@@ -2331,12 +2331,12 @@ bytes_split(PyByteArrayObject *self, PyObject *args)
 #endif
     SPLIT_ADD(s, i, len);
     FIX_PREALLOC_SIZE(list);
-    PyObject_ReleaseBuffer(subobj, &vsub);
+    PyBuffer_Release(&vsub);
     return list;
 
   onError:
     Py_DECREF(list);
-    PyObject_ReleaseBuffer(subobj, &vsub);
+    PyBuffer_Release(&vsub);
     return NULL;
 }
 
@@ -2527,15 +2527,18 @@ bytes_rsplit(PyByteArrayObject *self, PyObject *args)
 
     if (n == 0) {
         PyErr_SetString(PyExc_ValueError, "empty separator");
-        PyObject_ReleaseBuffer(subobj, &vsub);
+        PyBuffer_Release(&vsub);
         return NULL;
     }
-    else if (n == 1)
-        return rsplit_char(s, len, sub[0], maxsplit);
+    else if (n == 1) {
+        list = rsplit_char(s, len, sub[0], maxsplit);
+        PyBuffer_Release(&vsub);
+        return list;
+    }
 
     list = PyList_New(PREALLOC_SIZE(maxsplit));
     if (list == NULL) {
-        PyObject_ReleaseBuffer(subobj, &vsub);
+        PyBuffer_Release(&vsub);
         return NULL;
     }
 
@@ -2556,12 +2559,12 @@ bytes_rsplit(PyByteArrayObject *self, PyObject *args)
     FIX_PREALLOC_SIZE(list);
     if (PyList_Reverse(list) < 0)
         goto onError;
-    PyObject_ReleaseBuffer(subobj, &vsub);
+    PyBuffer_Release(&vsub);
     return list;
 
 onError:
     Py_DECREF(list);
-    PyObject_ReleaseBuffer(subobj, &vsub);
+    PyBuffer_Release(&vsub);
     return NULL;
 }
 
@@ -2594,10 +2597,11 @@ Insert a single item into the bytearray before the given index.");
 static PyObject *
 bytes_insert(PyByteArrayObject *self, PyObject *args)
 {
-    int value;
+    PyObject *value;
+    int ival;
     Py_ssize_t where, n = Py_SIZE(self);
 
-    if (!PyArg_ParseTuple(args, "ni:insert", &where, &value))
+    if (!PyArg_ParseTuple(args, "nO:insert", &where, &value))
         return NULL;
 
     if (n == PY_SSIZE_T_MAX) {
@@ -2605,11 +2609,8 @@ bytes_insert(PyByteArrayObject *self, PyObject *args)
                         "cannot add more objects to bytes");
         return NULL;
     }
-    if (value < 0 || value >= 256) {
-        PyErr_SetString(PyExc_ValueError,
-                        "byte must be in range(0, 256)");
+    if (!_getbytevalue(value, &ival))
         return NULL;
-    }
     if (PyByteArray_Resize((PyObject *)self, n + 1) < 0)
         return NULL;
 
@@ -2621,7 +2622,7 @@ bytes_insert(PyByteArrayObject *self, PyObject *args)
     if (where > n)
         where = n;
     memmove(self->ob_bytes + where + 1, self->ob_bytes + where, n - where);
-    self->ob_bytes[where] = value;
+    self->ob_bytes[where] = ival;
 
     Py_RETURN_NONE;
 }
@@ -2838,7 +2839,7 @@ bytes_strip(PyByteArrayObject *self, PyObject *args)
     else
         right = rstrip_helper(myptr, mysize, argptr, argsize);
     if (arg != Py_None)
-        PyObject_ReleaseBuffer(arg, &varg);
+        PyBuffer_Release(&varg);
     return PyByteArray_FromStringAndSize(self->ob_bytes + left, right - left);
 }
 
@@ -2871,7 +2872,7 @@ bytes_lstrip(PyByteArrayObject *self, PyObject *args)
     left = lstrip_helper(myptr, mysize, argptr, argsize);
     right = mysize;
     if (arg != Py_None)
-        PyObject_ReleaseBuffer(arg, &varg);
+        PyBuffer_Release(&varg);
     return PyByteArray_FromStringAndSize(self->ob_bytes + left, right - left);
 }
 
@@ -2904,7 +2905,7 @@ bytes_rstrip(PyByteArrayObject *self, PyObject *args)
     left = 0;
     right = rstrip_helper(myptr, mysize, argptr, argsize);
     if (arg != Py_None)
-        PyObject_ReleaseBuffer(arg, &varg);
+        PyBuffer_Release(&varg);
     return PyByteArray_FromStringAndSize(self->ob_bytes + left, right - left);
 }
 

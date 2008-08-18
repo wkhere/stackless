@@ -31,9 +31,7 @@ way is to use the :meth:`str.format` method.
 
 One question remains, of course: how do you convert values to strings? Luckily,
 Python has ways to convert any value to a string: pass it to the :func:`repr`
-or :func:`str` functions.  Reverse quotes (``````) are equivalent to
-:func:`repr`, but they are no longer used in modern Python code and are removed
-in future versions of the language.
+or :func:`str` functions.
 
 The :func:`str` function is meant to return representations of values which are
 fairly human-readable, while :func:`repr` is meant to generate representations
@@ -67,9 +65,6 @@ Some examples::
    'hello, world\n'
    >>> # The argument to repr() may be any Python object:
    ... repr((x, y, ('spam', 'eggs')))
-   "(32.5, 40000, ('spam', 'eggs'))"
-   >>> # reverse quotes are convenient in interactive sessions:
-   ... `x, y, ('spam', 'eggs')`
    "(32.5, 40000, ('spam', 'eggs'))"
 
 Here are two ways to write a table of squares and cubes::
@@ -143,12 +138,14 @@ the position of the object passed into the format method. ::
 If keyword arguments are used in the format method, their values are referred to
 by using the name of the argument. ::
 
-   >>> print 'This {food} is {adjective}.'.format(food='spam', adjective='absolutely horrible')
+   >>> print 'This {food} is {adjective}.'.format(
+   ...       food='spam', adjective='absolutely horrible')
    This spam is absolutely horrible.
 
 Positional and keyword arguments can be arbitrarily combined::
 
-   >>> print 'The story of {0}, {1}, and {other}.'.format('Bill', 'Manfred', other='Georg')
+   >>> print 'The story of {0}, {1}, and {other}.'.format('Bill', 'Manfred',
+   ...                                                    other='Georg')
    The story of Bill, Manfred, and Georg.
 
 An optional ``':``` and format specifier can follow the field name. This also
@@ -176,7 +173,8 @@ instead of by position.  This can be done by simply passing the dict and using
 square brackets ``'[]'`` to access the keys ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 8637678}
-   >>> print 'Jack: {0[Jack]:d}; Sjoerd: {0[Sjoerd]:d}; Dcab: {0[Dcab]:d}'.format(table)
+   >>> print ('Jack: {0[Jack]:d}; Sjoerd: {0[Sjoerd]:d}; '
+   ...        'Dcab: {0[Dcab]:d}'.format(table))
    Jack: 4098; Sjoerd: 4127; Dcab: 8637678
 
 This could also be done by passing the table as keyword arguments with the '**'
@@ -347,6 +345,16 @@ attempts to use the file object will automatically fail. ::
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
    ValueError: I/O operation on closed file
+
+It is good practice to use the :keyword:`with` keyword when dealing with file
+objects.  This has the advantage that the file is properly closed after its
+suite finishes, even if an exception is raised on the way.  It is also much
+shorter than writing equivalent :keyword:`try`\ -\ :keyword:`finally` blocks::
+
+    >>> with open('/tmp/workfile', 'r') as f:
+    ...     read_data = f.read()
+    >>> f.closed
+    True
 
 File objects have some additional methods, such as :meth:`isatty` and
 :meth:`truncate` which are less frequently used; consult the Library Reference

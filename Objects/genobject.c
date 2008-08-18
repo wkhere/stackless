@@ -399,7 +399,7 @@ PyGen_New(PyFrameObject *f)
 #ifdef STACKLESS
 	/* Support for unpickling generators.  This will segmentation fault if
 	   called by pricklepit.c:gen_new as that passes Py_None as a placeholder. */
-	if (f == Py_None) {
+	if ((PyObject*)f == Py_None) {
 		Py_INCREF(Py_None);
 		gen->gi_code = Py_None;
 	} else {

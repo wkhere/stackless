@@ -532,6 +532,9 @@ class UnicodeTest(
 
         self.assertEqual(unicode('+3ADYAA-', 'utf-7', 'replace'), u'\ufffd')
 
+        # Issue #2242: crash on some Windows/MSVC versions
+        self.assertRaises(UnicodeDecodeError, '+\xc1'.decode, 'utf-7')
+
     def test_codecs_utf8(self):
         self.assertEqual(u''.encode('utf-8'), '')
         self.assertEqual(u'\u20ac'.encode('utf-8'), '\xe2\x82\xac')
@@ -1109,6 +1112,15 @@ class UnicodeTest(
         # This will try to convert the argument from unicode to str, which
         #  will fail
         self.assertRaises(UnicodeEncodeError, "foo{0}".format, u'\u1000bar')
+
+    def test_raiseMemError(self):
+        # Ensure that the freelist contains a consistent object, even
+        # when a string allocation fails with a MemoryError.
+        # This used to crash the interpreter,
+        # or leak references when the number was smaller.
+        alloc = lambda: u"a" * (sys.maxsize - 100)
+        self.assertRaises(MemoryError, alloc)
+        self.assertRaises(MemoryError, alloc)
 
 def test_main():
     test_support.run_unittest(__name__)

@@ -2,11 +2,16 @@
 
 
 import os
-import rfc822
 import tempfile
+from test.test_support import catch_warning
+from warnings import filterwarnings
+with catch_warning(record=False):
+    filterwarnings("ignore", ".*rfc822 has been removed", DeprecationWarning)
+    import rfc822
 
 from warnings import warnpy3k
-warnpy3k("in 3.x, mimetools has been removed in favor of the email package")
+warnpy3k("in 3.x, mimetools has been removed in favor of the email package",
+         stacklevel=2)
 
 __all__ = ["Message","choose_boundary","encode","decode","copyliteral",
            "copybinary"]

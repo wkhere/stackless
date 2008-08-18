@@ -363,16 +363,6 @@ PyObject_GetBuffer(PyObject *obj, Py_buffer *view, int flags)
 	return (*(obj->ob_type->tp_as_buffer->bf_getbuffer))(obj, view, flags);
 }
 
-void
-PyObject_ReleaseBuffer(PyObject *obj, Py_buffer *view)
-{
-	if (obj->ob_type->tp_as_buffer != NULL &&
-	    obj->ob_type->tp_as_buffer->bf_releasebuffer != NULL) {
-		(*(obj->ob_type->tp_as_buffer->bf_releasebuffer))(obj, view);
-	}
-}
-
-
 static int
 _IsFortranContiguous(Py_buffer *view)
 {
@@ -604,15 +594,15 @@ int PyObject_CopyData(PyObject *dest, PyObject *src)
 
 	if (PyObject_GetBuffer(dest, &view_dest, PyBUF_FULL) != 0) return -1;
 	if (PyObject_GetBuffer(src, &view_src, PyBUF_FULL_RO) != 0) {
-		PyObject_ReleaseBuffer(dest, &view_dest);
+		PyBuffer_Release(&view_dest);
 		return -1;
 	}
 
 	if (view_dest.len < view_src.len) {
 		PyErr_SetString(PyExc_BufferError,
 				"destination is too small to receive data from source");
-		PyObject_ReleaseBuffer(dest, &view_dest);
-		PyObject_ReleaseBuffer(src, &view_src);
+		PyBuffer_Release(&view_dest);
+		PyBuffer_Release(&view_src);
 		return -1;
 	}
 
@@ -622,8 +612,8 @@ int PyObject_CopyData(PyObject *dest, PyObject *src)
 	     PyBuffer_IsContiguous(&view_src, 'F'))) {
 		/* simplest copy is all that is needed */
 		memcpy(view_dest.buf, view_src.buf, view_src.len);
-		PyObject_ReleaseBuffer(dest, &view_dest);
-		PyObject_ReleaseBuffer(src, &view_src);
+		PyBuffer_Release(&view_dest);
+		PyBuffer_Release(&view_src);
 		return 0;
 	}
 
@@ -633,8 +623,8 @@ int PyObject_CopyData(PyObject *dest, PyObject *src)
 	indices = (Py_ssize_t *)PyMem_Malloc(sizeof(Py_ssize_t)*view_src.ndim);
 	if (indices == NULL) {
 		PyErr_NoMemory();
-		PyObject_ReleaseBuffer(dest, &view_dest);
-		PyObject_ReleaseBuffer(src, &view_src);
+		PyBuffer_Release(&view_dest);
+		PyBuffer_Release(&view_src);
 		return -1;
 	}
 	for (k=0; k<view_src.ndim;k++) {
@@ -652,8 +642,8 @@ int PyObject_CopyData(PyObject *dest, PyObject *src)
 		memcpy(dptr, sptr, view_src.itemsize);
 	}
 	PyMem_Free(indices);
-	PyObject_ReleaseBuffer(dest, &view_dest);
-	PyObject_ReleaseBuffer(src, &view_src);
+	PyBuffer_Release(&view_dest);
+	PyBuffer_Release(&view_src);
 	return 0;
 }
 
@@ -682,7 +672,7 @@ PyBuffer_FillContiguousStrides(int nd, Py_ssize_t *shape,
 }
 
 int
-PyBuffer_FillInfo(Py_buffer *view, void *buf, Py_ssize_t len,
+PyBuffer_FillInfo(Py_buffer *view, PyObject *obj, void *buf, Py_ssize_t len,
 	      int readonly, int flags)
 {
 	if (view == NULL) return 0;
@@ -693,6 +683,9 @@ PyBuffer_FillInfo(Py_buffer *view, void *buf, Py_ssize_t len,
 		return -1;
 	}
 
+	view->obj = obj;
+	if (obj)
+		Py_INCREF(obj);
 	view->buf = buf;
 	view->len = len;
 	view->readonly = readonly;
@@ -710,6 +703,16 @@ PyBuffer_FillInfo(Py_buffer *view, void *buf, Py_ssize_t len,
 	view->suboffsets = NULL;
 	view->internal = NULL;
 	return 0;
+}
+
+void
+PyBuffer_Release(Py_buffer *view)
+{
+	PyObject *obj = view->obj;
+	if (obj && Py_TYPE(obj)->tp_as_buffer && Py_TYPE(obj)->tp_as_buffer->bf_releasebuffer)
+		Py_TYPE(obj)->tp_as_buffer->bf_releasebuffer(obj, view);
+	Py_XDECREF(obj);
+	view->obj = NULL;
 }
 
 PyObject *

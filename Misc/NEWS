@@ -4,12 +4,211 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.6 beta 2?
+What's New in Python 2.6 beta 3?
 ================================
+
+*Release date: XX-Aug-2008*
 
 Core and Builtins
 -----------------
 
+- Issue #3139: Make buffer-interface thread-safe wrt. PyArg_ParseTuple,
+  by denying s# to parse objects that have a releasebuffer procedure,
+  and introducing s*.
+
+- Issue #3537: Fix an assertion failure when an empty but presized dict
+  object was stored in the freelist.
+
+- Issue #1481296: Make long(float('nan')) and int(float('nan')) raise
+  ValueError consistently across platforms.
+
+- Issue #3479: On platforms where sizeof(int) is smaller than sizeof(long)
+  (64bit Unix, for example), unichr() would truncate its argument and return
+  u'\x00' for unichr(2**32). Now it properly raises an OverflowError.
+
+- Apply security patches from Apple.
+
+- Issue #2542: Now that issubclass() may call arbitrary code, ensure that
+  PyErr_ExceptionMatches returns 0 when an exception occurs there.
+
+- Issue #1819: function calls with several named parameters are now on
+  average 35% faster (as measured by pybench).
+
+- Issue #2378: An unexpected UnboundLocalError or NameError could appear when
+  the python debugger steps into a class statement: the free variables (local
+  variables defined in an outer scope) would be deleted from the outer scope.
+
+- Issue #2620: Overflow checking when allocating or reallocating memory
+  was not always being done properly in some python types and extension
+  modules.  PyMem_MALLOC, PyMem_REALLOC, PyMem_NEW and PyMem_RESIZE have
+  all been updated to perform better checks and places in the code that
+  would previously leak memory on the error path when such an allocation
+  failed have been fixed.
+
+Library
+-------
+
+- Issue #2235: Added Py3k warnings for types which will become unhashable
+  under the stricter __hash__ inheritance rules in 3.0. Several types
+  which did not meet the rules for hash invariants and were already
+  unhashable in 3.0 have now been explicitly flagged as unhashable in
+  2.6 as well (collections.Mapping, collections.Set, unittest.TestSuite,
+  xml.dom.minidom.NamedNodeMap, numbers.Number, UserList.UserList)
+
+- Update __all__ for cookielib, csv, os, urllib2, and weakref to include things
+  imported into the module but exposed as part of the module's API.
+
+- Remove an unneeded import of abc.ABCMeta from 'inspect'.
+
+- Remove unneeded imports of 'sys' and 'warnings' from 'io'.
+
+- Remove unneeded imports of 'warnings' from shelve, filecmp, and dummy_thread.
+
+- Issue #3575: Incremental decoder's decode function now takes bytearray
+  by using 's*' instead of 't#'.
+
+- Issue #2222: Fixed reference leak when occured os.rename()
+  fails unicode conversion on 2nd parameter. (windows only)
+
+- Issue 2464. urllib2 now supports a malformation in the URL received
+  in a redirect.
+
+- Silence the DeprecationWarning raised when importing mimetools in
+  BaseHTTPServer, cgi (and rfc822), httplib.
+
+- Issue #2776: fixed small issue when handling an URL with double slash
+  after a 302 response in the case of not going through a proxy.
+
+- Issue #2676: in the email package, content-type parsing was hanging on
+  pathological input because of quadratic or exponential behaviour of a
+  regular expression.
+
+- Issue #3476: binary buffered reading through the new "io" library is now
+  thread-safe.
+
+- Silence the DeprecationWarning of rfc822 when it is imported by mimetools
+  since mimetools itself is deprecated. Because modules are cached, all
+  subsequent imports of rfc822 will not raise a visible DeprecationWarning.
+
+- Issue #3134: shutil referenced undefined WindowsError symbol.
+
+- Issue #1342811: Fix leak in Tkinter.Menu.delete. Commands associated to
+  menu entries were not deleted.
+
+- Copied the implementation of reduce() to _functools.reduce() to have a
+  version that did not raise a DeprecationWarning under -3.
+
+- Issue #3205: When iterating over a BZ2File fails allocating memory, raise
+  a MemoryError rather than silently stop the iteration.
+
+- Issue #3487: sre "bytecode" validator.  Passing invalid "re-bytecode"
+  to _sre.compile() will now be rejected.  This should not affect anybody
+  since the re.compile() function never generates invalid re-bytecode.
+
+- Issue #3436: Make csv.DictReader's fieldnames attribute a property so that
+  upon first access it can be automatically initialized from the csv file if
+  it wasn't initialized during instantiation.
+
+- Issue #2338: Create imp.reload() to help with transitioning to Python 3.0 as
+  the reload() built-in has been removed.
+
+- Changed code in the following modules/packages to remove warnings raised
+  while running under the ``-3`` flag: aifc, asynchat, asyncore, bdb, bsddb,
+  ConfigParser, cookielib, csv, difflib, distutils, DocXMLRPCServer, email,
+  filecmp, fileinput, inspect, logging, modulefinder, pdb, pickle, profile,
+  pstats, pydoc, re, rlcompleter, SimpleXMLRPCServer, shelve, socket,
+  subprocess, sqlite3, tarfile, Tkinter, test.test_support, textwrap,
+  threading, tokenize, traceback, urlparse, wsgiref, xml, xmlrpclib.
+
+- Issue #3039: Fix tarfile.TarFileCompat.writestr() which always
+  raised an AttributeError.
+
+- Issue #2523: Fix quadratic behaviour when read()ing a binary file without
+  asking for a specific length. This problem only affected files opened
+  using the new "io" module, not the built-in open() function.
+
+- Issue #3449: Update decimal module to use most recent specification
+  (v. 1.68) and tests (v. 2.58) from IBM.
+
+- Issue 3437: Bug fix in robotparser parsing of Allow: lines.
+
+- Issue 1592:  Improve error reporting when operations are attempted
+  on a closed shelf.
+
+- Deprecate the "ast" parser function aliases.
+
+- Issue #3120: On 64-bit Windows the subprocess module was truncating handles.
+
+- Issue #3303: Fix a crash in locale.strcoll() when calling it with
+  invalid arguments.
+
+- Issue #3302: Fix several crashes when calling locale's gettext functions
+  with None arguments.
+
+- Issue #3389: Allow resolving dotted names for handlers in logging
+  configuration files.
+
+- Deprecate the sunaudio module for removal in Python 3.0.
+
+- Issue #3394: zipfile.writestr sets external attributes when passed a
+  file name rather than a ZipInfo instance, so files are extracted with
+  mode 0600 rather than 000 under Unix.
+
+- Issue #1857: subprocess.Popen.poll gained an additional _deadstate keyword
+  argument in python 2.5, this broke code that subclassed Popen to include its
+  own poll method.  Fixed my moving _deadstate to an _internal_poll method.
+
+Build
+-----
+
+- Generate the PatternGrammar pickle during "make install".
+
+Documentation
+-------------
+
+- Issue #2235: the C API function PyObject_HashNotImplemented and its
+  interaction with the tp_hash slot (added in 2.6b2) are now documented
+
+- Issue #643841: The language reference now provides more detailed
+  coverage of the lookup process for special methods. The disclaimers
+  regarding lack of coverage of new-style classes have also been
+  removed, since the coverage is now fairly reasonable.
+
+
+What's New in Python 2.6 beta 2?
+================================
+
+*Release date: 17-Jul-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3156: Fix inconsistent behavior of the bytearray type: all
+  its methods now allow for items objects that can be converted to
+  an integer using operator.index().
+
+- Issue #3360: Fix incorrect parsing of '020000000000.0', which
+  produced a ValueError instead of giving the correct float.
+
+- Issue #3083: Add alternate (#) formatting for bin, oct, hex output
+  for str.format().  This adds the prefix 0b, 0o, or 0x, respectively.
+
+- Issue #3008: the float type has a new instance method 'float.hex'
+  and a new class method 'float.fromhex' to convert floating-point
+  numbers to and from hexadecimal strings, respectively.
+
+- Issue #2235: __hash__ is once again inherited by default. To allow
+  collections.Hashable to remain meaningful in the presence of the
+  default hash implementation (object.__hash__), it is now possible
+  to explicit block inheritance of hash by setting __hash__=None at
+  the Python level, or tp_hash=PyObject_HashNotImplemented at the C
+  level.
+
+- Issue #3221: Issue a RuntimeWarning instead of raising SystemError if
+  the parent module cannot be found while performing an absolute import.
+  This means that an incorrectly defined __package__ attribute will
+  now only prevent relative imports in that module rather than causing
+  all imports from that module to fail.
 
 - Issue #2517: Allow unicode messages in Exceptions again by correctly
   bypassing the instance dictionary when looking up __unicode__ on
@@ -30,16 +229,41 @@ Core and Builtins
   slice(None, 10, -1).indices(10) returns (9, 9, -1) instead of (9,
   10, -1).
 
-- Issue #3219: Calling a function with repeated keyword arguments, f(a=2, a=23),
-  would not cause a syntax error.  This was a regression from 2.4 caused by the
-  switch to the new compiler.
+- Issue #3219: Calling a function with repeated keyword arguments,
+  f(a=2, a=23), would not cause a syntax error.  This was a regression
+  from 2.4 caused by the switch to the new compiler.
 
-- Issue #2862: Make int and float freelist management consistent with other
-  freelists.  Changes their CompactFreeList apis into ClearFreeList apis and
-  calls them via gc.collect().
+- Issue #2862: Make int and float freelist management consistent with
+  other freelists.  Changes their CompactFreeList apis into
+  ClearFreeList apis and calls them via gc.collect().
 
 Library
 -------
+
+- Issue #3554: ctypes.string_at and ctypes.wstring_at did call Python
+  api functions without holding the GIL, which could lead to a fatal
+  error when they failed.
+
+- Issue #799428: Fix Tkinter.Misc._nametowidget to unwrap Tcl command objects.
+
+- Issue #3395: fix reference in test_multiprocessing to old debugInfo method
+
+- Issue #3312: Fix two crashes in sqlite3.
+
+- Issue #1608818: Fix misbehavior in os.listdir() if readdir() fails.
+
+- Issue #3125: Remove copy_reg in multiprocessing and replace it with
+  ForkingPickler.register() to resolve conflict with ctypes.
+
+- Issue #3090: Fixed ARCHFLAGS parsing on OS/X
+
+- Issue #3313: Fixed a crash when a failed dlopen() call does not set
+  a valid dlerror() message.
+
+- Issue #3258: Fixed a crash when a ctypes POINTER type to an
+  incomplete structure was created.
+
+- Issue #3339: dummy_thread.acquire() should not return None.
 
 - Issue #3285: Fractions from_float() and from_decimal() accept Integral arguments.
 
@@ -59,9 +283,9 @@ Library
 
 - Issue #1746: Correct handling of zipfile archive comments (previously
   archives with comments over 4k were flagged as invalid). Allow writing
-  Zip files with archives by setting the 'comment' attribute of a ZipFile.  
+  Zip files with archives by setting the 'comment' attribute of a ZipFile.
 
-- Issue #449227: The rlcompleter module now adds "(" to callable objects 
+- Issue #449227: The rlcompleter module now adds "(" to callable objects
   when completed.
 
 - Issue #3190: Pydoc now hides the automatic module attribute __package__ (the
@@ -80,6 +304,17 @@ Library
 - Issue #3094: httplib.HTTPSConnection Host: headers no longer include the
   redundant ":443" port number designation when the connection is using the
   default https port (443).
+
+- Issue #874900: after an os.fork() call the threading module state is cleaned
+  up in the child process to prevent deadlock and report proper thread counts
+  if the new process uses the threading module.
+
+Tests
+-----
+
+- test.test_support.catch_warning now keeps track of all warnings it sees
+  and is now better documented. Explicit unit tests for this context manager
+  have been added to test_warnings.
 
 Build
 -----

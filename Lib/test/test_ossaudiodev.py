@@ -6,7 +6,7 @@ from test.test_support import findfile, TestSkipped
 import errno
 import ossaudiodev
 import sys
-import sunaudio
+import sunau
 import time
 import audioop
 import unittest
@@ -22,15 +22,16 @@ except ImportError:
         AFMT_S16_NE = ossaudiodev.AFMT_S16_BE
 
 
-SND_FORMAT_MULAW_8 = 1
-
 def read_sound_file(path):
-    fp = open(path, 'rb')
-    size, enc, rate, nchannels, extra = sunaudio.gethdr(fp)
-    data = fp.read()
-    fp.close()
+    with open(path, 'rb') as fp:
+        au = sunau.open(fp)
+        rate = au.getframerate()
+        nchannels = au.getnchannels()
+        encoding = au._encoding
+        fp.seek(0)
+        data = fp.read()
 
-    if enc != SND_FORMAT_MULAW_8:
+    if encoding != sunau.AUDIO_FILE_ENCODING_MULAW_8:
         raise RuntimeError("Expect .au file with 8-bit mu-law samples")
 
     # Convert the data to 16-bit signed.
@@ -55,7 +56,7 @@ class OSSAudioDevTests(unittest.TestCase):
         dsp.fileno()
 
         # Make sure the read-only attributes work.
-        self.failUnless(dsp.close)
+        self.failIf(dsp.closed)
         self.assertEqual(dsp.name, "/dev/dsp")
         self.assertEqual(dsp.mode, "w", "bad dsp.mode: %r" % dsp.mode)
 
@@ -73,7 +74,7 @@ class OSSAudioDevTests(unittest.TestCase):
 
         # set parameters based on .au file headers
         dsp.setparameters(AFMT_S16_NE, nchannels, rate)
-        self.assertEquals("%.2f" % expected_time, "2.93")
+        self.assertTrue(abs(expected_time - 2.94) < 1e-2, expected_time)
         t1 = time.time()
         dsp.write(data)
         dsp.close()

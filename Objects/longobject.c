@@ -70,6 +70,8 @@ _PyLong_New(Py_ssize_t size)
 		return NULL;
 	}
 	/* coverity[ampersand_in_size] */
+	/* XXX(nnorwitz): This can overflow --
+           PyObject_NEW_VAR / _PyObject_VAR_SIZE need to detect overflow */
 	return PyObject_NEW_VAR(PyLongObject, &PyLong_Type, size);
 }
 
@@ -174,11 +176,13 @@ PyLong_FromDouble(double dval)
 	neg = 0;
 	if (Py_IS_INFINITY(dval)) {
 		PyErr_SetString(PyExc_OverflowError,
-			"cannot convert float infinity to long");
+			"cannot convert float infinity to integer");
 		return NULL;
 	}
 	if (Py_IS_NAN(dval)) {
-		return PyLong_FromLong(0L);
+		PyErr_SetString(PyExc_ValueError,
+			"cannot convert float NaN to integer");
+		return NULL;
 	}
 	if (dval < 0.0) {
 		neg = 1;

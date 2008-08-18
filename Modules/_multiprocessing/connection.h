@@ -129,9 +129,7 @@ connection_sendbytes(ConnectionObject *self, PyObject *args)
 		}
 	}
 
-	Py_BEGIN_ALLOW_THREADS
 	res = conn_send_string(self, buffer + offset, size);
-	Py_END_ALLOW_THREADS
 
 	if (res < 0)
 		return mp_SetError(PyExc_IOError, res);
@@ -156,10 +154,8 @@ connection_recvbytes(ConnectionObject *self, PyObject *args)
 		return NULL;
 	}
 	
-	Py_BEGIN_ALLOW_THREADS
 	res = conn_recv_string(self, self->buffer, CONNECTION_BUFFER_SIZE, 
 			       &freeme, maxlength);
-	Py_END_ALLOW_THREADS
 	
 	if (res < 0) {
 		if (res == MP_BAD_MESSAGE_LENGTH) {
@@ -191,27 +187,29 @@ connection_recvbytes_into(ConnectionObject *self, PyObject *args)
 	char *freeme = NULL, *buffer = NULL;
 	Py_ssize_t res, length, offset = 0;
 	PyObject *result = NULL;
-
-	if (!PyArg_ParseTuple(args, "w#|" F_PY_SSIZE_T, 
-			      &buffer, &length, &offset))
-		return NULL;
+	Py_buffer pbuf;
 
 	CHECK_READABLE(self);
+	
+	if (!PyArg_ParseTuple(args, "w*|" F_PY_SSIZE_T, 
+			      &pbuf, &offset))
+		return NULL;
+
+	buffer = pbuf.buf;
+	length = pbuf.len;
 
 	if (offset < 0) {
 		PyErr_SetString(PyExc_ValueError, "negative offset");
-		return NULL;
+		goto _error;
 	}   
 
 	if (offset > length) {
 		PyErr_SetString(PyExc_ValueError, "offset too large");
-		return NULL;
+		goto _error;
 	}
 
-	Py_BEGIN_ALLOW_THREADS
 	res = conn_recv_string(self, buffer+offset, length-offset, 
 			       &freeme, PY_SSIZE_T_MAX);
-	Py_END_ALLOW_THREADS
 
 	if (res < 0) {
 		if (res == MP_BAD_MESSAGE_LENGTH) {
@@ -237,11 +235,17 @@ connection_recvbytes_into(ConnectionObject *self, PyObject *args)
 				PyErr_SetObject(BufferTooShort, result);
 				Py_DECREF(result);
 			}
-			return NULL;
+			goto _error;
 		}
 	}
 
+_cleanup:
+	PyBuffer_Release(&pbuf);
 	return result;
+
+_error:
+	result = NULL;
+	goto _cleanup;
 }
 
 /*
@@ -266,9 +270,7 @@ connection_send_obj(ConnectionObject *self, PyObject *obj)
 	if (PyString_AsStringAndSize(pickled_string, &buffer, &length) < 0)
 		goto failure;
 
-	Py_BEGIN_ALLOW_THREADS
 	res = conn_send_string(self, buffer, (int)length);
-	Py_END_ALLOW_THREADS
 
 	if (res < 0) {
 		mp_SetError(PyExc_IOError, res);
@@ -292,10 +294,8 @@ connection_recv_obj(ConnectionObject *self)
 
 	CHECK_READABLE(self);
 
-	Py_BEGIN_ALLOW_THREADS
 	res = conn_recv_string(self, self->buffer, CONNECTION_BUFFER_SIZE, 
 			       &freeme, PY_SSIZE_T_MAX);
-	Py_END_ALLOW_THREADS
 
 	if (res < 0) {
 		if (res == MP_BAD_MESSAGE_LENGTH) {

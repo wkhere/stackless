@@ -2160,6 +2160,7 @@ get_parent(PyObject *globals, char *buf, Py_ssize_t *p_buflen, int level)
 	static PyObject *pathstr = NULL;
 	static PyObject *pkgstr = NULL;
 	PyObject *pkgname, *modname, *modpath, *modules, *parent;
+	int orig_level = level;
 
 	if (globals == NULL || !PyDict_Check(globals) || !level)
 		return Py_None;
@@ -2285,9 +2286,27 @@ get_parent(PyObject *globals, char *buf, Py_ssize_t *p_buflen, int level)
 
 	modules = PyImport_GetModuleDict();
 	parent = PyDict_GetItemString(modules, buf);
-	if (parent == NULL)
-		PyErr_Format(PyExc_SystemError,
-				"Parent module '%.200s' not loaded", buf);
+	if (parent == NULL) {
+		if (orig_level < 1) {
+			PyObject *err_msg = PyString_FromFormat(
+				"Parent module '%.200s' not found "
+				"while handling absolute import", buf);
+			if (err_msg == NULL) {
+				return NULL;
+			}
+			if (!PyErr_WarnEx(PyExc_RuntimeWarning,
+					PyString_AsString(err_msg), 1)) {
+				*buf = '\0';
+				*p_buflen = 0;
+				parent = Py_None;
+			}
+			Py_DECREF(err_msg);
+		} else {
+			PyErr_Format(PyExc_SystemError,
+				"Parent module '%.200s' not loaded, "
+				"cannot perform relative import", buf);
+		}
+	}
 	return parent;
 	/* We expect, but can't guarantee, if parent != None, that:
 	   - parent.__name__ == buf
@@ -3011,11 +3030,23 @@ imp_new_module(PyObject *self, PyObject *args)
 	return PyModule_New(name);
 }
 
+static PyObject *
+imp_reload(PyObject *self, PyObject *v)
+{
+	return PyImport_ReloadModule(v);
+}
+
+
 /* Doc strings */
 
 PyDoc_STRVAR(doc_imp,
 "This module provides the components needed to build your own\n\
 __import__ function.  Undocumented functions are obsolete.");
+
+PyDoc_STRVAR(doc_reload,
+"reload(module) -> module\n\
+\n\
+Reload the module.  The module must have been successfully imported before.");
 
 PyDoc_STRVAR(doc_find_module,
 "find_module(name, [path]) -> (file, filename, (suffix, mode, type))\n\
@@ -3061,6 +3092,7 @@ Release the interpreter's import lock.\n\
 On platforms without threads, this function does nothing.");
 
 static PyMethodDef imp_methods[] = {
+	{"reload",	 imp_reload,	   METH_O,	 doc_reload},
 	{"find_module",	 imp_find_module,  METH_VARARGS, doc_find_module},
 	{"get_magic",	 imp_get_magic,	   METH_NOARGS,  doc_get_magic},
 	{"get_suffixes", imp_get_suffixes, METH_NOARGS,  doc_get_suffixes},

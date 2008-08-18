@@ -386,6 +386,11 @@ StructUnionType_new(PyTypeObject *type, PyObject *args, PyObject *kwds, int isSt
 	}
 	Py_DECREF(result->tp_dict);
 	result->tp_dict = (PyObject *)dict;
+	dict->format = alloc_format_string(NULL, "B");
+	if (dict->format == NULL) {
+		Py_DECREF(result);
+		return NULL;
+	}
 
 	dict->paramfunc = StructUnionType_paramfunc;
 
@@ -907,7 +912,13 @@ PointerType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (proto) {
 		StgDictObject *itemdict = PyType_stgdict(proto);
 		assert(itemdict);
-		stgdict->format = alloc_format_string("&", itemdict->format);
+		/* If itemdict->format is NULL, then this is a pointer to an
+		   incomplete type.  We create a generic format string
+		   'pointer to bytes' in this case.  XXX Better would be to
+		   fix the format string later...
+		*/
+		stgdict->format = alloc_format_string("&",
+			      itemdict->format ? itemdict->format : "B");
 		if (stgdict->format == NULL) {
 			Py_DECREF((PyObject *)stgdict);
 			return NULL;
@@ -1852,8 +1863,8 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 	if (PyString_Check(proto)) {
-		proto_str = PyBytes_AS_STRING(proto);
-		proto_len = PyBytes_GET_SIZE(proto);
+		proto_str = PyString_AS_STRING(proto);
+		proto_len = PyString_GET_SIZE(proto);
 	} else {
 		PyErr_SetString(PyExc_TypeError,
 			"class must define a '_type_' string attribute");
@@ -2495,6 +2506,7 @@ static PyMemberDef CData_members[] = {
 	{ NULL },
 };
 
+#if (PY_VERSION_HEX >= 0x02060000)
 static int CData_NewGetBuffer(PyObject *_self, Py_buffer *view, int flags)
 {
 	CDataObject *self = (CDataObject *)_self;
@@ -2504,6 +2516,8 @@ static int CData_NewGetBuffer(PyObject *_self, Py_buffer *view, int flags)
 	if (view == NULL) return 0;
 
 	view->buf = self->b_ptr;
+	view->obj = _self;
+	Py_INCREF(_self);
 	view->len = self->b_size;
 	view->readonly = 0;
 	/* use default format character if not set */
@@ -2519,6 +2533,7 @@ static int CData_NewGetBuffer(PyObject *_self, Py_buffer *view, int flags)
 	view->internal = NULL;
 	return 0;
 }
+#endif
 
 static Py_ssize_t CData_GetSegcount(PyObject *_self, Py_ssize_t *lenp)
 {
@@ -2543,8 +2558,10 @@ static PyBufferProcs CData_as_buffer = {
 	(writebufferproc)CData_GetBuffer,
 	(segcountproc)CData_GetSegcount,
 	(charbufferproc)NULL,
+#if (PY_VERSION_HEX >= 0x02060000)
 	(getbufferproc)CData_NewGetBuffer,
 	(releasebufferproc)NULL,
+#endif
 };
 
 /*

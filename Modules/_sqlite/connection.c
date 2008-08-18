@@ -940,6 +940,7 @@ static int pysqlite_connection_set_isolation_level(pysqlite_Connection* self, Py
 {
     PyObject* res;
     PyObject* begin_statement;
+    char* begin_statement_str;
 
     Py_XDECREF(self->isolation_level);
 
@@ -972,12 +973,18 @@ static int pysqlite_connection_set_isolation_level(pysqlite_Connection* self, Py
             return -1;
         }
 
-        self->begin_statement = PyMem_Malloc(PyString_Size(begin_statement) + 2);
+        begin_statement_str = PyString_AsString(begin_statement);
+        if (!begin_statement_str) {
+            Py_DECREF(begin_statement);
+            return -1;
+        }
+        self->begin_statement = PyMem_Malloc(strlen(begin_statement_str) + 2);
         if (!self->begin_statement) {
+            Py_DECREF(begin_statement);
             return -1;
         }
 
-        strcpy(self->begin_statement, PyString_AsString(begin_statement));
+        strcpy(self->begin_statement, begin_statement_str);
         Py_DECREF(begin_statement);
     }
 
@@ -1014,19 +1021,16 @@ PyObject* pysqlite_connection_call(pysqlite_Connection* self, PyObject* args, Py
             _pysqlite_seterror(self->db, NULL);
         }
 
-        Py_DECREF(statement);
-        statement = 0;
+        Py_CLEAR(statement);
     } else {
         weakref = PyWeakref_NewRef((PyObject*)statement, NULL);
         if (!weakref) {
-            Py_DECREF(statement);
-            statement = 0;
+            Py_CLEAR(statement);
             goto error;
         }
 
         if (PyList_Append(self->statements, weakref) != 0) {
-            Py_DECREF(weakref);
-            statement = 0;
+            Py_CLEAR(weakref);
             goto error;
         }
 
@@ -1050,15 +1054,13 @@ PyObject* pysqlite_connection_execute(pysqlite_Connection* self, PyObject* args,
 
     method = PyObject_GetAttrString(cursor, "execute");
     if (!method) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
         goto error;
     }
 
     result = PyObject_CallObject(method, args);
     if (!result) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
     }
 
 error:
@@ -1081,15 +1083,13 @@ PyObject* pysqlite_connection_executemany(pysqlite_Connection* self, PyObject* a
 
     method = PyObject_GetAttrString(cursor, "executemany");
     if (!method) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
         goto error;
     }
 
     result = PyObject_CallObject(method, args);
     if (!result) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
     }
 
 error:
@@ -1112,15 +1112,13 @@ PyObject* pysqlite_connection_executescript(pysqlite_Connection* self, PyObject*
 
     method = PyObject_GetAttrString(cursor, "executescript");
     if (!method) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
         goto error;
     }
 
     result = PyObject_CallObject(method, args);
     if (!result) {
-        Py_DECREF(cursor);
-        cursor = 0;
+        Py_CLEAR(cursor);
     }
 
 error:

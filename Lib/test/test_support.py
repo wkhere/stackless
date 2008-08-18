@@ -8,7 +8,6 @@ import errno
 import socket
 import sys
 import os
-import os.path
 import shutil
 import warnings
 import unittest
@@ -20,7 +19,7 @@ __all__ = ["Error", "TestFailed", "TestSkipped", "ResourceDenied", "import_modul
            "fcmp", "have_unicode", "is_jython", "TESTFN", "HOST", "FUZZ",
            "findfile", "verify", "vereq", "sortdict", "check_syntax_error",
            "open_urlresource", "WarningMessage", "catch_warning", "CleanImport",
-           "EnvironmentVarGuard", "TransientResource", "captured_output",
+           "EnvironmentVarGuard", "captured_output",
            "captured_stdout", "TransientResource", "transient_internet",
            "run_with_locale", "set_memlimit", "bigmemtest", "bigaddrspacetest",
            "BasicTestRunner", "run_unittest", "run_doctest", "threading_setup",
@@ -68,6 +67,7 @@ verbose = 1              # Flag set to 0 by regrtest.py
 use_resources = None     # Flag set to [] by regrtest.py
 max_memuse = 0           # Disable bigmem tests (they will still be run with
                          # small sizes, to make sure they work.)
+real_max_memuse = 0
 
 # _original_stdout is meant to hold stdout at the time regrtest began.
 # This may be "the real" stdout, or IDLE's emulation of stdout, or whatever.
@@ -225,21 +225,20 @@ def bind_port(sock, host=HOST):
 FUZZ = 1e-6
 
 def fcmp(x, y): # fuzzy comparison function
-    if type(x) == type(0.0) or type(y) == type(0.0):
+    if isinstance(x, float) or isinstance(y, float):
         try:
-            x, y = coerce(x, y)
             fuzz = (abs(x) + abs(y)) * FUZZ
             if abs(x-y) <= fuzz:
                 return 0
         except:
             pass
-    elif type(x) == type(y) and type(x) in (type(()), type([])):
+    elif type(x) == type(y) and isinstance(x, (tuple, list)):
         for i in range(min(len(x), len(y))):
             outcome = fcmp(x[i], y[i])
             if outcome != 0:
                 return outcome
-        return cmp(len(x), len(y))
-    return cmp(x, y)
+        return (len(x) > len(y)) - (len(x) < len(y))
+    return (x > y) - (x < y)
 
 try:
     unicode
@@ -383,36 +382,49 @@ def open_urlresource(url):
 
 
 class WarningMessage(object):
-    "Holds the result of the latest showwarning() call"
-    def __init__(self):
-        self.message = None
-        self.category = None
-        self.filename = None
-        self.lineno = None
-
-    def _showwarning(self, message, category, filename, lineno, file=None,
-                        line=None):
-        self.message = message
-        self.category = category
-        self.filename = filename
-        self.lineno = lineno
-        self.line = line
-
-    def reset(self):
-        self._showwarning(*((None,)*6))
+    "Holds the result of a single showwarning() call"
+    _WARNING_DETAILS = "message category filename lineno line".split()
+    def __init__(self, message, category, filename, lineno, line=None):
+        for attr in self._WARNING_DETAILS:
+            setattr(self, attr, locals()[attr])
+        self._category_name = category.__name__ if category else None
 
     def __str__(self):
         return ("{message : %r, category : %r, filename : %r, lineno : %s, "
-                    "line : %r}" % (self.message,
-                            self.category.__name__ if self.category else None,
-                            self.filename, self.lineno, self.line))
+                    "line : %r}" % (self.message, self._category_name,
+                                    self.filename, self.lineno, self.line))
 
+class WarningRecorder(object):
+    "Records the result of any showwarning calls"
+    def __init__(self):
+        self.warnings = []
+        self._set_last(None)
+
+    def _showwarning(self, message, category, filename, lineno,
+                    file=None, line=None):
+        wm = WarningMessage(message, category, filename, lineno, line)
+        self.warnings.append(wm)
+        self._set_last(wm)
+
+    def _set_last(self, last_warning):
+        if last_warning is None:
+            for attr in WarningMessage._WARNING_DETAILS:
+                setattr(self, attr, None)
+        else:
+            for attr in WarningMessage._WARNING_DETAILS:
+                setattr(self, attr, getattr(last_warning, attr))
+
+    def reset(self):
+        self.warnings = []
+        self._set_last(None)
+
+    def __str__(self):
+        return '[%s]' % (', '.join(map(str, self.warnings)))
 
 @contextlib.contextmanager
 def catch_warning(module=warnings, record=True):
-    """
-    Guard the warnings filter from being permanently changed and record the
-    data of the last warning that has been issued.
+    """Guard the warnings filter from being permanently changed and
+    optionally record the details of any warnings that are issued.
 
     Use like this:
 
@@ -420,13 +432,17 @@ def catch_warning(module=warnings, record=True):
             warnings.warn("foo")
             assert str(w.message) == "foo"
     """
-    original_filters = module.filters[:]
+    original_filters = module.filters
     original_showwarning = module.showwarning
     if record:
-        warning_obj = WarningMessage()
-        module.showwarning = warning_obj._showwarning
+        recorder = WarningRecorder()
+        module.showwarning = recorder._showwarning
+    else:
+        recorder = None
     try:
-        yield warning_obj if record else None
+        # Replace the filters with a copy of the original
+        module.filters = module.filters[:]
+        yield recorder
     finally:
         module.showwarning = original_showwarning
         module.filters = original_filters
@@ -436,7 +452,7 @@ class CleanImport(object):
     """Context manager to force import to return a new module reference.
 
     This is useful for testing module-level behaviours, such as
-    the emission of a DepreciationWarning on import.
+    the emission of a DeprecationWarning on import.
 
     Use like this:
 
@@ -596,12 +612,14 @@ def run_with_locale(catstr, *locales):
 _1M = 1024*1024
 _1G = 1024 * _1M
 _2G = 2 * _1G
+_4G = 4 * _1G
 
 MAX_Py_ssize_t = sys.maxsize
 
 def set_memlimit(limit):
     import re
     global max_memuse
+    global real_max_memuse
     sizes = {
         'k': 1024,
         'm': _1M,
@@ -613,6 +631,7 @@ def set_memlimit(limit):
     if m is None:
         raise ValueError('Invalid memory limit %r' % (limit,))
     memlimit = int(float(m.group(1)) * sizes[m.group(3).lower()])
+    real_max_memuse = memlimit
     if memlimit > MAX_Py_ssize_t:
         memlimit = MAX_Py_ssize_t
     if memlimit < _2G - 1:
@@ -653,6 +672,27 @@ def bigmemtest(minsize, memuse, overhead=5*_1M):
                 maxsize = max(maxsize - 50 * _1M, minsize)
             return f(self, maxsize)
         wrapper.minsize = minsize
+        wrapper.memuse = memuse
+        wrapper.overhead = overhead
+        return wrapper
+    return decorator
+
+def precisionbigmemtest(size, memuse, overhead=5*_1M):
+    def decorator(f):
+        def wrapper(self):
+            if not real_max_memuse:
+                maxsize = 5147
+            else:
+                maxsize = size
+
+                if real_max_memuse and real_max_memuse < maxsize * memuse:
+                    if verbose:
+                        sys.stderr.write("Skipping %s because of memory "
+                                         "constraint\n" % (f.__name__,))
+                    return
+
+            return f(self, maxsize)
+        wrapper.size = size
         wrapper.memuse = memuse
         wrapper.overhead = overhead
         return wrapper

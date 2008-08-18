@@ -38,9 +38,10 @@ This module defines one class called :class:`Popen`:
 
    Arguments are:
 
-   *args* should be a string, or a sequence of program arguments.  The program to
-   execute is normally the first item in the args sequence or string, but can be
-   explicitly set by using the executable argument.
+   *args* should be a string, or a sequence of program arguments.  The program
+   to execute is normally the first item in the args sequence or the string if a
+   string is given, but can be explicitly set by using the *executable*
+   argument.
 
    On Unix, with *shell=False* (default): In this case, the Popen class uses
    :meth:`os.execvp` to execute the child program. *args* should normally be a
@@ -192,6 +193,12 @@ Instances of the :class:`Popen` class have the following methods:
    Wait for child process to terminate.  Set and return :attr:`returncode`
    attribute.
 
+   .. warning::
+
+      This will deadlock if the child process generates enough output to a
+      stdout or stderr pipe such that it blocks waiting for the OS pipe buffer
+      to accept more data.  Use :meth:`communicate` to avoid that.
+
 
 .. method:: Popen.communicate(input=None)
 
@@ -243,6 +250,14 @@ Instances of the :class:`Popen` class have the following methods:
 
 
 The following attributes are also available:
+
+.. warning::
+
+   Use :meth:`communicate` rather than :meth:`.stdin.write`,
+   :meth:`.stdout.read` or :meth:`.stderr.read` to avoid deadlocks due
+   to any of the other OS pipe buffers filling up and blocking the child
+   process.
+
 
 .. attribute:: Popen.stdin
 

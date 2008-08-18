@@ -245,7 +245,7 @@ class Node(xml.dom.Node):
         except AttributeError:
             d = {}
             self._user_data = d
-        if d.has_key(key):
+        if key in d:
             old = d[key][0]
         if data is None:
             # ignore handlers passed for None
@@ -516,6 +516,7 @@ class NamedNodeMap(object):
 
     __len__ = _get_length
 
+    __hash__ = None # Mutable type can't be correctly hashed
     def __cmp__(self, other):
         if self._attrs is getattr(other, "_attrs", None):
             return 0
@@ -562,7 +563,7 @@ class NamedNodeMap(object):
             _clear_id_cache(self._ownerElement)
             del self._attrs[n.nodeName]
             del self._attrsNS[(n.namespaceURI, n.localName)]
-            if n.__dict__.has_key('ownerElement'):
+            if 'ownerElement' in n.__dict__:
                 n.__dict__['ownerElement'] = None
             return n
         else:
@@ -574,7 +575,7 @@ class NamedNodeMap(object):
             _clear_id_cache(self._ownerElement)
             del self._attrsNS[(n.namespaceURI, n.localName)]
             del self._attrs[n.nodeName]
-            if n.__dict__.has_key('ownerElement'):
+            if 'ownerElement' in n.__dict__:
                 n.__dict__['ownerElement'] = None
             return n
         else:
@@ -1664,7 +1665,7 @@ class Document(Node, DocumentLS):
         return n
 
     def getElementById(self, id):
-        if self._id_cache.has_key(id):
+        if id in self._id_cache:
             return self._id_cache[id]
         if not (self._elem_info or self._magic_id_count):
             return None

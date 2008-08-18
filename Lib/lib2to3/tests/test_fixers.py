@@ -11,6 +11,7 @@ except ImportError:
 # Python imports
 import unittest
 from itertools import chain
+from operator import itemgetter
 from os.path import dirname, pathsep
 
 # Local imports
@@ -28,8 +29,10 @@ class Options:
         self.verbose = False
 
 class FixerTestCase(support.TestCase):
-    def setUp(self):
-        options = Options(fix=[self.fixer], print_function=False)
+    def setUp(self, fix_list=None):
+        if not fix_list:
+            fix_list = [self.fixer]
+        options = Options(fix=fix_list, print_function=False)
         self.refactor = refactor.RefactoringTool("lib2to3/fixes", options)
         self.fixer_log = []
         self.filename = "<string>"
@@ -1410,7 +1413,7 @@ class Test_imports(FixerTestCase):
     from ..fixes.fix_imports import MAPPING as modules
 
     def test_import_module(self):
-        for old, (new, members) in self.modules.items():
+        for old, new in self.modules.items():
             b = "import %s" % old
             a = "import %s" % new
             self.check(b, a)
@@ -1420,24 +1423,17 @@ class Test_imports(FixerTestCase):
             self.check(b, a)
 
     def test_import_from(self):
-        for old, (new, members) in self.modules.items():
-            for member in members:
-                b = "from %s import %s" % (old, member)
-                a = "from %s import %s" % (new, member)
-                self.check(b, a)
-
-                s = "from foo import %s" % member
-                self.unchanged(s)
-
-            b = "from %s import %s" % (old, ", ".join(members))
-            a = "from %s import %s" % (new, ", ".join(members))
+        for old, new in self.modules.items():
+            b = "from %s import foo" % old
+            a = "from %s import foo" % new
             self.check(b, a)
 
-            s = "from foo import %s" % ", ".join(members)
-            self.unchanged(s)
+            b = "from %s import foo, bar" % old
+            a = "from %s import foo, bar" % new
+            self.check(b, a)
 
     def test_import_module_as(self):
-        for old, (new, members) in self.modules.items():
+        for old, new in self.modules.items():
             b = "import %s as foo_bar" % old
             a = "import %s as foo_bar" % new
             self.check(b, a)
@@ -1447,11 +1443,96 @@ class Test_imports(FixerTestCase):
             self.check(b, a)
 
     def test_import_from_as(self):
-        for old, (new, members) in self.modules.items():
-            for member in members:
-                b = "from %s import %s as foo_bar" % (old, member)
-                a = "from %s import %s as foo_bar" % (new, member)
+        for old, new in self.modules.items():
+            b = "from %s import foo as bar" % old
+            a = "from %s import foo as bar" % new
+            self.check(b, a)
+
+    def test_star(self):
+        for old, new in self.modules.items():
+            b = "from %s import *" % old
+            a = "from %s import *" % new
+            self.check(b, a)
+
+    def test_import_module_usage(self):
+        for old, new in self.modules.items():
+            b = """
+                import %s
+                foo(%s.bar)
+                """ % (old, old)
+            a = """
+                import %s
+                foo(%s.bar)
+                """ % (new, new)
+            self.check(b, a)
+
+
+class Test_imports2(Test_imports):
+    fixer = "imports2"
+    from ..fixes.fix_imports2 import MAPPING as modules
+
+
+class Test_imports_fixer_order(Test_imports):
+
+    fixer = None
+
+    def setUp(self):
+        Test_imports.setUp(self, ['imports', 'imports2'])
+        from ..fixes.fix_imports2 import MAPPING as mapping2
+        self.modules = mapping2.copy()
+        from ..fixes.fix_imports import MAPPING as mapping1
+        for key in ('dbhash', 'dumbdbm', 'dbm', 'gdbm'):
+            self.modules[key] = mapping1[key]
+
+
+class Test_urllib(FixerTestCase):
+    fixer = "urllib"
+    from ..fixes.fix_urllib import MAPPING as modules
+
+    def test_import_module(self):
+        for old, changes in self.modules.items():
+            b = "import %s" % old
+            a = "import %s" % ", ".join(map(itemgetter(0), changes))
+            self.check(b, a)
+
+    def test_import_from(self):
+        for old, changes in self.modules.items():
+            all_members = []
+            for new, members in changes:
+                for member in members:
+                    all_members.append(member)
+                    b = "from %s import %s" % (old, member)
+                    a = "from %s import %s" % (new, member)
+                    self.check(b, a)
+
+                    s = "from foo import %s" % member
+                    self.unchanged(s)
+
+                b = "from %s import %s" % (old, ", ".join(members))
+                a = "from %s import %s" % (new, ", ".join(members))
                 self.check(b, a)
+
+                s = "from foo import %s" % ", ".join(members)
+                self.unchanged(s)
+
+            # test the breaking of a module into multiple replacements
+            b = "from %s import %s" % (old, ", ".join(all_members))
+            a = "\n".join(["from %s import %s" % (new, ", ".join(members))
+                            for (new, members) in changes])
+            self.check(b, a)
+
+    def test_import_module_as(self):
+        for old in self.modules:
+            s = "import %s as foo" % old
+            self.warns_unchanged(s, "This module is now multiple modules")
+
+    def test_import_from_as(self):
+        for old, changes in self.modules.items():
+            for new, members in changes:
+                for member in members:
+                    b = "from %s import %s as foo_bar" % (old, member)
+                    a = "from %s import %s as foo_bar" % (new, member)
+                    self.check(b, a)
 
     def test_star(self):
         for old in self.modules:
@@ -1459,39 +1540,20 @@ class Test_imports(FixerTestCase):
             self.warns_unchanged(s, "Cannot handle star imports")
 
     def test_import_module_usage(self):
-        for old, (new, members) in self.modules.items():
-            for member in members:
-                b = """
-                    import %s
-                    foo(%s, %s.%s)
-                    """ % (old, old, old, member)
-                a = """
-                    import %s
-                    foo(%s, %s.%s)
-                    """ % (new, new, new, member)
-                self.check(b, a)
-
-    def test_from_import_usage(self):
-        for old, (new, members) in self.modules.items():
-            for member in members:
-                b = """
-                    from %s import %s
-                    foo(%s, %s())
-                    """ % (old, member, member, member)
-                a = """
-                    from %s import %s
-                    foo(%s, %s())
-                    """ % (new, member, member, member)
-                self.check(b, a)
-            b = """
-                from %s import %s
-                foo(%s)
-                """ % (old, ", ".join(members), ", ".join(members))
-            a = """
-                from %s import %s
-                foo(%s)
-                """ % (new, ", ".join(members), ", ".join(members))
-            self.check(b, a)
+        for old, changes in self.modules.items():
+            for new, members in changes:
+                for member in members:
+                    b = """
+                        import %s
+                        foo(%s.%s)
+                        """ % (old, old, member)
+                    a = """
+                        import %s
+                        foo(%s.%s)
+                        """ % (", ".join([n for (n, mems)
+                                           in self.modules[old]]),
+                                         new, member)
+                    self.check(b, a)
 
 
 class Test_input(FixerTestCase):
@@ -3255,6 +3317,17 @@ class Test_import(FixerTestCase):
     def test_dotted_import_as(self):
         b = "import foo.bar as bang"
         a = "from . import foo.bar as bang"
+        self.check_both(b, a)
+
+    def test_prefix(self):
+        b = """
+        # prefix
+        import foo.bar
+        """
+        a = """
+        # prefix
+        from . import foo.bar
+        """
         self.check_both(b, a)
 
 

@@ -1064,6 +1064,7 @@ class BuiltinTest(unittest.TestCase):
         class badzero(int):
             def __cmp__(self, other):
                 raise RuntimeError
+            __hash__ = None # Invalid cmp makes this unhashable
         self.assertRaises(RuntimeError, range, a, a + 1, badzero(1))
 
         # Reject floats when it would require PyLongs to represent.
@@ -1297,6 +1298,7 @@ class BuiltinTest(unittest.TestCase):
             )
             self.assertRaises(ValueError, unichr, sys.maxunicode+1)
             self.assertRaises(TypeError, unichr)
+            self.assertRaises((OverflowError, ValueError), unichr, 2**32)
 
     # We don't want self in vars(), so these are static methods
 

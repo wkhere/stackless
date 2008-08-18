@@ -173,16 +173,18 @@ def urlsplit(url, scheme='', allow_fragments=True):
     _parse_cache[key] = v
     return v
 
-def urlunparse((scheme, netloc, url, params, query, fragment)):
+def urlunparse(data):
     """Put a parsed URL back together again.  This may result in a
     slightly different, but equivalent URL, if the URL that was parsed
     originally had redundant delimiters, e.g. a ? with an empty query
     (the draft states that these are equivalent)."""
+    scheme, netloc, url, params, query, fragment = data
     if params:
         url = "%s;%s" % (url, params)
     return urlunsplit((scheme, netloc, url, query, fragment))
 
-def urlunsplit((scheme, netloc, url, query, fragment)):
+def urlunsplit(data):
+    scheme, netloc, url, query, fragment = data
     if netloc or (scheme and scheme in uses_netloc and url[:2] != '//'):
         if url and url[:1] != '/': url = '/' + url
         url = '//' + (netloc or '') + url
@@ -215,9 +217,18 @@ def urljoin(base, url, allow_fragments=True):
     if path[:1] == '/':
         return urlunparse((scheme, netloc, path,
                            params, query, fragment))
-    if not (path or params or query):
-        return urlunparse((scheme, netloc, bpath,
-                           bparams, bquery, fragment))
+    if not path:
+        path = bpath
+        if not params:
+            params = bparams
+        else:
+            path = path[:-1]
+            return urlunparse((scheme, netloc, path,
+                                params, query, fragment))
+        if not query:
+            query = bquery
+        return urlunparse((scheme, netloc, path,
+                           params, query, fragment))
     segments = bpath.split('/')[:-1] + path.split('/')
     # XXX The stuff below is bogus in various ways...
     if segments[-1] == '.':

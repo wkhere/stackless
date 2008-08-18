@@ -59,10 +59,9 @@ __all__ = ["BlockingIOError", "open", "IOBase", "RawIOBase", "FileIO",
 
 import os
 import abc
-import sys
 import codecs
 import _fileio
-import warnings
+import threading
 
 # open() uses st_blksize whenever we can
 DEFAULT_BUFFER_SIZE = 8 * 1024  # bytes
@@ -906,8 +905,13 @@ class BufferedReader(_BufferedIOMixin):
         """
         raw._checkReadable()
         _BufferedIOMixin.__init__(self, raw)
-        self._read_buf = b""
         self.buffer_size = buffer_size
+        self._reset_read_buf()
+        self._read_lock = threading.Lock()
+
+    def _reset_read_buf(self):
+        self._read_buf = b""
+        self._read_pos = 0
 
     def read(self, n=None):
         """Read n bytes.
@@ -917,25 +921,54 @@ class BufferedReader(_BufferedIOMixin):
         mode. If n is negative, read until EOF or until read() would
         block.
         """
-        if n is None:
-            n = -1
+        with self._read_lock:
+            return self._read_unlocked(n)
+
+    def _read_unlocked(self, n=None):
         nodata_val = b""
-        while n < 0 or len(self._read_buf) < n:
-            to_read = max(self.buffer_size,
-                          n if n is not None else 2*len(self._read_buf))
-            current = self.raw.read(to_read)
-            if current in (b"", None):
-                nodata_val = current
+        empty_values = (b"", None)
+        buf = self._read_buf
+        pos = self._read_pos
+
+        # Special case for when the number of bytes to read is unspecified.
+        if n is None or n == -1:
+            self._reset_read_buf()
+            chunks = [buf[pos:]]  # Strip the consumed bytes.
+            current_size = 0
+            while True:
+                # Read until EOF or until read() would block.
+                chunk = self.raw.read()
+                if chunk in empty_values:
+                    nodata_val = chunk
+                    break
+                current_size += len(chunk)
+                chunks.append(chunk)
+            return b"".join(chunks) or nodata_val
+
+        # The number of bytes to read is specified, return at most n bytes.
+        avail = len(buf) - pos  # Length of the available buffered data.
+        if n <= avail:
+            # Fast path: the data to read is fully buffered.
+            self._read_pos += n
+            return buf[pos:pos+n]
+        # Slow path: read from the stream until enough bytes are read,
+        # or until an EOF occurs or until read() would block.
+        chunks = [buf[pos:]]
+        wanted = max(self.buffer_size, n)
+        while avail < n:
+            chunk = self.raw.read(wanted)
+            if chunk in empty_values:
+                nodata_val = chunk
                 break
-            self._read_buf += current
-        if self._read_buf:
-            if n < 0:
-                n = len(self._read_buf)
-            out = self._read_buf[:n]
-            self._read_buf = self._read_buf[n:]
-        else:
-            out = nodata_val
-        return out
+            avail += len(chunk)
+            chunks.append(chunk)
+        # n is more then avail only when an EOF occurred or when
+        # read() would have blocked.
+        n = min(n, avail)
+        out = b"".join(chunks)
+        self._read_buf = out[n:]  # Save the extra data in the buffer.
+        self._read_pos = 0
+        return out[:n] if out else nodata_val
 
     def peek(self, n=0):
         """Returns buffered bytes without advancing the position.
@@ -944,14 +977,19 @@ class BufferedReader(_BufferedIOMixin):
         do at most one raw read to satisfy it.  We never return more
         than self.buffer_size.
         """
+        with self._read_lock:
+            return self._peek_unlocked(n)
+
+    def _peek_unlocked(self, n=0):
         want = min(n, self.buffer_size)
-        have = len(self._read_buf)
+        have = len(self._read_buf) - self._read_pos
         if have < want:
             to_read = self.buffer_size - have
             current = self.raw.read(to_read)
             if current:
-                self._read_buf += current
-        return self._read_buf
+                self._read_buf = self._read_buf[self._read_pos:] + current
+                self._read_pos = 0
+        return self._read_buf[self._read_pos:]
 
     def read1(self, n):
         """Reads up to n bytes, with at most one read() system call."""
@@ -959,18 +997,21 @@ class BufferedReader(_BufferedIOMixin):
         # only return buffered bytes.  Otherwise, we do one raw read.
         if n <= 0:
             return b""
-        self.peek(1)
-        return self.read(min(n, len(self._read_buf)))
+        with self._read_lock:
+            self._peek_unlocked(1)
+            return self._read_unlocked(
+                min(n, len(self._read_buf) - self._read_pos))
 
     def tell(self):
-        return self.raw.tell() - len(self._read_buf)
+        return self.raw.tell() - len(self._read_buf) + self._read_pos
 
     def seek(self, pos, whence=0):
-        if whence == 1:
-            pos -= len(self._read_buf)
-        pos = self.raw.seek(pos, whence)
-        self._read_buf = b""
-        return pos
+        with self._read_lock:
+            if whence == 1:
+                pos -= len(self._read_buf) - self._read_pos
+            pos = self.raw.seek(pos, whence)
+            self._reset_read_buf()
+            return pos
 
 
 class BufferedWriter(_BufferedIOMixin):
@@ -992,43 +1033,51 @@ class BufferedWriter(_BufferedIOMixin):
                                 if max_buffer_size is None
                                 else max_buffer_size)
         self._write_buf = bytearray()
+        self._write_lock = threading.Lock()
 
     def write(self, b):
         if self.closed:
             raise ValueError("write to closed file")
         if isinstance(b, unicode):
             raise TypeError("can't write unicode to binary stream")
-        # XXX we can implement some more tricks to try and avoid partial writes
-        if len(self._write_buf) > self.buffer_size:
-            # We're full, so let's pre-flush the buffer
-            try:
-                self.flush()
-            except BlockingIOError as e:
-                # We can't accept anything else.
-                # XXX Why not just let the exception pass through?
-                raise BlockingIOError(e.errno, e.strerror, 0)
-        before = len(self._write_buf)
-        self._write_buf.extend(b)
-        written = len(self._write_buf) - before
-        if len(self._write_buf) > self.buffer_size:
-            try:
-                self.flush()
-            except BlockingIOError as e:
-                if (len(self._write_buf) > self.max_buffer_size):
-                    # We've hit max_buffer_size. We have to accept a partial
-                    # write and cut back our buffer.
-                    overage = len(self._write_buf) - self.max_buffer_size
-                    self._write_buf = self._write_buf[:self.max_buffer_size]
-                    raise BlockingIOError(e.errno, e.strerror, overage)
-        return written
+        with self._write_lock:
+            # XXX we can implement some more tricks to try and avoid
+            # partial writes
+            if len(self._write_buf) > self.buffer_size:
+                # We're full, so let's pre-flush the buffer
+                try:
+                    self._flush_unlocked()
+                except BlockingIOError as e:
+                    # We can't accept anything else.
+                    # XXX Why not just let the exception pass through?
+                    raise BlockingIOError(e.errno, e.strerror, 0)
+            before = len(self._write_buf)
+            self._write_buf.extend(b)
+            written = len(self._write_buf) - before
+            if len(self._write_buf) > self.buffer_size:
+                try:
+                    self._flush_unlocked()
+                except BlockingIOError as e:
+                    if len(self._write_buf) > self.max_buffer_size:
+                        # We've hit max_buffer_size. We have to accept a
+                        # partial write and cut back our buffer.
+                        overage = len(self._write_buf) - self.max_buffer_size
+                        self._write_buf = self._write_buf[:self.max_buffer_size]
+                        raise BlockingIOError(e.errno, e.strerror, overage)
+            return written
 
     def truncate(self, pos=None):
-        self.flush()
-        if pos is None:
-            pos = self.raw.tell()
-        return self.raw.truncate(pos)
+        with self._write_lock:
+            self._flush_unlocked()
+            if pos is None:
+                pos = self.raw.tell()
+            return self.raw.truncate(pos)
 
     def flush(self):
+        with self._write_lock:
+            self._flush_unlocked()
+
+    def _flush_unlocked(self):
         if self.closed:
             raise ValueError("flush of closed file")
         written = 0
@@ -1047,8 +1096,9 @@ class BufferedWriter(_BufferedIOMixin):
         return self.raw.tell() + len(self._write_buf)
 
     def seek(self, pos, whence=0):
-        self.flush()
-        return self.raw.seek(pos, whence)
+        with self._write_lock:
+            self._flush_unlocked()
+            return self.raw.seek(pos, whence)
 
 
 class BufferedRWPair(BufferedIOBase):
@@ -1138,14 +1188,15 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         # First do the raw seek, then empty the read buffer, so that
         # if the raw seek fails, we don't lose buffered data forever.
         pos = self.raw.seek(pos, whence)
-        self._read_buf = b""
+        with self._read_lock:
+            self._reset_read_buf()
         return pos
 
     def tell(self):
-        if (self._write_buf):
+        if self._write_buf:
             return self.raw.tell() + len(self._write_buf)
         else:
-            return self.raw.tell() - len(self._read_buf)
+            return BufferedReader.tell(self)
 
     def truncate(self, pos=None):
         if pos is None:
@@ -1174,8 +1225,10 @@ class BufferedRandom(BufferedWriter, BufferedReader):
 
     def write(self, b):
         if self._read_buf:
-            self.raw.seek(-len(self._read_buf), 1) # Undo readahead
-            self._read_buf = b""
+            # Undo readahead
+            with self._read_lock:
+                self.raw.seek(self._read_pos - len(self._read_buf), 1)
+                self._reset_read_buf()
         return BufferedWriter.write(self, b)
 
 

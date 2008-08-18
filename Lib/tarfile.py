@@ -51,6 +51,7 @@ import time
 import struct
 import copy
 import re
+import operator
 
 if sys.platform == 'mac':
     # This module needs work for MacOS9, especially in the area of pathname
@@ -1401,7 +1402,7 @@ class TarInfo(object):
             next._apply_pax_info(pax_headers, tarfile.encoding, tarfile.errors)
             next.offset = self.offset
 
-            if pax_headers.has_key("size"):
+            if "size" in pax_headers:
                 # If the extended header replaces the size field,
                 # we need to recalculate the offset where the next
                 # header starts.
@@ -2027,7 +2028,7 @@ class TarFile(object):
             self.extract(tarinfo, path)
 
         # Reverse sort directories.
-        directories.sort(lambda a, b: cmp(a.name, b.name))
+        directories.sort(key=operator.attrgetter('name'))
         directories.reverse()
 
         # Set correct owner, mtime and filemode on directories.
@@ -2468,6 +2469,9 @@ class TarFileCompat:
        ZipFile class.
     """
     def __init__(self, file, mode="r", compression=TAR_PLAIN):
+        from warnings import warnpy3k
+        warnpy3k("the TarFileCompat class has been removed in Python 3.0",
+                stacklevel=2)
         if compression == TAR_PLAIN:
             self.tarfile = TarFile.taropen(file, mode)
         elif compression == TAR_GZIPPED:
@@ -2501,10 +2505,10 @@ class TarFileCompat:
         except ImportError:
             from StringIO import StringIO
         import calendar
-        zinfo.name = zinfo.filename
-        zinfo.size = zinfo.file_size
-        zinfo.mtime = calendar.timegm(zinfo.date_time)
-        self.tarfile.addfile(zinfo, StringIO(bytes))
+        tinfo = TarInfo(zinfo.filename)
+        tinfo.size = len(bytes)
+        tinfo.mtime = calendar.timegm(zinfo.date_time)
+        self.tarfile.addfile(tinfo, StringIO(bytes))
     def close(self):
         self.tarfile.close()
 #class TarFileCompat

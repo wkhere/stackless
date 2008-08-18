@@ -4,11 +4,16 @@ from test.test_support import (catch_warning, CleanImport,
                                TestSkipped, run_unittest)
 import warnings
 
+from contextlib import nested
+
 if not sys.py3kwarning:
     raise TestSkipped('%s must be run with the -3 flag' % __name__)
 
 
 class TestPy3KWarnings(unittest.TestCase):
+
+    def assertWarning(self, _, warning, expected_message):
+        self.assertEqual(str(warning.message), expected_message)
 
     def test_backquote(self):
         expected = 'backquote not supported in 3.x; use repr()'
@@ -26,41 +31,41 @@ class TestPy3KWarnings(unittest.TestCase):
         with catch_warning() as w:
             safe_exec("True = False")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("False = True")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             try:
                 safe_exec("obj.False = True")
             except NameError: pass
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             try:
                 safe_exec("obj.True = False")
             except NameError: pass
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("def False(): pass")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("def True(): pass")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("class False: pass")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("class True: pass")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("def f(True=43): pass")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("def f(False=None): pass")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("f(False=True)")
             self.assertWarning(None, w, expected)
-        with catch_warning() as w:
+            w.reset()
             safe_exec("f(True=1)")
             self.assertWarning(None, w, expected)
 
@@ -69,25 +74,25 @@ class TestPy3KWarnings(unittest.TestCase):
         expected = 'type inequality comparisons not supported in 3.x'
         with catch_warning() as w:
             self.assertWarning(int < str, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(type < object, w, expected)
 
     def test_object_inequality_comparisons(self):
         expected = 'comparing unequal types not supported in 3.x'
         with catch_warning() as w:
             self.assertWarning(str < [], w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(object() < (1, 2), w, expected)
 
     def test_dict_inequality_comparisons(self):
         expected = 'dict inequality comparisons not supported in 3.x'
         with catch_warning() as w:
             self.assertWarning({} < {2:3}, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning({} <= {}, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning({} > {2:3}, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning({2:3} >= {}, w, expected)
 
     def test_cell_inequality_comparisons(self):
@@ -100,7 +105,7 @@ class TestPy3KWarnings(unittest.TestCase):
         cell1, = f(1).func_closure
         with catch_warning() as w:
             self.assertWarning(cell0 == cell1, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(cell0 < cell1, w, expected)
 
     def test_code_inequality_comparisons(self):
@@ -111,11 +116,11 @@ class TestPy3KWarnings(unittest.TestCase):
             pass
         with catch_warning() as w:
             self.assertWarning(f.func_code < g.func_code, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(f.func_code <= g.func_code, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(f.func_code >= g.func_code, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(f.func_code > g.func_code, w, expected)
 
     def test_builtin_function_or_method_comparisons(self):
@@ -125,15 +130,12 @@ class TestPy3KWarnings(unittest.TestCase):
         meth = {}.get
         with catch_warning() as w:
             self.assertWarning(func < meth, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(func > meth, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(meth <= func, w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(meth >= func, w, expected)
-
-    def assertWarning(self, _, warning, expected_message):
-        self.assertEqual(str(warning.message), expected_message)
 
     def test_sort_cmp_arg(self):
         expected = "the cmp argument is not supported in 3.x"
@@ -142,11 +144,11 @@ class TestPy3KWarnings(unittest.TestCase):
 
         with catch_warning() as w:
             self.assertWarning(lst.sort(cmp=cmp), w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(sorted(lst, cmp=cmp), w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(lst.sort(cmp), w, expected)
-        with catch_warning() as w:
+            w.reset()
             self.assertWarning(sorted(lst, cmp), w, expected)
 
     def test_sys_exc_clear(self):
@@ -180,7 +182,7 @@ class TestPy3KWarnings(unittest.TestCase):
             self.assertWarning(None, w, expected)
 
     def test_buffer(self):
-        expected = 'buffer() not supported in 3.x; use memoryview()'
+        expected = 'buffer() not supported in 3.x'
         with catch_warning() as w:
             self.assertWarning(buffer('a'), w, expected)
 
@@ -191,14 +193,73 @@ class TestPy3KWarnings(unittest.TestCase):
             with catch_warning() as w:
                 self.assertWarning(f.xreadlines(), w, expected)
 
+    def test_hash_inheritance(self):
+        with catch_warning() as w:
+            # With object as the base class
+            class WarnOnlyCmp(object):
+                def __cmp__(self, other): pass
+            self.assertEqual(len(w.warnings), 1)
+            self.assertWarning(None, w,
+                 "Overriding __cmp__ blocks inheritance of __hash__ in 3.x")
+            w.reset()
+            class WarnOnlyEq(object):
+                def __eq__(self, other): pass
+            self.assertEqual(len(w.warnings), 1)
+            self.assertWarning(None, w,
+                 "Overriding __eq__ blocks inheritance of __hash__ in 3.x")
+            w.reset()
+            class WarnCmpAndEq(object):
+                def __cmp__(self, other): pass
+                def __eq__(self, other): pass
+            self.assertEqual(len(w.warnings), 2)
+            self.assertWarning(None, w.warnings[-2],
+                 "Overriding __cmp__ blocks inheritance of __hash__ in 3.x")
+            self.assertWarning(None, w,
+                 "Overriding __eq__ blocks inheritance of __hash__ in 3.x")
+            w.reset()
+            class NoWarningOnlyHash(object):
+                def __hash__(self): pass
+            self.assertEqual(len(w.warnings), 0)
+            # With an intermediate class in the heirarchy
+            class DefinesAllThree(object):
+                def __cmp__(self, other): pass
+                def __eq__(self, other): pass
+                def __hash__(self): pass
+            class WarnOnlyCmp(DefinesAllThree):
+                def __cmp__(self, other): pass
+            self.assertEqual(len(w.warnings), 1)
+            self.assertWarning(None, w,
+                 "Overriding __cmp__ blocks inheritance of __hash__ in 3.x")
+            w.reset()
+            class WarnOnlyEq(DefinesAllThree):
+                def __eq__(self, other): pass
+            self.assertEqual(len(w.warnings), 1)
+            self.assertWarning(None, w,
+                 "Overriding __eq__ blocks inheritance of __hash__ in 3.x")
+            w.reset()
+            class WarnCmpAndEq(DefinesAllThree):
+                def __cmp__(self, other): pass
+                def __eq__(self, other): pass
+            self.assertEqual(len(w.warnings), 2)
+            self.assertWarning(None, w.warnings[-2],
+                 "Overriding __cmp__ blocks inheritance of __hash__ in 3.x")
+            self.assertWarning(None, w,
+                 "Overriding __eq__ blocks inheritance of __hash__ in 3.x")
+            w.reset()
+            class NoWarningOnlyHash(DefinesAllThree):
+                def __hash__(self): pass
+            self.assertEqual(len(w.warnings), 0)
+
+
 
 class TestStdlibRemovals(unittest.TestCase):
 
     # test.testall not tested as it executes all unit tests as an
     # import side-effect.
     all_platforms = ('audiodev', 'imputil', 'mutex', 'user', 'new', 'rexec',
-                        'Bastion', 'compiler', 'dircache', 'mimetools', 'fpformat',
-                        'ihooks', 'mhlib', 'statvfs', 'htmllib', 'sgmllib', 'rfc822')
+                        'Bastion', 'compiler', 'dircache', 'mimetools',
+                        'fpformat', 'ihooks', 'mhlib', 'statvfs', 'htmllib',
+                        'sgmllib', 'rfc822', 'sunaudio')
     inclusive_platforms = {'irix' : ('pure', 'AL', 'al', 'CD', 'cd', 'cddb',
                                      'cdplayer', 'CL', 'cl', 'DEVICE', 'GL',
                                      'gl', 'ERRNO', 'FILE', 'FL', 'flp', 'fl',
@@ -219,7 +280,7 @@ class TestStdlibRemovals(unittest.TestCase):
                                       'Explorer', 'Finder', 'Netscape',
                                       'StdSuites', 'SystemEvents', 'Terminal',
                                       'cfmfile', 'bundlebuilder', 'buildtools',
-                                      'ColorPicker'),
+                                      'ColorPicker', 'Audio_mac'),
                            'sunos5' : ('sunaudiodev', 'SUNAUDIODEV'),
                           }
     optional_modules = ('bsddb185', 'Canvas', 'dl', 'linuxaudiodev', 'imageop',
@@ -228,23 +289,22 @@ class TestStdlibRemovals(unittest.TestCase):
     def check_removal(self, module_name, optional=False):
         """Make sure the specified module, when imported, raises a
         DeprecationWarning and specifies itself in the message."""
-        with CleanImport(module_name):
-            with catch_warning(record=False) as w:
-                warnings.filterwarnings("error", ".+ removed",
-                                        DeprecationWarning)
-                try:
-                    __import__(module_name, level=0)
-                except DeprecationWarning as exc:
-                    self.assert_(module_name in exc.args[0],
-                                 "%s warning didn't contain module name"
-                                 % module_name)
-                except ImportError:
-                    if not optional:
-                        self.fail("Non-optional module {0} raised an "
-                                  "ImportError.".format(module_name))
-                else:
-                    self.fail("DeprecationWarning not raised for {0}"
-                                .format(module_name))
+        with nested(CleanImport(module_name), catch_warning(record=False)):
+            warnings.filterwarnings("error", ".+ removed",
+                                    DeprecationWarning, __name__)
+            try:
+                __import__(module_name, level=0)
+            except DeprecationWarning as exc:
+                self.assert_(module_name in exc.args[0],
+                             "%s warning didn't contain module name"
+                             % module_name)
+            except ImportError:
+                if not optional:
+                    self.fail("Non-optional module {0} raised an "
+                              "ImportError.".format(module_name))
+            else:
+                self.fail("DeprecationWarning not raised for {0}"
+                            .format(module_name))
 
     def test_platform_independent_removals(self):
         # Make sure that the modules that are available on all platforms raise
@@ -280,6 +340,12 @@ class TestStdlibRemovals(unittest.TestCase):
                 func = getattr(commands, name)
                 self.assertRaises(DeprecationWarning, func, *([None]*arg_count))
 
+    def test_reduce_move(self):
+        from operator import add
+        with catch_warning(record=False):
+            warnings.filterwarnings("error", "reduce")
+            self.assertRaises(DeprecationWarning, reduce, add, range(10))
+
     def test_mutablestring_removal(self):
         # UserString.MutableString has been removed in 3.0.
         import UserString
@@ -290,7 +356,7 @@ class TestStdlibRemovals(unittest.TestCase):
 
 
 def test_main():
-    with catch_warning(record=True):
+    with catch_warning():
         warnings.simplefilter("always")
         run_unittest(TestPy3KWarnings,
                      TestStdlibRemovals)

@@ -411,17 +411,17 @@ except:
     MAXFD = 256
 
 # True/False does not exist on 2.2.0
-try:
-    False
-except NameError:
-    False = 0
-    True = 1
+#try:
+#    False
+#except NameError:
+#    False = 0
+#    True = 1
 
 _active = []
 
 def _cleanup():
     for inst in _active[:]:
-        if inst.poll(_deadstate=sys.maxint) >= 0:
+        if inst._internal_poll(_deadstate=sys.maxint) >= 0:
             try:
                 _active.remove(inst)
             except ValueError:
@@ -635,7 +635,7 @@ class Popen(object):
             # We didn't get to successfully create a child process.
             return
         # In case the child hasn't been waited on, check if it's done.
-        self.poll(_deadstate=sys.maxint)
+        self._internal_poll(_deadstate=sys.maxint)
         if self.returncode is None and _active is not None:
             # Child is still running, keep us alive until we can wait on it.
             _active.append(self)
@@ -669,6 +669,10 @@ class Popen(object):
             return (stdout, stderr)
 
         return self._communicate(input)
+
+
+    def poll(self):
+        return self._internal_poll()
 
 
     if mswindows:
@@ -842,7 +846,7 @@ class Popen(object):
                 errwrite.Close()
 
 
-        def poll(self, _deadstate=None):
+        def _internal_poll(self, _deadstate=None):
             """Check if child process has terminated.  Returns returncode
             attribute."""
             if self.returncode is None:
@@ -1062,7 +1066,7 @@ class Popen(object):
                         os.chdir(cwd)
 
                     if preexec_fn:
-                        apply(preexec_fn)
+                        preexec_fn()
 
                     if env is None:
                         os.execvp(executable, args)
@@ -1112,7 +1116,7 @@ class Popen(object):
                 raise RuntimeError("Unknown child exit status!")
 
 
-        def poll(self, _deadstate=None):
+        def _internal_poll(self, _deadstate=None):
             """Check if child process has terminated.  Returns returncode
             attribute."""
             if self.returncode is None:
@@ -1169,7 +1173,8 @@ class Popen(object):
                     # When select has indicated that the file is writable,
                     # we can write up to PIPE_BUF bytes without risk
                     # blocking.  POSIX defines PIPE_BUF >= 512
-                    bytes_written = os.write(self.stdin.fileno(), buffer(input, input_offset, 512))
+                    chunk = input[input_offset : input_offset + 512]
+                    bytes_written = os.write(self.stdin.fileno(), chunk)
                     input_offset += bytes_written
                     if input_offset >= len(input):
                         self.stdin.close()

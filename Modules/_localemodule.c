@@ -301,7 +301,9 @@ PyLocale_strcoll(PyObject* self, PyObject* args)
     if (!PyUnicode_Check(os2)) {
         os2 = PyUnicode_FromObject(os2);
         if (!os2) {
-            Py_DECREF(os1);
+            if (rel1) {
+                Py_DECREF(os1);
+            }
             return NULL;
         } 
         rel2 = 1;
@@ -586,7 +588,7 @@ static PyObject*
 PyIntl_gettext(PyObject* self, PyObject *args)
 {
 	char *in;
-	if (!PyArg_ParseTuple(args, "z", &in))
+	if (!PyArg_ParseTuple(args, "s", &in))
 		return 0;
 	return PyString_FromString(gettext(in));
 }
@@ -599,7 +601,7 @@ static PyObject*
 PyIntl_dgettext(PyObject* self, PyObject *args)
 {
 	char *domain, *in;
-	if (!PyArg_ParseTuple(args, "zz", &domain, &in))
+	if (!PyArg_ParseTuple(args, "zs", &domain, &in))
 		return 0;
 	return PyString_FromString(dgettext(domain, in));
 }
@@ -613,7 +615,7 @@ PyIntl_dcgettext(PyObject *self, PyObject *args)
 {
 	char *domain, *msgid;
 	int category;
-	if (!PyArg_ParseTuple(args, "zzi", &domain, &msgid, &category))
+	if (!PyArg_ParseTuple(args, "zsi", &domain, &msgid, &category))
 		return 0;
 	return PyString_FromString(dcgettext(domain,msgid,category));
 }
@@ -643,9 +645,13 @@ PyDoc_STRVAR(bindtextdomain__doc__,
 static PyObject*
 PyIntl_bindtextdomain(PyObject* self,PyObject*args)
 {
-	char *domain,*dirname;
-	if (!PyArg_ParseTuple(args, "zz", &domain, &dirname))
+	char *domain, *dirname;
+	if (!PyArg_ParseTuple(args, "sz", &domain, &dirname))
 		return 0;
+	if (!strlen(domain)) {
+		PyErr_SetString(Error, "domain must be a non-empty string");
+		return 0;
+	}
 	dirname = bindtextdomain(domain, dirname);
 	if (!dirname) {
 		PyErr_SetFromErrno(PyExc_OSError);

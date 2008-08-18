@@ -396,9 +396,9 @@ Return a string of one character with ordinal i; 0 <= i < 256.");
 static PyObject *
 builtin_unichr(PyObject *self, PyObject *args)
 {
-	long x;
+	int x;
 
-	if (!PyArg_ParseTuple(args, "l:unichr", &x))
+	if (!PyArg_ParseTuple(args, "i:unichr", &x))
 		return NULL;
 
 	return PyUnicode_FromOrdinal(x);
@@ -2010,68 +2010,22 @@ is printed without a trailing newline before reading.");
 static PyObject *
 builtin_reduce(PyObject *self, PyObject *args)
 {
-	PyObject *seq, *func, *result = NULL, *it;
+	static PyObject *functools_reduce = NULL;
 
 	if (PyErr_WarnPy3k("reduce() not supported in 3.x; "
 			   "use functools.reduce()", 1) < 0)
 		return NULL;
 
-	if (!PyArg_UnpackTuple(args, "reduce", 2, 3, &func, &seq, &result))
-		return NULL;
-	if (result != NULL)
-		Py_INCREF(result);
-
-	it = PyObject_GetIter(seq);
-	if (it == NULL) {
-		PyErr_SetString(PyExc_TypeError,
-		    "reduce() arg 2 must support iteration");
-		Py_XDECREF(result);
-		return NULL;
+	if (functools_reduce == NULL) {
+		PyObject *functools = PyImport_ImportModule("functools");
+		if (functools == NULL)
+			return NULL;
+		functools_reduce = PyObject_GetAttrString(functools, "reduce");
+		Py_DECREF(functools);
+		if (functools_reduce == NULL)
+			return NULL;
 	}
-
-	if ((args = PyTuple_New(2)) == NULL)
-		goto Fail;
-
-	for (;;) {
-		PyObject *op2;
-
-		if (args->ob_refcnt > 1) {
-			Py_DECREF(args);
-			if ((args = PyTuple_New(2)) == NULL)
-				goto Fail;
-		}
-
-		op2 = PyIter_Next(it);
-		if (op2 == NULL) {
-			if (PyErr_Occurred())
-				goto Fail;
- 			break;
-		}
-
-		if (result == NULL)
-			result = op2;
-		else {
-			PyTuple_SetItem(args, 0, result);
-			PyTuple_SetItem(args, 1, op2);
-			if ((result = PyEval_CallObject(func, args)) == NULL)
-				goto Fail;
-		}
-	}
-
-	Py_DECREF(args);
-
-	if (result == NULL)
-		PyErr_SetString(PyExc_TypeError,
-			   "reduce() of empty sequence with no initial value");
-
-	Py_DECREF(it);
-	return result;
-
-Fail:
-	Py_XDECREF(args);
-	Py_XDECREF(result);
-	Py_DECREF(it);
-	return NULL;
+	return PyObject_Call(functools_reduce, args, NULL);
 }
 
 PyDoc_STRVAR(reduce_doc,
