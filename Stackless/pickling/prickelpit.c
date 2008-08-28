@@ -762,22 +762,13 @@ frameobject_reduce(PyFrameObject *f)
 	if (blockstack_as_tuple == NULL) goto err_exit;
 
 	for (i = 0; i < f->f_iblock; i++) {
-		PyObject *ob, *tripel;
-
-		tripel = PyTuple_New(3);
-		if (tripel == NULL) goto err_exit;
+		PyObject *tripel = Py_BuildValue("iii", 
+				f->f_blockstack[i].b_type,
+				f->f_blockstack[i].b_handler,
+				f->f_blockstack[i].b_level);
+		if (!tripel) goto err_exit;
 		PyTuple_SET_ITEM(blockstack_as_tuple, i, tripel);
-		ob = Py_BuildValue("i", f->f_blockstack[i].b_type);
-		if (ob == NULL) goto err_exit;
-		PyTuple_SET_ITEM(tripel, 0, ob);
-		ob = Py_BuildValue("i", f->f_blockstack[i].b_handler);
-		if (ob == NULL) goto err_exit;
-		PyTuple_SET_ITEM(tripel, 1, ob);
-		ob = Py_BuildValue("i", f->f_blockstack[i].b_level);
-		if (ob == NULL) goto err_exit;
-		PyTuple_SET_ITEM(tripel, 2, ob);
 	}
-
 	f_stacktop = f->f_stacktop;
 	if (f_stacktop != NULL) {
 		if (f_stacktop < f->f_valuestack) {
@@ -1391,7 +1382,8 @@ typedef struct {
 	PyDictObject *di_dict; /* Set to NULL when iterator is exhausted */
 	Py_ssize_t di_used;
 	Py_ssize_t di_pos;
-	binaryfunc di_select;
+	PyObject* di_result; /* reusable result tuple for iteritems */
+	Py_ssize_t len;
 } dictiterobject;
 
 /*
