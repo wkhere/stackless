@@ -392,7 +392,7 @@ PyAPI_FUNC(int) initialize_main_and_current(void);
 #define TASKLET_CLAIMVAL(task, val) \
 	{ \
 		*(val) = (task)->tempval; \
-		*(task)->tempval = Py_None; \
+		(task)->tempval = Py_None; \
 		Py_INCREF(Py_None); \
 	}
 
