@@ -13,14 +13,17 @@ def getsoft():
     stackless.enable_softswitch(hold)
     return hold
 
-def makeSuite(target):
+def makeSuite(target, path = None):
     "Build a test suite of all available test files."
 
     suite = unittest.TestSuite()
     if '.' not in sys.path:
         sys.path.insert(0, '.')
-    
-    for idx, filename in enumerate(glob.glob('test_*.py')):
+
+    pattern = "test_*.py"
+    if path:
+        pattern = os.path.join(path, pattern)
+    for idx, filename in enumerate(glob.glob(pattern)):
         modname = os.path.splitext(os.path.basename(filename))[0]
         module = __import__(modname)
         tests = unittest.TestLoader().loadTestsFromModule(module)
@@ -35,6 +38,8 @@ def makeSuite(target):
 
 
 if __name__ == '__main__':
+    path = os.path.split(__file__)[0]
+    print path
     hold = stackless.enable_softswitch(True)
     try:
         target = int(sys.argv[1])
@@ -51,8 +56,7 @@ if __name__ == '__main__':
                 target = 0
         for switch in flags:
             stackless.enable_softswitch(switch)
-            testSuite = makeSuite(abs(target))
+            testSuite = makeSuite(abs(target), path)
             unittest.TextTestRunner().run(testSuite)
     finally:
         stackless.enable_softswitch(hold)
-        
