@@ -2,22 +2,20 @@
 
 import _symtable
 from _symtable import (USE, DEF_GLOBAL, DEF_LOCAL, DEF_PARAM,
-     DEF_STAR, DEF_DOUBLESTAR, DEF_INTUPLE, DEF_FREE,
      DEF_FREE_GLOBAL, DEF_FREE_CLASS, DEF_IMPORT, DEF_BOUND,
      OPT_IMPORT_STAR, SCOPE_OFF, SCOPE_MASK, FREE,
      GLOBAL_IMPLICIT, GLOBAL_EXPLICIT)
 
 import weakref
 
-__all__ = ["symtable", "SymbolTable", "newSymbolTable", "Class",
-           "Function", "Symbol"]
+__all__ = ["symtable", "SymbolTable", "Class", "Function", "Symbol"]
 
 def symtable(code, filename, compile_type):
     raw = _symtable.symtable(code, filename, compile_type)
     for top in raw.values():
         if top.name == 'top':
             break
-    return newSymbolTable(top, filename)
+    return _newSymbolTable(top, filename)
 
 class SymbolTableFactory:
     def __init__(self):
@@ -37,7 +35,7 @@ class SymbolTableFactory:
             obj = self.__memo[key] = self.new(table, filename)
         return obj
 
-newSymbolTable = SymbolTableFactory()
+_newSymbolTable = SymbolTableFactory()
 
 
 class SymbolTable(object):
@@ -112,12 +110,12 @@ class SymbolTable(object):
         return [self.lookup(ident) for ident in self.get_identifiers()]
 
     def __check_children(self, name):
-        return [newSymbolTable(st, self._filename)
+        return [_newSymbolTable(st, self._filename)
                 for st in self._table.children
                 if st.name == name]
 
     def get_children(self):
-        return [newSymbolTable(st, self._filename)
+        return [_newSymbolTable(st, self._filename)
                 for st in self._table.children]
 
 
@@ -193,12 +191,6 @@ class Symbol(object):
     def is_global(self):
         return bool(self.__scope in (GLOBAL_IMPLICIT, GLOBAL_EXPLICIT))
 
-    def is_vararg(self):
-        return bool(self.__flags & DEF_STAR)
-
-    def is_keywordarg(self):
-        return bool(self.__flags & DEF_DOUBLESTAR)
-
     def is_local(self):
         return bool(self.__flags & DEF_BOUND)
 
@@ -210,9 +202,6 @@ class Symbol(object):
 
     def is_assigned(self):
         return bool(self.__flags & DEF_LOCAL)
-
-    def is_in_tuple(self):
-        return bool(self.__flags & DEF_INTUPLE)
 
     def is_namespace(self):
         """Returns true if name binding introduces new namespace.

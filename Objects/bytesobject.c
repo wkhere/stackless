@@ -83,6 +83,12 @@ PyBytes_FromStringAndSize(const char *str, Py_ssize_t size)
 		return (PyObject *)op;
 	}
 
+	if (size > PY_SSIZE_T_MAX - sizeof(PyBytesObject)) {
+		PyErr_SetString(PyExc_OverflowError,
+				"byte string is too large");
+		return NULL;
+	}
+
 	/* Inline PyObject_NewVar */
 	op = (PyBytesObject *)PyObject_MALLOC(sizeof(PyBytesObject) + size);
 	if (op == NULL)
@@ -111,7 +117,7 @@ PyBytes_FromString(const char *str)
 
 	assert(str != NULL);
 	size = strlen(str);
-	if (size > PY_SSIZE_T_MAX) {
+	if (size > PY_SSIZE_T_MAX - sizeof(PyBytesObject)) {
 		PyErr_SetString(PyExc_OverflowError,
 			"byte string is too long");
 		return NULL;
@@ -1163,8 +1169,11 @@ string_split(PyBytesObject *self, PyObject *args)
 		PyBuffer_Release(&vsub);
 		return NULL;
 	}
-	else if (n == 1)
-		return split_char(self, len, sub[0], maxsplit);
+	else if (n == 1) {
+		list = split_char(self, len, sub[0], maxsplit);
+		PyBuffer_Release(&vsub);
+		return list;
+	}
 
 	list = PyList_New(PREALLOC_SIZE(maxsplit));
 	if (list == NULL) {
@@ -1379,8 +1388,11 @@ string_rsplit(PyBytesObject *self, PyObject *args)
 		PyBuffer_Release(&vsub);
 		return NULL;
 	}
-	else if (n == 1)
-		return rsplit_char(self, len, sub[0], maxsplit);
+	else if (n == 1) {
+		list = rsplit_char(self, len, sub[0], maxsplit);
+		PyBuffer_Release(&vsub);
+		return list;
+	}
 
 	list = PyList_New(PREALLOC_SIZE(maxsplit));
 	if (list == NULL) {
@@ -2870,11 +2882,10 @@ str_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 static PyObject *
 string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	PyObject *x = NULL, *it;
+	PyObject *x = NULL;
 	const char *encoding = NULL;
 	const char *errors = NULL;
 	PyObject *new = NULL;
-	Py_ssize_t i, size;
 	static char *kwlist[] = {"source", "encoding", "errors", 0};
 
 	if (type != &PyBytes_Type)
@@ -2910,6 +2921,19 @@ string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (encoding != NULL || errors != NULL) {
 		PyErr_SetString(PyExc_TypeError,
 			"encoding or errors without a string argument");
+		return NULL;
+	}
+        return PyObject_Bytes(x);
+}
+
+PyObject *
+PyBytes_FromObject(PyObject *x)
+{
+	PyObject *new, *it;
+	Py_ssize_t i, size;
+
+	if (x == NULL) {
+		PyErr_BadInternalCall();
 		return NULL;
 	}
 
@@ -3200,7 +3224,7 @@ _PyBytes_FormatLong(PyObject *val, int flags, int prec, int type,
 	int numnondigits = 0;
 
 	/* Avoid exceeding SSIZE_T_MAX */
-	if (prec > PY_SSIZE_T_MAX-3) {
+	if (prec > INT_MAX-3) {
 		PyErr_SetString(PyExc_OverflowError,
 				"precision too large");
 		return NULL;

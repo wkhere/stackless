@@ -139,15 +139,13 @@ Object Protocol
    Python expression ``str(o)``.  Called by the :func:`str` built-in function
    and, therefore, by the :func:`print` function.
 
+.. cfunction:: PyObject* PyObject_Bytes(PyObject *o)
 
-.. cfunction:: PyObject* PyObject_Unicode(PyObject *o)
+   .. index:: builtin: bytes
 
-   .. index:: builtin: unicode
-
-   Compute a Unicode string representation of object *o*.  Returns the Unicode
-   string representation on success, *NULL* on failure. This is the equivalent of
-   the Python expression ``unicode(o)``.  Called by the :func:`unicode` built-in
-   function.
+   Compute a bytes representation of object *o*.  *NULL* is returned on failure
+   and a bytes object on success.  This is equivalent to the Python expression
+   ``bytes(o)``.
 
 
 .. cfunction:: int PyObject_IsInstance(PyObject *inst, PyObject *cls)
@@ -255,6 +253,16 @@ is considered sufficient for this determination.
 
    Compute and return the hash value of an object *o*.  On failure, return ``-1``.
    This is the equivalent of the Python expression ``hash(o)``.
+
+
+.. cfunction:: long PyObject_HashNotImplemented(PyObject *o)
+
+   Set a TypeError indicating that ``type(o)`` is not hashable and return ``-1``.
+   This function receives special treatment when stored in a ``tp_hash`` slot,
+   allowing a type to explicitly indicate to the interpreter that it is not
+   hashable.
+
+   .. versionadded:: 2.6
 
 
 .. cfunction:: int PyObject_IsTrue(PyObject *o)

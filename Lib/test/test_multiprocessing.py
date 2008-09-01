@@ -120,22 +120,22 @@ class _TestProcess(BaseTestCase):
             return
 
         current = self.current_process()
-        authkey = current.get_authkey()
+        authkey = current.authkey
 
         self.assertTrue(current.is_alive())
-        self.assertTrue(not current.is_daemon())
+        self.assertTrue(not current.daemon)
         self.assertTrue(isinstance(authkey, bytes))
         self.assertTrue(len(authkey) > 0)
-        self.assertEqual(current.get_ident(), os.getpid())
-        self.assertEqual(current.get_exitcode(), None)
+        self.assertEqual(current.ident, os.getpid())
+        self.assertEqual(current.exitcode, None)
 
     def _test(self, q, *args, **kwds):
         current = self.current_process()
         q.put(args)
         q.put(kwds)
-        q.put(current.get_name())
+        q.put(current.name)
         if self.TYPE != 'threads':
-            q.put(bytes(current.get_authkey()))
+            q.put(bytes(current.authkey))
             q.put(current.pid)
 
     def test_process(self):
@@ -147,33 +147,33 @@ class _TestProcess(BaseTestCase):
         p = self.Process(
             target=self._test, args=args, kwargs=kwargs, name=name
             )
-        p.set_daemon(True)
+        p.daemon = True
         current = self.current_process()
 
         if self.TYPE != 'threads':
-            self.assertEquals(p.get_authkey(), current.get_authkey())
+            self.assertEquals(p.authkey, current.authkey)
         self.assertEquals(p.is_alive(), False)
-        self.assertEquals(p.is_daemon(), True)
+        self.assertEquals(p.daemon, True)
         self.assertTrue(p not in self.active_children())
         self.assertTrue(type(self.active_children()) is list)
-        self.assertEqual(p.get_exitcode(), None)
+        self.assertEqual(p.exitcode, None)
 
         p.start()
 
-        self.assertEquals(p.get_exitcode(), None)
+        self.assertEquals(p.exitcode, None)
         self.assertEquals(p.is_alive(), True)
         self.assertTrue(p in self.active_children())
 
         self.assertEquals(q.get(), args[1:])
         self.assertEquals(q.get(), kwargs)
-        self.assertEquals(q.get(), p.get_name())
+        self.assertEquals(q.get(), p.name)
         if self.TYPE != 'threads':
-            self.assertEquals(q.get(), current.get_authkey())
+            self.assertEquals(q.get(), current.authkey)
             self.assertEquals(q.get(), p.pid)
 
         p.join()
 
-        self.assertEquals(p.get_exitcode(), 0)
+        self.assertEquals(p.exitcode, 0)
         self.assertEquals(p.is_alive(), False)
         self.assertTrue(p not in self.active_children())
 
@@ -185,12 +185,12 @@ class _TestProcess(BaseTestCase):
             return
 
         p = self.Process(target=self._test_terminate)
-        p.set_daemon(True)
+        p.daemon = True
         p.start()
 
         self.assertEqual(p.is_alive(), True)
         self.assertTrue(p in self.active_children())
-        self.assertEqual(p.get_exitcode(), None)
+        self.assertEqual(p.exitcode, None)
 
         p.terminate()
 
@@ -203,8 +203,8 @@ class _TestProcess(BaseTestCase):
 
         p.join()
 
-        # XXX sometimes get p.get_exitcode() == 0 on Windows ...
-        #self.assertEqual(p.get_exitcode(), -signal.SIGTERM)
+        # XXX sometimes get p.exitcode == 0 on Windows ...
+        #self.assertEqual(p.exitcode, -signal.SIGTERM)
 
     def test_cpu_count(self):
         try:
@@ -331,7 +331,7 @@ class _TestQueue(BaseTestCase):
             target=self._test_put,
             args=(queue, child_can_start, parent_can_continue)
             )
-        proc.set_daemon(True)
+        proc.daemon = True
         proc.start()
 
         self.assertEqual(queue_empty(queue), True)
@@ -397,7 +397,7 @@ class _TestQueue(BaseTestCase):
             target=self._test_get,
             args=(queue, child_can_start, parent_can_continue)
             )
-        proc.set_daemon(True)
+        proc.daemon = True
         proc.start()
 
         self.assertEqual(queue_empty(queue), True)
@@ -620,11 +620,11 @@ class _TestCondition(BaseTestCase):
         woken = self.Semaphore(0)
 
         p = self.Process(target=self.f, args=(cond, sleeping, woken))
-        p.set_daemon(True)
+        p.daemon = True
         p.start()
 
         p = threading.Thread(target=self.f, args=(cond, sleeping, woken))
-        p.set_daemon(True)
+        p.daemon = True
         p.start()
 
         # wait for both children to start sleeping
@@ -666,12 +666,12 @@ class _TestCondition(BaseTestCase):
         for i in range(3):
             p = self.Process(target=self.f,
                              args=(cond, sleeping, woken, TIMEOUT1))
-            p.set_daemon(True)
+            p.daemon = True
             p.start()
 
             t = threading.Thread(target=self.f,
                                  args=(cond, sleeping, woken, TIMEOUT1))
-            t.set_daemon(True)
+            t.daemon = True
             t.start()
 
         # wait for them all to sleep
@@ -689,11 +689,11 @@ class _TestCondition(BaseTestCase):
         # start some more threads/processes
         for i in range(3):
             p = self.Process(target=self.f, args=(cond, sleeping, woken))
-            p.set_daemon(True)
+            p.daemon = True
             p.start()
 
             t = threading.Thread(target=self.f, args=(cond, sleeping, woken))
-            t.set_daemon(True)
+            t.daemon = True
             t.start()
 
         # wait for them to all sleep
@@ -1186,7 +1186,7 @@ class _TestConnection(BaseTestCase):
         conn, child_conn = self.Pipe()
 
         p = self.Process(target=self._echo, args=(child_conn,))
-        p.set_daemon(True)
+        p.daemon = True
         p.start()
 
         seq = [1, 2.25, None]
@@ -1335,7 +1335,7 @@ class _TestListenerClient(BaseTestCase):
         for family in self.connection.families:
             l = self.connection.Listener(family=family)
             p = self.Process(target=self._test, args=(l.address,))
-            p.set_daemon(True)
+            p.daemon = True
             p.start()
             conn = l.accept()
             self.assertEqual(conn.recv(), 'hello')
@@ -1737,6 +1737,37 @@ class ThreadsMixin(object):
 testcases_threads = create_test_cases(ThreadsMixin, type='threads')
 globals().update(testcases_threads)
 
+class OtherTest(unittest.TestCase):
+    # TODO: add more tests for deliver/answer challenge.
+    def test_deliver_challenge_auth_failure(self):
+        class _FakeConnection(object):
+            def recv_bytes(self, size):
+                return b'something bogus'
+            def send_bytes(self, data):
+                pass
+        self.assertRaises(multiprocessing.AuthenticationError,
+                          multiprocessing.connection.deliver_challenge,
+                          _FakeConnection(), b'abc')
+
+    def test_answer_challenge_auth_failure(self):
+        class _FakeConnection(object):
+            def __init__(self):
+                self.count = 0
+            def recv_bytes(self, size):
+                self.count += 1
+                if self.count == 1:
+                    return multiprocessing.connection.CHALLENGE
+                elif self.count == 2:
+                    return b'something bogus'
+                return b''
+            def send_bytes(self, data):
+                pass
+        self.assertRaises(multiprocessing.AuthenticationError,
+                          multiprocessing.connection.answer_challenge,
+                          _FakeConnection(), b'abc')
+
+testcases_other = [OtherTest]
+
 #
 #
 #
@@ -1765,7 +1796,8 @@ def test_main(run=None):
     testcases = (
         sorted(testcases_processes.values(), key=lambda tc:tc.__name__) +
         sorted(testcases_threads.values(), key=lambda tc:tc.__name__) +
-        sorted(testcases_manager.values(), key=lambda tc:tc.__name__)
+        sorted(testcases_manager.values(), key=lambda tc:tc.__name__) +
+        testcases_other
         )
 
     loadTestsFromTestCase = unittest.defaultTestLoader.loadTestsFromTestCase

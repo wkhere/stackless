@@ -13,11 +13,10 @@ import os
 import sys
 import socket
 import threading
-import copyreg
 
 import _multiprocessing
 from multiprocessing import current_process
-from multiprocessing.forking import Popen, duplicate, close
+from multiprocessing.forking import Popen, duplicate, close, ForkingPickler
 from multiprocessing.util import register_after_fork, debug, sub_debug
 from multiprocessing.connection import Client, Listener
 
@@ -82,9 +81,9 @@ def _get_listener():
         try:
             if _listener is None:
                 debug('starting listener and thread for sending handles')
-                _listener = Listener(authkey=current_process().get_authkey())
+                _listener = Listener(authkey=current_process().authkey)
                 t = threading.Thread(target=_serve)
-                t.set_daemon(True)
+                t.daemon = True
                 t.start()
         finally:
             _lock.release()
@@ -127,14 +126,14 @@ def rebuild_handle(pickled_data):
     if inherited:
         return handle
     sub_debug('rebuilding handle %d', handle)
-    conn = Client(address, authkey=current_process().get_authkey())
+    conn = Client(address, authkey=current_process().authkey)
     conn.send((handle, os.getpid()))
     new_handle = recv_handle(conn)
     conn.close()
     return new_handle
 
 #
-# Register `_multiprocessing.Connection` with `copy_reg`
+# Register `_multiprocessing.Connection` with `ForkingPickler`
 #
 
 def reduce_connection(conn):
@@ -147,10 +146,10 @@ def rebuild_connection(reduced_handle, readable, writable):
         handle, readable=readable, writable=writable
         )
 
-copyreg.pickle(_multiprocessing.Connection, reduce_connection)
+ForkingPickler.register(_multiprocessing.Connection, reduce_connection)
 
 #
-# Register `socket.socket` with `copy_reg`
+# Register `socket.socket` with `ForkingPickler`
 #
 
 def fromfd(fd, family, type_, proto=0):
@@ -169,10 +168,10 @@ def rebuild_socket(reduced_handle, family, type_, proto):
     close(fd)
     return _sock
 
-copyreg.pickle(socket.socket, reduce_socket)
+ForkingPickler.register(socket.socket, reduce_socket)
 
 #
-# Register `_multiprocessing.PipeConnection` with `copy_reg`
+# Register `_multiprocessing.PipeConnection` with `ForkingPickler`
 #
 
 if sys.platform == 'win32':
@@ -187,4 +186,4 @@ if sys.platform == 'win32':
             handle, readable=readable, writable=writable
             )
 
-    copyreg.pickle(_multiprocessing.PipeConnection, reduce_pipe_connection)
+    ForkingPickler.register(_multiprocessing.PipeConnection, reduce_pipe_connection)

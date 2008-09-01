@@ -299,12 +299,11 @@ class StatAttributeTests(unittest.TestCase):
     # systems support centiseconds
     if sys.platform == 'win32':
         def get_file_system(path):
-            import os
-            root = os.path.splitdrive(os.path.realpath("."))[0] + '\\'
+            root = os.path.splitdrive(os.path.abspath(path))[0] + '\\'
             import ctypes
             kernel32 = ctypes.windll.kernel32
-            buf = ctypes.create_string_buffer("", 100)
-            if kernel32.GetVolumeInformationA(root, None, 0, None, None, None, buf, len(buf)):
+            buf = ctypes.create_unicode_buffer("", 100)
+            if kernel32.GetVolumeInformationW(root, None, 0, None, None, None, buf, len(buf)):
                 return buf.value
 
         if get_file_system(support.TESTFN) == "NTFS":
@@ -318,7 +317,7 @@ class StatAttributeTests(unittest.TestCase):
             try:
                 os.stat(r"c:\pagefile.sys")
             except WindowsError as e:
-                if e == 2: # file does not exist; cannot run test
+                if e.errno == 2: # file does not exist; cannot run test
                     return
                 self.fail("Could not stat pagefile.sys")
 

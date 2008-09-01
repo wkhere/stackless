@@ -175,7 +175,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 						 kwlist,
 						 Py_FileSystemDefaultEncoding,
 						 &name, &mode, &closefd))
-			goto error;
+			return -1;
 	    }
 	}
 
@@ -278,6 +278,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 	ret = -1;
 
  done:
+	PyMem_Free(name);
 	return ret;
 }
 

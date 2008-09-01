@@ -5147,7 +5147,7 @@ def _dlog10(c, e, p):
         log_tenpower = f*M # exact
     else:
         log_d = 0  # error < 2.31
-        log_tenpower = div_nearest(f, 10**-p) # error < 0.5
+        log_tenpower = _div_nearest(f, 10**-p) # error < 0.5
 
     return _div_nearest(log_tenpower+log_d, 100)
 
@@ -5415,7 +5415,7 @@ ExtendedContext = Context(
 # 2. For finite numbers (not infinities and NaNs) the body of the
 # number between the optional sign and the optional exponent must have
 # at least one decimal digit, possibly after the decimal point.  The
-# lookahead expression '(?=\d|\.\d)' checks this.
+# lookahead expression '(?=[0-9]|\.[0-9])' checks this.
 #
 # As the flag UNICODE is not enabled here, we're explicitly avoiding any
 # other meaning for \d than the numbers [0-9].

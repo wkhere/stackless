@@ -400,7 +400,7 @@ def get_versions():
     """ Try to find out the versions of gcc, ld and dllwrap.
         If not possible it returns None for it.
     """
-    from distutils.version import StrictVersion
+    from distutils.version import LooseVersion
     from distutils.spawn import find_executable
     import re
 
@@ -409,9 +409,9 @@ def get_versions():
         out = os.popen(gcc_exe + ' -dumpversion','r')
         out_string = out.read()
         out.close()
-        result = re.search('(\d+\.\d+(\.\d+)*)',out_string)
+        result = re.search('(\d+\.\d+(\.\d+)*)', out_string, re.ASCII)
         if result:
-            gcc_version = StrictVersion(result.group(1))
+            gcc_version = LooseVersion(result.group(1))
         else:
             gcc_version = None
     else:
@@ -421,9 +421,9 @@ def get_versions():
         out = os.popen(ld_exe + ' -v','r')
         out_string = out.read()
         out.close()
-        result = re.search('(\d+\.\d+(\.\d+)*)',out_string)
+        result = re.search('(\d+\.\d+(\.\d+)*)', out_string, re.ASCII)
         if result:
-            ld_version = StrictVersion(result.group(1))
+            ld_version = LooseVersion(result.group(1))
         else:
             ld_version = None
     else:
@@ -433,9 +433,9 @@ def get_versions():
         out = os.popen(dllwrap_exe + ' --version','r')
         out_string = out.read()
         out.close()
-        result = re.search(' (\d+\.\d+(\.\d+)*)',out_string)
+        result = re.search(' (\d+\.\d+(\.\d+)*)', out_string, re.ASCII)
         if result:
-            dllwrap_version = StrictVersion(result.group(1))
+            dllwrap_version = LooseVersion(result.group(1))
         else:
             dllwrap_version = None
     else:

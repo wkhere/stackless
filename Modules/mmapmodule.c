@@ -245,7 +245,7 @@ mmap_read_method(mmap_object *self,
 		return(NULL);
 
 	/* silently 'adjust' out-of-range requests */
-	if ((self->pos + num_bytes) > self->size) {
+	if (num_bytes > self->size - self->pos) {
 		num_bytes -= (self->pos+num_bytes) - self->size;
 	}
 	result = PyByteArray_FromStringAndSize(self->data+self->pos, num_bytes);
@@ -913,7 +913,7 @@ and returns a mmap object.  If length is 0, the maximum length of the map\n\
 will be the current size of the file when mmap is called.\n\
 flags specifies the nature of the mapping. MAP_PRIVATE creates a\n\
 private copy-on-write mapping, so changes to the contents of the mmap\n\
-object will be private to this process, and MAP_SHARED`creates a mapping\n\
+object will be private to this process, and MAP_SHARED creates a mapping\n\
 that's shared with all other processes mapping the same areas of the file.\n\
 The default value is MAP_SHARED.\n\
 \n\

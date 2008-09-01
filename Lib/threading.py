@@ -2,6 +2,7 @@
 
 import sys as _sys
 import _thread
+import warnings
 
 from time import time as _time, sleep as _sleep
 from traceback import format_exc as _format_exc
@@ -40,7 +41,7 @@ if __debug__:
             if self._verbose:
                 format = format % args
                 format = "%s: %s\n" % (
-                    current_thread().get_name(), format)
+                    current_thread().name, format)
                 _sys.stderr.write(format)
 
 else:
@@ -83,7 +84,7 @@ class _RLock(_Verbose):
         owner = self._owner
         return "<%s(%s, %d)>" % (
                 self.__class__.__name__,
-                owner and owner.get_name(),
+                owner and owner.name,
                 self._count)
 
     def acquire(self, blocking=1):
@@ -340,6 +341,11 @@ class _Event(_Verbose):
     def is_set(self):
         return self._flag
 
+    def isSet(self):
+        warnings.warn("isSet() is deprecated in favor of is_set()",
+                      DeprecationWarning)
+        return self.is_set()
+
     def set(self):
         self._cond.acquire()
         try:
@@ -412,7 +418,7 @@ class Thread(_Verbose):
 
     def _set_daemon(self):
         # Overridden in _MainThread and _DummyThread
-        return current_thread().is_daemon()
+        return current_thread().daemon
 
     def __repr__(self):
         assert self._initialized, "Thread.__init__() was not called"
@@ -502,7 +508,7 @@ class Thread(_Verbose):
                 # self.
                 if _sys:
                     _sys.stderr.write("Exception in thread %s:\n%s\n" %
-                                      (self.get_name(), _format_exc()))
+                                      (self.name, _format_exc()))
                 else:
                     # Do the best job possible w/o a huge amt. of code to
                     # approximate a traceback (code ideas from
@@ -510,7 +516,7 @@ class Thread(_Verbose):
                     exc_type, exc_value, exc_tb = self._exc_info()
                     try:
                         print((
-                            "Exception in thread " + self.get_name() +
+                            "Exception in thread " + self.name +
                             " (most likely raised during interpreter shutdown):"), file=self._stderr)
                         print((
                             "Traceback (most recent call last):"), file=self._stderr)
@@ -621,15 +627,18 @@ class Thread(_Verbose):
         finally:
             self._block.release()
 
-    def get_name(self):
+    @property
+    def name(self):
         assert self._initialized, "Thread.__init__() not called"
         return self._name
 
-    def set_name(self, name):
+    @name.setter
+    def name(self, name):
         assert self._initialized, "Thread.__init__() not called"
         self._name = str(name)
 
-    def get_ident(self):
+    @property
+    def ident(self):
         assert self._initialized, "Thread.__init__() not called"
         return self._ident
 
@@ -637,16 +646,43 @@ class Thread(_Verbose):
         assert self._initialized, "Thread.__init__() not called"
         return self._started.is_set() and not self._stopped
 
-    def is_daemon(self):
+    def isAlive(self):
+        warnings.warn("isAlive() is deprecated in favor of is_alive()",
+                      DeprecationWarning)
+        return self.is_alive()
+
+    @property
+    def daemon(self):
         assert self._initialized, "Thread.__init__() not called"
         return self._daemonic
 
-    def set_daemon(self, daemonic):
+    @daemon.setter
+    def daemon(self, daemonic):
         if not self._initialized:
             raise RuntimeError("Thread.__init__() not called")
         if self._started.is_set():
             raise RuntimeError("cannot set daemon status of active thread");
         self._daemonic = daemonic
+
+    def isDaemon(self):
+        warnings.warn("isDaemon() is deprecated in favor of the " \
+                      "Thread.daemon property", DeprecationWarning)
+        return self.daemon
+
+    def setDaemon(self, daemonic):
+        warnings.warn("setDaemon() is deprecated in favor of the " \
+                      "Thread.daemon property", DeprecationWarning)
+        self.daemon = daemonic
+
+    def getName(self):
+        warnings.warn("getName() is deprecated in favor of the " \
+                      "Thread.name property", DeprecationWarning)
+        return self.name
+
+    def setName(self, name):
+        warnings.warn("setName() is deprecated in favor of the " \
+                      "Thread.name property", DeprecationWarning)
+        self.name = name
 
 # The timer class was contributed by Itamar Shtull-Trauring
 
@@ -709,7 +745,7 @@ class _MainThread(Thread):
 
 def _pickSomeNonDaemonThread():
     for t in enumerate():
-        if not t.is_daemon() and t.is_alive():
+        if not t.daemon and t.is_alive():
             return t
     return None
 
@@ -754,11 +790,20 @@ def current_thread():
         ##print "current_thread(): no current thread for", _get_ident()
         return _DummyThread()
 
+def currentThread():
+    warnings.warn("currentThread() is deprecated in favor of current_thread()",
+                  DeprecationWarning)
+
 def active_count():
     _active_limbo_lock.acquire()
     count = len(_active) + len(_limbo)
     _active_limbo_lock.release()
     return count
+
+def activeCount():
+    warnings.warn("activeCount() is deprecated in favor of active_count()",
+                  DeprecationWarning)
+    return active_count()
 
 def enumerate():
     _active_limbo_lock.acquire()
@@ -862,7 +907,7 @@ def _test():
             counter = 0
             while counter < self.quota:
                 counter = counter + 1
-                self.queue.put("%s.%d" % (self.get_name(), counter))
+                self.queue.put("%s.%d" % (self.name, counter))
                 _sleep(random() * 0.00001)
 
 
@@ -887,7 +932,7 @@ def _test():
     P = []
     for i in range(NP):
         t = ProducerThread(Q, NI)
-        t.set_name("Producer-%d" % (i+1))
+        t.name = "Producer-%d" % (i+1)
         P.append(t)
     C = ConsumerThread(Q, NI*NP)
     for t in P:

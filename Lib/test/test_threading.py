@@ -1,7 +1,7 @@
 # Very rudimentary test of threading module
 
 import test.support
-from test.support import verbose
+from test.support import verbose, catch_warning
 import random
 import re
 import sys
@@ -34,7 +34,7 @@ class TestThread(threading.Thread):
         delay = random.random() / 10000.0
         if verbose:
             print('task %s will run for %.1f usec' %
-                  (self.get_name(), delay * 1e6))
+                  (self.name, delay * 1e6))
 
         with self.sema:
             with self.mutex:
@@ -45,14 +45,14 @@ class TestThread(threading.Thread):
 
             time.sleep(delay)
             if verbose:
-                print('task', self.get_name(), 'done')
+                print('task', self.name, 'done')
 
             with self.mutex:
                 self.nrunning.dec()
                 self.testcase.assert_(self.nrunning.get() >= 0)
                 if verbose:
                     print('%s is finished. %d tasks are running' %
-                          (self.get_name(), self.nrunning.get()))
+                          (self.name, self.nrunning.get()))
 
 
 class ThreadTests(unittest.TestCase):
@@ -74,7 +74,7 @@ class ThreadTests(unittest.TestCase):
         for i in range(NUMTASKS):
             t = TestThread("<thread %d>"%i, self, sema, mutex, numrunning)
             threads.append(t)
-            self.failUnlessEqual(t.get_ident(), None)
+            self.failUnlessEqual(t.ident, None)
             self.assert_(re.match('<TestThread\(.*, initial\)>', repr(t)))
             t.start()
 
@@ -83,7 +83,7 @@ class ThreadTests(unittest.TestCase):
         for t in threads:
             t.join(NUMTASKS)
             self.assert_(not t.is_alive())
-            self.failIfEqual(t.get_ident(), 0)
+            self.failIfEqual(t.ident, 0)
             self.assert_(re.match('<TestThread\(.*, \w+ -?\d+\)>', repr(t)))
         if verbose:
             print('all tasks done')
@@ -173,7 +173,7 @@ class ThreadTests(unittest.TestCase):
                     worker_saw_exception.set()
 
         t = Worker()
-        t.set_daemon(True) # so if this fails, we don't hang Python at shutdown
+        t.daemon = True # so if this fails, we don't hang Python at shutdown
         t.start()
         if verbose:
             print("    started worker thread")
@@ -259,7 +259,7 @@ class ThreadTests(unittest.TestCase):
                 print('program blocked; aborting')
                 os._exit(2)
             t = threading.Thread(target=killer)
-            t.set_daemon(True)
+            t.daemon = True
             t.start()
 
             # This is the trace function
@@ -322,6 +322,45 @@ class ThreadTests(unittest.TestCase):
         self.assertEquals(None, weak_raising_cyclic_object(),
                           msg=('%d references still around' %
                                sys.getrefcount(weak_raising_cyclic_object())))
+
+    def test_pep8ified_threading(self):
+        def check(_, w, msg):
+            self.assertEqual(str(w.message), msg)
+
+        t = threading.Thread()
+        with catch_warning() as w:
+            try:
+                del threading.__warningregistry__
+            except AttributeError:
+                pass
+            msg = "isDaemon() is deprecated in favor of the " \
+                  "Thread.daemon property"
+            check(t.isDaemon(), w, msg)
+            w.reset()
+            msg = "setDaemon() is deprecated in favor of the " \
+                  "Thread.daemon property"
+            check(t.setDaemon(True), w, msg)
+            w.reset()
+            msg = "getName() is deprecated in favor of the " \
+                  "Thread.name property"
+            check(t.getName(), w, msg)
+            w.reset()
+            msg = "setName() is deprecated in favor of the " \
+                  "Thread.name property"
+            check(t.setName("name"), w, msg)
+            w.reset()
+            msg = "isAlive() is deprecated in favor of is_alive()"
+            check(t.isAlive(), w, msg)
+            w.reset()
+            e = threading.Event()
+            msg = "isSet() is deprecated in favor of is_set()"
+            check(e.isSet(), w, msg)
+            w.reset()
+            msg = "currentThread() is deprecated in favor of current_thread()"
+            check(threading.currentThread(), w, msg)
+            w.reset()
+            msg = "activeCount() is deprecated in favor of active_count()"
+            check(threading.activeCount(), w, msg)
 
 
 class ThreadJoinOnShutdown(unittest.TestCase):
@@ -437,7 +476,7 @@ class ThreadingExceptionTests(unittest.TestCase):
     def test_daemonize_active_thread(self):
         thread = threading.Thread()
         thread.start()
-        self.assertRaises(RuntimeError, thread.set_daemon, True)
+        self.assertRaises(RuntimeError, setattr, thread, "daemon", True)
 
 
 def test_main():

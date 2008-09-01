@@ -4,13 +4,106 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's new in Python 3.0b3?
-===========================
+What's New in Python 3.0 release candidate 1
+============================================
 
-*Release date: XX-XXX-2008*
+*Release date: XX-XXXX-2008*
 
 Core and Builtins
 -----------------
+
+- Issue #3712: The memoryview object had a reference leak and didn't support
+  cyclic garbage collection.
+
+- Issue #3668: Fix a memory leak with the "s*" argument parser in
+  PyArg_ParseTuple and friends, which occurred when the argument for "s*" 
+  was correctly parsed but parsing of subsequent arguments failed.
+
+- Issue #3611: An exception __context__ could be cleared in a complex pattern
+  involving a __del__ method re-raising an exception.
+
+- Issue #2534: speed up isinstance() and issubclass() by 50-70%, so as to 
+  match Python 2.5 speed despite the __instancecheck__ / __subclasscheck__
+  mechanism. In the process, fix a bug where isinstance() and issubclass(),
+  when given a tuple of classes as second argument, were looking up
+  __instancecheck__ / __subclasscheck__ on the tuple rather than on each
+  type object.
+
+- Issue #3663: Py_None was decref'd when printing SyntaxErrors.
+
+- Issue #3651: Fix various memory leaks when using the buffer
+  interface, or when the "s#" code of PyArg_ParseTuple is given a
+  bytes object.
+
+- Issue #3657: Fix uninitialized memory read when pickling longs.
+  Found by valgrind.
+
+- Apply security patches from Apple.
+
+- Fix crashes on memory allocation failure found with failmalloc.
+
+- Fix memory leaks found with valgrind and update suppressions file.
+
+- Fix compiler warnings in opt mode which would lead to invalid memory reads.
+
+- Fix problem using wrong name in decimal module reported by pychecker.
+
+- Issue #3650: Fixed a reference leak in bytes.split('x').
+
+- bytes(o) now tries to use o.__bytes__() before using fallbacks.
+
+C API
+-----
+
+- PyObject_Bytes and PyBytes_FromObject were added.
+
+Library
+-------
+
+Extension Modules
+-----------------
+
+- Issue #3643: Added a few more checks to _testcapi to prevent segfaults by
+  exploitation of poor argument checking.
+
+- bsddb code updated to version 4.7.3pre2. This code is the same than
+  Python 2.6 one, since the intention is to keep an unified 2.x/3.x codebase.
+  The Python code is automatically translated using "2to3". Please, do not
+  update this code in Python 3.0 by hand. Update the 2.6 one and then
+  do "2to3".
+
+Tools/Demos
+-----------
+
+- Fix Misc/gdbinit so it works.
+
+
+What's new in Python 3.0b3?
+===========================
+
+*Release date: 20-Aug-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3653: Fix a segfault when sys.excepthook was called with invalid
+  arguments.
+
+- Issue #2394: implement more of the memoryview API, with the caveat that
+  only one-dimensional contiguous buffers are supported and exercised right
+  now. Slicing, slice assignment and comparison (equality and inequality)
+  have been added. Also, the tolist() method has been implemented, but only
+  for byte buffers. Endly, the API has been updated to return bytes objects
+  wherever it used to return bytearrays.
+
+- Issue #3560: clean up the new C PyMemoryView API so that naming is
+  internally consistent; add macros PyMemoryView_GET_BASE() and
+  PyMemoryView_GET_BUFFER() to access useful properties of a memory views
+  without relying on a particular implementation; remove the ill-named
+  PyMemoryView() function (PyMemoryView_GET_BUFFER() can be used instead).
+
+- ctypes function pointers that are COM methods have a boolean True
+  value again.
 
 - Issue #1819: function calls with several named parameters are now on
   average 35% faster (as measured by pybench).
@@ -29,6 +122,36 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #1276: Added temporary aliases for CJK Mac encodings to resolve
+  a build problem on MacOS with CJK locales.  It adds four temporary
+  mappings to existing legacy codecs that are virtually compatible
+  with Mac encodings.  They will be replaced by codecs correctly
+  implemented in 3.1.
+
+- Issue #3614: Corrected a typo in xmlrpc.client, leading to a NameError
+  "global name 'header' is not defined".
+
+- Issue #2834: update the regular expression library to match the unicode
+  standards of py3k. In other words, mixing bytes and unicode strings
+  (be it as pattern, search string or replacement string) raises a TypeError.
+  Moreover, the re.UNICODE flag is enabled automatically for unicode patterns,
+  and can be disabled by specifying a new re.ASCII flag; as for bytes
+  patterns, ASCII matching is the only option and trying to specify re.UNICODE
+  for such patterns raises a ValueError.
+
+- Issue #3300: make urllib.parse.[un]quote() default to UTF-8.
+  Code contributed by Matt Giuca.  quote() now encodes the input
+  before quoting, unquote() decodes after unquoting.  There are
+  new arguments to change the encoding and errors settings.
+  There are also new APIs to skip the encode/decode steps.
+  [un]quote_plus() are also affected.
+
+- Issue #2235: numbers.Number now blocks inheritance of the default id()
+  based hash because that hash mechanism is not correct for numeric types.
+  All concrete numeric types that inherit from Number (rather than just
+  registering with it) must explicitly provide a hash implementation in
+  order for their instances to be hashable.
 
 - Issue #2676: in the email package, content-type parsing was hanging on
   pathological input because of quadratic or exponential behaviour of a
@@ -89,6 +212,12 @@ Library
 -------
 
 - Removed the sunaudio module. Use sunau instead.
+
+- Issue #3554: ctypes.string_at and ctypes.wstring_at did call Python
+  api functions without holding the GIL, which could lead to a fatal
+  error when they failed.
+
+- Issue #799428: Fix Tkinter.Misc._nametowidget to unwrap Tcl command objects.
 
 - Removed "ast" function aliases from the parser module.
 
@@ -206,6 +335,9 @@ Extension Modules
 Library
 -------
 
+- The methods ``is_in_tuple()``, ``is_vararg()``, and ``is_keywordarg()`` of
+  symtable.Symbol have been removed.
+
 - Patch #3133: http.server.CGIHTTPRequestHandler did not work on windows.
 
 - a new ``urllib`` package was created.  It consists of code from
@@ -314,7 +446,8 @@ Library
 
 - The test.test_support module has been renamed to test.support.
 
-- The threading module API was renamed to be PEP 8 complaint.
+- The threading module API was renamed to be PEP 8 compliant.  The
+  old names are still present, but will be removed in the near future.
 
 Tools/Demos
 -----------

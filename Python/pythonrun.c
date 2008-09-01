@@ -1266,7 +1266,10 @@ PyErr_PrintEx(int set_sys_last_vars)
 	if (exception == NULL)
 		return;
 	PyErr_NormalizeException(&exception, &v, &tb);
-	tb = tb ? tb : Py_None;
+	if (tb == NULL) {
+		tb = Py_None;
+		Py_INCREF(tb);
+	}
 	PyException_SetTraceback(v, tb);
 	if (exception == NULL)
 		return;
@@ -1323,6 +1326,13 @@ print_exception(PyObject *f, PyObject *value)
 {
 	int err = 0;
 	PyObject *type, *tb;
+
+	if (!PyExceptionInstance_Check(value)) {
+		PyFile_WriteString("TypeError: print_exception(): Exception expected for value, ", f);
+		PyFile_WriteString(Py_TYPE(value)->tp_name, f);
+		PyFile_WriteString(" found\n", f);
+		return;
+	}
 
 	Py_INCREF(value);
 	fflush(stdout);
