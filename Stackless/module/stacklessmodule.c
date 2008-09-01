@@ -255,6 +255,11 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 #ifdef WITH_THREAD
 	ts->st.thread.runflags = 0;
 #endif
+	/* retval really should be PyNone here.  Technically, it is the
+	 * tempval of some tasklet that has quit.  Even so, it is quite
+	 * useless to use.  run() must return None, or a tasklet
+	 */
+	Py_DECREF(retval);
 
 	ts->st.interrupt = NULL;
 
@@ -274,8 +279,8 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 		ts->st.current = (PyTaskletObject*)ts->st.main;
 		Py_DECREF(retval);
 		return (PyObject*) victim;
-	}
-	return retval;
+	} else
+		Py_RETURN_NONE;
 }
 
 static PyObject *

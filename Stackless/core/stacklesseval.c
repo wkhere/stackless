@@ -434,10 +434,9 @@ slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
 	if (slp_transfer(&cur->cstate, NULL, cur))
 		goto finally; /* fatal */
 	Py_XDECREF(cur->cstate);
-	retval = cur->tempval;
-	Py_INCREF(retval);
+	TASKLET_CLAIMVAL(cur, &retval);
 	if (PyBomb_Check(retval))
-		retval = slp_bomb_explode(cur);
+		retval = slp_bomb_explode(retval);
 finally:
 	cur->cstate = cst;
 	return retval;

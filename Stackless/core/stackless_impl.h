@@ -362,10 +362,8 @@ PyAPI_FUNC(int) initialize_main_and_current(void);
 
 #define TASKLET_SETVAL(task, val) \
 	if ((task)->tempval != (PyObject *) val) { \
-		PyObject *hold = (task)->tempval; \
 		Py_INCREF(val); \
-		(task)->tempval = (PyObject *) val; \
-		Py_DECREF(hold); \
+		TASKLET_SETVAL_OWN(task, val); \
 	}
 
 /* ditto, without incref. Made no sense to optimize. */
@@ -389,12 +387,21 @@ PyAPI_FUNC(int) initialize_main_and_current(void);
 		(next)->tempval = hold; \
 	}
 
+/* Get the value and replace it with a None */
+
+#define TASKLET_CLAIMVAL(task, val) \
+	{ \
+		*(val) = (task)->tempval; \
+		*(task)->tempval = Py_None; \
+		Py_INCREF(Py_None); \
+	}
+
 
 /* exception handling */
 
 PyAPI_FUNC(PyObject *) slp_make_bomb(PyObject *klass, PyObject *args, char *msg);
 PyAPI_FUNC(PyObject *) slp_curexc_to_bomb(void);
-PyAPI_FUNC(PyObject *) slp_bomb_explode(PyTaskletObject *task);
+PyAPI_FUNC(PyObject *) slp_bomb_explode(PyObject *bomb);
 
 /* tasklet startup */
 
