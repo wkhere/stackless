@@ -225,8 +225,7 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *victim;
 	PyObject *retval;
-	int err;
-
+	
 	if (ts->st.main == NULL)
 		return PyStackless_RunWatchdog_M(timeout, threadblocking);
 	if (ts->st.current != ts->st.main)
@@ -255,12 +254,14 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 #ifdef WITH_THREAD
 	ts->st.thread.runflags = 0;
 #endif
-
 	ts->st.interrupt = NULL;
 
-	err = retval == NULL;
-
-	if (err) /* an exception has occoured */
+	/* retval really should be PyNone here (or NULL).  Technically, it is the
+	 * tempval of some tasklet that has quit.  Even so, it is quite
+	 * useless to use.  run() must return None, or a tasklet
+	 */
+	Py_XDECREF(retval);
+	if (retval == NULL) /* an exception has occoured */
 		return NULL;
 
 	/* 
@@ -274,8 +275,8 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 		ts->st.current = (PyTaskletObject*)ts->st.main;
 		Py_DECREF(retval);
 		return (PyObject*) victim;
-	}
-	return retval;
+	} else
+		Py_RETURN_NONE;
 }
 
 static PyObject *

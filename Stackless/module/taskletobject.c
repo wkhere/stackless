@@ -887,8 +887,8 @@ static TASKLET_RAISE_EXCEPTION_HEAD(impl_tasklet_raise_exception)
 	TASKLET_SETVAL_OWN(self, bomb);
 	/* if the tasklet is dead, do not run it (no frame) but explode */
 	if (slp_get_frame(self) == NULL) {
-	    Py_INCREF(self->tempval);
-	    return slp_bomb_explode(self);
+		TASKLET_CLAIMVAL(self, &bomb);
+		return slp_bomb_explode(bomb);
 	}
 	return slp_schedule_task(ts->st.current, self, stackless);
 }
