@@ -16,8 +16,9 @@ class TestGarbageCollection(unittest.TestCase):
         gc.collect(2)
         after = gc.get_objects()
 
+        bset = set(id(o) for o in before)
         for x in after:
-            if x is not before and x is not after and x not in before:
+            if x is not before and id(x) not in bset:
                 leakage.append(x)
 
         if len(leakage):

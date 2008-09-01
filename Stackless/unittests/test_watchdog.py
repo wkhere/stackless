@@ -255,6 +255,19 @@ class TestWatchdog(unittest.TestCase):
         t.insert()
         while stackless.runcount > 1:
             returned = stackless.run(100)
+            
+    def test_run_return(self):
+        #if the main tasklet had previously gone into C stack recusion-based switch, stackless.run() would give
+        #strange results
+        #this would happen after, e.g. tasklet pickling and unpickling
+        #note, the bug was hard to repro, most of the time, it didn't occur.
+        t = pickle.loads(self.get_pickled_tasklet())
+        def func():
+            pass
+        t = stackless.tasklet(func)
+        t()
+        r = stackless.run()
+        self.assertEqual(r, None)
         
 if __name__ == '__main__':
     import sys

@@ -152,12 +152,12 @@ slp_curexc_to_bomb(void)
 	return (PyObject *) bomb;
 }
 
-/* set exception, destroy bomb reference and return NULL */
+/* set exception, consume bomb reference and return NULL */
 
 PyObject *
-slp_bomb_explode(PyTaskletObject *task)
+slp_bomb_explode(PyObject *_bomb)
 {
-	PyBombObject *bomb = (PyBombObject *) task->tempval;
+	PyBombObject* bomb = (PyBombObject*)_bomb;
 
 	assert(PyBomb_Check(bomb));
 	Py_XINCREF(bomb->curexc_type);
@@ -166,8 +166,6 @@ slp_bomb_explode(PyTaskletObject *task)
 	PyErr_Restore(bomb->curexc_type, bomb->curexc_value,
 		      bomb->curexc_traceback);
 	Py_DECREF(bomb);
-	/* avoid periodical re-bombing */
-	TASKLET_SETVAL(task, Py_None);
 	return NULL;
 }
 
@@ -470,6 +468,7 @@ jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
 	ts->frame = f->f_back;
 	Py_DECREF(f);
 	/* ignore retval. everything is in the tasklet. */
+	Py_DECREF(retval); /* consume ref according to protocol */
 	slp_transfer_return(ts->st.current->cstate);
 	/* we either have an error or don't come back, so: */
 	return NULL;
@@ -808,10 +807,9 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 		slp_current_insert(next);
 	}
 	if (prev == next) {
-		retval = prev->tempval;
-		Py_INCREF(retval);
+		TASKLET_CLAIMVAL(prev, &retval);
 		if (PyBomb_Check(retval))
-			retval = slp_bomb_explode(prev);
+			retval = slp_bomb_explode(retval);
 		return retval;
 	}
 
@@ -883,7 +881,6 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 	ts->recursion_depth = next->recursion_depth;
 
 	ts->st.current = next;
-	retval = next->tempval;
 
 	assert(next->cstate != NULL);
 	if (next->cstate->nesting_level != 0) {
@@ -894,13 +891,16 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 			ts->frame = prev->f.frame;
 			return NULL;
 		}
-		/* note that we don't explode the bomb now and don't incref! */
+		/* note that we don't explode any bomb now and leave it in next->tempval */
+		/* retval will be ignored eventually */
+		retval = next->tempval;
+		Py_INCREF(retval);
 		return STACKLESS_PACK(retval);
 	}
 
-	Py_INCREF(retval);
+	TASKLET_CLAIMVAL(next, &retval);
 	if (PyBomb_Check(retval))
-		retval = slp_bomb_explode(next);
+		retval = slp_bomb_explode(retval);
 
 	return STACKLESS_PACK(retval);
 
@@ -929,10 +929,9 @@ hard_switching:
 
 	if (transfer(cstprev, next->cstate, prev) == 0) {
 		--ts->st.nesting_level;
-		retval = prev->tempval;
-		Py_INCREF(retval);
+		TASKLET_CLAIMVAL(prev, &retval);
 		if (PyBomb_Check(retval))
-			retval = slp_bomb_explode(prev);
+			retval = slp_bomb_explode(retval);
 		return retval;
 	}
 	else {
@@ -1022,10 +1021,9 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 	if (prev != next)
 		retval = slp_schedule_task(prev, next, 1);
 	else {
-		retval = prev->tempval;
-		Py_INCREF(retval);
+		TASKLET_CLAIMVAL(prev, &retval);
 		if (PyBomb_Check(retval))
-			retval = slp_bomb_explode(prev);
+			retval = slp_bomb_explode(retval);
 	}
 
 	prev->ob_type->tp_clear((PyObject *)prev);
@@ -1067,11 +1065,17 @@ tasklet_end(PyObject *retval)
 		}
 	}
 
+#if 0
 	/*
 	 * put the result back into the dead tasklet, to give
 	 * possible referers access to the return value
 	 */
-	TASKLET_SETVAL_OWN(task, retval);
+	/* on second thought, it is pointless.  The tempval is cleared
+	 * as part of schedule_task_destruct() at the end of this function.
+	 */
+	if (!PyBomb_Check(retval))
+		TASKLET_SETVAL(task, retval);
+#endif
 
 	if (ismain) {
 		/*
@@ -1106,6 +1110,7 @@ tasklet_end(PyObject *retval)
 		 */
 		ts->st.main = NULL;
 		Py_DECREF(task);
+		Py_DECREF(retval);
 		return schedule_task_destruct(task, task);
 	}
 
@@ -1124,6 +1129,7 @@ tasklet_end(PyObject *retval)
 				    " without a receiver available.";
 			PyErr_SetString(PyExc_StopIteration, txt);
 			/* fall through to error handling */
+			Py_DECREF(retval);
 			retval = slp_curexc_to_bomb();
 			if (retval == NULL)
 				return NULL;
@@ -1138,6 +1144,7 @@ tasklet_end(PyObject *retval)
 		next = ts->st.main;
 		TASKLET_SETVAL(next, retval);
 	}
+	Py_DECREF(retval);
 
 	return schedule_task_destruct(task, next);
 }
@@ -1160,11 +1167,10 @@ slp_run_tasklet(void)
 		return NULL;
 	}
 
-	retval = ts->st.current->tempval;
-	Py_INCREF(retval);
+	TASKLET_CLAIMVAL(ts->st.current, &retval);
 
 	if (PyBomb_Check(retval))
-		retval = slp_bomb_explode(ts->st.current);
+		retval = slp_bomb_explode(retval);
 	while (ts->st.main != NULL) {
 		/* XXX correct condition? or current? */
 		retval = slp_frame_dispatch_top(retval);
