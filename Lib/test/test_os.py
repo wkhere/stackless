@@ -265,8 +265,7 @@ class StatAttributeTests(unittest.TestCase):
     # systems support centiseconds
     if sys.platform == 'win32':
         def get_file_system(path):
-            import os
-            root = os.path.splitdrive(os.path.realpath("."))[0] + '\\'
+            root = os.path.splitdrive(os.path.abspath(path))[0] + '\\'
             import ctypes
             kernel32 = ctypes.windll.kernel32
             buf = ctypes.create_string_buffer("", 100)
