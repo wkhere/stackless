@@ -1065,17 +1065,11 @@ tasklet_end(PyObject *retval)
 		}
 	}
 
-#if 0
 	/*
-	 * put the result back into the dead tasklet, to give
-	 * possible referers access to the return value
+	 * put the result back into the dead tasklet, to be retrieved
+	 * by schedule_task_destruct(), or cleared there
 	 */
-	/* on second thought, it is pointless.  The tempval is cleared
-	 * as part of schedule_task_destruct() at the end of this function.
-	 */
-	if (!PyBomb_Check(retval))
-		TASKLET_SETVAL(task, retval);
-#endif
+	TASKLET_SETVAL(task, retval);
 
 	if (ismain) {
 		/*
@@ -1109,9 +1103,10 @@ tasklet_end(PyObject *retval)
 		 * runnables chain intact.
 		 */
 		ts->st.main = NULL;
-		Py_DECREF(task);
 		Py_DECREF(retval);
-		return schedule_task_destruct(task, task);
+		retval = schedule_task_destruct(task, task);
+		Py_DECREF(task);
+		return retval;
 	}
 
 	next = ts->st.current;
