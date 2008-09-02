@@ -1052,13 +1052,10 @@ tasklet_end(PyObject *retval)
 	}
 
 	/*
-	 * put the result back into the dead tasklet,  This is required
-	 * to get access to the a the frame result value when a frame
-	 * is executed as a (main) tasklet, because otherwise the return
-	 * value is discarded just before schedule_task_destruct() below
+	 * put the result back into the dead tasklet, to be retrieved
+	 * by schedule_task_destruct(), or cleared there
 	 */
-	if (!PyBomb_Check(retval))
-		TASKLET_SETVAL(task, retval);
+	TASKLET_SETVAL(task, retval);
 
 	if (ismain) {
 		/*
@@ -1091,9 +1088,10 @@ tasklet_end(PyObject *retval)
 		 * runnables chain intact.
 		 */
 		ts->st.main = NULL;
-		Py_DECREF(task);
 		Py_DECREF(retval);
-		return schedule_task_destruct(task, task);
+		retval = schedule_task_destruct(task, task);
+		Py_DECREF(task);
+		return retval;
 	}
 
 	next = ts->st.current;
