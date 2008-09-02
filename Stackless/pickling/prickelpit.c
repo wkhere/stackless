@@ -1486,140 +1486,116 @@ typedef struct {
 static PyObject *
 dictiterkey_reduce(dictiterobject *di)
 {
-    PyObject *list, *key;
-    Py_ssize_t i, mask;
-	register PyDictEntry *ep;
-	PyDictObject *d = di->di_dict;
+	PyObject *tup, *list, *key;
+	Py_ssize_t i;
 
-    list = PyList_New(0);
-    if (list == NULL)
-        return NULL;
+	list = PyList_New(0);
+	if (list == NULL)
+		return PyErr_NoMemory();
 
-    /* is this dictiter is already exhausted? */
-    if (di->di_dict != NULL) {
-        if (di->di_used != di->di_dict->ma_used) {
-            PyErr_SetString(PyExc_RuntimeError,
-                "dictionary changed size during iteration");
-            di->di_used = -1; /* Make this state sticky */
-            goto fail;
-        }
-		if (di->di_pos < 0)
-			goto fail;
-		ep = d->ma_table;
-		mask = d->ma_mask;
-		for(i = di->di_pos; i <= mask; ++i) {
-			while (i <= mask && ep[i].me_value == NULL)
-				++i;
-			if (i > mask)
-				break;
-			key = ep[i].me_key;
-            if (PyList_Append(list, key) == -1)
-				goto fail;
-        }
-    }
-    /* masquerade as a PySeqIter */
-    return Py_BuildValue("(O(Nl)())",
-						&wrap_PySeqIter_Type,
-						list,
-						0
-						);
-fail:
-	Py_DECREF(list);
-	return NULL;
+	/* is this dictiter is already exhausted? */
+	if (di->di_dict != NULL) {
+		if (di->di_used != di->di_dict->ma_used) {
+			PyErr_SetString(PyExc_RuntimeError,
+				"dictionary changed size during iteration");
+			di->di_used = -1; /* Make this state sticky */
+			return NULL;
+		}
+		i = di->di_pos;
+		while (PyDict_Next((PyObject *)di->di_dict, &i, &key, NULL)) {
+			assert(key != NULL);
+			if (PyList_Append(list, key) == -1) {
+				Py_DECREF(list);
+				return NULL;
+			}
+		}
+	}
+	/* masquerade as a PySeqIter */
+	tup = Py_BuildValue("(O(Nl)())",
+		&wrap_PySeqIter_Type,
+		list,
+		0
+		);
+	return tup;
 }
 
 static PyObject *
 dictitervalue_reduce(dictiterobject *di)
 {
-    PyObject *list, *value;
-    Py_ssize_t i, mask;
-	register PyDictEntry *ep;
-	PyDictObject *d = di->di_dict;
+	PyObject *tup, *list, *value;
+	Py_ssize_t i;
 
-    list = PyList_New(0);
-    if (list == NULL)
-        return NULL;
+	list = PyList_New(0);
+	if (list == NULL)
+		return PyErr_NoMemory();
 
-    /* is this dictiter is already exhausted? */
-    if (di->di_dict != NULL) {
-        if (di->di_used != di->di_dict->ma_used) {
-            PyErr_SetString(PyExc_RuntimeError,
-                "dictionary changed size during iteration");
-            di->di_used = -1; /* Make this state sticky */
-            goto fail;
-        }
-		if (di->di_pos < 0)
-			goto fail;
-		ep = d->ma_table;
-		mask = d->ma_mask;
-		for(i = di->di_pos; i <= mask; ++i) {
-			while (i <= mask && (value=ep[i].me_value) == NULL)
-				++i;
-			if (i > mask)
-				break;
-			if (PyList_Append(list, value) == -1)
-				goto fail;
-        }
-    }
-    /* masquerade as a PySeqIter */
-    return Py_BuildValue("(O(Nl)())",
-						&wrap_PySeqIter_Type,
-						list,
-						0
-						);
-fail:
-	Py_DECREF(list);
-	return NULL;
+	/* is this dictiter is already exhausted? */
+	if (di->di_dict != NULL) {
+		if (di->di_used != di->di_dict->ma_used) {
+			PyErr_SetString(PyExc_RuntimeError,
+				"dictionary changed size during iteration");
+			di->di_used = -1; /* Make this state sticky */
+			return NULL;
+		}
+		i = di->di_pos;
+		while (PyDict_Next((PyObject *)di->di_dict, &i, NULL, &value)) {
+			assert(value != NULL);
+			if (PyList_Append(list, value) == -1) {
+				Py_DECREF(list);
+				return NULL;
+			}
+		}
+	}
+	/* masquerade as a PySeqIter */
+	tup = Py_BuildValue("(O(Nl)())",
+		&wrap_PySeqIter_Type,
+		list,
+		0
+		);
+	return tup;
 }
 
 static PyObject *
 dictiteritem_reduce(dictiterobject *di)
 {
-    PyObject *list, *tup;
-    Py_ssize_t i, mask;
-    register PyDictEntry *ep;
-    PyDictObject *d = di->di_dict;
+	PyObject *tup, *list, *key, *value, *res;
+	Py_ssize_t i;
 
-    list = PyList_New(0);
-    if (list == NULL)
-        return NULL;
+	list = PyList_New(0);
+	if (list == NULL)
+		return PyErr_NoMemory();
 
-    /* is this dictiter is already exhausted? */
-    if (d != NULL) {
-        if (di->di_used != d->ma_used) {
-            PyErr_SetString(PyExc_RuntimeError,
-                "dictionary changed size during iteration");
-            di->di_used = -1; /* Make this state sticky */
-            goto fail;
-        }
-		if (di->di_pos < 0)
-			goto fail;
-		ep = d->ma_table;
-		mask = d->ma_mask;	
-        for(i = di->di_pos; i <= mask; ++i) {
-			while (i <= mask && ep[i].me_value == NULL)
-				++i;
-			if (i>mask)
-				break;
-			tup = Py_BuildValue("(OO)", ep[i].me_key, ep[i].me_value);
-			if (!tup)
-				goto fail;
-            if (PyList_Append(list, tup) == -1) {
-				Py_DECREF(tup);
-                goto fail;
-            }
-			Py_DECREF(tup);
-        }
-    }
-    /* masquerade as a PySeqIter */
-    return Py_BuildValue("(O(Nl)())",
-						&wrap_PySeqIter_Type,
-						list,
-						0
-						);
-fail:
-	Py_DECREF(list);
-	return NULL;
+	/* is this dictiter is already exhausted? */
+	if (di->di_dict != NULL) {
+		if (di->di_used != di->di_dict->ma_used) {
+			PyErr_SetString(PyExc_RuntimeError,
+				"dictionary changed size during iteration");
+			di->di_used = -1; /* Make this state sticky */
+			return NULL;
+		}
+		i = di->di_pos;
+		while (PyDict_Next((PyObject *)di->di_dict, &i, &key, &value)) {
+			assert(key != NULL && value != NULL);
+			res = Py_BuildValue("OO", key, value);
+			if (res == NULL) {
+				Py_DECREF(list);
+				return NULL;
+			}
+			if (PyList_Append(list, res) == -1) {
+				Py_DECREF(list);
+				Py_DECREF(res);
+				return NULL;
+			}
+			Py_DECREF(res);
+		}
+	}
+	/* masquerade as a PySeqIter */
+	tup = Py_BuildValue("(O(Nl)())",
+		&wrap_PySeqIter_Type,
+		list,
+		0
+		);
+	return tup;
 }
 
 static PyTypeObject wrap_PyDictIterKey_Type;
