@@ -155,8 +155,8 @@ class TestWatchdog(unittest.TestCase):
         del self.verbose
 
         
-    def run_tasklets(self, fn):
-        scheduler = SimpleScheduler(100)
+    def run_tasklets(self, fn, no = 100):
+        scheduler = SimpleScheduler(no)
         tasklets = []
         for name in ["t1", "t2", "t3"]:
             tasklets.append(stackless.tasklet(fn)(name))
@@ -180,6 +180,10 @@ class TestWatchdog(unittest.TestCase):
 
     def test_nested(self):
         self.run_tasklets(runtask5)
+
+
+    def test_nested2(self):
+        self.run_tasklets(runtask5, 0)
 
 
     def test_tasklet_with_schedule(self):

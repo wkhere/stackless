@@ -273,7 +273,6 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 		ts->st.current = (PyTaskletObject*)ts->st.main->next;
 		victim = slp_current_remove();
 		ts->st.current = (PyTaskletObject*)ts->st.main;
-		Py_DECREF(retval);
 		return (PyObject*) victim;
 	} else
 		Py_RETURN_NONE;
