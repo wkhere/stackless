@@ -392,7 +392,8 @@ eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
 	ts->st.nesting_level = cf->n;
 	ts->frame = f->f_back;
 	Py_DECREF(f);
-	cur->cstate = NULL;
+	cur->cstate = ts->st.initial_stub;
+	Py_INCREF(cur->cstate);
 	retval = PyEval_EvalFrameEx_slp(ts->frame, exc, retval);
 	if (retval == NULL)
 		retval = slp_curexc_to_bomb();
@@ -400,7 +401,7 @@ eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
 		return NULL;
 	TASKLET_SETVAL_OWN(cur, retval);
 	/* jump back */
-	Py_XDECREF(cur->cstate);
+	Py_DECREF(cur->cstate);
 	cur->cstate = cst;
 	slp_transfer_return(cst);
 	/* never come here */
