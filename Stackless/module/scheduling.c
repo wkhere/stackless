@@ -550,17 +550,6 @@ next ? next->flags.blocked : 0)
 
 #ifdef WITH_THREAD
 
-static
-PyThread_type_lock interthread_lock = NULL;
-
-/* thread communication (protected by the lock) */
-
-static struct {
-	PyTaskletObject *unlock_target;
-	PyObject *other_lock;
-	long thread_id;
-} temp = {0, 0, 0};
-
 /* make sure that locks live longer than their threads */
 
 static void
@@ -595,7 +584,7 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 	PyThreadState *ts = PyThreadState_GET();
 	PyObject *retval;
 	PyTaskletObject *next = NULL;
-	PyObject *unlocker_lock;
+	PyObject *self_lock, *unlocker_lock;
 	int revive_main = 0;
 	
 #ifdef WITH_THREAD
@@ -623,24 +612,24 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 		if (!(ts->st.thread.self_lock = new_lock()))
 			return NULL;
 		acquire_lock(ts->st.thread.self_lock, 1);
-		if (!(ts->st.thread.unlock_lock = new_lock()))
-			return NULL;
 	}
 
 	/* let somebody reactivate us */
 
 	ts->st.thread.is_locked = 1; /* flag as blocked and wait */
 
-	PyEval_SaveThread();
+	self_lock = ts->st.thread.self_lock;
+	Py_INCREF(self_lock);
+	Py_BEGIN_ALLOW_THREADS
 	PR("locker waiting for my lock");
-	acquire_lock(ts->st.thread.self_lock, 1);
-	Py_INCREF(ts->st.thread.self_lock);
+	acquire_lock(self_lock, 1);
 	PR("HAVE my lock");
-	PyEval_RestoreThread(ts);
+	Py_END_ALLOW_THREADS
+	Py_DECREF(self_lock);
 
-	if (temp.unlock_target != NULL) {
-		next = temp.unlock_target;
-		temp.unlock_target = NULL;
+	if (ts->st.thread.unlock_target != NULL) {
+		next = (PyTaskletObject*)ts->st.thread.unlock_target;
+		ts->st.thread.unlock_target = NULL;
 	}
 	else
 		next = prev;
@@ -660,15 +649,15 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 		slp_current_insert(next);
 	}
 
-	if (temp.other_lock != NULL) {
+	if (ts->st.thread.unlocker_lock != NULL) {
 		PR("releasing unlocker");
-		unlocker_lock = temp.other_lock;
-		temp.other_lock = NULL;
+		unlocker_lock = ts->st.thread.unlocker_lock;
+		ts->st.thread.unlocker_lock = NULL;
 		release_lock(unlocker_lock);
+		PR("released unlocker");
 		Py_DECREF(unlocker_lock);
 	}
 
-	Py_DECREF(ts->st.thread.self_lock);
 	ts->st.thread.is_locked = 0;
 #else
 	(void)unlocker_lock;
@@ -695,13 +684,8 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 	if (ts->st.thread.self_lock == NULL) {
 		if (!(ts->st.thread.self_lock = new_lock()))
 			return NULL;
+		/* Non-recursive lock, used for blocking myself on second aquire() */
 		acquire_lock(ts->st.thread.self_lock, 1);
-		if (!(ts->st.thread.unlock_lock = new_lock()))
-			return NULL;
-		if (interthread_lock == NULL) {
-			if (!(interthread_lock = PyThread_allocate_lock()))
-				return NULL;
-		}
 	}
 
 	/*
@@ -718,20 +702,11 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 	unlock_lock = nts->st.thread.unlock_lock;
 	Py_INCREF(unlock_lock);
 
-	PyEval_SaveThread();
+	Py_BEGIN_ALLOW_THREADS
 	PR("unblocker waiting for unlocker lock");
 	acquire_lock(unlock_lock, 1);
 	PR("unblocker HAS unlocker lock");
-
-	/*
-	 * also make sure that only one single interthread transaction
-	 * is performed at any time.
-	 */
-
-	PR("unblocker waiting for interthread lock");
-	PyThread_acquire_lock(interthread_lock, 1);
-	PR("unblocker HAS interthread lock");
-	PyEval_RestoreThread(ts);
+	Py_END_ALLOW_THREADS
 
 	/* get myself ready */
 	retval = slp_schedule_task(prev, prev, stackless);
@@ -739,21 +714,20 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 	/* see whether the other thread still exists and is really blocked */
 	if (is_thread_alive(thread_id) && nts->st.thread.is_locked) {
 		/* tell the blocker what comes next */
-		temp.unlock_target = next;
-		temp.other_lock = ts->st.thread.self_lock;
+		nts->st.thread.unlock_target = (PyObject*)next;
+		nts->st.thread.unlocker_lock = ts->st.thread.self_lock;
 		/* give it an extra ref, in case I would die early */
-		Py_INCREF(temp.other_lock);
+		Py_INCREF(nts->st.thread.unlocker_lock);
 
 		/* unblock it */
 		release_lock(nts->st.thread.self_lock);
 
 		/* wait for the transaction to finish */
-
-		PyEval_SaveThread();
+		Py_BEGIN_ALLOW_THREADS
 		PR("unblocker waiting for own lock");
 		acquire_lock(ts->st.thread.self_lock, 1);
 		PR("unblocker HAS own lock");
-		PyEval_RestoreThread(ts);
+		Py_END_ALLOW_THREADS
 	}
 	else {
 		PR("unlocker: other is NOT LOCKED or dead");
@@ -768,14 +742,11 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 			slp_current_insert(next);
 		}
 	}
-	PR("unblocker releasing interthread lock");
-	PyThread_release_lock(interthread_lock);
-	PR("unblocker RELEASED interthread lock");
 	PR("unblocker releasing unlocker lock");
 	release_lock(unlock_lock);
-	Py_DECREF(unlock_lock);
 	PR("unblocker RELEASED unlocker lock");
-
+	Py_DECREF(unlock_lock);
+	
 	return retval;
 }
 
