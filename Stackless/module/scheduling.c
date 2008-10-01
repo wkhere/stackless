@@ -588,9 +588,12 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 	int revive_main = 0;
 	
 #ifdef WITH_THREAD
-	if (ts->st.thread.runflags == 0 && ts->st.main->next == NULL)
+	if ( !(ts->st.runflags & Py_WATCHDOG_THREADBLOCK) && ts->st.main->next == NULL)
 		/* we also must never block if watchdog is running not in threadblocking mode */
 		revive_main = 1;
+
+	if (revive_main)
+		assert(ts->st.main->next == NULL); /* main must be floating */
 #endif
 
 	if (revive_main || check_for_deadlock()) {
@@ -759,6 +762,21 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 	PyCStackObject **cstprev;
 	PyObject *retval;
 	int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
+
+	/* deal with soft interrupts here */
+	if(prev->flags.pending_irq && (ts->st.runflags & PY_WATCHDOG_SOFT) ) {
+		prev->flags.pending_irq = 0;
+		if (TASKLET_NESTING_OK(prev)) {
+			/* it is okay to interrupt this tasklet, revive main. */
+			assert(prev != ts->st.main);
+			assert(ts->st.main->next == NULL);
+			next = ts->st.main;
+		} else {
+			/* ok, let the next tasklet inherit the pending irq */
+			if (next && next != ts->st.main)
+				next->flags.pending_irq = 1;
+		}
+	}
 
 	if (next == NULL) {
 		return schedule_task_block(prev, stackless);

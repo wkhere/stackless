@@ -316,14 +316,26 @@ PyAPI_FUNC(PyObject *) PyStackless_GetCurrent(void);
  * In case on a timeout (opcode count), the return value
  * will be the long-running tasklet, removed from the queue.
  * You might decide to kill it or to insert it again.
- * The optional threadblocking argument, when non-zero enables
- * the old thread-blocking behaviour when we run out of tasklets
- * on this thread and there are other Python threads running.
+ * flags is interpreted as an OR of :
+ * Py_WATCHDOG_THREADBLOCK:
+ *   When set enables the old thread-blocking behaviour when
+ *   we run out of tasklets on this thread and there are other
+ *   Python threads running.
+ * Py_WATCHDOG_SOFT:
+ *   Instead of interrupting a tasklet, we wait until the
+ *   next tasklet scheduling moment to return.  Always returns
+ *   Py_None, as everything is in order.
+ * Py_WATCHDOG_IGNORE_NESTING:
+ *   allows interrupts at all levels, effectively acting as
+ *   though the "ignore_nesting" attribute were set on all
+ *   tasklets.
  */
+#define Py_WATCHDOG_THREADBLOCK			1
+#define PY_WATCHDOG_SOFT			2
+#define PY_WATCHDOG_IGNORE_NESTING	4
 PyAPI_FUNC(PyObject *) PyStackless_RunWatchdog(long timeout);
 PyAPI_FUNC(PyObject *) PyStackless_RunWatchdogEx(long timeout,
-											   long threadblocking);
-
+											   int flags);
 
 /******************************************************
 
