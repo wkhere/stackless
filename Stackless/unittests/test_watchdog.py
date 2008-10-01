@@ -13,9 +13,10 @@ class SimpleScheduler(object):
     """ Not really scheduler as such but used here to implement
     autoscheduling hack and store a schedule count. """
 
-    def __init__(self, bytecodes = 25):
+    def __init__(self, bytecodes = 25, softSchedule = False):
         self.bytecodes = bytecodes
         self.schedule_count = 0
+        self.softSchedule = softSchedule
 
 
     def get_schedule_count(self):
@@ -24,13 +25,14 @@ class SimpleScheduler(object):
 
     def schedule_cb(self, task):
         self.schedule_count += 1
-        task.insert()
+        if task:
+            task.insert()
 
 
     def autoschedule(self):
         while stackless.runcount > 1:
             try:
-                returned = stackless.run(self.bytecodes)
+                returned = stackless.run(self.bytecodes, soft = self.softSchedule)
                 
             except Exception, e:
                                 
@@ -41,8 +43,7 @@ class SimpleScheduler(object):
                 raise e
                         
             else:
-                if returned:
-                    self.schedule_cb(returned)
+                self.schedule_cb(returned)
 
 def runtask6(name):
     me = stackless.getcurrent()
@@ -147,6 +148,7 @@ def servertask(name, chan):
 
     
 class TestWatchdog(unittest.TestCase):
+    softSchedule = False
     def setUp(self):
         self.verbose = __name__ == "__main__"
 
@@ -154,8 +156,8 @@ class TestWatchdog(unittest.TestCase):
         del self.verbose
 
         
-    def run_tasklets(self, fn):
-        scheduler = SimpleScheduler(100)
+    def run_tasklets(self, fn, n=100):
+        scheduler = SimpleScheduler(n, self.softSchedule)
         tasklets = []
         for name in ["t1", "t2", "t3"]:
             tasklets.append(stackless.tasklet(fn)(name))
@@ -181,6 +183,10 @@ class TestWatchdog(unittest.TestCase):
         self.run_tasklets(runtask5)
 
 
+    def test_nested2(self):
+        self.run_tasklets(runtask5, 0)
+
+
     def test_tasklet_with_schedule(self):
         # make sure that we get enough tick counting
         try:
@@ -196,7 +202,10 @@ class TestWatchdog(unittest.TestCase):
         if self.verbose:
             print
             print 20*"*", "runtask:", n1, "runtask2:", n2
-        self.failUnless(n1 > n2)
+        if not self.softSchedule:
+            self.failUnless(n1 > n2)
+        else:
+            self.failUnless(n1 < n2)
 
 
     def test_exec_tasklet(self):
@@ -207,7 +216,7 @@ class TestWatchdog(unittest.TestCase):
         server = ServerTasklet(servertask)
         server_task = server("server", chan)
         
-        scheduler = SimpleScheduler(100)
+        scheduler = SimpleScheduler(100, self.softSchedule)
         
         tasklets = [stackless.tasklet(runtask4)(name, chan)
                      for name in ["client1", "client2", "client3"]] 
@@ -269,6 +278,10 @@ class TestWatchdog(unittest.TestCase):
         r = stackless.run()
         self.assertEqual(r, None)
         
+        
+class TestWatchdogSoft(TestWatchdog):
+    softSchedule = True
+    
 if __name__ == '__main__':
     import sys
     if not sys.argv[1:]:

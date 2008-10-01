@@ -27,12 +27,14 @@ typedef struct _sts {
 	PyObject * (*interrupt) (void);    /* the fast scheduler */
 	/* trap recursive scheduling via callbacks */
 	int schedlock;
+	int runflags;				/* flags for stackless.run() behaviour */
 #ifdef WITH_THREAD
 	struct {
-		PyObject *self_lock;
-		PyObject *unlock_lock;
+		PyObject *self_lock;		/* to block the thread */
+		PyObject *unlock_lock;		/* synchronize access to unblock the thread */
 		int is_locked;
-		int runflags;				/* flags for stackless.run() behaviour */
+		PyObject *unlock_target;	/*which tasklet to wake up when unblocked */
+		PyObject *unlocker_lock;	/* self_lock of the unlocker */
 	} thread;
 #endif
 	/* number of nested interpreters (1.0/2.0 merge) */
@@ -54,7 +56,8 @@ typedef struct _sts {
 	tstate->st.main = NULL; \
 	tstate->st.current = NULL; \
 	tstate->st.runcount = 0; \
-	tstate->st.nesting_level = 0;
+	tstate->st.nesting_level = 0; \
+	tstate->st.runflags = 0;
 
 /* note that the scheduler knows how to zap. It checks if it is in charge
    for this tstate and then clears everything. This will not work if
@@ -75,8 +78,9 @@ void slp_kill_tasks_with_stacks(struct _ts *tstate);
 	__STACKLESS_PYSTATE_NEW \
 	tstate->st.thread.self_lock = NULL; \
 	tstate->st.thread.unlock_lock = NULL; \
-	tstate->st.thread.is_locked = 0; \
-	tstate->st.thread.runflags = 0;
+	tstate->st.thread.is_locked = 0;\
+	tstate->st.thread.unlock_target = NULL; \
+	tstate->st.thread.unlocker_lock = NULL;
 
 
 #define STACKLESS_PYSTATE_CLEAR \
