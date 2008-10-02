@@ -933,7 +933,7 @@ def _follow_symlinks(filepath):
     filepath = _abspath(filepath)
     while os.path.islink(filepath):
         filepath = os.path.normpath(
-            os.path.join(filepath,os.readlink(filepath)))
+            os.path.join(os.path.dirname(filepath),os.readlink(filepath)))
     return filepath
 
 def _syscmd_uname(option,default=''):
@@ -964,9 +964,12 @@ def _syscmd_file(target,default=''):
         case the command should fail.
 
     """
+    if sys.platform in ('dos','win32','win16','os2'):
+        # XXX Others too ?
+        return default
     target = _follow_symlinks(target)
     try:
-        f = os.popen('file %s 2> /dev/null' % target)
+        f = os.popen('file "%s" 2> /dev/null' % target)
     except (AttributeError,os.error):
         return default
     output = string.strip(f.read())

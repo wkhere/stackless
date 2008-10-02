@@ -193,6 +193,17 @@ def normalize_and_reduce_paths(paths):
             reduced_paths.append(np)
     return reduced_paths
 
+def removeDuplicates(variable):
+    """Remove duplicate values of an environment variable.
+    """
+    oldList = variable.split(os.pathsep)
+    newList = []
+    for i in oldList:
+        if i not in newList:
+            newList.append(i)
+    newVariable = os.pathsep.join(newList)
+    return newVariable
+
 def find_vcvarsall(version):
     """Find the vcvarsall.bat file
 
@@ -252,12 +263,12 @@ def query_vcvarsall(version, arch="x86"):
         if '=' not in line:
             continue
         line = line.strip()
-        key, value = line.split('=')
+        key, value = line.split('=', 1)
         key = key.lower()
         if key in interesting:
             if value.endswith(os.pathsep):
                 value = value[:-1]
-            result[key] = value
+            result[key] = removeDuplicates(value)
 
     if len(result) != len(interesting):
         raise ValueError(str(list(result.keys())))
@@ -346,9 +357,10 @@ class MSVCCompiler(CCompiler) :
 
             vc_env = query_vcvarsall(VERSION, plat_spec)
 
-            self.__paths = vc_env['path'].split(os.pathsep)
-            os.environ['lib'] = vc_env['lib']
-            os.environ['include'] = vc_env['include']
+            # take care to only use strings in the environment.
+            self.__paths = vc_env['path'].encode('mbcs').split(os.pathsep)
+            os.environ['lib'] = vc_env['lib'].encode('mbcs')
+            os.environ['include'] = vc_env['include'].encode('mbcs')
 
             if len(self.__paths) == 0:
                 raise DistutilsPlatformError("Python was built with %s, "

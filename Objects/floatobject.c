@@ -1105,6 +1105,13 @@ float_trunc(PyObject *v)
 }
 
 static PyObject *
+float_long(PyObject *v)
+{
+	double x = PyFloat_AsDouble(v);
+	return PyLong_FromDouble(x);
+}
+
+static PyObject *
 float_float(PyObject *v)
 {
 	if (PyFloat_CheckExact(v))
@@ -1126,7 +1133,6 @@ char_from_hex(int x)
 static int
 hex_from_char(char c) {
 	int x;
-	assert(isxdigit(c));
 	switch(c) {
 	case '0':
 		x = 0;
@@ -1333,12 +1339,12 @@ float_fromhex(PyObject *cls, PyObject *arg)
 		s++;
 
 	/* infinities and nans */
-	if (PyOS_mystrnicmp(s, "nan", 4) == 0) {
+	if (PyOS_strnicmp(s, "nan", 4) == 0) {
 		x = Py_NAN;
 		goto finished;
 	}
-	if (PyOS_mystrnicmp(s, "inf", 4) == 0 ||
-	    PyOS_mystrnicmp(s, "infinity", 9) == 0) {
+	if (PyOS_strnicmp(s, "inf", 4) == 0 ||
+	    PyOS_strnicmp(s, "infinity", 9) == 0) {
 		x = sign*Py_HUGE_VAL;
 		goto finished;
 	}
@@ -1355,12 +1361,12 @@ float_fromhex(PyObject *cls, PyObject *arg)
 
 	/* coefficient: <integer> [. <fraction>] */
 	coeff_start = s;
-	while (isxdigit(*s))
+	while (hex_from_char(*s) >= 0)
 		s++;
 	s_store = s;
 	if (*s == '.') {
 		s++;
-		while (isxdigit(*s))
+		while (hex_from_char(*s) >= 0)
 			s++;
 		coeff_end = s-1;
 	}
@@ -1382,10 +1388,10 @@ float_fromhex(PyObject *cls, PyObject *arg)
 		exp_start = s;
 		if (*s == '-' || *s == '+')
 			s++;
-		if (!isdigit(*s))
+		if (!('0' <= *s && *s <= '9'))
 			goto parse_error;
 		s++;
-		while (isdigit(*s))
+		while ('0' <= *s && *s <= '9')
 			s++;
 		exp = strtol(exp_start, NULL, 10);
 	}
@@ -1898,7 +1904,7 @@ static PyNumberMethods float_as_number = {
 	0,		/*nb_or*/
 	float_coerce, 	/*nb_coerce*/
 	float_trunc, 	/*nb_int*/
-	float_trunc, 	/*nb_long*/
+	float_long, 	/*nb_long*/
 	float_float,	/*nb_float*/
 	0,		/* nb_oct */
 	0,		/* nb_hex */

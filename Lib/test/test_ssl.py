@@ -34,6 +34,21 @@ def handle_error(prefix):
     if test_support.verbose:
         sys.stdout.write(prefix + exc_format)
 
+    def testSimpleSSLwrap(self):
+        try:
+            ssl.sslwrap_simple(socket.socket(socket.AF_INET))
+        except IOError, e:
+            if e.errno == 32: # broken pipe when ssl_sock.do_handshake(), this test doesn't care about that
+                pass
+            else:
+                raise
+        try:
+            ssl.sslwrap_simple(socket.socket(socket.AF_INET)._sock)
+        except IOError, e:
+            if e.errno == 32: # broken pipe when ssl_sock.do_handshake(), this test doesn't care about that
+                pass
+            else:
+                raise
 
 class BasicTests(unittest.TestCase):
 
@@ -57,7 +72,6 @@ class BasicTests(unittest.TestCase):
             pass
         finally:
             s.close()
-
 
     def testCrucialConstants(self):
         ssl.PROTOCOL_SSLv2
@@ -200,7 +214,7 @@ else:
                 self.sock.setblocking(1)
                 self.sslconn = None
                 threading.Thread.__init__(self)
-                self.setDaemon(True)
+                self.daemon = True
 
             def show_conn_details(self):
                 if self.server.certreqs == ssl.CERT_REQUIRED:
@@ -338,7 +352,7 @@ else:
             self.port = test_support.bind_port(self.sock)
             self.active = False
             threading.Thread.__init__(self)
-            self.setDaemon(False)
+            self.daemon = True
 
         def start (self, flag=None):
             self.flag = flag
@@ -423,7 +437,7 @@ else:
             self.server = self.EchoServer(certfile)
             self.port = self.server.port
             threading.Thread.__init__(self)
-            self.setDaemon(True)
+            self.daemon = True
 
         def __str__(self):
             return "<%s %s>" % (self.__class__.__name__, self.server)
@@ -567,7 +581,7 @@ else:
             self.server = self.HTTPSServer(
                 (HOST, self.port), self.RootedHTTPRequestHandler, certfile)
             threading.Thread.__init__(self)
-            self.setDaemon(True)
+            self.daemon = True
 
         def __str__(self):
             return "<%s %s>" % (self.__class__.__name__, self.server)
@@ -1027,6 +1041,127 @@ else:
             finally:
                 server.stop()
                 # wait for server thread to end
+                server.join()
+
+
+        def testAllRecvAndSendMethods(self):
+
+            if test_support.verbose:
+                sys.stdout.write("\n")
+
+            server = ThreadedEchoServer(CERTFILE,
+                                        certreqs=ssl.CERT_NONE,
+                                        ssl_version=ssl.PROTOCOL_TLSv1,
+                                        cacerts=CERTFILE,
+                                        chatty=True,
+                                        connectionchatty=False)
+            flag = threading.Event()
+            server.start(flag)
+            # wait for it to start
+            flag.wait()
+            # try to connect
+            try:
+                s = ssl.wrap_socket(socket.socket(),
+                                    server_side=False,
+                                    certfile=CERTFILE,
+                                    ca_certs=CERTFILE,
+                                    cert_reqs=ssl.CERT_NONE,
+                                    ssl_version=ssl.PROTOCOL_TLSv1)
+                s.connect((HOST, server.port))
+            except ssl.SSLError as x:
+                raise support.TestFailed("Unexpected SSL error:  " + str(x))
+            except Exception as x:
+                raise support.TestFailed("Unexpected exception:  " + str(x))
+            else:
+                # helper methods for standardising recv* method signatures
+                def _recv_into():
+                    b = bytearray("\0"*100)
+                    count = s.recv_into(b)
+                    return b[:count]
+
+                def _recvfrom_into():
+                    b = bytearray("\0"*100)
+                    count, addr = s.recvfrom_into(b)
+                    return b[:count]
+
+                # (name, method, whether to expect success, *args)
+                send_methods = [
+                    ('send', s.send, True, []),
+                    ('sendto', s.sendto, False, ["some.address"]),
+                    ('sendall', s.sendall, True, []),
+                ]
+                recv_methods = [
+                    ('recv', s.recv, True, []),
+                    ('recvfrom', s.recvfrom, False, ["some.address"]),
+                    ('recv_into', _recv_into, True, []),
+                    ('recvfrom_into', _recvfrom_into, False, []),
+                ]
+                data_prefix = u"PREFIX_"
+
+                for meth_name, send_meth, expect_success, args in send_methods:
+                    indata = data_prefix + meth_name
+                    try:
+                        send_meth(indata.encode('ASCII', 'strict'), *args)
+                        outdata = s.read()
+                        outdata = outdata.decode('ASCII', 'strict')
+                        if outdata != indata.lower():
+                            raise support.TestFailed(
+                                "While sending with <<%s>> bad data "
+                                "<<%r>> (%d) received; "
+                                "expected <<%r>> (%d)\n" % (
+                                    meth_name, outdata[:20], len(outdata),
+                                    indata[:20], len(indata)
+                                )
+                            )
+                    except ValueError as e:
+                        if expect_success:
+                            raise support.TestFailed(
+                                "Failed to send with method <<%s>>; "
+                                "expected to succeed.\n" % (meth_name,)
+                            )
+                        if not str(e).startswith(meth_name):
+                            raise support.TestFailed(
+                                "Method <<%s>> failed with unexpected "
+                                "exception message: %s\n" % (
+                                    meth_name, e
+                                )
+                            )
+
+                for meth_name, recv_meth, expect_success, args in recv_methods:
+                    indata = data_prefix + meth_name
+                    try:
+                        s.send(indata.encode('ASCII', 'strict'))
+                        outdata = recv_meth(*args)
+                        outdata = outdata.decode('ASCII', 'strict')
+                        if outdata != indata.lower():
+                            raise support.TestFailed(
+                                "While receiving with <<%s>> bad data "
+                                "<<%r>> (%d) received; "
+                                "expected <<%r>> (%d)\n" % (
+                                    meth_name, outdata[:20], len(outdata),
+                                    indata[:20], len(indata)
+                                )
+                            )
+                    except ValueError as e:
+                        if expect_success:
+                            raise support.TestFailed(
+                                "Failed to receive with method <<%s>>; "
+                                "expected to succeed.\n" % (meth_name,)
+                            )
+                        if not str(e).startswith(meth_name):
+                            raise support.TestFailed(
+                                "Method <<%s>> failed with unexpected "
+                                "exception message: %s\n" % (
+                                    meth_name, e
+                                )
+                            )
+                        # consume data
+                        s.read()
+
+                s.write("over\n".encode("ASCII", "strict"))
+                s.close()
+            finally:
+                server.stop()
                 server.join()
 
 

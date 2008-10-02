@@ -34,7 +34,7 @@ class TestThread(threading.Thread):
         delay = random.random() / 10000.0
         if verbose:
             print 'task %s will run for %.1f usec' % (
-                self.get_name(), delay * 1e6)
+                self.name, delay * 1e6)
 
         with self.sema:
             with self.mutex:
@@ -45,14 +45,14 @@ class TestThread(threading.Thread):
 
             time.sleep(delay)
             if verbose:
-                print 'task', self.get_name(), 'done'
+                print 'task', self.name, 'done'
 
             with self.mutex:
                 self.nrunning.dec()
                 self.testcase.assert_(self.nrunning.get() >= 0)
                 if verbose:
                     print '%s is finished. %d tasks are running' % (
-                        self.get_name(), self.nrunning.get())
+                        self.name, self.nrunning.get())
 
 class ThreadTests(unittest.TestCase):
 
@@ -73,7 +73,7 @@ class ThreadTests(unittest.TestCase):
         for i in range(NUMTASKS):
             t = TestThread("<thread %d>"%i, self, sema, mutex, numrunning)
             threads.append(t)
-            self.failUnlessEqual(t.get_ident(), None)
+            self.failUnlessEqual(t.ident, None)
             self.assert_(re.match('<TestThread\(.*, initial\)>', repr(t)))
             t.start()
 
@@ -82,7 +82,7 @@ class ThreadTests(unittest.TestCase):
         for t in threads:
             t.join(NUMTASKS)
             self.assert_(not t.is_alive())
-            self.failIfEqual(t.get_ident(), 0)
+            self.failIfEqual(t.ident, 0)
             self.assert_(re.match('<TestThread\(.*, \w+ -?\d+\)>', repr(t)))
         if verbose:
             print 'all tasks done'
@@ -172,7 +172,7 @@ class ThreadTests(unittest.TestCase):
                     worker_saw_exception.set()
 
         t = Worker()
-        t.set_daemon(True) # so if this fails, we don't hang Python at shutdown
+        t.daemon = True # so if this fails, we don't hang Python at shutdown
         t.start()
         if verbose:
             print "    started worker thread"
@@ -258,7 +258,7 @@ class ThreadTests(unittest.TestCase):
                 print 'program blocked; aborting'
                 os._exit(2)
             t = threading.Thread(target=killer)
-            t.set_daemon(True)
+            t.daemon = True
             t.start()
 
             # This is the trace function
@@ -380,6 +380,12 @@ class ThreadJoinOnShutdown(unittest.TestCase):
         import os
         if not hasattr(os, 'fork'):
             return
+        # Skip platforms with known problems forking from a worker thread.
+        # See http://bugs.python.org/issue3863.
+        if sys.platform in ('freebsd4', 'freebsd5', 'freebsd6', 'os2emx'):
+            print >>sys.stderr, ('Skipping test_3_join_in_forked_from_thread'
+                                 ' due to known OS bugs on'), sys.platform
+            return
         script = """if 1:
             main_thread = threading.current_thread()
             def worker():
@@ -435,7 +441,7 @@ class ThreadingExceptionTests(unittest.TestCase):
     def test_daemonize_active_thread(self):
         thread = threading.Thread()
         thread.start()
-        self.assertRaises(RuntimeError, thread.set_daemon, True)
+        self.assertRaises(RuntimeError, setattr, thread, "daemon", True)
 
 
 def test_main():

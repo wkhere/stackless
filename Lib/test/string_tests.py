@@ -120,6 +120,14 @@ class CommonTest(unittest.TestCase):
         self.checkequal(2, 'aaa', 'count', '', -1)
         self.checkequal(4, 'aaa', 'count', '', -10)
 
+        self.checkequal(1, '', 'count', '')
+        self.checkequal(0, '', 'count', '', 1, 1)
+        self.checkequal(0, '', 'count', '', sys.maxint, 0)
+
+        self.checkequal(0, '', 'count', 'xx')
+        self.checkequal(0, '', 'count', 'xx', 1, 1)
+        self.checkequal(0, '', 'count', 'xx', sys.maxint, 0)
+
         self.checkraises(TypeError, 'hello', 'count')
         self.checkraises(TypeError, 'hello', 'count', 42)
 
@@ -168,6 +176,14 @@ class CommonTest(unittest.TestCase):
 
         self.checkraises(TypeError, 'hello', 'find')
         self.checkraises(TypeError, 'hello', 'find', 42)
+
+        self.checkequal(0, '', 'find', '')
+        self.checkequal(-1, '', 'find', '', 1, 1)
+        self.checkequal(-1, '', 'find', '', sys.maxint, 0)
+
+        self.checkequal(-1, '', 'find', 'xx')
+        self.checkequal(-1, '', 'find', 'xx', 1, 1)
+        self.checkequal(-1, '', 'find', 'xx', sys.maxint, 0)
 
         # For a variety of combinations,
         #    verify that str.find() matches __contains__
@@ -1117,6 +1133,9 @@ class MixinStrUnicodeUserStringTest:
         self.checkraises(ValueError, S, 'partition', '')
         self.checkraises(TypeError, S, 'partition', None)
 
+        # mixed use of str and unicode
+        self.assertEqual('a/b/c'.partition(u'/'), ('a', '/', 'b/c'))
+
     def test_rpartition(self):
 
         self.checkequal(('this is the rparti', 'ti', 'on method'),
@@ -1132,6 +1151,8 @@ class MixinStrUnicodeUserStringTest:
         self.checkraises(ValueError, S, 'rpartition', '')
         self.checkraises(TypeError, S, 'rpartition', None)
 
+        # mixed use of str and unicode
+        self.assertEqual('a/b/c'.rpartition(u'/'), ('a/b', '/', 'c'))
 
 class MixinStrStringUserStringTest:
     # Additional tests for 8bit strings, i.e. str, UserString and

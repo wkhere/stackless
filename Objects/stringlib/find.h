@@ -14,11 +14,10 @@ stringlib_find(const STRINGLIB_CHAR* str, Py_ssize_t str_len,
 {
     Py_ssize_t pos;
 
-    if (sub_len == 0) {
-        if (str_len < 0)
-            return -1;
+    if (str_len < 0)
+        return -1;
+    if (sub_len == 0)
         return offset;
-    }
 
     pos = fastsearch(str, str_len, sub, sub_len, FAST_SEARCH);
 
@@ -90,7 +89,7 @@ stringlib_rfind_slice(const STRINGLIB_CHAR* str, Py_ssize_t str_len,
     return stringlib_rfind(str + start, end - start, sub, sub_len, start);
 }
 
-#ifdef STRINGLIB_STR
+#if defined(STRINGLIB_STR) && !defined(FROM_BYTEARRAY)
 
 Py_LOCAL_INLINE(int)
 stringlib_contains_obj(PyObject* str, PyObject* sub)

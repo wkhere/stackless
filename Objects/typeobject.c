@@ -572,6 +572,49 @@ type_get_doc(PyTypeObject *type, void *context)
 	return result;
 }
 
+static PyObject *
+type___instancecheck__(PyObject *type, PyObject *inst)
+{
+	switch (_PyObject_RealIsInstance(inst, type)) {
+	case -1:
+		return NULL;
+	case 0:
+		Py_RETURN_FALSE;
+	default:
+		Py_RETURN_TRUE;
+	}
+}
+
+
+static PyObject *
+type_get_instancecheck(PyObject *type, void *context)
+{
+	static PyMethodDef ml = {"__instancecheck__",
+				 type___instancecheck__, METH_O };
+	return PyCFunction_New(&ml, type);
+}
+
+static PyObject *
+type___subclasscheck__(PyObject *type, PyObject *inst)
+{
+	switch (_PyObject_RealIsSubclass(inst, type)) {
+	case -1:
+		return NULL;
+	case 0:
+		Py_RETURN_FALSE;
+	default:
+		Py_RETURN_TRUE;
+	}
+}
+
+static PyObject *
+type_get_subclasscheck(PyObject *type, void *context)
+{
+	static PyMethodDef ml = {"__subclasscheck__",
+				 type___subclasscheck__, METH_O };
+	return PyCFunction_New(&ml, type);
+}
+
 static PyGetSetDef type_getsets[] = {
 	{"__name__", (getter)type_name, (setter)type_set_name, NULL},
 	{"__bases__", (getter)type_get_bases, (setter)type_set_bases, NULL},
@@ -580,6 +623,8 @@ static PyGetSetDef type_getsets[] = {
 	 (setter)type_set_abstractmethods, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
 	{"__doc__", (getter)type_get_doc, NULL, NULL},
+	{"__instancecheck__", (getter)type_get_instancecheck, NULL, NULL},
+	{"__subclasscheck__", (getter)type_get_subclasscheck, NULL, NULL},
 	{0}
 };
 
@@ -4966,7 +5011,17 @@ slot_sq_item(PyObject *self, Py_ssize_t i)
 	return NULL;
 }
 
-SLOT2(slot_sq_slice, "__getslice__", Py_ssize_t, Py_ssize_t, "nn")
+static PyObject*
+slot_sq_slice(PyObject *self, Py_ssize_t i, Py_ssize_t j)
+{
+	static PyObject *getslice_str;
+	
+	if (PyErr_WarnPy3k("in 3.x, __getslice__ has been removed; "
+			    "use __getitem__", 1) < 0)
+		return NULL;
+	return call_method(self, "__getslice__", &getslice_str,
+		"nn", i, j);
+}
 
 static int
 slot_sq_ass_item(PyObject *self, Py_ssize_t index, PyObject *value)
@@ -4991,13 +5046,21 @@ slot_sq_ass_slice(PyObject *self, Py_ssize_t i, Py_ssize_t j, PyObject *value)
 {
 	PyObject *res;
 	static PyObject *delslice_str, *setslice_str;
-
-	if (value == NULL)
+	
+	if (value == NULL) {
+		if (PyErr_WarnPy3k("in 3.x, __delslice__ has been removed; "
+				   "use __delitem__", 1) < 0)
+			return -1;
 		res = call_method(self, "__delslice__", &delslice_str,
 				  "(nn)", i, j);
-	else
+	}
+	else {
+		if (PyErr_WarnPy3k("in 3.x, __setslice__ has been removed; "
+					"use __setitem__", 1) < 0)
+			return -1;		
 		res = call_method(self, "__setslice__", &setslice_str,
-				  "(nnO)", i, j, value);
+			  "(nnO)", i, j, value);
+	}
 	if (res == NULL)
 		return -1;
 	Py_DECREF(res);

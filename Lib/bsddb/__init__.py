@@ -42,6 +42,12 @@ instead.  It mirrors the Oracle Berkeley DB C API.
 import sys
 absolute_import = (sys.version_info[0] >= 3)
 
+if sys.py3kwarning:
+    import warnings
+    warnings.warnpy3k("in 3.x, bsddb has been removed; "
+                      "please use the pybsddb project instead",
+                      DeprecationWarning, 2)
+
 try:
     if __name__ == 'bsddb3':
         # import _pybsddb binary as it should be the more recent version from
@@ -110,7 +116,7 @@ class _iter_mixin(MutableMapping):
                 key = _DeadlockWrap(cur.first, 0,0,0)[0]
                 yield key
 
-                next = cur.next
+                next = getattr(cur, "next")
                 while 1:
                     try:
                         key = _DeadlockWrap(next, 0,0,0)[0]
@@ -123,7 +129,7 @@ class _iter_mixin(MutableMapping):
                         # FIXME-20031101-greg: race condition.  cursor could
                         # be closed by another thread before this call.
                         _DeadlockWrap(cur.set, key,0,0,0)
-                        next = cur.next
+                        next = getattr(cur, "next")
             except _bsddb.DBNotFoundError:
                 pass
             except _bsddb.DBCursorClosedError:
@@ -152,7 +158,7 @@ class _iter_mixin(MutableMapping):
                 key = kv[0]
                 yield kv
 
-                next = cur.next
+                next = getattr(cur, "next")
                 while 1:
                     try:
                         kv = _DeadlockWrap(next)
@@ -166,7 +172,7 @@ class _iter_mixin(MutableMapping):
                         # FIXME-20031101-greg: race condition.  cursor could
                         # be closed by another thread before this call.
                         _DeadlockWrap(cur.set, key,0,0,0)
-                        next = cur.next
+                        next = getattr(cur, "next")
             except _bsddb.DBNotFoundError:
                 pass
             except _bsddb.DBCursorClosedError:
@@ -302,11 +308,14 @@ class _DBWithCursor(_iter_mixin):
         self._checkCursor()
         return _DeadlockWrap(self.dbc.set_range, key)
 
-    def next(self):
+    def next(self):  # Renamed by "2to3"
         self._checkOpen()
         self._checkCursor()
-        rv = _DeadlockWrap(self.dbc.next)
+        rv = _DeadlockWrap(getattr(self.dbc, "next"))
         return rv
+
+    if sys.version_info[0] >= 3 :  # For "2to3" conversion
+        next = __next__
 
     def previous(self):
         self._checkOpen()

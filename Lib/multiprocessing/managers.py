@@ -154,7 +154,7 @@ class Server(object):
                     except (OSError, IOError):
                         continue
                     t = threading.Thread(target=self.handle_request, args=(c,))
-                    t.set_daemon(True)
+                    t.daemon = True
                     t.start()
             except (KeyboardInterrupt, SystemExit):
                 pass
@@ -201,7 +201,7 @@ class Server(object):
         Handle requests from the proxies in a particular process/thread
         '''
         util.debug('starting server thread to service %r',
-                   threading.current_thread().get_name())
+                   threading.current_thread().name)
 
         recv = conn.recv
         send = conn.send
@@ -251,7 +251,7 @@ class Server(object):
 
             except EOFError:
                 util.debug('got EOF -- exiting thread serving %r',
-                           threading.current_thread().get_name())
+                           threading.current_thread().name)
                 sys.exit(0)
 
             except Exception:
@@ -264,7 +264,7 @@ class Server(object):
                     send(('#UNSERIALIZABLE', repr(msg)))
             except Exception, e:
                 util.info('exception in thread serving %r',
-                        threading.current_thread().get_name())
+                        threading.current_thread().name)
                 util.info(' ... message was %r', msg)
                 util.info(' ... exception was %r', e)
                 conn.close()
@@ -371,7 +371,13 @@ class Server(object):
 
             self.id_to_obj[ident] = (obj, set(exposed), method_to_typeid)
             if ident not in self.id_to_refcount:
-                self.id_to_refcount[ident] = None
+                self.id_to_refcount[ident] = 0
+            # increment the reference count immediately, to avoid
+            # this object being garbage collected before a Proxy
+            # object for it can be created.  The caller of create()
+            # is responsible for doing a decref once the Proxy object
+            # has been created.
+            self.incref(c, ident)
             return ident, tuple(exposed)
         finally:
             self.mutex.release()
@@ -386,18 +392,14 @@ class Server(object):
         '''
         Spawn a new thread to serve this connection
         '''
-        threading.current_thread().set_name(name)
+        threading.current_thread().name = name
         c.send(('#RETURN', None))
         self.serve_client(c)
 
     def incref(self, c, ident):
         self.mutex.acquire()
         try:
-            try:
-                self.id_to_refcount[ident] += 1
-            except TypeError:
-                assert self.id_to_refcount[ident] is None
-                self.id_to_refcount[ident] = 1
+            self.id_to_refcount[ident] += 1
         finally:
             self.mutex.release()
 
@@ -444,7 +446,7 @@ class BaseManager(object):
 
     def __init__(self, address=None, authkey=None, serializer='pickle'):
         if authkey is None:
-            authkey = current_process().get_authkey()
+            authkey = current_process().authkey
         self._address = address     # XXX not final address if eg ('', 0)
         self._authkey = AuthenticationString(authkey)
         self._state = State()
@@ -489,7 +491,7 @@ class BaseManager(object):
                   self._serializer, writer),
             )
         ident = ':'.join(str(i) for i in self._process._identity)
-        self._process.set_name(type(self).__name__  + '-' + ident)
+        self._process.name = type(self).__name__  + '-' + ident
         self._process.start()
 
         # get address of server
@@ -634,6 +636,8 @@ class BaseManager(object):
                     token, self._serializer, manager=self,
                     authkey=self._authkey, exposed=exp
                     )
+                conn = self._Client(token.address, authkey=self._authkey)
+                dispatch(conn, None, 'decref', (token.id,))
                 return proxy
             temp.__name__ = typeid
             setattr(cls, typeid, temp)
@@ -690,7 +694,7 @@ class BaseProxy(object):
         elif self._manager is not None:
             self._authkey = self._manager._authkey
         else:
-            self._authkey = current_process().get_authkey()
+            self._authkey = current_process().authkey
 
         if incref:
             self._incref()
@@ -699,9 +703,9 @@ class BaseProxy(object):
 
     def _connect(self):
         util.debug('making connection to manager')
-        name = current_process().get_name()
-        if threading.current_thread().get_name() != 'MainThread':
-            name += '|' + threading.current_thread().get_name()
+        name = current_process().name
+        if threading.current_thread().name != 'MainThread':
+            name += '|' + threading.current_thread().name
         conn = self._Client(self._token.address, authkey=self._authkey)
         dispatch(conn, None, 'accept_connection', (name,))
         self._tls.connection = conn
@@ -714,7 +718,7 @@ class BaseProxy(object):
             conn = self._tls.connection
         except AttributeError:
             util.debug('thread %r does not own a connection',
-                       threading.current_thread().get_name())
+                       threading.current_thread().name)
             self._connect()
             conn = self._tls.connection
 
@@ -726,10 +730,13 @@ class BaseProxy(object):
         elif kind == '#PROXY':
             exposed, token = result
             proxytype = self._manager._registry[token.typeid][-1]
-            return proxytype(
+            proxy = proxytype(
                 token, self._serializer, manager=self._manager,
                 authkey=self._authkey, exposed=exposed
                 )
+            conn = self._Client(token.address, authkey=self._authkey)
+            dispatch(conn, None, 'decref', (token.id,))
+            return proxy
         raise convert_to_error(kind, result)
 
     def _getvalue(self):
@@ -775,7 +782,7 @@ class BaseProxy(object):
         # the process owns no more references to objects for this manager
         if not idset and hasattr(tls, 'connection'):
             util.debug('thread %r has no more proxies so closing conn',
-                       threading.current_thread().get_name())
+                       threading.current_thread().name)
             tls.connection.close()
             del tls.connection
 
@@ -880,7 +887,7 @@ def AutoProxy(token, serializer, manager=None, authkey=None,
     if authkey is None and manager is not None:
         authkey = manager._authkey
     if authkey is None:
-        authkey = current_process().get_authkey()
+        authkey = current_process().authkey
 
     ProxyType = MakeProxyType('AutoProxy[%s]' % token.typeid, exposed)
     proxy = ProxyType(token, serializer, manager=manager, authkey=authkey,

@@ -21,19 +21,12 @@ from .. import refactor
 from .. import fixer_util
 
 
-class Options:
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-        self.verbose = False
-
 class FixerTestCase(support.TestCase):
     def setUp(self, fix_list=None):
-        if not fix_list:
+        if fix_list is None:
             fix_list = [self.fixer]
-        options = Options(fix=fix_list, print_function=False)
-        self.refactor = refactor.RefactoringTool("lib2to3/fixes", options)
+        options = {"print_function" : False}
+        self.refactor = support.get_refactorer(fix_list, options)
         self.fixer_log = []
         self.filename = "<string>"
 
@@ -70,10 +63,10 @@ class FixerTestCase(support.TestCase):
             self.failUnlessEqual(self.fixer_log, [])
 
     def assert_runs_after(self, *names):
-        fix = [self.fixer]
-        fix.extend(names)
-        options = Options(fix=fix, print_function=False)
-        r = refactor.RefactoringTool("lib2to3/fixes", options)
+        fixes = [self.fixer]
+        fixes.extend(names)
+        options = {"print_function" : False}
+        r = support.get_refactorer(fixes, options)
         (pre, post) = r.get_fixers()
         n = "fix_" + self.fixer
         if post and post[-1].__class__.__module__.endswith(n):
@@ -391,6 +384,16 @@ class Test_print(FixerTestCase):
         b = """print"""
         a = """print()"""
         self.check(b, a)
+
+    def test_4(self):
+        # from bug 3000
+        b = """print whatever; print"""
+        a = """print(whatever); print()"""
+        self.check(b, a)
+
+    def test_5(self):
+        b = """print; print whatever;"""
+        a = """print(); print(whatever);"""
 
     def test_tuple(self):
         b = """print (a, b, c)"""
@@ -1338,6 +1341,21 @@ class Test_raw_input(FixerTestCase):
     def test_4(self):
         b = """x = raw_input(foo(a) + 6)"""
         a = """x = input(foo(a) + 6)"""
+        self.check(b, a)
+
+    def test_5(self):
+        b = """x = raw_input(invite).split()"""
+        a = """x = input(invite).split()"""
+        self.check(b, a)
+
+    def test_6(self):
+        b = """x = raw_input(invite) . split ()"""
+        a = """x = input(invite) . split ()"""
+        self.check(b, a)
+
+    def test_8(self):
+        b = "x = int(raw_input())"
+        a = "x = int(input())"
         self.check(b, a)
 
 class Test_funcattrs(FixerTestCase):
@@ -2371,6 +2389,15 @@ class Test_numliterals(FixerTestCase):
         a = """b = 0x12"""
         self.check(b, a)
 
+    def test_comments_and_spacing(self):
+        b = """b =   0x12L"""
+        a = """b =   0x12"""
+        self.check(b, a)
+
+        b = """b = 0755 # spam"""
+        a = """b = 0o755 # spam"""
+        self.check(b, a)
+
     def test_unchanged_int(self):
         s = """5"""
         self.unchanged(s)
@@ -3329,6 +3356,225 @@ class Test_import(FixerTestCase):
         from . import foo.bar
         """
         self.check_both(b, a)
+
+class Test_sys_exc(FixerTestCase):
+    fixer = "sys_exc"
+
+    def test_0(self):
+        b = "sys.exc_type"
+        a = "sys.exc_info()[0]"
+        self.check(b, a)
+
+    def test_1(self):
+        b = "sys.exc_value"
+        a = "sys.exc_info()[1]"
+        self.check(b, a)
+
+    def test_2(self):
+        b = "sys.exc_traceback"
+        a = "sys.exc_info()[2]"
+        self.check(b, a)
+
+    def test_3(self):
+        b = "sys.exc_type # Foo"
+        a = "sys.exc_info()[0] # Foo"
+        self.check(b, a)
+
+    def test_4(self):
+        b = "sys.  exc_type"
+        a = "sys.  exc_info()[0]"
+        self.check(b, a)
+
+    def test_5(self):
+        b = "sys  .exc_type"
+        a = "sys  .exc_info()[0]"
+        self.check(b, a)
+
+
+class Test_paren(FixerTestCase):
+    fixer = "paren"
+
+    def test_0(self):
+        b = """[i for i in 1, 2 ]"""
+        a = """[i for i in (1, 2) ]"""
+        self.check(b, a)
+
+    def test_1(self):
+        b = """[i for i in 1, 2, ]"""
+        a = """[i for i in (1, 2,) ]"""
+        self.check(b, a)
+
+    def test_2(self):
+        b = """[i for i  in     1, 2 ]"""
+        a = """[i for i  in     (1, 2) ]"""
+        self.check(b, a)
+
+    def test_3(self):
+        b = """[i for i in 1, 2 if i]"""
+        a = """[i for i in (1, 2) if i]"""
+        self.check(b, a)
+
+    def test_4(self):
+        b = """[i for i in 1,    2    ]"""
+        a = """[i for i in (1,    2)    ]"""
+        self.check(b, a)
+
+    def test_5(self):
+        b = """(i for i in 1, 2)"""
+        a = """(i for i in (1, 2))"""
+        self.check(b, a)
+
+    def test_6(self):
+        b = """(i for i in 1   ,2   if i)"""
+        a = """(i for i in (1   ,2)   if i)"""
+        self.check(b, a)
+
+    def test_unchanged_0(self):
+        s = """[i for i in (1, 2)]"""
+        self.unchanged(s)
+
+    def test_unchanged_1(self):
+        s = """[i for i in foo()]"""
+        self.unchanged(s)
+
+    def test_unchanged_2(self):
+        s = """[i for i in (1, 2) if nothing]"""
+        self.unchanged(s)
+
+    def test_unchanged_3(self):
+        s = """(i for i in (1, 2))"""
+        self.unchanged(s)
+
+    def test_unchanged_4(self):
+        s = """[i for i in m]"""
+        self.unchanged(s)
+
+class Test_metaclass(FixerTestCase):
+
+    fixer = 'metaclass'
+
+    def test_unchanged(self):
+        self.unchanged("class X(): pass")
+        self.unchanged("class X(object): pass")
+        self.unchanged("class X(object1, object2): pass")
+        self.unchanged("class X(object1, object2, object3): pass")
+        self.unchanged("class X(metaclass=Meta): pass")
+        self.unchanged("class X(b, arg=23, metclass=Meta): pass")
+        self.unchanged("class X(b, arg=23, metaclass=Meta, other=42): pass")
+
+        s = """
+        class X:
+            def __metaclass__(self): pass
+        """
+        self.unchanged(s)
+
+    def test_comments(self):
+        b = """
+        class X:
+            # hi
+            __metaclass__ = AppleMeta
+        """
+        a = """
+        class X(metaclass=AppleMeta):
+            # hi
+            pass
+        """
+        self.check(b, a)
+
+        b = """
+        class X:
+            __metaclass__ = Meta
+            # Bedtime!
+        """
+        a = """
+        class X(metaclass=Meta):
+            pass
+            # Bedtime!
+        """
+        self.check(b, a)
+
+    def test_meta(self):
+        # no-parent class, odd body
+        b = """
+        class X():
+            __metaclass__ = Q
+            pass
+        """
+        a = """
+        class X(metaclass=Q):
+            pass
+        """
+        self.check(b, a)
+
+        # one parent class, no body
+        b = """class X(object): __metaclass__ = Q"""
+        a = """class X(object, metaclass=Q): pass"""
+        self.check(b, a)
+
+
+        # one parent, simple body
+        b = """
+        class X(object):
+            __metaclass__ = Meta
+            bar = 7
+        """
+        a = """
+        class X(object, metaclass=Meta):
+            bar = 7
+        """
+        self.check(b, a)
+
+        b = """
+        class X:
+            __metaclass__ = Meta; x = 4; g = 23
+        """
+        a = """
+        class X(metaclass=Meta):
+            x = 4; g = 23
+        """
+        self.check(b, a)
+
+        # one parent, simple body, __metaclass__ last
+        b = """
+        class X(object):
+            bar = 7
+            __metaclass__ = Meta
+        """
+        a = """
+        class X(object, metaclass=Meta):
+            bar = 7
+        """
+        self.check(b, a)
+
+        # redefining __metaclass__
+        b = """
+        class X():
+            __metaclass__ = A
+            __metaclass__ = B
+            bar = 7
+        """
+        a = """
+        class X(metaclass=B):
+            bar = 7
+        """
+        self.check(b, a)
+
+        # multiple inheritance, simple body
+        b = """
+        class X(clsA, clsB):
+            __metaclass__ = Meta
+            bar = 7
+        """
+        a = """
+        class X(clsA, clsB, metaclass=Meta):
+            bar = 7
+        """
+        self.check(b, a)
+
+        # keywords in the class statement
+        b = """class m(a, arg=23): __metaclass__ = Meta"""
+        a = """class m(a, arg=23, metaclass=Meta): pass"""
+        self.check(b, a)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,17 @@ from time import time as _time, sleep as _sleep
 from traceback import format_exc as _format_exc
 from collections import deque
 
+# Note regarding PEP 8 compliant aliases
+#  This threading model was originally inspired by Java, and inherited
+# the convention of camelCase function and method names from that
+# language. While those names are not in any imminent danger of being
+# deprecated, starting with Python 2.6, the module now provides a
+# PEP 8 compliant alias for any such method name.
+# Using the new PEP 8 compliant names also facilitates substitution
+# with the multiprocessing module, which doesn't provide the old
+# Java inspired names.
+
+
 # Rename some stuff so "from threading import *" is safe
 __all__ = ['activeCount', 'active_count', 'Condition', 'currentThread',
            'current_thread', 'enumerate', 'Event',
@@ -32,19 +43,6 @@ del thread
 # don't fully clear the exception until 3.0.
 warnings.filterwarnings('ignore', category=DeprecationWarning,
                         module='threading', message='sys.exc_clear')
-
-
-def _old_api(callable, old_name):
-    if not _sys.py3kwarning:
-        return callable
-    @wraps(callable)
-    def old(*args, **kwargs):
-        warnings.warnpy3k("In 3.x, {0} is renamed to {1}."
-                          .format(old_name, callable.__name__),
-                          stacklevel=3)
-        return callable(*args, **kwargs)
-    old.__name__ = old_name
-    return old
 
 # Debug support (adapted from ihooks.py).
 # All the major classes here derive from _Verbose.  We force that to
@@ -67,7 +65,7 @@ if __debug__:
             if self.__verbose:
                 format = format % args
                 format = "%s: %s\n" % (
-                    current_thread().get_name(), format)
+                    current_thread().name, format)
                 _sys.stderr.write(format)
 
 else:
@@ -110,7 +108,7 @@ class _RLock(_Verbose):
         owner = self.__owner
         return "<%s(%s, %d)>" % (
                 self.__class__.__name__,
-                owner and owner.get_name(),
+                owner and owner.name,
                 self.__count)
 
     def acquire(self, blocking=1):
@@ -287,10 +285,10 @@ class _Condition(_Verbose):
             except ValueError:
                 pass
 
-    def notify_all(self):
+    def notifyAll(self):
         self.notify(len(self.__waiters))
 
-    notifyAll = _old_api(notify_all, "notifyAll")
+    notify_all = notifyAll
 
 
 def Semaphore(*args, **kwargs):
@@ -368,10 +366,10 @@ class _Event(_Verbose):
         self.__cond = Condition(Lock())
         self.__flag = False
 
-    def is_set(self):
+    def isSet(self):
         return self.__flag
 
-    isSet = _old_api(is_set, "isSet")
+    is_set = isSet
 
     def set(self):
         self.__cond.acquire()
@@ -445,7 +443,7 @@ class Thread(_Verbose):
 
     def _set_daemon(self):
         # Overridden in _MainThread and _DummyThread
-        return current_thread().is_daemon()
+        return current_thread().daemon
 
     def __repr__(self):
         assert self.__initialized, "Thread.__init__() was not called"
@@ -534,7 +532,7 @@ class Thread(_Verbose):
                 # self.
                 if _sys:
                     _sys.stderr.write("Exception in thread %s:\n%s\n" %
-                                      (self.get_name(), _format_exc()))
+                                      (self.name, _format_exc()))
                 else:
                     # Do the best job possible w/o a huge amt. of code to
                     # approximate a traceback (code ideas from
@@ -542,7 +540,7 @@ class Thread(_Verbose):
                     exc_type, exc_value, exc_tb = self.__exc_info()
                     try:
                         print>>self.__stderr, (
-                            "Exception in thread " + self.get_name() +
+                            "Exception in thread " + self.name +
                             " (most likely raised during interpreter shutdown):")
                         print>>self.__stderr, (
                             "Traceback (most recent call last):")
@@ -651,42 +649,51 @@ class Thread(_Verbose):
         finally:
             self.__block.release()
 
-    def get_name(self):
+    @property
+    def name(self):
         assert self.__initialized, "Thread.__init__() not called"
         return self.__name
 
-    getName = _old_api(get_name, "getName")
-
-    def set_name(self, name):
+    @name.setter
+    def name(self, name):
         assert self.__initialized, "Thread.__init__() not called"
         self.__name = str(name)
 
-    setName = _old_api(set_name, "setName")
-
-    def get_ident(self):
+    @property
+    def ident(self):
         assert self.__initialized, "Thread.__init__() not called"
         return self.__ident
 
-    def is_alive(self):
+    def isAlive(self):
         assert self.__initialized, "Thread.__init__() not called"
         return self.__started.is_set() and not self.__stopped
 
-    isAlive = _old_api(is_alive, "isAlive")
+    is_alive = isAlive
 
-    def is_daemon(self):
+    @property
+    def daemon(self):
         assert self.__initialized, "Thread.__init__() not called"
         return self.__daemonic
 
-    isDaemon = _old_api(is_daemon, "isDaemon")
-
-    def set_daemon(self, daemonic):
+    @daemon.setter
+    def daemon(self, daemonic):
         if not self.__initialized:
             raise RuntimeError("Thread.__init__() not called")
         if self.__started.is_set():
             raise RuntimeError("cannot set daemon status of active thread");
         self.__daemonic = daemonic
 
-    setDaemon = _old_api(set_daemon, "setDaemon")
+    def isDaemon(self):
+        return self.daemon
+
+    def setDaemon(self, daemonic):
+        self.daemon = daemonic
+
+    def getName(self):
+        return self.name
+
+    def setName(self, name):
+        self.name = name
 
 # The timer class was contributed by Itamar Shtull-Trauring
 
@@ -749,7 +756,7 @@ class _MainThread(Thread):
 
 def _pickSomeNonDaemonThread():
     for t in enumerate():
-        if not t.is_daemon() and t.is_alive():
+        if not t.daemon and t.is_alive():
             return t
     return None
 
@@ -786,22 +793,22 @@ class _DummyThread(Thread):
 
 # Global API functions
 
-def current_thread():
+def currentThread():
     try:
         return _active[_get_ident()]
     except KeyError:
         ##print "current_thread(): no current thread for", _get_ident()
         return _DummyThread()
 
-currentThread = _old_api(current_thread, "currentThread")
+current_thread = currentThread
 
-def active_count():
+def activeCount():
     _active_limbo_lock.acquire()
     count = len(_active) + len(_limbo)
     _active_limbo_lock.release()
     return count
 
-activeCount = _old_api(active_count, "activeCount")
+active_count = activeCount
 
 def enumerate():
     _active_limbo_lock.acquire()
@@ -840,9 +847,12 @@ def _after_fork():
     new_active = {}
     current = current_thread()
     with _active_limbo_lock:
-        for ident, thread in _active.iteritems():
+        for thread in _active.itervalues():
             if thread is current:
-                # There is only one active thread.
+                # There is only one active thread. We reset the ident to
+                # its new value since it can have changed.
+                ident = _get_ident()
+                thread._Thread__ident = ident
                 new_active[ident] = thread
             else:
                 # All the others are already stopped.
@@ -905,7 +915,7 @@ def _test():
             counter = 0
             while counter < self.quota:
                 counter = counter + 1
-                self.queue.put("%s.%d" % (self.get_name(), counter))
+                self.queue.put("%s.%d" % (self.name, counter))
                 _sleep(random() * 0.00001)
 
 
@@ -930,7 +940,7 @@ def _test():
     P = []
     for i in range(NP):
         t = ProducerThread(Q, NI)
-        t.setName("Producer-%d" % (i+1))
+        t.name = ("Producer-%d" % (i+1))
         P.append(t)
     C = ConsumerThread(Q, NI*NP)
     for t in P:

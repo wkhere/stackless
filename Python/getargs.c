@@ -139,24 +139,35 @@ _PyArg_VaParse_SizeT(PyObject *args, char *format, va_list va)
 
 /* Handle cleanup of allocated memory in case of exception */
 
+static void
+cleanup_ptr(void *ptr)
+{
+	PyMem_FREE(ptr);
+}
+
+static void
+cleanup_buffer(void *ptr)
+{
+	PyBuffer_Release((Py_buffer *) ptr);
+}
+
 static int
-addcleanup(void *ptr, PyObject **freelist)
+addcleanup(void *ptr, PyObject **freelist, void (*destr)(void *))
 {
 	PyObject *cobj;
 	if (!*freelist) {
 		*freelist = PyList_New(0);
 		if (!*freelist) {
-			PyMem_FREE(ptr);
+			destr(ptr);
 			return -1;
 		}
 	}
-	cobj = PyCObject_FromVoidPtr(ptr, NULL);
+	cobj = PyCObject_FromVoidPtr(ptr, destr);
 	if (!cobj) {
-		PyMem_FREE(ptr);
+		destr(ptr);
 		return -1;
 	}
 	if (PyList_Append(*freelist, cobj)) {
-                PyMem_FREE(ptr);
 		Py_DECREF(cobj);
 		return -1;
 	}
@@ -167,15 +178,15 @@ addcleanup(void *ptr, PyObject **freelist)
 static int
 cleanreturn(int retval, PyObject *freelist)
 {
-	if (freelist) {
-		if (retval == 0) {
-			Py_ssize_t len = PyList_GET_SIZE(freelist), i;
-			for (i = 0; i < len; i++)
-                                PyMem_FREE(PyCObject_AsVoidPtr(
-                                		PyList_GET_ITEM(freelist, i)));
-		}
-		Py_DECREF(freelist);
+	if (freelist && retval != 0) {
+		/* We were successful, reset the destructors so that they
+		   don't get called. */
+		Py_ssize_t len = PyList_GET_SIZE(freelist), i;
+		for (i = 0; i < len; i++)
+			((PyCObject *) PyList_GET_ITEM(freelist, i))
+				->destructor = NULL;
 	}
+	Py_XDECREF(freelist);
 	return retval;
 }
 
@@ -798,6 +809,11 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 				if (getbuffer(arg, p, &buf) < 0)
 					return converterr(buf, arg, msgbuf, bufsize);
 			}
+			if (addcleanup(p, freelist, cleanup_buffer)) {
+				return converterr(
+					"(cleanup problem)",
+					arg, msgbuf, bufsize);
+			}
 			format++;
 		} else if (*format == '#') {
 			void **p = (void **)va_arg(*p_va, char **);
@@ -874,6 +890,11 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 				char *buf;
 				if (getbuffer(arg, p, &buf) < 0)
 					return converterr(buf, arg, msgbuf, bufsize);
+			}
+			if (addcleanup(p, freelist, cleanup_buffer)) {
+				return converterr(
+					"(cleanup problem)",
+					arg, msgbuf, bufsize);
 			}
 			format++;
 		} else if (*format == '#') { /* any buffer-like object */
@@ -1051,7 +1072,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 						"(memory error)",
 						arg, msgbuf, bufsize);
 				}
-				if (addcleanup(*buffer, freelist)) {
+				if (addcleanup(*buffer, freelist, cleanup_ptr)) {
 					Py_DECREF(s);
 					return converterr(
 						"(cleanup problem)",
@@ -1096,7 +1117,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 				return converterr("(memory error)",
 						  arg, msgbuf, bufsize);
 			}
-			if (addcleanup(*buffer, freelist)) {
+			if (addcleanup(*buffer, freelist, cleanup_ptr)) {
 				Py_DECREF(s);
 				return converterr("(cleanup problem)",
 						arg, msgbuf, bufsize);
@@ -1214,6 +1235,11 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 				PyErr_Clear();
 				return converterr("read-write buffer", arg, msgbuf, bufsize);
 			}
+			if (addcleanup(p, freelist, cleanup_buffer)) {
+				return converterr(
+					"(cleanup problem)",
+					arg, msgbuf, bufsize);
+			}
 			if (!PyBuffer_IsContiguous((Py_buffer*)p, 'C'))
 				return converterr("contiguous buffer", arg, msgbuf, bufsize);
 			break;
@@ -1312,7 +1338,7 @@ convertbuffer(PyObject *arg, void **p, char **errmsg)
 }
 
 static int
-getbuffer(PyObject *arg, Py_buffer *view, char**errmsg)
+getbuffer(PyObject *arg, Py_buffer *view, char **errmsg)
 {
 	void *buf;
 	Py_ssize_t count;
@@ -1322,8 +1348,10 @@ getbuffer(PyObject *arg, Py_buffer *view, char**errmsg)
 		return -1;
 	}
 	if (pb->bf_getbuffer) {
-		if (pb->bf_getbuffer(arg, view, 0) < 0)
+		if (pb->bf_getbuffer(arg, view, 0) < 0) {
+			*errmsg = "convertible to a buffer";
 			return -1;
+		}
 		if (!PyBuffer_IsContiguous(view, 'C')) {
 			*errmsg = "contiguous buffer";
 			return -1;
@@ -1332,8 +1360,10 @@ getbuffer(PyObject *arg, Py_buffer *view, char**errmsg)
 	}
 
 	count = convertbuffer(arg, &buf, errmsg);
-	if (count < 0)
+	if (count < 0) {
+		*errmsg = "convertible to a buffer";
 		return count;
+	}
 	PyBuffer_FillInfo(view, NULL, buf, count, 1, 0);
 	return 0;
 }

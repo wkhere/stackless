@@ -55,23 +55,6 @@ def do_test(buf, method):
     except StandardError, err:
         return ComparableException(err)
 
-# A list of test cases.  Each test case is a a two-tuple that contains
-# a string with the query and a dictionary with the expected result.
-
-parse_qsl_test_cases = [
-    ("", []),
-    ("&", []),
-    ("&&", []),
-    ("=", [('', '')]),
-    ("=a", [('', 'a')]),
-    ("a", [('a', '')]),
-    ("a=", [('a', '')]),
-    ("a=", [('a', '')]),
-    ("&a=b", [('a', 'b')]),
-    ("a=a+b&b=b+c", [('a', 'a b'), ('b', 'b c')]),
-    ("a=1&a=2", [('a', '1'), ('a', '2')]),
-]
-
 parse_strict_test_cases = [
     ("", ValueError("bad query field: ''")),
     ("&", ValueError("bad query field: ''")),
@@ -142,11 +125,6 @@ def gen_result(data, environ):
     return result
 
 class CgiTests(unittest.TestCase):
-
-    def test_qsl(self):
-        for orig, expect in parse_qsl_test_cases:
-            result = cgi.parse_qsl(orig, keep_blank_values=True)
-            self.assertEqual(result, expect, "Error parsing %s" % repr(orig))
 
     def test_strict(self):
         for orig, expect in parse_strict_test_cases:
@@ -365,6 +343,17 @@ this is the content of the fake file
         })
         v = gen_result(data, environ)
         self.assertEqual(result, v)
+
+    def test_deprecated_parse_qs(self):
+        # this func is moved to urlparse, this is just a sanity check
+        self.assertEqual({'a': ['A1'], 'B': ['B3'], 'b': ['B2']},
+                         cgi.parse_qs('a=A1&b=B2&B=B3'))
+
+    def test_deprecated_parse_qsl(self):
+        # this func is moved to urlparse, this is just a sanity check
+        self.assertEqual([('a', 'A1'), ('b', 'B2'), ('B', 'B3')],
+                         cgi.parse_qsl('a=A1&b=B2&B=B3'))
+
 
 def test_main():
     run_unittest(CgiTests)

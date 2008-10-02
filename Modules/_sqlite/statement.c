@@ -79,11 +79,13 @@ int pysqlite_statement_create(pysqlite_Statement* self, pysqlite_Connection* con
 
     sql_cstr = PyString_AsString(sql_str);
 
+    Py_BEGIN_ALLOW_THREADS
     rc = sqlite3_prepare(connection->db,
                          sql_cstr,
                          -1,
                          &self->st,
                          &tail);
+    Py_END_ALLOW_THREADS
 
     self->db = connection->db;
 
@@ -250,7 +252,7 @@ void pysqlite_statement_bind_parameters(pysqlite_Statement* self, PyObject* para
             if (!_need_adapt(current_param)) {
                 adapted = current_param;
             } else {
-                adapted = microprotocols_adapt(current_param, (PyObject*)&pysqlite_PrepareProtocolType, NULL);
+                adapted = pysqlite_microprotocols_adapt(current_param, (PyObject*)&pysqlite_PrepareProtocolType, NULL);
                 if (adapted) {
                     Py_DECREF(current_param);
                 } else {
@@ -295,7 +297,7 @@ void pysqlite_statement_bind_parameters(pysqlite_Statement* self, PyObject* para
             if (!_need_adapt(current_param)) {
                 adapted = current_param;
             } else {
-                adapted = microprotocols_adapt(current_param, (PyObject*)&pysqlite_PrepareProtocolType, NULL);
+                adapted = pysqlite_microprotocols_adapt(current_param, (PyObject*)&pysqlite_PrepareProtocolType, NULL);
                 if (adapted) {
                     Py_DECREF(current_param);
                 } else {
@@ -328,11 +330,13 @@ int pysqlite_statement_recompile(pysqlite_Statement* self, PyObject* params)
 
     sql_cstr = PyString_AsString(self->sql);
 
+    Py_BEGIN_ALLOW_THREADS
     rc = sqlite3_prepare(self->db,
                          sql_cstr,
                          -1,
                          &new_st,
                          &tail);
+    Py_END_ALLOW_THREADS
 
     if (rc == SQLITE_OK) {
         /* The efficient sqlite3_transfer_bindings is only available in SQLite

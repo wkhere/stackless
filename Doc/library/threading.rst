@@ -14,8 +14,12 @@ The :mod:`dummy_threading` module is provided for situations where
 
 .. note::
 
-   In 3.x, names in ``camelCase`` have been renamed to their underscored
-   equivalents.  Both names are available in 2.6.
+   Starting with Python 2.6, this module provides PEP 8 compliant aliases and
+   properties to replace the ``camelCase`` names that were inspired by Java's
+   threading API. This updated API is compatible with that of the
+   :mod:`multiprocessing` module. However, no schedule has been set for the
+   deprecation of the ``camelCase`` names and they remain fully supported in
+   both Python 2.x and 3.x.
 
 This module defines the following functions and objects:
 
@@ -553,19 +557,19 @@ separate thread of control.
 
 Once the thread's activity is started, the thread is considered 'alive'. It
 stops being alive when its :meth:`run` method terminates -- either normally, or
-by raising an unhandled exception.  The :meth:`isAlive` method tests whether the
+by raising an unhandled exception.  The :meth:`is_alive` method tests whether the
 thread is alive.
 
 Other threads can call a thread's :meth:`join` method.  This blocks the calling
 thread until the thread whose :meth:`join` method is called is terminated.
 
-A thread has a name.  The name can be passed to the constructor, set with the
-:meth:`set_name` method, and retrieved with the :meth:`get_name` method.
+A thread has a name.  The name can be passed to the constructor, and read or
+changed through the :attr:`name` attribute.
 
 A thread can be flagged as a "daemon thread".  The significance of this flag is
 that the entire Python program exits when only daemon threads are left.  The
-initial value is inherited from the creating thread.  The flag can be set with
-the :meth:`set_daemon` method and retrieved with the :meth:`is_daemon` method.
+initial value is inherited from the creating thread.  The flag can be set
+through the :attr:`daemon` attribute.
 
 There is a "main thread" object; this corresponds to the initial thread of
 control in the Python program.  It is not a daemon thread.
@@ -645,28 +649,25 @@ impossible to detect the termination of alien threads.
    raises the same exception.
 
 
-.. method:: Thread.get_name()
-            Thread.getName()
+.. method:: Thread.getName()
+            Thread.setName()
 
-   Return the thread's name.
+   Old API for :attr:`~Thread.name`.
 
 
-.. method:: Thread.set_name(name)
-            Thread.setName(name)
+.. attribute:: Thread.name
 
-   Set the thread's name.
-
-   The name is a string used for identification purposes only. It has no semantics.
+   A string used for identification purposes only. It has no semantics.
    Multiple threads may be given the same name.  The initial name is set by the
    constructor.
 
 
-.. method:: Thread.get_ident()
+.. attribute:: Thread.ident
 
-   Return the 'thread identifier' of this thread or None if the thread has not
-   been started.  This is a nonzero integer.  See the :func:`thread.get_ident()`
+   The 'thread identifier' of this thread or ``None`` if the thread has not been
+   started.  This is a nonzero integer.  See the :func:`thread.get_ident()`
    function.  Thread identifiers may be recycled when a thread exits and another
-   thread is created.  The identifier is returned even after the thread has
+   thread is created.  The identifier is available even after the thread has
    exited.
 
    .. versionadded:: 2.6
@@ -682,17 +683,16 @@ impossible to detect the termination of alien threads.
    returns a list of all alive threads.
 
 
-.. method:: Thread.is_daemon()
-            Thread.isDaemon()
+.. method:: Thread.isDaemon()
+            Thread.setDaemon()
 
-   Return the thread's daemon flag.
+   Old API for :attr:`~Thread.daemon`.
 
 
-.. method:: Thread.set_daemon(daemonic)
-            Thread.setDaemon(daemonic)
+.. attribute:: Thread.daemon
 
-   Set the thread's daemon flag to the Boolean value *daemonic*. This must be
-   called before :meth:`start` is called, otherwise :exc:`RuntimeError` is raised.
+   The thread's daemon flag. This must be set before :meth:`start` is called,
+   otherwise :exc:`RuntimeError` is raised.
 
    The initial value is inherited from the creating thread.
 

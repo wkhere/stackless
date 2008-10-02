@@ -165,10 +165,10 @@ typedef Py_ssize_t (*charbufferproc)(PyObject *, Py_ssize_t, char **);
 /* Py3k buffer interface */
 
 typedef struct bufferinfo {
-	void *buf;   
+	void *buf;
 	PyObject *obj;        /* borrowed reference */
         Py_ssize_t len;
-        Py_ssize_t itemsize;  /* This is Py_ssize_t so it can be 
+        Py_ssize_t itemsize;  /* This is Py_ssize_t so it can be
                                  pointed to by strides in simple case.*/
         int readonly;
         int ndim;
@@ -299,7 +299,7 @@ typedef struct {
 	segcountproc bf_getsegcount;
 	charbufferproc bf_getcharbuffer;
         getbufferproc bf_getbuffer;
-	releasebufferproc bf_releasebuffer; 
+	releasebufferproc bf_releasebuffer;
 } PyBufferProcs;
 
 
@@ -484,6 +484,7 @@ PyAPI_FUNC(void) _PyObject_Dump(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_Repr(PyObject *);
 PyAPI_FUNC(PyObject *) _PyObject_Str(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_Str(PyObject *);
+#define PyObject_Bytes PyObject_Str
 #ifdef Py_USING_UNICODE
 PyAPI_FUNC(PyObject *) PyObject_Unicode(PyObject *);
 #endif
@@ -556,6 +557,12 @@ Type definitions should use Py_TPFLAGS_DEFAULT for their tp_flags value.
 
 Code can use PyType_HasFeature(type_ob, flag_value) to test whether the
 given type object has a specified feature.
+
+NOTE: when building the core, Py_TPFLAGS_DEFAULT includes
+Py_TPFLAGS_HAVE_VERSION_TAG; outside the core, it doesn't.  This is so
+that extensions that modify tp_dict of their own types directly don't
+break, since this was allowed in 2.5.  In 3.0 they will have to
+manually remove this flag though!
 */
 
 /* PyBufferProcs contains bf_getcharbuffer */
@@ -633,7 +640,7 @@ given type object has a specified feature.
 #define Py_TPFLAGS_BASE_EXC_SUBCLASS	(1L<<30)
 #define Py_TPFLAGS_TYPE_SUBCLASS	(1L<<31)
 
-#define Py_TPFLAGS_DEFAULT  ( \
+#define Py_TPFLAGS_DEFAULT_EXTERNAL ( \
                              Py_TPFLAGS_HAVE_GETCHARBUFFER | \
                              Py_TPFLAGS_HAVE_SEQUENCE_IN | \
                              Py_TPFLAGS_HAVE_INPLACEOPS | \
@@ -643,8 +650,15 @@ given type object has a specified feature.
                              Py_TPFLAGS_HAVE_CLASS | \
                              Py_TPFLAGS_HAVE_STACKLESS_EXTENSION | \
                              Py_TPFLAGS_HAVE_INDEX | \
-                             Py_TPFLAGS_HAVE_VERSION_TAG | \
-                            0)
+                             0)
+#define Py_TPFLAGS_DEFAULT_CORE (Py_TPFLAGS_DEFAULT_EXTERNAL | \
+                                 Py_TPFLAGS_HAVE_VERSION_TAG)
+
+#ifdef Py_BUILD_CORE
+#define Py_TPFLAGS_DEFAULT Py_TPFLAGS_DEFAULT_CORE
+#else
+#define Py_TPFLAGS_DEFAULT Py_TPFLAGS_DEFAULT_EXTERNAL
+#endif
 
 #define PyType_HasFeature(t,f)  (((t)->tp_flags & (f)) != 0)
 #define PyType_FastSubclass(t,f)  PyType_HasFeature(t,f)

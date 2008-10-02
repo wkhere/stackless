@@ -101,6 +101,17 @@ class AutoFileTests(unittest.TestCase):
             # should raise on closed file
             self.assertRaises(ValueError, method)
 
+    def testOpendir(self):
+        # Issue 3703: opening a directory should fill the errno
+        # Windows always returns "[Errno 13]: Permission denied
+        # Unix calls dircheck() and returns "[Errno 21]: Is a directory"
+        try:
+            _fileio._FileIO('.', 'r')
+        except IOError as e:
+            self.assertNotEqual(e.errno, 0)
+        else:
+            self.fail("Should have raised IOError")
+
 
 class OtherFileTests(unittest.TestCase):
 
@@ -226,6 +237,10 @@ class OtherFileTests(unittest.TestCase):
                 os.unlink(TESTFN)
             except:
                 pass
+
+    def testInvalidInit(self):
+        self.assertRaises(TypeError, _fileio._FileIO, "1", 0, 0)
+
 
 def test_main():
     # Historically, these tests have been sloppy about removing TESTFN.

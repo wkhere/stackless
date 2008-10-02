@@ -175,7 +175,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 						 kwlist,
 						 Py_FileSystemDefaultEncoding,
 						 &name, &mode, &closefd))
-			goto error;
+			return -1;
 	    }
 	}
 
@@ -262,7 +262,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 #endif
 			self->fd = open(name, flags, 0666);
 		Py_END_ALLOW_THREADS
-		if (self->fd < 0 || dircheck(self) < 0) {
+		if (self->fd < 0) {
 #ifdef MS_WINDOWS
 			PyErr_SetFromErrnoWithUnicodeFilename(PyExc_IOError, widename);
 #else
@@ -270,6 +270,8 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 #endif
 			goto error;
 		}
+		if(dircheck(self) < 0)
+			goto error;
 	}
 
 	goto done;
@@ -278,6 +280,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 	ret = -1;
 
  done:
+	PyMem_Free(name);
 	return ret;
 }
 
@@ -828,7 +831,7 @@ static PyGetSetDef fileio_getsetlist[] = {
 };
 
 PyTypeObject PyFileIO_Type = {
-	PyVarObject_HEAD_INIT(&PyType_Type, 0)
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"_FileIO",
 	sizeof(PyFileIOObject),
 	0,

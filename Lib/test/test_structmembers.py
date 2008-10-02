@@ -69,32 +69,32 @@ class TestWarnings(unittest.TestCase):
         self.assertEqual(w.category, RuntimeWarning)
 
     def test_byte_max(self):
-        with test_support.catch_warning() as w:
+        with test_support.check_warnings() as w:
             ts.T_BYTE = CHAR_MAX+1
             self.has_warned(w)
 
     def test_byte_min(self):
-        with test_support.catch_warning() as w:
+        with test_support.check_warnings() as w:
             ts.T_BYTE = CHAR_MIN-1
             self.has_warned(w)
 
     def test_ubyte_max(self):
-        with test_support.catch_warning() as w:
+        with test_support.check_warnings() as w:
             ts.T_UBYTE = UCHAR_MAX+1
             self.has_warned(w)
 
     def test_short_max(self):
-        with test_support.catch_warning() as w:
+        with test_support.check_warnings() as w:
             ts.T_SHORT = SHRT_MAX+1
             self.has_warned(w)
 
     def test_short_min(self):
-        with test_support.catch_warning() as w:
+        with test_support.check_warnings() as w:
             ts.T_SHORT = SHRT_MIN-1
             self.has_warned(w)
 
     def test_ushort_max(self):
-        with test_support.catch_warning() as w:
+        with test_support.check_warnings() as w:
             ts.T_USHORT = USHRT_MAX+1
             self.has_warned(w)
 

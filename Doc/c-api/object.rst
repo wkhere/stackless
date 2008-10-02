@@ -130,6 +130,14 @@ Object Protocol
    by the :keyword:`print` statement.
 
 
+.. cfunction:: PyObject* PyObject_Bytes(PyObject *o)
+
+   .. index:: builtin: bytes
+
+   Compute a bytes representation of object *o*.  In 2.x, this is just a alias
+   for :cfunc:`PyObject_Str`.
+
+
 .. cfunction:: PyObject* PyObject_Unicode(PyObject *o)
 
    .. index:: builtin: unicode
@@ -271,7 +279,7 @@ is considered sufficient for this determination.
 
 .. cfunction:: long PyObject_HashNotImplemented(PyObject *o)
 
-   Set a TypeError indicating that ``type(o)`` is not hashable and return ``-1``.
+   Set a :exc:`TypeError` indicating that ``type(o)`` is not hashable and return ``-1``.
    This function receives special treatment when stored in a ``tp_hash`` slot,
    allowing a type to explicitly indicate to the interpreter that it is not
    hashable.

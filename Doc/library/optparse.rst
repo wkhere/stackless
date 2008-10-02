@@ -12,7 +12,7 @@
 
 
 ``optparse`` is a more convenient, flexible, and powerful library for parsing
-command-line options than ``getopt``.  ``optparse`` uses a more declarative
+command-line options than the old :mod:`getopt` module.  ``optparse`` uses a more declarative
 style of command-line parsing: you create an instance of :class:`OptionParser`,
 populate it with options, and parse the command line. ``optparse`` allows users
 to specify options in the conventional GNU/POSIX syntax, and additionally
@@ -96,7 +96,7 @@ argument
    ``sys.argv[1:]``, or of some other list provided as a substitute for
    ``sys.argv[1:]``".
 
-option   
+option
    an argument used to supply extra information to guide or customize the execution
    of a program.  There are many different syntaxes for options; the traditional
    Unix syntax is a hyphen ("-") followed by a single letter, e.g. ``"-x"`` or
@@ -468,7 +468,7 @@ user-friendly (documented) options::
                      action="store_true", dest="verbose", default=True,
                      help="make lots of noise [default]")
    parser.add_option("-q", "--quiet",
-                     action="store_false", dest="verbose", 
+                     action="store_false", dest="verbose",
                      help="be vewwy quiet (I'm hunting wabbits)")
    parser.add_option("-f", "--filename",
                      metavar="FILE", help="write output to FILE"),
@@ -602,7 +602,7 @@ There are two broad classes of errors that :mod:`optparse` has to worry about:
 programmer errors and user errors.  Programmer errors are usually erroneous
 calls to ``parser.add_option()``, e.g. invalid option strings, unknown option
 attributes, missing option attributes, etc.  These are dealt with in the usual
-way: raise an exception (either ``optparse.OptionError`` or ``TypeError``) and
+way: raise an exception (either ``optparse.OptionError`` or :exc:`TypeError`) and
 let the program crash.
 
 Handling user errors is much more important, since they are guaranteed to happen
@@ -799,10 +799,10 @@ And to define an option with only a long option string::
 The keyword arguments define attributes of the new Option object.  The most
 important option attribute is :attr:`action`, and it largely determines which
 other attributes are relevant or required.  If you pass irrelevant option
-attributes, or fail to pass required ones, :mod:`optparse` raises an OptionError
-exception explaining your mistake.
+attributes, or fail to pass required ones, :mod:`optparse` raises an 
+:exc:`OptionError` exception explaining your mistake.
 
-An options's *action* determines what :mod:`optparse` does when it encounters
+An option's *action* determines what :mod:`optparse` does when it encounters
 this option on the command-line.  The standard option actions hard-coded into
 :mod:`optparse` are:
 
@@ -1059,7 +1059,7 @@ Option attributes
 The following option attributes may be passed as keyword arguments to
 ``parser.add_option()``.  If you pass an option attribute that is not relevant
 to a particular option, or fail to pass a required option attribute,
-:mod:`optparse` raises OptionError.
+:mod:`optparse` raises :exc:`OptionError`.
 
 * :attr:`action` (default: ``"store"``)
 
@@ -1152,7 +1152,7 @@ although with a more useful error message.
 ``choice`` options are a subtype of ``string`` options.  The ``choices`` option
 attribute (a sequence of strings) defines the set of allowed option arguments.
 ``optparse.check_choice()`` compares user-supplied option arguments against this
-master list and raises OptionValueError if an invalid string is given.
+master list and raises :exc:`OptionValueError` if an invalid string is given.
 
 
 .. _optparse-parsing-arguments:
@@ -1198,22 +1198,37 @@ traditional Unix exit status for command-line errors).
 Querying and manipulating your option parser
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Sometimes, it's useful to poke around your option parser and see what's there.
-OptionParser provides a couple of methods to help you out:
+The default behavior of the option parser can be customized slightly,
+and you can also poke around your option parser and see what's there.
+OptionParser provides several methods to help you out:
 
-``has_option(opt_str)``
-   Return true if the OptionParser has an option with  option string ``opt_str``
-   (e.g., ``"-q"`` or ``"--verbose"``).
+``disable_interspersed_args()``
+  Set parsing to stop on the first non-option. Use this if you have a
+  command processor which runs another command which has options of
+  its own and you want to make sure these options don't get
+  confused. For example, each command might have a different
+  set of options.
+
+``enable_interspersed_args()``
+  Set parsing to not stop on the first non-option, allowing
+  interspersing switches with command arguments.  For example,
+  ``"-s arg1 --long arg2"`` would return ``["arg1", "arg2"]``
+  as the command arguments and ``-s, --long`` as options.
+  This is the default behavior.
 
 ``get_option(opt_str)``
    Returns the Option instance with the option string ``opt_str``, or ``None`` if
    no options have that option string.
 
+``has_option(opt_str)``
+   Return true if the OptionParser has an option with option string ``opt_str``
+   (e.g., ``"-q"`` or ``"--verbose"``).
+
 ``remove_option(opt_str)``
-   If the OptionParser has an option corresponding to ``opt_str``, that option is
+   If the :class:`OptionParser` has an option corresponding to ``opt_str``, that option is
    removed.  If that option provided any other option strings, all of those option
    strings become invalid. If ``opt_str`` does not occur in any option belonging to
-   this OptionParser, raises ValueError.
+   this :class:`OptionParser`, raises :exc:`ValueError`.
 
 
 .. _optparse-conflicts-between-options:
@@ -1244,13 +1259,13 @@ or with a separate call::
 The available conflict handlers are:
 
    ``error`` (default)
-      assume option conflicts are a programming error and raise  OptionConflictError
+      assume option conflicts are a programming error and raise :exc:`OptionConflictError`
 
    ``resolve``
       resolve option conflicts intelligently (see below)
 
 
-As an example, let's define an OptionParser that resolves conflicts
+As an example, let's define an :class:`OptionParser` that resolves conflicts
 intelligently and add conflicting options to it::
 
    parser = OptionParser(conflict_handler="resolve")
@@ -1480,7 +1495,7 @@ where
 Raising errors in a callback
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The callback function should raise OptionValueError if there are any problems
+The callback function should raise :exc:`OptionValueError` if there are any problems
 with the option or its argument(s).  :mod:`optparse` catches this and terminates
 the program, printing the error message you supply to stderr.  Your message
 should be clear, concise, accurate, and mention the option at fault.  Otherwise,
@@ -1637,7 +1652,7 @@ arguments::
        setattr(parser.values, option.dest, value)
 
    [...]
-   parser.add_option("-c", "--callback",
+   parser.add_option("-c", "--callback", dest="vararg_attr",
                      action="callback", callback=vararg_callback)
 
 The main weakness with this particular implementation is that negative numbers
@@ -1681,9 +1696,9 @@ type-checking function will wind up in the OptionValues instance returned by
 :meth:`OptionParser.parse_args`, or be passed to a callback as the ``value``
 parameter.
 
-Your type-checking function should raise OptionValueError if it encounters any
-problems.  OptionValueError takes a single string argument, which is passed
-as-is to OptionParser's :meth:`error` method, which in turn prepends the program
+Your type-checking function should raise :exc:`OptionValueError` if it encounters any
+problems.  :exc:`OptionValueError` takes a single string argument, which is passed
+as-is to :class:`OptionParser`'s :meth:`error` method, which in turn prepends the program
 name and the string ``"error:"`` and prints everything to stderr before
 terminating the process.
 

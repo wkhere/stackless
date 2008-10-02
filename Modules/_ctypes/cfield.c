@@ -65,10 +65,12 @@ CField_FromDesc(PyObject *desc, Py_ssize_t index,
 	}
 	if (bitsize /* this is a bitfield request */
 	    && *pfield_size /* we have a bitfield open */
-#if defined(MS_WIN32) && !defined(__MINGW32__)
-	    && dict->size * 8 == *pfield_size /* MSVC */
+#ifdef MS_WIN32
+	    /* MSVC, GCC with -mms-bitfields */
+	    && dict->size * 8 == *pfield_size
 #else
-	    && dict->size * 8 <= *pfield_size /* GCC, MINGW */
+	    /* GCC */
+	    && dict->size * 8 <= *pfield_size 
 #endif
 	    && (*pbitofs + bitsize) <= *pfield_size) {
 		/* continue bit field */
@@ -163,7 +165,7 @@ CField_FromDesc(PyObject *desc, Py_ssize_t index,
 		break;
 
 	case EXPAND_BITFIELD:
-		/* XXX needs more */
+		*poffset += dict->size - *pfield_size/8;
 		*psize += dict->size - *pfield_size/8;
 
 		*pfield_size = dict->size * 8;

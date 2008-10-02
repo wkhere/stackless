@@ -5,6 +5,7 @@ from test import test_support
 import math
 from math import isinf, isnan, copysign, ldexp
 import operator
+import random, fractions
 
 INF = float("inf")
 NAN = float("nan")
@@ -23,7 +24,7 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(ValueError, float, "+-3.14")
         self.assertRaises(ValueError, float, "-+3.14")
         self.assertRaises(ValueError, float, "--3.14")
-        if have_unicode:
+        if test_support.have_unicode:
             self.assertEqual(float(unicode("  3.14  ")), 3.14)
             self.assertEqual(float(unicode("  \u0663.\u0661\u0664  ",'raw-unicode-escape')), 3.14)
             # Implementation limitation in PyFloat_FromString()
@@ -54,7 +55,7 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(ValueError, float, "  -0x3.p-1  ")
         self.assertRaises(ValueError, float, "  +0x3.p-1  ")
         self.assertEqual(float("  25.e-1  "), 2.5)
-        self.assertEqual(fcmp(float("  .25e-1  "), .025), 0)
+        self.assertEqual(test_support.fcmp(float("  .25e-1  "), .025), 0)
 
     def test_floatconversion(self):
         # Make sure that calls to __float__() work properly
@@ -417,7 +418,13 @@ class HexFloatTestCase(unittest.TestCase):
             '0x1p0\0 0x1p0',  # embedded null byte is not end of string
             ]
         for x in invalid_inputs:
-            self.assertRaises(ValueError, fromHex, x)
+            try:
+                result = fromHex(x)
+            except ValueError:
+                pass
+            else:
+                self.fail('Expected float.fromhex(%r) to raise ValueError; '
+                          'got %r instead' % (x, result))
 
 
     def test_from_hex(self):
@@ -730,6 +737,7 @@ class HexFloatTestCase(unittest.TestCase):
 
 def test_main():
     test_support.run_unittest(
+        GeneralFloatCases,
         FormatFunctionsTestCase,
         UnknownFormatTestCase,
         IEEEFormatTestCase,

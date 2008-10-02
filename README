@@ -1,5 +1,5 @@
-This is Python version 2.6 beta 2
-=================================
+This is Python version 2.6
+==========================
 
 Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
 Python Software Foundation.
@@ -89,12 +89,6 @@ documentation is downloadable in HTML, PostScript, PDF, LaTeX, and
 reStructuredText (2.6+) formats; the LaTeX and reStructuredText versions are
 primarily for documentation authors, translators, and people with special
 formatting requirements.
-
-Unfortunately, new-style classes (new in Python 2.2) have not yet been
-integrated into Python's standard documentation.  A collection of
-pointers to what has been written is at:
-
-    http://www.python.org/doc/newstyle.html
 
 
 Web sites

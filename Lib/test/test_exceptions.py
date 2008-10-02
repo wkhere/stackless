@@ -4,9 +4,9 @@ import os
 import sys
 import unittest
 import pickle, cPickle
+import warnings
 
-from test.test_support import (TESTFN, unlink, run_unittest,
-                                catch_warning, captured_output)
+from test.test_support import TESTFN, unlink, run_unittest, captured_output
 from test.test_pep352 import ignore_message_warning
 
 # XXX This is not really enough, each *operation* should be tested!
@@ -274,7 +274,7 @@ class ExceptionTests(unittest.TestCase):
         except NameError:
             pass
 
-        with catch_warning():
+        with warnings.catch_warnings():
             ignore_message_warning()
             for exc, args, expected in exceptionList:
                 try:
@@ -333,7 +333,19 @@ class ExceptionTests(unittest.TestCase):
                 return g()
             except ValueError:
                 return -1
-        self.assertRaises(RuntimeError, g)
+
+        # The test prints an unraisable recursion error when
+        # doing "except ValueError", this is because subclass
+        # checking has recursion checking too.
+        with captured_output("stderr"):
+            try:
+                g()
+            except RuntimeError:
+                pass
+            except:
+                self.fail("Should have raised KeyError")
+            else:
+                self.fail("Should have raised KeyError")
 
     def testUnicodeStrUsage(self):
         # Make sure both instances and classes have a str and unicode
@@ -363,12 +375,20 @@ class ExceptionTests(unittest.TestCase):
             except KeyError:
                 pass
             except:
-                self.fail("Should have raised TypeError")
+                self.fail("Should have raised KeyError")
             else:
-                self.fail("Should have raised TypeError")
-        self.assertEqual(stderr.getvalue(),
-                         "Exception ValueError: ValueError() in "
-                         "<type 'exceptions.KeyError'> ignored\n")
+                self.fail("Should have raised KeyError")
+
+        with captured_output("stderr") as stderr:
+            def g():
+                try:
+                    return g()
+                except RuntimeError:
+                    return sys.exc_info()
+            e, v, tb = g()
+            self.assert_(e is RuntimeError, e)
+            self.assert_("maximum recursion depth exceeded" in str(v), v)
+
 
 def test_main():
     run_unittest(ExceptionTests)

@@ -381,10 +381,10 @@ available.  They are listed here in alphabetical order.
       >>> print eval('x+1')
       2
 
-   This function can also be used to execute arbitrary code objects (such as those
-   created by :func:`compile`).  In this case pass a code object instead of a
-   string.  The code object must have been compiled passing ``'eval'`` as the
-   *kind* argument.
+   This function can also be used to execute arbitrary code objects (such as
+   those created by :func:`compile`).  In this case pass a code object instead
+   of a string.  If the code object has been compiled with ``'exec'`` as the
+   *kind* argument, :func:`eval`\'s return value will be ``None``.
 
    Hints: dynamic execution of statements is supported by the :keyword:`exec`
    statement.  Execution of statements from a file is supported by the
@@ -571,14 +571,14 @@ available.  They are listed here in alphabetical order.
    it must contain a possibly signed decimal number representable as a Python
    integer, possibly embedded in whitespace.  The *radix* parameter gives the
    base for the conversion (which is 10 by default) and may be any integer in
-   the range [2, 36], or zero.  If *radix* is zero, the proper radix is guessed
-   based on the contents of string; the interpretation is the same as for
-   integer literals.  If *radix* is specified and *x* is not a string,
-   :exc:`TypeError` is raised. Otherwise, the argument may be a plain or long
-   integer or a floating point number.  Conversion of floating point numbers to
-   integers truncates (towards zero).  If the argument is outside the integer
-   range a long object will be returned instead.  If no arguments are given,
-   returns ``0``.
+   the range [2, 36], or zero.  If *radix* is zero, the proper radix is
+   determined based on the contents of string; the interpretation is the same as
+   for integer literals.  (See :ref:`numbers`.)  If *radix* is specified and *x*
+   is not a string, :exc:`TypeError` is raised. Otherwise, the argument may be a
+   plain or long integer or a floating point number.  Conversion of floating
+   point numbers to integers truncates (towards zero).  If the argument is
+   outside the integer range a long object will be returned instead.  If no
+   arguments are given, returns ``0``.
 
    The integer type is described in :ref:`typesnumeric`.
 
@@ -1215,13 +1215,29 @@ available.  They are listed here in alphabetical order.
 
 .. function:: super(type[, object-or-type])
 
-   Return the superclass of *type*.  If the second argument is omitted the super
+   Return a "super" object that acts like the superclass of *type*.
+
+   If the second argument is omitted the super
    object returned is unbound.  If the second argument is an object,
    ``isinstance(obj, type)`` must be true.  If the second argument is a type,
    ``issubclass(type2, type)`` must be true. :func:`super` only works for
    :term:`new-style class`\es.
 
-   A typical use for calling a cooperative superclass method is::
+   There are two typical use cases for "super".  In a class hierarchy with
+   single inheritance, "super" can be used to refer to parent classes without
+   naming them explicitly, thus making the code more maintainable.  This use
+   closely parallels the use of "super" in other programming languages.
+   
+   The second use case is to support cooperative multiple inheritence in a
+   dynamic execution environment.  This use case is unique to Python and is 
+   not found in statically compiled languages or languages that only support 
+   single inheritance.  This makes in possible to implement "diamond diagrams"
+   where multiple base classes implement the same method.  Good design dictates
+   that this method have the same calling signature in every case (because the
+   order of parent calls is determined at runtime and because that order adapts
+   to changes in the class hierarchy).
+
+   For both use cases, a typical superclass call looks like this::
 
       class C(B):
           def meth(self, arg):
@@ -1229,6 +1245,8 @@ available.  They are listed here in alphabetical order.
 
    Note that :func:`super` is implemented as part of the binding process for
    explicit dotted attribute lookups such as ``super(C, self).__getitem__(name)``.
+   It does so by implementing its own :meth:`__getattribute__` method for searching
+   parent classes in a predictable order that supports cooperative multiple inheritance.
    Accordingly, :func:`super` is undefined for implicit lookups using statements or
    operators such as ``super(C, self)[name]``.
 

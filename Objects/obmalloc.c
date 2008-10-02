@@ -526,8 +526,10 @@ new_arena(void)
 		numarenas = maxarenas ? maxarenas << 1 : INITIAL_ARENA_OBJECTS;
 		if (numarenas <= maxarenas)
 			return NULL;	/* overflow */
+#if SIZEOF_SIZE_T <= SIZEOF_INT
 		if (numarenas > PY_SIZE_MAX / sizeof(*arenas))
 			return NULL;	/* overflow */
+#endif
 		nbytes = numarenas * sizeof(*arenas);
 		arenaobj = (struct arena_object *)realloc(arenas, nbytes);
 		if (arenaobj == NULL)
@@ -675,8 +677,8 @@ extremely desirable that it be this fast.
 /* This is only useful when running memory debuggers such as
  * Purify or Valgrind.  Uncomment to use.
  *
- */
 #define Py_USING_MEMORY_DEBUGGER
+ */
 
 #ifdef Py_USING_MEMORY_DEBUGGER
 

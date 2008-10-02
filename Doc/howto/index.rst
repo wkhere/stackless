@@ -14,6 +14,7 @@ Currently, the HOWTOs are:
    :maxdepth: 1
 
    advocacy.rst
+   cporting.rst
    curses.rst
    doanddont.rst
    functional.rst
@@ -21,4 +22,5 @@ Currently, the HOWTOs are:
    sockets.rst
    unicode.rst
    urllib2.rst
+   webservers.rst
 

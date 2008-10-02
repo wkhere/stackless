@@ -4,13 +4,280 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.6 beta 3?
-================================
+What's New in Python 2.6 final
+==============================
 
-*Release date: XX-Aug-2008*
+*Release date: 01-Oct-2008*
 
 Core and Builtins
 -----------------
+
+- Issue #3967: Fixed a crash in the count() and find() methods of string-like
+  objects, when the "start" parameter is a huge value.
+
+- Issue #3965: Fixed a crash on Windows when open() is given an invalid
+  filename or mode, and the filename is a unicode string.
+
+- Bug #3951: Py_USING_MEMORY_DEBUGGER should not be enabled by default.
+
+Library
+-------
+
+- Issue #3965: Allow repeated calls to turtle.Screen, by making it a
+  true singleton object.
+
+- Issue #3895: It was possible to crash the interpreter when an external timer
+  was used with cProfile that returned an object that could not be converted
+  into a float.
+
+- Issue #3950: Made turtle respect scale factors.
+
+- Issue #3547: Fixed ctypes structures bitfields of varying integer
+  sizes.
+
+- Issue #3879: A regression in urllib.getproxies_enviroment was fixed.
+
+- Issue #3863: Disabled a unit test of fork being called from a thread
+  when running on platforms known to exhibit OS bugs when attempting that.
+
+Build
+-----
+
+- Bug #3989: Package the 2to3 script (as 2to3.py) in the Windows
+  installer.
+
+- Bug #3887: Package x64 version of CRT for AMD64 Windows binaries.
+
+
+What's New in Python 2.6 release candidate 2?
+=============================================
+
+*Release date: 17-Sep-2008*
+
+Core and Builtins
+-----------------
+
+Extension Modules
+-----------------
+
+- Security Issue #2: imageop did not validate arguments correctly and could
+  segfault as a result.
+
+- Issue #3886: Possible integer overflows in the _hashopenssl module were
+  closed.
+
+Tools/Demos
+-----------
+
+- Issue #3850: recursion tests in Misc/find_recursion_limit.py can raise
+  AttributeError instead of RuntimeError, depending in which C API call
+  exactly the recursion limit is exceeded. Consequently, both exception types
+  are caught and silenced.
+
+Build
+-----
+
+- Issue #3617: Include a licensing statement regarding the Microsoft
+  C runtime in the Windows installer.
+
+
+What's New in Python 2.6 release candidate 1?
+=============================================
+
+*Release date: 12-Sep-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3642: Suppress warning in obmalloc when size_t is larger than uint.
+
+- Issue #3743: In a few places, PY_FORMAT_SIZE_T was incorrectly used with
+  PyString_FromFormat or PyErr_Format to display size_t values. The macro
+  PY_FORMAT_SIZE_T is designed to select the correct format for the OS
+  ``printf`` function, whereas PyString_FromFormat has an independent
+  implementation and uses "%zd" on all platforms for size_t values.
+  This makes a difference on win64, where ``printf`` needs "%Id" to display
+  64bit values.
+
+- Issue #3634: _weakref.ref(Exception).__init__() gave invalid return value on
+  error.
+
+- Issue #3777: long() applied to a float object now always return a long
+  object; previously an int would be returned for small values. the __long__
+  method is allowed to return either an int or a long, but the behaviour of
+  float objects should not change to respect backward compatibility.
+
+- Issue #3751: str.rpartition would perform a left-partition when called with
+  a unicode argument.
+
+- Issue #3683: Fix compilation when --without-threads is given.
+
+- Issue #3668: Fix a memory leak with the "s*" argument parser in
+  PyArg_ParseTuple and friends, which occurred when the argument for "s*"
+  was correctly parsed but parsing of subsequent arguments failed.
+
+- Issue #2534: speed up isinstance() and issubclass() by 50-70%, so as to
+  match Python 2.5 speed despite the __instancecheck__ / __subclasscheck__
+  mechanism. In the process, fix a bug where isinstance() and issubclass(),
+  when given a tuple of classes as second argument, were looking up
+  __instancecheck__ / __subclasscheck__ on the tuple rather than on each
+  type object.
+
+- Fix crashes on memory allocation failure found with failmalloc.
+
+- Fix memory leaks found with valgrind and update suppressions file.
+
+- Fix compiler warnings in opt mode which would lead to invalid memory reads.
+
+- Fix problem using wrong name in decimal module reported by pychecker.
+
+- Silenced another compiler warning about a used but not defined
+  function 'stringlib_contains_obj'.
+
+- Added warnings on the use of ``__getslice__``, ``__setslice__``, or
+  ``__delslice__``.
+
+- Issue #3678: Correctly pass LDFLAGS and LDLAST to the linker on shared
+  library targets in the Makefile.
+
+- Issue #1204: The configure script now tests for additional libraries
+  that may be required when linking against readline.  This fixes issues
+  with x86_64 builds on some platforms (a few Linux flavors and OpenBSD).
+
+C-API
+-----
+
+- Aliased PyObject_Bytes to PyObject_Str.
+
+Library
+-------
+
+- Issue #3640: Pickling a list or a dict uses less local variables, to reduce
+  stack usage in the case of deeply nested objects.
+
+- Issue #3629: Fix sre "bytecode" validator for an end case.
+
+- Issue #3811: The Unicode database was updated to 5.1.
+
+- Issue #3781: Further warnings.catch_warnings() cleanup to prevent
+  silent misbehaviour when a single instance is nested in multiple
+  with statements, or when the methods are invoked in the wrong order.
+
+- Issue #3809: Fixed spurious 'test.blah' file left behind by test_logging.
+
+- Issue #3781: Clean up the API for warnings.catch_warnings() by having it
+  return a list or None rather than a custom object.
+
+- Issue #1638033: Cookie.Morsel gained the httponly attribute.
+
+- Issue #3535: zipfile couldn't read some zip files larger than 2GB.
+
+- Issue #3776: Deprecate the bsddb package for removal in 3.0.
+
+- Issue #3762: platform.architecture() fails if python is lanched via
+  its symbolic link.
+
+- Issue #3772: Fixed regression problem in StreamHandler.emit().
+
+- Issue 600362: Relocated parse_qs() and parse_qsl(), from the cgi module
+  to the urlparse one.  Added a PendingDeprecationWarning in the old
+  module, it will be deprecated in the future.
+
+- Issue #2562: Fix distutils PKG-INFO writing logic to allow having
+  non-ascii characters and Unicode in setup.py meta-data.
+
+- Issue #3726: Allow spaces in separators in logging configuration files.
+
+- Issue #3719: platform.architecture() fails if there are spaces in the
+  path to the Python binary.
+
+- Issue 3602: Moved test.test_support.catch_warning() to
+  warnings.catch_warnings() along with some API cleanup. Expanding the tests
+  for catch_warnings() also led to an improvement in the raising of a
+  DeprecationWarning related to warnings.warn_explicit().
+
+- The deprecation warnings for the old camelCase threading API were removed.
+
+- logging: fixed lack of use of encoding attribute specified on a stream.
+
+- Silenced a trivial compiler warning in the sqlite module.
+
+- Fixed two format strings in the _collections module.
+
+- Issue #3703: _fileio.FileIO gave unhelpful error message when trying to open a
+  directory.
+
+- Issue #3708: os.urandom no longer goes into an infinite loop when passed a
+  non-integer floating point number.
+
+- Issue #3110: multiprocessing fails to compiel on solaris 10 due to missing
+  SEM_VALUE_MAX.
+
+Extension Modules
+-----------------
+
+- Issue #2975: When compiling several extension modules with Visual Studio 2008
+  from the same python interpreter, some environment variables would grow
+  without limit.
+
+- Issue #3643: Added a few more checks to _testcapi to prevent segfaults by
+  exploitation of poor argument checking.
+
+- sqlite3: Changed docstring of iterdump() to mark method as "Non-standard".
+
+- Issue #3103: Reduced globals symbols used by sqlite3 module and made sure all
+  remaining ones have "pysqlite_" prefix.
+
+- Issue #3846: Release the GIL during sqlite3_prepare calls. This improves
+  concurrent access to the same SQLite database from multiple
+  threads/processes.
+
+Tests
+-----
+
+- Issue #3781: Add test.test_support.check_warnings() as a convenience
+  wrapper for warnings.catch_warnings() that makes it easier to check
+  that expected warning messages are being reported.
+
+- Issue #3796: Some tests functions were not enabled in test_float.
+
+- Issue #3768: Move test_py3kwarn over to the new API for catch_warnings().
+
+Build
+-----
+
+- Issue #3833: Use a different upgrade code for Win64 installers.
+
+- Issue #2271: Set SecureCustomProperties so that installation will properly
+  use the TARGETDIR even for unprivileged users.
+
+- Allow passing the MSI file name to merge.py.
+
+- Issue #3758: Rename the 'check' target to 'patchcheck' so as to not clash
+  with GNU build target guidelines.
+
+
+What's New in Python 2.6 beta 3?
+================================
+
+*Release date: 20-Aug-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #1878: Remove Py_TPFLAGS_HAVE_VERSION_TAG from
+  Py_TPFLAGS_DEFAULT when not building the core.  This means 3rd party
+  extensions do not automatically benefit from the class attribute
+  cache; they will have to explicitly add Py_TPFLAGS_HAVE_VERSION_TAG
+  to their tp_flags field if they care.  This is a backwards
+  compatibility feature; in 3.0, all types will use the cache by
+  default.
+
+- Keyword arguments can now follow starred arguments. (``f(a, *args,
+  keyword=23)`` is now valid syntax.)
+
+- ctypes function pointers that are COM methods have a boolean True
+  value again.
 
 - Issue #3139: Make buffer-interface thread-safe wrt. PyArg_ParseTuple,
   by denying s# to parse objects that have a releasebuffer procedure,
@@ -47,6 +314,15 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #3612: Added some missing basic types in ctypes.wintypes.
+
+- The methods ``is_in_tuple()``, ``is_vararg()``, and ``is_keywordarg()`` of
+  symtable.Symbol have been deprecated for removal in 3.0 and the next release.
+
+- Issue #2234: distutils failed for some versions of the cygwin compiler. The
+  version reported by these tools does not necessarily follow the python
+  version numbering scheme, so the module is less strict when parsing it.
 
 - Issue #2235: Added Py3k warnings for types which will become unhashable
   under the stricter __hash__ inheritance rules in 3.0. Several types
@@ -390,6 +666,7 @@ Core and Builtins
 
 Extension Modules
 -----------------
+- Issue #1179: [CVE-2007-4965] Integer overflow in imageop module.
 
 - Issue #3116:  marshal.dumps() had quadratic behavior for strings > 32Mb.
 
@@ -409,8 +686,9 @@ Extension Modules
 
 - Support for Windows 9x has been removed from the winsound module.
 
-- bsddb module updated to version 4.7.0.
-  http://www.jcea.es/programacion/pybsddb.htm#bsddb3-4.7.0
+- bsddb module updated to version 4.7.3.
+  http://www.jcea.es/programacion/pybsddb.htm#bsddb3-4.7.3. This
+  code should be compatible with Python 3.0.
 
 - Issue #2858: Fix potential memory corruption when
   bsddb.db.DBEnv.lock_get and other bsddb.db object constructors
@@ -422,7 +700,7 @@ Extension Modules
 
 - Issue #2870: cmathmodule.c compile error.
 
-- Added a threading.Thread.getIdent() method.
+- Added a threading.Thread.ident property.
 
 Library
 -------
@@ -665,7 +943,8 @@ Library
 - The bundled OSX-specific copy of libbffi is now in sync with the version
   shipped with PyObjC 2.0 and includes support for x86_64 and ppc64 platforms.
 
-- The threading module gained alias for names that are removed in 3.x.
+- The threading module gained aliases for names that will be removed in the
+  3.x series.
 
 Build
 -----
@@ -2575,8 +2854,8 @@ Extension Modules
 - fixed a bug with bsddb.DB.stat: the flags and txn keyword arguments
   were transposed.
 
-- Added support for linking the bsddb module against BerkeleyDB 4.5.x
-  and 4.6.x.
+- Added support for linking the bsddb module against BerkeleyDB 4.5.x,
+  4.6.x and 4.7.x.
 
 - Bug #1633621: if curses.resizeterm() or curses.resize_term() is
   called, update _curses.LINES, _curses.COLS, curses.LINES and

@@ -4,11 +4,11 @@ import struct
 import warnings
 
 from functools import wraps
-from test.test_support import TestFailed, verbose, run_unittest, catch_warning
+from test.test_support import TestFailed, verbose, run_unittest
 
 import sys
 ISBIGENDIAN = sys.byteorder == "big"
-IS32BIT = sys.maxint == 0x7fffffff
+IS32BIT = sys.maxsize == 0x7fffffff
 del sys
 
 try:
@@ -34,7 +34,7 @@ def bigendian_to_native(value):
 def with_warning_restore(func):
     @wraps(func)
     def decorator(*args, **kw):
-        with catch_warning():
+        with warnings.catch_warnings():
             # We need this function to warn every time, so stick an
             # unqualifed 'always' at the head of the filter list
             warnings.simplefilter("always")

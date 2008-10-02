@@ -64,8 +64,11 @@ current_version = "%s.%d" % (short_version, FIELD3)
 # This should never change. The UpgradeCode of this package can be
 # used in the Upgrade table of future packages to make the future
 # package replace this one. See "UpgradeCode Property".
+# upgrade_code gets set to upgrade_code_64 when we have determined
+# that the target is Win64.
 upgrade_code_snapshot='{92A24481-3ECB-40FC-8836-04B7966EC0D5}'
 upgrade_code='{65E6DE48-A358-434D-AA4F-4AF72DB4718F}'
+upgrade_code_64='{6A965A0C-6EE6-4E3A-9983-3263F56311EC}'
 
 if snapshot:
     current_version = "%s.%s.%s" % (major, minor, int(time.time()/3600/24))
@@ -173,6 +176,12 @@ dll_path = os.path.join(srcdir, PCBUILD, dll_file)
 msilib.set_arch_from_file(dll_path)
 if msilib.pe_type(dll_path) != msilib.pe_type("msisupport.dll"):
     raise SystemError, "msisupport.dll for incorrect architecture"
+if msilib.Win64:
+    upgrade_code = upgrade_code_64
+    # Bump the last digit of the code by one, so that 32-bit and 64-bit
+    # releases get separate product codes
+    digit = hex((int(product_code[-2],16)+1)%16)[-1]
+    product_code = product_code[:-2] + digit + '}'
 
 if testpackage:
     ext = 'px'
@@ -202,11 +211,15 @@ def build_database():
         uc = upgrade_code_snapshot
     else:
         uc = upgrade_code
+    if msilib.Win64:
+        productsuffix = " (Stackless) (64-bit)"
+    else:
+        productsuffix = " (Stackless)"
     # schema represents the installer 2.0 database schema.
     # sequence is the set of standard sequences
     # (ui/execute, admin/advt/install)
-    db = msilib.init_database("python-%s%s-stackless.msi" % (full_current_version, msilib.arch_ext),
-                  schema, ProductName="Python "+full_current_version+" (Stackless)",
+    db = msilib.init_database("python-%s%s.msi" % (full_current_version, msilib.arch_ext),
+                  schema, ProductName="Python "+full_current_version+productsuffix,
                   ProductCode=product_code,
                   ProductVersion=current_version,
                   Manufacturer=u"Richard Tew")
@@ -256,6 +269,8 @@ def remove_old_versions(db):
              (upgrade_code_snapshot, start, "%s.%d.0" % (major, int(minor)+1),
               None, migrate_features, None, "REMOVEOLDSNAPSHOT")])
         props = "REMOVEOLDSNAPSHOT;REMOVEOLDVERSION"
+
+    props += ";TARGETDIR;DLLDIR"
     # Installer collects the product codes of the earlier releases in
     # these properties. In order to allow modification of the properties,
     # they must be declared as secure. See "SecureCustomProperties Property"
@@ -834,7 +849,11 @@ def add_features(db):
 
 def extract_msvcr90():
     # Find the redistributable files
-    dir = os.path.join(os.environ['VS90COMNTOOLS'], r"..\..\VC\redist\x86\Microsoft.VC90.CRT")
+    if msilib.Win64:
+        arch = "amd64"
+    else:
+        arch = "x86"
+    dir = os.path.join(os.environ['VS90COMNTOOLS'], r"..\..\VC\redist\%s\Microsoft.VC90.CRT" % arch)
 
     result = []
     installer = msilib.MakeInstaller()
@@ -853,6 +872,7 @@ def generate_license():
     import shutil, glob
     out = open("LICENSE.txt", "w")
     shutil.copyfileobj(open(os.path.join(srcdir, "LICENSE")), out)
+    shutil.copyfileobj(open("crtlicense.txt"), out)
     for name, pat, file in (("bzip2","bzip2-*", "LICENSE"),
                       ("Berkeley DB", "db-*", "LICENSE"),
                       ("openssl", "openssl-*", "LICENSE"),
@@ -1119,6 +1139,7 @@ def add_files(db):
         if os.path.exists(os.path.join(lib.absolute, "README")):
             lib.add_file("README.txt", src="README")
         if f == 'Scripts':
+            lib.add_file("2to3.py", src="2to3")
             if have_tcl:
                 lib.start_component("pydocgui.pyw", tcltk, keyfile="pydocgui.pyw")
                 lib.add_file("pydocgui.pyw")

@@ -37,6 +37,17 @@
 #endif
 
 /*
+ * Issue 3110 - Solaris does not define SEM_VALUE_MAX
+ */
+#ifndef SEM_VALUE_MAX
+#  ifdef _SEM_VALUE_MAX
+#    define SEM_VALUE_MAX _SEM_VALUE_MAX
+#  else
+#    define SEM_VALUE_MAX INT_MAX
+#  endif
+#endif
+
+/*
  * Make sure Py_ssize_t available
  */
 
@@ -45,7 +56,6 @@
 #  define PY_SSIZE_T_MAX INT_MAX
 #  define PY_SSIZE_T_MIN INT_MIN
 #  define F_PY_SSIZE_T "i"
-#  define PY_FORMAT_SIZE_T ""
 #  define PyInt_FromSsize_t(n) PyInt_FromLong((long)n)
 #else
 #  define F_PY_SSIZE_T "n"

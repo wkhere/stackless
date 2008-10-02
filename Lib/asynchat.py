@@ -49,8 +49,8 @@ you - by calling your self.found_terminator() method.
 import socket
 import asyncore
 from collections import deque
-from test.test_support import catch_warning
-from warnings import filterwarnings
+from sys import py3kwarning
+from warnings import filterwarnings, catch_warnings
 
 class async_chat (asyncore.dispatcher):
     """This is an abstract class.  You must derive from this class, and add
@@ -218,8 +218,9 @@ class async_chat (asyncore.dispatcher):
             # handle classic producer behavior
             obs = self.ac_out_buffer_size
             try:
-                with catch_warning(record=False):
-                    filterwarnings("ignore", ".*buffer", DeprecationWarning)
+                with catch_warnings():
+                    if py3kwarning:
+                        filterwarnings("ignore", ".*buffer", DeprecationWarning)
                     data = buffer(first, 0, obs)
             except TypeError:
                 data = first.more()

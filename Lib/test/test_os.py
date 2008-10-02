@@ -47,6 +47,13 @@ class FileTests(unittest.TestCase):
         os.closerange(first, first + 2)
         self.assertRaises(OSError, os.write, first, "a")
 
+    def test_rename(self):
+        path = unicode(test_support.TESTFN)
+        old = sys.getrefcount(path)
+        self.assertRaises(TypeError, os.rename, path, 0)
+        new = sys.getrefcount(path)
+        self.assertEqual(old, new)
+
 
 class TemporaryFileTests(unittest.TestCase):
     def setUp(self):
@@ -294,8 +301,7 @@ class StatAttributeTests(unittest.TestCase):
     # systems support centiseconds
     if sys.platform == 'win32':
         def get_file_system(path):
-            import os
-            root = os.path.splitdrive(os.path.realpath("."))[0] + '\\'
+            root = os.path.splitdrive(os.path.abspath(path))[0] + '\\'
             import ctypes
             kernel32 = ctypes.windll.kernel32
             buf = ctypes.create_string_buffer("", 100)
@@ -498,6 +504,10 @@ class URandomTests (unittest.TestCase):
             self.assertEqual(len(os.urandom(10)), 10)
             self.assertEqual(len(os.urandom(100)), 100)
             self.assertEqual(len(os.urandom(1000)), 1000)
+            # see http://bugs.python.org/issue3708
+            self.assertEqual(len(os.urandom(0.9)), 0)
+            self.assertEqual(len(os.urandom(1.1)), 1)
+            self.assertEqual(len(os.urandom(2.0)), 2)
         except NotImplementedError:
             pass
 

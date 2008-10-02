@@ -5,19 +5,7 @@ is closed before its DB objects.
 import os
 import unittest
 
-try:
-    # For Pythons w/distutils pybsddb
-    from bsddb3 import db
-except ImportError:
-    # For Python 2.3
-    from bsddb import db
-
-try:
-    from bsddb3 import test_support
-except ImportError:
-    from test import test_support
-
-from test_all import verbose, get_new_environment_path, get_new_database_path
+from test_all import db, test_support, verbose, get_new_environment_path, get_new_database_path
 
 # We're going to get warnings in this module about trying to close the db when
 # its env is already closed.  Let's just ignore those.
@@ -180,9 +168,9 @@ class DBEnvClosedEarlyCrash(unittest.TestCase):
         self.assertEquals(("XXX", "yyy"), c1.first())
         import warnings
         # Not interested in warnings about implicit close.
-        warnings.simplefilter("ignore")
-        txn.commit()
-        warnings.resetwarnings()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            txn.commit()
         self.assertRaises(db.DBCursorClosedError, c2.first)
 
     if db.version() > (4,3,0) :

@@ -158,6 +158,75 @@ ImportWarning can also be enabled explicitly in Python code using::
    warnings.simplefilter('default', ImportWarning)
 
 
+.. _warning-suppress:
+
+Temporarily Suppressing Warnings
+--------------------------------
+
+If you are using code that you know will raise a warning, such as a deprecated
+function, but do not want to see the warning, then it is possible to suppress
+the warning using the :class:`catch_warnings` context manager::
+
+    import warnings
+
+    def fxn():
+        warnings.warn("deprecated", DeprecationWarning)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fxn()
+
+While within the context manager all warnings will simply be ignored. This
+allows you to use known-deprecated code without having to see the warning while
+not suppressing the warning for other code that might not be aware of its use
+of deprecated code.
+
+
+.. _warning-testing:
+
+Testing Warnings
+----------------
+
+To test warnings raised by code, use the :class:`catch_warnings` context
+manager. With it you can temporarily mutate the warnings filter to facilitate
+your testing. For instance, do the following to capture all raised warnings to
+check::
+
+    import warnings
+
+    def fxn():
+        warnings.warn("deprecated", DeprecationWarning)
+
+    with warnings.catch_warnings(record=True) as w:
+        # Cause all warnings to always be triggered.
+        warnings.simplefilter("always")
+        # Trigger a warning.
+        fxn()
+        # Verify some things
+        assert len(w) == 1
+        assert isinstance(w[-1].category, DeprecationWarning)
+        assert "deprecated" in str(w[-1].message)
+
+One can also cause all warnings to be exceptions by using ``error`` instead of
+``always``. One thing to be aware of is that if a warning has already been
+raised because of a ``once``/``default`` rule, then no matter what filters are
+set the warning will not be seen again unless the warnings registry related to
+the warning has been cleared.
+
+Once the context manager exits, the warnings filter is restored to its state
+when the context was entered. This prevents tests from changing the warnings
+filter in unexpected ways between tests and leading to indeterminate test
+results. The :func:`showwarning` function in the module is also restored to
+its original value.
+
+When testing multiple operations that raise the same kind of warning, it
+is important to test them in a manner that confirms each operation is raising
+a new warning (e.g. set warnings to be raised as exceptions and check the
+operations raise exceptions, check that the length of the warning list
+continues to increase after each operation, or else delete the previous
+entries from the warnings list before each new operation).
+
+
 .. _warning-functions:
 
 Available Functions
@@ -262,4 +331,31 @@ Available Functions
    Reset the warnings filter.  This discards the effect of all previous calls to
    :func:`filterwarnings`, including that of the :option:`-W` command line options
    and calls to :func:`simplefilter`.
+
+
+Available Context Managers
+--------------------------
+
+.. class:: catch_warnings([\*, record=False, module=None])
+
+    A context manager that copies and, upon exit, restores the warnings filter
+    and the :func:`showwarning` function.
+    If the *record* argument is :const:`False` (the default) the context manager
+    returns :class:`None` on entry. If *record* is :const:`True`, a list is
+    returned that is progressively populated with objects as seen by a custom
+    :func:`showwarning` function (which also suppresses output to ``sys.stdout``).
+    Each object in the list has attributes with the same names as the arguments to
+    :func:`showwarning`.
+
+    The *module* argument takes a module that will be used instead of the
+    module returned when you import :mod:`warnings` whose filter will be
+    protected. This argument exists primarily for testing the :mod:`warnings`
+    module itself.
+
+    .. note::
+
+        In Python 3.0, the arguments to the constructor for
+        :class:`catch_warnings` are keyword-only arguments.
+
+    .. versionadded:: 2.6
 
