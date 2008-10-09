@@ -1,6 +1,7 @@
 import pickle, sys
 import unittest
 import stackless
+import random
 
 # Helpers
 
@@ -282,6 +283,46 @@ class TestWatchdog(unittest.TestCase):
         
 class TestWatchdogSoft(TestWatchdog):
     softSchedule = True
+    
+
+    def __init__(self, *args):
+        self.chans = [stackless.channel() for i in xrange(3)]
+        TestWatchdog.__init__(self, *args)
+        
+    def ChannelTasklet(self, i):
+        a = i;
+        b = (i+1)%3
+        recv = False #to bootstrap the cycle
+        while True:
+            print a
+            if i != 0 or recv:
+                d = self.chans[a].receive()
+            recv = True
+            j = 0
+            for i in xrange(random.randint(100, 100000)):
+                j = i+i
+
+            self.chans[b].send(j)
+        
+        
+    #test the soft interrupt on a chain of tasklets running
+    def test_channelchain(self):
+        c = [stackless.tasklet(self.ChannelTasklet) for i in xrange(3)]
+        for i, t in enumerate(reversed(c)):
+            t(i)
+            
+            
+        try:
+            for i in range(10):
+                stackless.run(500000, soft=True)
+                print "**", stackless.runcount
+                self.failUnless(stackless.runcount == 3 or stackless.runcount == 4)
+        finally:
+            for t in c:
+                t.kill()
+            
+            
+        
     
 if __name__ == '__main__':
     import sys

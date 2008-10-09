@@ -313,7 +313,9 @@ PyAPI_FUNC(PyObject *) PyStackless_GetCurrent(void);
  * after the action. You will write your exception handler
  * here, since every uncaught exception will be directed
  * to main.
- * In case on a timeout (opcode count), the return value
+ * In case of a timeout (tick count), If a tasklet runs for
+ * more than 'timeout' ticks at a time, it will be interrupted.
+ * the return value
  * will be the long-running tasklet, removed from the queue.
  * You might decide to kill it or to insert it again.
  * flags is interpreted as an OR of :
@@ -329,10 +331,15 @@ PyAPI_FUNC(PyObject *) PyStackless_GetCurrent(void);
  *   allows interrupts at all levels, effectively acting as
  *   though the "ignore_nesting" attribute were set on all
  *   tasklets.
+ * Py_WATCHDOG_TIMEOUT:
+ *   interprets 'timeout' as a total timeout, rather than a
+ *   timeslice length.  The function will then attempt to
+ *   interrupt execution 
  */
-#define Py_WATCHDOG_THREADBLOCK			1
+#define Py_WATCHDOG_THREADBLOCK		1
 #define PY_WATCHDOG_SOFT			2
 #define PY_WATCHDOG_IGNORE_NESTING	4
+#define PY_WATCHDOG_TOTALTIMEOUT	8
 PyAPI_FUNC(PyObject *) PyStackless_RunWatchdog(long timeout);
 PyAPI_FUNC(PyObject *) PyStackless_RunWatchdogEx(long timeout,
 											   int flags);
