@@ -818,15 +818,18 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 		Py_INCREF(next);
 		slp_current_insert(next);
 	}
-
-	slp_schedule_soft_irq(ts, prev, &next);
-
 	if (prev == next) {
 		TASKLET_CLAIMVAL(prev, &retval);
 		if (PyBomb_Check(retval))
 			retval = slp_bomb_explode(retval);
 		return retval;
 	}
+
+	/* only soft irq if prev != next, so that channel send
+	 * on a channel with preference 0 doesn't accidentally cause a
+	 * schedule
+	 */
+	slp_schedule_soft_irq(ts, prev, &next);
 
 	NOTIFY_SCHEDULE(prev, next, NULL);
 

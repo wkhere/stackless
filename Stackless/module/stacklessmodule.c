@@ -300,8 +300,8 @@ run_watchdog(PyObject *self, PyObject *args, PyObject *kwds)
 	long timeout = 0;
 	int threadblock = 0;
 	int soft = 0;
-	int ignore_nesting;
-	int totaltimeout;
+	int ignore_nesting = 0;
+	int totaltimeout = 0;
 	int flags;
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|liiii:run_watchdog",
