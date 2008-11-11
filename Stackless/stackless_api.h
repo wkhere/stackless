@@ -267,6 +267,12 @@ PyAPI_FUNC(void) PyChannel_SetPreference(PyChannelObject *self, int val);
 PyAPI_FUNC(int) PyChannel_GetScheduleAll(PyChannelObject *self);
 PyAPI_FUNC(void) PyChannel_SetScheduleAll(PyChannelObject *self, int val);
 
+/*
+ *Get the current channel balance. Negative numbers are readers, positive
+ * are writers
+ */
+PyAPI_FUNC(int) PyChannel_GetBalance(PyChannelObject *self);
+
 /******************************************************
 
   stacklessmodule functions
@@ -323,10 +329,15 @@ PyAPI_FUNC(PyObject *) PyStackless_GetCurrent(void);
  *   allows interrupts at all levels, effectively acting as
  *   though the "ignore_nesting" attribute were set on all
  *   tasklets.
+ * Py_WATCHDOG_TIMEOUT:
+ *   interprets 'timeout' as a total timeout, rather than a
+ *   timeslice length.  The function will then attempt to
+ *   interrupt execution 
  */
-#define Py_WATCHDOG_THREADBLOCK			1
+#define Py_WATCHDOG_THREADBLOCK		1
 #define PY_WATCHDOG_SOFT			2
 #define PY_WATCHDOG_IGNORE_NESTING	4
+#define PY_WATCHDOG_TOTALTIMEOUT	8
 PyAPI_FUNC(PyObject *) PyStackless_RunWatchdog(long timeout);
 PyAPI_FUNC(PyObject *) PyStackless_RunWatchdogEx(long timeout,
 											   int flags);
