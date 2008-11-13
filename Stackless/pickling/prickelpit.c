@@ -2060,10 +2060,10 @@ gen_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	genobject *gen;
 
 	if (is_wrong_type(type)) return NULL;
+	Py_INCREF(Py_None);
 	gen = (genobject *) PyGenerator_New((PyFrameObject *) Py_None);
 	if (gen == NULL)
 		return NULL;
-	Py_INCREF(Py_None);
 	gen->ob_type = type;
 	return (PyObject *) gen;
 }
