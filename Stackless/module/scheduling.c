@@ -533,17 +533,6 @@ next ? next->flags.blocked : 0)
 
 #ifdef WITH_THREAD
 
-static
-PyThread_type_lock interthread_lock = NULL;
-
-/* thread communication (protected by the lock) */
-
-static struct {
-	PyTaskletObject *unlock_target;
-	PyObject *other_lock;
-	long thread_id;
-} temp = {0, 0, 0};
-
 /* make sure that locks live longer than their threads */
 
 static void
@@ -578,13 +567,16 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 	PyThreadState *ts = PyThreadState_GET();
 	PyObject *retval;
 	PyTaskletObject *next = NULL;
-	PyObject *unlocker_lock;
+	PyObject *self_lock, *unlocker_lock;
 	int revive_main = 0;
 	
 #ifdef WITH_THREAD
-	if (ts->st.thread.runflags == 0 && ts->st.main->next == NULL)
+	if ( !(ts->st.runflags & Py_WATCHDOG_THREADBLOCK) && ts->st.main->next == NULL)
 		/* we also must never block if watchdog is running not in threadblocking mode */
 		revive_main = 1;
+
+	if (revive_main)
+		assert(ts->st.main->next == NULL); /* main must be floating */
 #endif
 
 	if (revive_main || check_for_deadlock()) {
@@ -606,23 +598,24 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 		if (!(ts->st.thread.self_lock = new_lock()))
 			return NULL;
 		acquire_lock(ts->st.thread.self_lock, 1);
-		if (!(ts->st.thread.unlock_lock = new_lock()))
-			return NULL;
 	}
 
 	/* let somebody reactivate us */
 
 	ts->st.thread.is_locked = 1; /* flag as blocked and wait */
 
-	PyEval_SaveThread();
+	self_lock = ts->st.thread.self_lock;
+	Py_INCREF(self_lock);
+	Py_BEGIN_ALLOW_THREADS
 	PR("locker waiting for my lock");
-	acquire_lock(ts->st.thread.self_lock, 1);
+	acquire_lock(self_lock, 1);
 	PR("HAVE my lock");
-	PyEval_RestoreThread(ts);
+	Py_END_ALLOW_THREADS
+	Py_DECREF(self_lock);
 
-	if (temp.unlock_target != NULL) {
-		next = temp.unlock_target;
-		temp.unlock_target = NULL;
+	if (ts->st.thread.unlock_target != NULL) {
+		next = (PyTaskletObject*)ts->st.thread.unlock_target;
+		ts->st.thread.unlock_target = NULL;
 	}
 	else
 		next = prev;
@@ -642,11 +635,12 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 		slp_current_insert(next);
 	}
 
-	if (temp.other_lock != NULL) {
+	if (ts->st.thread.unlocker_lock != NULL) {
 		PR("releasing unlocker");
-		unlocker_lock = temp.other_lock;
-		temp.other_lock = NULL;
+		unlocker_lock = ts->st.thread.unlocker_lock;
+		ts->st.thread.unlocker_lock = NULL;
 		release_lock(unlocker_lock);
+		PR("released unlocker");
 		Py_DECREF(unlocker_lock);
 	}
 
@@ -676,13 +670,8 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 	if (ts->st.thread.self_lock == NULL) {
 		if (!(ts->st.thread.self_lock = new_lock()))
 			return NULL;
+		/* Non-recursive lock, used for blocking myself on second aquire() */
 		acquire_lock(ts->st.thread.self_lock, 1);
-		if (!(ts->st.thread.unlock_lock = new_lock()))
-			return NULL;
-		if (interthread_lock == NULL) {
-			if (!(interthread_lock = PyThread_allocate_lock()))
-				return NULL;
-		}
 	}
 
 	/*
@@ -699,20 +688,11 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 	unlock_lock = nts->st.thread.unlock_lock;
 	Py_INCREF(unlock_lock);
 
-	PyEval_SaveThread();
+	Py_BEGIN_ALLOW_THREADS
 	PR("unblocker waiting for unlocker lock");
 	acquire_lock(unlock_lock, 1);
 	PR("unblocker HAS unlocker lock");
-
-	/*
-	 * also make sure that only one single interthread transaction
-	 * is performed at any time.
-	 */
-
-	PR("unblocker waiting for interthread lock");
-	PyThread_acquire_lock(interthread_lock, 1);
-	PR("unblocker HAS interthread lock");
-	PyEval_RestoreThread(ts);
+	Py_END_ALLOW_THREADS
 
 	/* get myself ready */
 	retval = slp_schedule_task(prev, prev, stackless);
@@ -720,21 +700,20 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 	/* see whether the other thread still exists and is really blocked */
 	if (is_thread_alive(thread_id) && nts->st.thread.is_locked) {
 		/* tell the blocker what comes next */
-		temp.unlock_target = next;
-		temp.other_lock = ts->st.thread.self_lock;
+		nts->st.thread.unlock_target = (PyObject*)next;
+		nts->st.thread.unlocker_lock = ts->st.thread.self_lock;
 		/* give it an extra ref, in case I would die early */
-		Py_INCREF(temp.other_lock);
+		Py_INCREF(nts->st.thread.unlocker_lock);
 
 		/* unblock it */
 		release_lock(nts->st.thread.self_lock);
 
 		/* wait for the transaction to finish */
-
-		PyEval_SaveThread();
+		Py_BEGIN_ALLOW_THREADS
 		PR("unblocker waiting for own lock");
 		acquire_lock(ts->st.thread.self_lock, 1);
 		PR("unblocker HAS own lock");
-		PyEval_RestoreThread(ts);
+		Py_END_ALLOW_THREADS
 	}
 	else {
 		PR("unlocker: other is NOT LOCKED or dead");
@@ -749,18 +728,51 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 			slp_current_insert(next);
 		}
 	}
-	PR("unblocker releasing interthread lock");
-	PyThread_release_lock(interthread_lock);
-	PR("unblocker RELEASED interthread lock");
 	PR("unblocker releasing unlocker lock");
 	release_lock(unlock_lock);
-	Py_DECREF(unlock_lock);
 	PR("unblocker RELEASED unlocker lock");
-
+	Py_DECREF(unlock_lock);
+	
 	return retval;
 }
 
 #endif
+
+/* deal with soft interrupts by modifying next to specify the main tasklet */
+static void slp_schedule_soft_irq(PyThreadState *ts, PyTaskletObject *prev,
+						   PyTaskletObject **next, int not_now)
+{
+	PyTaskletObject *tmp;
+	assert(*next);
+	if(!prev->flags.pending_irq || !(ts->st.runflags & PY_WATCHDOG_SOFT) )
+		return; /* no soft interrupt pending */
+
+	prev->flags.pending_irq = 0;
+	if (ts->st.main->next != NULL)
+		return; /* main isn't floating, we are probably raising an exception */
+
+	/* if were were swithing from main or to main, we don't do anything */
+	if (prev == ts->st.main || *next == ts->st.main)
+		return;
+
+	if (not_now || !TASKLET_NESTING_OK(prev)) {
+		/* pass the irq flag to the next tasklet */
+		(*next)->flags.pending_irq = 1;
+		return;
+	}
+
+	/* restore main.  insert it before the old next, so that the old next get
+	 * run after it
+	 */
+	tmp = ts->st.current;
+	ts->st.current = *next;
+	slp_current_insert(ts->st.main);
+	Py_INCREF(ts->st.main);
+	ts->st.current = tmp;
+	
+	*next = ts->st.main;
+}
+
 
 PyObject *
 slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
@@ -769,6 +781,7 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 	PyCStackObject **cstprev;
 	PyObject *retval;
 	int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
+	int no_soft_irq;
 
 	if (next == NULL) {
 		return schedule_task_block(prev, stackless);
@@ -779,6 +792,11 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 		return schedule_task_unblock(prev, next, stackless);
 	}
 #endif
+
+	/* remove the no-soft-irq flag from the runflags */
+	no_soft_irq = ts->st.runflags & PY_WATCHDOG_NO_SOFT_IRQ;
+	ts->st.runflags &= ~PY_WATCHDOG_NO_SOFT_IRQ;
+
 	if (next->flags.blocked) {
 		/* unblock from channel */
 		slp_channel_remove_slow(next);
@@ -789,6 +807,9 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 		Py_INCREF(next);
 		slp_current_insert(next);
 	}
+
+	slp_schedule_soft_irq(ts, prev, &next, no_soft_irq);
+
 	if (prev == next) {
 		TASKLET_CLAIMVAL(prev, &retval);
 		if (PyBomb_Check(retval))
@@ -798,7 +819,8 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 
 	NOTIFY_SCHEDULE(prev, next, NULL);
 
-	ts->st.ticker = ts->st.interval;
+	if (!(ts->st.runflags & PY_WATCHDOG_TOTALTIMEOUT))
+		ts->st.ticker = ts->st.interval; /* reset timeslice */
 	prev->recursion_depth = ts->recursion_depth;
 	prev->f.frame = ts->frame;
 

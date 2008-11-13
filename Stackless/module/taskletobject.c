@@ -300,7 +300,8 @@ tasklet_setstate(PyObject *self, PyObject *args)
 	PyObject *tempval, *lis;
 	int flags, nesting_level;
 	PyFrameObject *f;
-	int i, nframes;
+	Py_ssize_t i, nframes;
+	int j;
 
 	if (!PyArg_ParseTuple(args, "iOiO!:tasklet",
 			      &flags, 
@@ -325,12 +326,12 @@ tasklet_setstate(PyObject *self, PyObject *args)
 	 * they can leave their blocked flag in place because the
 	 * channel would have set it.
 	 */
-	i = t->flags.blocked;
+	j = t->flags.blocked;
 	*(int *)&t->flags = flags;
 	if (t->next == NULL) {
 		t->flags.blocked = 0;
 	} else {
-		t->flags.blocked = i;
+		t->flags.blocked = j;
 	}
 
 	/* t->nesting_level = nesting_level;

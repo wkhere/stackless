@@ -50,10 +50,11 @@ void slp_check_pending_irq()
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *current = ts->st.current;
 
-	if (current->flags.pending_irq) {
+	/* act only if hard irq is in effect */
+	if (current->flags.pending_irq && !(ts->st.runflags & PY_WATCHDOG_SOFT)) {
 		if (current->flags.atomic)
 			return;
-		if (ts->st.nesting_level && !current->flags.ignore_nesting)
+		if (!TASKLET_NESTING_OK(current))
 			return;
 		/* trigger interrupt */
 		if (_Py_Ticker > 0)

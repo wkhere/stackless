@@ -28,6 +28,9 @@
 #ifdef BYTE
 #undef BYTE
 #endif
+#ifdef Yield
+#undef Yield /* remove definition from Python_ast.h to avoid conflict */
+#endif
 #include <windows.h>
 #endif
 #define _SEH32

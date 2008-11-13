@@ -1906,6 +1906,82 @@
 					>
 				</File>
 				<File
+					RelativePath="..\Stackless\platf\switch_x64_masm.asm"
+					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCustomBuildTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|x64"
+						>
+						<Tool
+							Name="VCCustomBuildTool"
+							Description="Running ml64"
+							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;"
+							Outputs="$(IntDir)\$(InputName) .obj"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCustomBuildTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug|x64"
+						>
+						<Tool
+							Name="VCCustomBuildTool"
+							Description="Running ml64"
+							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;"
+							Outputs="$(IntDir)\$(InputName) .obj"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGInstrument|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCustomBuildTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGInstrument|x64"
+						>
+						<Tool
+							Name="VCCustomBuildTool"
+							Description="Running ml64"
+							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;"
+							Outputs="$(IntDir)\$(InputName) .obj"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGUpdate|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCustomBuildTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGUpdate|x64"
+						>
+						<Tool
+							Name="VCCustomBuildTool"
+							Description="Running ml64"
+							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;"
+							Outputs="$(IntDir)\$(InputName) .obj"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\Stackless\platf\switch_x64_msvc.h"
 					>
 				</File>

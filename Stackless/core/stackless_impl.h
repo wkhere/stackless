@@ -459,6 +459,13 @@ PyAPI_DATA(slp_schedule_hook_func) *_slp_schedule_fasthook;
 PyAPI_DATA(PyObject* ) _slp_schedule_hook;
 int slp_schedule_callback(PyTaskletObject *prev, PyTaskletObject *next);
 
+/* macro for use when interrupting tasklets from watchdog */
+#define TASKLET_NESTING_OK(task) \
+	(ts->st.nesting_level == 0 || \
+	 (task)->flags.ignore_nesting || \
+	 (ts->st.runflags & PY_WATCHDOG_IGNORE_NESTING))
+
+
 #include "stackless_api.h"
 
 #else /* STACKLESS */

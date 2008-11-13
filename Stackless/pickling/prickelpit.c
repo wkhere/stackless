@@ -30,7 +30,7 @@ static int is_wrong_type(PyTypeObject *type)
 
 /* supporting __setstate__ for the wrapper type */
 
-PyObject *
+static PyObject *
 generic_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *inst;
@@ -448,18 +448,18 @@ err_exit:
  */
 
 PyObject *
-slp_into_tuple_with_nulls(PyObject **start, int length)
+slp_into_tuple_with_nulls(PyObject **start, Py_ssize_t length)
 {
 	PyObject *res = PyTuple_New(length+1);
 	PyObject *nulls = PyTuple_New(0);
-	int i, nullcount = 0;
+	Py_ssize_t i, nullcount = 0;
 	if (res == NULL)
 		return NULL;
 	for (i=0; i<length; ++i) {
 		PyObject *ob = start[i];
 		if (ob == NULL) {
 			/* store None, and add the position to nulls */
-			PyObject *pos = PyLong_FromLong(i);
+			PyObject *pos = PyLong_FromSsize_t(i);
 			if (pos == NULL)
 				return NULL;
 			ob = Py_None;
@@ -475,10 +475,10 @@ slp_into_tuple_with_nulls(PyObject **start, int length)
 	return res;
 }
 
-int
+Py_ssize_t
 slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
 {
-	int i, length = PyTuple_GET_SIZE(tup)-1;
+	Py_ssize_t i, length = PyTuple_GET_SIZE(tup)-1;
 	PyObject *nulls;
 	if (length < 0) return 0;
 
@@ -852,6 +852,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	PyObject *exec_name = NULL;
 	PyFrame_ExecFunc *good_func, *bad_func;
 	int valid, have_locals;
+	Py_ssize_t tmp;
 
 	if (is_wrong_type(Py_TYPE(f))) return NULL;
 	
@@ -910,7 +911,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	}
 
 	if (PyTuple_Check(localsplus_as_tuple)) {
-		int space =  f->f_code->co_stacksize + (f->f_valuestack - f->f_localsplus);
+		Py_ssize_t space =  f->f_code->co_stacksize + (f->f_valuestack - f->f_localsplus);
 
 		if (PyTuple_GET_SIZE(localsplus_as_tuple)-1 > space) {
 			PyErr_SetString(PyExc_ValueError, "invalid localsplus for frame");
@@ -936,7 +937,8 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 
 	f->f_lasti = f_lasti;
 	f->f_lineno = f_lineno;
-	f->f_iblock = PyTuple_GET_SIZE(blockstack_as_tuple);
+	tmp = PyTuple_GET_SIZE(blockstack_as_tuple);
+	f->f_iblock = Py_SAFE_DOWNCAST(tmp, Py_ssize_t, int);
 	if (f->f_iblock < 0 || f->f_iblock > CO_MAXBLOCKS) {
 		PyErr_SetString(PyExc_ValueError, "invalid blockstack for frame");
 		goto err_exit;

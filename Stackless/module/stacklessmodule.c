@@ -169,30 +169,45 @@ enable_softswitch(PyObject *self, PyObject *flag)
 
 
 static char run_watchdog__doc__[] =
-"run_watchdog(timeout, threadblocking) -- run tasklets until they are all\n\
-done, or timeout instructions have passed. Tasklets must\n\
-provide cooperative schedule() calls.\n\
+"run_watchdog(timeout=0, threadblock=False, soft=False,\n\
+              ignore_nesting=False, totaltimeout=False) -- \n\
+run tasklets until they are all\n\
+done, or timeout instructions have passed, if timeout is not 0.\n\
+Tasklets must provide cooperative schedule() calls.\n\
 If the timeout is met, the function returns.\n\
-The calling tasklet is put aside while the tasklets are running.\n\
-It is inserted back after the function stops, right before the\n\
-tasklet that caused a timeout, if any.\n\
+This function must be called from the main tasklet only.\n\
+If a tasklet is interrupted, it is returned as the return value of the\n\
+function.\n\
 If an exception occours, it will be passed to the main tasklet.\n\
-The optional threadblocking argument ensures, when True, that the thread\n\
+The other optional flags paremeter work as follows:\n\
+threadblock:  When set, ensures, that the thread\n\
 will block when it runs out of tasklets to await channel activity from\n\
-other Python threads to wake it up.";
+other Python threads to wake it up.\n\
+soft:  When set, tasklets won't be interrupted but\n\
+run will return (with a None) at the next convenient scheduling moment\n\
+when the timeout has occurred.\n\
+ignore_nesting: Allow interrupts at any interpreter nesting level,\n\
+ignoring the tasklets' own ignore_nesting attribute.\n\
+totaltimeout: The 'timeout' argument is the total timeout for run(),\n\
+rather than a maximum timeslice for a single tasklet.  This for run()\n\
+to return after a certain time.";
 
 static PyObject *
 interrupt_timeout_return(void)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *current = ts->st.current;
-	
+
 	/*
-	 * Tasklet has to be prevented from returning if atomic or
-	 * if nesting_level is relevant 
+	 * we mark the IRQ as pending if 
+	 * a) we are in soft interrupt mode
+	 * b) we are in hard interrupt mode, but aren't allowed to break here which happens
+	 * when "atomic" is set, or the "nesting level" is relevant and not ignored.
 	 */
-	if (current->flags.atomic || ts->st.schedlock ||
-	    ( ts->st.nesting_level && !current->flags.ignore_nesting ) ) {
+	if ((ts->st.runflags & PY_WATCHDOG_SOFT) ||
+		current->flags.atomic || ts->st.schedlock ||
+		!TASKLET_NESTING_OK(current))
+	{
 		ts->st.ticker = ts->st.interval;
 		current->flags.pending_irq = 1;
 		Py_INCREF(Py_None);
@@ -205,56 +220,52 @@ interrupt_timeout_return(void)
 }
 
 static PyObject *
-PyStackless_RunWatchdog_M(long timeout, long threadblocking)
+PyStackless_RunWatchdog_M(long timeout, long flags)
 {
-	return PyStackless_CallMethod_Main(slp_module, "run", "(ll)", timeout, threadblocking);
+	return PyStackless_CallMethod_Main(slp_module, "run", "(ll)", timeout, flags);
 }
 
 
 PyObject *
 PyStackless_RunWatchdog(long timeout)
 {
-	long threadblocking = 0;
-	return PyStackless_RunWatchdogEx(timeout, threadblocking);
+	return PyStackless_RunWatchdogEx(timeout, 0);
 }
 
 
 PyObject *
-PyStackless_RunWatchdogEx(long timeout, long threadblocking)
+PyStackless_RunWatchdogEx(long timeout, int flags)
 {
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *victim;
 	PyObject *retval;
 	
 	if (ts->st.main == NULL)
-		return PyStackless_RunWatchdog_M(timeout, threadblocking);
+		return PyStackless_RunWatchdog_M(timeout, flags);
 	if (ts->st.current != ts->st.main)
 		RUNTIME_ERROR(
 		    "run() must be run from the main tasklet.",
 		    NULL);
-	
-	if (timeout <= 0) {
-		ts->st.interrupt = NULL;
-	} 
-	else {
-		ts->st.interrupt = interrupt_timeout_return;
-	}
 
-	ts->st.interval = timeout;
+	if (timeout <= 0)
+		ts->st.interrupt = NULL;
+	else
+		ts->st.interrupt = interrupt_timeout_return;
+
+	ts->st.ticker = ts->st.interval = timeout;
 
 	/* remove main. Will get back at the end. */
 	slp_current_remove();
 	Py_DECREF(ts->st.main);
 
 	/* now let them run until the end. */
-#ifdef WITH_THREAD
-	ts->st.thread.runflags = threadblocking;
-#endif
+	ts->st.runflags = flags;
 	retval = slp_schedule_task(ts->st.main, ts->st.current, 0);
-#ifdef WITH_THREAD
-	ts->st.thread.runflags = 0;
-#endif
+	ts->st.runflags = 0;
 	ts->st.interrupt = NULL;
+
+	/* we should be back in the main tasklet */
+	assert(ts->st.current == ts->st.main);
 
 	/* retval really should be PyNone here (or NULL).  Technically, it is the
 	 * tempval of some tasklet that has quit.  Even so, it is quite
@@ -267,13 +278,14 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 	/* 
 	 * back in main.
 	 * We were either revived by slp_tasklet_end or the interrupt.
+	 * If we were using hard interrupts (bit 1 in flags not set)
+	 * we need to return the interrupted tasklet)
 	 */
-	if (ts->st.runcount > 1) {
+	if (ts->st.runcount > 1 && !(flags & PY_WATCHDOG_SOFT)) {
 		/* remove victim. It is sitting next to us. */
 		ts->st.current = (PyTaskletObject*)ts->st.main->next;
 		victim = slp_current_remove();
 		ts->st.current = (PyTaskletObject*)ts->st.main;
-		Py_DECREF(retval);
 		return (PyObject*) victim;
 	} else
 		Py_RETURN_NONE;
@@ -282,14 +294,25 @@ PyStackless_RunWatchdogEx(long timeout, long threadblocking)
 static PyObject *
 run_watchdog(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	static char *argnames[] = {"timeout", "threadblocking", NULL};
+	static char *argnames[] = {"timeout", "threadblock", "soft",
+								"ignore_nesting", "totaltimeout", 
+								NULL};
 	long timeout = 0;
-	long threadblocking = 0;
+	int threadblock = 0;
+	int soft = 0;
+	int ignore_nesting = 0;
+	int totaltimeout = 0;
+	int flags;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|ll:run_watchdog",
-					 argnames, &timeout, &threadblocking))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|liiii:run_watchdog",
+					 argnames, &timeout, &threadblock, &soft,
+					 &ignore_nesting, &totaltimeout))
 		return NULL;
-	return PyStackless_RunWatchdogEx(timeout, threadblocking);
+	flags = threadblock ? Py_WATCHDOG_THREADBLOCK : 0;
+	flags |= soft ? PY_WATCHDOG_SOFT : 0;
+	flags |= ignore_nesting ? PY_WATCHDOG_IGNORE_NESTING : 0;
+	flags |= totaltimeout ? PY_WATCHDOG_TOTALTIMEOUT : 0;
+	return PyStackless_RunWatchdogEx(timeout, flags);
 }
 
 static char get_thread_info__doc__[] =
@@ -695,8 +718,8 @@ _get_refinfo(PyObject *self)
 {
 	PyObject *op, *max = Py_None;
 	PyObject *refchain;
-	int ref_total = _Py_RefTotal;
-	int computed_total = 0;
+	Py_ssize_t ref_total = _Py_RefTotal;
+	Py_ssize_t computed_total = 0;
 
 	refchain = PyTuple_New(0)->_ob_next; /* None doesn't work in 2.2 */
 	Py_DECREF(refchain->_ob_prev);
@@ -709,7 +732,7 @@ _get_refinfo(PyObject *self)
 		max = op;
 		computed_total += op->ob_refcnt;
 	}
-	return Py_BuildValue("(Oiii)", max, max->ob_refcnt, ref_total,
+	return Py_BuildValue("(Onnn)", max, max->ob_refcnt, ref_total,
 			     computed_total);
 }
 
@@ -1072,8 +1095,8 @@ static int init_stackless_methods()
 
 	for (; p->type != NULL; p++) {
 		PyTypeObject *t = p->type;
-		int ind = p->offset & MFLAG_IND;
-		int ofs = p->offset - ind;
+		size_t ind = p->offset & MFLAG_IND;
+		size_t ofs = p->offset - ind;
 
 		if (ind)
 			t = *((PyTypeObject **)t);
