@@ -169,7 +169,8 @@ enable_softswitch(PyObject *self, PyObject *flag)
 
 
 static char run_watchdog__doc__[] =
-"run_watchdog(timeout=0, threadblock=False, soft=False, ignore_nesting=False) -- \
+"run_watchdog(timeout=0, threadblock=False, soft=False,\n\
+              ignore_nesting=False, totaltimeout=False) -- \n\
 run tasklets until they are all\n\
 done, or timeout instructions have passed, if timeout is not 0.\n\
 Tasklets must provide cooperative schedule() calls.\n\
@@ -186,7 +187,10 @@ soft:  When set, tasklets won't be interrupted but\n\
 run will return (with a None) at the next convenient scheduling moment\n\
 when the timeout has occurred.\n\
 ignore_nesting: Allow interrupts at any interpreter nesting level,\n\
-ignoring the tasklets' own ignore_nesting attribute.";
+ignoring the tasklets' own ignore_nesting attribute.\n\
+totaltimeout: The 'timeout' argument is the total timeout for run(),\n\
+rather than a maximum timeslice for a single tasklet.  This for run()\n\
+to return after a certain time.";
 
 static PyObject *
 interrupt_timeout_return(void)
@@ -248,7 +252,7 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	else
 		ts->st.interrupt = interrupt_timeout_return;
 
-	ts->st.interval = timeout;
+	ts->st.ticker = ts->st.interval = timeout;
 
 	/* remove main. Will get back at the end. */
 	slp_current_remove();
@@ -259,6 +263,9 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	retval = slp_schedule_task(ts->st.main, ts->st.current, 0);
 	ts->st.runflags = 0;
 	ts->st.interrupt = NULL;
+
+	/* we should be back in the main tasklet */
+	assert(ts->st.current == ts->st.main);
 
 	/* retval really should be PyNone here (or NULL).  Technically, it is the
 	 * tempval of some tasklet that has quit.  Even so, it is quite
@@ -287,19 +294,24 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 static PyObject *
 run_watchdog(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	static char *argnames[] = {"timeout", "threadblock", "soft", "ignore_nesting", NULL};
+	static char *argnames[] = {"timeout", "threadblock", "soft",
+								"ignore_nesting", "totaltimeout", 
+								NULL};
 	long timeout = 0;
 	int threadblock = 0;
 	int soft = 0;
-	int ignore_nesting;
+	int ignore_nesting = 0;
+	int totaltimeout = 0;
 	int flags;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|liii:run_watchdog",
-					 argnames, &timeout, &threadblock, &soft, &ignore_nesting))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|liiii:run_watchdog",
+					 argnames, &timeout, &threadblock, &soft,
+					 &ignore_nesting, &totaltimeout))
 		return NULL;
 	flags = threadblock ? Py_WATCHDOG_THREADBLOCK : 0;
 	flags |= soft ? PY_WATCHDOG_SOFT : 0;
 	flags |= ignore_nesting ? PY_WATCHDOG_IGNORE_NESTING : 0;
+	flags |= totaltimeout ? PY_WATCHDOG_TOTALTIMEOUT : 0;
 	return PyStackless_RunWatchdogEx(timeout, flags);
 }
 

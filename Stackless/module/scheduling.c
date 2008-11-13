@@ -755,6 +755,42 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 
 #endif
 
+/* deal with soft interrupts by modifying next to specify the main tasklet */
+static void slp_schedule_soft_irq(PyThreadState *ts, PyTaskletObject *prev,
+						   PyTaskletObject **next)
+{
+	PyTaskletObject *tmp;
+	assert(*next);
+	if(!prev->flags.pending_irq || !(ts->st.runflags & PY_WATCHDOG_SOFT) )
+		return; /* no soft interrupt pending */
+
+	prev->flags.pending_irq = 0;
+	if (ts->st.main->next != NULL)
+		return; /* main isn't floating, we are probably raising an exception */
+
+	/* if were were swithing from main or to main, we don't do anything */
+	if (prev == ts->st.main || *next == ts->st.main)
+		return;
+
+	if (!TASKLET_NESTING_OK(prev)) {
+		/* pass the irq flag to the next tasklet */
+		(*next)->flags.pending_irq = 1;
+		return;
+	}
+
+	/* restore main.  insert it before the old next, so that the old next get
+	 * run after it
+	 */
+	tmp = ts->st.current;
+	ts->st.current = *next;
+	slp_current_insert(ts->st.main);
+	Py_INCREF(ts->st.main);
+	ts->st.current = tmp;
+	
+	*next = ts->st.main;
+}
+
+
 PyObject *
 slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 {
@@ -762,21 +798,6 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 	PyCStackObject **cstprev;
 	PyObject *retval;
 	int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
-
-	/* deal with soft interrupts here */
-	if(prev->flags.pending_irq && (ts->st.runflags & PY_WATCHDOG_SOFT) ) {
-		prev->flags.pending_irq = 0;
-		if (TASKLET_NESTING_OK(prev)) {
-			/* it is okay to interrupt this tasklet, revive main. */
-			assert(prev != ts->st.main);
-			assert(ts->st.main->next == NULL);
-			next = ts->st.main;
-		} else {
-			/* ok, let the next tasklet inherit the pending irq */
-			if (next && next != ts->st.main)
-				next->flags.pending_irq = 1;
-		}
-	}
 
 	if (next == NULL) {
 		return schedule_task_block(prev, stackless);
@@ -804,9 +825,16 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 		return retval;
 	}
 
+	/* only soft irq if prev != next, so that channel send
+	 * on a channel with preference 0 doesn't accidentally cause a
+	 * schedule
+	 */
+	slp_schedule_soft_irq(ts, prev, &next);
+
 	NOTIFY_SCHEDULE(prev, next, NULL);
 
-	ts->st.ticker = ts->st.interval;
+	if (!(ts->st.runflags & PY_WATCHDOG_TOTALTIMEOUT))
+		ts->st.ticker = ts->st.interval; /* reset timeslice */
 	prev->recursion_depth = ts->recursion_depth;
 	prev->f.frame = ts->frame;
 
