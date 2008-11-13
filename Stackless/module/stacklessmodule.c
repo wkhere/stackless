@@ -719,8 +719,8 @@ _get_refinfo(PyObject *self)
 {
 	PyObject *op, *max = Py_None;
 	PyObject *refchain;
-	int ref_total = _Py_RefTotal;
-	int computed_total = 0;
+	Py_ssize_t ref_total = _Py_RefTotal;
+	Py_ssize_t computed_total = 0;
 
 	refchain = PyTuple_New(0)->_ob_next; /* None doesn't work in 2.2 */
 	Py_DECREF(refchain->_ob_prev);
@@ -733,7 +733,7 @@ _get_refinfo(PyObject *self)
 		max = op;
 		computed_total += op->ob_refcnt;
 	}
-	return Py_BuildValue("(Oiii)", max, max->ob_refcnt, ref_total,
+	return Py_BuildValue("(Onnn)", max, max->ob_refcnt, ref_total,
 			     computed_total);
 }
 
@@ -1093,8 +1093,8 @@ static int init_stackless_methods()
 
 	for (; p->type != NULL; p++) {
 		PyTypeObject *t = p->type;
-		int ind = p->offset & MFLAG_IND;
-		int ofs = p->offset - ind;
+		size_t ind = p->offset & MFLAG_IND;
+		size_t ofs = p->offset - ind;
 
 		if (ind)
 			t = *((PyTypeObject **)t);
