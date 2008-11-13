@@ -287,6 +287,8 @@ class TestWatchdogSoft(TestWatchdog):
 
     def __init__(self, *args):
         self.chans = [stackless.channel() for i in xrange(3)]
+        #for c in self.chans:
+        #    c.preference = 0
         TestWatchdog.__init__(self, *args)
         
     def ChannelTasklet(self, i):
@@ -294,12 +296,12 @@ class TestWatchdogSoft(TestWatchdog):
         b = (i+1)%3
         recv = False #to bootstrap the cycle
         while True:
-            print a
+            #print a
             if i != 0 or recv:
                 d = self.chans[a].receive()
             recv = True
             j = 0
-            for i in xrange(random.randint(100, 100000)):
+            for i in xrange(random.randint(100, 1000)):
                 j = i+i
 
             self.chans[b].send(j)
@@ -308,14 +310,13 @@ class TestWatchdogSoft(TestWatchdog):
     #test the soft interrupt on a chain of tasklets running
     def test_channelchain(self):
         c = [stackless.tasklet(self.ChannelTasklet) for i in xrange(3)]
+        #print sys.getcheckinterval()
         for i, t in enumerate(reversed(c)):
             t(i)
-            
-            
         try:
             for i in range(10):
-                stackless.run(500000, soft=True)
-                print "**", stackless.runcount
+                stackless.run(50000, soft=True, totaltimeout=True, ignore_nesting=True)
+                #print "**", stackless.runcount
                 self.failUnless(stackless.runcount == 3 or stackless.runcount == 4)
         finally:
             for t in c:
