@@ -1248,12 +1248,12 @@ float_fromhex(PyObject *cls, PyObject *arg)
 		s++;
 
 	/* infinities and nans */
-	if (PyOS_mystrnicmp(s, "nan", 4) == 0) {
+	if (PyOS_strnicmp(s, "nan", 4) == 0) {
 		x = Py_NAN;
 		goto finished;
 	}
-	if (PyOS_mystrnicmp(s, "inf", 4) == 0 ||
-	    PyOS_mystrnicmp(s, "infinity", 9) == 0) {
+	if (PyOS_strnicmp(s, "inf", 4) == 0 ||
+	    PyOS_strnicmp(s, "infinity", 9) == 0) {
 		x = sign*Py_HUGE_VAL;
 		goto finished;
 	}
@@ -1457,7 +1457,7 @@ float_as_integer_ratio(PyObject *v, PyObject *unused)
 #ifdef Py_NAN
 	if (Py_IS_NAN(self)) {
 	  PyErr_SetString(PyExc_ValueError,
-			  "Cannot pass nan to float.as_integer_ratio.");
+			  "Cannot pass NaN to float.as_integer_ratio.");
 	  return NULL;
 	}
 #endif
@@ -1516,7 +1516,7 @@ PyDoc_STRVAR(float_as_integer_ratio_doc,
 "\n"
 "Returns a pair of integers, whose ratio is exactly equal to the original\n"
 "float and with a positive denominator.\n"
-"Raises OverflowError on infinities and a ValueError on nans.\n"
+"Raises OverflowError on infinities and a ValueError on NaNs.\n"
 "\n"
 ">>> (10.0).as_integer_ratio()\n"
 "(10, 1)\n"

@@ -199,7 +199,7 @@ The grammar for a replacement field is as follows:
       field_name: (`identifier` | `integer`) ("." `attribute_name` | "[" element_index "]")*
       attribute_name: `identifier`
       element_index: `integer`
-      conversion: "r" | "s"
+      conversion: "r" | "s" | "a"
       format_spec: <described in the next section>
       
 In less formal terms, the replacement field starts with a *field_name*, which
@@ -348,9 +348,9 @@ following:
    |         | positive numbers, and a minus sign on negative numbers.  |
    +---------+----------------------------------------------------------+
 
-The ``'#'`` option is only valid for integers, and only for binary,
-octal, or hexadecimal output.  If present, it specifies that the output
-will be prefixed by ``'0b'``, ``'0o'``, or ``'0x'``, respectively.
+The ``'#'`` option is only valid for integers, and only for binary, octal, or
+hexadecimal output.  If present, it specifies that the output will be prefixed
+by ``'0b'``, ``'0o'``, or ``'0x'``, respectively.
 
 *width* is a decimal integer defining the minimum field width.  If not
 specified, then the field width will be determined by the content.

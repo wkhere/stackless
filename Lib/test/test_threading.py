@@ -1,7 +1,7 @@
 # Very rudimentary test of threading module
 
 import test.support
-from test.support import verbose, catch_warning
+from test.support import verbose
 import random
 import re
 import sys
@@ -323,44 +323,18 @@ class ThreadTests(unittest.TestCase):
                           msg=('%d references still around' %
                                sys.getrefcount(weak_raising_cyclic_object())))
 
-    def test_pep8ified_threading(self):
-        def check(_, w, msg):
-            self.assertEqual(str(w.message), msg)
-
+    def test_old_threading_api(self):
+        # Just a quick sanity check to make sure the old method names are
+        # still present
         t = threading.Thread()
-        with catch_warning() as w:
-            try:
-                del threading.__warningregistry__
-            except AttributeError:
-                pass
-            msg = "isDaemon() is deprecated in favor of the " \
-                  "Thread.daemon property"
-            check(t.isDaemon(), w, msg)
-            w.reset()
-            msg = "setDaemon() is deprecated in favor of the " \
-                  "Thread.daemon property"
-            check(t.setDaemon(True), w, msg)
-            w.reset()
-            msg = "getName() is deprecated in favor of the " \
-                  "Thread.name property"
-            check(t.getName(), w, msg)
-            w.reset()
-            msg = "setName() is deprecated in favor of the " \
-                  "Thread.name property"
-            check(t.setName("name"), w, msg)
-            w.reset()
-            msg = "isAlive() is deprecated in favor of is_alive()"
-            check(t.isAlive(), w, msg)
-            w.reset()
-            e = threading.Event()
-            msg = "isSet() is deprecated in favor of is_set()"
-            check(e.isSet(), w, msg)
-            w.reset()
-            msg = "currentThread() is deprecated in favor of current_thread()"
-            check(threading.currentThread(), w, msg)
-            w.reset()
-            msg = "activeCount() is deprecated in favor of active_count()"
-            check(threading.activeCount(), w, msg)
+        t.isDaemon()
+        t.setDaemon(True)
+        t.getName()
+        t.setName("name")
+        t.isAlive()
+        e = threading.Event()
+        e.isSet()
+        threading.activeCount()
 
 
 class ThreadJoinOnShutdown(unittest.TestCase):
@@ -373,6 +347,9 @@ class ThreadJoinOnShutdown(unittest.TestCase):
             def joiningfunc(mainthread):
                 mainthread.join()
                 print('end of thread')
+                # stdout is fully buffered because not a tty, we have to flush
+                # before exit.
+                sys.stdout.flush()
         \n""" + script
 
         import subprocess
@@ -414,12 +391,17 @@ class ThreadJoinOnShutdown(unittest.TestCase):
             """
         self._run_and_join(script)
 
-    # XXX This test hangs!
-    def Xtest_3_join_in_forked_from_thread(self):
+    def test_3_join_in_forked_from_thread(self):
         # Like the test above, but fork() was called from a worker thread
         # In the forked process, the main Thread object must be marked as stopped.
         import os
         if not hasattr(os, 'fork'):
+            return
+        # Skip platforms with known problems forking from a worker thread.
+        # See http://bugs.python.org/issue3863.
+        if sys.platform in ('freebsd4', 'freebsd5', 'freebsd6', 'os2emx'):
+            print >>sys.stderr, ('Skipping test_3_join_in_forked_from_thread'
+                                 ' due to known OS bugs on'), sys.platform
             return
         script = """if 1:
             main_thread = threading.current_thread()

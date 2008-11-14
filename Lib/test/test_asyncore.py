@@ -381,8 +381,8 @@ class DispatcherWithSendTests_UsePoll(DispatcherWithSendTests):
 if hasattr(asyncore, 'file_wrapper'):
     class FileWrapperTest(unittest.TestCase):
         def setUp(self):
-            self.d = "It's not dead, it's sleeping!"
-            open(TESTFN, 'w').write(self.d)
+            self.d = b"It's not dead, it's sleeping!"
+            open(TESTFN, 'wb').write(self.d)
 
         def tearDown(self):
             unlink(TESTFN)
@@ -390,6 +390,7 @@ if hasattr(asyncore, 'file_wrapper'):
         def test_recv(self):
             fd = os.open(TESTFN, os.O_RDONLY)
             w = asyncore.file_wrapper(fd)
+            os.close(fd)
 
             self.assertNotEqual(w.fd, fd)
             self.assertNotEqual(w.fileno(), fd)
@@ -399,15 +400,16 @@ if hasattr(asyncore, 'file_wrapper'):
             self.assertRaises(OSError, w.read, 1)
 
         def test_send(self):
-            d1 = "Come again?"
-            d2 = "I want to buy some cheese."
+            d1 = b"Come again?"
+            d2 = b"I want to buy some cheese."
             fd = os.open(TESTFN, os.O_WRONLY | os.O_APPEND)
             w = asyncore.file_wrapper(fd)
+            os.close(fd)
 
             w.write(d1)
             w.send(d2)
             w.close()
-            self.assertEqual(open(TESTFN).read(), self.d + d1 + d2)
+            self.assertEqual(open(TESTFN, 'rb').read(), self.d + d1 + d2)
 
 
 def test_main():

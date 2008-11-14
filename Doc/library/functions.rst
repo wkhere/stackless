@@ -22,9 +22,8 @@ are always available.  They are listed here in alphabetical order.
    The function is invoked by the :keyword:`import` statement.  It mainly exists
    so that you can replace it with another function that has a compatible
    interface, in order to change the semantics of the :keyword:`import`
-   statement. See also the built-in module :mod:`imp`, which
-   defines some useful operations out of which you can build your own
-   :func:`__import__` function.
+   statement.  See the built-in module :mod:`imp`, which defines some useful
+   operations out of which you can build your own :func:`__import__` function.
 
    For example, the statement ``import spam`` results in the following call:
    ``__import__('spam', globals(), locals(), [], -1)``; the statement
@@ -200,21 +199,20 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: compile(source, filename, mode[, flags[, dont_inherit]])
 
-   Compile the *source* into a code object.  Code objects can be
-   executed by a call to :func:`exec` or evaluated by a call to
-   :func:`eval`. *source* can either be a string or an AST object.
-   Refer to the :mod:`_ast` module documentation for information on
-   how to compile into and from AST objects.
+   Compile the *source* into a code or AST object.  Code objects can be executed
+   by an :keyword:`exec` statement or evaluated by a call to :func:`eval`.
+   *source* can either be a string or an AST object.  Refer to the :mod:`ast`
+   module documentation for information on how to work with AST objects.
 
-   The *filename* argument should give the file from
-   which the code was read; pass some recognizable value if it wasn't
-   read from a file (``'<string>'`` is commonly used). The *mode*
-   argument specifies what kind of code must be compiled; it can be
-   ``'exec'`` if *source* consists of a sequence of statements,
-   ``'eval'`` if it consists of a single expression, or ``'single'``
-   if it consists of a single interactive statement (in the latter
-   case, expression statements that evaluate to something else than
-   ``None`` will be printed).
+   The *filename* argument should give the file from which the code was read;
+   pass some recognizable value if it wasn't read from a file (``'<string>'`` is
+   commonly used).
+
+   The *mode* argument specifies what kind of code must be compiled; it can be
+   ``'exec'`` if *source* consists of a sequence of statements, ``'eval'`` if it
+   consists of a single expression, or ``'single'`` if it consists of a single
+   interactive statement (in the latter case, expression statements that
+   evaluate to something else than ``None`` will be printed).
 
    The optional arguments *flags* and *dont_inherit* control which future
    statements (see :pep:`236`) affect the compilation of *source*.  If neither
@@ -233,6 +231,14 @@ are always available.  They are listed here in alphabetical order.
 
    This function raises :exc:`SyntaxError` if the compiled source is invalid,
    and :exc:`TypeError` if the source contains null bytes.
+
+   .. note::
+
+      When compiling a string with multi-line statements, line endings must be
+      represented by a single newline character (``'\n'``), and the input must
+      be terminated by at least one newline character.  If line endings are
+      represented by ``'\r\n'``, use :meth:`str.replace` to change them into
+      ``'\n'``.
 
 
 .. function:: complex([real[, imag]])
@@ -372,10 +378,10 @@ are always available.  They are listed here in alphabetical order.
       >>> eval('x+1')
       2
 
-   This function can also be used to execute arbitrary code objects (such as those
-   created by :func:`compile`).  In this case pass a code object instead of a
-   string.  The code object must have been compiled passing ``'eval'`` as the
-   *kind* argument.
+   This function can also be used to execute arbitrary code objects (such as
+   those created by :func:`compile`).  In this case pass a code object instead
+   of a string.  If the code object has been compiled with ``'exec'`` as the
+   *kind* argument, :func:`eval`\'s return value will be ``None``.
 
    Hints: dynamic execution of statements is supported by the :func:`exec`
    function.  The :func:`globals` and :func:`locals` functions
@@ -385,16 +391,15 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: exec(object[, globals[, locals]])
 
-   This function supports dynamic execution of Python code. *object* must be either
-   a string, an open file object, or a code object.  If it is a string, the string
-   is parsed as a suite of Python statements which is then executed (unless a
-   syntax error occurs).  If it is an open file, the file is parsed until EOF and
-   executed.  If it is a code object, it is simply executed.  In all cases, the
+   This function supports dynamic execution of Python code. *object* must be
+   either a string or a code object.  If it is a string, the string is parsed as
+   a suite of Python statements which is then executed (unless a syntax error
+   occurs).  If it is a code object, it is simply executed.  In all cases, the
    code that's executed is expected to be valid as file input (see the section
-   "File input" in the Reference Manual). Be aware that the :keyword:`return` and
-   :keyword:`yield` statements may not be used outside of function definitions even
-   within the context of code passed to the :func:`exec` function. The return value
-   is ``None``.
+   "File input" in the Reference Manual). Be aware that the :keyword:`return`
+   and :keyword:`yield` statements may not be used outside of function
+   definitions even within the context of code passed to the :func:`exec`
+   function. The return value is ``None``.
 
    In all cases, if the optional parts are omitted, the code is executed in the
    current scope.  If only *globals* is provided, it must be a dictionary, which
@@ -664,10 +669,10 @@ are always available.  They are listed here in alphabetical order.
 
 
 .. function:: memoryview(obj)
+   :noindex:
 
-   Return a "memory view" object created from the given argument.
-   
-   XXX: To be documented.
+   Return a "memory view" object created from the given argument.  See
+   :ref:`typememoryview` for more information.
 
 
 .. function:: min(iterable[, args...], *[, key])
@@ -710,11 +715,11 @@ are always available.  They are listed here in alphabetical order.
 
    Open a file.  If the file cannot be opened, :exc:`IOError` is raised.
    
-   *file* is either a string giving the name (and the path if the file isn't in
-   the current working directory) of the file to be opened or an integer file
-   descriptor of the file to be wrapped.  (If a file descriptor is given, it is
-   closed when the returned I/O object is closed, unless *closefd* is set to
-   ``False``.)
+   *file* is either a string or bytes object giving the name (and the path if
+   the file isn't in the current working directory) of the file to be opened or
+   an integer file descriptor of the file to be wrapped.  (If a file descriptor
+   is given, it is closed when the returned I/O object is closed, unless
+   *closefd* is set to ``False``.)
 
    *mode* is an optional string that specifies the mode in which the file is
    opened.  It defaults to ``'r'`` which means open for reading in text mode.
@@ -832,7 +837,7 @@ are always available.  They are listed here in alphabetical order.
    must be of integer types, and *y* must be non-negative.
 
 
-.. function:: print([object, ...][, sep=' '][, end='\n'][, file=sys.stdout])
+.. function:: print([object, ...][, sep=' '][, end='\\n'][, file=sys.stdout])
 
    Print *object*\(s) to the stream *file*, separated by *sep* and followed by
    *end*.  *sep*, *end* and *file*, if present, must be given as keyword
@@ -890,7 +895,8 @@ are always available.  They are listed here in alphabetical order.
    best explained with an example::
 
       class C(object):
-          def __init__(self): self._x = None
+          def __init__(self):
+              self._x = None
 
           @property
           def x(self):
@@ -1086,16 +1092,29 @@ are always available.  They are listed here in alphabetical order.
 
    .. XXX updated as per http://www.artima.com/weblogs/viewpost.jsp?thread=208549 but needs checking
 
-   Return the superclass of *type*.
-   
-   Calling :func:`super()` without arguments is equivalent to
-   ``super(this_class, first_arg)``. If called with one
-   argument the super object returned is unbound.  If called with two
-   arguments and the second argument is an object, ``isinstance(obj,
-   type)`` must be true.  If the second argument is a type,
-   ``issubclass(type2, type)`` must be true.
+   Return a "super" object that acts like the superclass of *type*.
 
-   A typical use for calling a cooperative superclass method is::
+   If the second argument is omitted the super object returned is unbound.  If
+   the second argument is an object, ``isinstance(obj, type)`` must be true.  If
+   the second argument is a type, ``issubclass(type2, type)`` must be true.
+   Calling :func:`super` without arguments is equivalent to ``super(this_class,
+   first_arg)``.
+
+   There are two typical use cases for "super".  In a class hierarchy with
+   single inheritance, "super" can be used to refer to parent classes without
+   naming them explicitly, thus making the code more maintainable.  This use
+   closely parallels the use of "super" in other programming languages.
+   
+   The second use case is to support cooperative multiple inheritence in a
+   dynamic execution environment.  This use case is unique to Python and is 
+   not found in statically compiled languages or languages that only support 
+   single inheritance.  This makes in possible to implement "diamond diagrams"
+   where multiple base classes implement the same method.  Good design dictates
+   that this method have the same calling signature in every case (because the
+   order of parent calls is determined at runtime and because that order adapts
+   to changes in the class hierarchy).
+
+   For both use cases, a typical superclass call looks like this::
 
       class C(B):
           def method(self, arg):
@@ -1103,6 +1122,8 @@ are always available.  They are listed here in alphabetical order.
 
    Note that :func:`super` is implemented as part of the binding process for
    explicit dotted attribute lookups such as ``super().__getitem__(name)``.
+   It does so by implementing its own :meth:`__getattribute__` method for searching
+   parent classes in a predictable order that supports cooperative multiple inheritance.
    Accordingly, :func:`super` is undefined for implicit lookups using statements or
    operators such as ``super()[name]``. Also, :func:`super` is not
    limited to use inside methods: under the hood it searches the stack
@@ -1185,6 +1206,18 @@ are always available.  They are listed here in alphabetical order.
    :func:`zip` should only be used with unequal length inputs when you don't
    care about trailing, unmatched values from the longer iterables.  If those
    values are important, use :func:`itertools.zip_longest` instead.
+
+   :func:`zip` in conjunction with the ``*`` operator can be used to unzip a
+   list::
+
+      >>> x = [1, 2, 3]
+      >>> y = [4, 5, 6]
+      >>> zipped = zip(x, y)
+      >>> zipped
+      [(1, 4), (2, 5), (3, 6)]
+      >>> x2, y2 = zip(*zipped)
+      >>> x == x2, y == y2
+      True
 
 
 .. rubric:: Footnotes

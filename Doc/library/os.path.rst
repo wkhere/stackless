@@ -10,7 +10,20 @@
 
 This module implements some useful functions on pathnames. To read or
 write files see :func:`open`, and for accessing the filesystem see the
-:mod:`os` module.
+:mod:`os` module. The path parameters can be passed as either strings,
+or bytes. Applications are encouraged to represent file names as
+(Unicode) character strings. Unfortunately, some file names may not be
+representable as strings on Unix, so applications that need to support
+arbitrary file names on Unix should use bytes objects to represent
+path names. Vice versa, using bytes objects cannot represent all file
+names on Windows (in the standard ``mbcs`` encoding), hence Windows
+applications should use string objects to access all files.
+
+.. note::
+
+   All of these functions accept either only bytes or only string objects as
+   their parameters.  The result is an object of the same type, if a path or
+   file name is returned.
 
 .. warning::
 
@@ -208,13 +221,13 @@ write files see :func:`open`, and for accessing the filesystem see the
 
    Return ``True`` if both pathname arguments refer to the same file or directory
    (as indicated by device number and i-node number). Raise an exception if a
-   :func:`os.stat` call on either pathname fails. Availability:  Macintosh, Unix.
+   :func:`os.stat` call on either pathname fails. Availability: Unix.
 
 
 .. function:: sameopenfile(fp1, fp2)
 
    Return ``True`` if the file descriptors *fp1* and *fp2* refer to the same file.
-   Availability:  Macintosh, Unix.
+   Availability: Unix.
 
 
 .. function:: samestat(stat1, stat2)
@@ -222,7 +235,7 @@ write files see :func:`open`, and for accessing the filesystem see the
    Return ``True`` if the stat tuples *stat1* and *stat2* refer to the same file.
    These structures may have been returned by :func:`fstat`, :func:`lstat`, or
    :func:`stat`.  This function implements the underlying comparison used by
-   :func:`samefile` and :func:`sameopenfile`. Availability:  Macintosh, Unix.
+   :func:`samefile` and :func:`sameopenfile`. Availability: Unix.
 
 
 .. function:: split(path)

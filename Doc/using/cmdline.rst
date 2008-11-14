@@ -135,8 +135,7 @@ If no interface option is given, :option:`-i` is implied, ``sys.argv[0]`` is
 an empty string (``""``) and the current directory will be added to the
 start of :data:`sys.path`.
 
-   .. seealso:: 
-      :ref:`tut-invoking`
+.. seealso::  :ref:`tut-invoking`
 
 
 Generic options
@@ -451,7 +450,7 @@ These environment variables influence Python's behavior.
 
    If this environment variable is set, ``sys.argv[0]`` will be set to its
    value instead of the value got through the C runtime.  Only works on
-   MacOS X.
+   Mac OS X.
 
 
 Debug-mode variables

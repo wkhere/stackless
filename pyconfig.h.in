@@ -363,9 +363,6 @@
 /* Define to 1 if you have the `resolv' library (-lresolv). */
 #undef HAVE_LIBRESOLV
 
-/* Define to 1 if you have the `termcap' library (-ltermcap). */
-#undef HAVE_LIBTERMCAP
-
 /* Define to 1 if you have the <libutil.h> header file. */
 #undef HAVE_LIBUTIL_H
 
@@ -802,6 +799,10 @@
 
 /* Define to 1 if you have the `wcsxfrm' function. */
 #undef HAVE_WCSXFRM
+
+/* Define if mbstowcs(NULL, "text", 0) does not return the number of 
+   wide chars that would be converted */
+#undef HAVE_BROKEN_MBSTOWCS
 
 /* Define if tzset() actually switches the local timezone in a meaningful way.
    */

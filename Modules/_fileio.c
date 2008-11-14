@@ -61,10 +61,7 @@ static PyObject *
 fileio_close(PyFileIOObject *self)
 {
 	if (!self->closefd) {
-		if (PyErr_WarnEx(PyExc_RuntimeWarning,
-				 "Trying to close unclosable fd!", 3) < 0) {
-			return NULL;
-		}
+		self->fd = -1;
 		Py_RETURN_NONE;
 	}
 	errno = internal_close(self);
@@ -86,6 +83,10 @@ fileio_new(PyTypeObject *type, PyObject *args, PyObject *kews)
 	self = (PyFileIOObject *) type->tp_alloc(type, 0);
 	if (self != NULL) {
 		self->fd = -1;
+		self->readable = 0;
+		self->writable = 0;
+		self->seekable = -1;
+		self->closefd = 1;
 		self->weakreflist = NULL;
 	}
 
@@ -179,8 +180,6 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 	    }
 	}
 
-	self->readable = self->writable = 0;
-	self->seekable = -1;
 	s = mode;
 	while (*s) {
 		switch (*s++) {
@@ -249,7 +248,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 		self->closefd = 1;
 		if (!closefd) {
 			PyErr_SetString(PyExc_ValueError,
-                            "Cannot use closefd=True with file name");
+                            "Cannot use closefd=False with file name");
 			goto error;
 		}
 
@@ -262,7 +261,7 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 #endif
 			self->fd = open(name, flags, 0666);
 		Py_END_ALLOW_THREADS
-		if (self->fd < 0 || dircheck(self) < 0) {
+		if (self->fd < 0) {
 #ifdef MS_WINDOWS
 			PyErr_SetFromErrnoWithUnicodeFilename(PyExc_IOError, widename);
 #else
@@ -270,6 +269,8 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 #endif
 			goto error;
 		}
+		if(dircheck(self) < 0)
+			goto error;
 	}
 
 	goto done;
@@ -817,6 +818,12 @@ get_closed(PyFileIOObject *self, void *closure)
 }
 
 static PyObject *
+get_closefd(PyFileIOObject *self, void *closure)
+{
+	return PyBool_FromLong((long)(self->closefd));
+}
+
+static PyObject *
 get_mode(PyFileIOObject *self, void *closure)
 {
 	return PyUnicode_FromString(mode_string(self));
@@ -824,6 +831,8 @@ get_mode(PyFileIOObject *self, void *closure)
 
 static PyGetSetDef fileio_getsetlist[] = {
 	{"closed", (getter)get_closed, NULL, "True if the file is closed"},
+	{"closefd", (getter)get_closefd, NULL, 
+		"True if the file descriptor will be closed"},
 	{"mode", (getter)get_mode, NULL, "String giving the file mode"},
 	{0},
 };

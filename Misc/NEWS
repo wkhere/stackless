@@ -4,13 +4,199 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 3.0 release candidate 1
+What's New in Python 3.0 release candiate 3?
 ============================================
 
-*Release date: XX-XXXX-2008*
+*Release date: XX-XXX-2008*
+
 
 Core and Builtins
 -----------------
+
+- Issue #4296: Fix PyObject_RichCompareBool so that "x in [x]" evaluates to
+  True, even when x doesn't compare equal to itself.  This was a regression
+  from 2.6.
+
+- Issue #3705: Command-line arguments were not correctly decoded when the
+  terminal does not use UTF8.
+
+Library
+-------
+
+- Issue #4307: The named tuple that ``inspect.getfullargspec()`` returns now
+  uses ``kwonlydefaults`` instead of ``kwdefaults``.
+
+- Issue #4298: Fix a segfault when pickle.loads is passed a ill-formed input.
+
+- Issue #4283: Fix a left-over "iteritems" call in distutils.
+
+Build
+-----
+
+- Issue #1656675: Register a drop handler for .py* files on Windows.
+
+Tools/Demos
+-----------
+
+- Demos of the socketserver module now work with Python 3.
+
+
+What's New in Python 3.0 release candidate 2
+============================================
+
+*Release date: 05-Nov-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #4211: The __path__ attribute of frozen packages is now a list instead
+  of a string as required by PEP 302.
+
+- Issue #3727: Fixed poplib.
+
+- Issue #3714: Fixed nntplib by using bytes where appropriate.
+
+- Issue #1210: Fixed imaplib and its documentation.
+
+- Issue #4233: Changed semantic of ``_fileio.FileIO``'s ``close()`` 
+  method on file objects with closefd=False. The file descriptor is still
+  kept open but the file object behaves like a closed file. The ``FileIO``
+  object also got a new readonly attribute ``closefd``.
+
+- Issue #3626: On cygwin, starting python with a non-existent script name
+  would not display anything if the file name is only 1 character long.
+
+- Issue #4176: Fixed a crash when pickling an object which ``__reduce__``
+  method does not return iterators for the 4th and 5th items.
+
+- Issue #3723: Fixed initialization of subinterpreters.
+
+- Issue #4213: The file system encoding is now normalized by the
+  codec subsystem, for example UTF-8 is turned into utf-8.
+
+- Issue #4200: Changed the atexit module to store its state in its
+  PyModuleDef atexitmodule. This fixes a bug with multiple subinterpeters.
+
+- Issue #4237: io.FileIO() was raising invalid warnings caused by
+  insufficient initialization of PyFileIOObject struct members.
+
+- Issue #4170: Pickling a collections.defaultdict object would crash the
+  interpreter.
+
+- Issue #4146: Compilation on OpenBSD has been restored.
+
+- Issue #3574: compile() incorrectly handled source code encoded as Latin-1.
+
+- Issues #2384 and #3975: Tracebacks were not correctly printed when the
+  source file contains a ``coding:`` header: the wrong line was displayed, and
+  the encoding was not respected.
+
+- Issue #3740: Null-initialize module state.
+
+- Issue #3946: PyObject_CheckReadBuffer crashed on a memoryview object.
+
+- Issue #1688: On Windows, the input() prompt was not correctly displayed if it
+  contains non-ascii characters.
+
+- Bug #3951: Py_USING_MEMORY_DEBUGGER should not be enabled by default.
+
+Library
+-------
+
+- Issue #3664: The pickle module could segfault if a subclass of Pickler fails
+  to call the base __init__ method.
+
+- Issue #3725: telnetlib now works completely in bytes.
+
+- Issue #4072: Restore build_py_2to3.
+
+- Issue #4014: Don't claim that Python has an Alpha release status, in addition
+  to claiming it is Mature.
+
+- Issue #3187: Add sys.setfilesystemencoding.
+
+- Issue #3187: Better support for "undecodable" filenames.  Code by Victor
+  Stinner, with small tweaks by GvR.
+
+- Issue #3965: Allow repeated calls to turtle.Screen, by making it a
+  true singleton object.
+
+- Issue #3911: ftplib.FTP.makeport() could give invalid port numbers.
+
+- Issue #3929: When the database cannot be opened, dbm.open() would incorrectly
+  raise a TypeError: "'tuple' object is not callable" instead of the expected
+  dbm.error.
+
+- Bug #3884: Make the turtle module toplevel again.
+
+- Issue #3547: Fixed ctypes structures bitfields of varying integer
+  sizes.
+
+Extension Modules
+-----------------
+
+- Issue #3659: Subclasses of str didn't work as SQL parameters.
+
+Build
+-----
+
+- Issue #4120: Exclude manifest from extension modules in VS2008.
+
+- Issue #4091: Install pythonxy.dll in system32 again.
+
+- Issue #4018: Disable "for me" installations on Vista.
+
+- Issue #4204: Fixed module build errors on FreeBSD 4.
+
+Tools/Demos
+-----------
+
+- Issue #3717: Fix Demo/embed/demo.c.
+
+- Issue #4072: Add a distutils demo for build_py_2to3.
+
+
+What's New in Python 3.0 release candidate 1
+============================================
+
+*Release date: 17-Sep-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3827: memoryview lost its size attribute in favor of using len(view).
+
+- Issue #3813: could not lanch python.exe via symbolic link on cygwin.
+
+- Issue #3705: fix crash when given a non-ascii value on the command line for
+  the "-c" and "-m" parameters. Now the behaviour is as expected under Linux,
+  although under Windows it fails at a later point.
+
+- Issue #3279: Importing site at interpreter was failing silently because the
+  site module uses the open builtin which was not initialized at the time.
+
+- Issue #3660: Corrected a reference leak in str.encode() when the encoder
+  does not return a bytes object.
+
+- Issue #3774: Added a few more checks in PyTokenizer_FindEncoding to handle
+  error conditions.
+
+- Issue #3594: Fix Parser/tokenizer.c:fp_setreadl() to open the file being
+  tokenized by either a file path or file pointer for the benefit of
+  PyTokenizer_FindEncoding().
+
+- Issue #3696: Error parsing arguments on OpenBSD <= 4.4 and Cygwin. On
+  these systems, the mbstowcs() function is slightly buggy and must be
+  replaced with strlen() for the purpose of counting of number of wide
+  characters needed to represent the multi-byte character string.
+
+- Issue #3697: "Fatal Python error: Cannot recover from stack overflow"
+  could be easily encountered under Windows in debug mode when exercising
+  the recursion limit checking code, due to bogus handling of recursion
+  limit when USE_STACKCHEK was enabled.
+
+- Issue 3639: The _warnings module could segfault the interpreter when
+  unexpected types were passed in as arguments.
 
 - Issue #3712: The memoryview object had a reference leak and didn't support
   cyclic garbage collection.
@@ -52,6 +238,10 @@ Core and Builtins
 
 - bytes(o) now tries to use o.__bytes__() before using fallbacks.
 
+- Issue #1204: The configure script now tests for additional libraries
+  that may be required when linking against readline.  This fixes issues
+  with x86_64 builds on some platforms (a few Linux flavors and OpenBSD).
+
 C API
 -----
 
@@ -60,8 +250,53 @@ C API
 Library
 -------
 
+- Issue #3756: make re.escape() handle bytes as well as str.
+
+- Issue #3800: fix filter() related bug in formatter.py.
+
+- Issue #874900: fix behaviour of threading module after a fork.
+
+- Issue #3535: zipfile couldn't read some zip files larger than 2GB.
+
+- Issue #3776: Deprecate the bsddb package for removal in 3.0.
+
+- Issue #3762: platform.architecture() fails if python is lanched via
+  its symbolic link.
+
+- Issue #3660: fix a memory leak in the C accelerator of the pickle module.
+
+- Issue #3160: the "bdist_wininst" distutils command didn't work.
+
+- Issue #1658: tkinter changes dict size during iteration in both
+    tkinter.BaseWidget and tkinter.scrolledtext.ScrolledText.
+
+- The bsddb module (and therefore the dbm.bsd module) has been removed.
+  It is now maintained outside of the standard library at
+  http://www.jcea.es/programacion/pybsddb.htm.
+
+- Issue 600362:  Relocated parse_qs() and parse_qsl(), from the cgi module
+  to the urlparse one.  Added a DeprecationWarning in the old module, it
+  will be deprecated in the future.
+
+- Issue #3719: platform.architecture() fails if there are spaces in the
+  path to the Python binary.
+
+- Issue 3602: As part of the merge of r66135, make the parameters on
+  warnings.catch_warnings() keyword-only. Also remove a DeprecationWarning.
+
+- The deprecation warnings for the camelCase threading API names were removed.
+
+- Issue #3110: multiprocessing fails to compiel on solaris 10 due to missing 
+  SEM_VALUE_MAX.
+
 Extension Modules
 -----------------
+
+- Issue #3782: os.write() must not accept unicode strings.
+
+- Issue #2975: When compiling several extension modules with Visual Studio 2008
+  from the same python interpreter, some environment variables would grow
+  without limit.
 
 - Issue #3643: Added a few more checks to _testcapi to prevent segfaults by
   exploitation of poor argument checking.
@@ -72,10 +307,28 @@ Extension Modules
   update this code in Python 3.0 by hand. Update the 2.6 one and then
   do "2to3".
 
+- The _bytesio and _stringio modules are now compiled into the python binary.
+
+- Issue #3492 and #3790: Fixed the zlib module and zipimport module uses of
+  mutable bytearray objects where they should have been using immutable bytes.
+
+- Issue #3797: Fixed the dbm, marshal, mmap, ossaudiodev, & winreg modules to
+  return bytes objects instead of bytearray objects.
+
+
 Tools/Demos
 -----------
 
 - Fix Misc/gdbinit so it works.
+
+
+Build
+-----
+
+- Issue #3812: Failed to build python if configure --without-threads.
+
+- Issue #3791: Remove the bsddb module from the Windows installer, and the
+  core bsddb library from the Windows build files.
 
 
 What's new in Python 3.0b3?

@@ -292,11 +292,18 @@ case $ac_sys_system/$ac_sys_release in
   # but used in struct sockaddr.sa_family. Reported by Tim Rice.
   SCO_SV/3.2)
     define_xopen_source=no;;
-  # On FreeBSD 4.8 and MacOS X 10.2, a bug in ncurses.h means that
-  # it craps out if _XOPEN_EXTENDED_SOURCE is defined. Apparently,
-  # this is fixed in 10.3, which identifies itself as Darwin/7.*
-  # This should hopefully be fixed in FreeBSD 4.9
-  FreeBSD/4.8* | Darwin/6* )
+  # On FreeBSD 4, the math functions C89 does not cover are never defined
+  # with _XOPEN_SOURCE and __BSD_VISIBLE does not re-enable them.
+  FreeBSD/4.*)
+    define_xopen_source=no;;
+  # On MacOS X 10.2, a bug in ncurses.h means that it craps out if 
+  # _XOPEN_EXTENDED_SOURCE is defined. Apparently, this is fixed in 10.3, which
+  # identifies itself as Darwin/7.*
+  # On Mac OS X 10.4, defining _POSIX_C_SOURCE or _XOPEN_SOURCE
+  # disables platform specific features beyond repair.
+  # On Mac OS X 10.3, defining _POSIX_C_SOURCE or _XOPEN_SOURCE 
+  # has no effect, don't bother defining them
+  Darwin/@<:@6789@:>@.*)
     define_xopen_source=no;;
   # On AIX 4 and 5.1, mbstate_t is defined only when _XOPEN_SOURCE == 500 but
   # used in wcsnrtombs() and mbsnrtowcs() even if _XOPEN_SOURCE is not defined
@@ -307,13 +314,6 @@ case $ac_sys_system/$ac_sys_release in
     if test `uname -r` -eq 1; then
       define_xopen_source=no
     fi
-    ;;
-  # On Mac OS X 10.4, defining _POSIX_C_SOURCE or _XOPEN_SOURCE
-  # disables platform specific features beyond repair.
-  # On Mac OS X 10.3, defining _POSIX_C_SOURCE or _XOPEN_SOURCE 
-  # has no effect, don't bother defining them
-  Darwin/@<:@789@:>@.*)
-    define_xopen_source=no
     ;;
   # On QNX 6.3.2, defining _XOPEN_SOURCE prevents netdb.h from
   # defining NI_NUMERICHOST.
@@ -3238,16 +3238,40 @@ fi
 # check where readline lives
 # save the value of LIBS so we don't actually link Python with readline
 LIBS_no_readline=$LIBS
-AC_CHECK_LIB(readline, readline)
-if test "$ac_cv_have_readline_readline" = no
-then
-  AC_CHECK_LIB(termcap, readline)
+
+# On some systems we need to link readline to a termcap compatible
+# library.  NOTE: Keep the precedence of listed libraries synchronised
+# with setup.py.
+py_cv_lib_readline=no
+AC_MSG_CHECKING([how to link readline libs])
+for py_libtermcap in "" ncursesw ncurses curses termcap; do
+  if test -z "$py_libtermcap"; then
+    READLINE_LIBS="-lreadline"
+  else
+    READLINE_LIBS="-lreadline -l$py_libtermcap"
+  fi
+  LIBS="$READLINE_LIBS $LIBS_no_readline"
+  AC_LINK_IFELSE(
+    [AC_LANG_CALL([],[readline])],
+    [py_cv_lib_readline=yes])
+  if test $py_cv_lib_readline = yes; then
+    break
+  fi
+done
+# Uncomment this line if you want to use READINE_LIBS in Makefile or scripts
+#AC_SUBST([READLINE_LIBS])
+if test $py_cv_lib_readline = no; then
+  AC_MSG_RESULT([none])
+else
+  AC_MSG_RESULT([$READLINE_LIBS])
+  AC_DEFINE(HAVE_LIBREADLINE, 1,
+    [Define if you have the readline library (-lreadline).])
 fi
 
 # check for readline 2.1
 AC_CHECK_LIB(readline, rl_callback_handler_install,
 	AC_DEFINE(HAVE_RL_CALLBACK, 1,
-        [Define if you have readline 2.1]), , )
+        [Define if you have readline 2.1]), ,$READLINE_LIBS)
 
 # check for readline 2.2
 AC_TRY_CPP([#include <readline/readline.h>],
@@ -3263,17 +3287,17 @@ fi
 # check for readline 4.0
 AC_CHECK_LIB(readline, rl_pre_input_hook,
 	AC_DEFINE(HAVE_RL_PRE_INPUT_HOOK, 1,
-        [Define if you have readline 4.0]), , )
+        [Define if you have readline 4.0]), ,$READLINE_LIBS)
 
 # also in 4.0
 AC_CHECK_LIB(readline, rl_completion_display_matches_hook,
 	AC_DEFINE(HAVE_RL_COMPLETION_DISPLAY_MATCHES_HOOK, 1,
-        [Define if you have readline 4.0]), , )
+        [Define if you have readline 4.0]), ,$READLINE_LIBS)
 
 # check for readline 4.2
 AC_CHECK_LIB(readline, rl_completion_matches,
 	AC_DEFINE(HAVE_RL_COMPLETION_MATCHES, 1,
-        [Define if you have readline 4.2]), , )
+        [Define if you have readline 4.2]), ,$READLINE_LIBS)
 
 # also in readline 4.2
 AC_TRY_CPP([#include <readline/readline.h>],
@@ -3588,6 +3612,27 @@ AC_CHECK_TYPE(socklen_t,,
 #include <sys/socket.h>
 #endif
 ])
+
+AC_MSG_CHECKING(for broken mbstowcs)
+AC_TRY_RUN([
+#include<stdlib.h>
+int main() {
+    size_t len = -1;
+    const char *str = "text";
+    len = mbstowcs(NULL, str, 0);
+    return (len != 4);
+}
+],
+ac_cv_broken_mbstowcs=no,
+ac_cv_broken_mbstowcs=yes,
+ac_cv_broken_mbstowcs=no)
+AC_MSG_RESULT($ac_cv_broken_mbstowcs)
+if test "$ac_cv_broken_mbstowcs" = yes
+then
+  AC_DEFINE(HAVE_BROKEN_MBSTOWCS, 1,
+  [Define if mbstowcs(NULL, "text", 0) does not return the number of 
+   wide chars that would be converted.])
+fi
 
 AC_SUBST(THREADHEADERS)
 

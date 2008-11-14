@@ -876,6 +876,29 @@ class AbstractPickleTests(unittest.TestCase):
         d = self.dumps(x, 2)
         self.assertRaises(RuntimeError, self.loads, d)
 
+    def test_reduce_bad_iterator(self):
+        # Issue4176: crash when 4th and 5th items of __reduce__()
+        # are not iterators
+        class C(object):
+            def __reduce__(self):
+                # 4th item is not an iterator
+                return list, (), None, [], None
+        class D(object):
+            def __reduce__(self):
+                # 5th item is not an iterator
+                return dict, (), None, None, []
+
+        # Protocol 0 is less strict and also accept iterables.
+        for proto in protocols:
+            try:
+                self.dumps(C(), proto)
+            except (pickle.PickleError):
+                pass
+            try:
+                self.dumps(D(), proto)
+            except (pickle.PickleError):
+                pass
+
 # Test classes for reduce_ex
 
 class REX_one(object):
@@ -995,6 +1018,25 @@ class AbstractPickleModuleTests(unittest.TestCase):
         pickle.dumps(123, protocol=-1)
         pickle.Pickler(f, -1)
         pickle.Pickler(f, protocol=-1)
+
+    def test_bad_init(self):
+        # Test issue3664 (pickle can segfault from a badly initialized Pickler).
+        from io import BytesIO
+        # Override initialization without calling __init__() of the superclass.
+        class BadPickler(pickle.Pickler):
+            def __init__(self): pass
+
+        class BadUnpickler(pickle.Unpickler):
+            def __init__(self): pass
+
+        self.assertRaises(pickle.PicklingError, BadPickler().dump, 0)
+        self.assertRaises(pickle.UnpicklingError, BadUnpickler().load)
+
+    def test_bad_input(self):
+        # Test issue4298
+        s = bytes([0x58, 0, 0, 0, 0x54])
+        self.assertRaises(EOFError, pickle.loads, s)
+
 
 class AbstractPersistentPicklerTests(unittest.TestCase):
 

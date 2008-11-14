@@ -432,6 +432,11 @@ pickler_write(PicklerObject *self, const char *s, Py_ssize_t n)
 {
     PyObject *data, *result;
 
+    if (self->write_buf == NULL) {
+        PyErr_SetString(PyExc_SystemError, "invalid write buffer");
+        return -1;
+    }
+
     if (s == NULL) {
         if (!(self->buf_size))
             return 0;
@@ -492,6 +497,11 @@ unpickler_read(UnpicklerObject *self, char **s, Py_ssize_t n)
         PyErr_SetString(PyExc_ValueError,
                         "read() from the underlying stream did not"
                         "return bytes");
+        return -1;
+    }
+
+    if (PyBytes_GET_SIZE(data) != n) {
+        PyErr_SetNone(PyExc_EOFError);
         return -1;
     }
 
@@ -1364,8 +1374,8 @@ save_tuple(PicklerObject *self, PyObject *obj)
 static int
 batch_list(PicklerObject *self, PyObject *iter)
 {
-    PyObject *obj;
-    PyObject *slice[BATCHSIZE];
+    PyObject *obj = NULL;
+    PyObject *firstitem = NULL;
     int i, n;
 
     const char mark_op = MARK;
@@ -1400,44 +1410,69 @@ batch_list(PicklerObject *self, PyObject *iter)
 
     /* proto > 0:  write in batches of BATCHSIZE. */
     do {
-        /* Get next group of (no more than) BATCHSIZE elements. */
-        for (n = 0; n < BATCHSIZE; n++) {
+        /* Get first item */
+        firstitem = PyIter_Next(iter);
+        if (firstitem == NULL) {
+            if (PyErr_Occurred())
+                goto error;
+
+            /* nothing more to add */
+            break;
+        }
+
+        /* Try to get a second item */
+        obj = PyIter_Next(iter);
+        if (obj == NULL) {
+            if (PyErr_Occurred())
+                goto error;
+
+            /* Only one item to write */
+            if (save(self, firstitem, 0) < 0)
+                goto error;
+            if (pickler_write(self, &append_op, 1) < 0)
+                goto error;
+            Py_CLEAR(firstitem);
+            break;
+        }
+
+        /* More than one item to write */
+
+        /* Pump out MARK, items, APPENDS. */
+        if (pickler_write(self, &mark_op, 1) < 0)
+            goto error;
+
+        if (save(self, firstitem, 0) < 0)
+            goto error;
+        Py_CLEAR(firstitem);
+        n = 1;
+
+        /* Fetch and save up to BATCHSIZE items */
+        while (obj) {
+            if (save(self, obj, 0) < 0)
+                goto error;
+            Py_CLEAR(obj);
+            n += 1;
+
+            if (n == BATCHSIZE)
+                break;
+
             obj = PyIter_Next(iter);
             if (obj == NULL) {
                 if (PyErr_Occurred())
                     goto error;
                 break;
             }
-            slice[n] = obj;
         }
 
-        if (n > 1) {
-            /* Pump out MARK, slice[0:n], APPENDS. */
-            if (pickler_write(self, &mark_op, 1) < 0)
-                goto error;
-            for (i = 0; i < n; i++) {
-                if (save(self, slice[i], 0) < 0)
-                    goto error;
-            }
-            if (pickler_write(self, &appends_op, 1) < 0)
-                goto error;
-        }
-        else if (n == 1) {
-            if (save(self, slice[0], 0) < 0 || 
-                pickler_write(self, &append_op, 1) < 0)
-                goto error;
-        }
+        if (pickler_write(self, &appends_op, 1) < 0)
+            goto error;
 
-        for (i = 0; i < n; i++) {
-            Py_DECREF(slice[i]);
-        }
     } while (n == BATCHSIZE);
     return 0;
 
   error:
-    while (--n >= 0) {
-        Py_DECREF(slice[n]);
-    }
+    Py_XDECREF(firstitem);
+    Py_XDECREF(obj);
     return -1;
 }
 
@@ -1507,8 +1542,8 @@ save_list(PicklerObject *self, PyObject *obj)
 static int
 batch_dict(PicklerObject *self, PyObject *iter)
 {
-    PyObject *obj;
-    PyObject *slice[BATCHSIZE];
+    PyObject *obj = NULL;
+    PyObject *firstitem = NULL;
     int i, n;
 
     const char mark_op = MARK;
@@ -1545,53 +1580,84 @@ batch_dict(PicklerObject *self, PyObject *iter)
 
     /* proto > 0:  write in batches of BATCHSIZE. */
     do {
-        /* Get next group of (no more than) BATCHSIZE elements. */
-        for (n = 0; n < BATCHSIZE; n++) {
+        /* Get first item */
+        firstitem = PyIter_Next(iter);
+        if (firstitem == NULL) {
+            if (PyErr_Occurred())
+                goto error;
+
+            /* nothing more to add */
+            break;
+        }
+        if (!PyTuple_Check(firstitem) || PyTuple_Size(firstitem) != 2) {
+            PyErr_SetString(PyExc_TypeError, "dict items "
+                                "iterator must return 2-tuples");
+            goto error;
+        }
+
+        /* Try to get a second item */
+        obj = PyIter_Next(iter);
+        if (obj == NULL) {
+            if (PyErr_Occurred())
+                goto error;
+
+            /* Only one item to write */
+            if (save(self, PyTuple_GET_ITEM(firstitem, 0), 0) < 0)
+                goto error;
+            if (save(self, PyTuple_GET_ITEM(firstitem, 1), 0) < 0)
+                goto error;
+            if (pickler_write(self, &setitem_op, 1) < 0)
+                goto error;
+            Py_CLEAR(firstitem);
+            break;
+        }
+
+        /* More than one item to write */
+
+        /* Pump out MARK, items, SETITEMS. */
+        if (pickler_write(self, &mark_op, 1) < 0)
+            goto error;
+
+        if (save(self, PyTuple_GET_ITEM(firstitem, 0), 0) < 0)
+            goto error;
+        if (save(self, PyTuple_GET_ITEM(firstitem, 1), 0) < 0)
+            goto error;
+        Py_CLEAR(firstitem);
+        n = 1;
+
+        /* Fetch and save up to BATCHSIZE items */
+        while (obj) {
+            if (!PyTuple_Check(obj) || PyTuple_Size(obj) != 2) {
+                PyErr_SetString(PyExc_TypeError, "dict items "
+                    "iterator must return 2-tuples");
+                goto error;
+			}
+            if (save(self, PyTuple_GET_ITEM(obj, 0), 0) < 0 ||
+                save(self, PyTuple_GET_ITEM(obj, 1), 0) < 0)
+                goto error;
+            Py_CLEAR(obj);
+            n += 1;
+
+            if (n == BATCHSIZE)
+                break;
+
             obj = PyIter_Next(iter);
             if (obj == NULL) {
                 if (PyErr_Occurred())
                     goto error;
                 break;
             }
-            if (!PyTuple_Check(obj) || PyTuple_Size(obj) != 2) {
-                PyErr_SetString(PyExc_TypeError, "dict items "
-                                "iterator must return 2-tuples");
-                goto error;
-            }
-            slice[n] = obj;
         }
 
-        if (n > 1) {
-            /* Pump out MARK, slice[0:n], SETITEMS. */
-            if (pickler_write(self, &mark_op, 1) < 0)
-                goto error;
-            for (i = 0; i < n; i++) {
-                obj = slice[i];
-                if (save(self, PyTuple_GET_ITEM(obj, 0), 0) < 0 ||
-                    save(self, PyTuple_GET_ITEM(obj, 1), 0) < 0)
-                    goto error;
-            }
-            if (pickler_write(self, &setitems_op, 1) < 0)
-                goto error;
-        }
-        else if (n == 1) {
-            obj = slice[0];
-            if (save(self, PyTuple_GET_ITEM(obj, 0), 0) < 0 ||
-                save(self, PyTuple_GET_ITEM(obj, 1), 0) < 0 ||
-                pickler_write(self, &setitem_op, 1) < 0)
-                goto error;
-        }
+        if (pickler_write(self, &setitems_op, 1) < 0)
+            goto error;
 
-        for (i = 0; i < n; i++) {
-            Py_DECREF(slice[i]);
-        }
     } while (n == BATCHSIZE);
     return 0;
 
   error:
-    while (--n >= 0) {
-        Py_DECREF(slice[n]);
-    }
+    Py_XDECREF(firstitem);
+    Py_XDECREF(obj);
     return -1;
 }
 
@@ -1911,8 +1977,9 @@ save_reduce(PicklerObject *self, PyObject *args, PyObject *obj)
     PyObject *callable;
     PyObject *argtup;
     PyObject *state = NULL;
-    PyObject *listitems = NULL;
-    PyObject *dictitems = NULL;
+    PyObject *listitems = Py_None;
+    PyObject *dictitems = Py_None;
+    Py_ssize_t size;
 
     int use_newobj = self->proto >= 2;
 
@@ -1920,27 +1987,48 @@ save_reduce(PicklerObject *self, PyObject *args, PyObject *obj)
     const char build_op = BUILD;
     const char newobj_op = NEWOBJ;
 
+    size = PyTuple_Size(args);
+    if (size < 2 || size > 5) {
+        PyErr_SetString(PicklingError, "tuple returned by "
+                        "__reduce__ must contain 2 through 5 elements");
+        return -1;
+    }
+
     if (!PyArg_UnpackTuple(args, "save_reduce", 2, 5,
                            &callable, &argtup, &state, &listitems, &dictitems))
         return -1;
 
     if (!PyCallable_Check(callable)) {
-        PyErr_SetString(PicklingError,
-                        "first argument of save_reduce() must be callable");
+        PyErr_SetString(PicklingError, "first item of the tuple "
+                        "returned by __reduce__ must be callable");
         return -1;
     }
     if (!PyTuple_Check(argtup)) {
-        PyErr_SetString(PicklingError,
-                        "second argument of save_reduce() must be a tuple");
+        PyErr_SetString(PicklingError, "second item of the tuple "
+                        "returned by __reduce__ must be a tuple");
         return -1;
     }
 
     if (state == Py_None)
         state = NULL;
+
     if (listitems == Py_None)
         listitems = NULL;
+    else if (!PyIter_Check(listitems)) {
+        PyErr_Format(PicklingError, "Fourth element of tuple"
+                     "returned by __reduce__ must be an iterator, not %s",
+                     Py_TYPE(listitems)->tp_name);
+        return -1;
+    }
+
     if (dictitems == Py_None)
         dictitems = NULL;
+    else if (!PyIter_Check(dictitems)) {
+        PyErr_Format(PicklingError, "Fifth element of tuple"
+                     "returned by __reduce__ must be an iterator, not %s",
+                     Py_TYPE(dictitems)->tp_name);
+        return -1;
+    }
 
     /* Protocol 2 special case: if callable's name is __newobj__, use
        NEWOBJ. */
@@ -2279,16 +2367,6 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
                         "__reduce__ must return a string or tuple");
         goto error;
     }
-    if (Py_SIZE(reduce_value) < 2 || Py_SIZE(reduce_value) > 5) {
-        PyErr_SetString(PicklingError, "tuple returned by __reduce__ "
-                        "must contain 2 through 5 elements");
-        goto error;
-    }
-    if (!PyTuple_Check(PyTuple_GET_ITEM(reduce_value, 1))) {
-        PyErr_SetString(PicklingError, "second item of the tuple "
-                        "returned by __reduce__ must be a tuple");
-        goto error;
-    }
 
     status = save_reduce(self, reduce_value, obj);
 
@@ -2352,6 +2430,16 @@ static PyObject *
 Pickler_dump(PicklerObject *self, PyObject *args)
 {
     PyObject *obj;
+
+    /* Check whether the Pickler was initialized correctly (issue3664).
+       Developers often forget to call __init__() in their subclasses, which
+       would trigger a segfault without this check. */
+    if (self->write == NULL) {
+        PyErr_Format(PicklingError, 
+                     "Pickler.__init__() was not called by %s.__init__()",
+                     Py_TYPE(self)->tp_name);
+        return NULL;
+    }
 
     if (!PyArg_ParseTuple(args, "O:dump", &obj))
         return NULL;
@@ -3914,13 +4002,17 @@ load_build(UnpicklerObject *self)
     if (setstate == NULL) {
         if (PyErr_ExceptionMatches(PyExc_AttributeError))
             PyErr_Clear();
-        else
+        else {
+            Py_DECREF(state);
             return -1;
+        }
     }
     else {
         PyObject *result;
 
         /* The explicit __setstate__ is responsible for everything. */
+        /* Ugh... this does not leak since unpickler_call() steals the
+           reference to state first. */
         result = unpickler_call(self, setstate, state);
         Py_DECREF(setstate);
         if (result == NULL)

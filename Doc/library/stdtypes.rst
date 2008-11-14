@@ -173,7 +173,6 @@ any operand is a complex number, the objects are of different types that cannot
 be compared, or other cases where there is no defined ordering.
 
 .. index:: 
-   single: __cmp__() (instance method)
    single: __eq__() (instance method)
    single: __ne__() (instance method)
    single: __lt__() (instance method)
@@ -181,15 +180,14 @@ be compared, or other cases where there is no defined ordering.
    single: __gt__() (instance method)
    single: __ge__() (instance method)
 
-Instances of a class normally compare as non-equal unless the class defines the
-:meth:`__eq__` or :meth:`__cmp__` method.
+Non-identical instances of a class normally compare as non-equal unless the
+class defines the :meth:`__eq__` method.
 
 Instances of a class cannot be ordered with respect to other instances of the
 same class, or other types of object, unless the class defines enough of the
-methods :meth:`__cmp__`, :meth:`__lt__`, :meth:`__le__`, :meth:`__gt__`, and
-:meth:`__ge__` (in general, either :meth:`__cmp__` or both :meth:`__lt__` and
-:meth:`__eq__` are sufficient, if you want the conventional meanings of the
-comparison operators).
+methods :meth:`__lt__`, :meth:`__le__`, :meth:`__gt__`, and :meth:`__ge__` (in
+general, :meth:`__lt__` and :meth:`__eq__` are sufficient, if you want the
+conventional meanings of the comparison operators).
 
 The behavior of the :keyword:`is` and :keyword:`is not` operators cannot be
 customized; also they can be applied to any two objects and never raise an
@@ -424,7 +422,18 @@ Notes:
 Additional Methods on Float
 ---------------------------
 
-The float type has some additional methods to support conversion to
+The float type has some additional methods.
+
+.. method:: float.as_integer_ratio()
+
+    Return a pair of integers whose ratio is exactly equal to the
+    original float and with a positive denominator.  Raises
+    :exc:`OverflowError` on infinities and a :exc:`ValueError` on
+    NaNs.
+    
+    .. versionadded:: 2.6
+
+Two methods support conversion to
 and from hexadecimal strings.  Since Python's floats are stored
 internally as binary numbers, converting a float to or from a
 *decimal* string usually involves a small rounding error.  In
@@ -1631,8 +1640,7 @@ The constructors for both classes work the same:
    The subset and equality comparisons do not generalize to a complete ordering
    function.  For example, any two disjoint sets are not equal and are not
    subsets of each other, so *all* of the following return ``False``: ``a<b``,
-   ``a==b``, or ``a>b``. Accordingly, sets do not implement the :meth:`__cmp__`
-   method.
+   ``a==b``, or ``a>b``.
 
    Since sets only define partial ordering (subset relationships), the output of
    the :meth:`list.sort` method is undefined for lists of sets.
@@ -1956,7 +1964,7 @@ An example of dictionary view usage::
 
    >>> # set operations
    >>> keys & {'eggs', 'bacon', 'salad'}
-   {'eggs', 'bacon'}
+   {'bacon'}
 
 
 .. _bltin-file-objects:
@@ -2229,6 +2237,102 @@ the particular object.
    tuple containing all the newline types seen, to indicate that multiple newline
    conventions were encountered. For files not opened in universal newline read
    mode the value of this attribute will be ``None``.
+
+
+.. _typememoryview:
+
+memoryview Types
+================
+
+:class:`memoryview`\s allow Python code to access the internal data of an object
+that supports the buffer protocol without copying.  Memory can be interpreted as
+simple bytes or complex data structures.
+
+.. class:: memoryview(obj)
+
+   Create a :class:`memoryview` that references *obj*.  *obj* must support the
+   buffer protocol.  Builtin objects that support the buffer protocol include
+   :class:`bytes` and :class:`bytearray`.
+
+   ``len(view)`` returns the total number of bytes in the memoryview, *view*.
+
+   A :class:`memoryview` supports slicing to expose its data.  Taking a single
+   index will return a single byte.  Full slicing will result in a subview::
+
+      >>> v = memoryview(b'abcefg')
+      >>> v[1]
+      b'b'
+      >>> v[-1]
+      b'g'
+      >>> v[1:4]
+      <memory at 0x77ab28>
+      >>> bytes(v[1:4])
+      b'bce'
+      >>> v[3:-1]
+      <memory at 0x744f18>
+      >>> bytes(v[4:-1])
+
+   If the object the memory view is over supports changing its data, the
+   memoryview supports slice assignment::
+
+      >>> data = bytearray(b'abcefg')
+      >>> v = memoryview(data)
+      >>> v.readonly
+      False
+      >>> v[0] = 'z'
+      >>> data
+      bytearray(b'zbcefg')
+      >>> v[1:4] = b'123'
+      >>> data
+      bytearray(b'a123fg')
+      >>> v[2] = b'spam'
+      Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+      ValueError: cannot modify size of memoryview object
+
+   Notice how the size of the memoryview object can not be changed.
+
+
+   :class:`memoryview` has two methods:
+
+   .. method:: tobytes()
+
+      Return the data in the buffer as a bytestring.
+
+   .. method:: tolist()
+
+      Return the data in the buffer as a list of integers. ::
+
+         >>> memoryview(b'abc').tolist()
+         [97, 98, 99]
+
+   There are also several readonly attributes available:
+
+   .. attribute:: format
+
+      A string containing the format (in :mod:`struct` module style) for each
+      element in the view.  This defaults to ``'B'``, a simple bytestring.
+
+   .. attribute:: itemsize
+
+      The size in bytes of each element of the memoryview.
+
+   .. attribute:: shape
+
+      A tuple of integers the length of :attr:`ndim` giving the shape of the
+      memory as a N-dimensional array.
+
+   .. attribute:: ndim
+
+      An integer indicating how many dimensions of a multi-dimensional array the
+      memory represents.
+
+   .. attribute:: strides
+
+      A tuple of integers the length of :attr:`ndim` giving the size in bytes to
+      access each element for each dimension of the array.
+
+   .. memoryview.suboffsets isn't documented because it only seems useful for C
 
 
 .. _typecontextmanager:

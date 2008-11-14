@@ -1,7 +1,7 @@
 import sys
 sys.path = ['.'] + sys.path
 
-from test.support import verbose, run_unittest, catch_warning
+from test.support import verbose, run_unittest
 import re
 from re import Scanner
 import sys, os, traceback
@@ -90,6 +90,10 @@ class ReTests(unittest.TestCase):
         self.assertRaises(ValueError, re.search, pattern, 'A', re.I)
         self.assertRaises(ValueError, re.findall, pattern, 'A', re.I)
         self.assertRaises(ValueError, re.compile, pattern, re.I)
+
+    def test_bug_3629(self):
+        # A regex that triggered a bug in the sre-code validator
+        re.compile("(?P<quote>)(?(quote))")
 
     def test_sub_template_numeric_escape(self):
         # bug 776311 and friends
@@ -412,11 +416,25 @@ class ReTests(unittest.TestCase):
 
     def test_re_escape(self):
         p=""
+        self.assertEqual(re.escape(p), p)
         for i in range(0, 256):
             p = p + chr(i)
             self.assertEqual(re.match(re.escape(chr(i)), chr(i)) is not None,
                              True)
             self.assertEqual(re.match(re.escape(chr(i)), chr(i)).span(), (0,1))
+
+        pat=re.compile(re.escape(p))
+        self.assertEqual(pat.match(p) is not None, True)
+        self.assertEqual(pat.match(p).span(), (0,256))
+
+    def test_re_escape_byte(self):
+        p=b""
+        self.assertEqual(re.escape(p), p)
+        for i in range(0, 256):
+            b = bytes([i])
+            p += b
+            self.assertEqual(re.match(re.escape(b), b) is not None, True)
+            self.assertEqual(re.match(re.escape(b), b).span(), (0,1))
 
         pat=re.compile(re.escape(p))
         self.assertEqual(pat.match(p) is not None, True)

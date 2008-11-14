@@ -258,6 +258,8 @@ show_warning(PyObject *filename, int lineno, PyObject *text, PyObject
     /* Print "  source_line\n" */
     if (sourceline) {
         char *source_line_str = _PyUnicode_AsString(sourceline);
+	if (source_line_str == NULL)
+		return;
         while (*source_line_str == ' ' || *source_line_str == '\t' ||
                 *source_line_str == '\014')
             source_line_str++;
@@ -266,8 +268,9 @@ show_warning(PyObject *filename, int lineno, PyObject *text, PyObject
         PyFile_WriteString("\n", f_stderr);
     }
     else
-        _Py_DisplaySourceLine(f_stderr, _PyUnicode_AsString(filename),
-                              lineno, 2);
+        if (_Py_DisplaySourceLine(f_stderr, _PyUnicode_AsString(filename),
+                              lineno, 2) < 0)
+		return;
     PyErr_Clear();
 }
 
@@ -366,8 +369,11 @@ warn_explicit(PyObject *category, PyObject *message,
             PyObject *to_str = PyObject_Str(item);
             const char *err_str = "???";
 
-            if (to_str != NULL)
+            if (to_str != NULL) {
                 err_str = _PyUnicode_AsString(to_str);
+		if (err_str == NULL)
+			goto cleanup;
+	    }
             PyErr_Format(PyExc_RuntimeError,
                         "Unrecognized action (%s) in warnings.filters:\n %s",
                         action, err_str);
@@ -376,7 +382,7 @@ warn_explicit(PyObject *category, PyObject *message,
         }
     }
 
-    if (rc == 1)  // Already warned for this module. */
+    if (rc == 1)  /* Already warned for this module. */
         goto return_none;
     if (rc == 0) {
         PyObject *show_fxn = get_warnings_attr("showwarning");
@@ -386,49 +392,23 @@ warn_explicit(PyObject *category, PyObject *message,
             show_warning(filename, lineno, text, category, sourceline);
         }
         else {
-            const char *msg = "functions overriding warnings.showwarning() "
-                                "must support the 'line' argument";
-            const char *text_char = _PyUnicode_AsString(text);
+            PyObject *res;
 
-            if (strcmp(msg, text_char) == 0) {
-                /* Prevent infinite recursion by using built-in implementation
-                   of showwarning(). */
-                show_warning(filename, lineno, text, category, sourceline);
-            }
-            else {
-                PyObject *check_fxn;
-                PyObject *defaults;
-                PyObject *res;
-
-                if (PyMethod_Check(show_fxn))
-                    check_fxn = PyMethod_Function(show_fxn);
-                else if (PyFunction_Check(show_fxn))
-                    check_fxn = show_fxn;
-                else {
-                    PyErr_SetString(PyExc_TypeError,
-                                    "warnings.showwarning() must be set to a "
-                                    "function or method");
-                    Py_DECREF(show_fxn);
-                    goto cleanup;
-                }
-
-                defaults = PyFunction_GetDefaults(check_fxn);
-                /* A proper implementation of warnings.showwarning() should
-                    have at least two default arguments. */
-                if ((defaults == NULL) || (PyTuple_Size(defaults) < 2)) {
-                    if (PyErr_WarnEx(PyExc_DeprecationWarning, msg, 1) < 0) {
-                        Py_DECREF(show_fxn);
-                        goto cleanup;
-                    }
-                }
-                res = PyObject_CallFunctionObjArgs(show_fxn, message, category,
-                                                    filename, lineno_obj,
-                                                    NULL);
+            if (!PyMethod_Check(show_fxn) && !PyFunction_Check(show_fxn)) {
+                PyErr_SetString(PyExc_TypeError,
+                                "warnings.showwarning() must be set to a "
+                                "function or method");
                 Py_DECREF(show_fxn);
-                Py_XDECREF(res);
-                if (res == NULL)
-                    goto cleanup;
+                goto cleanup;
             }
+
+            res = PyObject_CallFunctionObjArgs(show_fxn, message, category,
+                                                filename, lineno_obj,
+                                                NULL);
+            Py_DECREF(show_fxn);
+            Py_XDECREF(res);
+            if (res == NULL)
+                goto cleanup;
         }
     }
     else /* if (rc == -1) */
@@ -524,7 +504,9 @@ setup_context(Py_ssize_t stack_level, PyObject **filename, int *lineno,
     }
     else {
         const char *module_str = _PyUnicode_AsString(*module);
-        if (module_str && strcmp(module_str, "__main__") == 0) {
+	if (module_str == NULL)
+		goto handle_error;
+        if (strcmp(module_str, "__main__") == 0) {
             PyObject *argv = PySys_GetObject("argv");
             if (argv != NULL && PyList_Size(argv) > 0) {
                 int is_true;
@@ -794,8 +776,8 @@ static PyMethodDef warnings_functions[] = {
         warn_doc},
     {"warn_explicit", (PyCFunction)warnings_warn_explicit,
         METH_VARARGS | METH_KEYWORDS, warn_explicit_doc},
-    // XXX(brett.cannon): add showwarning?
-    // XXX(brett.cannon): Reasonable to add formatwarning?
+    /* XXX(brett.cannon): add showwarning? */
+    /* XXX(brett.cannon): Reasonable to add formatwarning? */
     {NULL, NULL}	        /* sentinel */
 };
 

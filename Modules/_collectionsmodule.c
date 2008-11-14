@@ -671,7 +671,7 @@ deque_repr(PyObject *deque)
 	}
 	if (((dequeobject *)deque)->maxlen != -1)
 
-		result = PyUnicode_FromFormat("deque(%R, maxlen=%" PY_FORMAT_SIZE_T "d)", 
+		result = PyUnicode_FromFormat("deque(%R, maxlen=%zd)", 
                                               aslist, ((dequeobject *)deque)->maxlen);
 	else
 		result = PyUnicode_FromFormat("deque(%R)", aslist);
@@ -1155,6 +1155,7 @@ defdict_reduce(defdictobject *dd)
 	*/
 	PyObject *args;
 	PyObject *items;
+	PyObject *iter;
 	PyObject *result;
 	if (dd->default_factory == NULL || dd->default_factory == Py_None)
 		args = PyTuple_New(0);
@@ -1167,8 +1168,15 @@ defdict_reduce(defdictobject *dd)
 		Py_DECREF(args);
 		return NULL;
 	}
+	iter = PyObject_GetIter(items);
+	if (iter == NULL) {
+		Py_DECREF(items);
+		Py_DECREF(args);
+		return NULL;
+	}
 	result = PyTuple_Pack(5, Py_TYPE(dd), args,
-			      Py_None, Py_None, items);
+			      Py_None, Py_None, iter);
+	Py_DECREF(iter);
 	Py_DECREF(items);
 	Py_DECREF(args);
 	return result;

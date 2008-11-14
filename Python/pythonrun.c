@@ -127,6 +127,37 @@ add_flag(int flag, const char *envs)
 	return flag;
 }
 
+#if defined(HAVE_LANGINFO_H) && defined(CODESET)
+static char*
+get_codeset(void)
+{
+	char* codeset;
+	PyObject *codec, *name;
+
+	codeset = nl_langinfo(CODESET);
+	if (!codeset || codeset[0] == '\0')
+		return NULL;
+
+	codec = _PyCodec_Lookup(codeset);
+	if (!codec)
+		goto error;
+
+	name = PyObject_GetAttrString(codec, "name");
+	Py_CLEAR(codec);
+	if (!name)
+		goto error;
+
+	codeset = strdup(_PyUnicode_AsString(name));
+	Py_DECREF(name);
+	return codeset;
+
+error:
+	Py_XDECREF(codec);
+	PyErr_Clear();
+	return NULL;
+}
+#endif
+
 void
 Py_InitializeEx(int install_sigs)
 {
@@ -250,11 +281,11 @@ Py_InitializeEx(int install_sigs)
 	_PyStackless_Init();
 #endif
 	initmain(); /* Module __main__ */
-	if (!Py_NoSiteFlag)
-		initsite(); /* Module site */
 	if (initstdio() < 0)
 		Py_FatalError(
 		    "Py_Initialize: can't initialize sys standard streams");
+	if (!Py_NoSiteFlag)
+		initsite(); /* Module site */
 
 	/* auto-thread-state API, if available */
 #ifdef WITH_THREAD
@@ -268,15 +299,7 @@ Py_InitializeEx(int install_sigs)
 	   initialized by other means. Also set the encoding of
 	   stdin and stdout if these are terminals.  */
 
-	codeset = nl_langinfo(CODESET);
-	if (codeset && *codeset) {
-	    if (PyCodec_KnownEncoding(codeset))
-		codeset = strdup(codeset);
-	    else
-		codeset = NULL;
-	} else
-		codeset = NULL;
-
+	codeset = get_codeset();
 	if (codeset) {
 		if (!Py_FileSystemDefaultEncoding)
 			Py_FileSystemDefaultEncoding = codeset;
@@ -556,8 +579,13 @@ Py_NewInterpreter(void)
 			goto handle_error;
 		Py_INCREF(interp->builtins);
 	}
+
+	/* initialize builtin exceptions */
+	_PyExc_Init();
+
 	sysmod = _PyImport_FindExtension("sys", "sys");
 	if (bimod != NULL && sysmod != NULL) {
+		PyObject *pstderr;
 		interp->sysdict = PyModule_GetDict(sysmod);
 		if (interp->sysdict == NULL)
 			goto handle_error;
@@ -565,7 +593,18 @@ Py_NewInterpreter(void)
 		PySys_SetPath(Py_GetPath());
 		PyDict_SetItemString(interp->sysdict, "modules",
 				     interp->modules);
+		/* Set up a preliminary stderr printer until we have enough
+		   infrastructure for the io module in place. */
+		pstderr = PyFile_NewStdPrinter(fileno(stderr));
+		if (pstderr == NULL)
+			Py_FatalError("Py_Initialize: can't set preliminary stderr");
+		PySys_SetObject("stderr", pstderr);
+		PySys_SetObject("__stderr__", pstderr);
+
 		_PyImportHooks_Init();
+                if (initstdio() < 0)
+                    Py_FatalError(
+                        "Py_Initialize: can't initialize sys standard streams");
 		initmain();
 		if (!Py_NoSiteFlag)
 			initsite();
@@ -1681,16 +1720,19 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 		       PyCompilerFlags *flags, PyArena *arena)
 {
 	mod_ty mod;
+	PyCompilerFlags localflags;
 	perrdetail err;
 	int iflags = PARSER_FLAGS(flags);
 
 	node *n = PyParser_ParseStringFlagsFilenameEx(s, filename,
 					&_PyParser_Grammar, start, &err,
 					&iflags);
+	if (flags == NULL) {
+		localflags.cf_flags = 0;
+		flags = &localflags;
+	}
 	if (n) {
-		if (flags) {
-			flags->cf_flags |= iflags & PyCF_MASK;
-		}
+		flags->cf_flags |= iflags & PyCF_MASK;
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
 		return mod;
@@ -1708,16 +1750,19 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, const char* enc,
 		     PyArena *arena)
 {
 	mod_ty mod;
+	PyCompilerFlags localflags;
 	perrdetail err;
 	int iflags = PARSER_FLAGS(flags);
 
 	node *n = PyParser_ParseFileFlagsEx(fp, filename, enc,
 					  &_PyParser_Grammar,
 				start, ps1, ps2, &err, &iflags);
+	if (flags == NULL) {
+		localflags.cf_flags = 0;
+		flags = &localflags;
+	}
 	if (n) {
-		if (flags) {
-			flags->cf_flags |= iflags & PyCF_MASK;
-		}
+		flags->cf_flags |= iflags & PyCF_MASK;
 		mod = PyAST_FromNode(n, flags, filename, arena);
 		PyNode_Free(n);
 		return mod;

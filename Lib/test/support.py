@@ -19,7 +19,7 @@ __all__ = ["Error", "TestFailed", "TestSkipped", "ResourceDenied", "import_modul
            "is_resource_enabled", "requires", "find_unused_port", "bind_port",
            "fcmp", "is_jython", "TESTFN", "HOST", "FUZZ", "findfile", "verify",
            "vereq", "sortdict", "check_syntax_error", "open_urlresource",
-           "WarningMessage", "catch_warning", "CleanImport", "EnvironmentVarGuard",
+           "check_warnings", "CleanImport", "EnvironmentVarGuard",
            "TransientResource", "captured_output", "captured_stdout",
            "TransientResource", "transient_internet", "run_with_locale",
            "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
@@ -53,7 +53,7 @@ class ResourceDenied(TestSkipped):
 def import_module(name, deprecated=False):
     """Import the module to be tested, raising TestSkipped if it is not
     available."""
-    with catch_warning(record=False):
+    with warnings.catch_warnings():
         if deprecated:
             warnings.filterwarnings("ignore", ".+ (module|package)",
                                     DeprecationWarning)
@@ -368,71 +368,27 @@ def open_urlresource(url, *args, **kw):
     return open(fn, *args, **kw)
 
 
-class WarningMessage(object):
-    "Holds the result of a single showwarning() call"
-    _WARNING_DETAILS = "message category filename lineno line".split()
-    def __init__(self, message, category, filename, lineno, line=None):
-        for attr in self._WARNING_DETAILS:
-            setattr(self, attr, locals()[attr])
-        self._category_name = category.__name__ if category else None
+class WarningsRecorder(object):
+    """Convenience wrapper for the warnings list returned on
+       entry to the warnings.catch_warnings() context manager.
+    """
+    def __init__(self, warnings_list):
+        self.warnings = warnings_list
 
-    def __str__(self):
-        return ("{message : %r, category : %r, filename : %r, lineno : %s, "
-                    "line : %r}" % (self.message, self._category_name,
-                                    self.filename, self.lineno, self.line))
-
-class WarningRecorder(object):
-    "Records the result of any showwarning calls"
-    def __init__(self):
-        self.warnings = []
-        self._set_last(None)
-
-    def _showwarning(self, message, category, filename, lineno,
-                    file=None, line=None):
-        wm = WarningMessage(message, category, filename, lineno, line)
-        self.warnings.append(wm)
-        self._set_last(wm)
-
-    def _set_last(self, last_warning):
-        if last_warning is None:
-            for attr in WarningMessage._WARNING_DETAILS:
-                setattr(self, attr, None)
-        else:
-            for attr in WarningMessage._WARNING_DETAILS:
-                setattr(self, attr, getattr(last_warning, attr))
+    def __getattr__(self, attr):
+        if self.warnings:
+            return getattr(self.warnings[-1], attr)
+        elif attr in warnings.WarningMessage._WARNING_DETAILS:
+            return None
+        raise AttributeError("%r has no attribute %r" % (self, attr))
 
     def reset(self):
-        self.warnings = []
-        self._set_last(None)
-
-    def __str__(self):
-        return '[%s]' % (', '.join(map(str, self.warnings)))
+        del self.warnings[:]
 
 @contextlib.contextmanager
-def catch_warning(module=warnings, record=True):
-    """Guard the warnings filter from being permanently changed and
-    optionally record the details of any warnings that are issued.
-
-    Use like this:
-
-        with catch_warning() as w:
-            warnings.warn("foo")
-            assert str(w.message) == "foo"
-    """
-    original_filters = module.filters
-    original_showwarning = module.showwarning
-    if record:
-        recorder = WarningRecorder()
-        module.showwarning = recorder._showwarning
-    else:
-        recorder = None
-    try:
-        # Replace the filters with a copy of the original
-        module.filters = module.filters[:]
-        yield recorder
-    finally:
-        module.showwarning = original_showwarning
-        module.filters = original_filters
+def check_warnings():
+    with warnings.catch_warnings(record=True) as w:
+        yield WarningsRecorder(w)
 
 
 class CleanImport(object):

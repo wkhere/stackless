@@ -119,6 +119,7 @@ PyModule_Create2(struct PyModuleDef* module, int module_api_version)
 			Py_DECREF(m);
 			return NULL;
 		}
+		memset(m->md_state, 0, module->m_size);
 	}
 			
 	d = PyModule_GetDict((PyObject*)m);

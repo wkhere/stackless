@@ -473,6 +473,7 @@ _Py_CheckRecursiveCall(char *where)
 		return -1;
 	}
 #endif
+	_Py_CheckRecursionLimit = recursion_limit;
 	if (tstate->recursion_critical)
 		/* Somebody asked that we don't check for recursion. */
 		return 0;
@@ -491,7 +492,6 @@ _Py_CheckRecursiveCall(char *where)
 			     where);
 		return -1;
 	}
-	_Py_CheckRecursionLimit = recursion_limit;
 	return 0;
 }
 

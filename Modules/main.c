@@ -4,6 +4,8 @@
 #include "osdefs.h"
 #include "import.h"
 
+#include <locale.h>
+
 #ifdef __VMS
 #include <unixlib.h>
 #endif
@@ -56,8 +58,8 @@ static char *usage_line =
 /* Long usage message, split into parts < 512 bytes */
 static char *usage_1 = "\
 Options and arguments (and corresponding environment variables):\n\
--b     : issue warnings about str(bytes_instance), str(buffer_instance)\n\
-         and comparing bytes/buffer with str. (-bb: issue errors)\n\
+-b     : issue warnings about str(bytes_instance), str(bytearray_instance)\n\
+         and comparing bytes/bytearray with str. (-bb: issue errors)\n\
 -B     : don't write .py[co] files on import; also PYTHONDONTWRITEBYTECODE=x\n\
 -c cmd : program passed in as string (terminates option list)\n\
 -d     : debug output from parser; also PYTHONDEBUG=x\n\
@@ -174,9 +176,9 @@ static void RunStartupFile(PyCompilerFlags *cf)
 }
 
 
-static int RunModule(char *module, int set_argv0)
+static int RunModule(wchar_t *modname, int set_argv0)
 {
-	PyObject *runpy, *runmodule, *runargs, *result;
+	PyObject *module, *runpy, *runmodule, *runargs, *result;
 	runpy = PyImport_ImportModule("runpy");
 	if (runpy == NULL) {
 		fprintf(stderr, "Could not import runpy module\n");
@@ -188,12 +190,20 @@ static int RunModule(char *module, int set_argv0)
 		Py_DECREF(runpy);
 		return -1;
 	}
-	runargs = Py_BuildValue("(si)", module, set_argv0);
+	module = PyUnicode_FromWideChar(modname, wcslen(modname));
+	if (module == NULL) {
+		fprintf(stderr, "Could not convert module name to unicode\n");
+		Py_DECREF(runpy);
+		Py_DECREF(runmodule);
+		return -1;
+	}
+	runargs = Py_BuildValue("(Oi)", module, set_argv0);
 	if (runargs == NULL) {
 		fprintf(stderr,
 			"Could not create arguments for runpy._run_module_as_main\n");
 		Py_DECREF(runpy);
 		Py_DECREF(runmodule);
+		Py_DECREF(module);
 		return -1;
 	}
 	result = PyObject_Call(runmodule, runargs, NULL);
@@ -202,6 +212,7 @@ static int RunModule(char *module, int set_argv0)
 	}
 	Py_DECREF(runpy);
 	Py_DECREF(runmodule);
+	Py_DECREF(module);
 	Py_DECREF(runargs);
 	if (result == NULL) {
 		return -1;
@@ -227,7 +238,7 @@ static int RunMainFromImporter(wchar_t *filename)
 			Py_INCREF(argv0);
 			Py_DECREF(importer);
 			sys_path = NULL;
-			return RunModule("__main__", 0) != 0;
+			return RunModule(L"__main__", 0) != 0;
 		}
 	}
 	Py_XDECREF(argv0);
@@ -276,9 +287,9 @@ Py_Main(int argc, wchar_t **argv)
 {
 	int c;
 	int sts;
-	char *command = NULL;
+	wchar_t *command = NULL;
 	wchar_t *filename = NULL;
-	char *module = NULL;
+	wchar_t *module = NULL;
 	FILE *fp = stdin;
 	char *p;
 	int unbuffered = 0;
@@ -298,20 +309,19 @@ Py_Main(int argc, wchar_t **argv)
 
 	while ((c = _PyOS_GetOpt(argc, argv, PROGRAM_OPTS)) != EOF) {
 		if (c == 'c') {
-			size_t r1 = wcslen(_PyOS_optarg) + 2;
-			size_t r2;
+			size_t len;
 			/* -c is the last option; following arguments
 			   that look like options are left for the
 			   command to interpret. */
-			command = (char *)malloc(r1);
+
+			len = wcslen(_PyOS_optarg) + 1 + 1;
+			command = (wchar_t *)malloc(sizeof(wchar_t) * len);
 			if (command == NULL)
 				Py_FatalError(
 				   "not enough memory to copy -c argument");
-			r2 = wcstombs(command, _PyOS_optarg, r1);
-			if (r2 > r1-2)
-				Py_FatalError(
-				    "not enough memory to copy -c argument");
-			strcat(command, "\n");
+			wcscpy(command, _PyOS_optarg);
+			command[len - 2] = '\n';
+			command[len - 1] = 0;
 			break;
 		}
 
@@ -319,16 +329,7 @@ Py_Main(int argc, wchar_t **argv)
 			/* -m is the last option; following arguments
 			   that look like options are left for the
 			   module to interpret. */
-			size_t r1 = wcslen(_PyOS_optarg) + 1;
-			size_t r2;
-			module = (char *)malloc(r1);
-			if (module == NULL)
-				Py_FatalError(
-				   "not enough memory to copy -m argument");
-			r2 = wcstombs(module, _PyOS_optarg, r1);
-			if (r2 >= r1)
-				Py_FatalError(
-				   "not enough memory to copy -m argument");
+			module = _PyOS_optarg;
 			break;
 		}
 
@@ -530,11 +531,20 @@ Py_Main(int argc, wchar_t **argv)
 	}
 
 	if (command) {
-		sts = PyRun_SimpleStringFlags(command, &cf) != 0;
+		PyObject *commandObj = PyUnicode_FromWideChar(
+		    command, wcslen(command));
 		free(command);
+		if (commandObj != NULL) {
+			sts = PyRun_SimpleStringFlags(
+				_PyUnicode_AsString(commandObj), &cf) != 0;
+		}
+		else {
+			PyErr_Print();
+			sts = 1;
+		}
+		Py_DECREF(commandObj);
 	} else if (module) {
 		sts = RunModule(module, 1);
-		free(module);
 	}
 	else {
 
@@ -552,8 +562,17 @@ Py_Main(int argc, wchar_t **argv)
 
 		if (sts==-1 && filename!=NULL) {
 			if ((fp = _wfopen(filename, L"r")) == NULL) {
-				fprintf(stderr, "%ls: can't open file '%ls': [Errno %d] %s\n",
-					argv[0], filename, errno, strerror(errno));
+				char cfilename[PATH_MAX];
+				size_t r = wcstombs(cfilename, filename, PATH_MAX);
+				if (r == PATH_MAX)
+					/* cfilename is not null-terminated;
+					 * forcefully null-terminating it
+					 * might break the shift state */
+					strcpy(cfilename, "<file name too long>");
+				if (r == ((size_t)-1))
+					strcpy(cfilename, "<unprintable file name>");
+				fprintf(stderr, "%ls: can't open file '%s': [Errno %d] %s\n",
+					argv[0], cfilename, errno, strerror(errno));
 
 				return 2;
 			}

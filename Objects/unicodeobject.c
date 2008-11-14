@@ -126,19 +126,19 @@ static const char unicode_default_encoding[] = "utf-8";
 /* Fast detection of the most frequent whitespace characters */
 const unsigned char _Py_ascii_whitespace[] = {
 	0, 0, 0, 0, 0, 0, 0, 0,
-//     case 0x0009: /* HORIZONTAL TABULATION */
-//     case 0x000A: /* LINE FEED */
-//     case 0x000B: /* VERTICAL TABULATION */
-//     case 0x000C: /* FORM FEED */
-//     case 0x000D: /* CARRIAGE RETURN */
+/*     case 0x0009: * HORIZONTAL TABULATION */
+/*     case 0x000A: * LINE FEED */
+/*     case 0x000B: * VERTICAL TABULATION */
+/*     case 0x000C: * FORM FEED */
+/*     case 0x000D: * CARRIAGE RETURN */
 	0, 1, 1, 1, 1, 1, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
-//     case 0x001C: /* FILE SEPARATOR */
-//     case 0x001D: /* GROUP SEPARATOR */
-//     case 0x001E: /* RECORD SEPARATOR */
-//     case 0x001F: /* UNIT SEPARATOR */
+/*     case 0x001C: * FILE SEPARATOR */
+/*     case 0x001D: * GROUP SEPARATOR */
+/*     case 0x001E: * RECORD SEPARATOR */
+/*     case 0x001F: * UNIT SEPARATOR */
 	0, 0, 0, 0, 1, 1, 1, 1,
-//     case 0x0020: /* SPACE */
+/*     case 0x0020: * SPACE */
 	1, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
@@ -157,13 +157,13 @@ const unsigned char _Py_ascii_whitespace[] = {
 /* Same for linebreaks */
 static unsigned char ascii_linebreak[] = {
 	0, 0, 0, 0, 0, 0, 0, 0,
-//         0x000A, /* LINE FEED */
-//         0x000D, /* CARRIAGE RETURN */
+/*         0x000A, * LINE FEED */
+/*         0x000D, * CARRIAGE RETURN */
 	0, 0, 1, 0, 0, 1, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
-//         0x001C, /* FILE SEPARATOR */
-//         0x001D, /* GROUP SEPARATOR */
-//         0x001E, /* RECORD SEPARATOR */
+/*         0x001C, * FILE SEPARATOR */
+/*         0x001D, * GROUP SEPARATOR */
+/*         0x001E, * RECORD SEPARATOR */
 	0, 0, 0, 0, 1, 1, 1, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
@@ -1328,7 +1328,7 @@ PyObject *PyUnicode_AsEncodedString(PyObject *unicode,
 
     if (!PyUnicode_Check(unicode)) {
         PyErr_BadArgument();
-        goto onError;
+        return NULL;
     }
 
     if (encoding == NULL)
@@ -1346,32 +1346,51 @@ PyObject *PyUnicode_AsEncodedString(PyObject *unicode,
 #endif
 	else if (strcmp(encoding, "ascii") == 0)
 	    return PyUnicode_AsASCIIString(unicode);
+        /* During bootstrap, we may need to find the encodings
+           package, to load the file system encoding, and require the
+           file system encoding in order to load the encodings
+           package.
+
+           Break out of this dependency by assuming that the path to
+           the encodings module is ASCII-only.  XXX could try wcstombs
+           instead, if the file system encoding is the locale's
+           encoding. */
+        else if (Py_FileSystemDefaultEncoding &&
+                 strcmp(encoding, Py_FileSystemDefaultEncoding) == 0 &&
+                 !PyThreadState_GET()->interp->codecs_initialized)
+	    return PyUnicode_AsASCIIString(unicode);            
     }
 
     /* Encode via the codec registry */
     v = PyCodec_Encode(unicode, encoding, errors);
     if (v == NULL)
-        goto onError;
+        return NULL;
+
+    /* The normal path */
+    if (PyBytes_Check(v))
+        return v;
+
+    /* If the codec returns a buffer, raise a warning and convert to bytes */
     if (PyByteArray_Check(v)) {
         char msg[100];
+        PyObject *b;
         PyOS_snprintf(msg, sizeof(msg),
                       "encoder %s returned buffer instead of bytes",
                       encoding);
         if (PyErr_WarnEx(PyExc_RuntimeWarning, msg, 1) < 0) {
-            v = NULL;
-            goto onError;
+            Py_DECREF(v);
+            return NULL;
         }
-        v = PyBytes_FromStringAndSize(PyByteArray_AS_STRING(v), Py_SIZE(v));
-    }
-    else if (!PyBytes_Check(v)) {
-        PyErr_Format(PyExc_TypeError,
-                     "encoder did not return a bytes object (type=%.400s)",
-                     Py_TYPE(v)->tp_name);
-        v = NULL;
-    }
-    return v;
 
- onError:
+        b = PyBytes_FromStringAndSize(PyByteArray_AS_STRING(v), Py_SIZE(v));
+        Py_DECREF(v);
+        return b;
+    }
+
+    PyErr_Format(PyExc_TypeError,
+                 "encoder did not return a bytes object (type=%.400s)",
+                 Py_TYPE(v)->tp_name);
+    Py_DECREF(v);
     return NULL;
 }
 
@@ -7294,7 +7313,7 @@ unicode_length(PyUnicodeObject *self)
 PyDoc_STRVAR(ljust__doc__,
 "S.ljust(width[, fillchar]) -> str\n\
 \n\
-Return S left justified in a Unicode string of length width. Padding is\n\
+Return S left-justified in a Unicode string of length width. Padding is\n\
 done using the specified fill character (default is a space).");
 
 static PyObject *
@@ -7809,7 +7828,7 @@ unicode_rindex(PyUnicodeObject *self, PyObject *args)
 PyDoc_STRVAR(rjust__doc__,
 "S.rjust(width[, fillchar]) -> str\n\
 \n\
-Return S right justified in a string of length width. Padding is\n\
+Return S right-justified in a string of length width. Padding is\n\
 done using the specified fill character (default is a space).");
 
 static PyObject *
@@ -7939,7 +7958,7 @@ PyDoc_STRVAR(partition__doc__,
 \n\
 Search for the separator sep in S, and return the part before it,\n\
 the separator itself, and the part after it.  If the separator is not\n\
-found, returns S and two empty strings.");
+found, return S and two empty strings.");
 
 static PyObject*
 unicode_partition(PyUnicodeObject *self, PyObject *separator)
@@ -7952,7 +7971,7 @@ PyDoc_STRVAR(rpartition__doc__,
 \n\
 Search for the separator sep in S, starting at the end of S, and return\n\
 the part before it, the separator itself, and the part after it.  If the\n\
-separator is not found, returns two empty strings and S.");
+separator is not found, return two empty strings and S.");
 
 static PyObject*
 unicode_rpartition(PyUnicodeObject *self, PyObject *separator)
@@ -8184,8 +8203,8 @@ unicode_upper(PyUnicodeObject *self)
 PyDoc_STRVAR(zfill__doc__,
 "S.zfill(width) -> str\n\
 \n\
-Pad a numeric string x with zeros on the left, to fill a field\n\
-of the specified width. The string x is never truncated.");
+Pad a numeric string S with zeros on the left, to fill a field\n\
+of the specified width. The string S is never truncated.");
 
 static PyObject *
 unicode_zfill(PyUnicodeObject *self, PyObject *args)

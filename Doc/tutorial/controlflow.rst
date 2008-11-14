@@ -17,6 +17,7 @@ Perhaps the most well-known statement type is the :keyword:`if` statement.  For
 example::
 
    >>> x = int(input("Please enter an integer: "))
+   Please enter an integer: 42
    >>> if x < 0:
    ...      x = 0
    ...      print('Negative changed to zero')
@@ -26,7 +27,8 @@ example::
    ...      print('Single')
    ... else:
    ...      print('More')
-   ... 
+   ...
+   More
 
 There can be zero or more :keyword:`elif` parts, and the :keyword:`else` part is
 optional.  The keyword ':keyword:`elif`' is short for 'else if', and is useful
@@ -191,9 +193,44 @@ The :keyword:`pass` statement does nothing. It can be used when a statement is
 required syntactically but the program requires no action. For example::
 
    >>> while True:
-   ...       pass # Busy-wait for keyboard interrupt
+   ...     pass  # Busy-wait for keyboard interrupt (Ctrl+C)
    ... 
 
+This is commonly used for creating minimal classes such as exceptions, or
+for ignoring unwanted exceptions::
+
+   >>> class ParserError(Exception):
+   ...     pass
+   ... 
+   >>> try:
+   ...     import audioop
+   ... except ImportError:
+   ...     pass
+   ... 
+
+Another place :keyword:`pass` can be used is as a place-holder for a function or
+conditional body when you are working on new code, allowing you to keep
+thinking at a more abstract level.  However, as :keyword:`pass` is silently
+ignored, a better choice may be to raise a :exc:`NotImplementedError`
+exception::
+
+   >>> def initlog(*args):
+   ...     raise NotImplementedError   # Open logfile if not already open
+   ...     if not logfp:
+   ...         raise NotImplementedError  # Set up dummy log back-end
+   ...     raise NotImplementedError('Call log initialization handler')
+   ... 
+
+If :keyword:`pass` were used here and you later ran tests, they may fail
+without indicating why.  Using :exc:`NotImplementedError` causes this code
+to raise an exception, telling you exactly where the incomplete code 
+is.  Note the two calling styles of the exceptions above.
+The first style, with no message but with an accompanying comment, 
+lets you easily leave the comment when you remove the exception,
+which ideally would be a good description for
+the block of code the exception is a placeholder for.  However, the 
+third example, providing a message for the exception, will produce 
+a more useful traceback.
 
 .. _tut-functions:
 
@@ -223,14 +260,14 @@ boundary::
 The keyword :keyword:`def` introduces a function *definition*.  It must be
 followed by the function name and the parenthesized list of formal parameters.
 The statements that form the body of the function start at the next line, and
-must be indented.  The first statement of the function body can optionally be a
-string literal; this string literal is the function's documentation string, or
-:dfn:`docstring`.
+must be indented.
 
+The first statement of the function body can optionally be a string literal;
+this string literal is the function's documentation string, or :dfn:`docstring`.
+(More about docstrings can be found in the section :ref:`tut-docstrings`.)
 There are tools which use docstrings to automatically produce online or printed
 documentation, or to let the user interactively browse through code; it's good
-practice to include docstrings in code that you write, so try to make a habit of
-it.
+practice to include docstrings in code that you write, so make a habit of it.
 
 The *execution* of a function introduces a new symbol table used for the local
 variables of the function.  More precisely, all variable assignments in a
@@ -259,12 +296,12 @@ mechanism::
    >>> f(100)
    1 1 2 3 5 8 13 21 34 55 89
 
-You might object that ``fib`` is not a function but a procedure.  In Python,
-like in C, procedures are just functions that don't return a value.  In fact,
-technically speaking, procedures do return a value, albeit a rather boring one.
-This value is called ``None`` (it's a built-in name).  Writing the value
-``None`` is normally suppressed by the interpreter if it would be the only value
-written.  You can see it if you really want to using :func:`print`::
+Coming from other languages, you might object that ``fib`` is not a function but
+a procedure since it doesn't return a value.  In fact, even functions without a
+:keyword:`return` statement do return a value, albeit a rather boring one.  This
+value is called ``None`` (it's a built-in name).  Writing the value ``None`` is
+normally suppressed by the interpreter if it would be the only value written.
+You can see it if you really want to using :func:`print`::
 
    >>> fib(0)
    >>> print(fib(0))
@@ -290,7 +327,7 @@ This example, as usual, demonstrates some new Python features:
 
 * The :keyword:`return` statement returns with a value from a function.
   :keyword:`return` without an expression argument returns ``None``. Falling off
-  the end of a procedure also returns ``None``.
+  the end of a function also returns ``None``.
 
 * The statement ``result.append(b)`` calls a *method* of the list object
   ``result``.  A method is a function that 'belongs' to an object and is named
@@ -432,20 +469,20 @@ list.  (``*name`` must occur before ``**name``.) For example, if we define a
 function like this::
 
    def cheeseshop(kind, *arguments, **keywords):
-       print("-- Do you have any", kind, '?')
+       print("-- Do you have any", kind, "?")
        print("-- I'm sorry, we're all out of", kind)
        for arg in arguments: print(arg)
-       print('-'*40)
+       print("-" * 40)
        keys = sorted(keywords.keys())
-       for kw in keys: print(kw, ':', keywords[kw])
+       for kw in keys: print(kw, ":", keywords[kw])
 
 It could be called like this::
 
-   cheeseshop('Limburger', "It's very runny, sir.",
+   cheeseshop("Limburger", "It's very runny, sir.",
               "It's really very, VERY runny, sir.",
-              client='John Cleese',
-              shopkeeper='Michael Palin',
-              sketch='Cheese Shop Sketch')
+              shopkeeper="Michael Palin",
+              client="John Cleese",
+              sketch="Cheese Shop Sketch")
 
 and of course it would print::
 
@@ -472,8 +509,8 @@ Arbitrary Argument Lists
 
 Finally, the least frequently used option is to specify that a function can be
 called with an arbitrary number of arguments.  These arguments will be wrapped
-up in a tuple.  Before the variable number of arguments, zero or more normal
-arguments may occur. ::
+up in a tuple (see :ref:`tut-tuples`).  Before the variable number of arguments,
+zero or more normal arguments may occur. ::
 
    def write_multiple_items(file, separator, *args):
        file.write(separator.join(args))
@@ -644,7 +681,8 @@ extracted for you:
 
 * Name your classes and functions consistently; the convention is to use
   ``CamelCase`` for classes and ``lower_case_with_underscores`` for functions
-  and methods.  Always use ``self`` as the name for the first method argument.
+  and methods.  Always use ``self`` as the name for the first method argument
+  (see :ref:`tut-firstclasses` for more on classes and methods).
 
 * Don't use fancy encodings if your code is meant to be used in international
   environments.  Plain ASCII works best in any case.

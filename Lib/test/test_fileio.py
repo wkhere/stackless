@@ -6,7 +6,7 @@ import unittest
 from array import array
 from weakref import proxy
 
-from test.support import TESTFN, findfile, run_unittest
+from test.support import TESTFN, findfile, check_warnings, run_unittest
 from collections import UserList
 
 import _fileio
@@ -99,6 +99,17 @@ class AutoFileTests(unittest.TestCase):
             method = getattr(self.f, methodname)
             # should raise on closed file
             self.assertRaises(ValueError, method)
+
+    def testOpendir(self):
+        # Issue 3703: opening a directory should fill the errno
+        # Windows always returns "[Errno 13]: Permission denied
+        # Unix calls dircheck() and returns "[Errno 21]: Is a directory"
+        try:
+            _fileio._FileIO('.', 'r')
+        except IOError as e:
+            self.assertNotEqual(e.errno, 0)
+        else:
+            self.fail("Should have raised IOError")
 
 
 class OtherFileTests(unittest.TestCase):
@@ -228,6 +239,14 @@ class OtherFileTests(unittest.TestCase):
 
     def testInvalidInit(self):
         self.assertRaises(TypeError, _fileio._FileIO, "1", 0, 0)
+
+    def testWarnings(self):
+        with check_warnings() as w:
+            self.assertEqual(w.warnings, [])
+            self.assertRaises(TypeError, _fileio._FileIO, [])
+            self.assertEqual(w.warnings, [])
+            self.assertRaises(ValueError, _fileio._FileIO, "/some/invalid/name", "rt")
+            self.assertEqual(w.warnings, [])
 
 
 def test_main():

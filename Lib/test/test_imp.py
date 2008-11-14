@@ -1,4 +1,5 @@
 import imp
+import sys
 import unittest
 from test import support
 
@@ -59,6 +60,21 @@ class ImportTests(unittest.TestCase):
                          '"""Tokenization help for Python programs.\n')
         fp.close()
 
+    def test_issue3594(self):
+        temp_mod_name = 'test_imp_helper'
+        sys.path.insert(0, '.')
+        try:
+            with open(temp_mod_name + '.py', 'w') as file:
+                file.write("# coding: cp1252\nu = 'test.test_imp'\n")
+            file, filename, info = imp.find_module(temp_mod_name)
+            file.close()
+            self.assertEquals(file.encoding, 'cp1252')
+        finally:
+            del sys.path[0]
+            support.unlink(temp_mod_name + '.py')
+            support.unlink(temp_mod_name + '.pyc')
+            support.unlink(temp_mod_name + '.pyo')
+
     def test_reload(self):
         import marshal
         imp.reload(marshal)
@@ -69,10 +85,16 @@ class ImportTests(unittest.TestCase):
 
 
 def test_main():
-    support.run_unittest(
-                LockTests,
-                ImportTests,
-            )
+    tests = [
+        ImportTests,
+    ]
+    try:
+        import _thread
+    except ImportError:
+        pass
+    else:
+        tests.append(LockTests)
+    support.run_unittest(*tests)
 
 if __name__ == "__main__":
     test_main()

@@ -183,8 +183,8 @@ PYTHON=		python$(EXE)
 BUILDPYTHON=	python$(BUILDEXE)
 
 # The task to run while instrument when building the profile-opt target
-PROFILE_TASK=	Tools/pybench/pybench.py -n 2 --with-gc --with-syscheck
-#PROFILE_TASK=	Lib/test/regrtest.py
+PROFILE_TASK=	$(srcdir)/Tools/pybench/pybench.py -n 2 --with-gc --with-syscheck
+#PROFILE_TASK=	$(srcdir)/Lib/test/regrtest.py
 
 # === Definitions added by makesetup ===
 
@@ -427,14 +427,14 @@ $(LIBRARY): $(LIBRARY_OBJS)
 
 libpython$(VERSION).so: $(LIBRARY_OBJS)
 	if test $(INSTSONAME) != $(LDLIBRARY); then \
-		$(LDSHARED) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM); \
+		$(LDSHARED) $(LDFLAGS) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 		$(LN) -f $(INSTSONAME) $@; \
 	else\
-		$(LDSHARED) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM); \
+		$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 	fi
 
 libpython$(VERSION).sl: $(LIBRARY_OBJS)
-	$(LDSHARED) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM)
+	$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST)
 
 # This rule is here for OPENSTEP/Rhapsody/MacOSX. It builds a temporary
 # minimal framework (not including the Lib directory and such) in the current
@@ -468,8 +468,8 @@ $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK): \
 # for a shared core library; otherwise, this rule is a noop.
 $(DLLLIBRARY) libpython$(VERSION).dll.a: $(LIBRARY_OBJS)
 	if test -n "$(DLLLIBRARY)"; then \
-		$(LDSHARED) -Wl,--out-implib=$@ -o $(DLLLIBRARY) $^ \
-			$(LIBS) $(MODLIBS) $(SYSLIBS); \
+		$(LDSHARED) $(LDFLAGS) -Wl,--out-implib=$@ -o $(DLLLIBRARY) $^ \
+			$(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST); \
 	else true; \
 	fi
 
@@ -838,7 +838,7 @@ maninstall:
 		fi; \
 	done
 	$(INSTALL_DATA) $(srcdir)/Misc/python.man \
-		$(DESTDIR)$(MANDIR)/man1/python.1
+		$(DESTDIR)$(MANDIR)/man1/python$(VERSION).1
 
 # Install the library
 PLATDIR=	plat-$(MACHDEP)
@@ -1246,7 +1246,7 @@ funny:
 		-o -print
 
 # Perform some verification checks on any modified files.
-check:
+patchcheck:
 	$(RUNSHARED) ./$(BUILDPYTHON) $(srcdir)/Tools/scripts/patchcheck.py
 
 # Dependencies
@@ -1260,6 +1260,6 @@ Python/thread.o: @THREADHEADERS@
 .PHONY: frameworkinstall frameworkinstallframework frameworkinstallstructure
 .PHONY: frameworkinstallmaclib frameworkinstallapps frameworkinstallunixtools
 .PHONY: frameworkaltinstallunixtools recheck autoconf clean clobber distclean 
-.PHONY: smelly funny
+.PHONY: smelly funny patchcheck
 
 # IF YOU PUT ANYTHING HERE IT WILL GO AWAY

@@ -57,6 +57,9 @@ class AnyDBMTestCase(unittest.TestCase):
     def test_error(self):
         self.assert_(issubclass(self.module.error, IOError))
 
+    def test_anydbm_not_existing(self):
+        self.assertRaises(dbm.error, dbm.open, _fname)
+
     def test_anydbm_creation(self):
         f = dbm.open(_fname, 'c')
         self.assertEqual(list(f.keys()), [])
@@ -137,6 +140,23 @@ class WhichDBTestCase(unittest.TestCase):
 
     def setUp(self):
         delete_files()
+        self.filename = test.support.TESTFN
+        self.d = dbm.open(self.filename, 'c')
+        self.d.close()
+
+    def test_keys(self):
+        self.d = dbm.open(self.filename, 'c')
+        self.assertEqual(self.d.keys(), [])
+        a = [(b'a', b'b'), (b'12345678910', b'019237410982340912840198242')]
+        for k, v in a:
+            self.d[k] = v
+        self.assertEqual(sorted(self.d.keys()), sorted(k for (k, v) in a))
+        for k, v in a:
+            self.assert_(k in self.d)
+            self.assertEqual(self.d[k], v)
+        self.assert_(b'xxx' not in self.d)
+        self.assertRaises(KeyError, lambda: self.d[b'xxx'])
+        self.d.close()
 
 
 def test_main():

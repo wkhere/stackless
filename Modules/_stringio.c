@@ -140,6 +140,8 @@ stringio_read(StringIOObject *self, PyObject *args)
 
     if (PyLong_Check(arg)) {
         size = PyLong_AsSsize_t(arg);
+        if (size == -1 && PyErr_Occurred())
+            return NULL;
     }
     else if (arg == Py_None) {
         /* Read until EOF is reached, by default. */
@@ -177,6 +179,8 @@ stringio_truncate(StringIOObject *self, PyObject *args)
 
     if (PyLong_Check(arg)) {
         size = PyLong_AsSsize_t(arg);
+        if (size == -1 && PyErr_Occurred())
+            return NULL;
     }
     else if (arg == Py_None) {
         /* Truncate to current position if no argument is passed. */

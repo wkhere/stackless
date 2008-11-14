@@ -32,9 +32,9 @@ It defines the following functions:
 
    * ``name`` The name of the encoding;
 
-   * ``encoder`` The stateless encoding function;
+   * ``encode`` The stateless encoding function;
 
-   * ``decoder`` The stateless decoding function;
+   * ``decode`` The stateless decoding function;
 
    * ``incrementalencoder`` An incremental encoder class or factory function;
 
@@ -46,18 +46,18 @@ It defines the following functions:
 
    The various functions or classes take the following arguments:
 
-   *encoder* and *decoder*: These must be functions or methods which have the same
+   *encode* and *decode*: These must be functions or methods which have the same
    interface as the :meth:`encode`/:meth:`decode` methods of Codec instances (see
    Codec Interface). The functions/methods are expected to work in a stateless
    mode.
 
-   *incrementalencoder* and *incrementalencoder*: These have to be factory
+   *incrementalencoder* and *incrementaldecoder*: These have to be factory
    functions providing the following interface:
 
    ``factory(errors='strict')``
 
    The factory functions must return objects providing the interfaces defined by
-   the base classes :class:`IncrementalEncoder` and :class:`IncrementalEncoder`,
+   the base classes :class:`IncrementalEncoder` and :class:`IncrementalDecoder`,
    respectively. Incremental codecs can maintain state.
 
    *streamreader* and *streamwriter*: These have to be factory functions providing
@@ -478,7 +478,7 @@ define in order to be compatible with the Python codec registry.
 
    The *errors* argument will be assigned to an attribute of the same name.
    Assigning to this attribute makes it possible to switch between different error
-   handling strategies during the lifetime of the :class:`IncrementalEncoder`
+   handling strategies during the lifetime of the :class:`IncrementalDecoder`
    object.
 
    The set of allowed values for the *errors* argument can be extended with

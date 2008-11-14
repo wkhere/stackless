@@ -412,7 +412,7 @@ ast_type_init(PyObject *self, PyObject *args, PyObject *kw)
     if (PyTuple_GET_SIZE(args) > 0) {
         if (numfields != PyTuple_GET_SIZE(args)) {
             PyErr_Format(PyExc_TypeError, "%.400s constructor takes %s"
-                         "%" PY_FORMAT_SIZE_T "d positional argument%s",
+                         "%zd positional argument%s",
                          Py_TYPE(self)->tp_name,
                          numfields == 0 ? "" : "either 0 or ",
                          numfields, numfields == 1 ? "" : "s");
@@ -621,11 +621,29 @@ static int obj2ast_int(PyObject* obj, int* out, PyArena* arena)
     return 0;
 }
 
+static int add_ast_fields(void)
+{
+    PyObject *empty_tuple, *d;
+    if (PyType_Ready(&AST_type) < 0)
+        return -1;
+    d = AST_type.tp_dict;
+    empty_tuple = PyTuple_New(0);
+    if (!empty_tuple ||
+        PyDict_SetItemString(d, "_fields", empty_tuple) < 0 ||
+        PyDict_SetItemString(d, "_attributes", empty_tuple) < 0) {
+        Py_XDECREF(empty_tuple);
+        return -1;
+    }
+    Py_DECREF(empty_tuple);
+    return 0;
+}
+
 
 static int init_types(void)
 {
         static int initialized;
         if (initialized) return 1;
+        if (add_ast_fields() < 0) return 0;
         mod_type = make_type("mod", &AST_type, NULL, 0);
         if (!mod_type) return 0;
         if (!add_attributes(mod_type, NULL, 0)) return 0;

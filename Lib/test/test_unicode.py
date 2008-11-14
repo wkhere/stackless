@@ -429,7 +429,7 @@ class UnicodeTest(
         # some defined Unicode character
         self.assertTrue("\u0374".isprintable())
         # undefined character
-        self.assertFalse("\u0370".isprintable())
+        self.assertFalse("\u0378".isprintable())
         # single surrogate character
         self.assertFalse("\ud800".isprintable())
 
@@ -611,11 +611,11 @@ class UnicodeTest(
         self.assertEqual('{0!r}'.format('Hello'), "'Hello'")
         self.assertEqual('{0!r:}'.format('Hello'), "'Hello'")
         self.assertEqual('{0!r}'.format(F('Hello')), 'F(Hello)')
-        self.assertEqual('{0!r}'.format('\u0370'), "'\\u0370'") # nonprintable
+        self.assertEqual('{0!r}'.format('\u0378'), "'\\u0378'") # nonprintable
         self.assertEqual('{0!r}'.format('\u0374'), "'\u0374'")  # printable
         self.assertEqual('{0!r}'.format(F('\u0374')), 'F(\u0374)')
         self.assertEqual('{0!a}'.format('Hello'), "'Hello'")
-        self.assertEqual('{0!a}'.format('\u0370'), "'\\u0370'") # nonprintable
+        self.assertEqual('{0!a}'.format('\u0378'), "'\\u0378'") # nonprintable
         self.assertEqual('{0!a}'.format('\u0374'), "'\\u0374'") # printable
         self.assertEqual('{0!a:}'.format('Hello'), "'Hello'")
         self.assertEqual('{0!a}'.format(F('Hello')), 'F(Hello)')
@@ -1160,7 +1160,10 @@ class UnicodeTest(
         # when a string allocation fails with a MemoryError.
         # This used to crash the interpreter,
         # or leak references when the number was smaller.
-        alloc = lambda: "a" * (sys.maxsize - 100)
+        charwidth = 4 if sys.maxunicode >= 0x10000 else 2
+        # Note: sys.maxsize is half of the actual max allocation because of
+        # the signedness of Py_ssize_t.
+        alloc = lambda: "a" * (sys.maxsize // charwidth * 2)
         self.assertRaises(MemoryError, alloc)
         self.assertRaises(MemoryError, alloc)
 

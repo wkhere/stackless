@@ -6,7 +6,7 @@ import sys
 import py_compile
 import warnings
 import imp
-from test.support import unlink, TESTFN, unload, run_unittest, catch_warning
+from test.support import unlink, TESTFN, unload, run_unittest
 
 
 def remove_files(name):
@@ -153,7 +153,7 @@ class ImportTest(unittest.TestCase):
         self.assert_(y is test.support, y.__name__)
 
     def test_import_initless_directory_warning(self):
-        with catch_warning():
+        with warnings.catch_warnings():
             # Just a random non-package directory we always expect to be
             # somewhere in sys.path...
             warnings.simplefilter('error', ImportWarning)
@@ -266,21 +266,24 @@ class RelativeImport(unittest.TestCase):
         self.assertTrue(hasattr(relimport, "RelativeImport"))
 
     def test_issue3221(self):
+        # Note for mergers: the 'absolute' tests from the 2.x branch
+        # are missing in Py3k because implicit relative imports are
+        # a thing of the past
         def check_relative():
             exec("from . import relimport", ns)
-        # Check both OK with __package__ and __name__ correct
+        # Check relative import OK with __package__ and __name__ correct
         ns = dict(__package__='test', __name__='test.notarealmodule')
         check_relative()
-        # Check both OK with only __name__ wrong
+        # Check relative import OK with only __name__ wrong
         ns = dict(__package__='test', __name__='notarealpkg.notarealmodule')
         check_relative()
-        # Check relative fails with only __package__ wrong
+        # Check relative import fails with only __package__ wrong
         ns = dict(__package__='foo', __name__='test.notarealmodule')
         self.assertRaises(SystemError, check_relative)
-        # Check relative fails with __package__ and __name__ wrong
+        # Check relative import fails with __package__ and __name__ wrong
         ns = dict(__package__='foo', __name__='notarealpkg.notarealmodule')
         self.assertRaises(SystemError, check_relative)
-        # Check both fail with package set to a non-string
+        # Check relative import fails with package set to a non-string
         ns = dict(__package__=object())
         self.assertRaises(ValueError, check_relative)
 

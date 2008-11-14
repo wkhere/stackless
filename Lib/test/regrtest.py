@@ -1075,6 +1075,7 @@ _expectations = {
         test_tcl
         test_timeout
         test_urllibnet
+        test_multiprocessing
         """,
     'aix5':
         """
@@ -1102,6 +1103,7 @@ _expectations = {
         test_ossaudiodev
         test_pep277
         test_tcl
+        test_multiprocessing
         """,
     'netbsd3':
         """
@@ -1115,6 +1117,7 @@ _expectations = {
         test_ossaudiodev
         test_pep277
         test_tcl
+        test_multiprocessing
         """,
 }
 _expectations['freebsd5'] = _expectations['freebsd4']
@@ -1134,7 +1137,6 @@ class _ExpectedSkips:
 
             # These are broken tests, for now skipped on every platform.
             # XXX Fix these!
-            self.expected.add('test_cProfile')
             self.expected.add('test_nis')
 
             # expected to be skipped on every platform, even Linux

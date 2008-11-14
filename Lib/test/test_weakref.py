@@ -660,6 +660,14 @@ class ReferencesTestCase(TestBase):
 
         w = Target()
 
+    def test_init(self):
+        # Issue 3634
+        # <weakref to class>.__init__() doesn't check errors correctly
+        r = weakref.ref(Exception)
+        self.assertRaises(TypeError, r.__init__, 0, 0, 0, 0, 0)
+        # No exception should be raised here
+        gc.collect()
+
 
 class SubclassableWeakrefTestCase(TestBase):
 
@@ -790,8 +798,8 @@ class MappingTestCase(TestBase):
             self.assertEqual(weakref.getweakrefcount(o), 1)
             self.assert_(o is dict[o.arg],
                          "wrong object returned by weak dict!")
-        items1 = dict.items()
-        items2 = dict.copy().items()
+        items1 = list(dict.items())
+        items2 = list(dict.copy().items())
         items1.sort()
         items2.sort()
         self.assertEqual(items1, items2,
@@ -856,8 +864,8 @@ class MappingTestCase(TestBase):
 
         # Test iterkeyrefs()
         objects2 = list(objects)
-        self.assertEqual(len(list(dict.iterkeyrefs())), len(objects))
-        for wr in dict.iterkeyrefs():
+        self.assertEqual(len(list(dict.keyrefs())), len(objects))
+        for wr in dict.keyrefs():
             ob = wr()
             self.assert_(ob in dict)
             self.assert_(ob in dict)
@@ -892,28 +900,28 @@ class MappingTestCase(TestBase):
 
     def check_iters(self, dict):
         # item iterator:
-        items = dict.items()
+        items = list(dict.items())
         for item in dict.items():
             items.remove(item)
-        self.assert_(len(items) == 0, "items() did not touch all items")
+        self.assertFalse(items, "items() did not touch all items")
 
         # key iterator, via __iter__():
         keys = list(dict.keys())
         for k in dict:
             keys.remove(k)
-        self.assert_(len(keys) == 0, "__iter__() did not touch all keys")
+        self.assertFalse(keys, "__iter__() did not touch all keys")
 
         # key iterator, via iterkeys():
         keys = list(dict.keys())
         for k in dict.keys():
             keys.remove(k)
-        self.assert_(len(keys) == 0, "iterkeys() did not touch all keys")
+        self.assertFalse(keys, "iterkeys() did not touch all keys")
 
         # value iterator:
         values = list(dict.values())
         for v in dict.values():
             values.remove(v)
-        self.assert_(len(values) == 0,
+        self.assertFalse(values,
                      "itervalues() did not touch all values")
 
     def test_make_weak_keyed_dict_from_dict(self):
@@ -1030,7 +1038,7 @@ class MappingTestCase(TestBase):
         self.assertEqual(len(d), 2)
         del d[o1]
         self.assertEqual(len(d), 1)
-        self.assertEqual(d.keys(), [o2])
+        self.assertEqual(list(d.keys()), [o2])
 
     def test_weak_valued_delitem(self):
         d = weakref.WeakValueDictionary()
@@ -1041,7 +1049,7 @@ class MappingTestCase(TestBase):
         self.assertEqual(len(d), 2)
         del d['something']
         self.assertEqual(len(d), 1)
-        self.assert_(d.items() == [('something else', o2)])
+        self.assert_(list(d.items()) == [('something else', o2)])
 
     def test_weak_keyed_bad_delitem(self):
         d = weakref.WeakKeyDictionary()
@@ -1082,7 +1090,7 @@ class MappingTestCase(TestBase):
             d[o] = o.value
         del o   # now the only strong references to keys are in objs
         # Find the order in which iterkeys sees the keys.
-        objs = d.keys()
+        objs = list(d.keys())
         # Reverse it, so that the iteration implementation of __delitem__
         # has to keep looping to find the first object we delete.
         objs.reverse()

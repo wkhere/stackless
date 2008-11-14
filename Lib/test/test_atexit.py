@@ -26,12 +26,13 @@ def raise2():
 class TestCase(unittest.TestCase):
     def setUp(self):
         self.stream = io.StringIO()
+        self.save_stdout, self.save_stderr = sys.stderr, sys.stdout
         sys.stdout = sys.stderr = self.stream
         atexit._clear()
 
     def tearDown(self):
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
+        sys.stdout = self.save_stdout
+        sys.stderr = self.save_stderr
         atexit._clear()
 
     def test_args(self):
@@ -43,6 +44,10 @@ class TestCase(unittest.TestCase):
 
         self.assertEqual(self.stream.getvalue(),
                             "h4 (4,) {'kw': 'abc'}\nh4 () {}\nh1\n")
+
+    def test_badargs(self):
+        atexit.register(lambda: 1, 0, 0, (x for x in (1,2)), 0, 0)
+        self.assertRaises(TypeError, atexit._run_exitfuncs)
 
     def test_order(self):
         # be sure handlers are executed in reverse order

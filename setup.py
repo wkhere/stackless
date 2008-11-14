@@ -319,12 +319,13 @@ class PyBuildExt(build_ext):
         # the environment variable is not set even though the value were passed
         # into configure and stored in the Makefile (issue found on OS X 10.3).
         for env_var, arg_name, dir_list in (
+                ('LDFLAGS', '-R', self.compiler.runtime_library_dirs),
                 ('LDFLAGS', '-L', self.compiler.library_dirs),
                 ('CPPFLAGS', '-I', self.compiler.include_dirs)):
             env_val = sysconfig.get_config_var(env_var)
             if env_val:
                 # To prevent optparse from raising an exception about any
-                # options in env_val that is doesn't know about we strip out
+                # options in env_val that it doesn't know about we strip out
                 # all double dashes and any dashes followed by a character
                 # that is not for the option we are dealing with.
                 #
@@ -439,9 +440,6 @@ class PyBuildExt(build_ext):
         exts.append( Extension('operator', ['operator.c']) )
         # _functools
         exts.append( Extension("_functools", ["_functoolsmodule.c"]) )
-        # Memory-based IO accelerator modules
-        exts.append( Extension("_bytesio", ["_bytesio.c"]) )
-        exts.append( Extension("_stringio", ["_stringio.c"]) )
         # C-optimized pickle replacement
         exts.append( Extension("_pickle", ["_pickle.c", '../Stackless/pickling/safe_pickle.c']) )
         # atexit
@@ -665,20 +663,6 @@ class PyBuildExt(build_ext):
         # implementation independent wrapper for these; dbm/dumb.py provides
         # similar functionality (but slower of course) implemented in Python.
 
-        # Sleepycat^WOracle Berkeley DB interface.
-        #  http://www.oracle.com/database/berkeley-db/db/index.html
-        #
-        # This requires the Sleepycat^WOracle DB code. The supported versions
-        # are set below.  Visit the URL above to download
-        # a release.  Most open source OSes come with one or more
-        # versions of BerkeleyDB already installed.
-
-        max_db_ver = (4, 7)
-        min_db_ver = (4, 0)
-        db_setup_debug = False   # verbose debug prints from this script?
-
-        # construct a list of paths to look for the header file in on
-        # top of the normal inc_dirs.
         db_inc_paths = [
             '/usr/include/db4',
             '/usr/local/include/db4',
@@ -690,136 +674,8 @@ class PyBuildExt(build_ext):
             '/sw/include/db4',
             '/sw/include/db3',
         ]
-        # 4.x minor number specific paths
-        for x in range(max_db_ver[1]+1):
-            db_inc_paths.append('/usr/include/db4%d' % x)
-            db_inc_paths.append('/usr/include/db4.%d' % x)
-            db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
-            db_inc_paths.append('/usr/local/include/db4%d' % x)
-            db_inc_paths.append('/pkg/db-4.%d/include' % x)
-            db_inc_paths.append('/opt/db-4.%d/include' % x)
-            # MacPorts default (http://www.macports.org/)
-            db_inc_paths.append('/opt/local/include/db4%d' % x)
-        # 3.x minor number specific paths
-        for x in (3,):
-            db_inc_paths.append('/usr/include/db3%d' % x)
-            db_inc_paths.append('/usr/local/BerkeleyDB.3.%d/include' % x)
-            db_inc_paths.append('/usr/local/include/db3%d' % x)
-            db_inc_paths.append('/pkg/db-3.%d/include' % x)
-            db_inc_paths.append('/opt/db-3.%d/include' % x)
 
-        # Add some common subdirectories for Sleepycat DB to the list,
-        # based on the standard include directories. This way DB3/4 gets
-        # picked up when it is installed in a non-standard prefix and
-        # the user has added that prefix into inc_dirs.
-        std_variants = []
-        for dn in inc_dirs:
-            std_variants.append(os.path.join(dn, 'db3'))
-            std_variants.append(os.path.join(dn, 'db4'))
-            for x in range(max_db_ver[1]+1):
-                std_variants.append(os.path.join(dn, "db4%d"%x))
-                std_variants.append(os.path.join(dn, "db4.%d"%x))
-            for x in (3,):
-                std_variants.append(os.path.join(dn, "db3%d"%x))
-                std_variants.append(os.path.join(dn, "db3.%d"%x))
-
-        db_inc_paths = std_variants + db_inc_paths
-        db_inc_paths = [p for p in db_inc_paths if os.path.exists(p)]
-
-        db_ver_inc_map = {}
-
-        class db_found(Exception): pass
-        try:
-            # See whether there is a Sleepycat header in the standard
-            # search path.
-            for d in inc_dirs + db_inc_paths:
-                f = os.path.join(d, "db.h")
-                if db_setup_debug: print("db: looking for db.h in", f)
-                if os.path.exists(f):
-                    f = open(f).read()
-                    m = re.search(r"#define\WDB_VERSION_MAJOR\W(\d+)", f)
-                    if m:
-                        db_major = int(m.group(1))
-                        m = re.search(r"#define\WDB_VERSION_MINOR\W(\d+)", f)
-                        db_minor = int(m.group(1))
-                        db_ver = (db_major, db_minor)
-
-                        # Avoid 4.6 prior to 4.6.21 due to a BerkeleyDB bug
-                        if db_ver == (4, 6):
-                            m = re.search(r"#define\WDB_VERSION_PATCH\W(\d+)", f)
-                            db_patch = int(m.group(1))
-                            if db_patch < 21:
-                                print("db.h:", db_ver, "patch", db_patch,
-                                      "being ignored (4.6.x must be >= 4.6.21)")
-                                continue
-
-                        if ( (db_ver not in db_ver_inc_map) and
-                           (db_ver <= max_db_ver and db_ver >= min_db_ver) ):
-                            # save the include directory with the db.h version
-                            # (first occurrence only)
-                            db_ver_inc_map[db_ver] = d
-                            if db_setup_debug:
-                                print("db.h: found", db_ver, "in", d)
-                        else:
-                            # we already found a header for this library version
-                            if db_setup_debug: print("db.h: ignoring", d)
-                    else:
-                        # ignore this header, it didn't contain a version number
-                        if db_setup_debug:
-                            print("db.h: no version number version in", d)
-
-            db_found_vers = sorted(db_ver_inc_map.keys())
-
-            while db_found_vers:
-                db_ver = db_found_vers.pop()
-                db_incdir = db_ver_inc_map[db_ver]
-
-                # check lib directories parallel to the location of the header
-                db_dirs_to_check = [
-                    db_incdir.replace("include", 'lib64'),
-                    db_incdir.replace("include", 'lib'),
-                ]
-                db_dirs_to_check = [x for x in db_dirs_to_check if os.path.isdir(x)]
-
-                # Look for a version specific db-X.Y before an ambiguoius dbX
-                # XXX should we -ever- look for a dbX name?  Do any
-                # systems really not name their library by version and
-                # symlink to more general names?
-                for dblib in (('db-%d.%d' % db_ver),
-                              ('db%d%d' % db_ver),
-                              ('db%d' % db_ver[0])):
-                    dblib_file = self.compiler.find_library_file(
-                                    db_dirs_to_check + lib_dirs, dblib )
-                    if dblib_file:
-                        dblib_dir = [ os.path.abspath(os.path.dirname(dblib_file)) ]
-                        raise db_found
-                    else:
-                        if db_setup_debug: print("db lib: ", dblib, "not found")
-
-        except db_found:
-            if db_setup_debug:
-                print("db lib: using", db_ver, dblib)
-                print("db: lib dir", dblib_dir, "inc dir", db_incdir)
-            db_incs = [db_incdir]
-            dblibs = [dblib]
-            # We add the runtime_library_dirs argument because the
-            # BerkeleyDB lib we're linking against often isn't in the
-            # system dynamic library search path.  This is usually
-            # correct and most trouble free, but may cause problems in
-            # some unusual system configurations (e.g. the directory
-            # is on an NFS server that goes away).
-            exts.append(Extension('_bsddb', ['_bsddb.c'],
-                                  depends = ['bsddb.h'],
-                                  library_dirs=dblib_dir,
-                                  runtime_library_dirs=dblib_dir,
-                                  include_dirs=db_incs,
-                                  libraries=dblibs))
-        else:
-            if db_setup_debug: print("db: no appropriate library found")
-            db_incs = None
-            dblibs = []
-            dblib_dir = None
-            missing.append('_bsddb')
+        db_incs = None
 
         # The sqlite interface
         sqlite_setup_debug = False   # verbose debug prints from this script?
@@ -874,7 +730,8 @@ class PyBuildExt(build_ext):
             ]
             sqlite_libfile = self.compiler.find_library_file(
                                 sqlite_dirs_to_check + lib_dirs, 'sqlite3')
-            sqlite_libdir = [os.path.abspath(os.path.dirname(sqlite_libfile))]
+            if sqlite_libfile:
+                sqlite_libdir = [os.path.abspath(os.path.dirname(sqlite_libfile))]
 
         if sqlite_incdir and sqlite_libdir:
             sqlite_srcs = ['_sqlite/cache.c',
@@ -1154,11 +1011,19 @@ class PyBuildExt(build_ext):
                 )
             libraries = []
 
-        elif platform in ('freebsd5', 'freebsd6', 'freebsd7', 'freebsd8'):
+        elif platform in ('freebsd4', 'freebsd5', 'freebsd6', 'freebsd7', 'freebsd8'):
             # FreeBSD's P1003.1b semaphore support is very experimental
             # and has many known problems. (as of June 2008)
             macros = dict(                  # FreeBSD
                 HAVE_SEM_OPEN=0,
+                HAVE_SEM_TIMEDWAIT=0,
+                HAVE_FD_TRANSFER=1,
+                )
+            libraries = []
+
+        elif platform.startswith('openbsd'):
+            macros = dict(                  # OpenBSD
+                HAVE_SEM_OPEN=0,            # Not implemented
                 HAVE_SEM_TIMEDWAIT=0,
                 HAVE_FD_TRANSFER=1,
                 )
@@ -1626,7 +1491,6 @@ yourself.
 """
 
 CLASSIFIERS = """
-Development Status :: 3 - Alpha
 Development Status :: 6 - Mature
 License :: OSI Approved :: Python Software Foundation License
 Natural Language :: English

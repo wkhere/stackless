@@ -166,6 +166,9 @@ class SysModuleTest(unittest.TestCase):
             self.assert_(isinstance(v[3], int))
             self.assert_(isinstance(v[4], str))
 
+    def test_call_tracing(self):
+        self.assertRaises(TypeError, sys.call_tracing, type, 2)
+
     def test_dlopenflags(self):
         if hasattr(sys, "setdlopenflags"):
             self.assert_(hasattr(sys, "getdlopenflags"))
@@ -590,7 +593,7 @@ class SizeofTest(unittest.TestCase):
         check(reversed(''), size(h + 'PP'))
         # range
         check(range(1), size(h + '3P'))
-        check(range(66000), size(h + '3l'))
+        check(range(66000), size(h + '3P'))
         # set
         # frozenset
         PySet_MINSIZE = 8
@@ -678,6 +681,11 @@ class SizeofTest(unittest.TestCase):
         # sys.flags
         check(sys.flags, size(vh) + self.P * len(sys.flags))
 
+    def test_setfilesystemencoding(self):
+        old = sys.getfilesystemencoding()
+        sys.setfilesystemencoding("iso-8859-1")
+        self.assertEqual(sys.getfilesystemencoding(), "iso-8859-1")
+        sys.setfilesystemencoding(old)
 
 def test_main():
     test.support.run_unittest(SysModuleTest, SizeofTest)

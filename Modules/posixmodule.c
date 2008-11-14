@@ -499,10 +499,6 @@ win32_error_unicode(char* function, Py_UNICODE* filename)
 		return PyErr_SetFromWindowsErr(errno);
 }
 
-static PyObject *_PyUnicode_FromFileSystemEncodedObject(register PyObject *obj)
-{
-}
-
 static int
 convert_to_unicode(PyObject **param)
 {
@@ -713,7 +709,7 @@ win32_1str(PyObject* args, char* func,
    chdir is essentially a wrapper around SetCurrentDirectory; however,
    it also needs to set "magic" environment variables indicating
    the per-drive current directory, which are of the form =<drive>: */
-BOOL __stdcall
+static BOOL __stdcall
 win32_chdir(LPCSTR path)
 {
 	char new_path[MAX_PATH+1];
@@ -738,7 +734,7 @@ win32_chdir(LPCSTR path)
 
 /* The Unicode version differs from the ANSI version
    since the current directory might exceed MAX_PATH characters */
-BOOL __stdcall
+static BOOL __stdcall
 win32_wchdir(LPCWSTR path)
 {
 	wchar_t _new_path[MAX_PATH+1], *new_path = _new_path;
@@ -751,9 +747,14 @@ win32_wchdir(LPCWSTR path)
 	if (!result)
 		return FALSE;
 	if (result > MAX_PATH+1) {
-		new_path = malloc(result);
+		new_path = malloc(result * sizeof(wchar_t));
 		if (!new_path) {
 			SetLastError(ERROR_OUTOFMEMORY);
+			return FALSE;
+		}
+		result = GetCurrentDirectoryW(result, new_path);
+		if (!result) {
+			free(new_path);
 			return FALSE;
 		}
 	}
@@ -1651,7 +1652,7 @@ static PyObject *
 posix_chdir(PyObject *self, PyObject *args)
 {
 #ifdef MS_WINDOWS
-	return win32_1str(args, "chdir", "s:chdir", win32_chdir, "U:chdir", win32_wchdir);
+	return win32_1str(args, "chdir", "y:chdir", win32_chdir, "U:chdir", win32_wchdir);
 #elif defined(PYOS_OS2) && defined(PYCC_GCC)
 	return posix_1str(args, "et:chdir", _chdir2);
 #elif defined(__VMS)
@@ -1968,63 +1969,18 @@ posix_lchown(PyObject *self, PyObject *args)
 
 
 #ifdef HAVE_GETCWD
-PyDoc_STRVAR(posix_getcwd__doc__,
-"getcwd() -> path\n\n\
-Return a string representing the current working directory.");
-
 static PyObject *
-posix_getcwd(PyObject *self, PyObject *noargs)
-{
-	int bufsize_incr = 1024;
-	int bufsize = 0;
-	char *tmpbuf = NULL;
-	char *res = NULL;
-	PyObject *dynamic_return;
-
-	Py_BEGIN_ALLOW_THREADS
-	do {
-		bufsize = bufsize + bufsize_incr;
-		tmpbuf = malloc(bufsize);
-		if (tmpbuf == NULL) {
-			break;
-		}
-#if defined(PYOS_OS2) && defined(PYCC_GCC)
-		res = _getcwd2(tmpbuf, bufsize);
-#else
-		res = getcwd(tmpbuf, bufsize);
-#endif
-
-		if (res == NULL) {
-			free(tmpbuf);
-		}
-	} while ((res == NULL) && (errno == ERANGE));
-	Py_END_ALLOW_THREADS
-
-	if (res == NULL)
-		return posix_error();
-
-	dynamic_return = PyUnicode_FromString(tmpbuf);
-	free(tmpbuf);
-
-	return dynamic_return;
-}
-
-PyDoc_STRVAR(posix_getcwdu__doc__,
-"getcwdu() -> path\n\n\
-Return a unicode string representing the current working directory.");
-
-static PyObject *
-posix_getcwdu(PyObject *self, PyObject *noargs)
+posix_getcwd(int use_bytes)
 {
 	char buf[1026];
 	char *res;
 
 #ifdef Py_WIN_WIDE_FILENAMES
-	DWORD len;
-	if (unicode_file_names()) {
+	if (!use_bytes && unicode_file_names()) {
 		wchar_t wbuf[1026];
 		wchar_t *wbuf2 = wbuf;
 		PyObject *resobj;
+		DWORD len;
 		Py_BEGIN_ALLOW_THREADS
 		len = GetCurrentDirectoryW(sizeof wbuf/ sizeof wbuf[0], wbuf);
 		/* If the buffer is large enough, len does not include the
@@ -2059,7 +2015,29 @@ posix_getcwdu(PyObject *self, PyObject *noargs)
 	Py_END_ALLOW_THREADS
 	if (res == NULL)
 		return posix_error();
+	if (use_bytes)
+		return PyBytes_FromStringAndSize(buf, strlen(buf));
 	return PyUnicode_Decode(buf, strlen(buf), Py_FileSystemDefaultEncoding,"strict");
+}
+
+PyDoc_STRVAR(posix_getcwd__doc__,
+"getcwd() -> path\n\n\
+Return a unicode string representing the current working directory.");
+
+static PyObject *
+posix_getcwd_unicode(PyObject *self)
+{
+    return posix_getcwd(0);
+}
+
+PyDoc_STRVAR(posix_getcwdb__doc__,
+"getcwdb() -> path\n\n\
+Return a bytes string representing the current working directory.");
+
+static PyObject *
+posix_getcwd_bytes(PyObject *self)
+{
+    return posix_getcwd(1);
 }
 #endif
 
@@ -2378,9 +2356,12 @@ posix_listdir(PyObject *self, PyObject *args)
 				v = w;
 			}
 			else {
-				/* fall back to the original byte string, as
-				   discussed in patch #683592 */
+				/* Ignore undecodable filenames, as discussed
+				 * in issue 3187. To include these,
+				 * use getcwdb(). */
 				PyErr_Clear();
+				Py_DECREF(v);
+				continue;
 			}
 		}
 		if (PyList_Append(d, v) != 0) {
@@ -2606,7 +2587,7 @@ static PyObject *
 posix_rmdir(PyObject *self, PyObject *args)
 {
 #ifdef MS_WINDOWS
-	return win32_1str(args, "rmdir", "s:rmdir", RemoveDirectoryA, "U:rmdir", RemoveDirectoryW);
+	return win32_1str(args, "rmdir", "y:rmdir", RemoveDirectoryA, "U:rmdir", RemoveDirectoryW);
 #else
 	return posix_1str(args, "et:rmdir", rmdir);
 #endif
@@ -2687,7 +2668,7 @@ static PyObject *
 posix_unlink(PyObject *self, PyObject *args)
 {
 #ifdef MS_WINDOWS
-	return win32_1str(args, "remove", "s:remove", DeleteFileA, "U:remove", DeleteFileW);
+	return win32_1str(args, "remove", "y:remove", DeleteFileA, "U:remove", DeleteFileW);
 #else
 	return posix_1str(args, "et:remove", unlink);
 #endif
@@ -4477,9 +4458,7 @@ posix_readlink(PyObject *self, PyObject *args)
 			v = w;
 		}
 		else {
-			/* fall back to the original byte string, as
-			   discussed in patch #683592 */
-			PyErr_Clear();
+			v = NULL;
 		}
 	}
 	return v;
@@ -4896,7 +4875,7 @@ posix_write(PyObject *self, PyObject *args)
 	int fd;
 	Py_ssize_t size;
 
-	if (!PyArg_ParseTuple(args, "is*:write", &fd, &pbuf))
+	if (!PyArg_ParseTuple(args, "iy*:write", &fd, &pbuf))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 	size = write(fd, pbuf.buf, (size_t)pbuf.len);
@@ -6810,8 +6789,10 @@ static PyMethodDef posix_methods[] = {
 	{"ctermid",	posix_ctermid, METH_NOARGS, posix_ctermid__doc__},
 #endif
 #ifdef HAVE_GETCWD
-	{"getcwd",	posix_getcwd, METH_NOARGS, posix_getcwd__doc__},
-	{"getcwdu",	posix_getcwdu, METH_NOARGS, posix_getcwdu__doc__},
+	{"getcwd",	(PyCFunction)posix_getcwd_unicode,
+	METH_NOARGS, posix_getcwd__doc__},
+	{"getcwdb",	(PyCFunction)posix_getcwd_bytes,
+	METH_NOARGS, posix_getcwdb__doc__},
 #endif
 #ifdef HAVE_LINK
 	{"link",	posix_link, METH_VARARGS, posix_link__doc__},

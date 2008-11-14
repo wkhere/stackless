@@ -135,6 +135,7 @@ tok_new(void)
 	tok->decoding_state = STATE_INIT;
 	tok->decoding_erred = 0;
 	tok->read_coding_spec = 0;
+	tok->enc = NULL;
 	tok->encoding = NULL;
         tok->cont_line = 0;
 #ifndef PGEN
@@ -274,8 +275,7 @@ check_coding_spec(const char* line, Py_ssize_t size, struct tok_state *tok,
 		tok->read_coding_spec = 1;
 		if (tok->encoding == NULL) {
 			assert(tok->decoding_state == STATE_RAW);
-			if (strcmp(cs, "utf-8") == 0 ||
-			    strcmp(cs, "iso-8859-1") == 0) {
+			if (strcmp(cs, "utf-8") == 0) {
 				tok->encoding = cs;
 			} else {
 				r = set_readline(tok, cs);
@@ -448,14 +448,26 @@ fp_setreadl(struct tok_state *tok, const char* enc)
 	if (io == NULL)
 		goto cleanup;
 
-	stream = PyObject_CallMethod(io, "open", "ssis",
-				     tok->filename, "r", -1, enc);
+	if (tok->filename)
+		stream = PyObject_CallMethod(io, "open", "ssis",
+					     tok->filename, "r", -1, enc);
+	else
+		stream = PyObject_CallMethod(io, "open", "isis",
+				fileno(tok->fp), "r", -1, enc);
 	if (stream == NULL)
 		goto cleanup;
 
 	Py_XDECREF(tok->decoding_readline);
 	readline = PyObject_GetAttrString(stream, "readline");
 	tok->decoding_readline = readline;
+
+	/* The file has been reopened; parsing will restart from
+	 * the beginning of the file, we have to reset the line number.
+	 * But this function has been called from inside tok_nextc() which
+	 * will increment lineno before it returns. So we set it -1 so that
+	 * the next call to tok_nextc() will start with tok->lineno == 0.
+	 */
+	tok->lineno = -1;
 
   cleanup:
 	Py_XDECREF(stream);
@@ -1606,7 +1618,8 @@ PyTokenizer_FindEncoding(int fd)
 	fclose(fp);
 	if (tok->encoding) {
             encoding = (char *)PyMem_MALLOC(strlen(tok->encoding) + 1);
-            strcpy(encoding, tok->encoding);
+            if (encoding)
+                strcpy(encoding, tok->encoding);
         }
 	PyTokenizer_Free(tok);
 	return encoding;

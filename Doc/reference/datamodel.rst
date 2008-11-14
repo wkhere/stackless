@@ -405,10 +405,9 @@ Mappings
       .. index::
          module: dbm.ndbm
          module: dbm.gnu
-         module: bsddb
 
-      The extension modules :mod:`dbm.ndbm`, :mod:`dbm.gnu`, and :mod:`bsddb`
-      provide additional examples of mapping types, as does the :mod:`collections`
+      The extension modules :mod:`dbm.ndbm` and :mod:`dbm.gnu` provide
+      additional examples of mapping types, as does the :mod:`collections`
       module.
 
 Callable types
@@ -1109,15 +1108,14 @@ Basic customization
 
    .. index:: builtin: repr
 
-   Called by the :func:`repr` built-in function and by string conversions (reverse
-   quotes) to compute the "official" string representation of an object.  If at all
-   possible, this should look like a valid Python expression that could be used to
-   recreate an object with the same value (given an appropriate environment).  If
-   this is not possible, a string of the form ``<...some useful description...>``
-   should be returned.  The return value must be a string object. If a class
-   defines :meth:`__repr__` but not :meth:`__str__`, then :meth:`__repr__` is also
-   used when an "informal" string representation of instances of that class is
-   required.
+   Called by the :func:`repr` built-in function to compute the "official" string
+   representation of an object.  If at all possible, this should look like a
+   valid Python expression that could be used to recreate an object with the
+   same value (given an appropriate environment).  If this is not possible, a
+   string of the form ``<...some useful description...>`` should be returned.
+   The return value must be a string object. If a class defines :meth:`__repr__`
+   but not :meth:`__str__`, then :meth:`__repr__` is also used when an
+   "informal" string representation of instances of that class is required.
 
    This is typically used for debugging, so it is important that the representation
    is information-rich and unambiguous.
@@ -1169,8 +1167,7 @@ Basic customization
    .. index::
       single: comparisons
 
-   These are the so-called "rich comparison" methods, and are called for comparison
-   operators in preference to :meth:`__cmp__` below. The correspondence between
+   These are the so-called "rich comparison" methods. The correspondence between
    operator symbols and method names is as follows: ``x<y`` calls ``x.__lt__(y)``,
    ``x<=y`` calls ``x.__le__(y)``, ``x==y`` calls ``x.__eq__(y)``, ``x!=y`` calls
    ``x.__ne__(y)``, ``x>y`` calls ``x.__gt__(y)``, and ``x>=y`` calls
@@ -1199,28 +1196,11 @@ Basic customization
    Arguments to rich comparison methods are never coerced.
 
 
-.. method:: object.__cmp__(self, other)
-
-   .. index::
-      builtin: cmp
-      single: comparisons
-
-   Called by comparison operations if rich comparison (see above) is not
-   defined.  Should return a negative integer if ``self < other``, zero if
-   ``self == other``, a positive integer if ``self > other``.  If no
-   :meth:`__cmp__`, :meth:`__eq__` or :meth:`__ne__` operation is defined, class
-   instances are compared by object identity ("address").  See also the
-   description of :meth:`__hash__` for some important notes on creating
-   :term:`hashable` objects which support custom comparison operations and are
-   usable as dictionary keys.
-
-
 .. method:: object.__hash__(self)
 
    .. index::
       object: dictionary
       builtin: hash
-      single: __cmp__() (object method)
 
    Called for the key object for dictionary operations, and by the built-in
    function :func:`hash`.  Should return an integer usable as a hash value
@@ -1229,39 +1209,38 @@ Basic customization
    (e.g., using exclusive or) the hash values for the components of the object that
    also play a part in comparison of objects.
 
-   If a class does not define a :meth:`__cmp__` or :meth:`__eq__` method it
-   should not define a :meth:`__hash__` operation either; if it defines
-   :meth:`__cmp__` or :meth:`__eq__` but not :meth:`__hash__`, its instances
-   will not be usable as dictionary keys.  If a class defines mutable objects
-   and implements a :meth:`__cmp__` or :meth:`__eq__` method, it should not
-   implement :meth:`__hash__`, since the dictionary implementation requires that
-   a key's hash value is immutable (if the object's hash value changes, it will
-   be in the wrong hash bucket).
+   If a class does not define an :meth:`__eq__` method it should not define a
+   :meth:`__hash__` operation either; if it defines :meth:`__eq__` but not
+   :meth:`__hash__`, its instances will not be usable as dictionary keys.  If a
+   class defines mutable objects and implements an :meth:`__eq__` method, it
+   should not implement :meth:`__hash__`, since the dictionary implementation
+   requires that a key's hash value is immutable (if the object's hash value
+   changes, it will be in the wrong hash bucket).
 
-   User-defined classes have :meth:`__cmp__` and :meth:`__hash__` methods
+   User-defined classes have :meth:`__eq__` and :meth:`__hash__` methods
    by default; with them, all objects compare unequal (except with themselves)
    and ``x.__hash__()`` returns ``id(x)``.
 
    Classes which inherit a :meth:`__hash__` method from a parent class but
-   change the meaning of :meth:`__cmp__` or :meth:`__eq__` such that the hash
-   value returned is no longer appropriate (e.g. by switching to a value-based
-   concept of equality instead of the default identity based equality) can
-   explicitly flag themselves as being unhashable by setting
-   ``__hash__ = None`` in the class definition. Doing so means that not only
-   will instances of the class raise an appropriate :exc:`TypeError` when
-   a program attempts to retrieve their hash value, but they will also be
-   correctly identified as unhashable when checking
-   ``isinstance(obj, collections.Hashable)`` (unlike classes which define
-   their own :meth:`__hash__` to explicitly raise :exc:`TypeError`).
+   change the meaning of :meth:`__eq__` such that the hash value returned is no
+   longer appropriate (e.g. by switching to a value-based concept of equality
+   instead of the default identity based equality) can explicitly flag
+   themselves as being unhashable by setting ``__hash__ = None`` in the class
+   definition. Doing so means that not only will instances of the class raise an
+   appropriate :exc:`TypeError` when a program attempts to retrieve their hash
+   value, but they will also be correctly identified as unhashable when checking
+   ``isinstance(obj, collections.Hashable)`` (unlike classes which define their
+   own :meth:`__hash__` to explicitly raise :exc:`TypeError`).
 
-   If a class that overrrides :meth:`__cmp__` or :meth:`__eq__` needs to
-   retain the implementation of :meth:`__hash__` from a parent class,
-   the interpreter must be told this explicitly by setting
-   ``__hash__ = <ParentClass>.__hash__``. Otherwise the inheritance of
-   :meth:`__hash__` will be blocked, just as if :attr:`__hash__` had been
-   explicitly set to :const:`None`.
+   If a class that overrrides :meth:`__eq__` needs to retain the implementation
+   of :meth:`__hash__` from a parent class, the interpreter must be told this
+   explicitly by setting ``__hash__ = <ParentClass>.__hash__``. Otherwise the
+   inheritance of :meth:`__hash__` will be blocked, just as if :attr:`__hash__`
+   had been explicitly set to :const:`None`.
+
 
 .. method:: object.__bool__(self)
+
    .. index:: single: __len__() (mapping object method)
 
    Called to implement truth value testing, and the built-in operation ``bool()``;
@@ -1486,8 +1465,8 @@ Notes on using *__slots__*
   defined.  As a result, subclasses will have a *__dict__* unless they also define
   *__slots__*.
 
-* *__slots__* do not work for classes derived from "variable-length" built-in
-  types such as :class:`int`, :class:`str` and :class:`tuple`.
+* Nonempty *__slots__* does not work for classes derived from "variable-length"
+  built-in types such as :class:`int`, :class:`str` and :class:`tuple`.
 
 * Any non-string iterable may be assigned to *__slots__*. Mappings may also be
   used; however, in the future, special meaning may be assigned to the values
@@ -1505,10 +1484,11 @@ By default, classes are constructed using :func:`type`. A class definition is
 read into a separate namespace and the value of class name is bound to the
 result of ``type(name, bases, dict)``.
 
-When the class definition is read, if *__metaclass__* is defined then the
-callable assigned to it will be called instead of :func:`type`. This allows
-classes or functions to be written which monitor or alter the class creation
-process:
+When the class definition is read, if a callable ``metaclass`` keyword argument
+is passed after the bases in the class definition, the callable given will be
+called instead of :func:`type`.  If other keyword arguments are passed, they
+will also be passed to the metaclass.  This allows classes or functions to be
+written which monitor or alter the class creation process:
 
 * Modifying the class dictionary prior to the class being created.
 
@@ -1529,21 +1509,19 @@ You can of course also override other class methods (or add new methods); for
 example defining a custom :meth:`__call__` method in the metaclass allows custom
 behavior when the class is called, e.g. not always creating a new instance.
 
-
-.. data:: __metaclass__
-
-   This variable can be any callable accepting arguments for ``name``, ``bases``,
-   and ``dict``.  Upon class creation, the callable is used instead of the built-in
-   :func:`type`.
+If the metaclass has a :meth:`__prepare__` attribute (usually implemented as a
+class or static method), it is called before the class body is evaluated with
+the name of the class and a tuple of its bases for arguments.  It should return
+an object that supports the mapping interface that will be used to store the
+namespace of the class.  The default is a plain dictionary.  This could be used,
+for example, to keep track of the order that class attributes are declared in by
+returning an ordered dictionary.
 
 The appropriate metaclass is determined by the following precedence rules:
 
-* If ``dict['__metaclass__']`` exists, it is used.
+* If the ``metaclass`` keyword argument is based with the bases, it is used.
 
-* Otherwise, if there is at least one base class, its metaclass is used (this
-  looks for a *__class__* attribute first and if not found, uses its type).
-
-* Otherwise, if a global variable named __metaclass__ exists, it is used.
+* Otherwise, if there is at least one base class, its metaclass is used.
 
 * Otherwise, the default metaclass (:class:`type`) is used.
 
@@ -1713,6 +1691,7 @@ left undefined.
 .. method:: object.__add__(self, other)
             object.__sub__(self, other)
             object.__mul__(self, other)
+            object.__truediv__(self, other)
             object.__floordiv__(self, other)
             object.__mod__(self, other)
             object.__divmod__(self, other)
@@ -1729,33 +1708,22 @@ left undefined.
       builtin: pow
 
    These methods are called to implement the binary arithmetic operations (``+``,
-   ``-``, ``*``, ``//``, ``%``, :func:`divmod`, :func:`pow`, ``**``, ``<<``,
+   ``-``, ``*``, ``/``, ``//``, ``%``, :func:`divmod`, :func:`pow`, ``**``, ``<<``,
    ``>>``, ``&``, ``^``, ``|``).  For instance, to evaluate the expression
    ``x + y``, where *x* is an instance of a class that has an :meth:`__add__`
    method, ``x.__add__(y)`` is called.  The :meth:`__divmod__` method should be the
    equivalent to using :meth:`__floordiv__` and :meth:`__mod__`; it should not be
-   related to :meth:`__truediv__` (described below).  Note that :meth:`__pow__`
-   should be defined to accept an optional third argument if the ternary version of
-   the built-in :func:`pow` function is to be supported.
+   related to :meth:`__truediv__`.  Note that :meth:`__pow__` should be defined
+   to accept an optional third argument if the ternary version of the built-in
+   :func:`pow` function is to be supported.
 
    If one of those methods does not support the operation with the supplied
    arguments, it should return ``NotImplemented``.
 
 
-.. method:: object.__div__(self, other)
-            object.__truediv__(self, other)
-
-   The division operator (``/``) is implemented by these methods.  The
-   :meth:`__truediv__` method is used when ``__future__.division`` is in effect,
-   otherwise :meth:`__div__` is used.  If only one of these two methods is defined,
-   the object will not support division in the alternate context; :exc:`TypeError`
-   will be raised instead.
-
-
 .. method:: object.__radd__(self, other)
             object.__rsub__(self, other)
             object.__rmul__(self, other)
-            object.__rdiv__(self, other)
             object.__rtruediv__(self, other)
             object.__rfloordiv__(self, other)
             object.__rmod__(self, other)
@@ -1772,13 +1740,13 @@ left undefined.
       builtin: pow
 
    These methods are called to implement the binary arithmetic operations (``+``,
-   ``-``, ``*``, ``/``, ``%``, :func:`divmod`, :func:`pow`, ``**``, ``<<``, ``>>``,
-   ``&``, ``^``, ``|``) with reflected (swapped) operands.  These functions are
-   only called if the left operand does not support the corresponding operation and
-   the operands are of different types. [#]_  For instance, to evaluate the
-   expression ``x - y``, where *y* is an instance of a class that has an
-   :meth:`__rsub__` method, ``y.__rsub__(x)`` is called if ``x.__sub__(y)`` returns
-   *NotImplemented*.
+   ``-``, ``*``, ``/``, ``//``, ``%``, :func:`divmod`, :func:`pow`, ``**``,
+   ``<<``, ``>>``, ``&``, ``^``, ``|``) with reflected (swapped) operands.
+   These functions are only called if the left operand does not support the
+   corresponding operation and the operands are of different types. [#]_  For
+   instance, to evaluate the expression ``x - y``, where *y* is an instance of
+   a class that has an :meth:`__rsub__` method, ``y.__rsub__(x)`` is called if
+   ``x.__sub__(y)`` returns *NotImplemented*.
 
    .. index:: builtin: pow
 
@@ -1796,7 +1764,6 @@ left undefined.
 .. method:: object.__iadd__(self, other)
             object.__isub__(self, other)
             object.__imul__(self, other)
-            object.__idiv__(self, other)
             object.__itruediv__(self, other)
             object.__ifloordiv__(self, other)
             object.__imod__(self, other)
@@ -1951,15 +1918,14 @@ correctness, implicit special method lookup may also bypass the
 
    >>> class Meta(type):
    ...    def __getattribute__(*args):
-   ...       print "Metaclass getattribute invoked"
+   ...       print("Metaclass getattribute invoked")
    ...       return type.__getattribute__(*args)
    ...
-   >>> class C(object):
-   ...     __metaclass__ = Meta
+   >>> class C(object, metaclass=Meta):
    ...     def __len__(self):
    ...         return 10
    ...     def __getattribute__(*args):
-   ...         print "Class getattribute invoked"
+   ...         print("Class getattribute invoked")
    ...         return object.__getattribute__(*args)
    ...
    >>> c = C()

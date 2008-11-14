@@ -5,6 +5,7 @@ from test import support
 import math
 from math import isinf, isnan, copysign, ldexp
 import operator
+import random, fractions
 
 INF = float("inf")
 NAN = float("nan")
@@ -15,6 +16,7 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertEqual(float(3.14), 3.14)
         self.assertEqual(float(314), 314.0)
         self.assertEqual(float("  3.14  "), 3.14)
+        self.assertEqual(float(b" 3.14  "), 3.14)
         self.assertRaises(ValueError, float, "  0x3.1  ")
         self.assertRaises(ValueError, float, "  -0x3.p-1  ")
         self.assertRaises(ValueError, float, "  +0x3.p-1  ")
@@ -22,10 +24,7 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(ValueError, float, "+-3.14")
         self.assertRaises(ValueError, float, "-+3.14")
         self.assertRaises(ValueError, float, "--3.14")
-        self.assertEqual(float(unicode("  3.14  ")), 3.14)
-        self.assertEqual(float(unicode("  \u0663.\u0661\u0664  ",'raw-unicode-escape')), 3.14)
-        # Implementation limitation in PyFloat_FromString()
-        self.assertRaises(ValueError, float, unicode("1"*10000))
+        self.assertEqual(float(b"  \u0663.\u0661\u0664  ".decode('raw-unicode-escape')), 3.14)
 
     @support.run_with_locale('LC_NUMERIC', 'fr_FR', 'de_DE')
     def test_float_with_comma(self):
@@ -52,7 +51,7 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(ValueError, float, "  -0x3.p-1  ")
         self.assertRaises(ValueError, float, "  +0x3.p-1  ")
         self.assertEqual(float("  25.e-1  "), 2.5)
-        self.assertEqual(fcmp(float("  .25e-1  "), .025), 0)
+        self.assertEqual(support.fcmp(float("  .25e-1  "), .025), 0)
 
     def test_floatconversion(self):
         # Make sure that calls to __float__() work properly
@@ -117,6 +116,33 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(OverflowError, float('inf').as_integer_ratio)
         self.assertRaises(OverflowError, float('-inf').as_integer_ratio)
         self.assertRaises(ValueError, float('nan').as_integer_ratio)
+
+    def test_float_containment(self):
+        floats = (INF, -INF, 0.0, 1.0, NAN)
+        for f in floats:
+            self.assert_(f in [f], "'%r' not in []" % f)
+            self.assert_(f in (f,), "'%r' not in ()" % f)
+            self.assert_(f in {f}, "'%r' not in set()" % f)
+            self.assert_(f in {f: None}, "'%r' not in {}" % f)
+            self.assertEqual([f].count(f), 1, "[].count('%r') != 1" % f)
+            self.assert_(f in floats, "'%r' not in container" % f)
+
+        for f in floats:
+            # nonidentical containers, same type, same contents
+            self.assert_([f] == [f], "[%r] != [%r]" % (f, f))
+            self.assert_((f,) == (f,), "(%r,) != (%r,)" % (f, f))
+            self.assert_({f} == {f}, "{%r} != {%r}" % (f, f))
+            self.assert_({f : None} == {f: None}, "{%r : None} != "
+                                                   "{%r : None}" % (f, f))
+
+            # identical containers
+            l, t, s, d = [f], (f,), {f}, {f: None}
+            self.assert_(l == l, "[%r] not equal to itself" % f)
+            self.assert_(t == t, "(%r,) not equal to itself" % f)
+            self.assert_(s == s, "{%r} not equal to itself" % f)
+            self.assert_(d == d, "{%r : None} not equal to itself" % f)
+
+
 
 class FormatFunctionsTestCase(unittest.TestCase):
 
@@ -766,6 +792,7 @@ class HexFloatTestCase(unittest.TestCase):
 
 def test_main():
     support.run_unittest(
+        GeneralFloatCases,
         FormatFunctionsTestCase,
         UnknownFormatTestCase,
         IEEEFormatTestCase,

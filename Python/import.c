@@ -612,7 +612,6 @@ _PyImport_FindExtension(char *name, char *filename)
 		mod = PyImport_AddModule(name);
 		if (mod == NULL)
 			return NULL;
-		Py_INCREF(mod);
 		mdict = PyModule_GetDict(mod);
 		if (mdict == NULL)
 			return NULL;
@@ -626,6 +625,7 @@ _PyImport_FindExtension(char *name, char *filename)
 		if (mod == NULL)
 			return NULL;
 		PyDict_SetItemString(PyImport_GetModuleDict(), name, mod);
+		Py_DECREF(mod);
 	}
 	if (_PyState_AddModule(mod, def) < 0) {
 		PyDict_DelItemString(PyImport_GetModuleDict(), name);
@@ -1293,37 +1293,16 @@ find_module(char *fullname, char *subname, PyObject *path, char *buf,
 		Py_DECREF(meta_path);
 	}
 
-	if (path != NULL && PyUnicode_Check(path)) {
-		/* The only type of submodule allowed inside a "frozen"
-		   package are other frozen modules or packages. */
-		char *p = _PyUnicode_AsString(path);
-		if (strlen(p) + 1 + strlen(name) >= (size_t)buflen) {
-			PyErr_SetString(PyExc_ImportError,
-					"full frozen module name too long");
-			return NULL;
-		}
-		strcpy(buf, p);
-		strcat(buf, ".");
-		strcat(buf, name);
-		strcpy(name, buf);
-		if (find_frozen(name) != NULL) {
-			strcpy(buf, name);
-			return &fd_frozen;
-		}
-		PyErr_Format(PyExc_ImportError,
-			     "No frozen submodule named %.200s", name);
-		return NULL;
+	if (find_frozen(fullname) != NULL) {
+		strcpy(buf, fullname);
+		return &fd_frozen;
 	}
+
 	if (path == NULL) {
 		if (is_builtin(name)) {
 			strcpy(buf, name);
 			return &fd_builtin;
 		}
-		if ((find_frozen(name)) != NULL) {
-			strcpy(buf, name);
-			return &fd_frozen;
-		}
-
 #ifdef MS_COREDLL
 		fp = PyWin_FindRegisteredModule(name, &fdp, buf, buflen);
 		if (fp != NULL) {
@@ -1333,6 +1312,7 @@ find_module(char *fullname, char *subname, PyObject *path, char *buf,
 #endif
 		path = PySys_GetObject("path");
 	}
+
 	if (path == NULL || !PyList_Check(path)) {
 		PyErr_SetString(PyExc_ImportError,
 				"sys.path must be a list of directory names");
@@ -1886,6 +1866,9 @@ find_frozen(char *name)
 {
 	struct _frozen *p;
 
+	if (!name)
+		return NULL;
+
 	for (p = PyImport_FrozenModules; ; p++) {
 		if (p->name == NULL)
 			return NULL;
@@ -1959,7 +1942,7 @@ PyImport_ImportFrozenModule(char *name)
 	}
 	if (ispackage) {
 		/* Set __path__ to the package name */
-		PyObject *d, *s;
+		PyObject *d, *s, *l;
 		int err;
 		m = PyImport_AddModule(name);
 		if (m == NULL)
@@ -1968,8 +1951,14 @@ PyImport_ImportFrozenModule(char *name)
 		s = PyUnicode_InternFromString(name);
 		if (s == NULL)
 			goto err_return;
-		err = PyDict_SetItemString(d, "__path__", s);
-		Py_DECREF(s);
+		l = PyList_New(1);
+		if (l == NULL) {
+			Py_DECREF(s);
+			goto err_return;
+		}
+		PyList_SET_ITEM(l, 0, s);
+		err = PyDict_SetItemString(d, "__path__", l);
+		Py_DECREF(l);
 		if (err != 0)
 			goto err_return;
 	}
@@ -2031,7 +2020,7 @@ PyImport_ImportModuleNoBlock(const char *name)
 	else {
 		PyErr_Clear();
 	}
-
+#ifdef WITH_THREAD
 	/* check the import lock
 	 * me might be -1 but I ignore the error here, the lock function
 	 * takes care of the problem */
@@ -2047,6 +2036,9 @@ PyImport_ImportModuleNoBlock(const char *name)
 			     name);
 		return NULL;
 	}
+#else
+	return PyImport_ImportModule(name);
+#endif
 }
 
 /* Forward declarations for helper routines */
@@ -2801,6 +2793,7 @@ call_find_module(char *name, PyObject *path)
 {
 	extern int fclose(FILE *);
 	PyObject *fob, *ret;
+	PyObject *pathobj;
 	struct filedescr *fdp;
 	char pathname[MAXPATHLEN+1];
 	FILE *fp = NULL;
@@ -2827,6 +2820,8 @@ call_find_module(char *name, PyObject *path)
 			   memory. */
 			found_encoding = PyTokenizer_FindEncoding(fd);
 			lseek(fd, 0, 0); /* Reset position */
+			if (found_encoding == NULL && PyErr_Occurred())
+				return NULL;
 			encoding = (found_encoding != NULL) ? found_encoding :
 				   (char*)PyUnicode_GetDefaultEncoding();
 		}
@@ -2842,9 +2837,9 @@ call_find_module(char *name, PyObject *path)
 		fob = Py_None;
 		Py_INCREF(fob);
 	}
-	ret = Py_BuildValue("Os(ssi)",
-		      fob, pathname, fdp->suffix, fdp->mode, fdp->type);
-	Py_DECREF(fob);
+	pathobj = PyUnicode_DecodeFSDefault(pathname);
+	ret = Py_BuildValue("NN(ssi)",
+		      fob, pathobj, fdp->suffix, fdp->mode, fdp->type);
 	PyMem_FREE(found_encoding);
 
 	return ret;
@@ -2855,7 +2850,9 @@ imp_find_module(PyObject *self, PyObject *args)
 {
 	char *name;
 	PyObject *path = NULL;
-	if (!PyArg_ParseTuple(args, "s|O:find_module", &name, &path))
+	if (!PyArg_ParseTuple(args, "es|O:find_module",
+	                      Py_FileSystemDefaultEncoding, &name,
+	                      &path))
 		return NULL;
 	return call_find_module(name, path);
 }

@@ -202,9 +202,6 @@ class TestJointOps(unittest.TestCase):
         s = self.thetype(t)
         self.assertEqual(len(s), 3)
 
-    def test_compare(self):
-        self.assertRaises(TypeError, self.s.__cmp__, self.s)
-
     def test_sub_and_super(self):
         p, q, r = map(self.thetype, ['ab', 'abcde', 'def'])
         self.assert_(p < q)
@@ -390,6 +387,17 @@ class TestSet(TestJointOps):
                 self.assertEqual(v1, v2)
             else:
                 self.fail()
+
+    def test_remove_keyerror_set(self):
+        key = self.thetype([3, 4])
+        try:
+            self.s.remove(key)
+        except KeyError as e:
+            self.assert_(e.args[0] is key,
+                         "KeyError should be {0}, not {1}".format(key,
+                                                                  e.args[0]))
+        else:
+            self.fail()
 
     def test_discard(self):
         self.s.discard('a')

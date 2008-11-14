@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import copy
+import operator
 import pickle
 import tempfile
 import unittest
@@ -396,7 +397,7 @@ class BaseBytesTest(unittest.TestCase):
         self.assertEqual(b.rpartition(b'i'), (b'mississipp', b'i', b''))
 
     def test_pickling(self):
-        for proto in range(pickle.HIGHEST_PROTOCOL):
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             for b in b"", b"a", b"abc", b"\xffab\x80", b"\0\0\377\0\0":
                 b = self.type2test(b)
                 ps = pickle.dumps(b, proto)
@@ -863,6 +864,17 @@ class AssortedBytesTest(unittest.TestCase):
         b = bytearray()
         self.failIf(b.replace(b'', b'') is b)
 
+    def test_compare(self):
+        if sys.flags.bytes_warning:
+            warnings.simplefilter('error', BytesWarning)
+            self.assertRaises(BytesWarning, operator.eq, b'', '')
+            self.assertRaises(BytesWarning, operator.ne, b'', '')
+            self.assertRaises(BytesWarning, operator.eq, bytearray(b''), '')
+            self.assertRaises(BytesWarning, operator.ne, bytearray(b''), '')
+        else:
+            # raise test.support.TestSkipped("BytesWarning is needed for this test: use -bb option")
+            pass
+
     # Optimizations:
     # __iter__? (optimization)
     # __reversed__? (optimization)
@@ -967,7 +979,7 @@ class ByteArraySubclassTest(unittest.TestCase):
         a = ByteArraySubclass(b"abcd")
         a.x = 10
         a.y = ByteArraySubclass(b"efgh")
-        for proto in range(pickle.HIGHEST_PROTOCOL):
+        for proto in range(pickle.HIGHEST_PROTOCOL + 1):
             b = pickle.loads(pickle.dumps(a, proto))
             self.assertNotEqual(id(a), id(b))
             self.assertEqual(a, b)

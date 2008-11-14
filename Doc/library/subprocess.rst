@@ -99,7 +99,7 @@ This module defines one class called :class:`Popen`:
 
    If *universal_newlines* is :const:`True`, the file objects stdout and stderr are
    opened as text files, but lines may be terminated by any of ``'\n'``, the Unix
-   end-of-line convention, ``'\r'``, the Macintosh convention or ``'\r\n'``, the
+   end-of-line convention, ``'\r'``, the old Macintosh convention or ``'\r\n'``, the
    Windows convention. All of these external representations are seen as ``'\n'``
    by the Python program.
 
@@ -133,7 +133,7 @@ This module also defines four shortcut functions:
 .. function:: check_call(*popenargs, **kwargs)
 
    Run command with arguments.  Wait for command to complete. If the exit code was
-   zero then return, otherwise raise :exc:`CalledProcessError.` The
+   zero then return, otherwise raise :exc:`CalledProcessError`. The
    :exc:`CalledProcessError` object will have the return code in the
    :attr:`returncode` attribute.
 
@@ -334,8 +334,8 @@ Replacing /bin/sh shell backquote
    output = Popen(["mycmd", "myarg"], stdout=PIPE).communicate()[0]
 
 
-Replacing shell pipe line
-^^^^^^^^^^^^^^^^^^^^^^^^^
+Replacing shell pipeline
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 ::
 

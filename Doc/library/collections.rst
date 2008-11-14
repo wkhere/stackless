@@ -23,9 +23,6 @@ be useful when inheriting directly from :class:`dict` or
 The specialized containers provided in this module provide alternatives
 to Python's general purpose built-in containers, :class:`dict`,
 :class:`list`, :class:`set`, and :class:`tuple`.
-Besides the containers provided here, the optional :mod:`bsddb`
-module offers the ability to create in-memory or file based ordered
-dictionaries with string keys using the :meth:`bsddb.btopen` method.
 
 In addition to containers, the collections module provides some ABCs
 (abstract base classes) that can be used to test whether a class
@@ -231,7 +228,9 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
 
 In addition to the above, deques support iteration, pickling, ``len(d)``,
 ``reversed(d)``, ``copy.copy(d)``, ``copy.deepcopy(d)``, membership testing with
-the :keyword:`in` operator, and subscript references such as ``d[-1]``.
+the :keyword:`in` operator, and subscript references such as ``d[-1]``.  Indexed
+access is O(1) at both ends but slows to O(n) in the middle.  For fast random
+access, use lists instead.
 
 Example:
 
@@ -362,7 +361,7 @@ in Unix::
 
    .. method:: defaultdict.__missing__(key)
 
-      If the :attr:`default_factory` attribute is ``None``, this raises an
+      If the :attr:`default_factory` attribute is ``None``, this raises a
       :exc:`KeyError` exception with the *key* as argument.
 
       If :attr:`default_factory` is not ``None``, it is called without arguments
@@ -635,7 +634,7 @@ a fixed-width print format:
     ...     def __str__(self):
     ...         return 'Point: x=%6.3f  y=%6.3f  hypot=%6.3f' % (self.x, self.y, self.hypot)
 
-    >>> for p in Point(3, 4), Point(14, 5/7.):
+    >>> for p in Point(3, 4), Point(14, 5/7):
     ...     print(p)
     Point: x= 3.000  y= 4.000  hypot= 5.000
     Point: x=14.000  y= 0.714  hypot=14.018

@@ -499,8 +499,8 @@ always available.
    ================ ===========================
    Windows          ``'win32'``
    Windows/Cygwin   ``'cygwin'``
-   MacOS X          ``'darwin'``
-   MacOS 9          ``'mac'``
+   Mac OS X         ``'darwin'``
+   Mac OS 9         ``'mac'``
    OS/2             ``'os2'``
    OS/2 EMX         ``'os2emx'``
    RiscOS           ``'riscos'``
@@ -578,6 +578,14 @@ always available.
    :file:`/usr/include/dlfcn.h` using the :program:`h2py` script. Availability:
    Unix.
 
+.. function:: setfilesystemencoding(enc)
+
+   Set the encoding used when converting Python strings to file names to *enc*.
+   By default, Python tries to determine the encoding it should use automatically
+   on Unix; on Windows, it avoids such conversion completely. This function can
+   be used when Python's determination of the encoding needs to be overwritten,
+   e.g. when not all file names on disk can be decoded using the encoding that
+   Python had chosen.
 
 .. function:: setprofile(profilefunc)
 

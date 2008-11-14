@@ -216,7 +216,24 @@ Return the encoding used to convert Unicode filenames in\n\
 operating system filenames."
 );
 
+static PyObject *
+sys_setfilesystemencoding(PyObject *self, PyObject *args)
+{
+	PyObject *new_encoding;
+	if (!PyArg_ParseTuple(args, "U:setfilesystemencoding", &new_encoding))
+		return NULL;
+	if (_Py_SetFileSystemEncoding(new_encoding))
+		return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
+}
 
+PyDoc_STRVAR(setfilesystemencoding_doc,
+"setfilesystemencoding(string) -> None\n\
+\n\
+Set the encoding used to convert Unicode filenames in\n\
+operating system filenames."
+);
 
 static PyObject *
 sys_intern(PyObject *self, PyObject *args)
@@ -770,7 +787,7 @@ static PyObject *
 sys_call_tracing(PyObject *self, PyObject *args)
 {
 	PyObject *func, *funcargs;
-	if (!PyArg_UnpackTuple(args, "call_tracing", 2, 2, &func, &funcargs))
+	if (!PyArg_ParseTuple(args, "OO!:call_tracing", &func, &PyTuple_Type, &funcargs))
 		return NULL;
 	return _PyEval_CallTracing(func, funcargs);
 }
@@ -876,6 +893,8 @@ static PyMethodDef sys_methods[] = {
 #endif
 	{"setdefaultencoding", sys_setdefaultencoding, METH_VARARGS,
 	 setdefaultencoding_doc},
+	{"setfilesystemencoding", sys_setfilesystemencoding, METH_VARARGS,
+	 setfilesystemencoding_doc},
 	{"setcheckinterval",	sys_setcheckinterval, METH_VARARGS,
 	 setcheckinterval_doc},
 	{"getcheckinterval",	sys_getcheckinterval, METH_NOARGS,
@@ -1220,7 +1239,7 @@ static struct PyModuleDef sysmodule = {
 	PyModuleDef_HEAD_INIT,
 	"sys",
 	sys_doc,
-	0,
+	-1, /* multiple "initialization" just copies the module dict. */
 	sys_methods,
 	NULL,
 	NULL,
@@ -1376,7 +1395,7 @@ makepathobject(const wchar_t *path, wchar_t delim)
 	for (i = 0; ; i++) {
 		p = wcschr(path, delim);
 		if (p == NULL)
-			p = wcschr(path, L'\0'); /* End of string */
+			p = path + wcslen(path); /* End of string */
 		w = PyUnicode_FromWideChar(path, (Py_ssize_t)(p - path));
 		if (w == NULL) {
 			Py_DECREF(v);

@@ -64,8 +64,11 @@ current_version = "%s.%d" % (short_version, FIELD3)
 # This should never change. The UpgradeCode of this package can be
 # used in the Upgrade table of future packages to make the future
 # package replace this one. See "UpgradeCode Property".
+# upgrade_code gets set to upgrade_code_64 when we have determined
+# that the target is Win64.
 upgrade_code_snapshot='{92A24481-3ECB-40FC-8836-04B7966EC0D5}'
 upgrade_code='{65E6DE48-A358-434D-AA4F-4AF72DB4718F}'
+upgrade_code_64='{6A965A0C-6EE6-4E3A-9983-3263F56311EC}'
 
 if snapshot:
     current_version = "%s.%s.%s" % (major, minor, int(time.time()/3600/24))
@@ -83,7 +86,6 @@ extensions = [
     'unicodedata.pyd',
     'winsound.pyd',
     '_elementtree.pyd',
-    '_bsddb.pyd',
     '_socket.pyd',
     '_ssl.pyd',
     '_testcapi.pyd',
@@ -108,7 +110,9 @@ pythondll_uuid = {
     "24":"{9B81E618-2301-4035-AC77-75D9ABEB7301}",
     "25":"{2e41b118-38bd-4c1b-a840-6977efd1b911}",
     "26":"{34ebecac-f046-4e1c-b0e3-9bac3cdaacfa}",
+    "27":"{4fe21c76-1760-437b-a2f2-99909130a175}",
     "30":"{6953bc3b-6768-4291-8410-7914ce6e2ca8}",
+    "31":"{4afcba0b-13e4-47c3-bebe-477428b46913}",
     } [major+minor]
 
 # Compute the name that Sphinx gives to the docfile
@@ -174,6 +178,12 @@ dll_path = os.path.join(srcdir, PCBUILD, dll_file)
 msilib.set_arch_from_file(dll_path)
 if msilib.pe_type(dll_path) != msilib.pe_type("msisupport.dll"):
     raise SystemError("msisupport.dll for incorrect architecture")
+if msilib.Win64:
+    upgrade_code = upgrade_code_64
+    # Bump the last digit of the code by one, so that 32-bit and 64-bit
+    # releases get separate product codes
+    digit = hex((int(product_code[-2],16)+1)%16)[-1]
+    product_code = product_code[:-2] + digit + '}'
 
 if testpackage:
     ext = 'px'
@@ -203,14 +213,19 @@ def build_database():
         uc = upgrade_code_snapshot
     else:
         uc = upgrade_code
+    if msilib.Win64:
+        productsuffix = " (64-bit)"
+    else:
+        productsuffix = ""
     # schema represents the installer 2.0 database schema.
     # sequence is the set of standard sequences
     # (ui/execute, admin/advt/install)
-    db = msilib.init_database("python-%s%s-stackless.msi" % (full_current_version, msilib.arch_ext),
-                  schema, ProductName="Python "+full_current_version+" (Stackless)",
+    db = msilib.init_database("python-%s%s.msi" % (full_current_version, msilib.arch_ext),
+                  schema, ProductName="Python "+full_current_version+productsuffix+" (Stackless)",
                   ProductCode=product_code,
                   ProductVersion=current_version,
-                  Manufacturer=u"Richard Tew")
+                  Manufacturer=u"Richard Tew",
+                  request_uac = True)
     # The default sequencing of the RemoveExistingProducts action causes
     # removal of files that got just installed. Place it after
     # InstallInitialize, so we first uninstall everything, but still roll
@@ -257,6 +272,8 @@ def remove_old_versions(db):
              (upgrade_code_snapshot, start, "%s.%d.0" % (major, int(minor)+1),
               None, migrate_features, None, "REMOVEOLDSNAPSHOT")])
         props = "REMOVEOLDSNAPSHOT;REMOVEOLDVERSION"
+
+    props += ";TARGETDIR;DLLDIR"
     # Installer collects the product codes of the earlier releases in
     # these properties. In order to allow modification of the properties,
     # they must be declared as secure. See "SecureCustomProperties Property"
@@ -688,10 +705,11 @@ def add_ui(db):
                         "AdminInstall", "Next", "Cancel")
     whichusers.title("Select whether to install [ProductName] for all users of this computer.")
     # A radio group with two options: allusers, justme
-    g = whichusers.radiogroup("AdminInstall", 135, 60, 160, 50, 3,
+    g = whichusers.radiogroup("AdminInstall", 135, 60, 235, 80, 3,
                               "WhichUsers", "", "Next")
+    g.condition("Disable", "VersionNT=600") # Not available on Vista and Windows 2008
     g.add("ALL", 0, 5, 150, 20, "Install for all users")
-    g.add("JUSTME", 0, 25, 150, 20, "Install just for me")
+    g.add("JUSTME", 0, 25, 235, 20, "Install just for me (not available on Windows Vista)")
 
     whichusers.back("Back", None, active=0)
 
@@ -835,7 +853,11 @@ def add_features(db):
 
 def extract_msvcr90():
     # Find the redistributable files
-    dir = os.path.join(os.environ['VS90COMNTOOLS'], r"..\..\VC\redist\x86\Microsoft.VC90.CRT")
+    if msilib.Win64:
+        arch = "amd64"
+    else:
+        arch = "x86"
+    dir = os.path.join(os.environ['VS90COMNTOOLS'], r"..\..\VC\redist\%s\Microsoft.VC90.CRT" % arch)
 
     result = []
     installer = msilib.MakeInstaller()
@@ -854,6 +876,7 @@ def generate_license():
     import shutil, glob
     out = open("LICENSE.txt", "w")
     shutil.copyfileobj(open(os.path.join(srcdir, "LICENSE")), out)
+    shutil.copyfileobj(open("crtlicense.txt"), out)
     for name, pat, file in (("bzip2","bzip2-*", "LICENSE"),
                       ("Berkeley DB", "db-*", "LICENSE"),
                       ("openssl", "openssl-*", "LICENSE"),
@@ -899,9 +922,7 @@ def add_files(db):
     root.add_file("%s/pythonw.exe" % PCBUILD)
 
     # msidbComponentAttributesSharedDllRefCount = 8, see "Component Table"
-    #dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
-    #install python30.dll into root dir for now
-    dlldir = root
+    dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
 
     pydll = "python%s%s.dll" % (major, minor)
     pydllsrc = os.path.join(srcdir, PCBUILD, pydll)
@@ -926,10 +947,12 @@ def add_files(db):
     root.add_file(manifest[0], **manifest[1])
     root.add_file(crtdll[0], **crtdll[1])
     # Copy the manifest
-    manifest_dlls = manifest[0]+".root"
-    open(manifest_dlls, "w").write(open(manifest[1]['src']).read().replace("msvcr","../msvcr"))
-    DLLs.start_component("msvcr90_dlls", feature=private_crt)
-    DLLs.add_file(manifest[0], src=os.path.abspath(manifest_dlls))
+    # Actually, don't do that anymore - no DLL in DLLs should have a manifest
+    # dependency on msvcr90.dll anymore, so this should not be necessary
+    #manifest_dlls = manifest[0]+".root"
+    #open(manifest_dlls, "w").write(open(manifest[1]['src']).read().replace("msvcr","../msvcr"))
+    #DLLs.start_component("msvcr90_dlls", feature=private_crt)
+    #DLLs.add_file(manifest[0], src=os.path.abspath(manifest_dlls))
 
     # Now start the main component for the DLLs directory;
     # no regular files have been added to the directory yet.
@@ -955,7 +978,7 @@ def add_files(db):
                 continue
             tcltk.set_current()
         elif dir in ['test', 'tests', 'data', 'output']:
-            # test: Lib, Lib/email, Lib/bsddb, Lib/ctypes, Lib/sqlite3
+            # test: Lib, Lib/email, Lib/ctypes, Lib/sqlite3
             # tests: Lib/distutils
             # data: Lib/email/test
             # output: Lib/test
@@ -1120,6 +1143,7 @@ def add_files(db):
         if os.path.exists(os.path.join(lib.absolute, "README")):
             lib.add_file("README.txt", src="README")
         if f == 'Scripts':
+            lib.add_file("2to3.py", src="2to3")
             if have_tcl:
                 lib.start_component("pydocgui.pyw", tcltk, keyfile="pydocgui.pyw")
                 lib.add_file("pydocgui.pyw")
@@ -1177,6 +1201,7 @@ def add_registry(db):
     ewi = "Edit with IDLE"
     pat2 = r"Software\Classes\%sPython.%sFile\DefaultIcon"
     pat3 = r"Software\Classes\%sPython.%sFile"
+    pat4 = r"Software\Classes\%sPython.%sFile\shellex\DropHandler"
     tcl_verbs = []
     if have_tcl:
         tcl_verbs=[
@@ -1224,6 +1249,13 @@ def add_registry(db):
               "Python File (no console)", "REGISTRY.def"),
              ("pyc.txt", -1, pat3 % (testprefix, "Compiled"), "",
               "Compiled Python File", "REGISTRY.def"),
+             # Drop Handler
+             ("py.drop", -1, pat4 % (testprefix, ""), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
+             ("pyw.drop", -1, pat4 % (testprefix, "NoCon"), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
+             ("pyc.drop", -1, pat4 % (testprefix, "Compiled"), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
             ])
 
     # Registry keys

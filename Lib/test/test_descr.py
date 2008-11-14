@@ -1020,14 +1020,10 @@ order (MRO) for bases """
             def __del__(self_):
                 self.assertEqual(self_.a, 1)
                 self.assertEqual(self_.b, 2)
-
-        save_stderr = sys.stderr
-        sys.stderr = sys.stdout
-        h = H()
-        try:
+        with support.captured_output('stderr') as s:
+            h = H()
             del h
-        finally:
-            sys.stderr = save_stderr
+        self.assertEqual(s.getvalue(), '')
 
     def test_slots_special(self):
         # Testing __dict__ and __weakref__ in __slots__...
@@ -1566,7 +1562,7 @@ order (MRO) for bases """
         for i in range(10):
             self.assert_(i in d1)
         self.assertFalse(10 in d1)
-        # Test overridden behavior for static classes
+        # Test overridden behavior
         class Proxy(object):
             def __init__(self, x):
                 self.x = x
@@ -1578,8 +1574,14 @@ order (MRO) for bases """
                 return self.x == other
             def __ne__(self, other):
                 return self.x != other
-            def __cmp__(self, other):
-                return cmp(self.x, other.x)
+            def __ge__(self, other):
+                return self.x >= other
+            def __gt__(self, other):
+                return self.x > other
+            def __le__(self, other):
+                return self.x <= other
+            def __lt__(self, other):
+                return self.x < other
             def __str__(self):
                 return "Proxy:%s" % self.x
             def __repr__(self):
@@ -1596,52 +1598,13 @@ order (MRO) for bases """
         self.assertNotEqual(p0, p1)
         self.assert_(not p0 != p0)
         self.assertEqual(not p0, p1)
-        self.assertEqual(cmp(p0, p1), -1)
-        self.assertEqual(cmp(p0, p0), 0)
-        self.assertEqual(cmp(p0, p_1), 1)
+        self.assert_(p0 < p1)
+        self.assert_(p0 <= p1)
+        self.assert_(p1 > p0)
+        self.assert_(p1 >= p0)
         self.assertEqual(str(p0), "Proxy:0")
         self.assertEqual(repr(p0), "Proxy(0)")
         p10 = Proxy(range(10))
-        self.assertFalse(-1 in p10)
-        for i in range(10):
-            self.assert_(i in p10)
-        self.assertFalse(10 in p10)
-        # Test overridden behavior for dynamic classes
-        class DProxy(object):
-            def __init__(self, x):
-                self.x = x
-            def __bool__(self):
-                return not not self.x
-            def __hash__(self):
-                return hash(self.x)
-            def __eq__(self, other):
-                return self.x == other
-            def __ne__(self, other):
-                return self.x != other
-            def __cmp__(self, other):
-                return cmp(self.x, other.x)
-            def __str__(self):
-                return "DProxy:%s" % self.x
-            def __repr__(self):
-                return "DProxy(%r)" % self.x
-            def __contains__(self, value):
-                return value in self.x
-        p0 = DProxy(0)
-        p1 = DProxy(1)
-        p_1 = DProxy(-1)
-        self.assertFalse(p0)
-        self.assert_(not not p1)
-        self.assertEqual(hash(p0), hash(0))
-        self.assertEqual(p0, p0)
-        self.assertNotEqual(p0, p1)
-        self.assertNotEqual(not p0, p0)
-        self.assertEqual(not p0, p1)
-        self.assertEqual(cmp(p0, p1), -1)
-        self.assertEqual(cmp(p0, p0), 0)
-        self.assertEqual(cmp(p0, p_1), 1)
-        self.assertEqual(str(p0), "DProxy:0")
-        self.assertEqual(repr(p0), "DProxy(0)")
-        p10 = DProxy(range(10))
         self.assertFalse(-1 in p10)
         for i in range(10):
             self.assert_(i in p10)
