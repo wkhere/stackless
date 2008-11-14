@@ -306,6 +306,7 @@ class RawPen:
                                             {'fill': self._color,
                                              'smooth': smooth})
                 self._items.append(item)
+                self._canvas.update()
         self._path = []
         self._filling = flag
         if flag:
@@ -762,7 +763,7 @@ def setup(**geometry):
 
     startx = geometry.get('startx', _startx)
     if startx >= 0 or startx == None:
-        _startx = _startx
+        _startx = startx
     else:
         raise ValueError, "startx can not be less than 0"
 
