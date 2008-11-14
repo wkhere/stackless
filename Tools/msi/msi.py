@@ -222,7 +222,8 @@ def build_database():
                   schema, ProductName="Python "+full_current_version+productsuffix,
                   ProductCode=product_code,
                   ProductVersion=current_version,
-                  Manufacturer=u"Richard Tew")
+                  Manufacturer=u"Richard Tew",
+                  request_uac = True)
     # The default sequencing of the RemoveExistingProducts action causes
     # removal of files that got just installed. Place it after
     # InstallInitialize, so we first uninstall everything, but still roll
@@ -702,10 +703,11 @@ def add_ui(db):
                         "AdminInstall", "Next", "Cancel")
     whichusers.title("Select whether to install [ProductName] for all users of this computer.")
     # A radio group with two options: allusers, justme
-    g = whichusers.radiogroup("AdminInstall", 135, 60, 160, 50, 3,
+    g = whichusers.radiogroup("AdminInstall", 135, 60, 235, 80, 3,
                               "WhichUsers", "", "Next")
+    g.condition("Disable", "VersionNT=600") # Not available on Vista and Windows 2008
     g.add("ALL", 0, 5, 150, 20, "Install for all users")
-    g.add("JUSTME", 0, 25, 150, 20, "Install just for me")
+    g.add("JUSTME", 0, 25, 235, 20, "Install just for me (not available on Windows Vista)")
 
     whichusers.back("Back", None, active=0)
 
@@ -918,9 +920,7 @@ def add_files(db):
     root.add_file("%s/pythonw.exe" % PCBUILD)
 
     # msidbComponentAttributesSharedDllRefCount = 8, see "Component Table"
-    #dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
-    #install python30.dll into root dir for now
-    dlldir = root
+    dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
 
     pydll = "python%s%s.dll" % (major, minor)
     pydllsrc = os.path.join(srcdir, PCBUILD, pydll)
@@ -945,10 +945,12 @@ def add_files(db):
     root.add_file(manifest[0], **manifest[1])
     root.add_file(crtdll[0], **crtdll[1])
     # Copy the manifest
-    manifest_dlls = manifest[0]+".root"
-    open(manifest_dlls, "w").write(open(manifest[1]['src']).read().replace("msvcr","../msvcr"))
-    DLLs.start_component("msvcr90_dlls", feature=private_crt)
-    DLLs.add_file(manifest[0], src=os.path.abspath(manifest_dlls))
+    # Actually, don't do that anymore - no DLL in DLLs should have a manifest
+    # dependency on msvcr90.dll anymore, so this should not be necessary
+    #manifest_dlls = manifest[0]+".root"
+    #open(manifest_dlls, "w").write(open(manifest[1]['src']).read().replace("msvcr","../msvcr"))
+    #DLLs.start_component("msvcr90_dlls", feature=private_crt)
+    #DLLs.add_file(manifest[0], src=os.path.abspath(manifest_dlls))
 
     # Now start the main component for the DLLs directory;
     # no regular files have been added to the directory yet.
@@ -1197,6 +1199,7 @@ def add_registry(db):
     ewi = "Edit with IDLE"
     pat2 = r"Software\Classes\%sPython.%sFile\DefaultIcon"
     pat3 = r"Software\Classes\%sPython.%sFile"
+    pat4 = r"Software\Classes\%sPython.%sFile\shellex\DropHandler"
     tcl_verbs = []
     if have_tcl:
         tcl_verbs=[
@@ -1244,6 +1247,13 @@ def add_registry(db):
               "Python File (no console)", "REGISTRY.def"),
              ("pyc.txt", -1, pat3 % (testprefix, "Compiled"), "",
               "Compiled Python File", "REGISTRY.def"),
+             # Drop Handler
+             ("py.drop", -1, pat4 % (testprefix, ""), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
+             ("pyw.drop", -1, pat4 % (testprefix, "NoCon"), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
+             ("pyc.drop", -1, pat4 % (testprefix, "Compiled"), "",
+              "{60254CA5-953B-11CF-8C96-00AA00B8708C}", "REGISTRY.def"),
             ])
 
     # Registry keys
