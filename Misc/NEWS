@@ -4,13 +4,27 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.6.1 alpha 1
-==================================
+What's New in Python 2.6.1
+==========================
 
-*Release date: XX-XXX-2008*
+*Release date: 04-Dec-2008*
 
 Core and Builtins
 -----------------
+
+- Issue #3996: On Windows, the PyOS_CheckStack function would cause the
+  interpreter to abort ("Fatal Python error: Could not reset the stack!")
+  instead of throwing a MemoryError.
+
+- Issue #4367: Python would segfault during compiling when the unicodedata
+  module couldn't be imported and \N escapes were present.
+
+- Issue #4348: Some bytearray methods returned that didn't cause any change to
+  the bytearray, returned the same bytearray instead of a copy.
+
+- Issue #4317: Fixed a crash in the imageop.rgb2rgb8() function.
+
+- Issue #4230: If ``__getattr__`` is a descriptor, it now functions correctly.
 
 - Issue #4048: The parser module now correctly validates relative imports.
 
@@ -38,6 +52,14 @@ Core and Builtins
 Library
 -------
 
+- Issue #3741: DISTUTILS_USE_SDK set causes msvc9compiler.py to raise an
+  exception.
+
+- Issue #4363: The uuid.uuid1() and uuid.uuid4() functions now work even if
+  the ctypes module is not present.
+
+- Issue #4116: Resolve member name conflict in ScrolledCanvas.__init__.
+
 - Issue #3774: Fixed an error when create a Tkinter menu item without command
   and then remove it.
 
@@ -57,6 +79,10 @@ Library
 Build
 -----
 
+- Issue #4389: Add icon to the uninstall entry in "add-and-remove-programs".
+
+- Issue #4289: Remove Cancel button from AdvancedDlg.
+
 - Issue #1656675: Register a drop handler for .py* files on Windows.
 
 - Issue #4120: Exclude manifest from extension modules in VS2008.
@@ -74,6 +100,13 @@ C-API
 
 - Issue #4122: On Windows, fix a compilation error when using the
   Py_UNICODE_ISSPACE macro in an extension module.
+
+Extension Modules
+-----------------
+
+- Issue #4365: Add crtassem.h constants to the msvcrt module.
+
+- Issue #4396: The parser module now correctly validates the with statement.
 
 
 What's New in Python 2.6 final
