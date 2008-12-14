@@ -5046,6 +5046,24 @@ slot_tp_getattro(PyObject *self, PyObject *name)
 }
 
 static PyObject *
+call_attribute(PyObject *self, PyObject *attr, PyObject *name)
+{
+	PyObject *res, *descr = NULL;
+	descrgetfunc f = Py_TYPE(attr)->tp_descr_get;
+
+	if (f != NULL) {
+		descr = f(attr, self, (PyObject *)(Py_TYPE(self)));
+		if (descr == NULL)
+			return NULL;
+		else
+			attr = descr;
+	}
+	res = PyObject_CallFunctionObjArgs(attr, name, NULL);
+	Py_XDECREF(descr);
+	return res;
+}
+
+static PyObject *
 slot_tp_getattr_hook(PyObject *self, PyObject *name)
 {
 	STACKLESS_GETARG(); /* partially supported */
@@ -5065,6 +5083,11 @@ slot_tp_getattr_hook(PyObject *self, PyObject *name)
 		if (getattribute_str == NULL)
 			return NULL;
 	}
+	/* speed hack: we could use lookup_maybe, but that would resolve the
+	   method fully for each attribute lookup for classes with
+	   __getattr__, even when the attribute is present. So we use
+	   _PyType_Lookup and create the method only when needed, with
+	   call_attribute. */
 	getattr = _PyType_Lookup(tp, getattr_str);
 	STACKLESS_PROMOTE_ALL();
 	if (getattr == NULL) {
@@ -5074,19 +5097,29 @@ slot_tp_getattr_hook(PyObject *self, PyObject *name)
 		STACKLESS_ASSERT();
 		return res;
 	}
+	Py_INCREF(getattr);
+	/* speed hack: we could use lookup_maybe, but that would resolve the
+	   method fully for each attribute lookup for classes with
+	   __getattr__, even when self has the default __getattribute__
+	   method. So we use _PyType_Lookup and create the method only when
+	   needed, with call_attribute. */
 	getattribute = _PyType_Lookup(tp, getattribute_str);
 	if (getattribute == NULL ||
 	    (Py_TYPE(getattribute) == &PyWrapperDescr_Type &&
 	     ((PyWrapperDescrObject *)getattribute)->d_wrapped ==
 	     (void *)PyObject_GenericGetAttr))
 		res = PyObject_GenericGetAttr(self, name);
-	else
-		res = PyObject_CallFunctionObjArgs(getattribute, self, name, NULL);
+	else {
+		Py_INCREF(getattribute);
+		res = call_attribute(self, getattribute, name);
+		Py_DECREF(getattribute);
+	}
 	if (res == NULL && PyErr_ExceptionMatches(PyExc_AttributeError)) {
 		PyErr_Clear();
 		STACKLESS_PROMOTE_ALL();
-		res = PyObject_CallFunctionObjArgs(getattr, self, name, NULL);
+		res = call_attribute(self, getattr, name);
 	}
+	Py_DECREF(getattr);
 	STACKLESS_ASSERT();
 	return res;
 }
@@ -6308,8 +6341,9 @@ super_init(PyObject *self, PyObject *args, PyObject *kwds)
 			assert(PyUnicode_Check(name));
                         if (!PyUnicode_CompareWithASCIIString(name,
                                                               "__class__")) {
-				PyObject *cell =
-					f->f_localsplus[co->co_nlocals + i];
+				Py_ssize_t index = co->co_nlocals + 
+					PyTuple_GET_SIZE(co->co_cellvars) + i;
+				PyObject *cell = f->f_localsplus[index];
 				if (cell == NULL || !PyCell_Check(cell)) {
 					PyErr_SetString(PyExc_SystemError,
 					  "super(): bad __class__ cell");

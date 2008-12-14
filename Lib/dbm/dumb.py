@@ -66,9 +66,9 @@ class _Database(collections.MutableMapping):
 
         # Mod by Jack: create data file if needed
         try:
-            f = _io.open(self._datfile, 'r')
+            f = _io.open(self._datfile, 'r', encoding="Latin-1")
         except IOError:
-            f = _io.open(self._datfile, 'w')
+            f = _io.open(self._datfile, 'w', encoding="Latin-1")
             self._chmod(self._datfile)
         f.close()
         self._update()
@@ -77,13 +77,14 @@ class _Database(collections.MutableMapping):
     def _update(self):
         self._index = {}
         try:
-            f = _io.open(self._dirfile, 'r')
+            f = _io.open(self._dirfile, 'r', encoding="Latin-1")
         except IOError:
             pass
         else:
             for line in f:
                 line = line.rstrip()
                 key, pos_and_siz_pair = eval(line)
+                key = key.encode('Latin-1')
                 self._index[key] = pos_and_siz_pair
             f.close()
 
@@ -107,16 +108,19 @@ class _Database(collections.MutableMapping):
         except self._os.error:
             pass
 
-        f = self._io.open(self._dirfile, 'w')
+        f = self._io.open(self._dirfile, 'w', encoding="Latin-1")
         self._chmod(self._dirfile)
         for key, pos_and_siz_pair in self._index.items():
-            f.write("%r, %r\n" % (key, pos_and_siz_pair))
+            # Use Latin-1 since it has no qualms with any value in any
+            # position; UTF-8, though, does care sometimes.
+            f.write("%r, %r\n" % (key.decode('Latin-1'), pos_and_siz_pair))
         f.close()
 
     sync = _commit
 
     def __getitem__(self, key):
-        key = key.decode("latin-1")
+        if isinstance(key, str):
+            key = key.encode('utf-8')
         pos, siz = self._index[key]     # may raise KeyError
         f = _io.open(self._datfile, 'rb')
         f.seek(pos)
@@ -155,17 +159,20 @@ class _Database(collections.MutableMapping):
     # the in-memory index dict, and append one to the directory file.
     def _addkey(self, key, pos_and_siz_pair):
         self._index[key] = pos_and_siz_pair
-        f = _io.open(self._dirfile, 'a')
+        f = _io.open(self._dirfile, 'a', encoding="Latin-1")
         self._chmod(self._dirfile)
-        f.write("%r, %r\n" % (key, pos_and_siz_pair))
+        f.write("%r, %r\n" % (key.decode("Latin-1"), pos_and_siz_pair))
         f.close()
 
     def __setitem__(self, key, val):
-        if not isinstance(key, bytes):
-            raise TypeError("keys must be bytes")
-        key = key.decode("latin-1") # hashable bytes
-        if not isinstance(val, (bytes, bytearray)):
-            raise TypeError("values must be byte strings")
+        if isinstance(key, str):
+            key = key.encode('utf-8')
+        elif not isinstance(key, (bytes, bytearray)):
+            raise TypeError("keys must be bytes or strings")
+        if isinstance(val, str):
+            val = val.encode('utf-8')
+        elif not isinstance(val, (bytes, bytearray)):
+            raise TypeError("values must be bytes or strings")
         if key not in self._index:
             self._addkey(key, self._addval(val))
         else:
@@ -191,7 +198,8 @@ class _Database(collections.MutableMapping):
             # (so that _commit() never gets called).
 
     def __delitem__(self, key):
-        key = key.decode("latin-1")
+        if isinstance(key, str):
+            key = key.encode('utf-8')
         # The blocks used by the associated value are lost.
         del self._index[key]
         # XXX It's unclear why we do a _commit() here (the code always
@@ -201,14 +209,14 @@ class _Database(collections.MutableMapping):
         self._commit()
 
     def keys(self):
-        return [key.encode("latin-1") for key in self._index.keys()]
+        return list(self._index.keys())
 
     def items(self):
-        return [(key.encode("latin-1"), self[key.encode("latin-1")])
-                for key in self._index.keys()]
+        return [(key, self[key]) for key in self._index.keys()]
 
     def __contains__(self, key):
-        key = key.decode("latin-1")
+        if isinstance(key, str):
+            key = key.encode('utf-8')
         return key in self._index
 
     def iterkeys(self):

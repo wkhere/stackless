@@ -7,6 +7,9 @@
 # in the original order then consider using `Pool.map()` or
 # `Pool.imap()` (which will save on the amount of code needed anyway).
 #
+# Copyright (c) 2006-2008, R Oudkerk
+# All rights reserved.
+#
 
 import time
 import random
@@ -65,9 +68,9 @@ def test():
         Process(target=worker, args=(task_queue, done_queue)).start()
 
     # Get and print results
-    print 'Unordered results:'
+    print('Unordered results:')
     for i in range(len(TASKS1)):
-        print '\t', done_queue.get()
+        print('\t', done_queue.get())
 
     # Add more tasks using `put()`
     for task in TASKS2:
@@ -75,7 +78,7 @@ def test():
 
     # Get and print some more results
     for i in range(len(TASKS2)):
-        print '\t', done_queue.get()
+        print('\t', done_queue.get())
 
     # Tell child processes to stop
     for i in range(NUMBER_OF_PROCESSES):

@@ -723,17 +723,14 @@ def add_ui(db):
     #####################################################################
     # Advanced Dialog.
     advanced = PyDialog(db, "AdvancedDlg", x, y, w, h, modal, title,
-                        "CompilePyc", "Next", "Cancel")
+                        "CompilePyc", "Ok", "Ok")
     advanced.title("Advanced Options for [ProductName]")
     # A radio group with two options: allusers, justme
     advanced.checkbox("CompilePyc", 135, 60, 230, 50, 3,
-                      "COMPILEALL", "Compile .py files to byte code after installation", "Next")
+                      "COMPILEALL", "Compile .py files to byte code after installation", "Ok")
 
-    c = advanced.next("Finish", "Cancel")
+    c = advanced.cancel("Ok", "CompilePyc", name="Ok") # Button just has location of cancel button.
     c.event("EndDialog", "Return")
-
-    c = advanced.cancel("Cancel", "CompilePyc")
-    c.event("SpawnDialog", "CancelDlg")
 
     #####################################################################
     # Existing Directory dialog
@@ -1270,7 +1267,10 @@ def add_registry(db):
                "[TARGETDIR]Doc\\"+docfile , "REGISTRY.doc"),
               ("Modules", -1, prefix+r"\Modules", "+", None, "REGISTRY"),
               ("AppPaths", -1, r"Software\Microsoft\Windows\CurrentVersion\App Paths\Python.exe",
-               "", r"[TARGETDIR]Python.exe", "REGISTRY.def")
+               "", r"[TARGETDIR]Python.exe", "REGISTRY.def"),
+              ("DisplayIcon", -1,
+               r"Software\Microsoft\Windows\CurrentVersion\Uninstall\%s" % product_code,
+               "DisplayIcon", "[TARGETDIR]python.exe", "REGISTRY.def")
               ])
     # Shortcuts, see "Shortcut Table"
     add_data(db, "Directory",

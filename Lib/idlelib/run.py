@@ -119,10 +119,11 @@ def manage_socket(address):
         except socket.error as err:
             print("IDLE Subprocess: socket error: " + err.args[1] +
                   ", retrying....", file=sys.__stderr__)
+            socket_error = err
     else:
-        print("IDLE Subprocess: Connection to "\
-                               "IDLE GUI failed, exiting.", file=sys.__stderr__)
-        show_socket_error(err, address)
+        print("IDLE Subprocess: Connection to "
+              "IDLE GUI failed, exiting.", file=sys.__stderr__)
+        show_socket_error(socket_error, address)
         global exit_now
         exit_now = True
         return
@@ -229,7 +230,7 @@ class MyRPCServer(rpc.RPCServer):
             erf = sys.__stderr__
             print('\n' + '-'*40, file=erf)
             print('Unhandled server exception!', file=erf)
-            print('Thread: %s' % threading.current_thread().get_name(), file=erf)
+            print('Thread: %s' % threading.current_thread().name, file=erf)
             print('Client Address: ', client_address, file=erf)
             print('Request: ', repr(request), file=erf)
             traceback.print_exc(file=erf)

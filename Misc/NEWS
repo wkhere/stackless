@@ -4,14 +4,90 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 3.0 release candiate 3?
-============================================
+What's New in Python 3.0 final
+==============================
 
 *Release date: XX-XXX-2008*
+
+Core and Builtins
+-----------------
+
+- Issue #3996: On Windows, the PyOS_CheckStack function would cause the
+  interpreter to abort ("Fatal Python error: Could not reset the stack!")
+  instead of throwing a MemoryError.
+
+- Issue #3689: The list reversed iterator now supports __length_hint__
+  instead of __len__.  Behavior now matches other reversed iterators.
+
+- Issue #4367: Python would segfault during compiling when the unicodedata
+  module couldn't be imported and \N escapes were present.
+
+- Fix build failure of _cursesmodule.c building with -D_FORTIFY_SOURCE=2.
+
+Library
+-------
+
+- Issue #4387: binascii now refuses to accept str as binary input.
+
+- Issue #4073: Add 2to3 support to build_scripts, refactor that support
+  in build_py.
+
+- IDLE would print a "Unhandled server exception!" message when internal
+  debugging is enabled.
+
+- Issue #4455: IDLE failed to display the windows list when two windows have
+  the same title.
+
+- Issue #3741: DISTUTILS_USE_SDK set causes msvc9compiler.py to raise an
+  exception.
+
+- Issue #4433: Fixed an access violation when garbage collecting
+  _ctypes.COMError instances.
+
+- Issue #4429: Fixed UnicodeDecodeError in ctypes.
+
+- Issue #4373: Corrected a potential reference leak in the pickle module and
+  silenced a false positive ref leak in distutils.tests.test_build_ext.
+
+- Issue #4382: dbm.dumb did not specify the expected file encoding for opened
+  files.
+
+- Issue #4383: When IDLE cannot make the connection to its subprocess, it would
+  fail to properly display the error message.
+
+Build
+-----
+
+- Issue #4407: Fix source file that caused the compileall step in Windows installer
+  to fail.
+
+Docs
+----
+
+- Issue #4449: Fixed multiprocessing examples
+
+- Issue #3799: Document that dbm.gnu and dbm.ndbm will accept string arguments
+  for keys and values which will be converted to bytes before committal.
+
+
+What's New in Python 3.0 release candidate 3?
+=============================================
+
+*Release date: 20-Nov-2008*
 
 
 Core and Builtins
 -----------------
+
+- Issue #4349: sys.path included a non-existent platform directory because of a
+  faulty Makefile.
+
+- Issue #3327: Don't overallocate in the modules_by_index list.
+
+- Issue #1721812:  Binary set operations and copy() returned the input type
+  instead of the appropriate base type.  This was incorrect because set
+  subclasses would be created without their __init__() method being called.
+  The corrected behavior brings sets into line with lists and dicts.
 
 - Issue #4296: Fix PyObject_RichCompareBool so that "x in [x]" evaluates to
   True, even when x doesn't compare equal to itself.  This was a regression
@@ -23,6 +99,20 @@ Core and Builtins
 Library
 -------
 
+- Issue #4363: The uuid.uuid1() and uuid.uuid4() functions now work even if
+  the ctypes module is not present.
+
+- FileIO's mode attribute now always includes ``"b"``.
+
+- Issue #3799: Fix dbm.dumb to accept strings as well as bytes for keys. String
+  keys are now written out in UTF-8.
+
+- Issue #4338: Fix distutils upload command.
+
+- Issue #4354: Fix distutils register command.
+
+- Issue #4116: Resolve member name conflict in ScrolledCanvas.__init__.
+
 - Issue #4307: The named tuple that ``inspect.getfullargspec()`` returns now
   uses ``kwonlydefaults`` instead of ``kwdefaults``.
 
@@ -32,6 +122,10 @@ Library
 
 Build
 -----
+
+- Issue #4389: Add icon to the uninstall entry in "add-and-remove-programs".
+
+- Issue #4289: Remove Cancel button from AdvancedDlg.
 
 - Issue #1656675: Register a drop handler for .py* files on Windows.
 
@@ -1031,7 +1125,7 @@ Core and Builtins
 
 - intobject.h is no longer included by Python.h. The remains were
   moved to longobject.h. It still exists to define several aliases
-  from PyInt_ to PyLong_ functions.
+  from PyInt to PyLong functions.
 
 - Removed sys.maxint, use sys.maxsize instead.
 
@@ -1057,7 +1151,7 @@ Library
 
 
 What's New in Python 3.0a1?
-==========================
+===========================
 
 *Release date: 31-Aug-2007*
 
@@ -1180,13 +1274,14 @@ Core and Builtins
 
 - Integer division always returns a float.  The -Q option is no more.
   All the following are gone:
-   * PyNumber_Divide and PyNumber_InPlaceDivide
-   * __div__, __rdiv__, and __idiv__
-   * nb_divide, nb_inplace_divide
-   * operator.div, operator.idiv, operator.__div__, operator.__idiv__
-  (Only __truediv__ and __floordiv__ remain, not sure how to handle them
-   if we want to re-use __div__ and friends.  If we do, it will make
-   it harder to write code for both 2.x and 3.x.)
+
+  * PyNumber_Divide and PyNumber_InPlaceDivide
+  * __div__, __rdiv__, and __idiv__
+  * nb_divide, nb_inplace_divide
+  * operator.div, operator.idiv, operator.__div__, operator.__idiv__
+    (Only __truediv__ and __floordiv__ remain, not sure how to handle
+    them if we want to re-use __div__ and friends.  If we do, it will
+    make it harder to write code for both 2.x and 3.x.)
 
 - 'as' and 'with' are keywords.
 

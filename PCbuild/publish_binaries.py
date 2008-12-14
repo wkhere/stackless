@@ -1,16 +1,16 @@
 from zipfile import *
-import os, sys, md5
+import os, sys, hashlib
 
 exp_path = r""
 
 prog = """
-import md5
+import hashlib
 expected = "%s"
 fname = r"%s"
-print "expected digest", expected
-received = md5.md5(file(fname, "rb").read()).hexdigest()
-print ("matched", "NOT MATCHED!!") [received != expected]
-raw_input("press enter to continue")
+print("expected digest", expected)
+received = hashlib.md5(open(fname, "rb").read()).hexdigest()
+print(("matched", "NOT MATCHED!!") [received != expected])
+input("press enter to continue")
 """
 
 fileList = [
@@ -46,7 +46,7 @@ for f in os.listdir(slpdir):
     elif f.endswith(".h"):
         includeFileList.append([ "include/Stackless/"+ f, os.path.join(slpdir, f) ])
 
-zname = os.path.join(exp_path, "python30.zip")
+zname = os.path.join(exp_path, "stackless-python-30.zip")
 z = ZipFile(zname, "w", ZIP_DEFLATED)
 for fileName in fileList:
     if os.path.exists(fileName):
@@ -58,19 +58,19 @@ for fileName in fileList:
         s = open(fileName, "rb").read()
         z.writestr(outFileName, s)
     else:
-        print "File not found:", fileName
+        print("File not found:", fileName)
 for zipPath, relPath in includeFileList:
     if os.path.exists(fileName):
         s = open(relPath, "rb").read()
         z.writestr(zipPath, s)
     else:
-        print "File not found:", fileName
+        print("File not found:", fileName)
 z.close()
 
 signame = zname+".md5.py"
-expected = md5.md5(file(zname, "rb").read()).hexdigest()
+expected = hashlib.md5(open(zname, "rb").read()).hexdigest()
 shortname = os.path.split(zname)[-1]
-file(signame, "w").write(prog % (expected, shortname))
+open(signame, "w").write(prog % (expected, shortname))
 
 # generate a reST include for upload time.
 #import time

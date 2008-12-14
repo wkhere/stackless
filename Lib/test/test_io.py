@@ -1249,6 +1249,9 @@ class TextIOWrapperTest(unittest.TestCase):
 
 class MiscIOTest(unittest.TestCase):
 
+    def tearDown(self):
+        support.unlink(support.TESTFN)
+
     def testImport__all__(self):
         for name in io.__all__:
             obj = getattr(io, name, None)
@@ -1259,6 +1262,34 @@ class MiscIOTest(unittest.TestCase):
                 self.assert_(issubclass(obj, Exception), name)
             else:
                 self.assert_(issubclass(obj, io.IOBase))
+
+
+    def test_attributes(self):
+        f = io.open(support.TESTFN, "wb", buffering=0)
+        self.assertEquals(f.mode, "wb")
+        f.close()
+
+        f = io.open(support.TESTFN, "U")
+        self.assertEquals(f.name,            support.TESTFN)
+        self.assertEquals(f.buffer.name,     support.TESTFN)
+        self.assertEquals(f.buffer.raw.name, support.TESTFN)
+        self.assertEquals(f.mode,            "U")
+        self.assertEquals(f.buffer.mode,     "rb")
+        self.assertEquals(f.buffer.raw.mode, "rb")
+        f.close()
+
+        f = io.open(support.TESTFN, "w+")
+        self.assertEquals(f.mode,            "w+")
+        self.assertEquals(f.buffer.mode,     "rb+") # Does it really matter?
+        self.assertEquals(f.buffer.raw.mode, "rb+")
+
+        g = io.open(f.fileno(), "wb", closefd=False)
+        self.assertEquals(g.mode,     "wb")
+        self.assertEquals(g.raw.mode, "wb")
+        self.assertEquals(g.name,     f.fileno())
+        self.assertEquals(g.raw.name, f.fileno())
+        f.close()
+        g.close()
 
 
 def test_main():

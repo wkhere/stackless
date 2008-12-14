@@ -3097,20 +3097,12 @@ order (MRO) for bases """
         import binascii
         # SF bug [#470040] ParseTuple t# vs subclasses.
 
-        class MyStr(str):
+        class MyBytes(bytes):
             pass
-        base = 'abc'
-        m = MyStr(base)
+        base = b'abc'
+        m = MyBytes(base)
         # b2a_hex uses the buffer interface to get its argument's value, via
         # PyArg_ParseTuple 't#' code.
-        self.assertEqual(binascii.b2a_hex(m), binascii.b2a_hex(base))
-
-        # It's not clear that unicode will continue to support the character
-        # buffer interface, and this test will fail if that's taken away.
-        class MyUni(str):
-            pass
-        base = 'abc'
-        m = MyUni(base)
         self.assertEqual(binascii.b2a_hex(m), binascii.b2a_hex(base))
 
         class MyInt(int):
@@ -3129,7 +3121,7 @@ order (MRO) for bases """
 
         class octetstring(str):
             def __str__(self):
-                return binascii.b2a_hex(self).decode("ascii")
+                return binascii.b2a_hex(self.encode('ascii')).decode("ascii")
             def __repr__(self):
                 return self + " repr"
 
@@ -4000,6 +3992,46 @@ order (MRO) for bases """
         c = C()
         c[1:2] = 3
         self.assertEqual(c.value, 3)
+
+    def test_getattr_hooks(self):
+        # issue 4230
+
+        class Descriptor(object):
+            counter = 0
+            def __get__(self, obj, objtype=None):
+                def getter(name):
+                    self.counter += 1
+                    raise AttributeError(name)
+                return getter
+
+        descr = Descriptor()
+        class A(object):
+            __getattribute__ = descr
+        class B(object):
+            __getattr__ = descr
+        class C(object):
+            __getattribute__ = descr
+            __getattr__ = descr
+
+        self.assertRaises(AttributeError, getattr, A(), "attr")
+        self.assertEquals(descr.counter, 1)
+        self.assertRaises(AttributeError, getattr, B(), "attr")
+        self.assertEquals(descr.counter, 2)
+        self.assertRaises(AttributeError, getattr, C(), "attr")
+        self.assertEquals(descr.counter, 4)
+
+        import gc
+        class EvilGetattribute(object):
+            # This used to segfault
+            def __getattr__(self, name):
+                raise AttributeError(name)
+            def __getattribute__(self, name):
+                del EvilGetattribute.__getattr__
+                for i in range(5):
+                    gc.collect()
+                raise AttributeError(name)
+
+        self.assertRaises(AttributeError, getattr, EvilGetattribute(), "attr")
 
 
 class DictProxyTests(unittest.TestCase):
