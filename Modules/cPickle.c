@@ -2397,14 +2397,11 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 
 #ifdef STACKLESS
 	/* but we save the stack after a fixed watermark */
-	if (CSTACK_SAVE_NOW(PyThreadState_GET(), self)) {
-		res = slp_safe_pickling((void *)&save, (PyObject *)self, args, pers_save);
-		goto finally;
-	}
-#else
+	if (CSTACK_SAVE_NOW(PyThreadState_GET(), self))
+		return slp_safe_pickling((void *)&save, (PyObject *)self, args, pers_save);
+#endif
 	if (Py_EnterRecursiveCall(" while pickling an object"))
 		return -1;
-#endif
 
 	if (!pers_save && self->pers_func) {
 		if ((tmp = save_pers(self, args, self->pers_func)) != 0) {
@@ -2649,9 +2646,7 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 	res = save_reduce(self, t, __reduce__, args);
 
   finally:
-#ifndef STACKLESS
 	Py_LeaveRecursiveCall();
-#endif
 	Py_XDECREF(py_ob_id);
 	Py_XDECREF(__reduce__);
 	Py_XDECREF(t);
