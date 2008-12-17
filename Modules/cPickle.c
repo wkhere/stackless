@@ -2331,20 +2331,15 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 	int tmp;
 
 #ifdef STACKLESS
-	/* for debugging */
-	++self->nesting;
 	/* but we save the stack after a fixed watermark */
-	if (CSTACK_SAVE_NOW(PyThreadState_GET(), self)) {
-		res = slp_safe_pickling((void *)&save, (PyObject *)self, args, pers_save);
-		goto finally;
-	}
-#else
-        if (self->nesting++ > Py_GetRecursionLimit()){
+	if (CSTACK_SAVE_NOW(PyThreadState_GET(), self))
+		return slp_safe_pickling((void *)&save, (PyObject *)self, args, pers_save);
+#endif
+	if (self->nesting++ > Py_GetRecursionLimit()){
 		PyErr_SetString(PyExc_RuntimeError,
 				"maximum recursion depth exceeded");
 		goto finally;
 	}
-#endif
 
 	if (!pers_save && self->pers_func) {
 		if ((tmp = save_pers(self, args, self->pers_func)) != 0) {
