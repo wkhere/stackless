@@ -726,7 +726,7 @@ whichmodule(PyObject *global, PyObject *global_name)
     i = 0;
     module_name = NULL;
     while ((j = PyDict_Next(modules_dict, &i, &module_name, &module))) {
-        if (PyObject_Compare(module_name, main_str) == 0)
+        if (PyObject_RichCompareBool(module_name, main_str, Py_EQ) == 1)
             continue;
 
         obj = PyObject_GetAttr(module, global_name);
@@ -857,8 +857,8 @@ save_int(PicklerObject *self, long x)
         /* Text-mode pickle, or long too big to fit in the 4-byte
          * signed BININT format:  store as a string.
          */
-        pdata[0] = LONG;        /* use LONG for consistence with pickle.py */
-        PyOS_snprintf(pdata + 1, sizeof(pdata) - 1, "%ld\n", x);
+        pdata[0] = LONG;        /* use LONG for consistency with pickle.py */
+        PyOS_snprintf(pdata + 1, sizeof(pdata) - 1, "%ldL\n", x);
         if (pickler_write(self, pdata, strlen(pdata)) < 0)
             return -1;
     }
@@ -988,8 +988,9 @@ save_long(PicklerObject *self, PyObject *obj)
     else {
         char *string;
 
-        /* proto < 2:  write the repr and newline.  This is quadratic-time
-           (in the number of digits), in both directions. */
+        /* proto < 2: write the repr and newline.  This is quadratic-time (in
+           the number of digits), in both directions.  We add a trailing 'L'
+           to the repr, for compatibility with Python 2.x. */
 
         repr = PyObject_Repr(obj);
         if (repr == NULL)
@@ -1001,7 +1002,7 @@ save_long(PicklerObject *self, PyObject *obj)
 
         if (pickler_write(self, &long_op, 1) < 0 ||
             pickler_write(self, string, size) < 0 ||
-            pickler_write(self, "\n", 1) < 0)
+            pickler_write(self, "L\n", 2) < 0)
             goto error;
     }
 
@@ -1120,16 +1121,21 @@ raw_unicode_escape(const Py_UNICODE *s, Py_ssize_t size)
     static const char *hexdigits = "0123456789abcdef";
 
 #ifdef Py_UNICODE_WIDE
-    repr = PyBytes_FromStringAndSize(NULL, 10 * size);
+    const Py_ssize_t expandsize = 10;
 #else
-    repr = PyBytes_FromStringAndSize(NULL, 6 * size);
+    const Py_ssize_t expandsize = 6;
 #endif
+    
+    if (size > PY_SSIZE_T_MAX / expandsize)
+        return PyErr_NoMemory();
+    
+    repr = PyByteArray_FromStringAndSize(NULL, expandsize * size);
     if (repr == NULL)
         return NULL;
     if (size == 0)
         goto done;
 
-    p = q = PyBytes_AS_STRING(repr);
+    p = q = PyByteArray_AS_STRING(repr);
     while (size-- > 0) {
         Py_UNICODE ch = *s++;
 #ifdef Py_UNICODE_WIDE
@@ -1147,6 +1153,32 @@ raw_unicode_escape(const Py_UNICODE *s, Py_ssize_t size)
             *p++ = hexdigits[ch & 15];
         }
         else
+#else
+            /* Map UTF-16 surrogate pairs to '\U00xxxxxx' */
+            if (ch >= 0xD800 && ch < 0xDC00) {
+                Py_UNICODE ch2;
+                Py_UCS4 ucs;
+
+                ch2 = *s++;
+                size--;
+                if (ch2 >= 0xDC00 && ch2 <= 0xDFFF) {
+                    ucs = (((ch & 0x03FF) << 10) | (ch2 & 0x03FF)) + 0x00010000;
+                    *p++ = '\\';
+                    *p++ = 'U';
+                    *p++ = hexdigits[(ucs >> 28) & 0xf];
+                    *p++ = hexdigits[(ucs >> 24) & 0xf];
+                    *p++ = hexdigits[(ucs >> 20) & 0xf];
+                    *p++ = hexdigits[(ucs >> 16) & 0xf];
+                    *p++ = hexdigits[(ucs >> 12) & 0xf];
+                    *p++ = hexdigits[(ucs >> 8) & 0xf];
+                    *p++ = hexdigits[(ucs >> 4) & 0xf];
+                    *p++ = hexdigits[ucs & 0xf];
+                    continue;
+                }
+                /* Fall through: isolated surrogates are copied as-is */
+                s--;
+                size++;
+            }
 #endif
         /* Map 16-bit characters to '\uxxxx' */
         if (ch >= 256 || ch == '\\' || ch == '\n') {
@@ -1157,14 +1189,14 @@ raw_unicode_escape(const Py_UNICODE *s, Py_ssize_t size)
             *p++ = hexdigits[(ch >> 4) & 0xf];
             *p++ = hexdigits[ch & 15];
         }
-	/* Copy everything else as-is */
+        /* Copy everything else as-is */
         else
             *p++ = (char) ch;
     }
     size = p - q;
 
   done:
-    result = PyBytes_FromStringAndSize(PyBytes_AS_STRING(repr), size);
+    result = PyBytes_FromStringAndSize(PyByteArray_AS_STRING(repr), size);
     Py_DECREF(repr);
     return result;
 }
@@ -2719,7 +2751,7 @@ static PyTypeObject Pickler_Type = {
     0,                                  /*tp_print*/
     0,                                  /*tp_getattr*/
     0,                                  /*tp_setattr*/
-    0,                                  /*tp_compare*/
+    0,                                  /*tp_reserved*/
     0,                                  /*tp_repr*/
     0,                                  /*tp_as_number*/
     0,                                  /*tp_as_sequence*/
@@ -2923,7 +2955,7 @@ static int
 load_long(UnpicklerObject *self)
 {
     PyObject *value;
-    char *s;
+    char *s, *ss;
     Py_ssize_t len;
 
     if ((len = unpickler_readline(self, &s)) < 0)
@@ -2931,8 +2963,27 @@ load_long(UnpicklerObject *self)
     if (len < 2)
         return bad_readline();
 
-    /* XXX: Should the base argument explicitly set to 10? */
-    if ((value = PyLong_FromString(s, NULL, 0)) == NULL)
+    /* s[len-2] will usually be 'L' (and s[len-1] is '\n'); we need to remove
+       the 'L' before calling PyLong_FromString.  In order to maintain
+       compatibility with Python 3.0.0, we don't actually *require*
+       the 'L' to be present. */
+    if (s[len-2] == 'L') {
+        ss = (char *)PyMem_Malloc(len-1);
+        if (ss == NULL) {
+            PyErr_NoMemory();
+            return -1;
+        }
+        strncpy(ss, s, len-2);
+        ss[len-2] = '\0';
+
+        /* XXX: Should the base argument explicitly set to 10? */
+        value = PyLong_FromString(ss, NULL, 0);
+        PyMem_Free(ss);
+    }
+    else {
+        value = PyLong_FromString(s, NULL, 0);
+    }
+    if (value == NULL)
         return -1;
 
     PDATA_PUSH(self->stack, value, -1);
@@ -2992,7 +3043,8 @@ load_float(UnpicklerObject *self)
     errno = 0;
     d = PyOS_ascii_strtod(s, &endptr);
 
-    if (errno || (endptr[0] != '\n') || (endptr[1] != '\0')) {
+    if ((errno == ERANGE && !(fabs(d) <= 1.0)) ||
+        (endptr[0] != '\n') || (endptr[1] != '\0')) {
         PyErr_SetString(PyExc_ValueError, "could not convert string to float");
         return -1;
     }
@@ -4567,7 +4619,7 @@ static PyTypeObject Unpickler_Type = {
     0,                                  /*tp_print*/
     0,                                  /*tp_getattr*/
     0,	                                /*tp_setattr*/
-    0,                                  /*tp_compare*/
+    0,                                  /*tp_reserved*/
     0,                                  /*tp_repr*/
     0,                                  /*tp_as_number*/
     0,                                  /*tp_as_sequence*/

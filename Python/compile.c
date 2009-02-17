@@ -1237,7 +1237,7 @@ get_ref_type(struct compiler *c, PyObject *name)
 	    char buf[350];
 	    PyOS_snprintf(buf, sizeof(buf),
 			  "unknown scope for %.100s in %.100s(%s) in %s\n"
-			  "symbols: %s\nlocals: %s\nglobals: %s\n",
+			  "symbols: %s\nlocals: %s\nglobals: %s",
 			  PyBytes_AS_STRING(name), 
 			  PyBytes_AS_STRING(c->u->u_name), 
 			  PyObject_REPR(c->u->u_ste->ste_id),
@@ -4016,6 +4016,8 @@ dict_keys_inorder(PyObject *dict, int offset)
 		return NULL;
 	while (PyDict_Next(dict, &pos, &k, &v)) {
 		i = PyLong_AS_LONG(v);
+		/* The keys of the dictionary are tuples. (see compiler_add_o)
+		   The object we want is always first, though. */
 		k = PyTuple_GET_ITEM(k, 0);
 		Py_INCREF(k);
 		assert((i - offset) < size);
@@ -4039,13 +4041,11 @@ compute_code_flags(struct compiler *c)
 			flags |= CO_NESTED;
 		if (ste->ste_generator)
 			flags |= CO_GENERATOR;
+		if (ste->ste_varargs)
+			flags |= CO_VARARGS;
+		if (ste->ste_varkeywords)
+			flags |= CO_VARKEYWORDS;
 	}
-	if (ste->ste_varargs)
-		flags |= CO_VARARGS;
-	if (ste->ste_varkeywords)
-		flags |= CO_VARKEYWORDS;
-	if (ste->ste_generator)
-		flags |= CO_GENERATOR;
 
 	/* (Only) inherit compilerflags in PyCF_MASK */
 	flags |= (c->c_flags->cf_flags & PyCF_MASK);

@@ -9,12 +9,12 @@ SVNROOT      = http://svn.python.org/projects
 SPHINXOPTS   =
 PAPER        =
 SOURCES      =
-DISTVERSION  =
+DISTVERSION  = $(shell $(PYTHON) tools/sphinxext/patchlevel.py)
 
 ALLSPHINXOPTS = -b $(BUILDER) -d build/doctrees -D latex_paper_size=$(PAPER) \
                 $(SPHINXOPTS) . build/$(BUILDER) $(SOURCES)
 
-.PHONY: help checkout update build html htmlhelp clean coverage dist
+.PHONY: help checkout update build html htmlhelp clean coverage dist check
 
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -24,6 +24,7 @@ help:
 	@echo "  text      to make plain text files"
 	@echo "  changes   to make an overview over all changed/added/deprecated items"
 	@echo "  linkcheck to check all external links for integrity"
+	@echo "  suspicious to check for suspicious markup in output text"
 	@echo "  coverage  to check documentation coverage for library and C API"
 	@echo "  dist      to create a \"dist\" directory with archived docs for download"
 
@@ -36,9 +37,9 @@ checkout:
 	  echo "Checking out Docutils..."; \
 	  svn checkout $(SVNROOT)/external/docutils-0.5/docutils tools/docutils; \
 	fi
-	@if [ ! -d tools/jinja ]; then \
+	@if [ ! -d tools/jinja2 ]; then \
 	  echo "Checking out Jinja..."; \
-	  svn checkout $(SVNROOT)/external/Jinja-1.2/jinja tools/jinja; \
+	  svn checkout $(SVNROOT)/external/Jinja-2.1.1/jinja2 tools/jinja2; \
 	fi
 	@if [ ! -d tools/pygments ]; then \
 	  echo "Checking out Pygments..."; \
@@ -48,7 +49,7 @@ checkout:
 update: checkout
 	svn update tools/sphinx
 	svn update tools/docutils
-	svn update tools/jinja
+	svn update tools/jinja2
 	svn update tools/pygments
 
 build: checkout
@@ -84,6 +85,11 @@ linkcheck: build
 	@echo "Link check complete; look for any errors in the above output " \
 	      "or in build/$(BUILDER)/output.txt"
 
+suspicious: BUILDER = suspicious
+suspicious: build
+	@echo "Suspicious check complete; look for any errors in the above output " \
+	      "or in build/$(BUILDER)/suspicious.txt"
+
 coverage: BUILDER = coverage
 coverage: build
 	@echo "Coverage finished; see c.txt and python.txt in build/coverage"
@@ -111,33 +117,35 @@ dist:
 
 	# archive the HTML
 	make html
-	cp -pPR build/html dist/python$(DISTVERSION)-docs-html
-	tar -C dist -cf dist/python$(DISTVERSION)-docs-html.tar python$(DISTVERSION)-docs-html
-	bzip2 -9 -k dist/python$(DISTVERSION)-docs-html.tar
-	(cd dist; zip -q -r -9 python$(DISTVERSION)-docs-html.zip python$(DISTVERSION)-docs-html)
-	rm -r dist/python$(DISTVERSION)-docs-html
-	rm dist/python$(DISTVERSION)-docs-html.tar
+	cp -pPR build/html dist/python-$(DISTVERSION)-docs-html
+	tar -C dist -cf dist/python-$(DISTVERSION)-docs-html.tar python-$(DISTVERSION)-docs-html
+	bzip2 -9 -k dist/python-$(DISTVERSION)-docs-html.tar
+	(cd dist; zip -q -r -9 python-$(DISTVERSION)-docs-html.zip python-$(DISTVERSION)-docs-html)
+	rm -r dist/python-$(DISTVERSION)-docs-html
+	rm dist/python-$(DISTVERSION)-docs-html.tar
 
 	# archive the text build
 	make text
-	cp -pPR build/text dist/python$(DISTVERSION)-docs-text
-	tar -C dist -cf dist/python$(DISTVERSION)-docs-text.tar python$(DISTVERSION)-docs-text
-	bzip2 -9 -k dist/python$(DISTVERSION)-docs-text.tar
-	(cd dist; zip -q -r -9 python$(DISTVERSION)-docs-text.zip python$(DISTVERSION)-docs-text)
-	rm -r dist/python$(DISTVERSION)-docs-text
-	rm dist/python$(DISTVERSION)-docs-text.tar
+	cp -pPR build/text dist/python-$(DISTVERSION)-docs-text
+	tar -C dist -cf dist/python-$(DISTVERSION)-docs-text.tar python-$(DISTVERSION)-docs-text
+	bzip2 -9 -k dist/python-$(DISTVERSION)-docs-text.tar
+	(cd dist; zip -q -r -9 python-$(DISTVERSION)-docs-text.zip python-$(DISTVERSION)-docs-text)
+	rm -r dist/python-$(DISTVERSION)-docs-text
+	rm dist/python-$(DISTVERSION)-docs-text.tar
 	
 	# archive the A4 latex
 	-rm -r build/latex
 	make latex PAPER=a4
 	(cd build/latex; make clean && make all-pdf && make FMT=pdf zip bz2)
-	cp build/latex/docs-pdf.zip dist/python$(DISTVERSION)-docs-pdf-a4.zip
-	cp build/latex/docs-pdf.tar.bz2 dist/python$(DISTVERSION)-docs-pdf-a4.tar.bz2
+	cp build/latex/docs-pdf.zip dist/python-$(DISTVERSION)-docs-pdf-a4.zip
+	cp build/latex/docs-pdf.tar.bz2 dist/python-$(DISTVERSION)-docs-pdf-a4.tar.bz2
 
 	# archive the letter latex
 	rm -r build/latex
 	make latex PAPER=letter
 	(cd build/latex; make clean && make all-pdf && make FMT=pdf zip bz2)
-	cp build/latex/docs-pdf.zip dist/python$(DISTVERSION)-docs-pdf-letter.zip
-	cp build/latex/docs-pdf.tar.bz2 dist/python$(DISTVERSION)-docs-pdf-letter.tar.bz2
+	cp build/latex/docs-pdf.zip dist/python-$(DISTVERSION)-docs-pdf-letter.zip
+	cp build/latex/docs-pdf.tar.bz2 dist/python-$(DISTVERSION)-docs-pdf-letter.tar.bz2
 
+check:
+	$(PYTHON) tools/rstlint.py -i tools

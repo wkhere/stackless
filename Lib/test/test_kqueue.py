@@ -22,6 +22,7 @@ class TestKQueue(unittest.TestCase):
         self.assertRaises(ValueError, kq.fileno)
 
     def test_create_event(self):
+        from operator import lt, le, gt, ge
         fd = sys.stderr.fileno()
         ev = select.kevent(fd)
         other = select.kevent(1000)
@@ -33,12 +34,12 @@ class TestKQueue(unittest.TestCase):
         self.assertEqual(ev.udata, 0)
         self.assertEqual(ev, ev)
         self.assertNotEqual(ev, other)
-        self.assertEqual(cmp(ev, other), -1)
         self.assert_(ev < other)
         self.assert_(other >= ev)
-        self.assertRaises(TypeError, cmp, ev, None)
-        self.assertRaises(TypeError, cmp, ev, 1)
-        self.assertRaises(TypeError, cmp, ev, "ev")
+        for op in lt, le, gt, ge:
+            self.assertRaises(TypeError, op, ev, None)
+            self.assertRaises(TypeError, op, ev, 1)
+            self.assertRaises(TypeError, op, ev, "ev")
 
         ev = select.kevent(fd, select.KQ_FILTER_WRITE)
         self.assertEqual(ev.ident, fd)
@@ -120,12 +121,15 @@ class TestKQueue(unittest.TestCase):
         client.send(b"Hello!")
         server.send(b"world!!!")
 
-        events = kq.control(None, 4, 1)
         # We may need to call it several times
-        for i in range(5):
+        for i in range(10):
+            events = kq.control(None, 4, 1)
             if len(events) == 4:
                 break
-            events = kq.control(None, 4, 1)
+            time.sleep(1.0)
+        else:
+            self.fail('timeout waiting for event notifications')
+
         events = [(e.ident, e.filter, e.flags) for e in events]
         events.sort()
 

@@ -1392,7 +1392,7 @@ getbuffer(PyObject *arg, Py_buffer *view, char **errmsg)
 	Py_ssize_t count;
 	PyBufferProcs *pb = arg->ob_type->tp_as_buffer;
 	if (pb == NULL) {
-		*errmsg = "string or buffer";
+		*errmsg = "bytes or buffer";
 		return -1;
 	}
 	if (pb->bf_getbuffer) {
@@ -1649,7 +1649,7 @@ vgetargskeywords(PyObject *args, PyObject *keywords, const char *format,
 		}
 	}
 
-	if (!IS_END_OF_FORMAT(*format)) {
+	if (!IS_END_OF_FORMAT(*format) && *format != '|') {
 		PyErr_Format(PyExc_RuntimeError,
 			"more argument specifiers than keyword list entries "
 			"(remaining format:'%s')", format);

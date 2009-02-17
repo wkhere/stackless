@@ -289,7 +289,7 @@ PyTypeObject CField_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)CField_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -1472,11 +1472,14 @@ Z_set(void *ptr, PyObject *value, Py_ssize_t size)
 		size += 1; /* terminating NUL */
 		size *= sizeof(wchar_t);
 		buffer = (wchar_t *)PyMem_Malloc(size);
-		if (!buffer)
+		if (!buffer) {
+			Py_DECREF(value);
 			return PyErr_NoMemory();
+		}
 		memset(buffer, 0, size);
 		keep = PyCObject_FromVoidPtr(buffer, PyMem_Free);
 		if (!keep) {
+			Py_DECREF(value);
 			PyMem_Free(buffer);
 			return NULL;
 		}

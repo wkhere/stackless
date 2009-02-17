@@ -510,6 +510,13 @@ enum why_code {
 static enum why_code do_raise(PyObject *, PyObject *);
 static int unpack_iterable(PyObject *, int, int, PyObject **);
 
+/* Records whether tracing is on for any thread.  Counts the number of
+   threads for which tstate->c_tracefunc is non-NULL, so if the value
+   is 0, we know we don't have to check this thread's c_tracefunc.
+   This speeds up the if statement in PyEval_EvalFrameEx() after
+   fast_next_opcode*/
+static int _Py_TracingPossible = 0;
+
 /* for manipulating the thread switch and periodic "stuff" - used to be
    per thread, now just a pair o' globals */
 int _Py_CheckInterval = 100;
@@ -1154,7 +1161,8 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 
 		/* line-by-line tracing support */
 
-		if (tstate->c_tracefunc != NULL && !tstate->tracing) {
+		if (_Py_TracingPossible &&
+		    tstate->c_tracefunc != NULL && !tstate->tracing) {
 			/* see maybe_call_line_trace
 			   for expository comments */
 			f->f_stacktop = stack_pointer;
@@ -1309,6 +1317,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 			}
 			Py_FatalError("invalid argument to DUP_TOPX"
 				      " (bytecode corruption?)");
+			/* Never returns, so don't bother to set why. */
 			break;
 
 		case UNARY_POSITIVE:
@@ -1925,6 +1934,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 			if ((v = f->f_locals) == NULL) {
 				PyErr_Format(PyExc_SystemError,
 					     "no locals when loading %R", w);
+				why = WHY_EXCEPTION;
 				break;
 			}
 			if (PyDict_CheckExact(v)) {
@@ -2389,7 +2399,17 @@ stackless_iter_return:
 			Py_DECREF(exit_func);
 			if (x == NULL)
 				break; /* Go to error exit */
-			if (u != Py_None && PyObject_IsTrue(x)) {
+
+			if (u != Py_None)
+				err = PyObject_IsTrue(x);
+			else
+				err = 0;
+			Py_DECREF(x);
+
+			if (err < 0)
+				break; /* Go to error exit */
+			else if (err > 0) {
+				err = 0;
 				/* There was an exception and a True return */
 				STACKADJ(-2);
 				SET_TOP(PyLong_FromLong((long) WHY_SILENCED));
@@ -2397,7 +2417,6 @@ stackless_iter_return:
 				Py_DECREF(v);
 				Py_DECREF(w);
 			}
-			Py_DECREF(x);
 			PREDICT(END_FINALLY);
 			break;
 		}
@@ -2489,7 +2508,10 @@ stackless_call_return:
 
 			if (x != NULL && opcode == MAKE_CLOSURE) {
 				v = POP();
-				err = PyFunction_SetClosure(x, v);
+				if (PyFunction_SetClosure(x, v) != 0) {
+					/* Can't happen unless bytecode is corrupt. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 			}
 
@@ -2513,7 +2535,11 @@ stackless_call_return:
 					Py_DECREF(w);
 				}
 
-				err = PyFunction_SetAnnotations(x, v);
+				if (PyFunction_SetAnnotations(x, v) != 0) {
+					/* Can't happen unless
+					   PyFunction_SetAnnotations changes. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 				Py_DECREF(u);
 			}
@@ -2530,7 +2556,11 @@ stackless_call_return:
 					w = POP();
 					PyTuple_SET_ITEM(v, posdefaults, w);
 				}
-				err = PyFunction_SetDefaults(x, v);
+				if (PyFunction_SetDefaults(x, v) != 0) {
+					/* Can't happen unless
+                                           PyFunction_SetDefaults changes. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 			}
 			if (x != NULL && kwdefaults > 0) {
@@ -2548,7 +2578,11 @@ stackless_call_return:
 					Py_DECREF(w);
 					Py_DECREF(u);
 				}
-				err = PyFunction_SetKwDefaults(x, v);
+				if (PyFunction_SetKwDefaults(x, v) != 0) {
+					/* Can't happen unless
+                                           PyFunction_SetKwDefaults changes. */
+					why = WHY_EXCEPTION;
+				}
 				Py_DECREF(v);
 			}
 			PUSH(x);
@@ -3461,6 +3495,7 @@ PyEval_SetTrace(Py_tracefunc func, PyObject *arg)
 {
 	PyThreadState *tstate = PyThreadState_GET();
 	PyObject *temp = tstate->c_traceobj;
+	_Py_TracingPossible += (func != NULL) - (tstate->c_tracefunc != NULL);
 	Py_XINCREF(arg);
 	tstate->c_tracefunc = NULL;
 	tstate->c_traceobj = NULL;

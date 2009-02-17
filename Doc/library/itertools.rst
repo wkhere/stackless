@@ -74,7 +74,7 @@ loops that truncate the stream.
 
 .. function:: itertools.chain.from_iterable(iterable)
 
-   Alternate constructor for :func:`chain`.  Gets chained inputs from a 
+   Alternate constructor for :func:`chain`.  Gets chained inputs from a
    single iterable argument that is evaluated lazily.  Equivalent to::
 
       @classmethod
@@ -89,9 +89,9 @@ loops that truncate the stream.
 
    Return *r* length subsequences of elements from the input *iterable*.
 
-   Combinations are emitted in lexicographic sort order.  So, if the 
+   Combinations are emitted in lexicographic sort order.  So, if the
    input *iterable* is sorted, the combination tuples will be produced
-   in sorted order.  
+   in sorted order.
 
    Elements are treated as unique based on their position, not on their
    value.  So if the input elements are unique, there will be no repeat
@@ -104,7 +104,9 @@ loops that truncate the stream.
             # combinations(range(4), 3) --> 012 013 023 123
             pool = tuple(iterable)
             n = len(pool)
-            indices = range(r)
+            if r > n:
+                return
+            indices = list(range(r))
             yield tuple(pool[i] for i in indices)
             while 1:
                 for i in reversed(range(r)):
@@ -128,6 +130,8 @@ loops that truncate the stream.
                 if sorted(indices) == list(indices):
                     yield tuple(pool[i] for i in indices)
 
+   The number of items returned is ``n! / r! / (n-r)!`` when ``0 <= r <= n``
+   or zero when ``r > n``.
 
 .. function:: count([n])
 
@@ -180,6 +184,20 @@ loops that truncate the stream.
           for x in iterable:
               yield x
 
+.. function:: filterfalse(predicate, iterable)
+
+   Make an iterator that filters elements from iterable returning only those for
+   which the predicate is ``False``. If *predicate* is ``None``, return the items
+   that are false. Equivalent to::
+
+      def filterfalse(predicate, iterable):
+          # filterfalse(lambda x: x%2, range(10)) --> 0 2 4 6 8
+          if predicate is None:
+              predicate = bool
+          for x in iterable:
+              if not predicate(x):
+                  yield x
+
 
 .. function:: groupby(iterable[, key])
 
@@ -211,7 +229,7 @@ loops that truncate the stream.
 
       class groupby(object):
           # [k for k, g in groupby('AAAABBBCCDAABBB')] --> A B C D A B
-          # [(list(g)) for k, g in groupby('AAAABBBCCD')] --> AAAA BBB CC D
+          # [list(g) for k, g in groupby('AAAABBBCCD')] --> AAAA BBB CC D
           def __init__(self, iterable, key=None):
               if key is None:
                   key = lambda x: x
@@ -231,21 +249,6 @@ loops that truncate the stream.
                   yield self.currvalue
                   self.currvalue = next(self.it) # Exit on StopIteration
                   self.currkey = self.keyfunc(self.currvalue)
-
-
-.. function:: filterfalse(predicate, iterable)
-
-   Make an iterator that filters elements from iterable returning only those for
-   which the predicate is ``False``. If *predicate* is ``None``, return the items
-   that are false. Equivalent to::
-
-      def filterfalse(predicate, iterable):
-          # filterfalse(lambda x: x%2, range(10)) --> 0 2 4 6 8
-          if predicate is None:
-              predicate = bool
-          for x in iterable:
-              if not predicate(x):
-                  yield x
 
 
 .. function:: islice(iterable, [start,] stop [, step])
@@ -277,41 +280,17 @@ loops that truncate the stream.
    then the step defaults to one.
 
 
-.. function:: zip_longest(*iterables[, fillvalue])
-
-   Make an iterator that aggregates elements from each of the iterables. If the
-   iterables are of uneven length, missing values are filled-in with *fillvalue*.
-   Iteration continues until the longest iterable is exhausted.  Equivalent to::
-
-      def zip_longest(*args, fillvalue=None):
-          # zip_longest('ABCD', 'xy', fillvalue='-') --> Ax By C- D-
-          def sentinel(counter = ([fillvalue]*(len(args)-1)).pop):
-              yield counter()         # yields the fillvalue, or raises IndexError
-          fillers = repeat(fillvalue)
-          iters = [chain(it, sentinel(), fillers) for it in args]
-          try:
-              for tup in zip(*iters):
-                  yield tup
-          except IndexError:
-              pass
-
-   If one of the iterables is potentially infinite, then the :func:`zip_longest`
-   function should be wrapped with something that limits the number of calls
-   (for example :func:`islice` or :func:`takewhile`).  If not specified,
-   *fillvalue* defaults to ``None``.
-
-
 .. function:: permutations(iterable[, r])
 
    Return successive *r* length permutations of elements in the *iterable*.
 
    If *r* is not specified or is ``None``, then *r* defaults to the length
-   of the *iterable* and all possible full-length permutations 
+   of the *iterable* and all possible full-length permutations
    are generated.
 
-   Permutations are emitted in lexicographic sort order.  So, if the 
+   Permutations are emitted in lexicographic sort order.  So, if the
    input *iterable* is sorted, the permutation tuples will be produced
-   in sorted order.  
+   in sorted order.
 
    Elements are treated as unique based on their position, not on their
    value.  So if the input elements are unique, there will be no repeat
@@ -325,7 +304,9 @@ loops that truncate the stream.
             pool = tuple(iterable)
             n = len(pool)
             r = n if r is None else r
-            indices = range(n)
+            if r > n:
+                return
+            indices = list(range(n))
             cycles = range(n, n-r, -1)
             yield tuple(pool[i] for i in indices[:r])
             while n:
@@ -342,7 +323,7 @@ loops that truncate the stream.
                 else:
                     return
 
-   The code for :func:`permutations` can be also expressed as a subsequence of 
+   The code for :func:`permutations` can be also expressed as a subsequence of
    :func:`product`, filtered to exclude entries with repeated elements (those
    from the same position in the input pool)::
 
@@ -354,6 +335,8 @@ loops that truncate the stream.
                 if len(set(indices)) == r:
                     yield tuple(pool[i] for i in indices)
 
+   The number of items returned is ``n! / (n-r)!`` when ``0 <= r <= n``
+   or zero when ``r > n``.
 
 .. function:: product(*iterables[, repeat])
 
@@ -456,6 +439,30 @@ loops that truncate the stream.
    is faster to use :func:`list` instead of :func:`tee`.
 
 
+.. function:: zip_longest(*iterables[, fillvalue])
+
+   Make an iterator that aggregates elements from each of the iterables. If the
+   iterables are of uneven length, missing values are filled-in with *fillvalue*.
+   Iteration continues until the longest iterable is exhausted.  Equivalent to::
+
+      def zip_longest(*args, fillvalue=None):
+          # zip_longest('ABCD', 'xy', fillvalue='-') --> Ax By C- D-
+          def sentinel(counter = ([fillvalue]*(len(args)-1)).pop):
+              yield counter()         # yields the fillvalue, or raises IndexError
+          fillers = repeat(fillvalue)
+          iters = [chain(it, sentinel(), fillers) for it in args]
+          try:
+              for tup in zip(*iters):
+                  yield tup
+          except IndexError:
+              pass
+
+   If one of the iterables is potentially infinite, then the :func:`zip_longest`
+   function should be wrapped with something that limits the number of calls
+   (for example :func:`islice` or :func:`takewhile`).  If not specified,
+   *fillvalue* defaults to ``None``.
+
+
 .. _itertools-example:
 
 Examples
@@ -466,7 +473,7 @@ can be combined.
 
 .. doctest::
 
-   # Show a dictionary sorted and grouped by value
+   >>> # Show a dictionary sorted and grouped by value
    >>> from operator import itemgetter
    >>> d = dict(a=1, b=2, c=1, d=2, e=1, f=2, g=3)
    >>> di = sorted(d.items(), key=itemgetter(1))
@@ -477,13 +484,13 @@ can be combined.
    2 ['b', 'd', 'f']
    3 ['g']
 
-   # Find runs of consecutive numbers using groupby.  The key to the solution
-   # is differencing with a range so that consecutive numbers all appear in
-   # same group.
+   >>> # Find runs of consecutive numbers using groupby.  The key to the solution
+   >>> # is differencing with a range so that consecutive numbers all appear in
+   >>> # same group.
    >>> data = [ 1,  4,5,6, 10, 15,16,17,18, 22, 25,26,27,28]
    >>> for k, g in groupby(enumerate(data), lambda t:t[0]-t[1]):
    ...     print(map(operator.itemgetter(1), g))
-   ... 
+   ...
    [1]
    [4, 5, 6]
    [10]
@@ -523,8 +530,8 @@ which incur interpreter overhead.
        return map(function, count(start))
 
    def nth(iterable, n):
-       "Returns the nth item or empty list"
-       return list(islice(iterable, n, n+1))
+       "Returns the nth item or None"
+       return next(islice(iterable, n, None), None)
 
    def quantify(iterable, pred=bool):
        "Count how many times the predicate is true"
@@ -566,7 +573,7 @@ which incur interpreter overhead.
    def grouper(n, iterable, fillvalue=None):
        "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
        args = [iter(iterable)] * n
-       return zip_longest(fillvalue=fillvalue, *args)
+       return zip_longest(*args, fillvalue=fillvalue)
 
    def roundrobin(*iterables):
        "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
@@ -582,18 +589,17 @@ which incur interpreter overhead.
                nexts = cycle(islice(nexts, pending))
 
    def powerset(iterable):
-       "powerset('ab') --> set([]), set(['a']), set(['b']), set(['a', 'b'])"
-       # Recipe credited to Eric Raymond
-       pairs = [(2**i, x) for i, x in enumerate(iterable)]
-       for n in xrange(2**len(pairs)):
-           yield set(x for m, x in pairs if m&n)
+       "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+       s = list(iterable)
+       return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
 
    def compress(data, selectors):
        "compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F"
        return (d for d, s in zip(data, selectors) if s)
 
    def combinations_with_replacement(iterable, r):
-       "combinations_with_replacement('ABC', 3) --> AA AB AC BB BC CC"
+       "combinations_with_replacement('ABC', 2) --> AA AB AC BB BC CC"
+       # number items returned:  (n+r-1)! / r! / (n-1)!
        pool = tuple(iterable)
        n = len(pool)
        indices = [0] * r
@@ -606,3 +612,27 @@ which incur interpreter overhead.
                return
            indices[i:] = [indices[i] + 1] * (r - i)
            yield tuple(pool[i] for i in indices)
+
+    def unique_everseen(iterable, key=None):
+        "List unique elements, preserving order. Remember all elements ever seen."
+        # unique_everseen('AAAABBBCCDAABBB') --> A B C D
+        # unique_everseen('ABBCcAD', str.lower) --> A B C D
+        seen = set()
+        seen_add = seen.add
+        if key is None:
+            for element in iterable:
+                if element not in seen:
+                    seen_add(element)
+                    yield element
+        else:
+            for element in iterable:
+                k = key(element)
+                if k not in seen:
+                    seen_add(k)
+                    yield element
+
+    def unique_justseen(iterable, key=None):
+        "List unique elements, preserving order. Remember only the element just seen."
+        # unique_justseen('AAAABBBCCDAABBB') --> A B C D A B
+        # unique_justseen('ABBCcAD', str.lower) --> A B C A D
+        return map(next, map(itemgetter(1), groupby(iterable, key)))

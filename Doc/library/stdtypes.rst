@@ -172,7 +172,7 @@ notion of comparison where any two objects of that type are unequal.  The ``<``,
 any operand is a complex number, the objects are of different types that cannot
 be compared, or other cases where there is no defined ordering.
 
-.. index:: 
+.. index::
    single: __eq__() (instance method)
    single: __ne__() (instance method)
    single: __lt__() (instance method)
@@ -322,6 +322,7 @@ Notes:
       module: math
       single: floor() (in module math)
       single: ceil() (in module math)
+      single: trunc() (in module math)
       pair: numeric; conversions
       pair: C; language
 
@@ -330,31 +331,31 @@ Notes:
    for well-defined conversions.
 
 (4)
-   float also accepts the strings "nan" and "inf" with an optional prefix "+" 
+   float also accepts the strings "nan" and "inf" with an optional prefix "+"
    or "-" for Not a Number (NaN) and positive or negative infinity.
 
 (5)
    Python defines ``pow(0, 0)`` and ``0 ** 0`` to be ``1``, as is common for
    programming languages.
 
-   
+
 
 All :class:`numbers.Real` types (:class:`int` and
 :class:`float`) also include the following operations:
 
-+--------------------+--------------------------------+--------+
-| Operation          | Result                         | Notes  |
-+====================+================================+========+
-| ``trunc(x)``       | *x* truncated to Integral      |        |
-+--------------------+--------------------------------+--------+
-| ``round(x[, n])``  | *x* rounded to n digits,       |        |
-|                    | rounding half to even. If n is |        |
-|                    | omitted, it defaults to 0.     |        |
-+--------------------+--------------------------------+--------+
-| ``math.floor(x)``  | the greatest Integral <= *x*   |        |
-+--------------------+--------------------------------+--------+
-| ``math.ceil(x)``   | the least Integral >= *x*      |        |
-+--------------------+--------------------------------+--------+
++--------------------+------------------------------------+--------+
+| Operation          | Result                             | Notes  |
++====================+====================================+========+
+| ``math.trunc(x)``  | *x* truncated to Integral          |        |
++--------------------+------------------------------------+--------+
+| ``round(x[, n])``  | *x* rounded to n digits,           |        |
+|                    | rounding half to even. If n is     |        |
+|                    | omitted, it defaults to 0.         |        |
++--------------------+------------------------------------+--------+
+| ``math.floor(x)``  | the greatest integral float <= *x* |        |
++--------------------+------------------------------------+--------+
+| ``math.ceil(x)``   | the least integral float >= *x*    |        |
++--------------------+------------------------------------+--------+
 
 For additional numeric operations see the :mod:`math` and :mod:`cmath`
 modules.
@@ -419,6 +420,36 @@ Notes:
    overflow check.
 
 
+Additional Methods on Integer Types
+-----------------------------------
+
+.. method:: int.bit_length()
+
+    Return the number of bits necessary to represent an integer in binary,
+    excluding the sign and leading zeros::
+
+        >>> n = -37
+        >>> bin(n)
+        '-0b100101'
+        >>> n.bit_length()
+        6
+
+    More precisely, if ``x`` is nonzero, then ``x.bit_length()`` is the
+    unique positive integer ``k`` such that ``2**(k-1) <= abs(x) < 2**k``.
+    Equivalently, when ``abs(x)`` is small enough to have a correctly
+    rounded logarithm, then ``k = 1 + int(log(abs(x), 2))``.
+    If ``x`` is zero, then ``x.bit_length()`` returns ``0``.
+
+    Equivalent to::
+
+        def bit_length(self):
+            s = bin(x)          # binary representation:  bin(-37) --> '-0b100101'
+            s = s.lstrip('-0b') # remove leading zeros and minus sign
+            return len(s)       # len('100101') --> 6
+
+    .. versionadded:: 3.1
+
+
 Additional Methods on Float
 ---------------------------
 
@@ -430,8 +461,6 @@ The float type has some additional methods.
     original float and with a positive denominator.  Raises
     :exc:`OverflowError` on infinities and a :exc:`ValueError` on
     NaNs.
-    
-    .. versionadded:: 2.6
 
 Two methods support conversion to
 and from hexadecimal strings.  Since Python's floats are stored
@@ -565,16 +594,17 @@ generator object) supplying the :meth:`__iter__` and :meth:`__next__` methods.
 Sequence Types --- :class:`str`, :class:`bytes`, :class:`bytearray`, :class:`list`, :class:`tuple`, :class:`range`
 ==================================================================================================================
 
-There are five sequence types: strings, byte sequences, byte arrays, lists,
-tuples, and range objects.  (For other containers see the built-in
-:class:`dict`, :class:`list`, :class:`set`, and :class:`tuple` classes, and the
-:mod:`collections` module.)
+There are six sequence types: strings, byte sequences (:class:`bytes` objects),
+byte arrays (:class:`bytearray` objects), lists, tuples, and range objects.  For
+other containers see the built in :class:`dict` and :class:`set` classes, and
+the :mod:`collections` module.
+
 
 .. index::
    object: sequence
    object: string
    object: bytes
-   object: buffer
+   object: bytearray
    object: tuple
    object: list
    object: range
@@ -845,7 +875,7 @@ functions based on regular expressions.
    otherwise. Decimal characters include digit characters, and all characters
    that that can be used to form decimal-radix numbers, e.g. U+0660,
    ARABIC-INDIC DIGIT ZERO.
-   
+
 
 .. method:: str.isdigit()
 
@@ -873,7 +903,7 @@ functions based on regular expressions.
    that have the Unicode numeric value property, e.g. U+2155,
    VULGAR FRACTION ONE FIFTH.
 
-   
+
 .. method:: str.isprintable()
 
    Return true if all characters in the string are printable or the string is
@@ -1086,16 +1116,12 @@ functions based on regular expressions.
 .. method:: str.translate(map)
 
    Return a copy of the *s* where all characters have been mapped through the
-   *map* which must be a dictionary of Unicode ordinals(integers) to Unicode
+   *map* which must be a dictionary of Unicode ordinals (integers) to Unicode
    ordinals, strings or ``None``.  Unmapped characters are left untouched.
    Characters mapped to ``None`` are deleted.
 
-   A *map* for :meth:`translate` is usually best created by
-   :meth:`str.maketrans`.
-
-   You can use the :func:`maketrans` helper function in the :mod:`string` module to
-   create a translation table. For string objects, set the *table* argument to
-   ``None`` for translations that only delete characters:
+   You can use :meth:`str.maketrans` to create a translation map from
+   character-to-character mappings in different formats.
 
    .. note::
 
@@ -1448,7 +1474,7 @@ Notes:
    example, sort by department, then by salary grade).
 
    While a list is being sorted, the effect of attempting to mutate, or even
-   inspect, the list is undefined.  The C implementation 
+   inspect, the list is undefined.  The C implementation
    makes the list appear empty for the duration, and raises :exc:`ValueError` if it
    can detect that the list has been mutated during a sort.
 
@@ -1498,23 +1524,23 @@ The bytes and bytearray types have an additional class method:
    >>> bytes.fromhex('f0 f1f2  ')
    b'\xf0\xf1\xf2'
 
-.. XXX verify/document translate() semantics!
+The translate method differs in semantics from the version available on strings:
 
-   .. method:: bytes.translate(table[, delete])
+.. method:: bytes.translate(table[, delete])
 
-   Return a copy of the bytes object where all bytes occurring in the optional
-   argument *delete* are removed, and the remaining bytes have been mapped
-   through the given translation table, which must be a bytes object of length
-   256.
+   Return a copy of the bytes or bytearray object where all bytes occurring in
+   the optional argument *delete* are removed, and the remaining bytes have been
+   mapped through the given translation table, which must be a bytes object of
+   length 256.
 
-   You can use the :func:`maketrans` helper function in the :mod:`string` module to
-   create a translation table.
+   You can use the :func:`string.maketrans` helper function to create a
+   translation table.
 
-   .. XXX a None table doesn't seem to be supported
-      Set the *table* argument to ``None`` for translations that only delete characters::
+   Set the *table* argument to ``None`` for translations that only delete
+   characters::
 
-         >>> 'read this short text'.translate(None, 'aeiou')
-         'rd ths shrt txt'
+      >>> b'read this short text'.translate(None, b'aeiou')
+      b'rd ths shrt txt'
 
 
 .. _types-set:
@@ -1597,12 +1623,12 @@ The constructors for both classes work the same:
    .. method:: union(other, ...)
                set | other | ...
 
-      Return a new set with elements from both sets.
+      Return a new set with elements from the set and all others.
 
    .. method:: intersection(other, ...)
                set & other & ...
 
-      Return a new set with elements common to both sets.
+      Return a new set with elements common to the set and all others.
 
    .. method:: difference(other, ...)
                set - other - ...
@@ -1781,7 +1807,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
 
       Return the item of *d* with key *key*.  Raises a :exc:`KeyError` if *key* is
       not in the map.
-      
+
       If a subclass of dict defines a method :meth:`__missing__`, if the key *key*
       is not present, the ``d[key]`` operation calls that method with the key *key*
       as argument.  The ``d[key]`` operation then returns or raises whatever is
@@ -2123,7 +2149,7 @@ Files have the following methods:
    positioning); other values are ``os.SEEK_CUR`` or ``1`` (seek relative to the
    current position) and ``os.SEEK_END`` or ``2``  (seek relative to the file's
    end).  There is no return value.
-   
+
    For example, ``f.seek(2, os.SEEK_CUR)`` advances the position by two and
    ``f.seek(-3, os.SEEK_END)`` sets the position to the third to last.
 

@@ -14,7 +14,7 @@ multiple base classes, a derived class can override any methods of its base
 class or classes, and a method can call the method of a base class with the same
 name.  Objects can contain an arbitrary amount of private data.
 
-In C++ terminology, normally class members (including the data members) are 
+In C++ terminology, normally class members (including the data members) are
 *public* (except see below :ref:`tut-private`),
 and all member functions are *virtual*.  There are no special constructors or
 destructors.  As in Modula-3, there are no shorthands for referencing the
@@ -119,12 +119,11 @@ contains the current module's global names; and the outermost scope (searched
 last) is the namespace containing built-in names.
 
 If a name is declared global, then all references and assignments go directly to
-the middle scope containing the module's global names. Otherwise, all variables
-found outside of the innermost scope are read-only (an attempt to write to such
-a variable will simply create a *new* local variable in the innermost scope,
-leaving the identically named outer variable unchanged).
-
-.. XXX mention nonlocal
+the middle scope containing the module's global names.  To rebind variables
+found outside of the innermost scope, the :keyword:`nonlocal` statement can be
+used; if not declared nonlocal, those variable are read-only (an attempt to
+write to such a variable will simply create a *new* local variable in the
+innermost scope, leaving the identically named outer variable unchanged).
 
 Usually, the local scope references the local names of the (textually) current
 function.  Outside functions, the local scope references the same namespace as
@@ -172,7 +171,7 @@ binding::
        def do_global():
            global spam
            spam = "global spam"
-   
+
        spam = "test spam"
        do_local()
        print("After local assignment:", spam)
@@ -303,7 +302,7 @@ are passed on to :meth:`__init__`.  For example, ::
    ...     def __init__(self, realpart, imagpart):
    ...         self.r = realpart
    ...         self.i = imagpart
-   ... 
+   ...
    >>> x = Complex(3.0, -4.5)
    >>> x.r, x.i
    (3.0, -4.5)
@@ -533,7 +532,7 @@ Python has two builtin functions that work with inheritance:
   is ``True`` since :class:`bool` is a subclass of :class:`int`.  However,
   ``issubclass(float, int)`` is ``False`` since :class:`float` is not a
   subclass of :class:`int`.
-  
+
 
 
 .. _tut-multiple:
@@ -790,7 +789,7 @@ easy to create::
    f
    l
    o
-   g	
+   g
 
 Anything that can be done with generators can also be done with class based
 iterators as described in the previous section.  What makes generators so

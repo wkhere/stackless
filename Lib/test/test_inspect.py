@@ -18,6 +18,9 @@ from test import inspect_fodder2 as mod2
 # getclasstree, getargspec, getargvalues, formatargspec, formatargvalues,
 # currentframe, stack, trace, isdatadescriptor
 
+# NOTE: There are some additional tests relating to interaction with
+#       zipimport in the test_zipimport_support test module.
+
 modfile = mod.__file__
 if modfile.endswith(('c', 'o')):
     modfile = modfile[:-1]
@@ -71,7 +74,6 @@ class TestPredicates(IsTestBase):
     def test_excluding_predicates(self):
         self.istest(inspect.isbuiltin, 'sys.exit')
         self.istest(inspect.isbuiltin, '[].append')
-        self.istest(inspect.isclass, 'mod.StupidGit')
         self.istest(inspect.iscode, 'mod.spam.__code__')
         self.istest(inspect.isframe, 'tb.tb_frame')
         self.istest(inspect.isfunction, 'mod.spam')
@@ -95,6 +97,26 @@ class TestPredicates(IsTestBase):
     def test_isroutine(self):
         self.assert_(inspect.isroutine(mod.spam))
         self.assert_(inspect.isroutine([].count))
+
+    def test_isclass(self):
+        self.istest(inspect.isclass, 'mod.StupidGit')
+        self.assertTrue(inspect.isclass(list))
+
+        class CustomGetattr(object):
+            def __getattr__(self, attr):
+                return None
+        self.assertFalse(inspect.isclass(CustomGetattr()))
+
+    def test_get_slot_members(self):
+        class C(object):
+            __slots__ = ("a", "b")
+
+        x = C()
+        x.a = 42
+        members = dict(inspect.getmembers(x))
+        self.assert_('a' in members)
+        self.assert_('b' not in members)
+
 
 class TestInterpreterStack(IsTestBase):
     def __init__(self, *args, **kwargs):

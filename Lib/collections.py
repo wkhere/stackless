@@ -108,7 +108,7 @@ def namedtuple(typename, field_names, verbose=False):
     # where the named tuple is created.  Bypass this step in enviroments where
     # sys._getframe is not defined (Jython for example).
     if hasattr(_sys, '_getframe'):
-        result.__module__ = _sys._getframe(1).f_globals['__name__']
+        result.__module__ = _sys._getframe(1).f_globals.get('__name__', '__main__')
 
     return result
 
@@ -191,8 +191,6 @@ class UserList(MutableSequence):
     def __ge__(self, other): return self.data >= self.__cast(other)
     def __cast(self, other):
         return other.data if isinstance(other, UserList) else other
-    def __cmp__(self, other):
-        return cmp(self.data, self.__cast(other))
     def __contains__(self, item): return item in self.data
     def __len__(self): return len(self.data)
     def __getitem__(self, i): return self.data[i]
@@ -255,7 +253,6 @@ class UserString(Sequence):
     def __str__(self): return str(self.data)
     def __repr__(self): return repr(self.data)
     def __int__(self): return int(self.data)
-    def __long__(self): return int(self.data)
     def __float__(self): return float(self.data)
     def __complex__(self): return complex(self.data)
     def __hash__(self): return hash(self.data)

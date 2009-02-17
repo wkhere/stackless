@@ -75,11 +75,11 @@ class TestBasicOps(unittest.TestCase):
         self.assertRaises(TypeError, list, chain.from_iterable([2, 3]))
 
     def test_combinations(self):
-        self.assertRaises(TypeError, combinations, 'abc')   # missing r argument
+        self.assertRaises(TypeError, combinations, 'abc')       # missing r argument
         self.assertRaises(TypeError, combinations, 'abc', 2, 1) # too many arguments
         self.assertRaises(TypeError, combinations, None)        # pool is not iterable
         self.assertRaises(ValueError, combinations, 'abc', -2)  # r is negative
-        self.assertRaises(ValueError, combinations, 'abc', 32)  # r is too big
+        self.assertEqual(list(combinations('abc', 32)), [])     # r > n
         self.assertEqual(list(combinations(range(4), 3)),
                                            [(0,1,2), (0,1,3), (0,2,3), (1,2,3)])
 
@@ -87,6 +87,8 @@ class TestBasicOps(unittest.TestCase):
             'Pure python version shown in the docs'
             pool = tuple(iterable)
             n = len(pool)
+            if r > n:
+                return
             indices = list(range(r))
             yield tuple(pool[i] for i in indices)
             while 1:
@@ -110,9 +112,9 @@ class TestBasicOps(unittest.TestCase):
 
         for n in range(7):
             values = [5*x-12 for x in range(n)]
-            for r in range(n+1):
+            for r in range(n+2):
                 result = list(combinations(values, r))
-                self.assertEqual(len(result), fact(n) / fact(r) / fact(n-r)) # right number of combs
+                self.assertEqual(len(result), 0 if r>n else fact(n) / fact(r) / fact(n-r)) # right number of combs
                 self.assertEqual(len(result), len(set(result)))         # no repeats
                 self.assertEqual(result, sorted(result))                # lexicographic order
                 for c in result:
@@ -123,7 +125,7 @@ class TestBasicOps(unittest.TestCase):
                     self.assertEqual(list(c),
                                      [e for e in values if e in c])      # comb is a subsequence of the input iterable
                 self.assertEqual(result, list(combinations1(values, r))) # matches first pure python version
-                self.assertEqual(result, list(combinations2(values, r))) # matches first pure python version
+                self.assertEqual(result, list(combinations2(values, r))) # matches second pure python version
 
         # Test implementation detail:  tuple re-use
         self.assertEqual(len(set(map(id, combinations('abcde', 3)))), 1)
@@ -134,7 +136,7 @@ class TestBasicOps(unittest.TestCase):
         self.assertRaises(TypeError, permutations, 'abc', 2, 1) # too many arguments
         self.assertRaises(TypeError, permutations, None)        # pool is not iterable
         self.assertRaises(ValueError, permutations, 'abc', -2)  # r is negative
-        self.assertRaises(ValueError, permutations, 'abc', 32)  # r is too big
+        self.assertEqual(list(permutations('abc', 32)), [])     # r > n
         self.assertRaises(TypeError, permutations, 'abc', 's')  # r is not an int or None
         self.assertEqual(list(permutations(range(3), 2)),
                                            [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)])
@@ -144,6 +146,8 @@ class TestBasicOps(unittest.TestCase):
             pool = tuple(iterable)
             n = len(pool)
             r = n if r is None else r
+            if r > n:
+                return
             indices = list(range(n))
             cycles = list(range(n-r+1, n+1))[::-1]
             yield tuple(pool[i] for i in indices[:r])
@@ -172,9 +176,9 @@ class TestBasicOps(unittest.TestCase):
 
         for n in range(7):
             values = [5*x-12 for x in range(n)]
-            for r in range(n+1):
+            for r in range(n+2):
                 result = list(permutations(values, r))
-                self.assertEqual(len(result), fact(n) / fact(n-r))      # right number of perms
+                self.assertEqual(len(result), 0 if r>n else fact(n) / fact(n-r))      # right number of perms
                 self.assertEqual(len(result), len(set(result)))         # no repeats
                 self.assertEqual(result, sorted(result))                # lexicographic order
                 for p in result:
@@ -182,7 +186,7 @@ class TestBasicOps(unittest.TestCase):
                     self.assertEqual(len(set(p)), r)                    # no duplicate elements
                     self.assert_(all(e in values for e in p))           # elements taken from input iterable
                 self.assertEqual(result, list(permutations1(values, r))) # matches first pure python version
-                self.assertEqual(result, list(permutations2(values, r))) # matches first pure python version
+                self.assertEqual(result, list(permutations2(values, r))) # matches second pure python version
                 if r == n:
                     self.assertEqual(result, list(permutations(values, None))) # test r as None
                     self.assertEqual(result, list(permutations(values)))       # test default r
@@ -1216,8 +1220,8 @@ Samuele
 ...     return map(function, count(start))
 
 >>> def nth(iterable, n):
-...     "Returns the nth item or empty list"
-...     return list(islice(iterable, n, n+1))
+...     "Returns the nth item or None"
+...     return next(islice(iterable, n, None), None)
 
 >>> def quantify(iterable, pred=bool):
 ...     "Count how many times the predicate is true"
@@ -1257,7 +1261,7 @@ Samuele
 >>> def grouper(n, iterable, fillvalue=None):
 ...     "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
 ...     args = [iter(iterable)] * n
-...     return zip_longest(fillvalue=fillvalue, *args)
+...     return zip_longest(*args, fillvalue=fillvalue)
 
 >>> def roundrobin(*iterables):
 ...     "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
@@ -1273,11 +1277,9 @@ Samuele
 ...             nexts = cycle(islice(nexts, pending))
 
 >>> def powerset(iterable):
-...     "powerset('ab') --> set([]), set(['a']), set(['b']), set(['a', 'b'])"
-...     # Recipe credited to Eric Raymond
-...     pairs = [(2**i, x) for i, x in enumerate(iterable)]
-...     for n in range(2**len(pairs)):
-...         yield set(x for m, x in pairs if m&n)
+...     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+...     s = list(iterable)
+...     return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
 
 >>> def compress(data, selectors):
 ...     "compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F"
@@ -1298,6 +1300,30 @@ Samuele
 ...         indices[i:] = [indices[i] + 1] * (r - i)
 ...         yield tuple(pool[i] for i in indices)
 
+>>> def unique_everseen(iterable, key=None):
+...     "List unique elements, preserving order. Remember all elements ever seen."
+...     # unique_everseen('AAAABBBCCDAABBB') --> A B C D
+...     # unique_everseen('ABBCcAD', str.lower) --> A B C D
+...     seen = set()
+...     seen_add = seen.add
+...     if key is None:
+...         for element in iterable:
+...             if element not in seen:
+...                 seen_add(element)
+...                 yield element
+...     else:
+...         for element in iterable:
+...             k = key(element)
+...             if k not in seen:
+...                 seen_add(k)
+...                 yield element
+
+>>> def unique_justseen(iterable, key=None):
+...     "List unique elements, preserving order. Remember only the element just seen."
+...     # unique_justseen('AAAABBBCCDAABBB') --> A B C D A B
+...     # unique_justseen('ABBCcAD', str.lower) --> A B C A D
+...     return map(next, map(itemgetter(1), groupby(iterable, key)))
+
 This is not part of the examples but it tests to make sure the definitions
 perform as purported.
 
@@ -1311,7 +1337,10 @@ perform as purported.
 [0, 2, 4, 6]
 
 >>> nth('abcde', 3)
-['d']
+'d'
+
+>>> nth('abcde', 9) is None
+True
 
 >>> quantify(range(99), lambda x: x%2==0)
 50
@@ -1351,14 +1380,46 @@ perform as purported.
 >>> list(roundrobin('abc', 'd', 'ef'))
 ['a', 'd', 'e', 'b', 'f', 'c']
 
->>> list(map(sorted, powerset('ab')))
-[[], ['a'], ['b'], ['a', 'b']]
+>>> list(powerset([1,2,3]))
+[(), (1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
 
 >>> list(compress('abcdef', [1,0,1,0,1,1]))
 ['a', 'c', 'e', 'f']
 
 >>> list(combinations_with_replacement('abc', 2))
 [('a', 'a'), ('a', 'b'), ('a', 'c'), ('b', 'b'), ('b', 'c'), ('c', 'c')]
+
+>>> list(combinations_with_replacement('01', 3))
+[('0', '0', '0'), ('0', '0', '1'), ('0', '1', '1'), ('1', '1', '1')]
+
+>>> def combinations_with_replacement2(iterable, r):
+...     'Alternate version that filters from product()'
+...     pool = tuple(iterable)
+...     n = len(pool)
+...     for indices in product(range(n), repeat=r):
+...         if sorted(indices) == list(indices):
+...             yield tuple(pool[i] for i in indices)
+
+>>> list(combinations_with_replacement('abc', 2)) == list(combinations_with_replacement2('abc', 2))
+True
+
+>>> list(combinations_with_replacement('01', 3)) == list(combinations_with_replacement2('01', 3))
+True
+
+>>> list(combinations_with_replacement('2310', 6)) == list(combinations_with_replacement2('2310', 6))
+True
+
+>>> list(unique_everseen('AAAABBBCCDAABBB'))
+['A', 'B', 'C', 'D']
+
+>>> list(unique_everseen('ABBCcAD', str.lower))
+['A', 'B', 'C', 'D']
+
+>>> list(unique_justseen('AAAABBBCCDAABBB'))
+['A', 'B', 'C', 'D', 'A', 'B']
+
+>>> list(unique_justseen('ABBCcAD', str.lower))
+['A', 'B', 'C', 'A', 'D']
 
 """
 

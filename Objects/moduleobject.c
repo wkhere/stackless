@@ -91,9 +91,9 @@ PyModule_Create2(struct PyModuleDef* module, int module_api_version)
 
 	   This is a bit of a hack: when the shared library is loaded,
 	   the module name is "package.module", but the module calls
-	   Py_InitModule*() with just "module" for the name.  The shared
+	   PyModule_Create*() with just "module" for the name.  The shared
 	   library loader squirrels away the true name of the module in
-	   _Py_PackageContext, and Py_InitModule*() will substitute this
+	   _Py_PackageContext, and PyModule_Create*() will substitute this
 	   (if the name actually matches).
 	*/
 	if (_Py_PackageContext != NULL) {
@@ -321,6 +321,8 @@ module_dealloc(PyModuleObject *m)
 		_PyModule_Clear((PyObject *)m);
 		Py_DECREF(m->md_dict);
 	}
+	if (m->md_state != NULL)
+		PyMem_FREE(m->md_state);
 	Py_TYPE(m)->tp_free((PyObject *)m);
 }
 
@@ -383,7 +385,7 @@ PyTypeObject PyModule_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)module_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

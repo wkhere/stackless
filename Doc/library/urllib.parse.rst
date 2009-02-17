@@ -106,8 +106,8 @@ The :mod:`urllib.parse` module defines the following functions:
    parsing errors.  If false (the default), errors are silently ignored.  If true,
    errors raise a :exc:`ValueError` exception.
 
-   Use the :func:`urllib.urlencode` function to convert such dictionaries into
-   query strings.
+   Use the :func:`urllib.parse.urlencode` function to convert such
+   dictionaries into query strings.
 
 
 .. function:: parse_qsl(qs[, keep_blank_values[, strict_parsing]])
@@ -365,7 +365,7 @@ described in those functions, as well as provide an additional method:
       'http://www.Python.org/doc/'
 
 
-The following classes provide the implementations of the parse results::
+The following classes provide the implementations of the parse results:
 
 .. class:: BaseResult
 

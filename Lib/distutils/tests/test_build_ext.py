@@ -1,6 +1,5 @@
 import sys
 import os
-import tempfile
 import shutil
 from io import StringIO
 
@@ -19,7 +18,8 @@ class BuildExtTestCase(unittest.TestCase):
     def setUp(self):
         # Create a simple test environment
         # Note that we're making changes to sys.path
-        self.tmp_dir = tempfile.mkdtemp(prefix="pythontest_")
+        self.tmp_dir = os.path.join(os.path.dirname(__file__), 'xx')
+        os.mkdir(self.tmp_dir)
         self.sys_path = sys.path[:]
         sys.path.append(self.tmp_dir)
 
@@ -74,6 +74,27 @@ class BuildExtTestCase(unittest.TestCase):
         sys.path = self.sys_path
         # XXX on Windows the test leaves a directory with xx module in TEMP
         shutil.rmtree(self.tmp_dir, os.name == 'nt' or sys.platform == 'cygwin')
+
+    def test_solaris_enable_shared(self):
+        dist = Distribution({'name': 'xx'})
+        cmd = build_ext(dist)
+        old = sys.platform
+
+        sys.platform = 'sunos' # fooling finalize_options
+        from distutils.sysconfig import  _config_vars
+        old_var = _config_vars.get('Py_ENABLE_SHARED')
+        _config_vars['Py_ENABLE_SHARED'] = 1
+        try:
+            cmd.ensure_finalized()
+        finally:
+            sys.platform = old
+            if old_var is None:
+                del _config_vars['Py_ENABLE_SHARED']
+            else:
+                _config_vars['Py_ENABLE_SHARED'] = old_var
+
+        # make sur we get some lobrary dirs under solaris
+        self.assert_(len(cmd.library_dirs) > 0)
 
 def test_suite():
     if not sysconfig.python_build:

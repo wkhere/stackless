@@ -7,7 +7,7 @@
 
 
 .. testsetup::
-   
+
    import operator
    from operator import itemgetter
 
@@ -43,9 +43,9 @@ the rich comparison operators they support:
    equivalent to ``a < b``, ``le(a, b)`` is equivalent to ``a <= b``, ``eq(a,
    b)`` is equivalent to ``a == b``, ``ne(a, b)`` is equivalent to ``a != b``,
    ``gt(a, b)`` is equivalent to ``a > b`` and ``ge(a, b)`` is equivalent to ``a
-   >= b``.  Note that unlike the built-in :func:`cmp`, these functions can
-   return any value, which may or may not be interpretable as a Boolean value.
-   See :ref:`comparisons` for more information about rich comparisons.
+   >= b``.  Note that these functions can return any value, which may
+   or may not be interpretable as a Boolean value.  See
+   :ref:`comparisons` for more information about rich comparisons.
 
 
 The logical operations are also generally applicable to all objects, and support
@@ -209,7 +209,7 @@ Operations which work with sequences include:
 
    Remove the value of *a* at index *b*.
 
- 
+
 .. function:: getitem(a, b)
               __getitem__(a, b)
 
@@ -219,12 +219,6 @@ Operations which work with sequences include:
 .. function:: indexOf(a, b)
 
    Return the index of the first of occurrence of *b* in *a*.
-
-
-.. function:: repeat(a, b)
-              __repeat__(a, b)
-
-   Return ``a * b`` where *a* is a sequence and *b* is an integer.
 
 
 .. function:: setitem(a, b, c)
@@ -294,13 +288,6 @@ example, the :term:`statement` ``x += y`` is equivalent to
    ``a = ipow(a, b)`` is equivalent to ``a **= b``.
 
 
-.. function:: irepeat(a, b)
-              __irepeat__(a, b)
-
-   ``a = irepeat(a, b)`` is equivalent to ``a *= b`` where *a* is a sequence and
-   *b* is an integer.
-
-
 .. function:: irshift(a, b)
               __irshift__(a, b)
 
@@ -323,67 +310,6 @@ example, the :term:`statement` ``x += y`` is equivalent to
               __ixor__(a, b)
 
    ``a = ixor(a, b)`` is equivalent to ``a ^= b``.
-
-
-The :mod:`operator` module also defines a few predicates to test the type of
-objects.
-
-.. XXX just remove them?
-.. note::
-
-   Be careful not to misinterpret the results of these functions; none have any
-   measure of reliability with instance objects.
-   For example:
-
-      >>> class C:
-      ...     pass
-      ... 
-      >>> import operator
-      >>> obj = C()
-      >>> operator.isMappingType(obj)
-      True
-
-.. note::
-
-   Since there are now abstract classes for collection types, you should write,
-   for example, ``isinstance(obj, collections.Mapping)`` and ``isinstance(obj,
-   collections.Sequence)``.
-
-.. function:: isMappingType(obj)
-
-   Returns true if the object *obj* supports the mapping interface. This is true for
-   dictionaries and all instance objects defining :meth:`__getitem__`.
-
-   .. warning::
-
-      There is no reliable way to test if an instance supports the complete mapping
-      protocol since the interface itself is ill-defined.  This makes this test less
-      useful than it otherwise might be.
-
-
-.. function:: isNumberType(obj)
-
-   Returns true if the object *obj* represents a number.  This is true for all
-   numeric types implemented in C.
-
-   .. warning::
-
-      There is no reliable way to test if an instance supports the complete numeric
-      interface since the interface itself is ill-defined.  This makes this test less
-      useful than it otherwise might be.
-
-
-.. function:: isSequenceType(obj)
-
-   Returns true if the object *obj* supports the sequence protocol. This returns true
-   for all objects which define sequence methods in C, and for all instance objects
-   defining :meth:`__getitem__`.
-
-   .. warning::
-
-      There is no reliable way to test if an instance supports the complete sequence
-      interface since the interface itself is ill-defined.  This makes this test less
-      useful than it otherwise might be.
 
 Example: Build a dictionary that maps the ordinals from ``0`` to ``255`` to
 their character equivalents.
@@ -427,9 +353,9 @@ expect a function argument.
                 def g(obj):
                     return tuple(obj[item] for item in items)
             return g
-   
-   The items can be any type accepted by the operand's :meth:`__getitem__` 
-   method.  Dictionaries accept any hashable value.  Lists, tuples, and 
+
+   The items can be any type accepted by the operand's :meth:`__getitem__`
+   method.  Dictionaries accept any hashable value.  Lists, tuples, and
    strings accept an index or a slice:
 
       >>> itemgetter(1)('ABCDEFG')
@@ -512,8 +438,6 @@ Python syntax and the functions in the :mod:`operator` module.
 | Negation (Logical)    | ``not a``               | ``not_(a)``                     |
 +-----------------------+-------------------------+---------------------------------+
 | Right Shift           | ``a >> b``              | ``rshift(a, b)``                |
-+-----------------------+-------------------------+---------------------------------+
-| Sequence Repetition   | ``seq * i``             | ``repeat(seq, i)``              |
 +-----------------------+-------------------------+---------------------------------+
 | String Formatting     | ``s % obj``             | ``mod(s, obj)``                 |
 +-----------------------+-------------------------+---------------------------------+

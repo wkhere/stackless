@@ -769,6 +769,37 @@ class ByteArrayTest(BaseBytesTest):
         self.assertEqual(b, b"")
         self.assertEqual(c, b"")
 
+    def test_resize_forbidden(self):
+        # #4509: can't resize a bytearray when there are buffer exports, even
+        # if it wouldn't reallocate the underlying buffer.
+        # Furthermore, no destructive changes to the buffer may be applied
+        # before raising the error.
+        b = bytearray(range(10))
+        v = memoryview(b)
+        def resize(n):
+            b[1:-1] = range(n + 1, 2*n - 1)
+        resize(10)
+        orig = b[:]
+        self.assertRaises(BufferError, resize, 11)
+        self.assertEquals(b, orig)
+        self.assertRaises(BufferError, resize, 9)
+        self.assertEquals(b, orig)
+        self.assertRaises(BufferError, resize, 0)
+        self.assertEquals(b, orig)
+        # Other operations implying resize
+        self.assertRaises(BufferError, b.pop, 0)
+        self.assertEquals(b, orig)
+        self.assertRaises(BufferError, b.remove, b[1])
+        self.assertEquals(b, orig)
+        def delitem():
+            del b[1]
+        self.assertRaises(BufferError, delitem)
+        self.assertEquals(b, orig)
+        # deleting a non-contiguous slice
+        def delslice():
+            b[1:-1:2] = b""
+        self.assertRaises(BufferError, delslice)
+        self.assertEquals(b, orig)
 
 class AssortedBytesTest(unittest.TestCase):
     #
@@ -857,11 +888,19 @@ class AssortedBytesTest(unittest.TestCase):
 
     def test_translate(self):
         b = b'hello'
+        ba = bytearray(b)
         rosetta = bytearray(range(0, 256))
         rosetta[ord('o')] = ord('e')
         c = b.translate(rosetta, b'l')
         self.assertEqual(b, b'hello')
         self.assertEqual(c, b'hee')
+        c = ba.translate(rosetta, b'l')
+        self.assertEqual(ba, b'hello')
+        self.assertEqual(c, b'hee')
+        c = b.translate(None, b'e')
+        self.assertEqual(c, b'hllo')
+        self.assertRaises(TypeError, b.translate, b'a'*256, None)
+        self.assertRaises(TypeError, ba.translate, b'a'*256, None)
 
     def test_split_bytearray(self):
         self.assertEqual(b'a b'.split(memoryview(b' ')), [b'a', b'b'])

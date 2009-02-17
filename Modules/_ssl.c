@@ -1432,7 +1432,7 @@ static PyTypeObject PySSL_Type = {
 	0,				/*tp_print*/
 	0,				/*tp_getattr*/
 	0,				/*tp_setattr*/
-	0,				/*tp_compare*/
+	0,				/*tp_reserved*/
 	0,				/*tp_repr*/
 	0,				/*tp_as_number*/
 	0,				/*tp_as_sequence*/
@@ -1592,7 +1592,7 @@ static int _setup_ssl_threads(void) {
 		for (i = 0;  i < _ssl_locks_count;  i++) {
 			_ssl_locks[i] = PyThread_allocate_lock();
 			if (_ssl_locks[i] == NULL) {
-				int j;
+				unsigned int j;
 				for (j = 0;  j < i;  j++) {
 					PyThread_free_lock(_ssl_locks[j]);
 				}

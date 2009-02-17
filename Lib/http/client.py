@@ -249,7 +249,7 @@ def parse_headers(fp):
 
     return email.parser.Parser(_class=HTTPMessage).parsestr(hstring)
 
-class HTTPResponse:
+class HTTPResponse(io.RawIOBase):
 
     # strict: If true, raise BadStatusLine if the status line can't be
     # parsed as a valid HTTP/1.0 or 1.1 status line.  By default it is
@@ -359,8 +359,8 @@ class HTTPResponse:
 
         if self.version == 9:
             self.length = None
-            self.chunked = 0
-            self.will_close = 1
+            self.chunked = False
+            self.will_close = True
             self.msg = email.message_from_string('')
             return
 
@@ -373,10 +373,10 @@ class HTTPResponse:
         # are we using the chunked-style of transfer encoding?
         tr_enc = self.msg.get("transfer-encoding")
         if tr_enc and tr_enc.lower() == "chunked":
-            self.chunked = 1
+            self.chunked = True
             self.chunk_left = None
         else:
-            self.chunked = 0
+            self.chunked = False
 
         # will the connection close at the end of the response?
         self.will_close = self._check_close()
@@ -411,7 +411,7 @@ class HTTPResponse:
         if (not self.will_close and
             not self.chunked and
             self.length is None):
-            self.will_close = 1
+            self.will_close = True
 
     def _check_close(self):
         conn = self.msg.get("connection")
@@ -470,8 +470,6 @@ class HTTPResponse:
         # IMPLIES: if will_close is FALSE, then self.close() will ALWAYS be
         #          called, meaning self.isclosed() is meaningful.
         return self.fp is None
-
-    # XXX It would be nice to have readline and __iter__ for this, too.
 
     def read(self, amt=None):
         if self.fp is None:
@@ -585,6 +583,9 @@ class HTTPResponse:
             amt -= len(chunk)
         return b"".join(s)
 
+    def fileno(self):
+        return self.fp.fileno()
+
     def getheader(self, name, default=None):
         if self.msg is None:
             raise ResponseNotReady()
@@ -595,6 +596,11 @@ class HTTPResponse:
         if self.msg is None:
             raise ResponseNotReady()
         return list(self.msg.items())
+
+    # We override IOBase.__iter__ so that it doesn't check for closed-ness
+
+    def __iter__(self):
+        return self
 
 
 class HTTPConnection:

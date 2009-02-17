@@ -25,7 +25,7 @@ another rational number, or from a string.
    :exc:`ZeroDivisionError`. The second version requires that
    *other_fraction* is an instance of :class:`numbers.Rational` and
    returns an :class:`Fraction` instance with the same value.  The
-   last version of the constructor expects a string or unicode
+   last version of the constructor expects a string
    instance in one of two possible forms.  The first form is::
 
       [sign] numerator ['/' denominator]
@@ -126,11 +126,11 @@ another rational number, or from a string.
 
 .. function:: gcd(a, b)
 
-   Return the greatest common divisor of the integers `a` and `b`.  If
-   either `a` or `b` is nonzero, then the absolute value of `gcd(a,
-   b)` is the largest integer that divides both `a` and `b`.  `gcd(a,b)`
-   has the same sign as `b` if `b` is nonzero; otherwise it takes the sign
-   of `a`.  `gcd(0, 0)` returns `0`.
+   Return the greatest common divisor of the integers *a* and *b*.  If either
+   *a* or *b* is nonzero, then the absolute value of ``gcd(a, b)`` is the
+   largest integer that divides both *a* and *b*.  ``gcd(a,b)`` has the same
+   sign as *b* if *b* is nonzero; otherwise it takes the sign of *a*.  ``gcd(0,
+   0)`` returns ``0``.
 
 
 .. seealso::

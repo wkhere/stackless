@@ -147,16 +147,18 @@ typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
 typedef struct bufferinfo {
 	void *buf;   
 	PyObject *obj;        /* owned reference */
-        Py_ssize_t len;
-        Py_ssize_t itemsize;  /* This is Py_ssize_t so it can be 
-                                 pointed to by strides in simple case.*/
-        int readonly;
-        int ndim;
-        char *format;
-        Py_ssize_t *shape;
-        Py_ssize_t *strides;
-        Py_ssize_t *suboffsets;
-        void *internal;
+	Py_ssize_t len;
+	Py_ssize_t itemsize;  /* This is Py_ssize_t so it can be 
+			         pointed to by strides in simple case.*/
+	int readonly;
+	int ndim;
+	char *format;
+	Py_ssize_t *shape;
+	Py_ssize_t *strides;
+	Py_ssize_t *suboffsets;
+	Py_ssize_t smalltable[2];  /* static store for shape and strides of
+				      mono-dimensional buffers. */
+	void *internal;
 } Py_buffer;
 
 typedef int (*getbufferproc)(PyObject *, Py_buffer *, int);
@@ -220,7 +222,7 @@ typedef struct {
 	binaryfunc nb_xor;
 	binaryfunc nb_or;
 	unaryfunc nb_int;
-	unaryfunc nb_long;
+	void *nb_reserved;  /* the slot formerly known as nb_long */
 	unaryfunc nb_float;
 
 	binaryfunc nb_inplace_add;
@@ -275,7 +277,6 @@ typedef PyObject *(*getattrfunc)(PyObject *, char *);
 typedef PyObject *(*getattrofunc)(PyObject *, PyObject *);
 typedef int (*setattrfunc)(PyObject *, char *, PyObject *);
 typedef int (*setattrofunc)(PyObject *, PyObject *, PyObject *);
-typedef int (*cmpfunc)(PyObject *, PyObject *);
 typedef PyObject *(*reprfunc)(PyObject *);
 typedef long (*hashfunc)(PyObject *);
 typedef PyObject *(*richcmpfunc) (PyObject *, PyObject *, int);
@@ -298,7 +299,7 @@ typedef struct _typeobject {
 	printfunc tp_print;
 	getattrfunc tp_getattr;
 	setattrfunc tp_setattr;
-	cmpfunc tp_compare;
+	void *tp_reserved; /* formerly known as tp_compare */
 	reprfunc tp_repr;
 
 	/* Method suites for standard classes */
@@ -448,10 +449,8 @@ PyAPI_FUNC(PyObject *) PyObject_Repr(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_Str(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_ASCII(PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_Bytes(PyObject *);
-PyAPI_FUNC(int) PyObject_Compare(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_RichCompare(PyObject *, PyObject *, int);
 PyAPI_FUNC(int) PyObject_RichCompareBool(PyObject *, PyObject *, int);
-PyAPI_FUNC(PyObject *) Py_CmpToRich(int op, int cmp);
 PyAPI_FUNC(PyObject *) PyObject_GetAttrString(PyObject *, const char *);
 PyAPI_FUNC(int) PyObject_SetAttrString(PyObject *, const char *, PyObject *);
 PyAPI_FUNC(int) PyObject_HasAttrString(PyObject *, const char *);

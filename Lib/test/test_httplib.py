@@ -42,7 +42,6 @@ class NoEOFStringIO(io.BytesIO):
             raise AssertionError('caller tried to read past EOF')
         return data
 
-
 class HeaderTests(TestCase):
     def test_auto_headers(self):
         # Some headers are added automatically, but should not be added by
@@ -188,7 +187,8 @@ class BasicTest(TestCase):
                 resp.close()
 
     def test_negative_content_length(self):
-        sock = FakeSocket('HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nHello\r\n')
+        sock = FakeSocket(
+            'HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nHello\r\n')
         resp = httplib.HTTPResponse(sock, method="GET")
         resp.begin()
         self.assertEquals(resp.read(), b'Hello\r\n')
@@ -244,7 +244,6 @@ class TimeoutTest(TestCase):
         self.assertEqual(httpConn.sock.gettimeout(), 30)
         httpConn.close()
 
-
 class HTTPSTimeoutTest(TestCase):
 # XXX Here should be tests for HTTPS, there isn't any right now!
 
@@ -256,7 +255,7 @@ class HTTPSTimeoutTest(TestCase):
 
 def test_main(verbose=None):
     support.run_unittest(HeaderTests, OfflineTest, BasicTest, TimeoutTest,
-                              HTTPSTimeoutTest)
+                         HTTPSTimeoutTest)
 
 if __name__ == '__main__':
     test_main()

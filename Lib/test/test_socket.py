@@ -366,6 +366,9 @@ class GeneralModuleTests(unittest.TestCase):
         eq(socket.getservbyport(port, 'tcp'), service)
         if udpport is not None:
             eq(socket.getservbyport(udpport, 'udp'), service)
+        # Make sure getservbyport does not accept out of range ports.
+        self.assertRaises(OverflowError, socket.getservbyport, -1)
+        self.assertRaises(OverflowError, socket.getservbyport, 65536)
 
     def testDefaultTimeout(self):
         # Testing default timeout
@@ -466,15 +469,23 @@ class GeneralModuleTests(unittest.TestCase):
 
     # XXX The following don't test module-level functionality...
 
-    def testSockName(self):
-        # Testing getsockname().  Use a temporary socket to elicit an unused
-        # ephemeral port that we can use later in the test.
-        tempsock = socket.socket()
-        tempsock.bind(("0.0.0.0", 0))
-        (host, port) = tempsock.getsockname()
-        tempsock.close()
-        del tempsock
+    def _get_unused_port(self, bind_address='0.0.0.0'):
+        """Use a temporary socket to elicit an unused ephemeral port.
 
+        Args:
+            bind_address: Hostname or IP address to search for a port on.
+
+        Returns: A most likely to be unused port.
+        """
+        tempsock = socket.socket()
+        tempsock.bind((bind_address, 0))
+        host, port = tempsock.getsockname()
+        tempsock.close()
+        return port
+
+    def testSockName(self):
+        # Testing getsockname()
+        port = self._get_unused_port()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(("0.0.0.0", port))
         name = sock.getsockname()
@@ -513,6 +524,19 @@ class GeneralModuleTests(unittest.TestCase):
         self.assertEqual(sock.type, socket.SOCK_STREAM)
         self.assertEqual(sock.proto, 0)
         sock.close()
+
+    def test_getsockaddrarg(self):
+        host = '0.0.0.0'
+        port = self._get_unused_port(bind_address=host)
+        big_port = port + 65536
+        neg_port = port - 65536
+        sock = socket.socket()
+        try:
+            self.assertRaises(OverflowError, sock.bind, (host, big_port))
+            self.assertRaises(OverflowError, sock.bind, (host, neg_port))
+            sock.bind((host, port))
+        finally:
+            sock.close()
 
     def test_sock_ioctl(self):
         if os.name != "nt":
@@ -603,6 +627,10 @@ class BasicTCPTest(SocketConnectedTest):
         # Testing shutdown()
         msg = self.cli_conn.recv(1024)
         self.assertEqual(msg, MSG)
+        # wait for _testShutdown to finish: on OS X, when the server
+        # closes the connection the client also becomes disconnected,
+        # and the client's shutdown call will fail. (Issue #4397.)
+        self.done.wait()
 
     def _testShutdown(self):
         self.serv_conn.send(MSG)
@@ -856,6 +884,16 @@ class FileObjectClassTestCase(SocketConnectedTest):
         self.assertEqual(self.cli_file.mode, 'wb')
         self.assertEqual(self.cli_file.name, self.serv_conn.fileno())
 
+    def testRealClose(self):
+        self.serv_file.close()
+        self.assertRaises(ValueError, self.serv_file.fileno)
+        self.cli_conn.close()
+        self.assertRaises(socket.error, self.cli_conn.getsockname)
+
+    def _testRealClose(self):
+        pass
+
+
 class UnbufferedFileObjectClassTestCase(FileObjectClassTestCase):
 
     """Repeat the tests from FileObjectClassTestCase with bufsize==0.
@@ -880,6 +918,29 @@ class UnbufferedFileObjectClassTestCase(FileObjectClassTestCase):
         self.cli_file.write(b"A. " + MSG)
         self.cli_file.write(b"B. " + MSG)
         self.cli_file.flush()
+
+    def testMakefileClose(self):
+        # The file returned by makefile should keep the socket open...
+        self.cli_conn.close()
+        msg = self.cli_conn.recv(1024)
+        self.assertEqual(msg, MSG)
+        # ...until the file is itself closed
+        self.serv_file.close()
+        self.assertRaises(socket.error, self.cli_conn.recv, 1024)
+
+    def _testMakefileClose(self):
+        self.cli_file.write(MSG)
+        self.cli_file.flush()
+
+    def testMakefileCloseSocketDestroy(self):
+        refcount_before = sys.getrefcount(self.cli_conn)
+        self.serv_file.close()
+        refcount_after = sys.getrefcount(self.cli_conn)
+        self.assertEqual(refcount_before - 1, refcount_after)
+
+    def _testMakefileCloseSocketDestroy(self):
+        pass
+
 
 class LineBufferedFileObjectClassTestCase(FileObjectClassTestCase):
 

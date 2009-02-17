@@ -114,6 +114,7 @@
 FILE *logfile;
 
 char modulename[MAX_PATH];
+wchar_t wmodulename[MAX_PATH];
 
 HWND hwndMain;
 HWND hDialog;
@@ -299,6 +300,27 @@ static int do_compile_files(int (__cdecl * PyRun_SimpleString)(char *),
 
 typedef void PyObject;
 
+// Convert a "char *" string to "whcar_t *", or NULL on error.
+// Result string must be free'd
+wchar_t *widen_string(char *src)
+{
+	wchar_t *result;
+	DWORD dest_cch;
+	int src_len = strlen(src) + 1; // include NULL term in all ops
+	/* use MultiByteToWideChar() to see how much we need. */
+	/* NOTE: this will include the null-term in the length */
+	dest_cch = MultiByteToWideChar(CP_ACP, 0, src, src_len, NULL, 0);
+	// alloc the buffer
+	result = (wchar_t *)malloc(dest_cch * sizeof(wchar_t));
+	if (result==NULL)
+		return NULL;
+	/* do the conversion */
+	if (0==MultiByteToWideChar(CP_ACP, 0, src, src_len, result, dest_cch)) {
+		free(result);
+		return NULL;
+	}
+	return result;
+}
 
 /*
  * Returns number of files which failed to compile,
@@ -307,7 +329,7 @@ typedef void PyObject;
 static int compile_filelist(HINSTANCE hPython, BOOL optimize_flag)
 {
 	DECLPROC(hPython, void, Py_Initialize, (void));
-	DECLPROC(hPython, void, Py_SetProgramName, (char *));
+	DECLPROC(hPython, void, Py_SetProgramName, (wchar_t *));
 	DECLPROC(hPython, void, Py_Finalize, (void));
 	DECLPROC(hPython, int, PyRun_SimpleString, (char *));
 	DECLPROC(hPython, PyObject *, PySys_GetObject, (char *));
@@ -326,7 +348,7 @@ static int compile_filelist(HINSTANCE hPython, BOOL optimize_flag)
 		return -1;
 
 	*Py_OptimizeFlag = optimize_flag ? 1 : 0;
-	Py_SetProgramName(modulename);
+	Py_SetProgramName(wmodulename);
 	Py_Initialize();
 
 	errors += do_compile_files(PyRun_SimpleString, optimize_flag);
@@ -694,10 +716,12 @@ static int prepare_script_environment(HINSTANCE hPython)
  */
 
 static int
-run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
+do_run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 {
+	int fh, result, i;
+	static wchar_t *wargv[256];
 	DECLPROC(hPython, void, Py_Initialize, (void));
-	DECLPROC(hPython, int, PySys_SetArgv, (int, char **));
+	DECLPROC(hPython, int, PySys_SetArgv, (int, wchar_t **));
 	DECLPROC(hPython, int, PyRun_SimpleString, (char *));
 	DECLPROC(hPython, void, Py_Finalize, (void));
 	DECLPROC(hPython, PyObject *, Py_BuildValue, (char *, ...));
@@ -705,9 +729,6 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 		 (PyMethodDef *, PyObject *));
 	DECLPROC(hPython, int, PyArg_ParseTuple, (PyObject *, char *, ...));
 	DECLPROC(hPython, PyObject *, PyErr_Format, (PyObject *, char *));
-
-	int result = 0;
-	int fh;
 
 	if (!Py_Initialize || !PySys_SetArgv
 	    || !PyRun_SimpleString || !Py_Finalize)
@@ -730,11 +751,20 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 	}
 
 	SetDlgItemText(hDialog, IDC_INFO, "Running Script...");
-		
+
 	Py_Initialize();
 
 	prepare_script_environment(hPython);
-	PySys_SetArgv(argc, argv);
+	// widen the argv array for py3k.
+	memset(wargv, 0, sizeof(wargv));
+	for (i=0;i<argc;i++)
+		wargv[i] = argv[i] ? widen_string(argv[i]) : NULL;
+	PySys_SetArgv(argc, wargv);
+	// free the strings we just widened.
+	for (i=0;i<argc;i++)
+		if (wargv[i])
+			free(wargv[i]);
+
 	result = 3;
 	{
 		struct _stat statbuf;
@@ -751,7 +781,57 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 	Py_Finalize();
 
 	close(fh);
+	return result;
+}
 
+static int
+run_installscript(char *pathname, int argc, char **argv, char **pOutput)
+{
+	HINSTANCE hPython;
+	int result = 1;
+	int out_buf_size;
+	HANDLE redirected, old_stderr, old_stdout;
+	char *tempname;
+
+	*pOutput = NULL;
+
+	tempname = tempnam(NULL, NULL);
+	// We use a static CRT while the Python version we load uses
+	// the CRT from one of various possibile DLLs.  As a result we
+	// need to redirect the standard handles using the API rather
+	// than the CRT.
+	redirected = CreateFile(
+					tempname,
+					GENERIC_WRITE | GENERIC_READ,
+					FILE_SHARE_READ,
+					NULL,
+					CREATE_ALWAYS,
+					FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+					NULL);
+	old_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	old_stderr = GetStdHandle(STD_ERROR_HANDLE);
+	SetStdHandle(STD_OUTPUT_HANDLE, redirected);
+	SetStdHandle(STD_ERROR_HANDLE, redirected);
+
+	hPython = LoadPythonDll(pythondll);
+	if (hPython) {
+		result = do_run_installscript(hPython, pathname, argc, argv);
+		FreeLibrary(hPython);
+	} else {
+		fprintf(stderr, "*** Could not load Python ***");
+	}
+	SetStdHandle(STD_OUTPUT_HANDLE, old_stdout);
+	SetStdHandle(STD_ERROR_HANDLE, old_stderr);
+	out_buf_size = min(GetFileSize(redirected, NULL), 4096);
+	*pOutput = malloc(out_buf_size+1);
+	if (*pOutput) {
+		DWORD nread = 0;
+		SetFilePointer(redirected, 0, 0, FILE_BEGIN);
+		ReadFile(redirected, *pOutput, out_buf_size, &nread, NULL);
+		(*pOutput)[nread] = '\0';
+	}
+	CloseHandle(redirected);
+	DeleteFile(tempname);
 	return result;
 }
 
@@ -759,7 +839,7 @@ static int do_run_simple_script(HINSTANCE hPython, char *script)
 {
 	int rc;
 	DECLPROC(hPython, void, Py_Initialize, (void));
-	DECLPROC(hPython, void, Py_SetProgramName, (char *));
+	DECLPROC(hPython, void, Py_SetProgramName, (wchar_t *));
 	DECLPROC(hPython, void, Py_Finalize, (void));
 	DECLPROC(hPython, int, PyRun_SimpleString, (char *));
 	DECLPROC(hPython, void, PyErr_Print, (void));
@@ -768,7 +848,7 @@ static int do_run_simple_script(HINSTANCE hPython, char *script)
 	    !PyRun_SimpleString || !PyErr_Print)
 		return -1;
 
-	Py_SetProgramName(modulename);
+	Py_SetProgramName(wmodulename);
 	Py_Initialize();
 	prepare_script_environment(hPython);
 	rc = PyRun_SimpleString(script);
@@ -781,11 +861,21 @@ static int do_run_simple_script(HINSTANCE hPython, char *script)
 static int run_simple_script(char *script)
 {
 	int rc;
-	char *tempname;
 	HINSTANCE hPython;
-	tempname = tempnam(NULL, NULL);
-	freopen(tempname, "a", stderr);
-	freopen(tempname, "a", stdout);
+	char *tempname = tempnam(NULL, NULL);
+	// Redirect output using win32 API - see comments above...
+	HANDLE redirected = CreateFile(
+					tempname,
+					GENERIC_WRITE | GENERIC_READ,
+					FILE_SHARE_READ,
+					NULL,
+					CREATE_ALWAYS,
+					FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+					NULL);
+	HANDLE old_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	HANDLE old_stderr = GetStdHandle(STD_ERROR_HANDLE);
+	SetStdHandle(STD_OUTPUT_HANDLE, redirected);
+	SetStdHandle(STD_ERROR_HANDLE, redirected);
 
 	hPython = LoadPythonDll(pythondll);
 	if (!hPython) {
@@ -796,10 +886,8 @@ static int run_simple_script(char *script)
 	}
 	rc = do_run_simple_script(hPython, script);
 	FreeLibrary(hPython);
-	fflush(stderr);
-	fclose(stderr);
-	fflush(stdout);
-	fclose(stdout);
+	SetStdHandle(STD_OUTPUT_HANDLE, old_stdout);
+	SetStdHandle(STD_ERROR_HANDLE, old_stderr);
 	/* We only care about the output when we fail.  If the script works
 	   OK, then we discard it
 	*/
@@ -808,24 +896,24 @@ static int run_simple_script(char *script)
 		char *err_buf;
 		const char *prefix = "Running the pre-installation script failed\r\n";
 		int prefix_len = strlen(prefix);
-		FILE *fp = fopen(tempname, "rb");
-		fseek(fp, 0, SEEK_END);
-		err_buf_size = ftell(fp);
-		fseek(fp, 0, SEEK_SET);
+		err_buf_size = GetFileSize(redirected, NULL);
+		if (err_buf_size==INVALID_FILE_SIZE) // an error - let's try anyway...
+			err_buf_size = 4096;
 		err_buf = malloc(prefix_len + err_buf_size + 1);
 		if (err_buf) {
-			int n;
+			DWORD n = 0;
 			strcpy(err_buf, prefix);
-			n = fread(err_buf+prefix_len, 1, err_buf_size, fp);
+			SetFilePointer(redirected, 0, 0, FILE_BEGIN);
+			ReadFile(redirected, err_buf+prefix_len, err_buf_size, &n, NULL);
 			err_buf[prefix_len+n] = '\0';
-			fclose(fp);
 			set_failure_reason(err_buf);
 			free(err_buf);
 		} else {
 			set_failure_reason("Out of memory!");
 		}
 	}
-	remove(tempname);
+	CloseHandle(redirected);
+	DeleteFile(tempname);
 	return rc;
 }
 
@@ -1946,12 +2034,9 @@ FinishedDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 		if (success && install_script && install_script[0]) {
 			char fname[MAX_PATH];
-			char *tempname;
-			FILE *fp;
-			char buffer[4096];
-			int n;
+			char *buffer;
 			HCURSOR hCursor;
-			HINSTANCE hPython;
+			int result;
 
 			char *argv[3] = {NULL, "-install", NULL};
 
@@ -1964,48 +2049,21 @@ FinishedDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			if (logfile)
 				fprintf(logfile, "300 Run Script: [%s]%s\n", pythondll, fname);
 
-			tempname = tempnam(NULL, NULL);
-
-			if (!freopen(tempname, "a", stderr))
-				MessageBox(GetFocus(), "freopen stderr", NULL, MB_OK);
-			if (!freopen(tempname, "a", stdout))
-				MessageBox(GetFocus(), "freopen stdout", NULL, MB_OK);
-/*
-  if (0 != setvbuf(stdout, NULL, _IONBF, 0))
-  MessageBox(GetFocus(), "setvbuf stdout", NULL, MB_OK);
-*/
 			hCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
 			argv[0] = fname;
 
-			hPython = LoadPythonDll(pythondll);
-			if (hPython) {
-				int result;
-				result = run_installscript(hPython, fname, 2, argv);
-				if (-1 == result) {
-					fprintf(stderr, "*** run_installscript: internal error 0x%X ***\n", result);
-				}
-				FreeLibrary(hPython);
-			} else {
-				fprintf(stderr, "*** Could not load Python ***");
+			result = run_installscript(fname, 2, argv, &buffer);
+			if (0 != result) {
+				fprintf(stderr, "*** run_installscript: internal error 0x%X ***\n", result);
 			}
-			fflush(stderr);
-			fclose(stderr);
-			fflush(stdout);
-			fclose(stdout);
-	    
-			fp = fopen(tempname, "rb");
-			n = fread(buffer, 1, sizeof(buffer), fp);
-			fclose(fp);
-			remove(tempname);
-	    
-			buffer[n] = '\0';
-	    
-			SetDlgItemText(hwnd, IDC_INFO, buffer);
+			if (buffer)
+				SetDlgItemText(hwnd, IDC_INFO, buffer);
 			SetDlgItemText(hwnd, IDC_TITLE,
 					"Postinstall script finished.\n"
 					"Click the Finish button to exit the Setup wizard.");
 
+			free(buffer);
 			SetCursor(hCursor);
 			CloseLogfile();
 		}
@@ -2418,42 +2476,17 @@ BOOL Run_RemoveScript(char *line)
 	/* this function may be called more than one time with the same
 	   script, only run it one time */
 	if (strcmp(lastscript, scriptname)) {
-		HINSTANCE hPython;
 		char *argv[3] = {NULL, "-remove", NULL};
-		char buffer[4096];
-		FILE *fp;
-		char *tempname;
-		int n;
+		char *buffer = NULL;
 
 		argv[0] = scriptname;
 
-		tempname = tempnam(NULL, NULL);
+		if (0 != run_installscript(scriptname, 2, argv, &buffer))
+			fprintf(stderr, "*** Could not run installation script ***");
 
-		if (!freopen(tempname, "a", stderr))
-			MessageBox(GetFocus(), "freopen stderr", NULL, MB_OK);
-		if (!freopen(tempname, "a", stdout))
-			MessageBox(GetFocus(), "freopen stdout", NULL, MB_OK);
-	
-		hPython = LoadLibrary(dllname);
-		if (hPython) {
-			if (0x80000000 == run_installscript(hPython, scriptname, 2, argv))
-				fprintf(stderr, "*** Could not load Python ***");
-			FreeLibrary(hPython);
-		}
-	
-		fflush(stderr);
-		fclose(stderr);
-		fflush(stdout);
-		fclose(stdout);
-	
-		fp = fopen(tempname, "rb");
-		n = fread(buffer, 1, sizeof(buffer), fp);
-		fclose(fp);
-		remove(tempname);
-	
-		buffer[n] = '\0';
-		if (buffer[0])
+		if (buffer && buffer[0])
 			MessageBox(GetFocus(), buffer, "uninstall-script", MB_OK);
+		free(buffer);
 
 		strcpy(lastscript, scriptname);
 	}
@@ -2617,6 +2650,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst,
 	char *basename;
 
 	GetModuleFileName(NULL, modulename, sizeof(modulename));
+	GetModuleFileNameW(NULL, wmodulename, sizeof(wmodulename)/sizeof(wmodulename[0]));
 
 	/* Map the executable file to memory */
 	arc_data = MapExistingFile(modulename, &arc_size);

@@ -369,7 +369,7 @@ The following methods are overridden from the base class implementation:
    If the message id is not found in the catalog, and a fallback is specified, the
    request is forwarded to the fallback's :meth:`ngettext` method.  Otherwise, when
    *n* is 1 *singular* is returned, and *plural* is returned in all other cases.
-   
+
    Here is an example::
 
       n = len(os.listdir('.'))
@@ -551,10 +551,9 @@ translation until later.  A classic example is::
 
    animals = ['mollusk',
               'albatross',
-   	   'rat',
-   	   'penguin',
-   	   'python',
-   	   ]
+              'rat',
+              'penguin',
+              'python', ]
    # ...
    for a in animals:
        print(a)
@@ -569,10 +568,9 @@ Here is one way you can handle this situation::
 
    animals = [_('mollusk'),
               _('albatross'),
-   	   _('rat'),
-   	   _('penguin'),
-   	   _('python'),
-   	   ]
+              _('rat'),
+              _('penguin'),
+              _('python'), ]
 
    del _
 
@@ -595,10 +593,9 @@ Another way to handle this is with the following example::
 
    animals = [N_('mollusk'),
               N_('albatross'),
-   	   N_('rat'),
-   	   N_('penguin'),
-   	   N_('python'),
-   	   ]
+              N_('rat'),
+              N_('penguin'),
+              N_('python'), ]
 
    # ...
    for a in animals:

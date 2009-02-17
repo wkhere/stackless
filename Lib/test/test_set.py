@@ -1,6 +1,7 @@
 import unittest
 from test import support
-from weakref import proxy
+import gc
+import weakref
 import operator
 import copy
 import pickle
@@ -219,7 +220,7 @@ class TestJointOps(unittest.TestCase):
         self.failIf(set('cbs').issuperset('a'))
 
     def test_pickling(self):
-        for i in (0, 1, 2):
+        for i in range(pickle.HIGHEST_PROTOCOL + 1):
             p = pickle.dumps(self.s, i)
             dup = pickle.loads(p)
             self.assertEqual(self.s, dup, "%s != %s" % (self.s, dup))
@@ -322,6 +323,18 @@ class TestJointOps(unittest.TestCase):
         d3 = dict.fromkeys(frozenset(d), 123)
         self.assertEqual(sum(elem.hash_count for elem in d), n)
         self.assertEqual(d3, dict.fromkeys(d, 123))
+
+    def test_container_iterator(self):
+        # Bug #3680: tp_traverse was not implemented for set iterator object
+        class C(object):
+            pass
+        obj = C()
+        ref = weakref.ref(obj)
+        container = set([obj, 1])
+        obj.x = iter(container)
+        del obj, container
+        gc.collect()
+        self.assert_(ref() is None, "Cycle was not collected")
 
 class TestSet(TestJointOps):
     thetype = set
@@ -546,7 +559,7 @@ class TestSet(TestJointOps):
 
     def test_weakref(self):
         s = self.thetype('gallahad')
-        p = proxy(s)
+        p = weakref.proxy(s)
         self.assertEqual(str(p), str(s))
         s = None
         self.assertRaises(ReferenceError, str, p)
@@ -1022,16 +1035,6 @@ class TestBinaryOps(unittest.TestCase):
     def test_sym_difference_non_overlap(self):
         result = self.set ^ set([8])
         self.assertEqual(result, set([2, 4, 6, 8]))
-
-    def test_cmp(self):
-        a, b = set('a'), set('b')
-        self.assertRaises(TypeError, cmp, a, b)
-
-        # In py3k, this works!
-        self.assertRaises(TypeError, cmp, a, a)
-
-        self.assertRaises(TypeError, cmp, a, 12)
-        self.assertRaises(TypeError, cmp, "abc", a)
 
 #==============================================================================
 

@@ -2,6 +2,7 @@
 /* DBM module using dictionary interface */
 
 
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 
 #include <sys/types.h>
@@ -20,6 +21,9 @@ static char *which_dbm = "GNU gdbm";  /* EMX port of GDBM */
 #endif
 #elif defined(HAVE_GDBM_NDBM_H)
 #include <gdbm/ndbm.h>
+static char *which_dbm = "GNU gdbm";
+#elif defined(HAVE_GDBM_DASH_NDBM_H)
+#include <gdbm-ndbm.h>
 static char *which_dbm = "GNU gdbm";
 #elif defined(HAVE_BERKDB_H)
 #include <db.h>
@@ -333,7 +337,7 @@ static PyTypeObject Dbmtype = {
 	0,			  /*tp_print*/
 	0,                        /*tp_getattr*/
 	0,			  /*tp_setattr*/
-	0,			  /*tp_compare*/
+	0,			  /*tp_reserved*/
 	0,			  /*tp_repr*/
 	0,			  /*tp_as_number*/
 	&dbm_as_sequence,	  /*tp_as_sequence*/

@@ -1238,7 +1238,7 @@ float_fromhex(PyObject *cls, PyObject *arg)
 	 ********************/
 
 	/* leading whitespace and optional sign */
-	while (isspace(*s))
+	while (isspace(Py_CHARMASK(*s)))
 		s++;
 	if (*s == '-') {
 		s++;
@@ -1308,7 +1308,7 @@ float_fromhex(PyObject *cls, PyObject *arg)
 		exp = 0;
 
 	/* optional trailing whitespace leading to the end of the string */
-	while (isspace(*s))
+	while (isspace(Py_CHARMASK(*s)))
 		s++;
 	if (s != s_end)
 		goto parse_error;
@@ -1494,12 +1494,6 @@ float_as_integer_ratio(PyObject *v, PyObject *unused)
 		denominator = py_exponent;
 		py_exponent = NULL;
 	}
-
-	/* Returns ints instead of longs where possible */
-	INPLACE_UPDATE(numerator, PyNumber_Int(numerator));
-	if (numerator == NULL) goto error;
-	INPLACE_UPDATE(denominator, PyNumber_Int(denominator));
-	if (denominator == NULL) goto error;
 
 	result_pair = PyTuple_Pack(2, numerator, denominator);
 
@@ -1798,7 +1792,7 @@ static PyNumberMethods float_as_number = {
 	0,		/*nb_xor*/
 	0,		/*nb_or*/
 	float_trunc,	/*nb_int*/
-	float_trunc,	/*nb_long*/
+	0,		/*nb_reserved*/
 	float_float,	/*nb_float*/
 	0,		/* nb_inplace_add */
 	0,		/* nb_inplace_subtract */
@@ -1825,7 +1819,7 @@ PyTypeObject PyFloat_Type = {
 	0,			 		/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,			 		/* tp_compare */
+	0,			 		/* tp_reserved */
 	(reprfunc)float_repr,			/* tp_repr */
 	&float_as_number,			/* tp_as_number */
 	0,					/* tp_as_sequence */

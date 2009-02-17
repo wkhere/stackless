@@ -612,7 +612,7 @@ MultibyteCodec_Decode(MultibyteCodecObject *self,
 	const char *data, *errors = NULL;
 	Py_ssize_t datalen, finalsize;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s*|z:decode",
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|z:decode",
 				codeckwarglist, &pdata, &errors))
 		return NULL;
 	data = pdata.buf;
@@ -705,7 +705,7 @@ static PyTypeObject MultibyteCodec_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -990,7 +990,7 @@ static PyTypeObject MultibyteIncrementalEncoder_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -1038,7 +1038,7 @@ mbidecoder_decode(MultibyteIncrementalDecoderObject *self,
 	Py_ssize_t wsize, finalsize = 0, size, origpending;
 	int final = 0;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s*|i:decode",
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|i:decode",
 			incrementalkwarglist, &pdata, &final))
 		return NULL;
 	data = pdata.buf;
@@ -1199,7 +1199,7 @@ static PyTypeObject MultibyteIncrementalDecoder_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -1529,7 +1529,7 @@ static PyTypeObject MultibyteStreamReader_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -1749,7 +1749,7 @@ static PyTypeObject MultibyteStreamWriter_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */

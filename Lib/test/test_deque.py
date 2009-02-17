@@ -1,7 +1,8 @@
 from collections import deque
 import unittest
 from test import support, seq_tests
-from weakref import proxy
+import gc
+import weakref
 import copy
 import pickle
 from io import StringIO
@@ -102,7 +103,6 @@ class TestBasic(unittest.TestCase):
                 self.assertEqual(x <= y, list(x) <= list(y), (x,y))
                 self.assertEqual(x >  y, list(x) >  list(y), (x,y))
                 self.assertEqual(x >= y, list(x) >= list(y), (x,y))
-                self.assertEqual(cmp(x,y), cmp(list(x),list(y)), (x,y))
 
     def test_extend(self):
         d = deque('a')
@@ -375,7 +375,7 @@ class TestBasic(unittest.TestCase):
 
     def test_pickle(self):
         d = deque(range(200))
-        for i in (0, 1, 2):
+        for i in range(pickle.HIGHEST_PROTOCOL + 1):
             s = pickle.dumps(d, i)
             e = pickle.loads(s)
             self.assertNotEqual(id(d), id(e))
@@ -384,7 +384,7 @@ class TestBasic(unittest.TestCase):
 ##    def test_pickle_recursive(self):
 ##        d = deque('abc')
 ##        d.append(d)
-##        for i in (0, 1, 2):
+##        for i in range(pickle.HIGHEST_PROTOCOL + 1):
 ##            e = pickle.loads(pickle.dumps(d, i))
 ##            self.assertNotEqual(id(d), id(e))
 ##            self.assertEqual(id(e), id(e[-1]))
@@ -419,6 +419,22 @@ class TestBasic(unittest.TestCase):
         for i in range(100):
             d.append(1)
             gc.collect()
+
+    def test_container_iterator(self):
+        # Bug #3680: tp_traverse was not implemented for deque iterator objects
+        class C(object):
+            pass
+        for i in range(2):
+            obj = C()
+            ref = weakref.ref(obj)
+            if i == 0:
+                container = deque([obj, 1])
+            else:
+                container = reversed(deque([obj, 1]))
+            obj.x = iter(container)
+            del obj, container
+            gc.collect()
+            self.assert_(ref() is None, "Cycle was not collected")
 
 class TestVariousIteratorArgs(unittest.TestCase):
 
@@ -530,7 +546,7 @@ class TestSubclass(unittest.TestCase):
 
     def test_weakref(self):
         d = deque('gallahad')
-        p = proxy(d)
+        p = weakref.proxy(d)
         self.assertEqual(str(p), str(d))
         d = None
         self.assertRaises(ReferenceError, str, p)

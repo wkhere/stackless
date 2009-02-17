@@ -27,6 +27,20 @@
 #include <windows.h>
 #endif
 
+#if BUFSIZ < (8*1024)
+#define SMALLCHUNK (8*1024)
+#elif (BUFSIZ >= (2 << 25))
+#error "unreasonable BUFSIZ > 64MB defined"
+#else
+#define SMALLCHUNK BUFSIZ
+#endif
+
+#if SIZEOF_INT < 4
+#define BIGCHUNK  (512 * 32)
+#else
+#define BIGCHUNK  (512 * 1024)
+#endif
+
 typedef struct {
 	PyObject_HEAD
 	int fd;
@@ -41,20 +55,30 @@ PyTypeObject PyFileIO_Type;
 
 #define PyFileIO_Check(op) (PyObject_TypeCheck((op), &PyFileIO_Type))
 
-/* Returns 0 on success, errno (which is < 0) on failure. */
+static PyObject *
+portable_lseek(int fd, PyObject *posobj, int whence);
+
+/* Returns 0 on success, -1 with exception set on failure. */
 static int
 internal_close(PyFileIOObject *self)
 {
+	int err = 0;
 	int save_errno = 0;
 	if (self->fd >= 0) {
 		int fd = self->fd;
 		self->fd = -1;
 		Py_BEGIN_ALLOW_THREADS
-		if (close(fd) < 0)
+		err = close(fd);
+		if (err < 0)
 			save_errno = errno;
 		Py_END_ALLOW_THREADS
 	}
-	return save_errno;
+	if (err < 0) {
+		errno = save_errno;
+		PyErr_SetFromErrno(PyExc_IOError);
+		return -1;
+	}
+	return 0;
 }
 
 static PyObject *
@@ -64,11 +88,8 @@ fileio_close(PyFileIOObject *self)
 		self->fd = -1;
 		Py_RETURN_NONE;
 	}
-	errno = internal_close(self);
-	if (errno < 0) {
-		PyErr_SetFromErrno(PyExc_IOError);
+	if (internal_close(self))
 		return NULL;
-	}
 
 	Py_RETURN_NONE;
 }
@@ -98,7 +119,7 @@ fileio_new(PyTypeObject *type, PyObject *args, PyObject *kews)
    directories, so we need a check.  */
 
 static int
-dircheck(PyFileIOObject* self)
+dircheck(PyFileIOObject* self, char *name)
 {
 #if defined(HAVE_FSTAT) && defined(S_IFDIR) && defined(EISDIR)
 	struct stat buf;
@@ -107,11 +128,30 @@ dircheck(PyFileIOObject* self)
 	if (fstat(self->fd, &buf) == 0 && S_ISDIR(buf.st_mode)) {
 		char *msg = strerror(EISDIR);
 		PyObject *exc;
-		internal_close(self);
+		if (internal_close(self))
+			return -1;
 
-		exc = PyObject_CallFunction(PyExc_IOError, "(is)",
-					    EISDIR, msg);
+		exc = PyObject_CallFunction(PyExc_IOError, "(iss)",
+					    EISDIR, msg, name);
 		PyErr_SetObject(PyExc_IOError, exc);
+		Py_XDECREF(exc);
+		return -1;
+	}
+#endif
+	return 0;
+}
+
+static int
+check_fd(int fd)
+{
+#if defined(HAVE_FSTAT)
+	struct stat buf;
+	if (fstat(fd, &buf) < 0 && errno == EBADF) {
+		PyObject *exc;
+		char *msg = strerror(EBADF);
+		exc = PyObject_CallFunction(PyExc_OSError, "(is)",
+					    EBADF, msg);
+		PyErr_SetObject(PyExc_OSError, exc);
 		Py_XDECREF(exc);
 		return -1;
 	}
@@ -151,6 +191,8 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 					"Negative filedescriptor");
 			return -1;
 		}
+		if (check_fd(fd))
+			return -1;
 	}
 	else {
 		PyErr_Clear();
@@ -265,14 +307,25 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 		Py_END_ALLOW_THREADS
 		if (self->fd < 0) {
 #ifdef MS_WINDOWS
-			PyErr_SetFromErrnoWithUnicodeFilename(PyExc_IOError, widename);
-#else
-			PyErr_SetFromErrnoWithFilename(PyExc_IOError, name);
+			if (widename != NULL)
+				PyErr_SetFromErrnoWithUnicodeFilename(PyExc_IOError, widename);
+			else
 #endif
+				PyErr_SetFromErrnoWithFilename(PyExc_IOError, name);
 			goto error;
 		}
-		if(dircheck(self) < 0)
+		if(dircheck(self, name) < 0)
 			goto error;
+	}
+
+	if (append) {
+		/* For consistent behaviour, we explicitly seek to the
+		   end of file (otherwise, it might be done only on the
+		   first write()). */
+		PyObject *pos = portable_lseek(self->fd, NULL, 2);
+		if (pos == NULL)
+			goto error;
+		Py_DECREF(pos);
 	}
 
 	goto done;
@@ -292,11 +345,8 @@ fileio_dealloc(PyFileIOObject *self)
 		PyObject_ClearWeakRefs((PyObject *) self);
 
 	if (self->fd >= 0 && self->closefd) {
-		errno = internal_close(self);
-		if (errno < 0) {
-			PySys_WriteStderr("close failed: [Errno %d] %s\n",
-                                          errno, strerror(errno));
-		}
+		if(internal_close(self))
+			PyErr_WriteUnraisable((PyObject*)self);
 	}
 
 	Py_TYPE(self)->tp_free((PyObject *)self);
@@ -387,8 +437,6 @@ fileio_readinto(PyFileIOObject *self, PyObject *args)
 	return PyLong_FromSsize_t(n);
 }
 
-#define DEFAULT_BUFFER_SIZE (8*1024)
-
 static PyObject *
 fileio_readall(PyFileIOObject *self)
 {
@@ -396,12 +444,23 @@ fileio_readall(PyFileIOObject *self)
 	Py_ssize_t total = 0;
 	int n;
 
-	result = PyBytes_FromStringAndSize(NULL, DEFAULT_BUFFER_SIZE);
+	result = PyBytes_FromStringAndSize(NULL, SMALLCHUNK);
 	if (result == NULL)
 		return NULL;
 
 	while (1) {
-		Py_ssize_t newsize = total + DEFAULT_BUFFER_SIZE;
+		Py_ssize_t newsize = (total < SMALLCHUNK) ? SMALLCHUNK : total;
+
+		/* Keep doubling until we reach BIGCHUNK;
+		   then keep adding BIGCHUNK. */
+		if (newsize <= BIGCHUNK) {
+			newsize += newsize;
+		}
+		else {
+			/* NOTE: overflow impossible due to limits on BUFSIZ */
+			newsize += BIGCHUNK;
+		}
+
 		if (PyBytes_GET_SIZE(result) < newsize) {
 			if (_PyBytes_Resize(&result, newsize) < 0) {
 				if (total == 0) {
@@ -848,7 +907,7 @@ PyTypeObject PyFileIO_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)fileio_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

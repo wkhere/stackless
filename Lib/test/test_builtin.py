@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore", "hex../oct.. of negative int",
                         FutureWarning, __name__)
 warnings.filterwarnings("ignore", "integer argument expected",
                         DeprecationWarning, "unittest")
+import builtins
 
 class Squares:
 
@@ -219,21 +220,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises((OverflowError, ValueError), chr, 2**32)
 
     def test_cmp(self):
-        self.assertEqual(cmp(-1, 1), -1)
-        self.assertEqual(cmp(1, -1), 1)
-        self.assertEqual(cmp(1, 1), 0)
-        # verify that circular objects are not handled
-        a = []; a.append(a)
-        b = []; b.append(b)
-        from collections import UserList
-        c = UserList(); c.append(c)
-        self.assertRaises(RuntimeError, cmp, a, b)
-        self.assertRaises(RuntimeError, cmp, b, c)
-        self.assertRaises(RuntimeError, cmp, c, a)
-        self.assertRaises(RuntimeError, cmp, a, c)
-       # okay, now break the cycles
-        a.pop(); b.pop(); c.pop()
-        self.assertRaises(TypeError, cmp)
+        self.assert_(not hasattr(builtins, "cmp"))
 
     def test_compile(self):
         compile('print(1)\n', '', 'exec')
@@ -624,6 +611,18 @@ class BuiltinTest(unittest.TestCase):
             def __len__(self):
                 raise ValueError
         self.assertRaises(ValueError, len, BadSeq())
+        class InvalidLen:
+            def __len__(self):
+                return None
+        self.assertRaises(TypeError, len, InvalidLen())
+        class FloatLen:
+            def __len__(self):
+                return 4.5
+        self.assertRaises(TypeError, len, FloatLen())
+        class HugeLen:
+            def __len__(self):
+                return sys.maxsize + 1
+        self.assertRaises(OverflowError, len, HugeLen())
 
     def test_map(self):
         self.assertEqual(
@@ -736,10 +735,6 @@ class BuiltinTest(unittest.TestCase):
             def __getitem__(self, index):
                 raise ValueError
         self.assertRaises(ValueError, min, BadSeq())
-        class BadNumber:
-            def __cmp__(self, other):
-                raise ValueError
-        self.assertRaises(TypeError, min, (42, BadNumber()))
 
         for stmt in (
             "min(key=int)",                 # no args
@@ -1083,9 +1078,9 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(round(8), 8)
         self.assertEqual(round(-8), -8)
         self.assertEqual(type(round(0)), int)
-        self.assertEqual(type(round(-8, -1)), float)
-        self.assertEqual(type(round(-8, 0)), float)
-        self.assertEqual(type(round(-8, 1)), float)
+        self.assertEqual(type(round(-8, -1)), int)
+        self.assertEqual(type(round(-8, 0)), int)
+        self.assertEqual(type(round(-8, 1)), int)
 
         # test new kwargs
         self.assertEqual(round(number=-8.0, ndigits=-1), -10.0)

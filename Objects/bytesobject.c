@@ -1884,11 +1884,6 @@ string_translate(PyBytesObject *self, PyObject *args)
 			del_table = PyBytes_AS_STRING(delobj);
 			dellen = PyBytes_GET_SIZE(delobj);
 		}
-		else if (PyUnicode_Check(delobj)) {
-			PyErr_SetString(PyExc_TypeError,
-			"deletions are implemented differently for unicode");
-			return NULL;
-		}
 		else if (PyObject_AsCharBuffer(delobj, &del_table, &dellen))
 			return NULL;
 	}
@@ -3086,7 +3081,7 @@ PyTypeObject PyBytes_Type = {
 	0,			 		/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)string_repr, 			/* tp_repr */
 	0,					/* tp_as_number */
 	&string_as_sequence,			/* tp_as_sequence */
@@ -3420,7 +3415,7 @@ PyTypeObject PyBytesIter_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

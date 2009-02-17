@@ -228,29 +228,6 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        */
 #define  PyObject_DelAttr(O,A) PyObject_SetAttr((O),(A),NULL)
 
-     PyAPI_FUNC(int) PyObject_Cmp(PyObject *o1, PyObject *o2, int *result);
-
-       /*
-	 Compare the values of o1 and o2 using a routine provided by
-	 o1, if one exists, otherwise with a routine provided by o2.
-	 The result of the comparison is returned in result.  Returns
-	 -1 on failure.  This is the equivalent of the Python
-	 statement: result=cmp(o1,o2).
-
-       */
-
-     /* Implemented elsewhere:
-
-     int PyObject_Compare(PyObject *o1, PyObject *o2);
-
-	 Compare the values of o1 and o2 using a routine provided by
-	 o1, if one exists, otherwise with a routine provided by o2.
-	 Returns the result of the comparison on success.  On error,
-	 the value returned is undefined. This is equivalent to the
-	 Python expression: cmp(o1,o2).
-
-       */
-
      /* Implemented elsewhere:
 
      PyObject *PyObject_Repr(PyObject *o);
@@ -415,7 +392,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        /*
          Guess the size of object o using len(o) or o.__length_hint__().
          If neither of those return a non-negative value, then return the
-         default value.  This function never fails. All exceptions are cleared.
+         default value.  If one of the calls fails, this function returns -1.
        */
 
      PyAPI_FUNC(PyObject *) PyObject_GetItem(PyObject *o, PyObject *key);
@@ -806,20 +783,18 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
         is cleared and the value is clipped. 
        */
 
-     #define PyNumber_Int PyNumber_Long
-
        /*
-	 Returns the o converted to an integer object on success, or
-	 NULL on failure.  This is the equivalent of the Python
-	 expression: int(o).
+         PyNumber_Int used to be found here.  It's now in Include/intobject.h,
+         where it is defined to be an alias for PyNumber_Long.  New code
+         should use PyNumber_Long instead.
        */
 
      PyAPI_FUNC(PyObject *) PyNumber_Long(PyObject *o);
 
        /*
-	 Returns the o converted to a long integer object on success,
-	 or NULL on failure.  This is the equivalent of the Python
-	 expression: long(o).
+	 Returns the o converted to an integer object on success, or
+	 NULL on failure.  This is the equivalent of the Python
+	 expression: int(o).
        */
 
      PyAPI_FUNC(PyObject *) PyNumber_Float(PyObject *o);

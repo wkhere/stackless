@@ -13,7 +13,7 @@ syntax (ECMA-262 3rd edition) used as a lightweight data interchange format.
 :mod:`marshal` and :mod:`pickle` modules.
 
 Encoding basic Python object hierarchies::
-    
+
     >>> import json
     >>> json.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
     '["foo", {"bar": ["baz", null, 1.0, 2]}]'
@@ -42,12 +42,12 @@ Pretty printing::
     >>> import json
     >>> print(json.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4))
     {
-        "4": 5, 
+        "4": 5,
         "6": 7
     }
 
 Decoding JSON::
-    
+
     >>> import json
     >>> json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]')
     ['foo', {'bar': ['baz', None, 1.0, 2]}]
@@ -74,7 +74,7 @@ Specializing JSON object decoding::
     Decimal('1.1')
 
 Extending :class:`JSONEncoder`::
-    
+
     >>> import json
     >>> class ComplexEncoder(json.JSONEncoder):
     ...     def default(self, obj):
@@ -88,12 +88,12 @@ Extending :class:`JSONEncoder`::
     '[2.0, 1.0]'
     >>> list(ComplexEncoder().iterencode(2 + 1j))
     ['[', '2.0', ', ', '1.0', ']']
-    
+
 
 .. highlight:: none
 
 Using json.tool from the shell to validate and pretty-print::
-    
+
     $ echo '{"json":"obj"}' | python -mjson.tool
     {
         "json": "obj"
@@ -103,7 +103,7 @@ Using json.tool from the shell to validate and pretty-print::
 
 .. highlight:: python
 
-.. note:: 
+.. note::
 
    The JSON produced by this module's default settings is a subset of
    YAML, so it may be used as a serializer for that as well.
@@ -151,7 +151,7 @@ Basic Usage
    *default(obj)* is a function that should return a serializable version of
    *obj* or raise :exc:`TypeError`.  The default simply raises :exc:`TypeError`.
 
-   To use a custom :class:`JSONEncoder`` subclass (e.g. one that overrides the
+   To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
    :meth:`default` method to serialize additional types), specify it with the
    *cls* kwarg.
 
@@ -165,7 +165,7 @@ Basic Usage
    :func:`dump`.
 
 
-.. function load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, **kw]]]]]]])
+.. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, **kw]]]]]]])
 
    Deserialize *fp* (a ``.read()``-supporting file-like object containing a JSON
    document) to a Python object.
@@ -201,7 +201,7 @@ Basic Usage
    class.
 
 
-.. function loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, **kw]]]]]]])
+.. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, **kw]]]]]]])
 
    Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
    document) to a Python object.
@@ -367,7 +367,7 @@ Encoders and decoders
 
       For example, to support arbitrary iterators, you could implement default
       like this::
-            
+
          def default(self, o):
             try:
                 iterable = iter(o)
@@ -391,6 +391,6 @@ Encoders and decoders
 
       Encode the given object, *o*, and yield each string representation as
       available.  For example::
-            
+
             for chunk in JSONEncoder().iterencode(bigobject):
                 mysocket.write(chunk)

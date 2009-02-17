@@ -1,8 +1,8 @@
-This is Python version 3.0 final
-================================
+This is Python version 3.0.1
+============================
 
 For notes specific to this release, see RELNOTES in this directory.
-Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
 Python Software Foundation.
 All rights reserved.
 
@@ -114,11 +114,11 @@ tracker:
 If you're not sure whether you're dealing with a bug or a feature, use the
 mailing list:
 
-    python-3000@python.org
+    python-dev@python.org
 
 To subscribe to the list, use the Mailman form:
 
-    http://mail.python.org/mailman/listinfo/python-3000/
+    http://mail.python.org/mailman/listinfo/python-dev/
 
 
 Build Instructions
@@ -159,7 +159,7 @@ should do a "make clean" at the toplevel first.)
 Copyright and License Information
 ---------------------------------
 
-Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008
+Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
 Python Software Foundation.
 All rights reserved.
 

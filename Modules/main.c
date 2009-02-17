@@ -292,7 +292,6 @@ Py_Main(int argc, wchar_t **argv)
 	wchar_t *module = NULL;
 	FILE *fp = stdin;
 	char *p;
-	int unbuffered = 0;
 	int skipfirstline = 0;
 	int stdin_is_interactive = 0;
 	int help = 0;
@@ -374,7 +373,7 @@ Py_Main(int argc, wchar_t **argv)
 			break;
 
 		case 'u':
-			unbuffered++;
+			Py_UnbufferedStdioFlag = 1;
 			saw_unbuffered_flag = 1;
 			break;
 
@@ -423,7 +422,7 @@ Py_Main(int argc, wchar_t **argv)
 		Py_InspectFlag = 1;
 	if (!saw_unbuffered_flag &&
 	    (p = Py_GETENV("PYTHONUNBUFFERED")) && *p != '\0')
-		unbuffered = 1;
+		Py_UnbufferedStdioFlag = 1;
 
 	if (!Py_NoUserSiteDirectory &&
 	    (p = Py_GETENV("PYTHONNOUSERSITE")) && *p != '\0')
@@ -444,7 +443,7 @@ Py_Main(int argc, wchar_t **argv)
 
 	stdin_is_interactive = Py_FdIsInteractive(stdin, (char *)0);
 
-	if (unbuffered) {
+	if (Py_UnbufferedStdioFlag) {
 #if defined(MS_WINDOWS) || defined(__CYGWIN__)
 		_setmode(fileno(stdin), O_BINARY);
 		_setmode(fileno(stdout), O_BINARY);
@@ -488,10 +487,23 @@ Py_Main(int argc, wchar_t **argv)
 	   so the actual executable path is passed in an environment variable.
 	   See Lib/plat-mac/bundlebuiler.py for details about the bootstrap
 	   script. */
-	if ((p = Py_GETENV("PYTHONEXECUTABLE")) && *p != '\0')
-		Py_SetProgramName(p);
-	else
+	if ((p = Py_GETENV("PYTHONEXECUTABLE")) && *p != '\0') {
+		wchar_t* buffer;
+		size_t len = strlen(p);
+		size_t r;
+
+		buffer = malloc(len * sizeof(wchar_t));
+		if (buffer == NULL) {
+			Py_FatalError(
+			   "not enough memory to copy PYTHONEXECUTABLE");
+		}
+
+		r = mbstowcs(buffer, p, len);
+		Py_SetProgramName(buffer);
+		/* buffer is now handed off - do not free */
+	} else {
 		Py_SetProgramName(argv[0]);
+	}
 #else
 	Py_SetProgramName(argv[0]);
 #endif
@@ -600,18 +612,21 @@ Py_Main(int argc, wchar_t **argv)
 		}
 
 		if (sts==-1) {
-			char cfilename[PATH_MAX];
+			PyObject *filenameObj = NULL;
 			char *p_cfilename = "<stdin>";
 			if (filename) {
-				size_t r = wcstombs(cfilename, filename, PATH_MAX);
-				p_cfilename = cfilename;
-				if (r == (size_t)-1 || r >= PATH_MAX)
+				filenameObj = PyUnicode_FromWideChar(
+					filename, wcslen(filename));
+				if (filenameObj != NULL)
+					p_cfilename = _PyUnicode_AsString(filenameObj);
+				else
 					p_cfilename = "<decoding error>";
 			}
 			sts = PyRun_AnyFileExFlags(
 				fp,
 				p_cfilename,
 				filename != NULL, &cf) != 0;
+			Py_XDECREF(filenameObj);
 		}
 		
 	}

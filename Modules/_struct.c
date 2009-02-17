@@ -127,8 +127,8 @@ get_pylong(PyObject *v)
 		return v;
 	}
 	m = Py_TYPE(v)->tp_as_number;
-	if (m != NULL && m->nb_long != NULL) {
-		v = m->nb_long(v);
+	if (m != NULL && m->nb_int != NULL) {
+		v = m->nb_int(v);
 		if (v == NULL)
 			return NULL;
 		if (PyLong_Check(v))
@@ -155,7 +155,7 @@ get_long(PyObject *v, long *p)
 			PyErr_Clear();
 			if (PyErr_WarnEx(PyExc_DeprecationWarning, FLOAT_COERCE, 2) < 0)
 				return -1;
-			o = PyNumber_Int(v);
+			o = PyNumber_Long(v);
 			if (o == NULL)
 				return -1;
 			res = get_long(o, p);
@@ -260,7 +260,7 @@ get_wrapped_long(PyObject *v, long *p)
 				PyErr_Clear();
 				if (PyErr_WarnEx(PyExc_DeprecationWarning, FLOAT_COERCE, 2) < 0)
 					return -1;
-				o = PyNumber_Int(v);
+				o = PyNumber_Long(v);
 				if (o == NULL)
 					return -1;
 				res = get_wrapped_long(o, p);
@@ -299,7 +299,7 @@ get_wrapped_ulong(PyObject *v, unsigned long *p)
 			PyErr_Clear();
 			if (PyErr_WarnEx(PyExc_DeprecationWarning, FLOAT_COERCE, 2) < 0)
 				return -1;
-			o = PyNumber_Int(v);
+			o = PyNumber_Long(v);
 			if (o == NULL)
 				return -1;
 			res = get_wrapped_ulong(o, p);
@@ -661,7 +661,7 @@ np_int(char *p, PyObject *v, const formatdef *f)
 		return -1;
 #if (SIZEOF_LONG > SIZEOF_INT)
 	if ((x < ((long)INT_MIN)) || (x > ((long)INT_MAX)))
-		return _range_error(f, 0);
+		RANGE_ERROR(x, f, 0, -1);
 #endif
 	y = (int)x;
 	memcpy(p, (char *)&y, sizeof y);
@@ -673,12 +673,12 @@ np_uint(char *p, PyObject *v, const formatdef *f)
 {
 	unsigned long x;
 	unsigned int y;
-	if (get_ulong(v, &x) < 0)
-		return _range_error(f, 1);
+	if (get_wrapped_ulong(v, &x) < 0)
+		return -1;
 	y = (unsigned int)x;
 #if (SIZEOF_LONG > SIZEOF_INT)
 	if (x > ((unsigned long)UINT_MAX))
-		return _range_error(f, 1);
+		RANGE_ERROR(y, f, 1, -1);
 #endif
 	memcpy(p, (char *)&y, sizeof y);
 	return 0;
@@ -698,8 +698,8 @@ static int
 np_ulong(char *p, PyObject *v, const formatdef *f)
 {
 	unsigned long x;
-	if (get_ulong(v, &x) < 0)
-		return _range_error(f, 1);
+	if (get_wrapped_ulong(v, &x) < 0)
+		return -1;
 	memcpy(p, (char *)&x, sizeof x);
 	return 0;
 }
@@ -1853,7 +1853,7 @@ PyTypeObject PyStructType = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

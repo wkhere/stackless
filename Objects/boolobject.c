@@ -109,7 +109,7 @@ static PyNumberMethods bool_as_number = {
 	bool_xor,		/* nb_xor */
 	bool_or,		/* nb_or */
 	0,			/* nb_int */
-	0,			/* nb_long */
+	0,			/* nb_reserved */
 	0,			/* nb_float */
 	0,			/* nb_inplace_add */
 	0,			/* nb_inplace_subtract */
@@ -139,7 +139,7 @@ PyTypeObject PyBool_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	bool_repr,				/* tp_repr */
 	&bool_as_number,			/* tp_as_number */
 	0,					/* tp_as_sequence */

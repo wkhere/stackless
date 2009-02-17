@@ -5,6 +5,7 @@ Main program for 2to3.
 import sys
 import os
 import logging
+import shutil
 import optparse
 
 from . import refactor
@@ -39,6 +40,8 @@ class StdoutRefactoringTool(refactor.RefactoringTool):
         # Actually write the new file
         super(StdoutRefactoringTool, self).write_file(new_text,
                                                       filename, old_text)
+        if not self.nobackups:
+            shutil.copymode(backup, filename)
 
     def print_output(self, lines):
         for line in lines:
@@ -56,7 +59,7 @@ def main(fixer_pkg, args=None):
     Returns a suggested exit status (0, 1, 2).
     """
     # Set up option parser
-    parser = optparse.OptionParser(usage="refactor.py [options] file|dir ...")
+    parser = optparse.OptionParser(usage="2to3 [options] file|dir ...")
     parser.add_option("-d", "--doctests_only", action="store_true",
                       help="Fix up doctests only")
     parser.add_option("-f", "--fix", action="append", default=[],

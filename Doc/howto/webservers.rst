@@ -88,7 +88,7 @@ they can be run as CGI if no better option is available.
    <http://wiki.python.org/moin/CgiScripts>`_ with some additional information
    about CGI in Python.
 
-   
+
 Simple script for testing CGI
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -101,10 +101,10 @@ simple CGI program::
     # enable debugging
     import cgitb; cgitb.enable()
 
-    print "Content-Type: text/plain;charset=utf-8"
-    print
+    print("Content-Type: text/plain;charset=utf-8")
+    print()
 
-    print "Hello World!"
+    print("Hello World!")
 
 You need to write this code into a file with a ``.py`` or ``.cgi`` extension,
 this depends on your web server configuration.  Depending on your web server
@@ -278,8 +278,8 @@ following WSGI-application::
     #!/usr/bin/env python
     # -*- coding: UTF-8 -*-
 
-    from cgi import escape
     import sys, os
+    from cgi import escape
     from flup.server.fcgi import WSGIServer
 
     def app(environ, start_response):
@@ -288,7 +288,8 @@ following WSGI-application::
         yield '<h1>FastCGI Environment</h1>'
         yield '<table>'
         for k, v in sorted(environ.items()):
-             yield '<tr><th>%s</th><td>%s</td></tr>' % (escape(k), escape(v))
+             yield '<tr><th>{0}</th><td>{1}</td></tr>'.format(
+                 escape(k), escape(v))
         yield '</table>'
 
     WSGIServer(app).run()
@@ -386,7 +387,7 @@ compared with other web techniques.
 
    You might be interested in some WSGI-supporting modules already contained in
    the standard library, namely:
-    
+
    * :mod:`wsgiref` -- some tiny utilities and servers for WSGI
 
 
@@ -476,8 +477,8 @@ placeholders.
 Python already includes such simple templates::
 
     # a simple template
-    template = "<html><body><h1>Hello %s!</h1></body></html>"
-    print template % "Reader"
+    template = "<html><body><h1>Hello {who}!</h1></body></html>"
+    print(template.format(who="Reader"))
 
 The Python standard library also includes some more advanced templates usable
 through :class:`string.Template`, but in HTML templates it is needed to use
@@ -499,7 +500,7 @@ using these is a good idea.
    time in looking through the most popular ones.  Some frameworks have their
    own template engine or have a recommentation for one.  It's wise to use
    these.
-  
+
    Popular template engines include:
 
    * Mako
@@ -687,7 +688,7 @@ And that's still not everything.  The most up-to-date information can always be
 found in the Python wiki.
 
 .. seealso::
-    
+
    The Python wiki contains an extensive list of `web frameworks
    <http://wiki.python.org/moin/WebFrameworks>`_.
 

@@ -23,8 +23,8 @@ The :mod:`urllib.request` module defines the following functions:
    that use *data*; the HTTP request will be a POST instead of a GET when the
    *data* parameter is provided.  *data* should be a buffer in the standard
    :mimetype:`application/x-www-form-urlencoded` format.  The
-   :func:`urllib.urlencode` function takes a mapping or sequence of 2-tuples and
-   returns a string in this format.
+   :func:`urllib.parse.urlencode` function takes a mapping or sequence
+   of 2-tuples and returns a string in this format.
 
    The optional *timeout* parameter specifies a timeout in seconds for blocking
    operations like the connection attempt (if not specified, the global default
@@ -49,8 +49,8 @@ The :mod:`urllib.request` module defines the following functions:
    The urlopen function from the previous version, Python 2.6 and earlier,  of
    the module  urllib has been discontinued as urlopen can return the
    file-object as the previous. The proxy handling, which in earlier was passed
-   as a dict parameter to urlopen can be availed by the use of `ProxyHandler`
-   objects.
+   as a dict parameter to urlopen can be availed by the use of
+   :class:`ProxyHandler` objects.
 
 
 .. function:: install_opener(opener)
@@ -172,8 +172,8 @@ The following classes are provided:
    that use *data*; the HTTP request will be a POST instead of a GET when the
    *data* parameter is provided.  *data* should be a buffer in the standard
    :mimetype:`application/x-www-form-urlencoded` format.  The
-   :func:`urllib.urlencode` function takes a mapping or sequence of 2-tuples and
-   returns a string in this format.
+   :func:`urllib.parse.urlencode` function takes a mapping or sequence
+   of 2-tuples and returns a string in this format.
 
    *headers* should be a dictionary, and will be treated as if :meth:`add_header`
    was called with each key and value as arguments.  This is often used to "spoof"

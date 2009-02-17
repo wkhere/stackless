@@ -802,7 +802,14 @@ static void
 setiter_dealloc(setiterobject *si)
 {
 	Py_XDECREF(si->si_set);
-	PyObject_Del(si);
+	PyObject_GC_Del(si);
+}
+
+static int
+setiter_traverse(setiterobject *si, visitproc visit, void *arg)
+{
+	Py_VISIT(si->si_set);
+	return 0;
 }
 
 static PyObject *
@@ -869,7 +876,7 @@ PyTypeObject PySetIter_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -880,9 +887,9 @@ PyTypeObject PySetIter_Type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
  	0,					/* tp_doc */
- 	0,					/* tp_traverse */
+ 	(traverseproc)setiter_traverse,		/* tp_traverse */
  	0,					/* tp_clear */
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
@@ -895,7 +902,7 @@ PyTypeObject PySetIter_Type = {
 static PyObject *
 set_iter(PySetObject *so)
 {
-	setiterobject *si = PyObject_New(setiterobject, &PySetIter_Type);
+	setiterobject *si = PyObject_GC_New(setiterobject, &PySetIter_Type);
 	if (si == NULL)
 		return NULL;
 	Py_INCREF(so);
@@ -903,6 +910,7 @@ set_iter(PySetObject *so)
 	si->si_used = so->used;
 	si->si_pos = 0;
 	si->len = so->used;
+	_PyObject_GC_TRACK(si);
 	return (PyObject *)si;
 }
 
@@ -1816,13 +1824,6 @@ set_richcompare(PySetObject *v, PyObject *w, int op)
 	return Py_NotImplemented;
 }
 
-static int
-set_nocmp(PyObject *self, PyObject *other)
-{
-	PyErr_SetString(PyExc_TypeError, "cannot compare sets using cmp()");
-	return -1;
-}
-
 static PyObject *
 set_add(PySetObject *so, PyObject *key)
 {
@@ -2074,7 +2075,7 @@ static PyNumberMethods set_as_number = {
 	(binaryfunc)set_xor,		/*nb_xor*/
 	(binaryfunc)set_or,		/*nb_or*/
 	0,				/*nb_int*/
-	0,				/*nb_long*/
+	0,				/*nb_reserved*/
 	0,				/*nb_float*/
 	0,				/*nb_inplace_add*/
 	(binaryfunc)set_isub,		/*nb_inplace_subtract*/
@@ -2103,7 +2104,7 @@ PyTypeObject PySet_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	set_nocmp,			/* tp_compare */
+	0,				/* tp_reserved */
 	(reprfunc)set_repr,		/* tp_repr */
 	&set_as_number,			/* tp_as_number */
 	&set_as_sequence,		/* tp_as_sequence */
@@ -2200,7 +2201,7 @@ PyTypeObject PyFrozenSet_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	set_nocmp,			/* tp_compare */
+	0,				/* tp_reserved */
 	(reprfunc)set_repr,		/* tp_repr */
 	&frozenset_as_number,		/* tp_as_number */
 	&set_as_sequence,		/* tp_as_sequence */

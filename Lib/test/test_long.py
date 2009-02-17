@@ -283,6 +283,16 @@ class LongTest(unittest.TestCase):
 
         self.assertRaises(ValueError, int, '123\0')
         self.assertRaises(ValueError, int, '53', 40)
+        # trailing L should no longer be accepted...
+        self.assertRaises(ValueError, int, '123L')
+        self.assertRaises(ValueError, int, '123l')
+        self.assertRaises(ValueError, int, '0L')
+        self.assertRaises(ValueError, int, '-37L')
+        self.assertRaises(ValueError, int, '0x32L', 16)
+        self.assertRaises(ValueError, int, '1L', 21)
+        # ... but it's just a normal digit if base >= 22
+        self.assertEqual(int('1L', 22), 43)
+
         self.assertRaises(TypeError, int, 1, 12)
 
         # SF patch #1638879: embedded NULs were not detected with
@@ -366,7 +376,7 @@ class LongTest(unittest.TestCase):
 
 
     def test_conversion(self):
-        # Test __long__()
+        # Test __int__()
         class ClassicMissingMethods:
             pass
         self.assertRaises(TypeError, int, ClassicMissingMethods())
@@ -409,17 +419,31 @@ class LongTest(unittest.TestCase):
         class Classic:
             pass
         for base in (object, Classic):
-            class LongOverridesTrunc(base):
-                def __long__(self):
+            class IntOverridesTrunc(base):
+                def __int__(self):
                     return 42
                 def __trunc__(self):
                     return -12
-            self.assertEqual(int(LongOverridesTrunc()), 42)
+            self.assertEqual(int(IntOverridesTrunc()), 42)
 
             class JustTrunc(base):
                 def __trunc__(self):
                     return 42
             self.assertEqual(int(JustTrunc()), 42)
+
+            class JustLong(base):
+                # test that __long__ no longer used in 3.x
+                def __long__(self):
+                    return 42
+            self.assertRaises(TypeError, int, JustLong())
+
+            class LongTrunc(base):
+                # __long__ should be ignored in 3.x
+                def __long__(self):
+                    return 42
+                def __trunc__(self):
+                    return 1729
+            self.assertEqual(int(LongTrunc()), 1729)
 
             for trunc_result_base in (object, Classic):
                 class Integral(trunc_result_base):
@@ -672,7 +696,8 @@ class LongTest(unittest.TestCase):
             def _cmp__(self, other):
                 if not isinstance(other, Rat):
                     other = Rat(other)
-                return cmp(self.n * other.d, self.d * other.n)
+                x, y = self.n * other.d, self.d * other.n
+                return (x > y) - (x < y)
             def __eq__(self, other):
                 return self._cmp__(other) == 0
             def __ne__(self, other):
@@ -702,8 +727,8 @@ class LongTest(unittest.TestCase):
             Rx = Rat(x)
             for y in cases:
                 Ry = Rat(y)
-                Rcmp = cmp(Rx, Ry)
-                xycmp = cmp(x, y)
+                Rcmp = (Rx > Ry) - (Rx < Ry)
+                xycmp = (x > y) - (x < y)
                 eq(Rcmp, xycmp, Frm("%r %r %d %d", x, y, Rcmp, xycmp))
                 eq(x == y, Rcmp == 0, Frm("%r == %r %d", x, y, Rcmp))
                 eq(x != y, Rcmp != 0, Frm("%r != %r %d", x, y, Rcmp))
@@ -835,6 +860,82 @@ class LongTest(unittest.TestCase):
         i = 1 << 70
         self.assertTrue(i - i is 0)
         self.assertTrue(0 * i is 0)
+
+    def test_round(self):
+        # check round-half-even algorithm. For round to nearest ten;
+        # rounding map is invariant under adding multiples of 20
+        test_dict = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0,
+                     6:10, 7:10, 8:10, 9:10, 10:10, 11:10, 12:10, 13:10, 14:10,
+                     15:20, 16:20, 17:20, 18:20, 19:20}
+        for offset in range(-520, 520, 20):
+            for k, v in test_dict.items():
+                got = round(k+offset, -1)
+                expected = v+offset
+                self.assertEqual(got, expected)
+                self.assert_(type(got) is int)
+
+        # larger second argument
+        self.assertEqual(round(-150, -2), -200)
+        self.assertEqual(round(-149, -2), -100)
+        self.assertEqual(round(-51, -2), -100)
+        self.assertEqual(round(-50, -2), 0)
+        self.assertEqual(round(-49, -2), 0)
+        self.assertEqual(round(-1, -2), 0)
+        self.assertEqual(round(0, -2), 0)
+        self.assertEqual(round(1, -2), 0)
+        self.assertEqual(round(49, -2), 0)
+        self.assertEqual(round(50, -2), 0)
+        self.assertEqual(round(51, -2), 100)
+        self.assertEqual(round(149, -2), 100)
+        self.assertEqual(round(150, -2), 200)
+        self.assertEqual(round(250, -2), 200)
+        self.assertEqual(round(251, -2), 300)
+        self.assertEqual(round(172500, -3), 172000)
+        self.assertEqual(round(173500, -3), 174000)
+        self.assertEqual(round(31415926535, -1), 31415926540)
+        self.assertEqual(round(31415926535, -2), 31415926500)
+        self.assertEqual(round(31415926535, -3), 31415927000)
+        self.assertEqual(round(31415926535, -4), 31415930000)
+        self.assertEqual(round(31415926535, -5), 31415900000)
+        self.assertEqual(round(31415926535, -6), 31416000000)
+        self.assertEqual(round(31415926535, -7), 31420000000)
+        self.assertEqual(round(31415926535, -8), 31400000000)
+        self.assertEqual(round(31415926535, -9), 31000000000)
+        self.assertEqual(round(31415926535, -10), 30000000000)
+        self.assertEqual(round(31415926535, -11), 0)
+        self.assertEqual(round(31415926535, -12), 0)
+        self.assertEqual(round(31415926535, -999), 0)
+
+        # should get correct results even for huge inputs
+        for k in range(10, 100):
+            got = round(10**k + 324678, -3)
+            expect = 10**k + 325000
+            self.assertEqual(got, expect)
+            self.assert_(type(got) is int)
+
+        # nonnegative second argument: round(x, n) should just return x
+        for n in range(5):
+            for i in range(100):
+                x = random.randrange(-10000, 10000)
+                got = round(x, n)
+                self.assertEqual(got, x)
+                self.assert_(type(got) is int)
+        for huge_n in 2**31-1, 2**31, 2**63-1, 2**63, 2**100, 10**100:
+            self.assertEqual(round(8979323, huge_n), 8979323)
+
+        # omitted second argument
+        for i in range(100):
+            x = random.randrange(-10000, 10000)
+            got = round(x)
+            self.assertEqual(got, x)
+            self.assert_(type(got) is int)
+
+        # bad second argument
+        bad_exponents = ('brian', 2.0, 0j, None)
+        for e in bad_exponents:
+            self.assertRaises(TypeError, round, 3, e)
+
+
 
 def test_main():
     support.run_unittest(LongTest)
