@@ -1,19 +1,21 @@
 import unittest
 import stackless
+import gc
 
 
 class SchedulingMonitor:
     "A scheduling monitor acting as a callback for set_schedule_callback()."
-    
+
     def __init__(self):
         self.count = 0
 
     def __call__(self, prevTasklet, nextTasklet):
         self.count += 1
-        
 
 class SchedulingCallbackTestCase(unittest.TestCase):
     "A collection of scheduling callback tests."
+    def setUp(self):
+        gc.collect() #to avoid unexpected GC
 
     def test0(self):
         "Test #callbacks before and after running isolated monitor."
@@ -36,10 +38,10 @@ class SchedulingCallbackTestCase(unittest.TestCase):
 
     def test1(self):
         "Test multiple monitors, from test/test_set_schedule_callback.py"
-        
+
         fu = self.failUnless
         n = 2
-        
+
         mon1 = SchedulingMonitor()
         stackless.set_schedule_callback(mon1)
         v = 3
@@ -59,7 +61,7 @@ class SchedulingCallbackTestCase(unittest.TestCase):
         fu(c2 >= n*v, "At least as may callbacks as many test_cframe calls")
         fu(mon1.count == c1, "No calls to previous callback")
         fu(c2 > c1, "More test_cframe calls => more callbacks on second run")
-        
+
         stackless.set_schedule_callback(None)
         v = 7
         for i in range(n): stackless.tasklet(stackless.test_cframe)(v)
