@@ -372,6 +372,28 @@ slp_schedule_callback(PyTaskletObject *prev, PyTaskletObject *next)
 		if (ret) return errflag; \
 	}
 
+/* a function to cath the "return" of the macro */
+static int
+notify_schedule_unmacro(PyThreadState *ts, PyTaskletObject *prev, PyTaskletObject *next)
+{
+	NOTIFY_SCHEDULE(prev, next, -1);
+	return 0;
+}
+
+/* call scheduling callback and ignore exceptions */
+static void
+notify_schedule(PyThreadState *ts, PyTaskletObject *prev, PyTaskletObject *next)
+{
+	if (_slp_schedule_fasthook == NULL)
+		return;
+	if (notify_schedule_unmacro(ts, prev, next)) {
+		PyObject *obj = Py_None;
+		if (slp_schedule_callback == _slp_schedule_fasthook)
+			obj = _slp_schedule_hook;
+		PyErr_WriteUnraisable(obj);
+	}
+}
+
 static void
 kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
 {
@@ -773,7 +795,6 @@ static void slp_schedule_soft_irq(PyThreadState *ts, PyTaskletObject *prev,
 	*next = ts->st.main;
 }
 
-
 PyObject *
 slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 {
@@ -817,7 +838,7 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 		return retval;
 	}
 
-	NOTIFY_SCHEDULE(prev, next, NULL);
+	notify_schedule(ts, prev, next);
 
 	if (!(ts->st.runflags & PY_WATCHDOG_TOTALTIMEOUT))
 		ts->st.ticker = ts->st.interval; /* reset timeslice */

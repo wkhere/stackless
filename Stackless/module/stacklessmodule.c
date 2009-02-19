@@ -386,7 +386,6 @@ test_cframe(PyObject *self, PyObject *args, PyObject *kwds)
 	long i;
 	PyObject *ret = Py_None;
 
-	Py_INCREF(ret);
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "l|l:test_cframe",
 					 argnames, &switches, &extra))
 		return NULL;
@@ -396,6 +395,7 @@ test_cframe(PyObject *self, PyObject *args, PyObject *kwds)
 				STACK_MAX_USESTR, NULL);
 	if (extra > 0)
 		alloca(extra*sizeof(PyObject*));
+	Py_INCREF(ret);
 	for (i=0; i<switches; i++) {
 		Py_DECREF(ret);
 		ret = PyStackless_Schedule(Py_None, 0);
