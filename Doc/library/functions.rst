@@ -8,59 +8,6 @@ The Python interpreter has a number of functions and types built into it that
 are always available.  They are listed here in alphabetical order.
 
 
-.. function:: __import__(name[, globals[, locals[, fromlist[, level]]]])
-
-   .. index::
-      statement: import
-      module: imp
-
-   .. note::
-
-      This is an advanced function that is not needed in everyday Python
-      programming.
-
-   The function is invoked by the :keyword:`import` statement.  It mainly exists
-   so that you can replace it with another function that has a compatible
-   interface, in order to change the semantics of the :keyword:`import`
-   statement.  See the built-in module :mod:`imp`, which defines some useful
-   operations out of which you can build your own :func:`__import__` function.
-
-   For example, the statement ``import spam`` results in the following call:
-   ``__import__('spam', globals(), locals(), [], -1)``; the statement
-   ``from spam.ham import eggs`` results in ``__import__('spam.ham', globals(),
-   locals(), ['eggs'], -1)``.  Note that even though ``locals()`` and ``['eggs']``
-   are passed in as arguments, the :func:`__import__` function does not set the
-   local variable named ``eggs``; this is done by subsequent code that is generated
-   for the import statement.  (In fact, the standard implementation does not use
-   its *locals* argument at all, and uses its *globals* only to determine the
-   package context of the :keyword:`import` statement.)
-
-   When the *name* variable is of the form ``package.module``, normally, the
-   top-level package (the name up till the first dot) is returned, *not* the
-   module named by *name*.  However, when a non-empty *fromlist* argument is
-   given, the module named by *name* is returned.  This is done for
-   compatibility with the :term:`bytecode` generated for the different kinds of import
-   statement; when using ``import spam.ham.eggs``, the top-level package
-   :mod:`spam` must be placed in the importing namespace, but when using ``from
-   spam.ham import eggs``, the ``spam.ham`` subpackage must be used to find the
-   ``eggs`` variable.  As a workaround for this behavior, use :func:`getattr` to
-   extract the desired components.  For example, you could define the following
-   helper::
-
-      def my_import(name):
-          mod = __import__(name)
-          components = name.split('.')
-          for comp in components[1:]:
-              mod = getattr(mod, comp)
-          return mod
-
-   *level* specifies whether to use absolute or relative imports. The default is
-   ``-1`` which indicates both absolute and relative imports will be attempted.
-   ``0`` means only perform absolute imports. Positive values for *level* indicate
-   the number of parent directories to search relative to the directory of the
-   module calling :func:`__import__`.
-
-
 .. function:: abs(x)
 
    Return the absolute value of a number.  The argument may be an
@@ -148,7 +95,7 @@ are always available.  They are listed here in alphabetical order.
    the range ``0 <= x < 256``.  :class:`bytes` is an immutable version of
    :class:`bytearray` -- it has the same non-mutating methods and the same
    indexing and slicing behavior.
-   
+
    Accordingly, constructor arguments are interpreted as for :func:`buffer`.
 
    Bytes objects can also be created with literals, see :ref:`strings`.
@@ -188,13 +135,6 @@ are always available.  They are listed here in alphabetical order.
 
    For more information on class methods, consult the documentation on the standard
    type hierarchy in :ref:`types`.
-
-
-.. function:: cmp(x, y)
-
-   Compare the two objects *x* and *y* and return an integer according to the
-   outcome.  The return value is negative if ``x < y``, zero if ``x == y`` and
-   strictly positive if ``x > y``.
 
 
 .. function:: compile(source, filename, mode[, flags[, dont_inherit]])
@@ -331,7 +271,7 @@ are always available.  They are listed here in alphabetical order.
 
    Take two (non complex) numbers as arguments and return a pair of numbers
    consisting of their quotient and remainder when using integer division.  With mixed
-   operand types, the rules for binary arithmetic operators apply.  For integers, 
+   operand types, the rules for binary arithmetic operators apply.  For integers,
    the result is the same as ``(a // b, a % b)``. For floating point
    numbers the result is ``(q, a % b)``, where *q* is usually ``math.floor(a / b)``
    but may be 1 less than that.  In any case ``q * b + a % b`` is very close to
@@ -349,7 +289,7 @@ are always available.  They are listed here in alphabetical order.
    :func:`enumerate` is useful for obtaining an indexed series: ``(0, seq[0])``,
    ``(1, seq[1])``, ``(2, seq[2])``, .... For example:
 
-      >>> for i, season in enumerate(['Spring', 'Summer', 'Fall', 'Winter')]:
+      >>> for i, season in enumerate(['Spring', 'Summer', 'Fall', 'Winter']):
       ...     print(i, season)
       0 Spring
       1 Summer
@@ -394,12 +334,12 @@ are always available.  They are listed here in alphabetical order.
    This function supports dynamic execution of Python code. *object* must be
    either a string or a code object.  If it is a string, the string is parsed as
    a suite of Python statements which is then executed (unless a syntax error
-   occurs).  If it is a code object, it is simply executed.  In all cases, the
-   code that's executed is expected to be valid as file input (see the section
-   "File input" in the Reference Manual). Be aware that the :keyword:`return`
-   and :keyword:`yield` statements may not be used outside of function
-   definitions even within the context of code passed to the :func:`exec`
-   function. The return value is ``None``.
+   occurs). [#]_ If it is a code object, it is simply executed.  In all cases,
+   the code that's executed is expected to be valid as file input (see the
+   section "File input" in the Reference Manual). Be aware that the
+   :keyword:`return` and :keyword:`yield` statements may not be used outside of
+   function definitions even within the context of code passed to the
+   :func:`exec` function. The return value is ``None``.
 
    In all cases, if the optional parts are omitted, the code is executed in the
    current scope.  If only *globals* is provided, it must be a dictionary, which
@@ -440,6 +380,9 @@ are always available.  They are listed here in alphabetical order.
    not ``None`` and ``(item for item in iterable if item)`` if function is
    ``None``.
 
+   See :func:`itertools.filterfalse` for the complementary function that returns
+   elements of *iterable* for which *function* returns false.
+
 
 .. function:: float([x])
 
@@ -471,15 +414,16 @@ are always available.  They are listed here in alphabetical order.
    .. index::
       pair: str; format
       single: __format__
-   
-   Convert a string or a number to a "formatted" representation, as controlled
-   by *format_spec*.  The interpretation of *format_spec* will depend on the
-   type of the *value* argument, however there is a standard formatting syntax
-   that is used by most built-in types: :ref:`formatspec`.
-   
+
+   Convert a *value* to a "formatted" representation, as controlled by
+   *format_spec*.  The interpretation of *format_spec* will depend on the type
+   of the *value* argument, however there is a standard formatting syntax that
+   is used by most built-in types: :ref:`formatspec`.
+
    .. note::
 
-      ``format(value, format_spec)`` merely calls ``value.__format__(format_spec)``.
+      ``format(value, format_spec)`` merely calls
+      ``value.__format__(format_spec)``.
 
 
 .. function:: frozenset([iterable])
@@ -617,6 +561,14 @@ are always available.  They are listed here in alphabetical order.
    its :meth:`__next__` method; if the value returned is equal to *sentinel*,
    :exc:`StopIteration` will be raised, otherwise the value will be returned.
 
+   One useful application of the second form of :func:`iter` is to read lines of
+   a file until a certain line is reached.  The following example reads a file
+   until ``"STOP"`` is reached: ::
+
+      with open("mydata.txt") as fp:
+          for line in iter(fp.readline, "STOP"):
+              process_line(line)
+
 
 .. function:: len(s)
 
@@ -633,7 +585,7 @@ are always available.  They are listed here in alphabetical order.
    returns ``['a', 'b', 'c']`` and ``list( (1, 2, 3) )`` returns ``[1, 2, 3]``.  If
    no argument is given, returns a new empty list, ``[]``.
 
-   :class:`list` is a mutable sequence type, as documented in :ref:`typesseq`. 
+   :class:`list` is a mutable sequence type, as documented in :ref:`typesseq`.
 
 .. function:: locals()
 
@@ -655,7 +607,8 @@ are always available.  They are listed here in alphabetical order.
    yielding the results.  If additional *iterable* arguments are passed,
    *function* must take that many arguments and is applied to the items from all
    iterables in parallel.  With multiple iterables, the iterator stops when the
-   shortest iterable is exhausted.
+   shortest iterable is exhausted.  For cases where the function inputs are
+   already arranged into argument tuples, see :func:`itertools.starmap`\.
 
 
 .. function:: max(iterable[, args...], *[, key])
@@ -713,8 +666,9 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: open(file[, mode='r'[, buffering=None[, encoding=None[, errors=None[, newline=None[, closefd=True]]]]]])
 
-   Open a file.  If the file cannot be opened, :exc:`IOError` is raised.
-   
+   Open *file* and return a corresponding stream.  If the file cannot be opened,
+   an :exc:`IOError` is raised.
+
    *file* is either a string or bytes object giving the name (and the path if
    the file isn't in the current working directory) of the file to be opened or
    an integer file descriptor of the file to be wrapped.  (If a file descriptor
@@ -739,39 +693,44 @@ are always available.  They are listed here in alphabetical order.
    ``'b'``   binary mode
    ``'t'``   text mode (default)
    ``'+'``   open a disk file for updating (reading and writing)
-   ``'U'``   universal newline mode (for backwards compatibility; unneeded
-             for new code)
+   ``'U'``   universal newline mode (for backwards compatibility; should
+             not be used in new code)
    ========= ===============================================================
 
    The default mode is ``'rt'`` (open for reading text).  For binary random
    access, the mode ``'w+b'`` opens and truncates the file to 0 bytes, while
    ``'r+b'`` opens the file without truncation.
 
-   Python distinguishes between files opened in binary and text modes, even
-   when the underlying operating system doesn't.  Files opened in binary
-   mode (appending ``'b'`` to the *mode* argument) return contents as
-   ``bytes`` objects without any decoding.  In text mode (the default, or when
-   ``'t'`` is appended to the *mode* argument) the contents of
-   the file are returned as strings, the bytes having been first decoded
-   using a platform-dependent encoding or using the specified *encoding*
-   if given.
+   Python distinguishes between files opened in binary and text modes, even when
+   the underlying operating system doesn't.  Files opened in binary mode
+   (including ``'b'`` in the *mode* argument) return contents as ``bytes``
+   objects without any decoding.  In text mode (the default, or when ``'t'`` is
+   included in the *mode* argument), the contents of the file are returned as
+   strings, the bytes having been first decoded using a platform-dependent
+   encoding or using the specified *encoding* if given.
 
    *buffering* is an optional integer used to set the buffering policy.  By
-   default full buffering is on. Pass 0 to switch buffering off (only allowed in
-   binary mode), 1 to set line buffering, and an integer > 1 for full buffering.
-    
+   default full buffering is on.  Pass 0 to switch buffering off (only allowed
+   in binary mode), 1 to set line buffering, and an integer > 1 for full
+   buffering.
+
    *encoding* is the name of the encoding used to decode or encode the file.
    This should only be used in text mode.  The default encoding is platform
-   dependent, but any encoding supported by Python can be passed.  See the
-   :mod:`codecs` module for the list of supported encodings.
+   dependent (whatever :func:`locale.getpreferredencoding` returns), but any
+   encoding supported by Python can be used.  See the :mod:`codecs` module for
+   the list of supported encodings.
 
-   *errors* is an optional string that specifies how encoding errors are to be
-   handled---this argument should not be used in binary mode. Pass ``'strict'``
-   to raise a :exc:`ValueError` exception if there is an encoding error (the
-   default of ``None`` has the same effect), or pass ``'ignore'`` to ignore
-   errors. (Note that ignoring encoding errors can lead to data loss.) See the
-   documentation for :func:`codecs.register` for a list of the permitted
-   encoding error strings.
+   *errors* is an optional string that specifies how encoding and decoding
+   errors are to be handled--this cannot be used in binary mode.  Pass
+   ``'strict'`` to raise a :exc:`ValueError` exception if there is an encoding
+   error (the default of ``None`` has the same effect), or pass ``'ignore'`` to
+   ignore errors.  (Note that ignoring encoding errors can lead to data loss.)
+   ``'replace'`` causes a replacement marker (such as ``'?'``) to be inserted
+   where there is malformed data.  When writing, ``'xmlcharrefreplace'``
+   (replace with the appropriate XML character reference) or
+   ``'backslashreplace'`` (replace with backslashed escape sequences) can be
+   used.  Any other error handling name that has been registered with
+   :func:`codecs.register_error` is also valid.
 
    *newline* controls how universal newlines works (it only applies to text
    mode).  It can be ``None``, ``''``, ``'\n'``, ``'\r'``, and ``'\r\n'``.  It
@@ -791,9 +750,22 @@ are always available.  They are listed here in alphabetical order.
      the other legal values, any ``'\n'`` characters written are translated to
      the given string.
 
-   If *closefd* is ``False``, the underlying file descriptor will be kept open
-   when the file is closed.  This does not work when a file name is given and
-   must be ``True`` in that case.
+   If *closefd* is ``False`` and a file descriptor rather than a filename was
+   given, the underlying file descriptor will be kept open when the file is
+   closed.  If a filename is given *closefd* has no effect and must be ``True``
+   (the default).
+
+   The type of file object returned by the :func:`open` function depends on the
+   mode.  When :func:`open` is used to open a file in a text mode (``'w'``,
+   ``'r'``, ``'wt'``, ``'rt'``, etc.), it returns a subclass of
+   :class:`io.TextIOBase` (specifically :class:`io.TextIOWrapper`).  When used
+   to open a file in a binary mode with buffering, the returned class is a
+   subclass of :class:`io.BufferedIOBase`.  The exact class varies: in read
+   binary mode, it returns a :class:`io.BufferedReader`; in write binary and
+   append binary modes, it returns a :class:`io.BufferedWriter`, and in
+   read/write mode, it returns a :class:`io.BufferedRandom`.  When buffering is
+   disabled, the raw stream, a subclass of :class:`io.RawIOBase`,
+   :class:`io.FileIO`, is returned.
 
    .. index::
       single: line-buffered I/O
@@ -805,8 +777,8 @@ are always available.  They are listed here in alphabetical order.
       module: sys
 
    See also the file handling modules, such as, :mod:`fileinput`, :mod:`io`
-   (where :func:`open()` is declared), :mod:`os`, :mod:`os.path`,
-   :mod:`tempfile`, and :mod:`shutil`.
+   (where :func:`open` is declared), :mod:`os`, :mod:`os.path`, :mod:`tempfile`,
+   and :mod:`shutil`.
 
 
 .. XXX works for bytes too, but should it?
@@ -1008,7 +980,8 @@ are always available.  They are listed here in alphabetical order.
    default).  They have no other explicit functionality; however they are used by
    Numerical Python and other third party extensions.  Slice objects are also
    generated when extended indexing syntax is used.  For example:
-   ``a[start:stop:step]`` or ``a[start:stop, i]``.
+   ``a[start:stop:step]`` or ``a[start:stop, i]``.  See :func:`itertools.islice`
+   for an alternate version that returns an iterator.
 
 
 .. function:: sorted(iterable[, key[, reverse]])
@@ -1023,6 +996,9 @@ are always available.  They are listed here in alphabetical order.
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
 
+   To convert an old-style *cmp* function to a *key* function, see the
+   `CmpToKey recipe in the ASPN cookbook
+   <http://code.activestate.com/recipes/576653/>`_\.
 
 .. function:: staticmethod(function)
 
@@ -1051,7 +1027,7 @@ are always available.  They are listed here in alphabetical order.
 .. function:: str([object[, encoding[, errors]]])
 
    Return a string version of an object, using one of the following modes:
-   
+
    If *encoding* and/or *errors* are given, :func:`str` will decode the
    *object* which can either be a byte string or a character buffer using
    the codec for *encoding*. The *encoding* parameter is a string giving
@@ -1062,7 +1038,7 @@ are always available.  They are listed here in alphabetical order.
    errors, while a value of ``'ignore'`` causes errors to be silently ignored,
    and a value of ``'replace'`` causes the official Unicode replacement character,
    U+FFFD, to be used to replace input characters which cannot be decoded.
-   See also the :mod:`codecs` module. 
+   See also the :mod:`codecs` module.
 
    When only *object* is given, this returns its nicely printable representation.
    For strings, this is the string itself.  The difference with ``repr(object)``
@@ -1085,34 +1061,40 @@ are always available.  They are listed here in alphabetical order.
    Sums *start* and the items of an *iterable* from left to right and returns the
    total.  *start* defaults to ``0``. The *iterable*'s items are normally numbers,
    and are not allowed to be strings.  The fast, correct way to concatenate a
-   sequence of strings is by calling ``''.join(sequence)``.
+   sequence of strings is by calling ``''.join(sequence)``.  To add floating
+   point values with extended precision, see :func:`math.fsum`\.
 
 
 .. function:: super([type[, object-or-type]])
 
-   .. XXX updated as per http://www.artima.com/weblogs/viewpost.jsp?thread=208549 but needs checking
+   Return a proxy object that delegates method calls to a parent or sibling
+   class of *type*.  This is useful for accessing inherited methods that have
+   been overridden in a class. The search order is same as that used by
+   :func:`getattr` except that the *type* itself is skipped.
 
-   Return a "super" object that acts like the superclass of *type*.
+   The :attr:`__mro__` attribute of the *type* lists the method resolution
+   search order used by both :func:`getattr` and :func:`super`.  The attribute
+   is dynamic and can change whenever the inheritance hierarchy is updated.
 
-   If the second argument is omitted the super object returned is unbound.  If
+   If the second argument is omitted, the super object returned is unbound.  If
    the second argument is an object, ``isinstance(obj, type)`` must be true.  If
-   the second argument is a type, ``issubclass(type2, type)`` must be true.
-   Calling :func:`super` without arguments is equivalent to ``super(this_class,
-   first_arg)``.
+   the second argument is a type, ``issubclass(type2, type)`` must be true (this
+   is useful for classmethods).
 
-   There are two typical use cases for "super".  In a class hierarchy with
-   single inheritance, "super" can be used to refer to parent classes without
+   There are two typical use cases for *super*.  In a class hierarchy with
+   single inheritance, *super* can be used to refer to parent classes without
    naming them explicitly, thus making the code more maintainable.  This use
-   closely parallels the use of "super" in other programming languages.
-   
-   The second use case is to support cooperative multiple inheritence in a
-   dynamic execution environment.  This use case is unique to Python and is 
-   not found in statically compiled languages or languages that only support 
-   single inheritance.  This makes in possible to implement "diamond diagrams"
+   closely parallels the use of *super* in other programming languages.
+
+   The second use case is to support cooperative multiple inheritance in a
+   dynamic execution environment.  This use case is unique to Python and is
+   not found in statically compiled languages or languages that only support
+   single inheritance.  This makes it possible to implement "diamond diagrams"
    where multiple base classes implement the same method.  Good design dictates
    that this method have the same calling signature in every case (because the
-   order of parent calls is determined at runtime and because that order adapts
-   to changes in the class hierarchy).
+   order of calls is determined at runtime, because that order adapts
+   to changes in the class hierarchy, and because that order can include
+   sibling classes that are unknown prior to runtime).
 
    For both use cases, a typical superclass call looks like this::
 
@@ -1123,11 +1105,14 @@ are always available.  They are listed here in alphabetical order.
    Note that :func:`super` is implemented as part of the binding process for
    explicit dotted attribute lookups such as ``super().__getitem__(name)``.
    It does so by implementing its own :meth:`__getattribute__` method for searching
-   parent classes in a predictable order that supports cooperative multiple inheritance.
+   classes in a predictable order that supports cooperative multiple inheritance.
    Accordingly, :func:`super` is undefined for implicit lookups using statements or
-   operators such as ``super()[name]``. Also, :func:`super` is not
-   limited to use inside methods: under the hood it searches the stack
-   frame for the class (``__class__``) and the first argument.
+   operators such as ``super()[name]``.
+
+   Also note that :func:`super` is not limited to use inside methods.  The two
+   argument form specifies the arguments exactly and makes the appropriate
+   references.  The zero argument form automatically searches the stack frame
+   for the class (``__class__``) and the first argument.
 
 
 .. function:: tuple([iterable])
@@ -1139,7 +1124,7 @@ are always available.  They are listed here in alphabetical order.
    3])`` returns ``(1, 2, 3)``.  If no argument is given, returns a new empty
    tuple, ``()``.
 
-   :class:`tuple` is an immutable sequence type, as documented in :ref:`typesseq`. 
+   :class:`tuple` is an immutable sequence type, as documented in :ref:`typesseq`.
 
 
 .. function:: type(object)
@@ -1169,7 +1154,7 @@ are always available.  They are listed here in alphabetical order.
 
       >>> class X(object):
       ...     a = 1
-      ...     
+      ...
       >>> X = type('X', (object,), dict(a=1))
 
 
@@ -1184,20 +1169,19 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: zip(*iterables)
 
-   Make an iterator that aggregates elements from each of the iterables. 
+   Make an iterator that aggregates elements from each of the iterables.
 
    Returns an iterator of tuples, where the *i*-th tuple contains
    the *i*-th element from each of the argument sequences or iterables.  The
    iterator stops when the shortest input iterable is exhausted. With a single
-   iterable argument, it returns an iterator of 1-tuples.  With no arguments, 
+   iterable argument, it returns an iterator of 1-tuples.  With no arguments,
    it returns an empty iterator.  Equivalent to::
 
       def zip(*iterables):
           # zip('ABCD', 'xy') --> Ax By
           iterables = map(iter, iterables)
           while iterables:
-              result = [it.next() for it in iterables]
-              yield tuple(result)
+              yield tuple(map(next, iterables))
 
    The left-to-right evaluation order of the iterables is guaranteed. This
    makes possible an idiom for clustering a data series into n-length groups
@@ -1213,22 +1197,88 @@ are always available.  They are listed here in alphabetical order.
       >>> x = [1, 2, 3]
       >>> y = [4, 5, 6]
       >>> zipped = zip(x, y)
-      >>> zipped
+      >>> list(zipped)
       [(1, 4), (2, 5), (3, 6)]
-      >>> x2, y2 = zip(*zipped)
+      >>> x2, y2 = zip(*zip(x, y))
       >>> x == x2, y == y2
       True
 
 
+.. function:: __import__(name[, globals[, locals[, fromlist[, level]]]])
+
+   .. index::
+      statement: import
+      module: imp
+
+   .. note::
+
+      This is an advanced function that is not needed in everyday Python
+      programming.
+
+   This function is invoked by the :keyword:`import` statement.  It can be
+   replaced (by importing the :mod:`builtins` module and assigning to
+   ``builtins.__import__``) in order to change semantics of the
+   :keyword:`import` statement, but nowadays it is usually simpler to use import
+   hooks (see :pep:`302`).  Direct use of :func:`__import__` is rare, except in
+   cases where you want to import a module whose name is only known at runtime.
+
+   The function imports the module *name*, potentially using the given *globals*
+   and *locals* to determine how to interpret the name in a package context.
+   The *fromlist* gives the names of objects or submodules that should be
+   imported from the module given by *name*.  The standard implementation does
+   not use its *locals* argument at all, and uses its *globals* only to
+   determine the package context of the :keyword:`import` statement.
+
+   *level* specifies whether to use absolute or relative imports. ``0`` (the
+   default) means only perform absolute imports.  Positive values for
+   *level* indicate the number of parent directories to search relative to the
+   directory of the module calling :func:`__import__`.
+
+   When the *name* variable is of the form ``package.module``, normally, the
+   top-level package (the name up till the first dot) is returned, *not* the
+   module named by *name*.  However, when a non-empty *fromlist* argument is
+   given, the module named by *name* is returned.
+
+   For example, the statement ``import spam`` results in bytecode resembling the
+   following code::
+
+      spam = __import__('spam', globals(), locals(), [], 0)
+
+   The statement ``import spam.ham`` results in this call::
+
+      spam = __import__('spam.ham', globals(), locals(), [], 0)
+
+   Note how :func:`__import__` returns the toplevel module here because this is
+   the object that is bound to a name by the :keyword:`import` statement.
+
+   On the other hand, the statement ``from spam.ham import eggs, sausage as
+   saus`` results in ::
+
+      _temp = __import__('spam.ham', globals(), locals(), ['eggs', 'sausage'], 0)
+      eggs = _temp.eggs
+      saus = _temp.sausage
+
+   Here, the ``spam.ham`` module is returned from :func:`__import__`.  From this
+   object, the names to import are retrieved and assigned to their respective
+   names.
+
+   If you simply want to import a module (potentially within a package) by name,
+   you can get it from :data:`sys.modules`::
+
+      >>> import sys
+      >>> name = 'foo.bar.baz'
+      >>> __import__(name)
+      <module 'foo' from ...>
+      >>> baz = sys.modules[name]
+      >>> baz
+      <module 'foo.bar.baz' from ...>
+
 .. rubric:: Footnotes
 
-.. [#] Specifying a buffer size currently has no effect on systems that don't have
-   :cfunc:`setvbuf`.  The interface to specify the buffer size is not done using a
-   method that calls :cfunc:`setvbuf`, because that may dump core when called after
-   any I/O has been performed, and there's no reliable way to determine whether
-   this is the case.
+.. [#] Note that the parser only accepts the Unix-style end of line convention.
+   If you are reading the code from a file, make sure to use newline conversion
+   mode to convert Windows or Mac-style newlines.
 
 .. [#] In the current implementation, local variable bindings cannot normally be
    affected this way, but variables retrieved from other scopes (such as modules)
    can be.  This may change.
-

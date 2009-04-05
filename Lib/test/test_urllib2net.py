@@ -99,7 +99,7 @@ class OtherNetworkTests(unittest.TestCase):
     def test_ftp(self):
         urls = [
             'ftp://ftp.kernel.org/pub/linux/kernel/README',
-            'ftp://ftp.kernel.org/pub/linux/kernel/non-existant-file',
+            'ftp://ftp.kernel.org/pub/linux/kernel/non-existent-file',
             #'ftp://ftp.kernel.org/pub/leenox/kernel/test',
             'ftp://gatekeeper.research.compaq.com/pub/DEC/SRC'
                 '/research-reports/00README-Legal-Rules-Regs',
@@ -195,7 +195,7 @@ class TimeoutTest(unittest.TestCase):
     def test_http_basic(self):
         self.assertTrue(socket.getdefaulttimeout() is None)
         u = _urlopen_with_retry("http://www.python.org")
-        self.assertTrue(u.fp._sock.gettimeout() is None)
+        self.assertTrue(u.fp.raw._sock.gettimeout() is None)
 
     def test_http_default_timeout(self):
         self.assertTrue(socket.getdefaulttimeout() is None)
@@ -204,7 +204,7 @@ class TimeoutTest(unittest.TestCase):
             u = _urlopen_with_retry("http://www.python.org")
         finally:
             socket.setdefaulttimeout(None)
-        self.assertEqual(u.fp._sock.gettimeout(), 60)
+        self.assertEqual(u.fp.raw._sock.gettimeout(), 60)
 
     def test_http_no_timeout(self):
         self.assertTrue(socket.getdefaulttimeout() is None)
@@ -213,11 +213,11 @@ class TimeoutTest(unittest.TestCase):
             u = _urlopen_with_retry("http://www.python.org", timeout=None)
         finally:
             socket.setdefaulttimeout(None)
-        self.assertTrue(u.fp._sock.gettimeout() is None)
+        self.assertTrue(u.fp.raw._sock.gettimeout() is None)
 
     def test_http_timeout(self):
         u = _urlopen_with_retry("http://www.python.org", timeout=120)
-        self.assertEqual(u.fp._sock.gettimeout(), 120)
+        self.assertEqual(u.fp.raw._sock.gettimeout(), 120)
 
     FTP_HOST = "ftp://ftp.mirror.nl/pub/mirror/gnu/"
 

@@ -84,7 +84,7 @@ sp_handle_detach(sp_handle_object* self, PyObject* args)
 
 	handle = self->handle;
 
-	self->handle = NULL;
+	self->handle = INVALID_HANDLE_VALUE;
 
 	/* note: return the current handle, as an integer */
 	return HANDLE_TO_PYNUM(handle);
@@ -133,7 +133,7 @@ static PyTypeObject sp_handle_type = {
 	0, /*tp_print*/
 	0,				/*tp_getattr*/
 	0,				/*tp_setattr*/
-	0,				/*tp_compare*/
+	0,				/*tp_reserved*/
 	0,				/*tp_repr*/
 	&sp_handle_as_number,		/*tp_as_number */
 	0,				/*tp_as_sequence */

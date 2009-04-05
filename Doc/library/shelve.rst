@@ -23,7 +23,7 @@ lots of shared  sub-objects.  The keys are ordinary strings.
    database file is opened for reading and writing.  The optional *flag* parameter
    has the same interpretation as the *flag* parameter of :func:`dbm.open`.
 
-   By default, version 0 pickles are used to serialize values.  The version of the
+   By default, version 3 pickles are used to serialize values.  The version of the
    pickle protocol can be specified with the *protocol* parameter.
 
    By default, mutations to persistent-dictionary mutable entries are not
@@ -47,6 +47,12 @@ One additional method is supported:
    to *True*. Also empty the cache and synchronize the persistent dictionary on
    disk, if feasible.  This is called automatically when the shelf is closed with
    :meth:`close`.
+
+.. seealso::
+
+   `Persistent dictionary recipe <http://code.activestate.com/recipes/576642/>`_
+   with widely supported storage formats and having the speed of native
+   dictionaries.
 
 
 Restrictions

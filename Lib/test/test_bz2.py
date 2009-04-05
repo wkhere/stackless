@@ -8,7 +8,9 @@ import os
 import subprocess
 import sys
 
-import bz2
+# Skip tests if the bz2 module doesn't exist.
+bz2 = support.import_module('bz2')
+
 from bz2 import BZ2File, BZ2Compressor, BZ2Decompressor
 
 has_cmdline_bunzip2 = sys.platform not in ("win32", "os2emx")
@@ -257,6 +259,28 @@ class BZ2FileTest(BaseTest):
         xlines = list(bz2f.readlines())
         bz2f.close()
         self.assertEqual(xlines, [b'Test'])
+
+    def testContextProtocol(self):
+        # BZ2File supports the context management protocol
+        f = None
+        with BZ2File(self.filename, "wb") as f:
+            f.write(b"xxx")
+        f = BZ2File(self.filename, "rb")
+        f.close()
+        try:
+            with f:
+                pass
+        except ValueError:
+            pass
+        else:
+            self.fail("__enter__ on a closed file didn't raise an exception")
+        try:
+            with BZ2File(self.filename, "wb") as f:
+                1/0
+        except ZeroDivisionError:
+            pass
+        else:
+            self.fail("1/0 didn't raise an exception")
 
 
 class BZ2CompressorTest(BaseTest):

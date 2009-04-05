@@ -508,8 +508,28 @@ time_strftime(PyObject *self, PyObject *args)
             return NULL;
         }
 
-    /* Convert the unicode string to an ascii one */
-    fmt = _PyUnicode_AsString(format);
+	/* Convert the unicode string to an ascii one */
+	format = PyUnicode_AsEncodedString(format, TZNAME_ENCODING, NULL);
+	if (format == NULL)
+		return NULL;
+	fmt = PyBytes_AS_STRING(format);
+
+#ifdef MS_WINDOWS
+	/* check that the format string contains only valid directives */
+	for(outbuf = strchr(fmt, '%');
+		outbuf != NULL;
+		outbuf = strchr(outbuf+2, '%'))
+	{
+		if (outbuf[1]=='#')
+			++outbuf; /* not documented by python, */
+		if (outbuf[1]=='\0' ||
+			!strchr("aAbBcdfHIjmMpSUwWxXyYzZ%", outbuf[1]))
+		{
+			PyErr_SetString(PyExc_ValueError, "Invalid format string");
+			return 0;
+		}
+	}
+#endif
 
 	fmtlen = strlen(fmt);
 
@@ -519,6 +539,7 @@ time_strftime(PyObject *self, PyObject *args)
 	for (i = 1024; ; i += i) {
 		outbuf = (char *)PyMem_Malloc(i);
 		if (outbuf == NULL) {
+			Py_DECREF(format);
 			return PyErr_NoMemory();
 		}
 		buflen = strftime(outbuf, i, fmt, &buf);
@@ -532,6 +553,7 @@ time_strftime(PyObject *self, PyObject *args)
 			ret = PyUnicode_Decode(outbuf, buflen,
 					       TZNAME_ENCODING, NULL);
 			PyMem_Free(outbuf);
+			Py_DECREF(format);
 			return ret;
 		}
 		PyMem_Free(outbuf);
@@ -539,6 +561,7 @@ time_strftime(PyObject *self, PyObject *args)
 		/* VisualStudio .NET 2005 does this properly */
 		if (buflen == 0 && errno == EINVAL) {
 			PyErr_SetString(PyExc_ValueError, "Invalid format string");
+			Py_DECREF(format);
 			return 0;
 		}
 #endif

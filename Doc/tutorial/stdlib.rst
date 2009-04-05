@@ -17,16 +17,16 @@ operating system::
    >>> os.system('time 0:02')
    0
    >>> os.getcwd()      # Return the current working directory
-   'C:\\Python30'
+   'C:\\Python31'
    >>> os.chdir('/server/accesslogs')
 
 Be sure to use the ``import os`` style instead of ``from os import *``.  This
-will keep :func:`os.open` from shadowing the builtin :func:`open` function which
+will keep :func:`os.open` from shadowing the built-in :func:`open` function which
 operates much differently.
 
 .. index:: builtin: help
 
-The builtin :func:`dir` and :func:`help` functions are useful as interactive
+The built-in :func:`dir` and :func:`help` functions are useful as interactive
 aids for working with large modules like :mod:`os`::
 
    >>> import os
@@ -136,7 +136,7 @@ The :mod:`random` module provides tools for making random selections::
    >>> random.random()    # random float
    0.17970987693706186
    >>> random.randrange(6)    # random integer chosen from range(6)
-   4   
+   4
 
 The SciPy project <http://scipy.org> has many other modules for numerical
 computations.

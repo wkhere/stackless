@@ -1,3 +1,34 @@
+What's New in IDLE 3.1a1?
+=========================
+
+*Release date: XX-XXX-XXXX*
+
+- Allow multiple IDLE GUI/subprocess pairs to exist simultaneously. Thanks to
+  David Scherer for suggesting the use of an ephemeral port for the GUI.
+  Patch 1529142 Weeble.
+
+- Remove port spec from run.py and fix bug where subprocess fails to
+  extract port from command line when warnings are present.
+
+- Tk 8.5 Text widget requires 'wordprocessor' tabstyle attr to handle
+  mixed space/tab properly. Issue 5120, patch by Guilherme Polo.
+
+- Issue #4815: Offer conversion to UTF-8 if source files have
+  no encoding declaration and are not encoded in UTF-8.
+
+- Issue #4008: Fix problems with non-ASCII source files.
+
+- Issue #4323: Always encode source as UTF-8 without asking
+  the user (unless a different encoding is declared); remove
+  user configuration of source encoding; all according to
+  PEP 3120.
+
+- Issue #3549: On MacOS the preferences menu was not present
+
+- Issue #2665: On Windows, an IDLE installation upgraded from an old version
+  would not start if a custom theme was defined.
+
+
 What's New in IDLE 3.0a3?
 =========================
 
@@ -318,7 +349,7 @@ What's New in IDLE 1.1a3?
   window raising, especially in the Windows menu and in the debugger.
   IDLEfork 763524.
 
-- If user passes a non-existant filename on the commandline, just
+- If user passes a non-existent filename on the commandline, just
   open a new file, don't raise a dialog.  IDLEfork 854928.
 
 

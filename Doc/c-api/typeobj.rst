@@ -23,7 +23,7 @@ structure.
 Typedefs: unaryfunc, binaryfunc, ternaryfunc, inquiry, intargfunc,
 intintargfunc, intobjargproc, intintobjargproc, objobjargproc, destructor,
 freefunc, printfunc, getattrfunc, getattrofunc, setattrfunc, setattrofunc,
-cmpfunc, reprfunc, hashfunc
+reprfunc, hashfunc
 
 The structure definition for :ctype:`PyTypeObject` can be found in
 :file:`Include/object.h`.  For convenience of reference, this repeats the
@@ -135,7 +135,7 @@ type objects) *must* have the :attr:`ob_size` field.
    :attr:`ob_size` field, and the instance size is :attr:`tp_basicsize` plus N
    times :attr:`tp_itemsize`, where N is the "length" of the object.  The value of
    N is typically stored in the instance's :attr:`ob_size` field.  There are
-   exceptions:  for example, long ints use a negative :attr:`ob_size` to indicate a
+   exceptions:  for example, ints use a negative :attr:`ob_size` to indicate a
    negative number, and N is ``abs(ob_size)`` there.  Also, the presence of an
    :attr:`ob_size` field in the instance layout doesn't mean that the instance
    structure is variable-length (for example, the structure for the list type has
@@ -244,19 +244,9 @@ type objects) *must* have the :attr:`ob_size` field.
    the subtype's :attr:`tp_setattr` and :attr:`tp_setattro` are both *NULL*.
 
 
-.. cmember:: cmpfunc PyTypeObject.tp_compare
+.. cmember:: void* PyTypeObject.tp_reserved
 
-   An optional pointer to the three-way comparison function.
-
-   The signature is the same as for :cfunc:`PyObject_Compare`. The function should
-   return ``1`` if *self* greater than *other*, ``0`` if *self* is equal to
-   *other*, and ``-1`` if *self* less than *other*.  It should return ``-1`` and
-   set an exception condition when an error occurred during the comparison.
-
-   This field is inherited by subtypes together with :attr:`tp_richcompare` and
-   :attr:`tp_hash`: a subtypes inherits all three of :attr:`tp_compare`,
-   :attr:`tp_richcompare`, and :attr:`tp_hash` when the subtype's
-   :attr:`tp_compare`, :attr:`tp_richcompare`, and :attr:`tp_hash` are all *NULL*.
+   Reserved slot, formerly known as tp_compare.
 
 
 .. cmember:: reprfunc PyTypeObject.tp_repr
@@ -329,14 +319,13 @@ type objects) *must* have the :attr:`ob_size` field.
    the Python level will result in the ``tp_hash`` slot being set to
    :cfunc:`PyObject_HashNotImplemented`.
 
-   When this field is not set, two possibilities exist: if the :attr:`tp_compare`
-   and :attr:`tp_richcompare` fields are both *NULL*, a default hash value based on
-   the object's address is returned; otherwise, a :exc:`TypeError` is raised.
+   When this field is not set, an attempt to take the hash of the
+   object raises :exc:`TypeError`.
 
-   This field is inherited by subtypes together with :attr:`tp_richcompare` and
-   :attr:`tp_compare`: a subtypes inherits all three of :attr:`tp_compare`,
-   :attr:`tp_richcompare`, and :attr:`tp_hash`, when the subtype's
-   :attr:`tp_compare`, :attr:`tp_richcompare` and :attr:`tp_hash` are all *NULL*.
+   This field is inherited by subtypes together with
+   :attr:`tp_richcompare`: a subtype inherits both of
+   :attr:`tp_richcompare` and :attr:`tp_hash`, when the subtype's
+   :attr:`tp_richcompare` and :attr:`tp_hash` are both *NULL*.
 
 
 .. cmember:: ternaryfunc PyTypeObject.tp_call
@@ -596,10 +585,10 @@ type objects) *must* have the :attr:`ob_size` field.
       comparisons makes sense (e.g. ``==`` and ``!=``, but not ``<`` and
       friends), directly raise :exc:`TypeError` in the rich comparison function.
 
-   This field is inherited by subtypes together with :attr:`tp_compare` and
-   :attr:`tp_hash`: a subtype inherits all three of :attr:`tp_compare`,
-   :attr:`tp_richcompare`, and :attr:`tp_hash`, when the subtype's
-   :attr:`tp_compare`, :attr:`tp_richcompare`, and :attr:`tp_hash` are all *NULL*.
+   This field is inherited by subtypes together with :attr:`tp_hash`:
+   a subtype inherits :attr:`tp_richcompare` and :attr:`tp_hash` when
+   the subtype's :attr:`tp_richcompare` and :attr:`tp_hash` are both
+   *NULL*.
 
    The following constants are defined to be used as the third argument for
    :attr:`tp_richcompare` and for :cfunc:`PyObject_RichCompare`:
@@ -651,7 +640,6 @@ type objects) *must* have the :attr:`ob_size` field.
    When a type's :attr:`__slots__` declaration does not contain a slot named
    :attr:`__weakref__`, the type inherits its :attr:`tp_weaklistoffset` from its
    base type.
-
 
 .. cmember:: getiterfunc PyTypeObject.tp_iter
 
@@ -813,7 +801,7 @@ type objects) *must* have the :attr:`ob_size` field.
 
    where :attr:`tp_basicsize`, :attr:`tp_itemsize` and :attr:`tp_dictoffset` are
    taken from the type object, and :attr:`ob_size` is taken from the instance.  The
-   absolute value is taken because long ints use the sign of :attr:`ob_size` to
+   absolute value is taken because ints use the sign of :attr:`ob_size` to
    store the sign of the number.  (There's never a need to do this calculation
    yourself; it is done for you by :cfunc:`_PyObject_GetDictPtr`.)
 
@@ -1058,12 +1046,13 @@ Number Object Structures
             binaryfunc nb_xor;
             binaryfunc nb_or;
             unaryfunc nb_int;
-            unaryfunc nb_long;
+            void *nb_reserved;
             unaryfunc nb_float;
 
             binaryfunc nb_inplace_add;
             binaryfunc nb_inplace_subtract;
             binaryfunc nb_inplace_multiply;
+            binaryfunc nb_inplace_divide;
             binaryfunc nb_inplace_remainder;
             ternaryfunc nb_inplace_power;
             binaryfunc nb_inplace_lshift;
@@ -1088,6 +1077,12 @@ Number Object Structures
       given operands, binary and ternary functions must return
       ``Py_NotImplemented``, if another error occurred they must return ``NULL``
       and set an exception.
+
+   .. note::
+
+      The :cdata:`nb_reserved` field should always be ``NULL``.  It
+      was previously called :cdata:`nb_long`, and was renamed in
+      Python 3.0.1.
 
 
 .. _mapping-structs:
@@ -1220,7 +1215,7 @@ member in the :ctype:`PyTypeObject` structure should be *NULL*.  Otherwise, the
       export, *view* is the :ctype:`Py_buffer` struct to fill, and *flags* gives
       the conditions the caller wants the memory under.  (See
       :cfunc:`PyObject_GetBuffer` for all flags.)  :cmember:`bf_getbuffer` is
-      responsible for filling *view* with the approiate information.
+      responsible for filling *view* with the appropriate information.
       (:cfunc:`PyBuffer_FillView` can be used in simple cases.)  See
       :ctype:`Py_buffer`\s docs for what needs to be filled in.
 

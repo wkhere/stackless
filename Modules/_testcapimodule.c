@@ -175,6 +175,105 @@ test_dict_iteration(PyObject* self)
 }
 
 
+/* Issue #4701: Check that PyObject_Hash implicitly calls
+ *   PyType_Ready if it hasn't already been called
+ */
+static PyTypeObject _HashInheritanceTester_Type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"hashinheritancetester",	/* Name of this type */
+	sizeof(PyObject),	/* Basic object size */
+	0,			/* Item size for varobject */
+	(destructor)PyObject_Del, /* tp_dealloc */
+	0,			/* tp_print */
+	0,			/* tp_getattr */
+	0,			/* tp_setattr */
+	0,			/* tp_reserved */
+	0,			/* tp_repr */
+	0,			/* tp_as_number */
+	0,			/* tp_as_sequence */
+	0,			/* tp_as_mapping */
+	0,			/* tp_hash */
+	0,			/* tp_call */
+	0,			/* tp_str */
+	PyObject_GenericGetAttr,  /* tp_getattro */
+	0,			/* tp_setattro */
+	0,			/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,	/* tp_flags */
+	0,			/* tp_doc */
+	0,			/* tp_traverse */
+	0,			/* tp_clear */
+	0,			/* tp_richcompare */
+	0,			/* tp_weaklistoffset */
+	0,			/* tp_iter */
+	0,			/* tp_iternext */
+	0,			/* tp_methods */
+	0,			/* tp_members */
+	0,			/* tp_getset */
+	0,			/* tp_base */
+	0,			/* tp_dict */
+	0,			/* tp_descr_get */
+	0,			/* tp_descr_set */
+	0,			/* tp_dictoffset */
+	0,			/* tp_init */
+	0,			/* tp_alloc */
+	PyType_GenericNew,		/* tp_new */
+};
+
+static PyObject*
+test_lazy_hash_inheritance(PyObject* self)
+{
+	PyTypeObject *type;
+	PyObject *obj;
+	long hash;
+
+	type = &_HashInheritanceTester_Type;
+	obj = PyObject_New(PyObject, type);
+	if (obj == NULL) {
+		PyErr_Clear();
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: failed to create object");
+		return NULL;
+	}
+
+	if (type->tp_dict != NULL) {
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: type initialised too soon");
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	hash = PyObject_Hash(obj);
+	if ((hash == -1) && PyErr_Occurred()) {
+		PyErr_Clear();
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: could not hash object");
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	if (type->tp_dict == NULL) {
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: type not initialised by hash()");
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	if (type->tp_hash != PyType_Type.tp_hash) {
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: unexpected hash function");
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	Py_RETURN_NONE;
+}
+
+
 /* Tests of PyLong_{As, From}{Unsigned,}Long(), and (#ifdef HAVE_LONG_LONG)
    PyLong_{As, From}{Unsigned,}LongLong().
 
@@ -508,6 +607,8 @@ test_s_code(PyObject *self)
     Py_RETURN_NONE;
 }
 
+static volatile int x;
+
 /* Test the u and u# codes for PyArg_ParseTuple. May leak memory in case
    of an error.
 */
@@ -522,7 +623,6 @@ test_u_code(PyObject *self)
 	/* issue4122: Undefined reference to _Py_ascii_whitespace on Windows */
 	/* Just use the macro and check that it compiles */
 	x = Py_UNICODE_ISSPACE(25);
-	x = x;
 
         tuple = PyTuple_New(1);
         if (tuple == NULL)
@@ -605,6 +705,76 @@ test_Z_code(PyObject *self)
 
 	Py_DECREF(tuple);
 	Py_RETURN_NONE;
+}
+
+static PyObject *
+test_widechar(PyObject *self)
+{
+#if defined(SIZEOF_WCHAR_T) && (SIZEOF_WCHAR_T == 4)
+	const wchar_t wtext[2] = {(wchar_t)0x10ABCDu};
+	size_t wtextlen = 1;
+#else
+	const wchar_t wtext[3] = {(wchar_t)0xDBEAu, (wchar_t)0xDFCDu};
+	size_t wtextlen = 2;
+#endif
+	PyObject *wide, *utf8;
+
+	wide = PyUnicode_FromWideChar(wtext, wtextlen);
+	if (wide == NULL)
+		return NULL;
+
+	utf8 = PyUnicode_FromString("\xf4\x8a\xaf\x8d");
+	if (utf8 == NULL) {
+		Py_DECREF(wide);
+		return NULL;
+	}
+
+	if (PyUnicode_GET_SIZE(wide) != PyUnicode_GET_SIZE(utf8)) {
+		Py_DECREF(wide);
+		Py_DECREF(utf8);
+		return raiseTestError("test_widechar",
+				      "wide string and utf8 string "
+				      "have different length");
+	}
+	if (PyUnicode_Compare(wide, utf8)) {
+		Py_DECREF(wide);
+		Py_DECREF(utf8);
+		if (PyErr_Occurred())
+			return NULL;
+		return raiseTestError("test_widechar",
+				      "wide string and utf8 string "
+				      "are different");
+	}
+
+	Py_DECREF(wide);
+	Py_DECREF(utf8);
+	Py_RETURN_NONE;
+}
+
+static PyObject *
+test_empty_argparse(PyObject *self)
+{
+	/* Test that formats can begin with '|'. See issue #4720. */
+	PyObject *tuple, *dict = NULL;
+	static char *kwlist[] = {NULL};
+	int result;
+	tuple = PyTuple_New(0);
+	if (!tuple)
+		return NULL;
+	if ((result = PyArg_ParseTuple(tuple, "|:test_empty_argparse")) < 0)
+		goto done;
+	dict = PyDict_New();
+	if (!dict)
+		goto done;
+	result = PyArg_ParseTupleAndKeywords(tuple, dict, "|:test_empty_argparse", kwlist);
+  done:
+	Py_DECREF(tuple);
+	Py_XDECREF(dict);
+	if (result < 0)
+		return NULL;
+	else {
+		Py_RETURN_NONE;
+	}
 }
 
 static PyObject *
@@ -792,6 +962,43 @@ test_thread_state(PyObject *self, PyObject *args)
 	if (!success)
 		return NULL;
 	Py_RETURN_NONE;
+}
+
+/* test Py_AddPendingCalls using threads */
+static int _pending_callback(void *arg)
+{
+	/* we assume the argument is callable object to which we own a reference */
+	PyObject *callable = (PyObject *)arg;
+	PyObject *r = PyObject_CallObject(callable, NULL);
+	Py_DECREF(callable);
+	Py_XDECREF(r);
+	return r != NULL ? 0 : -1;
+}
+
+/* The following requests n callbacks to _pending_callback.  It can be
+ * run from any python thread.
+ */
+PyObject *pending_threadfunc(PyObject *self, PyObject *arg)
+{
+	PyObject *callable;
+	int r;
+	if (PyArg_ParseTuple(arg, "O", &callable) == 0)
+		return NULL;
+
+	/* create the reference for the callbackwhile we hold the lock */
+	Py_INCREF(callable);
+
+	Py_BEGIN_ALLOW_THREADS
+	r = Py_AddPendingCall(&_pending_callback, callable);
+	Py_END_ALLOW_THREADS
+
+	if (r<0) {
+		Py_DECREF(callable); /* unsuccessful add, destroy the extra reference */
+		Py_INCREF(Py_False);
+		return Py_False;
+	}
+	Py_INCREF(Py_True);
+	return Py_True;
 }
 #endif
 
@@ -1009,9 +1216,11 @@ static PyMethodDef TestMethods[] = {
 	{"test_config",		(PyCFunction)test_config,	 METH_NOARGS},
 	{"test_list_api",	(PyCFunction)test_list_api,	 METH_NOARGS},
 	{"test_dict_iteration",	(PyCFunction)test_dict_iteration,METH_NOARGS},
+	{"test_lazy_hash_inheritance",	(PyCFunction)test_lazy_hash_inheritance,METH_NOARGS},
 	{"test_long_api",	(PyCFunction)test_long_api,	 METH_NOARGS},
 	{"test_long_numbits",	(PyCFunction)test_long_numbits,	 METH_NOARGS},
 	{"test_k_code",		(PyCFunction)test_k_code,	 METH_NOARGS},
+	{"test_empty_argparse", (PyCFunction)test_empty_argparse,METH_NOARGS},
 	{"test_null_strings",	(PyCFunction)test_null_strings,	 METH_NOARGS},
 	{"test_string_from_format", (PyCFunction)test_string_from_format, METH_NOARGS},
 	{"test_with_docstring", (PyCFunction)test_with_docstring, METH_NOARGS,
@@ -1041,8 +1250,10 @@ static PyMethodDef TestMethods[] = {
 	{"test_s_code",		(PyCFunction)test_s_code,	 METH_NOARGS},
 	{"test_u_code",		(PyCFunction)test_u_code,	 METH_NOARGS},
 	{"test_Z_code",		(PyCFunction)test_Z_code,	 METH_NOARGS},
+ 	{"test_widechar",	(PyCFunction)test_widechar,	 METH_NOARGS},
 #ifdef WITH_THREAD
 	{"_test_thread_state",  test_thread_state, 		 METH_VARARGS},
+	{"_pending_threadfunc",	pending_threadfunc,		 METH_VARARGS},
 #endif
 #ifdef HAVE_GETTIMEOFDAY
 	{"profile_int",		profile_int,			METH_NOARGS},
@@ -1156,7 +1367,7 @@ static PyTypeObject test_structmembersType = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -1210,6 +1421,8 @@ PyInit__testcapi(void)
 	m = PyModule_Create(&_testcapimodule);
 	if (m == NULL)
 		return NULL;
+
+	Py_TYPE(&_HashInheritanceTester_Type)=&PyType_Type;
 
 	Py_TYPE(&test_structmembersType)=&PyType_Type;
 	Py_INCREF(&test_structmembersType);

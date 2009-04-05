@@ -18,6 +18,7 @@ docs@python.org), and we'll be glad to correct the problem.
    * Oliver Andrich
    * Heidi Annexstad
    * Jesús Cea Avión
+   * Manuel Balsera
    * Daniel Barclay
    * Chris Barker
    * Don Bashford
@@ -60,6 +61,7 @@ docs@python.org), and we'll be glad to correct the problem.
    * Peter Funk
    * Lele Gaifax
    * Matthew Gallagher
+   * Gabriel Genellina
    * Ben Gertzfield
    * Nadim Ghaznavi
    * Jonathan Giddy

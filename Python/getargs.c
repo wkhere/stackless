@@ -776,24 +776,18 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 		char *p = va_arg(*p_va, char *);
 		if (PyBytes_Check(arg) && PyBytes_Size(arg) == 1)
 			*p = PyBytes_AS_STRING(arg)[0];
-		else if (PyUnicode_Check(arg) &&
-			 PyUnicode_GET_SIZE(arg) == 1 &&
-			 PyUnicode_AS_UNICODE(arg)[0] < 256)
-			*p = (char)PyUnicode_AS_UNICODE(arg)[0];
 		else
-			return converterr("char < 256", arg, msgbuf, bufsize);
+			return converterr("a byte string of length 1", arg, msgbuf, bufsize);
 		break;
 	}
 
 	case 'C': {/* unicode char */
 		int *p = va_arg(*p_va, int *);
-		if (PyBytes_Check(arg) && PyBytes_Size(arg) == 1)
-			*p = PyBytes_AS_STRING(arg)[0];
-		else if (PyUnicode_Check(arg) &&
-			 PyUnicode_GET_SIZE(arg) == 1)
+		if (PyUnicode_Check(arg) &&
+                    PyUnicode_GET_SIZE(arg) == 1)
 			*p = PyUnicode_AS_UNICODE(arg)[0];
 		else
-			return converterr("char", arg, msgbuf, bufsize);
+			return converterr("a unicode character", arg, msgbuf, bufsize);
 		break;
 	}
 
@@ -1392,7 +1386,7 @@ getbuffer(PyObject *arg, Py_buffer *view, char **errmsg)
 	Py_ssize_t count;
 	PyBufferProcs *pb = arg->ob_type->tp_as_buffer;
 	if (pb == NULL) {
-		*errmsg = "string or buffer";
+		*errmsg = "bytes or buffer";
 		return -1;
 	}
 	if (pb->bf_getbuffer) {
@@ -1649,7 +1643,7 @@ vgetargskeywords(PyObject *args, PyObject *keywords, const char *format,
 		}
 	}
 
-	if (!IS_END_OF_FORMAT(*format)) {
+	if (!IS_END_OF_FORMAT(*format) && *format != '|') {
 		PyErr_Format(PyExc_RuntimeError,
 			"more argument specifiers than keyword list entries "
 			"(remaining format:'%s')", format);

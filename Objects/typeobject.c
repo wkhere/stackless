@@ -2613,7 +2613,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)type_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -2936,7 +2936,7 @@ same_slots_added(PyTypeObject *a, PyTypeObject *b)
 	slots_a = ((PyHeapTypeObject *)a)->ht_slots;
 	slots_b = ((PyHeapTypeObject *)b)->ht_slots;
 	if (slots_a && slots_b) {
-		if (PyObject_Compare(slots_a, slots_b) != 0)
+		if (PyObject_RichCompareBool(slots_a, slots_b, Py_EQ) != 1)
 			return 0;
 		size += sizeof(PyObject *) * PyTuple_GET_SIZE(slots_a);
 	}
@@ -3396,7 +3396,7 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	object_repr,				/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -3661,7 +3661,6 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		COPYNUM(nb_xor);
 		COPYNUM(nb_or);
 		COPYNUM(nb_int);
-		COPYNUM(nb_long);
 		COPYNUM(nb_float);
 		COPYNUM(nb_inplace_add);
 		COPYNUM(nb_inplace_subtract);
@@ -3722,7 +3721,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		type->tp_setattr = base->tp_setattr;
 		type->tp_setattro = base->tp_setattro;
 	}
-	/* tp_compare see tp_richcompare */
+	/* tp_reserved is ignored */
 	COPYSLOT(tp_repr);
 	/* tp_hash see tp_richcompare */
 	COPYSLOT(tp_call);
@@ -3730,12 +3729,10 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	{
 		/* Copy comparison-related slots only when
 		   not overriding them anywhere */
-		if (type->tp_compare == NULL &&
-		    type->tp_richcompare == NULL &&
+		if (type->tp_richcompare == NULL &&
 		    type->tp_hash == NULL &&
 		    !overrides_hash(type))
 		{
-			type->tp_compare = base->tp_compare;
 			type->tp_richcompare = base->tp_richcompare;
 			type->tp_hash = base->tp_hash;
 		}
@@ -3955,6 +3952,21 @@ PyType_Ready(PyTypeObject *type)
 		PyObject *b = PyTuple_GET_ITEM(bases, i);
 		if (PyType_Check(b) &&
 		    add_subclass((PyTypeObject *)b, type) < 0)
+			goto error;
+	}
+
+	/* Warn for a type that implements tp_compare (now known as
+	   tp_reserved) but not tp_richcompare. */
+	if (type->tp_reserved && !type->tp_richcompare) {
+		int error;
+		char msg[240];
+		PyOS_snprintf(msg, sizeof(msg),
+			      "Type %.100s defines tp_reserved (formerly "
+			      "tp_compare) but not tp_richcompare. "
+			      "Comparisons may not behave as intended.",
+			      type->tp_name);
+		error = PyErr_WarnEx(PyExc_DeprecationWarning, msg, 1);
+		if (error == -1)
 			goto error;
 	}
 
@@ -4675,7 +4687,7 @@ slot_sq_length(PyObject *self)
 
 	if (res == NULL)
 		return -1;
-	len = PyLong_AsSsize_t(res);
+	len = PyNumber_AsSsize_t(res, PyExc_OverflowError);
 	Py_DECREF(res);
 	if (len < 0) {
 		if (!PyErr_Occurred())
@@ -4842,7 +4854,7 @@ slot_nb_bool(PyObject *self)
 	PyObject *func, *args;
 	static PyObject *bool_str, *len_str;
 	int result = -1;
-	int from_len = 0;
+	int using_len = 0;
 
 	func = lookup_maybe(self, "__bool__", &bool_str);
 	if (func == NULL) {
@@ -4851,14 +4863,14 @@ slot_nb_bool(PyObject *self)
 		func = lookup_maybe(self, "__len__", &len_str);
 		if (func == NULL)
 			return PyErr_Occurred() ? -1 : 1;
-		from_len = 1;
- 	}
+		using_len = 1;
+	}
 	args = PyTuple_New(0);
 	if (args != NULL) {
 		PyObject *temp = PyObject_Call(func, args, NULL);
 		Py_DECREF(args);
 		if (temp != NULL) {
-			if (from_len) {
+			if (using_len) {
 				/* enforced by slot_nb_len */
 				result = PyObject_IsTrue(temp);
 			}
@@ -4867,9 +4879,11 @@ slot_nb_bool(PyObject *self)
 			}
 			else {
 				PyErr_Format(PyExc_TypeError,
-					 "__bool__ should return "
-					 "bool, returned %s",
-					 Py_TYPE(temp)->tp_name);
+					     "%s should return "
+					     "bool or int, returned %s",
+					     (using_len ? "__len__"
+					                : "__bool__"),
+					     Py_TYPE(temp)->tp_name);
 				result = -1;
 			}
 			Py_DECREF(temp);
@@ -4896,7 +4910,6 @@ SLOT1BIN(slot_nb_xor, nb_xor, "__xor__", "__rxor__")
 SLOT1BIN(slot_nb_or, nb_or, "__or__", "__ror__")
 
 SLOT0(slot_nb_int, "__int__")
-SLOT0(slot_nb_long, "__long__")
 SLOT0(slot_nb_float, "__float__")
 SLOT1(slot_nb_inplace_add, "__iadd__", PyObject *, "O")
 SLOT1(slot_nb_inplace_subtract, "__isub__", PyObject *, "O")
@@ -5607,8 +5620,6 @@ static slotdef slotdefs[] = {
 	RBINSLOT("__ror__", nb_or, slot_nb_or, "|"),
 	UNSLOT("__int__", nb_int, slot_nb_int, wrap_unaryfunc,
 	       "int(x)"),
-	UNSLOT("__long__", nb_long, slot_nb_long, wrap_unaryfunc,
-	       "long(x)"),
 	UNSLOT("__float__", nb_float, slot_nb_float, wrap_unaryfunc,
 	       "float(x)"),
 	NBSLOT("__index__", nb_index, slot_nb_index, wrap_unaryfunc, 
@@ -5794,8 +5805,12 @@ update_one_slot(PyTypeObject *type, slotdef *p)
 	}
 	do {
 		descr = _PyType_Lookup(type, p->name_strobj);
-		if (descr == NULL)
+		if (descr == NULL) {
+			if (ptr == (void**)&type->tp_iternext) {
+				specific = _PyObject_NextNotImplemented;
+			}
 			continue;
+		}
 		if (Py_TYPE(descr) == &PyWrapperDescr_Type) {
 			void **tptr = resolve_slotdups(type, p->name_strobj);
 			if (tptr == NULL || tptr == ptr)
@@ -5814,7 +5829,7 @@ update_one_slot(PyTypeObject *type, slotdef *p)
 		else if (Py_TYPE(descr) == &PyCFunction_Type &&
 			 PyCFunction_GET_FUNCTION(descr) ==
 			 (PyCFunction)tp_new_wrapper &&
-			 strcmp(p->name, "__new__") == 0)
+			 ptr == (void**)&type->tp_new)
 		{
 			/* The __new__ wrapper is not a wrapper descriptor,
 			   so must be special-cased differently.
@@ -5834,7 +5849,7 @@ update_one_slot(PyTypeObject *type, slotdef *p)
 			   point out a bug in this reasoning a beer. */
 		}
 		else if (descr == Py_None &&
-			 strcmp(p->name, "__hash__") == 0) {
+			 ptr == (void**)&type->tp_hash) {
 			/* We specifically allow __hash__ to be set to None
 			   to prevent inheritance of the default
 			   implementation from object.__hash__ */
@@ -6423,7 +6438,7 @@ PyTypeObject PySuper_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	super_repr,				/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

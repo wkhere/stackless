@@ -1,7 +1,9 @@
-from test.support import TESTFN, run_unittest
-import mmap
+from test.support import TESTFN, run_unittest, import_module
 import unittest
-import os, re
+import os, re, itertools
+
+# Skip test if we can't import mmap.
+mmap = import_module('mmap')
 
 PAGESIZE = mmap.PAGESIZE
 
@@ -35,12 +37,16 @@ class MmapTests(unittest.TestCase):
         # Simple sanity checks
 
         tp = str(type(m))  # SF bug 128713:  segfaulted on Linux
-        self.assertEqual(m.find('foo'), PAGESIZE)
+        self.assertEqual(m.find(b'foo'), PAGESIZE)
 
         self.assertEqual(len(m), 2*PAGESIZE)
 
         self.assertEqual(m[0], 0)
         self.assertEqual(m[0:3], b'\0\0\0')
+
+        # Shouldn't crash on boundary (Issue #5292)
+        self.assertRaises(IndexError, m.__getitem__, len(m))
+        self.assertRaises(IndexError, m.__setitem__, len(m), b'\0')
 
         # Modify the file's content
         m[0] = b'3'[0]
@@ -256,38 +262,38 @@ class MmapTests(unittest.TestCase):
 
     def test_find_end(self):
         # test the new 'end' parameter works as expected
-        f = open(TESTFN, 'w+')
-        data = 'one two ones'
+        f = open(TESTFN, 'wb+')
+        data = b'one two ones'
         n = len(data)
         f.write(data)
         f.flush()
         m = mmap.mmap(f.fileno(), n)
         f.close()
 
-        self.assertEqual(m.find('one'), 0)
-        self.assertEqual(m.find('ones'), 8)
-        self.assertEqual(m.find('one', 0, -1), 0)
-        self.assertEqual(m.find('one', 1), 8)
-        self.assertEqual(m.find('one', 1, -1), 8)
-        self.assertEqual(m.find('one', 1, -2), -1)
+        self.assertEqual(m.find(b'one'), 0)
+        self.assertEqual(m.find(b'ones'), 8)
+        self.assertEqual(m.find(b'one', 0, -1), 0)
+        self.assertEqual(m.find(b'one', 1), 8)
+        self.assertEqual(m.find(b'one', 1, -1), 8)
+        self.assertEqual(m.find(b'one', 1, -2), -1)
 
 
     def test_rfind(self):
         # test the new 'end' parameter works as expected
-        f = open(TESTFN, 'w+')
-        data = 'one two ones'
+        f = open(TESTFN, 'wb+')
+        data = b'one two ones'
         n = len(data)
         f.write(data)
         f.flush()
         m = mmap.mmap(f.fileno(), n)
         f.close()
 
-        self.assertEqual(m.rfind('one'), 8)
-        self.assertEqual(m.rfind('one '), 0)
-        self.assertEqual(m.rfind('one', 0, -1), 8)
-        self.assertEqual(m.rfind('one', 0, -2), 0)
-        self.assertEqual(m.rfind('one', 1, -1), 8)
-        self.assertEqual(m.rfind('one', 1, -2), -1)
+        self.assertEqual(m.rfind(b'one'), 8)
+        self.assertEqual(m.rfind(b'one '), 0)
+        self.assertEqual(m.rfind(b'one', 0, -1), 8)
+        self.assertEqual(m.rfind(b'one', 0, -2), 0)
+        self.assertEqual(m.rfind(b'one', 1, -1), 8)
+        self.assertEqual(m.rfind(b'one', 1, -2), -1)
 
 
     def test_double_close(self):
@@ -330,6 +336,35 @@ class MmapTests(unittest.TestCase):
         self.assertEqual(mf[:], b"ABCDEABCDE", "Map move should have duplicated front 5")
         mf.close()
         f.close()
+
+        # more excessive test
+        data = b"0123456789"
+        for dest in range(len(data)):
+            for src in range(len(data)):
+                for count in range(len(data) - max(dest, src)):
+                    expected = data[:dest] + data[src:src+count] + data[dest+count:]
+                    m = mmap.mmap(-1, len(data))
+                    m[:] = data
+                    m.move(dest, src, count)
+                    self.assertEqual(m[:], expected)
+                    m.close()
+
+        # segfault test (Issue 5387)
+        m = mmap.mmap(-1, 100)
+        offsets = [-100, -1, 0, 1, 100]
+        for source, dest, size in itertools.product(offsets, offsets, offsets):
+            try:
+                m.move(source, dest, size)
+            except ValueError:
+                pass
+        self.assertRaises(ValueError, m.move, -1, -1, -1)
+        self.assertRaises(ValueError, m.move, -1, -1, 0)
+        self.assertRaises(ValueError, m.move, -1, 0, -1)
+        self.assertRaises(ValueError, m.move, 0, -1, -1)
+        self.assertRaises(ValueError, m.move, -1, 0, 0)
+        self.assertRaises(ValueError, m.move, 0, -1, 0)
+        self.assertRaises(ValueError, m.move, 0, 0, -1)
+        m.close()
 
     def test_anonymous(self):
         # anonymous mmap.mmap(-1, PAGE)
@@ -412,6 +447,27 @@ class MmapTests(unittest.TestCase):
             m = mmap.mmap(f.fileno(), mapsize - halfsize, offset=halfsize)
             self.assertEqual(m[0:3], b'foo')
             f.close()
+
+            # Try resizing map
+            try:
+                m.resize(512)
+            except SystemError:
+                pass
+            else:
+                # resize() is supported
+                self.assertEqual(len(m), 512)
+                # Check that we can no longer seek beyond the new size.
+                self.assertRaises(ValueError, m.seek, 513, 0)
+                # Check that the content is not changed
+                self.assertEqual(m[0:3], b'foo')
+
+                # Check that the underlying file is truncated too
+                f = open(TESTFN)
+                f.seek(0, 2)
+                self.assertEqual(f.tell(), halfsize + 512)
+                f.close()
+                self.assertEqual(m.size(), halfsize + 512)
+
             m.close()
 
         finally:
@@ -440,6 +496,88 @@ class MmapTests(unittest.TestCase):
     def test_error(self):
         self.assert_(issubclass(mmap.error, EnvironmentError))
         self.assert_("mmap.error" in str(mmap.error))
+
+    def test_io_methods(self):
+        data = b"0123456789"
+        open(TESTFN, "wb").write(b"x"*len(data))
+        f = open(TESTFN, "r+b")
+        m = mmap.mmap(f.fileno(), len(data))
+        f.close()
+        # Test write_byte()
+        for i in range(len(data)):
+            self.assertEquals(m.tell(), i)
+            m.write_byte(data[i])
+            self.assertEquals(m.tell(), i+1)
+        self.assertRaises(ValueError, m.write_byte, b"x"[0])
+        self.assertEquals(m[:], data)
+        # Test read_byte()
+        m.seek(0)
+        for i in range(len(data)):
+            self.assertEquals(m.tell(), i)
+            self.assertEquals(m.read_byte(), data[i])
+            self.assertEquals(m.tell(), i+1)
+        self.assertRaises(ValueError, m.read_byte)
+        # Test read()
+        m.seek(3)
+        self.assertEquals(m.read(3), b"345")
+        self.assertEquals(m.tell(), 6)
+        # Test write()
+        m.seek(3)
+        m.write(b"bar")
+        self.assertEquals(m.tell(), 6)
+        self.assertEquals(m[:], b"012bar6789")
+        m.seek(8)
+        self.assertRaises(ValueError, m.write, b"bar")
+
+    if os.name == 'nt':
+        def test_tagname(self):
+            data1 = b"0123456789"
+            data2 = b"abcdefghij"
+            assert len(data1) == len(data2)
+
+            # Test same tag
+            m1 = mmap.mmap(-1, len(data1), tagname="foo")
+            m1[:] = data1
+            m2 = mmap.mmap(-1, len(data2), tagname="foo")
+            m2[:] = data2
+            self.assertEquals(m1[:], data2)
+            self.assertEquals(m2[:], data2)
+            m2.close()
+            m1.close()
+
+            # Test differnt tag
+            m1 = mmap.mmap(-1, len(data1), tagname="foo")
+            m1[:] = data1
+            m2 = mmap.mmap(-1, len(data2), tagname="boo")
+            m2[:] = data2
+            self.assertEquals(m1[:], data1)
+            self.assertEquals(m2[:], data2)
+            m2.close()
+            m1.close()
+
+        def test_crasher_on_windows(self):
+            # Should not crash (Issue 1733986)
+            m = mmap.mmap(-1, 1000, tagname="foo")
+            try:
+                mmap.mmap(-1, 5000, tagname="foo")[:] # same tagname, but larger size
+            except:
+                pass
+            m.close()
+
+            # Should not crash (Issue 5385)
+            open(TESTFN, "wb").write(b"x"*10)
+            f = open(TESTFN, "r+b")
+            m = mmap.mmap(f.fileno(), 0)
+            f.close()
+            try:
+                m.resize(0) # will raise WindowsError
+            except:
+                pass
+            try:
+                m[:]
+            except:
+                pass
+            m.close()
 
 
 def test_main():

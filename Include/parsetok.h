@@ -29,6 +29,9 @@ typedef struct {
 #define PyPARSE_UNICODE_LITERALS        0x0008
 #endif
 
+#define PyPARSE_IGNORE_COOKIE 0x0010
+#define PyPARSE_BARRY_AS_BDFL 0x0020
+
 PyAPI_FUNC(node *) PyParser_ParseString(const char *, grammar *, int,
                                               perrdetail *);
 PyAPI_FUNC(node *) PyParser_ParseFile (FILE *, const char *, grammar *, int,

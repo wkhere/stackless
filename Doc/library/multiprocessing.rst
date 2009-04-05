@@ -19,9 +19,9 @@ Windows.
 .. warning::
 
     Some of this package's functionality requires a functioning shared semaphore
-    implementation on the host operating system. Without one, the 
-    :mod:`multiprocessing.synchronize` module will be disabled, and attempts to 
-    import it will result in an :exc:`ImportError`. See 
+    implementation on the host operating system. Without one, the
+    :mod:`multiprocessing.synchronize` module will be disabled, and attempts to
+    import it will result in an :exc:`ImportError`. See
     :issue:`3770` for additional information.
 
 .. note::
@@ -35,8 +35,8 @@ Windows.
         >>> from multiprocessing import Pool
         >>> p = Pool(5)
         >>> def f(x):
-        ... 	return x*x
-        ... 
+        ...     return x*x
+        ...
         >>> p.map(f, [1,2,3])
         Process PoolWorker-1:
         Process PoolWorker-2:
@@ -75,11 +75,11 @@ To show the individual process IDs involved, here is an expanded example::
         print 'module name:', __name__
         print 'parent process:', os.getppid()
         print 'process id:', os.getpid()
-    
+
     def f(name):
         info('function f')
         print 'hello', name
-    
+
     if __name__ == '__main__':
         info('main line')
         p = Process(target=f, args=('bob',))
@@ -107,12 +107,12 @@ processes:
       def f(q):
           q.put([42, None, 'hello'])
 
-       if __name__ == '__main__':
-           q = Queue()
-           p = Process(target=f, args=(q,))
-           p.start()
-           print(q.get())    # prints "[42, None, 'hello']"
-           p.join()
+      if __name__ == '__main__':
+          q = Queue()
+          p = Process(target=f, args=(q,))
+          p.start()
+          print(q.get())    # prints "[42, None, 'hello']"
+          p.join()
 
    Queues are thread and process safe.
 
@@ -356,7 +356,7 @@ The :mod:`multiprocessing` package mostly replicates the API of the
 
    .. attribute:: daemon
 
-      The process's daemon flag, a Boolean value.  This must be called before
+      The process's daemon flag, a Boolean value.  This must be set before
       :meth:`start` is called.
 
       The initial value is inherited from the creating process.
@@ -541,7 +541,7 @@ For an example of the usage of queues for interprocess communication see
 
    .. method:: put(item[, block[, timeout]])
 
-      Put item into the queue.  If the optional argument *block* is ``True`` 
+      Put item into the queue.  If the optional argument *block* is ``True``
       (the default) and *timeout* is ``None`` (the default), block if necessary until
       a free slot is available.  If *timeout* is a positive number, it blocks at
       most *timeout* seconds and raises the :exc:`queue.Full` exception if no
@@ -856,7 +856,7 @@ object -- see :ref:`multiprocessing-managers`.
    acceptable.  If *block* is ``True`` and *timeout* is not ``None`` then it
    specifies a timeout in seconds.  If *block* is ``False`` then *timeout* is
    ignored.
-   
+
    Note that on OS/X ``sem_timedwait`` is unsupported, so timeout arguments
    for these will be ignored.
 
@@ -878,7 +878,7 @@ Shared :mod:`ctypes` Objects
 It is possible to create shared objects using shared memory which can be
 inherited by child processes.
 
-.. function:: Value(typecode_or_type[, *args, lock]])
+.. function:: Value(typecode_or_type, *args[, lock])
 
    Return a :mod:`ctypes` object allocated from shared memory.  By default the
    return value is actually a synchronized wrapper for the object.
@@ -960,7 +960,7 @@ processes.
 
    *typecode_or_type* determines the type of the returned object: it is either a
    ctypes type or a one character typecode of the kind used by the :mod:`array`
-   module.  */*args* is passed on to the constructor for the type.
+   module.  *\*args* is passed on to the constructor for the type.
 
    Note that setting and getting the value is potentially non-atomic -- use
    :func:`Value` instead to make sure that access is automatically synchronized
@@ -970,7 +970,7 @@ processes.
    attributes which allow one to use it to store and retrieve strings -- see
    documentation for :mod:`ctypes`.
 
-.. function:: Array(typecode_or_type, size_or_initializer[, *args[, lock]])
+.. function:: Array(typecode_or_type, size_or_initializer, *args[, lock])
 
    The same as :func:`RawArray` except that depending on the value of *lock* a
    process-safe synchronization wrapper may be returned instead of a raw ctypes
@@ -1133,22 +1133,22 @@ their parent process exits.  The manager classes are defined in the
       server process which is using the given address and authentication key.
 
    .. method:: get_server()
-      
+
       Returns a :class:`Server` object which represents the actual server under
-      the control of the Manager. The :class:`Server` object supports the 
-      :meth:`serve_forever` method::
-      
-       >>> from multiprocessing.managers import BaseManager
-       >>> m = BaseManager(address=('', 50000), authkey='abc'))
-       >>> server = m.get_server()
-       >>> s.serve_forever()
-       
-       :class:`Server` additionally have an :attr:`address` attribute.
+      the control of the Manager. The :class:`Server` object supports the
+      :meth:`serve_forever` method:
+
+      >>> from multiprocessing.managers import BaseManager
+      >>> m = BaseManager(address=('', 50000), authkey='abc'))
+      >>> server = m.get_server()
+      >>> s.serve_forever()
+
+      :class:`Server` additionally have an :attr:`address` attribute.
 
    .. method:: connect()
-   
-      Connect a local manager object to a remote manager process::
-      
+
+      Connect a local manager object to a remote manager process:
+
       >>> from multiprocessing.managers import BaseManager
       >>> m = BaseManager(address='127.0.0.1', authkey='abc))
       >>> m.connect()
@@ -1293,7 +1293,7 @@ Customized managers
 >>>>>>>>>>>>>>>>>>>
 
 To create one's own manager, one creates a subclass of :class:`BaseManager` and
-use the :meth:`~BaseManager.resgister` classmethod to register new types or
+use the :meth:`~BaseManager.register` classmethod to register new types or
 callables with the manager class.  For example::
 
    from multiprocessing.managers import BaseManager
@@ -1358,7 +1358,7 @@ Another client can also use it::
    >>> queue.get()
    'hello'
 
-Local processes can also access that queue, using the code from above on the 
+Local processes can also access that queue, using the code from above on the
 client to access it remotely::
 
     >>> from multiprocessing import Process, Queue
@@ -1369,12 +1369,12 @@ client to access it remotely::
     ...         super(Worker, self).__init__()
     ...     def run(self):
     ...         self.q.put('local hello')
-    ... 
+    ...
     >>> queue = Queue()
     >>> w = Worker(queue)
     >>> w.start()
     >>> class QueueManager(BaseManager): pass
-    ... 
+    ...
     >>> QueueManager.register('get_queue', callable=lambda: queue)
     >>> m = QueueManager(address=('', 50000), authkey='abracadabra')
     >>> s = m.get_server()
@@ -1436,13 +1436,13 @@ itself.  This means, for example, that one shared object can contain a second::
 
    Proxy objects are instances of subclasses of :class:`BaseProxy`.
 
-   .. method:: _call_method(methodname[, args[, kwds]])
+   .. method:: _callmethod(methodname[, args[, kwds]])
 
       Call and return the result of a method of the proxy's referent.
 
       If ``proxy`` is a proxy whose referent is ``obj`` then the expression ::
 
-         proxy._call_method(methodname, args, kwds)
+         proxy._callmethod(methodname, args, kwds)
 
       will evaluate the expression ::
 
@@ -1455,26 +1455,26 @@ itself.  This means, for example, that one shared object can contain a second::
       argument of :meth:`BaseManager.register`.
 
       If an exception is raised by the call, then then is re-raised by
-      :meth:`_call_method`.  If some other exception is raised in the manager's
+      :meth:`_callmethod`.  If some other exception is raised in the manager's
       process then this is converted into a :exc:`RemoteError` exception and is
-      raised by :meth:`_call_method`.
+      raised by :meth:`_callmethod`.
 
       Note in particular that an exception will be raised if *methodname* has
       not been *exposed*
 
-      An example of the usage of :meth:`_call_method`::
+      An example of the usage of :meth:`_callmethod`::
 
          >>> l = manager.list(range(10))
-         >>> l._call_method('__len__')
+         >>> l._callmethod('__len__')
          10
-         >>> l._call_method('__getslice__', (2, 7))   # equiv to `l[2:7]`
+         >>> l._callmethod('__getslice__', (2, 7))   # equiv to `l[2:7]`
          [2, 3, 4, 5, 6]
-         >>> l._call_method('__getitem__', (20,))     # equiv to `l[20]`
+         >>> l._callmethod('__getitem__', (20,))     # equiv to `l[20]`
          Traceback (most recent call last):
          ...
          IndexError: list index out of range
 
-   .. method:: _get_value()
+   .. method:: _getvalue()
 
       Return a copy of the referent.
 
@@ -1522,7 +1522,9 @@ with the :class:`Pool` class.
    .. method:: apply(func[, args[, kwds]])
 
       Call *func* with arguments *args* and keyword arguments *kwds*.  It blocks
-      till the result is ready.
+      till the result is ready. Given this blocks - :meth:`apply_async` is better suited
+      for performing work in parallel. Additionally, the passed
+      in function is only executed in one of the workers of the pool.
 
    .. method:: apply_async(func[, args[, kwds[, callback]]])
 
@@ -1808,9 +1810,9 @@ Address Formats
   filesystem.
 
 * An ``'AF_PIPE'`` address is a string of the form
-   ``r'\\\\.\\pipe\\PipeName'``.  To use :func:`Client` to connect to a named
-   pipe on a remote computer called ServerName* one should use an address of the
-   form ``r'\\\\ServerName\\pipe\\PipeName'`` instead.
+   :samp:`r'\\\\.\\pipe\\{PipeName}'`.  To use :func:`Client` to connect to a named
+   pipe on a remote computer called *ServerName* one should use an address of the
+   form :samp:`r'\\\\{ServerName}\\pipe\\{PipeName}'` instead.
 
 Note that any string beginning with two backslashes is assumed by default to be
 an ``'AF_PIPE'`` address rather than an ``'AF_UNIX'`` address.
@@ -1855,30 +1857,74 @@ handler type) for messages from different processes to get mixed up.
    Returns the logger used by :mod:`multiprocessing`.  If necessary, a new one
    will be created.
 
-   When first created the logger has level :data:`logging.NOTSET` and has a
-   handler which sends output to :data:`sys.stderr` using format
-   ``'[%(levelname)s/%(processName)s] %(message)s'``.  (The logger allows use of
-   the non-standard ``'%(processName)s'`` format.)  Message sent to this logger
-   will not by default propagate to the root logger.
+   When first created the logger has level :data:`logging.NOTSET` and no
+   default handler. Messages sent to this logger will not by default propagate
+   to the root logger.
 
    Note that on Windows child processes will only inherit the level of the
    parent process's logger -- any other customization of the logger will not be
    inherited.
 
+.. currentmodule:: multiprocessing
+.. function:: log_to_stderr()
+
+   This function performs a call to :func:`get_logger` but in addition to
+   returning the logger created by get_logger, it adds a handler which sends
+   output to :data:`sys.stderr` using format
+   ``'[%(levelname)s/%(processName)s] %(message)s'``.
+
 Below is an example session with logging turned on::
 
     >>> import multiprocessing, logging
-    >>> logger = multiprocessing.get_logger()
+    >>> logger = multiprocessing.log_to_stderr()
     >>> logger.setLevel(logging.INFO)
     >>> logger.warning('doomed')
     [WARNING/MainProcess] doomed
     >>> m = multiprocessing.Manager()
     [INFO/SyncManager-1] child process calling self.run()
-    [INFO/SyncManager-1] manager bound to '\\\\.\\pipe\\pyc-2776-0-lj0tfa'
+    [INFO/SyncManager-1] created temp directory /.../pymp-Wh47O_
+    [INFO/SyncManager-1] manager serving at '/.../listener-lWsERs'
     >>> del m
     [INFO/MainProcess] sending shutdown message to manager
     [INFO/SyncManager-1] manager exiting with exitcode 0
 
+In addition to having these two logging functions, the multiprocessing also
+exposes two additional logging level attributes. These are  :const:`SUBWARNING`
+and :const:`SUBDEBUG`. The table below illustrates where theses fit in the
+normal level hierarchy.
+
++----------------+----------------+
+| Level          | Numeric value  |
++================+================+
+| ``SUBWARNING`` | 25             |
++----------------+----------------+
+| ``SUBDEBUG``   | 5              |
++----------------+----------------+
+
+For a full table of logging levels, see the :mod:`logging` module.
+
+These additional logging levels are used primarily for certain debug messages
+within the multiprocessing module. Below is the same example as above, except
+with :const:`SUBDEBUG` enabled::
+
+    >>> import multiprocessing, logging
+    >>> logger = multiprocessing.log_to_stderr()
+    >>> logger.setLevel(multiprocessing.SUBDEBUG)
+    >>> logger.warning('doomed')
+    [WARNING/MainProcess] doomed
+    >>> m = multiprocessing.Manager()
+    [INFO/SyncManager-1] child process calling self.run()
+    [INFO/SyncManager-1] created temp directory /.../pymp-djGBXN
+    [INFO/SyncManager-1] manager serving at '/.../pymp-djGBXN/listener-knBYGe'
+    >>> del m
+    [SUBDEBUG/MainProcess] finalizer calling ...
+    [INFO/MainProcess] sending shutdown message to manager
+    [DEBUG/SyncManager-1] manager received shutdown message
+    [SUBDEBUG/SyncManager-1] calling <Finalize object, callback=unlink, ...
+    [SUBDEBUG/SyncManager-1] finalizer calling <built-in function unlink> ...
+    [SUBDEBUG/SyncManager-1] calling <Finalize object, dead>
+    [SUBDEBUG/SyncManager-1] finalizer calling <function rmtree at 0x5aa730> ...
+    [INFO/SyncManager-1] manager exiting with exitcode 0
 
 The :mod:`multiprocessing.dummy` module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2118,7 +2164,7 @@ Some simple benchmarks comparing :mod:`multiprocessing` with :mod:`threading`:
 .. literalinclude:: ../includes/mp_benchmarks.py
 
 An example/demo of how to use the :class:`managers.SyncManager`, :class:`Process`
-and others to build a system which can distribute processes and work via a 
+and others to build a system which can distribute processes and work via a
 distributed queue to a "cluster" of machines on a network, accessible via SSH.
 You will need to have private key authentication for all hosts configured for
 this to work.

@@ -65,13 +65,14 @@ def _run_module_code(code, init_globals=None,
 
 # This helper is needed due to a missing component in the PEP 302
 # loader protocol (specifically, "get_filename" is non-standard)
+# Since we can't introduce new features in maintenance releases,
+# support was added to zipimporter under the name '_get_filename'
 def _get_filename(loader, mod_name):
-    try:
-        get_filename = loader.get_filename
-    except AttributeError:
-        return None
-    else:
-        return get_filename(mod_name)
+    for attr in ("get_filename", "_get_filename"):
+        meth = getattr(loader, attr, None)
+        if meth is not None:
+            return meth(mod_name)
+    return None
 
 # Helper to get the loader, code and filename for a module
 def _get_module_details(mod_name):
@@ -79,13 +80,19 @@ def _get_module_details(mod_name):
     if loader is None:
         raise ImportError("No module named %s" % mod_name)
     if loader.is_package(mod_name):
-        raise ImportError(("%s is a package and cannot " +
-                          "be directly executed") % mod_name)
+        if mod_name == "__main__" or mod_name.endswith(".__main__"):
+            raise ImportError(("Cannot use package as __main__ module"))
+        try:
+            pkg_main_name = mod_name + ".__main__"
+            return _get_module_details(pkg_main_name)
+        except ImportError as e:
+            raise ImportError(("%s; %r is a package and cannot " +
+                               "be directly executed") %(e, mod_name))
     code = loader.get_code(mod_name)
     if code is None:
         raise ImportError("No code object available for %s" % mod_name)
     filename = _get_filename(loader, mod_name)
-    return loader, code, filename
+    return mod_name, loader, code, filename
 
 
 # XXX ncoghlan: Should this be documented and made public?
@@ -100,12 +107,12 @@ def _run_module_as_main(mod_name, set_argv0=True):
            __loader__
     """
     try:
-        loader, code, fname = _get_module_details(mod_name)
+        mod_name, loader, code, fname = _get_module_details(mod_name)
     except ImportError as exc:
         # Try to provide a good error message
         # for directories, zip files and the -m switch
         if set_argv0:
-            # For -m switch, just disply the exception
+            # For -m switch, just display the exception
             info = str(exc)
         else:
             # For directories/zipfiles, let the user
@@ -126,7 +133,7 @@ def run_module(mod_name, init_globals=None,
 
        Returns the resulting top level namespace dictionary
     """
-    loader, code, fname = _get_module_details(mod_name)
+    mod_name, loader, code, fname = _get_module_details(mod_name)
     if run_name is None:
         run_name = mod_name
     pkg_name = mod_name.rpartition('.')[0]

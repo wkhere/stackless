@@ -639,12 +639,11 @@ class _BZ2Proxy(object):
     def read(self, size):
         x = len(self.buf)
         while x < size:
-            try:
-                raw = self.fileobj.read(self.blocksize)
-                data = self.bz2obj.decompress(raw)
-                self.buf += data
-            except EOFError:
+            raw = self.fileobj.read(self.blocksize)
+            if not raw:
                 break
+            data = self.bz2obj.decompress(raw)
+            self.buf += data
             x += len(data)
 
         buf = self.buf[:size]
@@ -1753,7 +1752,7 @@ class TarFile(object):
     def getmember(self, name):
         """Return a TarInfo object for member `name'. If `name' can not be
            found in the archive, KeyError is raised. If a member occurs more
-           than once in the archive, its last occurence is assumed to be the
+           than once in the archive, its last occurrence is assumed to be the
            most up-to-date version.
         """
         tarinfo = self._getmember(name)
@@ -2264,10 +2263,6 @@ class TarFile(object):
         """Set modification time of targetpath according to tarinfo.
         """
         if not hasattr(os, 'utime'):
-            return
-        if sys.platform == "win32" and tarinfo.isdir():
-            # According to msdn.microsoft.com, it is an error (EACCES)
-            # to use utime() on directories.
             return
         try:
             os.utime(targetpath, (tarinfo.mtime, tarinfo.mtime))

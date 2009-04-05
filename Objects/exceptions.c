@@ -250,11 +250,67 @@ BaseException_set_tb(PyBaseExceptionObject *self, PyObject *tb)
     return 0;
 }
 
+static PyObject *
+BaseException_get_context(PyObject *self) {
+    PyObject *res = PyException_GetContext(self);
+    if (res) return res;  /* new reference already returned above */
+    Py_RETURN_NONE;
+}
+
+static int
+BaseException_set_context(PyObject *self, PyObject *arg) {
+    if (arg == NULL) {
+        PyErr_SetString(PyExc_TypeError, "__context__ may not be deleted");
+        return -1;
+    } else if (arg == Py_None) {
+        arg = NULL;
+    } else if (!PyExceptionInstance_Check(arg)) {
+        PyErr_SetString(PyExc_TypeError, "exception context must be None "
+                        "or derive from BaseException");
+        return -1;
+    } else {
+        /* PyException_SetContext steals this reference */
+        Py_INCREF(arg);
+    } 
+    PyException_SetContext(self, arg);
+    return 0;
+}
+
+static PyObject *
+BaseException_get_cause(PyObject *self) {
+    PyObject *res = PyException_GetCause(self);
+    if (res) return res;  /* new reference already returned above */
+    Py_RETURN_NONE;
+}
+
+static int
+BaseException_set_cause(PyObject *self, PyObject *arg) {
+    if (arg == NULL) {
+        PyErr_SetString(PyExc_TypeError, "__cause__ may not be deleted");
+        return -1;
+    } else if (arg == Py_None) {
+        arg = NULL;
+    } else if (!PyExceptionInstance_Check(arg)) {
+        PyErr_SetString(PyExc_TypeError, "exception cause must be None "
+                        "or derive from BaseException");
+        return -1;
+    } else {
+        /* PyException_SetCause steals this reference */
+        Py_INCREF(arg);
+    } 
+    PyException_SetCause(self, arg);
+    return 0;
+}
+
 
 static PyGetSetDef BaseException_getset[] = {
     {"__dict__", (getter)BaseException_get_dict, (setter)BaseException_set_dict},
     {"args", (getter)BaseException_get_args, (setter)BaseException_set_args},
     {"__traceback__", (getter)BaseException_get_tb, (setter)BaseException_set_tb},
+    {"__context__", (getter)BaseException_get_context,
+     (setter)BaseException_set_context, PyDoc_STR("exception context")},
+    {"__cause__", (getter)BaseException_get_cause,
+     (setter)BaseException_set_cause, PyDoc_STR("exception cause")},
     {NULL},
 };
 
@@ -303,14 +359,6 @@ PyException_SetContext(PyObject *self, PyObject *context) {
 }
 
 
-static PyMemberDef BaseException_members[] = {
-    {"__context__", T_OBJECT, offsetof(PyBaseExceptionObject, context), 0,
-        PyDoc_STR("exception context")},
-    {"__cause__", T_OBJECT, offsetof(PyBaseExceptionObject, cause), 0,
-        PyDoc_STR("exception cause")},
-    {NULL}  /* Sentinel */
-};
-
 static PyTypeObject _PyExc_BaseException = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "BaseException", /*tp_name*/
@@ -320,7 +368,7 @@ static PyTypeObject _PyExc_BaseException = {
     0,                          /*tp_print*/
     0,                          /*tp_getattr*/
     0,                          /*tp_setattr*/
-    0,                          /* tp_compare; */
+    0,                          /* tp_reserved; */
     (reprfunc)BaseException_repr, /*tp_repr*/
     0,                          /*tp_as_number*/
     0,                          /*tp_as_sequence*/
@@ -341,7 +389,7 @@ static PyTypeObject _PyExc_BaseException = {
     0,                          /* tp_iter */
     0,                          /* tp_iternext */
     BaseException_methods,      /* tp_methods */
-    BaseException_members,      /* tp_members */
+    0,                          /* tp_members */
     BaseException_getset,       /* tp_getset */
     0,                          /* tp_base */
     0,                          /* tp_dict */
@@ -1784,28 +1832,6 @@ PyObject *PyExc_RecursionErrorInst = NULL;
     if (PyDict_SetItemString(bdict, # TYPE, PyExc_ ## TYPE)) \
         Py_FatalError("Module dictionary insertion problem.");
 
-#if defined _MSC_VER && _MSC_VER >= 1400 && defined(__STDC_SECURE_LIB__)
-/* crt variable checking in VisualStudio .NET 2005 */
-#include <crtdbg.h>
-
-static int	prevCrtReportMode;
-static _invalid_parameter_handler	prevCrtHandler;
-
-/* Invalid parameter handler.  Sets a ValueError exception */
-static void
-InvalidParameterHandler(
-    const wchar_t * expression,
-    const wchar_t * function,
-    const wchar_t * file,
-    unsigned int line,
-    uintptr_t pReserved)
-{
-    /* Do nothing, allow execution to continue.  Usually this
-     * means that the CRT will set errno to EINVAL
-     */
-}
-#endif
-
 
 void
 _PyExc_Init(void)
@@ -1937,7 +1963,7 @@ _PyExc_Init(void)
 
     PyExc_MemoryErrorInst = BaseException_new(&_PyExc_MemoryError, NULL, NULL);
     if (!PyExc_MemoryErrorInst)
-        Py_FatalError("Cannot pre-allocate MemoryError instance\n");
+        Py_FatalError("Cannot pre-allocate MemoryError instance");
 
     PyExc_RecursionErrorInst = BaseException_new(&_PyExc_RuntimeError, NULL, NULL);
     if (!PyExc_RecursionErrorInst)
@@ -1963,13 +1989,6 @@ _PyExc_Init(void)
     }
 
     Py_DECREF(bltinmod);
-
-#if defined _MSC_VER && _MSC_VER >= 1400 && defined(__STDC_SECURE_LIB__)
-    /* Set CRT argument error handler */
-    prevCrtHandler = _set_invalid_parameter_handler(InvalidParameterHandler);
-    /* turn off assertions in debug mode */
-    prevCrtReportMode = _CrtSetReportMode(_CRT_ASSERT, 0);
-#endif
 }
 
 void
@@ -1977,9 +1996,4 @@ _PyExc_Fini(void)
 {
     Py_XDECREF(PyExc_MemoryErrorInst);
     PyExc_MemoryErrorInst = NULL;
-#if defined _MSC_VER && _MSC_VER >= 1400 && defined(__STDC_SECURE_LIB__)
-    /* reset CRT error handling */
-    _set_invalid_parameter_handler(prevCrtHandler);
-    _CrtSetReportMode(_CRT_ASSERT, prevCrtReportMode);
-#endif
 }

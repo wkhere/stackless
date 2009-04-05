@@ -53,8 +53,9 @@ variable(s) whose address should be passed.
    string may contain embedded null bytes.  Unicode objects pass back a pointer
    to the default encoded string version of the object if such a conversion is
    possible.  All other read-buffer compatible objects pass back a reference to
-   the raw internal data representation.  Since this format doesn't allow writable buffer compatible objects like byte
-   arrays, ``s*`` is to be preferred.
+   the raw internal data representation.  Since this format doesn't allow
+   writable buffer compatible objects like byte arrays, ``s*`` is to be
+   preferred.
 
    The type of the length argument (int or :ctype:`Py_ssize_t`) is controlled by
    defining the macro :cmacro:`PY_SSIZE_T_CLEAN` before including
@@ -164,8 +165,9 @@ variable(s) whose address should be passed.
    them. Instead, the implementation assumes that the string object uses the
    encoding passed in as parameter.
 
-``b`` (integer) [char]
-   Convert a Python integer to a tiny int, stored in a C :ctype:`char`.
+``b`` (integer) [unsigned char]
+   Convert a nonnegative Python integer to an unsigned tiny int, stored in a C
+   :ctype:`unsigned char`.
 
 ``B`` (integer) [unsigned char]
    Convert a Python integer to a tiny int without overflow checking, stored in a C
@@ -206,8 +208,12 @@ variable(s) whose address should be passed.
    Convert a Python integer to a C :ctype:`Py_ssize_t`.
 
 ``c`` (string of length 1) [char]
-   Convert a Python character, represented as a string of length 1, to a C
+   Convert a Python character, represented as a byte string of length 1, to a C
    :ctype:`char`.
+
+``C`` (string of length 1) [int]
+   Convert a Python character, represented as a unicode string of length 1, to a
+   C :ctype:`int`.
 
 ``f`` (float) [float]
    Convert a Python floating point number to a C :ctype:`float`.
@@ -305,8 +311,8 @@ inside nested parentheses.  They are:
 
 ``;``
    The list of format units ends here; the string after the semicolon is used as
-   the error message *instead* of the default error message.  Clearly, ``:`` and
-   ``;`` mutually exclude each other.
+   the error message *instead* of the default error message.  ``:`` and ``;``
+   mutually exclude each other.
 
 Note that any Python object references which are provided to the caller are
 *borrowed* references; do not decrement their reference count!
@@ -438,7 +444,7 @@ and the following format units are left untouched.
       Convert a C string and its length to a Python object.  If the C string pointer
       is *NULL*, the length is ignored and ``None`` is returned.
 
-   ``y`` (bytes) [char \*, int]
+   ``y`` (bytes) [char \*]
       This converts a C string to a Python :func:`bytes` object.  If the C
       string pointer is *NULL*, ``None`` is returned.
 
@@ -487,11 +493,11 @@ and the following format units are left untouched.
    ``H`` (integer) [unsigned short int]
       Convert a C :ctype:`unsigned short int` to a Python integer object.
 
-   ``I`` (integer/long) [unsigned int]
-      Convert a C :ctype:`unsigned int` to a Python long integer object.
+   ``I`` (integer) [unsigned int]
+      Convert a C :ctype:`unsigned int` to a Python integer object.
 
-   ``k`` (integer/long) [unsigned long]
-      Convert a C :ctype:`unsigned long` to a Python long integer object.
+   ``k`` (integer) [unsigned long]
+      Convert a C :ctype:`unsigned long` to a Python integer object.
 
    ``L`` (long) [PY_LONG_LONG]
       Convert a C :ctype:`long long` to a Python integer object. Only available
@@ -505,8 +511,12 @@ and the following format units are left untouched.
       Convert a C :ctype:`Py_ssize_t` to a Python integer.
 
    ``c`` (string of length 1) [char]
-      Convert a C :ctype:`int` representing a character to a Python string of length
-      1.
+      Convert a C :ctype:`int` representing a byte to a Python byte string of
+      length 1.
+
+   ``C`` (string of length 1) [int]
+      Convert a C :ctype:`int` representing a character to Python unicode
+      string of length 1.
 
    ``d`` (float) [double]
       Convert a C :ctype:`double` to a Python floating point number.
@@ -552,3 +562,8 @@ and the following format units are left untouched.
 
    If there is an error in the format string, the :exc:`SystemError` exception is
    set and *NULL* returned.
+
+.. cfunction:: PyObject* Py_VaBuildValue(const char *format, va_list vargs)
+
+   Identical to :cfunc:`Py_BuildValue`, except that it accepts a va_list
+   rather than a variable number of arguments.

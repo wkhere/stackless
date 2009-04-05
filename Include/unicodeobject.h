@@ -126,6 +126,10 @@ typedef unsigned int Py_UCS4;
 typedef unsigned long Py_UCS4; 
 #endif
 
+/* Py_UNICODE is the native Unicode storage format (code unit) used by
+   Python and represents a single Unicode element in the Unicode
+   type. */
+
 typedef PY_UNICODE_TYPE Py_UNICODE;
 
 /* --- UCS-2/UCS-4 Name Mangling ------------------------------------------ */
@@ -152,6 +156,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_AsUnicode PyUnicodeUCS2_AsUnicode
 # define PyUnicode_AsUnicodeEscapeString PyUnicodeUCS2_AsUnicodeEscapeString
 # define PyUnicode_AsWideChar PyUnicodeUCS2_AsWideChar
+# define PyUnicode_ClearFreeList PyUnicodeUCS2_ClearFreelist
 # define PyUnicode_Compare PyUnicodeUCS2_Compare
 # define PyUnicode_Concat PyUnicodeUCS2_Concat
 # define PyUnicode_Append PyUnicodeUCS2_Append
@@ -185,13 +190,13 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_Find PyUnicodeUCS2_Find
 # define PyUnicode_Format PyUnicodeUCS2_Format
 # define PyUnicode_FromEncodedObject PyUnicodeUCS2_FromEncodedObject
+# define PyUnicode_FromFormat PyUnicodeUCS2_FromFormat
+# define PyUnicode_FromFormatV PyUnicodeUCS2_FromFormatV
 # define PyUnicode_FromObject PyUnicodeUCS2_FromObject
 # define PyUnicode_FromOrdinal PyUnicodeUCS2_FromOrdinal
-# define PyUnicode_FromUnicode PyUnicodeUCS2_FromUnicode
 # define PyUnicode_FromString PyUnicodeUCS2_FromString
 # define PyUnicode_FromStringAndSize PyUnicodeUCS2_FromStringAndSize
-# define PyUnicode_FromFormatV PyUnicodeUCS2_FromFormatV
-# define PyUnicode_FromFormat PyUnicodeUCS2_FromFormat
+# define PyUnicode_FromUnicode PyUnicodeUCS2_FromUnicode
 # define PyUnicode_FromWideChar PyUnicodeUCS2_FromWideChar
 # define PyUnicode_GetDefaultEncoding PyUnicodeUCS2_GetDefaultEncoding
 # define PyUnicode_GetMax PyUnicodeUCS2_GetMax
@@ -213,7 +218,6 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define _PyUnicode_AsDefaultEncodedString _PyUnicodeUCS2_AsDefaultEncodedString
 # define _PyUnicode_Fini _PyUnicodeUCS2_Fini
 # define _PyUnicode_Init _PyUnicodeUCS2_Init
-# define PyUnicode_ClearFreeList PyUnicodeUCS2_ClearFreelist
 # define _PyUnicode_IsAlpha _PyUnicodeUCS2_IsAlpha
 # define _PyUnicode_IsDecimalDigit _PyUnicodeUCS2_IsDecimalDigit
 # define _PyUnicode_IsDigit _PyUnicodeUCS2_IsDigit
@@ -250,6 +254,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_AsUnicode PyUnicodeUCS4_AsUnicode
 # define PyUnicode_AsUnicodeEscapeString PyUnicodeUCS4_AsUnicodeEscapeString
 # define PyUnicode_AsWideChar PyUnicodeUCS4_AsWideChar
+# define PyUnicode_ClearFreeList PyUnicodeUCS4_ClearFreelist
 # define PyUnicode_Compare PyUnicodeUCS4_Compare
 # define PyUnicode_Concat PyUnicodeUCS4_Concat
 # define PyUnicode_Append PyUnicodeUCS4_Append
@@ -283,13 +288,13 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_Find PyUnicodeUCS4_Find
 # define PyUnicode_Format PyUnicodeUCS4_Format
 # define PyUnicode_FromEncodedObject PyUnicodeUCS4_FromEncodedObject
+# define PyUnicode_FromFormat PyUnicodeUCS4_FromFormat
+# define PyUnicode_FromFormatV PyUnicodeUCS4_FromFormatV
 # define PyUnicode_FromObject PyUnicodeUCS4_FromObject
 # define PyUnicode_FromOrdinal PyUnicodeUCS4_FromOrdinal
-# define PyUnicode_FromUnicode PyUnicodeUCS4_FromUnicode
 # define PyUnicode_FromString PyUnicodeUCS4_FromString
 # define PyUnicode_FromStringAndSize PyUnicodeUCS4_FromStringAndSize
-# define PyUnicode_FromFormatV PyUnicodeUCS4_FromFormatV
-# define PyUnicode_FromFormat PyUnicodeUCS4_FromFormat
+# define PyUnicode_FromUnicode PyUnicodeUCS4_FromUnicode
 # define PyUnicode_FromWideChar PyUnicodeUCS4_FromWideChar
 # define PyUnicode_GetDefaultEncoding PyUnicodeUCS4_GetDefaultEncoding
 # define PyUnicode_GetMax PyUnicodeUCS4_GetMax
@@ -311,7 +316,6 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define _PyUnicode_AsDefaultEncodedString _PyUnicodeUCS4_AsDefaultEncodedString
 # define _PyUnicode_Fini _PyUnicodeUCS4_Fini
 # define _PyUnicode_Init _PyUnicodeUCS4_Init
-# define PyUnicode_ClearFreeList PyUnicodeUCS2_ClearFreelist
 # define _PyUnicode_IsAlpha _PyUnicodeUCS4_IsAlpha
 # define _PyUnicode_IsDecimalDigit _PyUnicodeUCS4_IsDecimalDigit
 # define _PyUnicode_IsDigit _PyUnicodeUCS4_IsDigit
@@ -369,12 +373,12 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 
 #else
 
-/* Since splitting on whitespace is an important use case, and whitespace
-   in most situations is solely ASCII whitespace, we optimize for the common
-   case by using a quick look-up table with an inlined check.
- */
-PyAPI_DATA(const unsigned char) _Py_ascii_whitespace[];
+/* Since splitting on whitespace is an important use case, and
+   whitespace in most situations is solely ASCII whitespace, we
+   optimize for the common case by using a quick look-up table
+   _Py_ascii_whitespace (see below) with an inlined check.
 
+ */
 #define Py_UNICODE_ISSPACE(ch) \
 	((ch) < 128U ? _Py_ascii_whitespace[(ch)] : _PyUnicode_IsWhitespace(ch))
 
@@ -409,13 +413,14 @@ PyAPI_DATA(const unsigned char) _Py_ascii_whitespace[];
 #define Py_UNICODE_COPY(target, source, length)				\
 	Py_MEMCPY((target), (source), (length)*sizeof(Py_UNICODE))
 
-#define Py_UNICODE_FILL(target, value, length) do\
-    {Py_ssize_t i_; Py_UNICODE *t_ = (target); Py_UNICODE v_ = (value);\
+#define Py_UNICODE_FILL(target, value, length) \
+    do {Py_ssize_t i_; Py_UNICODE *t_ = (target); Py_UNICODE v_ = (value);\
         for (i_ = 0; i_ < (length); i_++) t_[i_] = v_;\
     } while (0)
 
-/* check if substring matches at given offset.  the offset must be
+/* Check if substring matches at given offset.  the offset must be
    valid, and the substring must not be empty */
+
 #define Py_UNICODE_MATCH(string, offset, substring) \
     ((*((string)->str + (offset)) == *((substring)->str)) && \
     ((*((string)->str + (offset) + (substring)->length-1) == *((substring)->str + (substring)->length-1))) && \
@@ -424,8 +429,6 @@ PyAPI_DATA(const unsigned char) _Py_ascii_whitespace[];
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-PyAPI_FUNC(int) PyUnicode_ClearFreeList(void);
 
 /* --- Unicode Type ------------------------------------------------------- */
 
@@ -640,6 +643,17 @@ PyAPI_FUNC(Py_ssize_t) PyUnicode_AsWideChar(
 */
 
 PyAPI_FUNC(PyObject*) PyUnicode_FromOrdinal(int ordinal);
+
+/* --- Free-list management ----------------------------------------------- */
+
+/* Clear the free list used by the Unicode implementation.
+
+   This can be used to release memory used for objects on the free
+   list back to the Python memory allocator.
+
+*/
+
+PyAPI_FUNC(int) PyUnicode_ClearFreeList(void);
 
 /* === Builtin Codecs ===================================================== 
 
@@ -1468,14 +1482,29 @@ PyAPI_FUNC(PyObject *) _PyUnicode_XStrip(
    into the string pointed to by buffer.  For the argument descriptions,
    see Objects/stringlib/localeutil.h */
 
-PyAPI_FUNC(int) _PyUnicode_InsertThousandsGrouping(Py_UNICODE *buffer,
+PyAPI_FUNC(int) _PyUnicode_InsertThousandsGroupingLocale(Py_UNICODE *buffer,
 						  Py_ssize_t n_buffer,
 						  Py_ssize_t n_digits,
 						  Py_ssize_t buf_size,
 						  Py_ssize_t *count,
 						  int append_zero_char);
 
+/* Using explicit passed-in values, insert the thousands grouping
+   into the string pointed to by buffer.  For the argument descriptions,
+   see Objects/stringlib/localeutil.h */
+PyAPI_FUNC(int) _PyUnicode_InsertThousandsGrouping(Py_UNICODE *buffer,
+						 Py_ssize_t n_buffer,
+						 Py_ssize_t n_digits,
+						 Py_ssize_t buf_size,
+						 Py_ssize_t *count,
+                                                 int append_zero_char,
+                                                 const char *grouping,
+                                                 const char *thousands_sep);
 /* === Characters Type APIs =============================================== */
+
+/* Helper array used by Py_UNICODE_ISSPACE(). */
+
+PyAPI_DATA(const unsigned char) _Py_ascii_whitespace[];
 
 /* These should not be used directly. Use the Py_UNICODE_IS* and
    Py_UNICODE_TO* macros instead. 

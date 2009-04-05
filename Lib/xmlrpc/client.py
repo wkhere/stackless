@@ -349,10 +349,6 @@ class DateTime:
     def timetuple(self):
         return time.strptime(self.value, "%Y%m%dT%H:%M:%S")
 
-    def __cmp__(self, other):
-        s, o = self.make_comparable(other)
-        return cmp(s, o)
-
     ##
     # Get date/time value.
     #
@@ -1133,7 +1129,7 @@ class Transport:
 
         self.verbose = verbose
 
-        return self._parse_response(resp, None)
+        return self.parse_response(resp)
 
     ##
     # Create parser.
@@ -1165,7 +1161,8 @@ class Transport:
 
         if auth:
             import base64
-            auth = base64.encodestring(urllib.parse.unquote(auth))
+            auth = urllib.parse.unquote_to_bytes(auth)
+            auth = base64.encodestring(auth).decode("utf-8")
             auth = "".join(auth.split()) # get rid of whitespace
             extra_headers = [
                 ("Authorization", "Basic " + auth)
@@ -1216,29 +1213,12 @@ class Transport:
     # @return Response tuple and target method.
 
     def parse_response(self, file):
-        # compatibility interface
-        return self._parse_response(file, None)
-
-    ##
-    # Parse response (alternate interface).  This is similar to the
-    # parse_response method, but also provides direct access to the
-    # underlying socket object (where available).
-    #
-    # @param file Stream.
-    # @param sock Socket handle (or None, if the socket object
-    #    could not be accessed).
-    # @return Response tuple and target method.
-
-    def _parse_response(self, file, sock):
         # read response from input file/socket, and parse it
 
         p, u = self.getparser()
 
         while 1:
-            if sock:
-                response = sock.recv(1024)
-            else:
-                response = file.read(1024)
+            response = file.read(1024)
             if not response:
                 break
             if self.verbose:
@@ -1336,7 +1316,7 @@ class ServerProxy:
                 transport = Transport(use_datetime=use_datetime)
         self.__transport = transport
 
-        self.__encoding = encoding
+        self.__encoding = encoding or 'utf-8'
         self.__verbose = verbose
         self.__allow_none = allow_none
 
@@ -1344,7 +1324,7 @@ class ServerProxy:
         # call a method on the remote server
 
         request = dumps(params, methodname, encoding=self.__encoding,
-                        allow_none=self.__allow_none)
+                        allow_none=self.__allow_none).encode(self.__encoding)
 
         response = self.__transport.request(
             self.__host,

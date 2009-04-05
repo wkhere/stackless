@@ -84,20 +84,21 @@ __version__ = "0.6"
 
 __all__ = ["HTTPServer", "BaseHTTPRequestHandler"]
 
-import io
-import os
-import sys
 import cgi
-import time
-import socket # For gethostbyaddr()
-import shutil
-import urllib.parse
-import select
-import mimetypes
-import posixpath
-import socketserver
 import email.message
 import email.parser
+import http.client
+import io
+import mimetypes
+import os
+import posixpath
+import select
+import shutil
+import socket # For gethostbyaddr()
+import socketserver
+import sys
+import time
+import urllib.parse
 
 # Default error message template
 DEFAULT_ERROR_MESSAGE = """\
@@ -312,20 +313,8 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         self.command, self.path, self.request_version = command, path, version
 
         # Examine the headers and look for a Connection directive.
-
-        # MessageClass wants to see strings rather than bytes.
-        # But a TextIOWrapper around self.rfile would buffer too many bytes
-        # from the stream, bytes which we later need to read as bytes.
-        # So we read the correct bytes here, as bytes, then use StringIO
-        # to make them look like strings for MessageClass to parse.
-        headers = []
-        while True:
-            line = self.rfile.readline()
-            headers.append(line)
-            if line in (b'\r\n', b'\n', b''):
-                break
-        hfile = io.StringIO(b''.join(headers).decode('iso-8859-1'))
-        self.headers = email.parser.Parser(_class=self.MessageClass).parse(hfile)
+        self.headers = http.client.parse_headers(self.rfile,
+                                                 _class=self.MessageClass)
 
         conntype = self.headers.get('Connection', "")
         if conntype.lower() == 'close':
@@ -524,7 +513,6 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
     protocol_version = "HTTP/1.0"
 
     # MessageClass used to parse headers
-    import http.client
     MessageClass = http.client.HTTPMessage
 
     # Table mapping response codes to messages; entries have the
@@ -1094,10 +1082,12 @@ def test(HandlerClass = BaseHTTPRequestHandler,
 
     sa = httpd.socket.getsockname()
     print("Serving HTTP on", sa[0], "port", sa[1], "...")
-    httpd.serve_forever()
-
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nKeyboard interrupt received, exiting.")
+        httpd.server_close()
+        sys.exit(0)
 
 if __name__ == '__main__':
-    test(HandlerClass=BaseHTTPRequestHandler)
     test(HandlerClass=SimpleHTTPRequestHandler)
-    test(HandlerClass=CGIHTTPRequestHandler)

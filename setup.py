@@ -112,50 +112,35 @@ class PyBuildExt(build_ext):
         self.extensions = extensions
 
         # Fix up the autodetected modules, prefixing all the source files
-        # with Modules/ and adding Python's include directory to the path.
-        (srcdir,) = sysconfig.get_config_vars('srcdir')
+        # with Modules/.
+        srcdir = sysconfig.get_config_var('srcdir')
         if not srcdir:
             # Maybe running on Windows but not using CYGWIN?
             raise ValueError("No source directory; cannot proceed.")
-
-        # Figure out the location of the source code for extension modules
-        # (This logic is copied in distutils.test.test_sysconfig,
-        # so building in a separate directory does not break test_distutils.)
-        moddir = os.path.join(os.getcwd(), srcdir, 'Modules')
-        moddir = os.path.normpath(moddir)
-        srcdir, tail = os.path.split(moddir)
-        srcdir = os.path.normpath(srcdir)
-        moddir = os.path.normpath(moddir)
-
-        moddirlist = [moddir]
-        incdirlist = ['./Include', './Stackless']
+        srcdir = os.path.abspath(srcdir)
+        moddirlist = [os.path.join(srcdir, 'Modules')]
 
         # Platform-dependent module source and include directories
         platform = self.get_platform()
-
-        alldirlist = moddirlist + incdirlist
 
         # Fix up the paths for scripts, too
         self.distribution.scripts = [os.path.join(srcdir, filename)
                                      for filename in self.distribution.scripts]
 
         # Python header files
-        headers = glob("Include/*.h") + ["pyconfig.h"]
+        headers = [sysconfig.get_config_h_filename()]
+        headers += glob(os.path.join(sysconfig.get_python_inc(), "*.h"))
 
         for ext in self.extensions[:]:
             ext.sources = [ find_module_file(filename, moddirlist)
                             for filename in ext.sources ]
             if ext.depends is not None:
-                ext.depends = [find_module_file(filename, alldirlist)
+                ext.depends = [find_module_file(filename, moddirlist)
                                for filename in ext.depends]
             else:
                 ext.depends = []
             # re-compile extensions if a header file has been changed
             ext.depends.extend(headers)
-
-            ext.include_dirs.append( '.' ) # to get config.h
-            for incdir in incdirlist:
-                ext.include_dirs.append( os.path.join(srcdir, incdir) )
 
             # If a module has already been built statically,
             # don't build it here
@@ -208,7 +193,8 @@ class PyBuildExt(build_ext):
 
         if missing:
             print()
-            print("Failed to find the necessary bits to build these modules:")
+            print("Python build finished, but the necessary bits to build "
+                   "these modules were not found:")
             print_three_column(missing)
             print("To find the necessary bits, look in setup.py in"
                   " detect_modules() for the module's name.")
@@ -367,7 +353,7 @@ class PyBuildExt(build_ext):
         config_h_vars = sysconfig.parse_config_h(open(config_h))
 
         platform = self.get_platform()
-        (srcdir,) = sysconfig.get_config_vars('srcdir')
+        srcdir = sysconfig.get_config_var('srcdir')
 
         # Check for AtheOS which has libraries in non-standard locations
         if platform == 'atheos':
@@ -447,7 +433,8 @@ class PyBuildExt(build_ext):
         # _json speedups
         exts.append( Extension("_json", ["_json.c"]) )
         # Python C API test module
-        exts.append( Extension('_testcapi', ['_testcapimodule.c']) )
+        exts.append( Extension('_testcapi', ['_testcapimodule.c'],
+                               depends=['testcapi_long.h']) )
         # profiler (_lsprof is for cProfile.py)
         exts.append( Extension('_lsprof', ['_lsprof.c', 'rotatingtree.c']) )
         # static Unicode character database
@@ -783,11 +770,20 @@ class PyBuildExt(build_ext):
                 exts.append( Extension('_dbm', ['_dbmmodule.c'],
                                        define_macros=[('HAVE_NDBM_H',None)],
                                        libraries = ndbm_libs ) )
-            elif (self.compiler.find_library_file(lib_dirs, 'gdbm')
-                  and find_file("gdbm/ndbm.h", inc_dirs, []) is not None):
-                exts.append( Extension('_dbm', ['_dbmmodule.c'],
-                                       define_macros=[('HAVE_GDBM_NDBM_H',None)],
-                                       libraries = ['gdbm'] ) )
+            elif self.compiler.find_library_file(lib_dirs, 'gdbm'):
+                gdbm_libs = ['gdbm']
+                if self.compiler.find_library_file(lib_dirs, 'gdbm_compat'):
+                    gdbm_libs.append('gdbm_compat')
+                if find_file("gdbm/ndbm.h", inc_dirs, []) is not None:
+                    exts.append( Extension(
+                        '_dbm', ['_dbmmodule.c'],
+                        define_macros=[('HAVE_GDBM_NDBM_H',None)],
+                        libraries = gdbm_libs ) )
+                elif find_file("gdbm-ndbm.h", inc_dirs, []) is not None:
+                    exts.append( Extension(
+                        '_dbm', ['_dbmmodule.c'],
+                        define_macros=[('HAVE_GDBM_DASH_NDBM_H',None)],
+                        libraries = gdbm_libs ) )
             elif db_incs is not None:
                 exts.append( Extension('_dbm', ['_dbmmodule.c'],
                                        library_dirs=dblib_dir,
@@ -986,8 +982,6 @@ class PyBuildExt(build_ext):
         # Thomas Heller's _ctypes module
         self.detect_ctypes(inc_dirs, lib_dirs)
 
-        # _fileio -- supposedly cross platform
-        exts.append(Extension('_fileio', ['_fileio.c']))
         # Richard Oudkerk's multiprocessing module
         if platform == 'win32':             # Windows
             macros = dict()
@@ -1029,6 +1023,15 @@ class PyBuildExt(build_ext):
                 )
             libraries = []
 
+        elif platform.startswith('netbsd'):
+            macros = dict(                  # at least NetBSD 5
+                HAVE_SEM_OPEN=1,
+                HAVE_SEM_TIMEDWAIT=0,
+                HAVE_FD_TRANSFER=1,
+                HAVE_BROKEN_SEM_GETVALUE=1
+                )
+            libraries = []
+
         else:                                   # Linux and other unices
             macros = dict(
                 HAVE_SEM_OPEN=1,
@@ -1053,9 +1056,12 @@ class PyBuildExt(build_ext):
             if macros.get('HAVE_SEM_OPEN', False):
                 multiprocessing_srcs.append('_multiprocessing/semaphore.c')
 
-        exts.append ( Extension('_multiprocessing', multiprocessing_srcs,
-                                 define_macros=list(macros.items()),
-                                 include_dirs=["Modules/_multiprocessing"]))
+        if sysconfig.get_config_var('WITH_THREAD'):
+            exts.append ( Extension('_multiprocessing', multiprocessing_srcs,
+                                    define_macros=list(macros.items()),
+                                    include_dirs=["Modules/_multiprocessing"]))
+        else:
+            missing.append('_multiprocessing')
         # End multiprocessing
 
         # Platform-specific libraries
@@ -1086,8 +1092,8 @@ class PyBuildExt(build_ext):
         # different the UNIX search logic is not sharable.
         from os.path import join, exists
         framework_dirs = [
-            '/System/Library/Frameworks/',
             '/Library/Frameworks',
+            '/System/Library/Frameworks/',
             join(os.getenv('HOME'), '/Library/Frameworks')
         ]
 
@@ -1272,7 +1278,7 @@ class PyBuildExt(build_ext):
     def configure_ctypes_darwin(self, ext):
         # Darwin (OS X) uses preconfigured files, in
         # the Modules/_ctypes/libffi_osx directory.
-        (srcdir,) = sysconfig.get_config_vars('srcdir')
+        srcdir = sysconfig.get_config_var('srcdir')
         ffi_srcdir = os.path.abspath(os.path.join(srcdir, 'Modules',
                                                   '_ctypes', 'libffi_osx'))
         sources = [os.path.join(ffi_srcdir, p)
@@ -1301,7 +1307,7 @@ class PyBuildExt(build_ext):
             if sys.platform == 'darwin':
                 return self.configure_ctypes_darwin(ext)
 
-            (srcdir,) = sysconfig.get_config_vars('srcdir')
+            srcdir = sysconfig.get_config_var('srcdir')
             ffi_builddir = os.path.join(self.build_temp, 'libffi')
             ffi_srcdir = os.path.abspath(os.path.join(srcdir, 'Modules',
                                          '_ctypes', 'libffi'))

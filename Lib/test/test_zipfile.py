@@ -9,9 +9,10 @@ from tempfile import TemporaryFile
 from random import randint, random
 
 import test.support as support
-from test.support import TESTFN, run_unittest
+from test.support import TESTFN, run_unittest, findfile
 
 TESTFN2 = TESTFN + "2"
+TESTFNDIR = TESTFN + "d"
 FIXEDTEST_SIZE = 1000
 
 SMALL_TEST_DATA = [('_ziptest1', '1q2w3e4r5t'),
@@ -621,20 +622,49 @@ class OtherTests(unittest.TestCase):
     def testIsZipErroneousFile(self):
         # This test checks that the is_zipfile function correctly identifies
         # a file that is not a zip file
-        fp = open(TESTFN, "w")
-        fp.write("this is not a legal zip file\n")
-        fp.close()
+
+        # - passing a filename
+        with open(TESTFN, "w") as fp:
+            fp.write("this is not a legal zip file\n")
         chk = zipfile.is_zipfile(TESTFN)
-        self.assert_(chk is False)
+        self.assert_(not chk)
+        # - passing a file object
+        with open(TESTFN, "rb") as fp:
+            chk = zipfile.is_zipfile(fp)
+            self.assert_(not chk)
+        # - passing a file-like object
+        fp = io.BytesIO()
+        fp.write(b"this is not a legal zip file\n")
+        chk = zipfile.is_zipfile(fp)
+        self.assert_(not chk)
+        fp.seek(0,0)
+        chk = zipfile.is_zipfile(fp)
+        self.assert_(not chk)
 
     def testIsZipValidFile(self):
         # This test checks that the is_zipfile function correctly identifies
         # a file that is a zip file
+
+        # - passing a filename
         zipf = zipfile.ZipFile(TESTFN, mode="w")
         zipf.writestr("foo.txt", b"O, for a Muse of Fire!")
         zipf.close()
         chk = zipfile.is_zipfile(TESTFN)
-        self.assert_(chk is True)
+        self.assert_(chk)
+        # - passing a file object
+        with open(TESTFN, "rb") as fp:
+            chk = zipfile.is_zipfile(fp)
+            self.assert_(chk)
+            fp.seek(0,0)
+            zip_contents = fp.read()
+        # - passing a file-like object
+        fp = io.BytesIO()
+        fp.write(zip_contents)
+        chk = zipfile.is_zipfile(fp)
+        self.assert_(chk)
+        fp.seek(0,0)
+        chk = zipfile.is_zipfile(fp)
+        self.assert_(chk)
 
     def testNonExistentFileRaisesIOError(self):
         # make sure we don't raise an AttributeError when a partially-constructed
@@ -971,6 +1001,28 @@ class TestsWithMultipleOpens(unittest.TestCase):
     def tearDown(self):
         os.remove(TESTFN2)
 
+class TestWithDirectory(unittest.TestCase):
+    def setUp(self):
+        os.mkdir(TESTFN2)
+
+    def testExtractDir(self):
+        zipf = zipfile.ZipFile(findfile("zipdir.zip"))
+        zipf.extractall(TESTFN2)
+        self.assertTrue(os.path.isdir(os.path.join(TESTFN2, "a")))
+        self.assertTrue(os.path.isdir(os.path.join(TESTFN2, "a", "b")))
+        self.assertTrue(os.path.exists(os.path.join(TESTFN2, "a", "b", "c")))
+
+    def testStoreDir(self):
+        os.mkdir(os.path.join(TESTFN2, "x"))
+        zipf = zipfile.ZipFile(TESTFN, "w")
+        zipf.write(os.path.join(TESTFN2, "x"), "x")
+        self.assertTrue(zipf.filelist[0].filename.endswith("x/"))
+
+    def tearDown(self):
+        shutil.rmtree(TESTFN2)
+        if os.path.exists(TESTFN):
+            os.remove(TESTFN)
+
 
 class UniversalNewlineTests(unittest.TestCase):
     def setUp(self):
@@ -1085,6 +1137,7 @@ class UniversalNewlineTests(unittest.TestCase):
 def test_main():
     run_unittest(TestsWithSourceFile, TestZip64InSmallFiles, OtherTests,
                  PyZipFileTests, DecryptionTests, TestsWithMultipleOpens,
+                 TestWithDirectory,
                  UniversalNewlineTests, TestsWithRandomBinaryFiles)
 
 if __name__ == "__main__":

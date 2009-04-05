@@ -169,7 +169,7 @@ typedef struct {
 
 
 static void parser_free(PyST_Object *st);
-static int parser_compare(PyST_Object *left, PyST_Object *right);
+static PyObject* parser_richcompare(PyObject *left, PyObject *right, int op);
 static PyObject* parser_compilest(PyST_Object *, PyObject *, PyObject *);
 static PyObject* parser_isexpr(PyST_Object *, PyObject *, PyObject *);
 static PyObject* parser_issuite(PyST_Object *, PyObject *, PyObject *);
@@ -203,7 +203,7 @@ PyTypeObject PyST_Type = {
     0,                                  /* tp_print             */
     0,                                  /* tp_getattr           */
     0,                                  /* tp_setattr           */
-    (cmpfunc)parser_compare,            /* tp_compare           */
+    0,                                  /* tp_reserved          */
     0,                                  /* tp_repr              */
     0,                                  /* tp_as_number         */
     0,                                  /* tp_as_sequence       */
@@ -223,13 +223,16 @@ PyTypeObject PyST_Type = {
     "Intermediate representation of a Python parse tree.",
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
-    0,                                  /* tp_richcompare */
+    parser_richcompare,                 /* tp_richcompare */
     0,                                  /* tp_weaklistoffset */
     0,                                  /* tp_iter */
     0,                                  /* tp_iternext */
     parser_methods,                     /* tp_methods */
 };  /* PyST_Type */
 
+
+/* PyST_Type isn't subclassable, so just check ob_type */
+#define PyST_Object_Check(v) ((v)->ob_type == &PyST_Type)
 
 static int
 parser_compare_nodes(node *left, node *right)
@@ -260,26 +263,69 @@ parser_compare_nodes(node *left, node *right)
     return (0);
 }
 
-
-/*  int parser_compare(PyST_Object* left, PyST_Object* right)
+/*  parser_richcompare(PyObject* left, PyObject* right, int op)
  *
  *  Comparison function used by the Python operators ==, !=, <, >, <=, >=
  *  This really just wraps a call to parser_compare_nodes() with some easy
  *  checks and protection code.
  *
  */
-static int
-parser_compare(PyST_Object *left, PyST_Object *right)
+
+#define TEST_COND(cond) ((cond) ? Py_True : Py_False)
+
+static PyObject *
+parser_richcompare(PyObject *left, PyObject *right, int op)
 {
+    int result;
+    PyObject *v;
+
+    /* neither argument should be NULL, unless something's gone wrong */
+    if (left == NULL || right == NULL) {
+        PyErr_BadInternalCall();
+        return NULL;
+    }
+
+    /* both arguments should be instances of PyST_Object */
+    if (!PyST_Object_Check(left) || !PyST_Object_Check(right)) {
+        v = Py_NotImplemented;
+        goto finished;
+    }
+
     if (left == right)
-        return (0);
+        /* if arguments are identical, they're equal */
+        result = 0;
+    else
+        result = parser_compare_nodes(((PyST_Object *)left)->st_node,
+                                      ((PyST_Object *)right)->st_node);
 
-    if ((left == 0) || (right == 0))
-        return (-1);
-
-    return (parser_compare_nodes(left->st_node, right->st_node));
+    /* Convert return value to a Boolean */
+    switch (op) {
+    case Py_EQ:
+        v = TEST_COND(result == 0);
+        break;
+    case Py_NE:
+        v = TEST_COND(result != 0);
+        break;
+    case Py_LE:
+        v = TEST_COND(result <= 0);
+        break;
+    case Py_GE:
+        v = TEST_COND(result >= 0);
+        break;
+    case Py_LT:
+        v = TEST_COND(result < 0);
+        break;
+    case Py_GT:
+        v = TEST_COND(result > 0);
+        break;
+    default:
+        PyErr_BadArgument();
+        return NULL;
+    }
+  finished:
+    Py_INCREF(v);
+    return v;
 }
-
 
 /*  parser_newstobject(node* st)
  *
@@ -1862,6 +1908,7 @@ validate_for(node *tree)
 
 /*  try_stmt:
  *      'try' ':' suite (except_clause ':' suite)+ ['else' ':' suite]
+                                                   ['finally' ':' suite]
  *    | 'try' ':' suite 'finally' ':' suite
  *
  */
@@ -1887,35 +1934,34 @@ validate_try(node *tree)
         PyErr_Format(parser_error,
                      "Illegal number of children for try/%s node.", name);
     }
-    /*  Skip past except_clause sections:  */
+    /* Handle try/finally statement */
+    if (res && (TYPE(CHILD(tree, pos)) == NAME) &&
+        (strcmp(STR(CHILD(tree, pos)), "finally") == 0)) {
+        res = (validate_numnodes(tree, 6, "try/finally")
+               && validate_colon(CHILD(tree, 4))
+               && validate_suite(CHILD(tree, 5)));
+        return (res);
+    }
+    /* try/except statement: skip past except_clause sections */
     while (res && (TYPE(CHILD(tree, pos)) == except_clause)) {
         res = (validate_except_clause(CHILD(tree, pos))
                && validate_colon(CHILD(tree, pos + 1))
                && validate_suite(CHILD(tree, pos + 2)));
         pos += 3;
     }
-    if (res && (pos < nch)) {
-        res = validate_ntype(CHILD(tree, pos), NAME);
-        if (res && (strcmp(STR(CHILD(tree, pos)), "finally") == 0))
-            res = (validate_numnodes(tree, 6, "try/finally")
-                   && validate_colon(CHILD(tree, 4))
-                   && validate_suite(CHILD(tree, 5)));
-        else if (res) {
-            if (nch == (pos + 3)) {
-                res = ((strcmp(STR(CHILD(tree, pos)), "except") == 0)
-                       || (strcmp(STR(CHILD(tree, pos)), "else") == 0));
-                if (!res)
-                    err_string("illegal trailing triple in try statement");
-            }
-            else if (nch == (pos + 6)) {
-                res = (validate_name(CHILD(tree, pos), "except")
-                       && validate_colon(CHILD(tree, pos + 1))
-                       && validate_suite(CHILD(tree, pos + 2))
-                       && validate_name(CHILD(tree, pos + 3), "else"));
-            }
-            else
-                res = validate_numnodes(tree, pos + 3, "try/except");
-        }
+    /* skip else clause */
+    if (res && (TYPE(CHILD(tree, pos)) == NAME) &&
+        (strcmp(STR(CHILD(tree, pos)), "else") == 0)) {
+        res = (validate_colon(CHILD(tree, pos + 1))
+               && validate_suite(CHILD(tree, pos + 2)));
+        pos += 3;
+    }
+    if (res && pos < nch) {
+        /* last clause must be a finally */
+        res = (validate_name(CHILD(tree, pos), "finally")
+               && validate_numnodes(tree, pos + 3, "try/except/finally")
+               && validate_colon(CHILD(tree, pos + 1))
+               && validate_suite(CHILD(tree, pos + 2)));
     }
     return (res);
 }

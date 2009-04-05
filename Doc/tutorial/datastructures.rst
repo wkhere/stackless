@@ -159,7 +159,7 @@ List Comprehensions
 
 List comprehensions provide a concise way to create lists from sequences.
 Common applications are to make lists where each element is the result of
-some operations applied to each member of the sequence, or to create a 
+some operations applied to each member of the sequence, or to create a
 subsequence of those elements that satisfy a certain condition.
 
 
@@ -167,7 +167,7 @@ Each list comprehension consists of an expression followed by a :keyword:`for`
 clause, then zero or more :keyword:`for` or :keyword:`if` clauses.  The result
 will be a list resulting from evaluating the expression in the context of the
 :keyword:`for` and :keyword:`if` clauses which follow it.  If the expression
-would evaluate to a tuple, it must be parenthesized. 
+would evaluate to a tuple, it must be parenthesized.
 
 Here we take a list of numbers and return a list of three times each number::
 
@@ -195,7 +195,7 @@ Using the :keyword:`if` clause we can filter the stream::
 
 Tuples can often be created without their parentheses, but not here::
 
-   >>> [x, x**2 for x in vec]	# error - parens required for tuples
+   >>> [x, x**2 for x in vec]  # error - parens required for tuples
      File "<stdin>", line 1, in ?
        [x, x**2 for x in vec]
                   ^
@@ -227,7 +227,7 @@ If you've got the stomach for it, list comprehensions can be nested. They are a
 powerful tool but -- like all powerful tools -- they need to be used carefully,
 if at all.
 
-Consider the following example of a 3x3 matrix held as a list containing three 
+Consider the following example of a 3x3 matrix held as a list containing three
 lists, one list per row::
 
     >>> mat = [
@@ -236,7 +236,7 @@ lists, one list per row::
     ...        [7, 8, 9],
     ...       ]
 
-Now, if you wanted to swap rows and columns, you could use a list 
+Now, if you wanted to swap rows and columns, you could use a list
 comprehension::
 
     >>> print([[row[i] for row in mat] for i in [0, 1, 2]])
@@ -254,7 +254,7 @@ A more verbose version of this snippet shows the flow explicitly::
             print(row[i], end="")
         print()
 
-In real world, you should prefer builtin functions to complex flow statements. 
+In real world, you should prefer built-in functions to complex flow statements.
 The :func:`zip` function would do a great job for this use case::
 
     >>> list(zip(*mat))
@@ -376,7 +376,7 @@ Here is a brief demonstration::
 
    >>> basket = {'apple', 'orange', 'apple', 'pear', 'orange', 'banana'}
    >>> print(basket)
-   {'orange', 'bananna', 'pear', 'apple'}
+   {'orange', 'banana', 'pear', 'apple'}
    >>> fruit = ['apple', 'orange', 'apple', 'pear', 'orange', 'banana']
    >>> fruit = set(basket)               # create a set without duplicates
    >>> fruit
@@ -440,9 +440,9 @@ pair with ``del``. If you store using a key that is already in use, the old
 value associated with that key is forgotten.  It is an error to extract a value
 using a non-existent key.
 
-The :meth:`keys` method of a dictionary object returns a list of all the keys
+Performing ``list(d.keys())`` on a dictionary returns a list of all the keys
 used in the dictionary, in arbitrary order (if you want it sorted, just apply
-the :meth:`sort` method to the list of keys).  To check whether a single key is
+the :meth:`sorted` function instead).  To check whether a single key is
 in the dictionary, use the :keyword:`in` keyword.
 
 Here is a small example using a dictionary::
@@ -458,6 +458,8 @@ Here is a small example using a dictionary::
    >>> tel
    {'guido': 4127, 'irv': 4127, 'jack': 4098}
    >>> list(tel.keys())
+   ['irv', 'guido', 'jack']
+   >>> sorted(tel.keys())
    ['guido', 'irv', 'jack']
    >>> 'guido' in tel
    True
@@ -517,7 +519,7 @@ with the :func:`zip` function. ::
    >>> answers = ['lancelot', 'the holy grail', 'blue']
    >>> for q, a in zip(questions, answers):
    ...     print('What is your {0}?  It is {1}.'.format(q, a))
-   ...	
+   ...
    What is your name?  It is lancelot.
    What is your quest?  It is the holy grail.
    What is your favorite color?  It is blue.
@@ -540,7 +542,7 @@ returns a new sorted list while leaving the source unaltered. ::
    >>> basket = ['apple', 'orange', 'apple', 'pear', 'orange', 'banana']
    >>> for f in sorted(set(basket)):
    ...     print(f)
-   ... 	
+   ...
    apple
    banana
    orange

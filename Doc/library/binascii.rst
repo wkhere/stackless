@@ -49,14 +49,14 @@ The :mod:`binascii` module defines the following functions:
    should be at most 57 to adhere to the base64 standard.
 
 
-.. function:: a2b_qp(string[, header])
+.. function:: a2b_qp(string, header=False)
 
    Convert a block of quoted-printable data back to binary and return the binary
    data. More than one line may be passed at a time. If the optional argument
    *header* is present and true, underscores will be decoded as spaces.
 
 
-.. function:: b2a_qp(data[, quotetabs, istext, header])
+.. function:: b2a_qp(data, quotetabs=False, istext=True, header=False)
 
    Convert binary data to a line(s) of ASCII characters in quoted-printable
    encoding.  The return value is the converted line(s). If the optional argument
@@ -113,8 +113,19 @@ The :mod:`binascii` module defines the following functions:
       print(binascii.crc32("hello world"))
       # Or, in two pieces:
       crc = binascii.crc32("hello")
-      crc = binascii.crc32(" world", crc)
-      print(crc)
+      crc = binascii.crc32(" world", crc) & 0xffffffff
+      print('crc32 = 0x%08x' % crc)
+
+.. note::
+   To generate the same numeric value across all Python versions and
+   platforms use crc32(data) & 0xffffffff.  If you are only using
+   the checksum in packed binary format this is not necessary as the
+   return value is the correct 32bit binary representation
+   regardless of sign.
+
+.. versionchanged:: 3.0
+   The return value is unsigned and in the range [0, 2**32-1]
+   regardless of platform.
 
 
 .. function:: b2a_hex(data)

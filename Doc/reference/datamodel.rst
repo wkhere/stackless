@@ -317,7 +317,7 @@ Sequences
       slicing notations can be used as the target of assignment and :keyword:`del`
       (delete) statements.
 
-      There is currently a single intrinsic mutable sequence type:
+      There are currently two intrinsic mutable sequence types:
 
       Lists
          .. index:: object: list
@@ -1009,8 +1009,9 @@ of this is the :class:`NodeList` interface in the W3C's Document Object Model.)
 Basic customization
 -------------------
 
-
 .. method:: object.__new__(cls[, ...])
+
+   .. index:: pair: subclassing; immutable types
 
    Called to create a new instance of class *cls*.  :meth:`__new__` is a static
    method (special-cased so you need not declare it as such) that takes the class
@@ -1095,7 +1096,9 @@ Basic customization
       is printed to ``sys.stderr`` instead.  Also, when :meth:`__del__` is invoked in
       response to a module being deleted (e.g., when execution of the program is
       done), other globals referenced by the :meth:`__del__` method may already have
-      been deleted.  For this reason, :meth:`__del__` methods should do the absolute
+      been deleted or in the process of being torn down (e.g. the import
+      machinery shutting down).  For this reason, :meth:`__del__` methods
+      should do the absolute
       minimum needed to maintain external invariants.  Starting with version 1.5,
       Python guarantees that globals whose name begins with a single underscore are
       deleted from their module before other globals are deleted; if no other
@@ -1151,12 +1154,13 @@ Basic customization
    implementing :meth:`__format__`, however most classes will either
    delegate formatting to one of the built-in types, or use a similar
    formatting option syntax.
-   
+
    See :ref:`formatspec` for a description of the standard formatting syntax.
 
    The return value must be a string object.
 
 
+.. _richcmpfuncs:
 .. method:: object.__lt__(self, other)
             object.__le__(self, other)
             object.__eq__(self, other)
@@ -1195,6 +1199,9 @@ Basic customization
 
    Arguments to rich comparison methods are never coerced.
 
+   To automatically generate ordering operations from a single root operation,
+   see the `Total Ordering recipe in the ASPN cookbook
+   <http://code.activestate.com/recipes/576529/>`_\.
 
 .. method:: object.__hash__(self)
 
@@ -1234,7 +1241,7 @@ Basic customization
    ``isinstance(obj, collections.Hashable)`` (unlike classes which define their
    own :meth:`__hash__` to explicitly raise :exc:`TypeError`).
 
-   If a class that overrrides :meth:`__eq__` needs to retain the implementation
+   If a class that overrides :meth:`__eq__` needs to retain the implementation
    of :meth:`__hash__` from a parent class, the interpreter must be told this
    explicitly by setting ``__hash__ = <ParentClass>.__hash__``. Otherwise the
    inheritance of :meth:`__hash__` will be blocked, just as if :attr:`__hash__`
@@ -1245,11 +1252,12 @@ Basic customization
 
    .. index:: single: __len__() (mapping object method)
 
-   Called to implement truth value testing, and the built-in operation ``bool()``;
-   should return ``False`` or ``True``. When this method is not defined,
-   :meth:`__len__` is called, if it is defined (see below) and ``True`` is returned
-   when the length is not zero.  If a class defines neither :meth:`__len__` nor
-   :meth:`__bool__`, all its instances are considered true.
+   Called to implement truth value testing and the built-in operation
+   ``bool()``; should return ``False`` or ``True``, or their integer equivalents
+   ``0`` or ``1``.  When this method is not defined, :meth:`__len__` is called,
+   if it is defined, and the object is considered true if its result is nonzero.
+   If a class defines neither :meth:`__len__` nor :meth:`__bool__`, all its
+   instances are considered true.
 
 
 .. _attribute-access:
@@ -1776,13 +1784,13 @@ left undefined.
             object.__ixor__(self, other)
             object.__ior__(self, other)
 
-   These methods are called to implement the augmented arithmetic operations
+   These methods are called to implement the augmented arithmetic assignments
    (``+=``, ``-=``, ``*=``, ``/=``, ``//=``, ``%=``, ``**=``, ``<<=``, ``>>=``,
    ``&=``, ``^=``, ``|=``).  These methods should attempt to do the operation
    in-place (modifying *self*) and return the result (which could be, but does
    not have to be, *self*).  If a specific method is not defined, the augmented
-   operation falls back to the normal methods.  For instance, to evaluate the
-   expression ``x += y``, where *x* is an instance of a class that has an
+   assignment falls back to the normal methods.  For instance, to execute the
+   statement ``x += y``, where *x* is an instance of a class that has an
    :meth:`__iadd__` method, ``x.__iadd__(y)`` is called.  If *x* is an instance
    of a class that does not define a :meth:`__iadd__` method, ``x.__add__(y)``
    and ``y.__radd__(x)`` are considered, as with the evaluation of ``x + y``.
@@ -1915,7 +1923,7 @@ the instance when looking up special methods::
    True
 
 In addition to bypassing any instance attributes in the interest of
-correctness, implicit special method lookup may also bypass the
+correctness, implicit special method lookup generally also bypasses the
 :meth:`__getattribute__` method even of the object's metaclass::
 
    >>> class Meta(type):

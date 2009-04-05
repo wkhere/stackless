@@ -178,10 +178,10 @@ The module :mod:`socket` exports the following constants and functions:
 
 .. data:: SIO_*
           RCVALL_*
-          
+
    Constants for Windows' WSAIoctl(). The constants are used as arguments to the
    :meth:`ioctl` method of socket objects.
-   
+
 
 .. data:: TIPC_*
 
@@ -210,7 +210,7 @@ The module :mod:`socket` exports the following constants and functions:
    all the necessary arguments for creating the corresponding socket. *host* is a domain
    name, a string representation of an IPv4/v6 address or ``None``. *port* is a string
    service name such as ``'http'``, a numeric port number or ``None``.
-   The rest of the arguments are optional and must be numeric if specified.  
+   The rest of the arguments are optional and must be numeric if specified.
    By passing ``None`` as the value of *host* and *port*, , you can pass ``NULL`` to the C API.
 
    The :func:`getaddrinfo` function returns a list of 5-tuples with the following
@@ -544,14 +544,14 @@ correspond to Unix system calls applicable to sockets.
    contents of the buffer (see the optional built-in module :mod:`struct` for a way
    to decode C structures encoded as byte strings).
 
-   
+
 .. method:: socket.ioctl(control, option)
 
-   :platform: Windows 
-   
+   :platform: Windows
+
    The :meth:`ioctl` method is a limited interface to the WSAIoctl system
    interface. Please refer to the MSDN documentation for more information.
-   
+
 
 .. method:: socket.listen(backlog)
 
@@ -673,12 +673,13 @@ correspond to Unix system calls applicable to sockets.
 
 Some notes on socket blocking and timeouts: A socket object can be in one of
 three modes: blocking, non-blocking, or timeout.  Sockets are always created in
-blocking mode.  In blocking mode, operations block until complete.  In
+blocking mode.  In blocking mode, operations block until complete or
+the system returns an error (such as connection timed out).  In
 non-blocking mode, operations fail (with an error that is unfortunately
 system-dependent) if they cannot be completed immediately.  In timeout mode,
 operations fail if they cannot be completed within the timeout specified for the
-socket.  The :meth:`setblocking` method is simply a shorthand for certain
-:meth:`settimeout` calls.
+socket or if the system returns an error.  The :meth:`setblocking` method is simply
+a shorthand for certain :meth:`settimeout` calls.
 
 Timeout mode internally sets the socket in non-blocking mode.  The blocking and
 timeout modes are shared between file descriptors and socket objects that refer
@@ -689,7 +690,9 @@ completed immediately will fail.
 
 Note that the :meth:`connect` operation is subject to the timeout setting, and
 in general it is recommended to call :meth:`settimeout` before calling
-:meth:`connect`.
+:meth:`connect` or pass a timeout parameter to :meth:`create_connection`.
+The system network stack may return a connection timeout error
+of its own regardless of any python socket timeout setting.
 
 
 .. method:: socket.setsockopt(level, optname, value)
@@ -797,17 +800,17 @@ sends traffic to the first one connected successfully. ::
                                  socket.SOCK_STREAM, 0, socket.AI_PASSIVE):
        af, socktype, proto, canonname, sa = res
        try:
-   	s = socket.socket(af, socktype, proto)
+           s = socket.socket(af, socktype, proto)
        except socket.error as msg:
-   	s = None
-   	continue
+           s = None
+           continue
        try:
-   	s.bind(sa)
-   	s.listen(1)
+           s.bind(sa)
+           s.listen(1)
        except socket.error as msg:
-   	s.close()
-   	s = None
-   	continue
+           s.close()
+           s = None
+           continue
        break
    if s is None:
        print('could not open socket')
@@ -832,16 +835,16 @@ sends traffic to the first one connected successfully. ::
    for res in socket.getaddrinfo(HOST, PORT, socket.AF_UNSPEC, socket.SOCK_STREAM):
        af, socktype, proto, canonname, sa = res
        try:
-   	s = socket.socket(af, socktype, proto)
+           s = socket.socket(af, socktype, proto)
        except socket.error as msg:
-   	s = None
-   	continue
+           s = None
+           continue
        try:
-   	s.connect(sa)
+           s.connect(sa)
        except socket.error as msg:
-   	s.close()
-   	s = None
-   	continue
+           s.close()
+           s = None
+           continue
        break
    if s is None:
        print('could not open socket')
@@ -851,7 +854,7 @@ sends traffic to the first one connected successfully. ::
    s.close()
    print('Received', repr(data))
 
-   
+
 The last example shows how to write a very simple network sniffer with raw
 sockets on Windows. The example requires administrator privileges to modify
 the interface::
@@ -860,19 +863,19 @@ the interface::
 
    # the public network interface
    HOST = socket.gethostbyname(socket.gethostname())
-   
+
    # create a raw socket and bind it to the public interface
    s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
    s.bind((HOST, 0))
-   
+
    # Include IP headers
    s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
-   
+
    # receive all packages
    s.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
-   
+
    # receive a package
    print(s.recvfrom(65565))
-   
+
    # disabled promiscuous mode
    s.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)

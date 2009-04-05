@@ -452,8 +452,8 @@ fp_setreadl(struct tok_state *tok, const char* enc)
 		stream = PyObject_CallMethod(io, "open", "ssis",
 					     tok->filename, "r", -1, enc);
 	else
-		stream = PyObject_CallMethod(io, "open", "isis",
-				fileno(tok->fp), "r", -1, enc);
+		stream = PyObject_CallMethod(io, "open", "isisOOO",
+				fileno(tok->fp), "r", -1, enc, Py_None, Py_None, Py_False);
 	if (stream == NULL)
 		goto cleanup;
 
@@ -709,6 +709,28 @@ PyTokenizer_FromString(const char *str)
 		PyTokenizer_Free(tok);
 		return NULL;
 	}
+
+	/* XXX: constify members. */
+	tok->buf = tok->cur = tok->end = tok->inp = (char*)str;
+	return tok;
+}
+
+struct tok_state *
+PyTokenizer_FromUTF8(const char *str)
+{
+	struct tok_state *tok = tok_new();
+	if (tok == NULL)
+		return NULL;
+	tok->decoding_state = STATE_RAW;
+	tok->read_coding_spec = 1;
+	tok->enc = NULL;
+	tok->str = str;
+	tok->encoding = (char *)PyMem_MALLOC(6);
+	if (!tok->encoding) {
+		PyTokenizer_Free(tok);
+		return NULL;
+	}
+	strcpy(tok->encoding, "utf-8");
 
 	/* XXX: constify members. */
 	tok->buf = tok->cur = tok->end = tok->inp = (char*)str;
@@ -1018,6 +1040,7 @@ PyToken_TwoChars(int c1, int c2)
 		break;
 	case '<':
 		switch (c2) {
+		case '>':	return NOTEQUAL;
 		case '=':	return LESSEQUAL;
 		case '<':	return LEFTSHIFT;
 		}

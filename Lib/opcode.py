@@ -57,8 +57,6 @@ def_op('UNARY_NOT', 12)
 
 def_op('UNARY_INVERT', 15)
 
-def_op('SET_ADD', 17)
-def_op('LIST_APPEND', 18)
 def_op('BINARY_POWER', 19)
 def_op('BINARY_MULTIPLY', 20)
 
@@ -133,9 +131,11 @@ name_op('IMPORT_NAME', 108)     # Index in name list
 name_op('IMPORT_FROM', 109)     # Index in name list
 
 jrel_op('JUMP_FORWARD', 110)    # Number of bytes to skip
-jrel_op('JUMP_IF_FALSE', 111)   # ""
-jrel_op('JUMP_IF_TRUE', 112)    # ""
-jabs_op('JUMP_ABSOLUTE', 113)   # Target byte offset from beginning of code
+jabs_op('JUMP_IF_FALSE_OR_POP', 111) # Target byte offset from beginning of code
+jabs_op('JUMP_IF_TRUE_OR_POP', 112)  # ""
+jabs_op('JUMP_ABSOLUTE', 113)        # ""
+jabs_op('POP_JUMP_IF_FALSE', 114)    # ""
+jabs_op('POP_JUMP_IF_TRUE', 115)     # ""
 
 name_op('LOAD_GLOBAL', 116)     # Index in name list
 
@@ -168,5 +168,10 @@ def_op('CALL_FUNCTION_KW', 141)      # #args + (#kwargs << 8)
 def_op('CALL_FUNCTION_VAR_KW', 142)  # #args + (#kwargs << 8)
 def_op('EXTENDED_ARG', 143)
 EXTENDED_ARG = 143
+
+def_op('LIST_APPEND', 145)
+def_op('SET_ADD', 146)
+def_op('MAP_ADD', 147)
+
 
 del def_op, name_op, jrel_op, jabs_op

@@ -46,11 +46,11 @@ DIR=`dirname $DIR`
 
 FAILURE_SUBJECT="Python Regression Test Failures"
 #FAILURE_MAILTO="YOUR_ACCOUNT@gmail.com"
-FAILURE_MAILTO="python-3000-checkins@python.org"
+FAILURE_MAILTO="python-checkins@python.org"
 #FAILURE_CC="optional--uncomment and set to desired address"
 
 REMOTE_SYSTEM="neal@dinsdale.python.org"
-REMOTE_DIR="/data/ftp.python.org/pub/docs.python.org/dev/3.0"
+REMOTE_DIR="/data/ftp.python.org/pub/docs.python.org/dev/py3k"
 RESULT_FILE="$DIR/build/index.html"
 INSTALL_DIR="/tmp/python-test-3.0/local"
 RSYNC_OPTS="-aC -e ssh"
@@ -264,7 +264,7 @@ if [ $conflict_count != 0 ]; then
     echo "Conflict detected in $CONFLICTED_FILE.  Doc build skipped." > ../build/$F
     err=1
 else
-    make update html >& ../build/$F
+    make checkout update html >& ../build/$F
     err=$?
 fi
 update_status "Making doc" "$F" $start

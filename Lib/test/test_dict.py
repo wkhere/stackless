@@ -2,6 +2,7 @@ import unittest
 from test import support
 
 import sys, collections, random, string
+import gc, weakref
 
 
 class DictTest(unittest.TestCase):
@@ -35,16 +36,16 @@ class DictTest(unittest.TestCase):
         k = d.keys()
         self.assert_('a' in d)
         self.assert_('b' in d)
-
         self.assertRaises(TypeError, d.keys, None)
+        self.assertEqual(repr(dict(a=1).keys()), "dict_keys(['a'])")
 
     def test_values(self):
         d = {}
         self.assertEqual(set(d.values()), set())
         d = {1:2}
         self.assertEqual(set(d.values()), {2})
-
         self.assertRaises(TypeError, d.values, None)
+        self.assertEqual(repr(dict(a=1).values()), "dict_values([1])")
 
     def test_items(self):
         d = {}
@@ -52,8 +53,8 @@ class DictTest(unittest.TestCase):
 
         d = {1:2}
         self.assertEqual(set(d.items()), {(1, 2)})
-
         self.assertRaises(TypeError, d.items, None)
+        self.assertEqual(repr(dict(a=1).items()), "dict_items([('a', 1)])")
 
     def test_contains(self):
         d = {}
@@ -569,7 +570,7 @@ class DictTest(unittest.TestCase):
             self.fail("missing KeyError")
 
     def test_bad_key(self):
-        # Dictionary lookups should fail if __cmp__() raises an exception.
+        # Dictionary lookups should fail if __eq__() raises an exception.
         class CustomException(Exception):
             pass
 
@@ -648,6 +649,119 @@ class DictTest(unittest.TestCase):
             pass
         d = {}
 
+    def test_container_iterator(self):
+        # Bug #3680: tp_traverse was not implemented for dictiter and
+        # dictview objects.
+        class C(object):
+            pass
+        views = (dict.items, dict.values, dict.keys)
+        for v in views:
+            obj = C()
+            ref = weakref.ref(obj)
+            container = {obj: 1}
+            obj.v = v(container)
+            obj.x = iter(obj.v)
+            del obj, container
+            gc.collect()
+            self.assert_(ref() is None, "Cycle was not collected")
+
+    def _not_tracked(self, t):
+        # Nested containers can take several collections to untrack
+        gc.collect()
+        gc.collect()
+        self.assertFalse(gc.is_tracked(t), t)
+
+    def _tracked(self, t):
+        self.assertTrue(gc.is_tracked(t), t)
+        gc.collect()
+        gc.collect()
+        self.assertTrue(gc.is_tracked(t), t)
+
+    def test_track_literals(self):
+        # Test GC-optimization of dict literals
+        x, y, z, w = 1.5, "a", (1, None), []
+
+        self._not_tracked({})
+        self._not_tracked({x:(), y:x, z:1})
+        self._not_tracked({1: "a", "b": 2})
+        self._not_tracked({1: 2, (None, True, False, ()): int})
+        self._not_tracked({1: object()})
+
+        # Dicts with mutable elements are always tracked, even if those
+        # elements are not tracked right now.
+        self._tracked({1: []})
+        self._tracked({1: ([],)})
+        self._tracked({1: {}})
+        self._tracked({1: set()})
+
+    def test_track_dynamic(self):
+        # Test GC-optimization of dynamically-created dicts
+        class MyObject(object):
+            pass
+        x, y, z, w, o = 1.5, "a", (1, object()), [], MyObject()
+
+        d = dict()
+        self._not_tracked(d)
+        d[1] = "a"
+        self._not_tracked(d)
+        d[y] = 2
+        self._not_tracked(d)
+        d[z] = 3
+        self._not_tracked(d)
+        self._not_tracked(d.copy())
+        d[4] = w
+        self._tracked(d)
+        self._tracked(d.copy())
+        d[4] = None
+        self._not_tracked(d)
+        self._not_tracked(d.copy())
+
+        # dd isn't tracked right now, but it may mutate and therefore d
+        # which contains it must be tracked.
+        d = dict()
+        dd = dict()
+        d[1] = dd
+        self._not_tracked(dd)
+        self._tracked(d)
+        dd[1] = d
+        self._tracked(dd)
+
+        d = dict.fromkeys([x, y, z])
+        self._not_tracked(d)
+        dd = dict()
+        dd.update(d)
+        self._not_tracked(dd)
+        d = dict.fromkeys([x, y, z, o])
+        self._tracked(d)
+        dd = dict()
+        dd.update(d)
+        self._tracked(dd)
+
+        d = dict(x=x, y=y, z=z)
+        self._not_tracked(d)
+        d = dict(x=x, y=y, z=z, w=w)
+        self._tracked(d)
+        d = dict()
+        d.update(x=x, y=y, z=z)
+        self._not_tracked(d)
+        d.update(w=w)
+        self._tracked(d)
+
+        d = dict([(x, y), (z, 1)])
+        self._not_tracked(d)
+        d = dict([(x, y), (z, w)])
+        self._tracked(d)
+        d = dict()
+        d.update([(x, y), (z, 1)])
+        self._not_tracked(d)
+        d.update([(x, y), (z, w)])
+        self._tracked(d)
+
+    def test_track_subtypes(self):
+        # Dict subtypes are always tracked
+        class MyDict(dict):
+            pass
+        self._tracked(MyDict())
 
 
 from test import mapping_tests

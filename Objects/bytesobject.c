@@ -5,6 +5,7 @@
 #include "Python.h"
 
 #include "bytes_methods.h"
+#include <stddef.h>
 
 static Py_ssize_t
 _getbuffer(PyObject *obj, Py_buffer *view)
@@ -25,11 +26,19 @@ _getbuffer(PyObject *obj, Py_buffer *view)
 }
 
 #ifdef COUNT_ALLOCS
-int null_strings, one_strings;
+Py_ssize_t null_strings, one_strings;
 #endif
 
 static PyBytesObject *characters[UCHAR_MAX + 1];
 static PyBytesObject *nullstring;
+
+/* PyBytesObject_SIZE gives the basic size of a string; any memory allocation
+   for a string of length n should request PyBytesObject_SIZE + n bytes.
+
+   Using PyBytesObject_SIZE instead of sizeof(PyBytesObject) saves
+   3 bytes per string allocation on a typical system.
+*/
+#define PyBytesObject_SIZE (offsetof(PyBytesObject, ob_sval) + 1)
 
 /*
    For both PyBytes_FromString() and PyBytes_FromStringAndSize(), the
@@ -83,14 +92,14 @@ PyBytes_FromStringAndSize(const char *str, Py_ssize_t size)
 		return (PyObject *)op;
 	}
 
-	if (size > PY_SSIZE_T_MAX - sizeof(PyBytesObject)) {
+	if (size > PY_SSIZE_T_MAX - PyBytesObject_SIZE) {
 		PyErr_SetString(PyExc_OverflowError,
 				"byte string is too large");
 		return NULL;
 	}
 
 	/* Inline PyObject_NewVar */
-	op = (PyBytesObject *)PyObject_MALLOC(sizeof(PyBytesObject) + size);
+	op = (PyBytesObject *)PyObject_MALLOC(PyBytesObject_SIZE + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyBytes_Type, size);
@@ -117,7 +126,7 @@ PyBytes_FromString(const char *str)
 
 	assert(str != NULL);
 	size = strlen(str);
-	if (size > PY_SSIZE_T_MAX - sizeof(PyBytesObject)) {
+	if (size > PY_SSIZE_T_MAX - PyBytesObject_SIZE) {
 		PyErr_SetString(PyExc_OverflowError,
 			"byte string is too long");
 		return NULL;
@@ -138,7 +147,7 @@ PyBytes_FromString(const char *str)
 	}
 
 	/* Inline PyObject_NewVar */
-	op = (PyBytesObject *)PyObject_MALLOC(sizeof(PyBytesObject) + size);
+	op = (PyBytesObject *)PyObject_MALLOC(PyBytesObject_SIZE + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyBytes_Type, size);
@@ -574,6 +583,7 @@ PyBytes_AsStringAndSize(register PyObject *obj,
 #include "stringlib/transmogrify.h"
 
 #define _Py_InsertThousandsGrouping _PyBytes_InsertThousandsGrouping
+#define _Py_InsertThousandsGroupingLocale _PyBytes_InsertThousandsGroupingLocale
 #include "stringlib/localeutil.h"
 
 PyObject *
@@ -746,13 +756,12 @@ string_repeat(register PyBytesObject *a, register Py_ssize_t n)
 		return (PyObject *)a;
 	}
 	nbytes = (size_t)size;
-	if (nbytes + sizeof(PyBytesObject) <= nbytes) {
+	if (nbytes + PyBytesObject_SIZE <= nbytes) {
 		PyErr_SetString(PyExc_OverflowError,
 			"repeated bytes are too long");
 		return NULL;
 	}
-	op = (PyBytesObject *)
-		PyObject_MALLOC(sizeof(PyBytesObject) + nbytes);
+	op = (PyBytesObject *)PyObject_MALLOC(PyBytesObject_SIZE + nbytes);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyBytes_Type, size);
@@ -943,19 +952,17 @@ string_subscript(PyBytesObject* self, PyObject* item)
 				slicelength);
 		}
 		else {
-			source_buf = PyBytes_AsString((PyObject*)self);
-			result_buf = (char *)PyMem_Malloc(slicelength);
-			if (result_buf == NULL)
-				return PyErr_NoMemory();
+			source_buf = PyBytes_AS_STRING(self);
+			result = PyBytes_FromStringAndSize(NULL, slicelength);
+			if (result == NULL)
+				return NULL;
 
+			result_buf = PyBytes_AS_STRING(result);
 			for (cur = start, i = 0; i < slicelength;
 			     cur += step, i++) {
 				result_buf[i] = source_buf[cur];
 			}
 
-			result = PyBytes_FromStringAndSize(result_buf,
-							    slicelength);
-			PyMem_Free(result_buf);
 			return result;
 		}
 	}
@@ -1884,11 +1891,6 @@ string_translate(PyBytesObject *self, PyObject *args)
 			del_table = PyBytes_AS_STRING(delobj);
 			dellen = PyBytes_GET_SIZE(delobj);
 		}
-		else if (PyUnicode_Check(delobj)) {
-			PyErr_SetString(PyExc_TypeError,
-			"deletions are implemented differently for unicode");
-			return NULL;
-		}
 		else if (PyObject_AsCharBuffer(delobj, &del_table, &dellen))
 			return NULL;
 	}
@@ -2803,7 +2805,7 @@ static PyObject *
 string_sizeof(PyBytesObject *v)
 {
 	Py_ssize_t res;
-	res = sizeof(PyBytesObject) + Py_SIZE(v) * Py_TYPE(v)->tp_itemsize;
+	res = PyBytesObject_SIZE + Py_SIZE(v) * Py_TYPE(v)->tp_itemsize;
 	return PyLong_FromSsize_t(res);
 }
 
@@ -3080,13 +3082,13 @@ static PyObject *str_iter(PyObject *seq);
 PyTypeObject PyBytes_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	"bytes",
-	sizeof(PyBytesObject),
+	PyBytesObject_SIZE,
 	sizeof(char),
  	string_dealloc, 			/* tp_dealloc */
 	0,			 		/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)string_repr, 			/* tp_repr */
 	0,					/* tp_as_number */
 	&string_as_sequence,			/* tp_as_sequence */
@@ -3175,7 +3177,7 @@ _PyBytes_Resize(PyObject **pv, Py_ssize_t newsize)
 	_Py_DEC_REFTOTAL;
 	_Py_ForgetReference(v);
 	*pv = (PyObject *)
-		PyObject_REALLOC((char *)v, sizeof(PyBytesObject) + newsize);
+		PyObject_REALLOC((char *)v, PyBytesObject_SIZE + newsize);
 	if (*pv == NULL) {
 		PyObject_Del(v);
 		PyErr_NoMemory();
@@ -3420,7 +3422,7 @@ PyTypeObject PyBytesIter_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

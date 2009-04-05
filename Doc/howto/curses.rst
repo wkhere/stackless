@@ -297,7 +297,7 @@ So, to display a reverse-video status line on the top line of the screen, you
 could code::
 
    stdscr.addstr(0, 0, "Current mode: Typing mode",
-   	      curses.A_REVERSE)
+                 curses.A_REVERSE)
    stdscr.refresh()
 
 The curses library also supports color on those terminals that provide it, The
@@ -399,8 +399,8 @@ string.  It can optionally be limited to a fixed number of characters. ::
 
    curses.echo()            # Enable echoing of characters
 
-   # Get a 15-character string, with the cursor on the top line 
-   s = stdscr.getstr(0,0, 15)  
+   # Get a 15-character string, with the cursor on the top line
+   s = stdscr.getstr(0,0, 15)
 
 The Python :mod:`curses.textpad` module supplies something better. With it, you
 can turn a window into a text box that supports an Emacs-like set of
@@ -426,7 +426,7 @@ quirks, and provide complete lists of all the functions, attributes, and
 Because the curses API is so large, some functions aren't supported in the
 Python interface, not because they're difficult to implement, but because no one
 has needed them yet.  Feel free to add them and then submit a patch.  Also, we
-don't yet have support for the menus or panels libraries associated with
+don't yet have support for the menu library associated with
 ncurses; feel free to add that.
 
 If you write an interesting little program, feel free to contribute it as

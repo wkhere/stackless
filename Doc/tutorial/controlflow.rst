@@ -61,7 +61,7 @@ they appear in the sequence.  For example (no pun intended):
    ... a = ['cat', 'window', 'defenestrate']
    >>> for x in a:
    ...     print(x, len(x))
-   ... 
+   ...
    cat 3
    window 6
    defenestrate 12
@@ -74,7 +74,7 @@ convenient::
 
    >>> for x in a[:]: # make a slice copy of the entire list
    ...    if len(x) > 6: a.insert(0, x)
-   ... 
+   ...
    >>> a
    ['defenestrate', 'cat', 'window', 'defenestrate']
 
@@ -96,7 +96,7 @@ If you do need to iterate over a sequence of numbers, the built-in function
     2
     3
     4
-    
+
 
 
 The given end point is never part of the generated list; ``range(10)`` generates
@@ -104,27 +104,30 @@ The given end point is never part of the generated list; ``range(10)`` generates
 is possible to let the range start at another number, or to specify a different
 increment (even negative; sometimes this is called the 'step')::
 
-    range(5, 10)          
+    range(5, 10)
        5 through 9
 
-    range(0, 10, 3)       
+    range(0, 10, 3)
        0, 3, 6, 9
 
-    range(-10, -100, -30) 
+    range(-10, -100, -30)
       -10, -40, -70
 
-To iterate over the indices of a sequence, combine :func:`range` and :func:`len`
-as follows::
+To iterate over the indices of a sequence, you can combine :func:`range` and
+:func:`len` as follows::
 
    >>> a = ['Mary', 'had', 'a', 'little', 'lamb']
    >>> for i in range(len(a)):
    ...     print(i, a[i])
-   ... 
+   ...
    0 Mary
    1 had
    2 a
    3 little
    4 lamb
+
+In most such cases, however, it is convenient to use the :func:`enumerate`
+function, see :ref:`tut-loopidioms`.
 
 A strange thing happens if you just print a range::
 
@@ -132,12 +135,12 @@ A strange thing happens if you just print a range::
    range(0, 10)
 
 In many ways the object returned by :func:`range` behaves as if it is a list,
-but in fact it isn't. It is an object which returns the successive items of 
-the desired sequence when you iterate over it, but it doesn't really make 
-the list, thus saving space. 
+but in fact it isn't. It is an object which returns the successive items of
+the desired sequence when you iterate over it, but it doesn't really make
+the list, thus saving space.
 
-We say such an object is *iterable*, that is, suitable as a target for 
-functions and constructs that expect something from which they can 
+We say such an object is *iterable*, that is, suitable as a target for
+functions and constructs that expect something from which they can
 obtain successive items until the supply is exhausted. We have seen that
 the :keyword:`for` statement is such an *iterator*. The function :func:`list`
 is another; it creates lists from iterables::
@@ -147,6 +150,7 @@ is another; it creates lists from iterables::
    [0, 1, 2, 3, 4]
 
 Later we will see more functions that return iterables and take iterables as argument.
+
 
 .. _tut-break:
 
@@ -173,7 +177,7 @@ following loop, which searches for prime numbers::
    ...     else:
    ...         # loop fell through without finding a factor
    ...         print(n, 'is a prime number')
-   ... 
+   ...
    2 is a prime number
    3 is a prime number
    4 equals 2 * 2
@@ -194,43 +198,21 @@ required syntactically but the program requires no action. For example::
 
    >>> while True:
    ...     pass  # Busy-wait for keyboard interrupt (Ctrl+C)
-   ... 
+   ...
 
-This is commonly used for creating minimal classes such as exceptions, or
-for ignoring unwanted exceptions::
+This is commonly used for creating minimal classes::
 
-   >>> class ParserError(Exception):
+   >>> class MyEmptyClass:
    ...     pass
-   ... 
-   >>> try:
-   ...     import audioop
-   ... except ImportError:
-   ...     pass
-   ... 
+   ...
 
 Another place :keyword:`pass` can be used is as a place-holder for a function or
-conditional body when you are working on new code, allowing you to keep
-thinking at a more abstract level.  However, as :keyword:`pass` is silently
-ignored, a better choice may be to raise a :exc:`NotImplementedError`
-exception::
+conditional body when you are working on new code, allowing you to keep thinking
+at a more abstract level.  The :keyword:`pass` is silently ignored::
 
    >>> def initlog(*args):
-   ...     raise NotImplementedError   # Open logfile if not already open
-   ...     if not logfp:
-   ...         raise NotImplementedError  # Set up dummy log back-end
-   ...     raise NotImplementedError('Call log initialization handler')
-   ... 
-
-If :keyword:`pass` were used here and you later ran tests, they may fail
-without indicating why.  Using :exc:`NotImplementedError` causes this code
-to raise an exception, telling you exactly where the incomplete code 
-is.  Note the two calling styles of the exceptions above.
-The first style, with no message but with an accompanying comment, 
-lets you easily leave the comment when you remove the exception,
-which ideally would be a good description for
-the block of code the exception is a placeholder for.  However, the 
-third example, providing a message for the exception, will produce 
-a more useful traceback.
+   ...     pass   # Remember to implement this!
+   ...
 
 .. _tut-functions:
 
@@ -247,7 +229,7 @@ boundary::
    ...         print(b, end=' ')
    ...         a, b = b, a+b
    ...     print()
-   ... 
+   ...
    >>> # Now call the function we just defined:
    ... fib(2000)
    1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
@@ -318,7 +300,7 @@ Fibonacci series, instead of printing it::
    ...         result.append(b)    # see below
    ...         a, b = b, a+b
    ...     return result
-   ... 
+   ...
    >>> f100 = fib2(100)    # call it
    >>> f100                # write the result
    [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
@@ -454,7 +436,7 @@ calls. Here's an example that fails due to this restriction::
 
    >>> def function(a):
    ...     pass
-   ... 
+   ...
    >>> function(0, a=0)
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
@@ -505,7 +487,7 @@ Arbitrary Argument Lists
 ------------------------
 
 .. index::
-  statement: *  
+  statement: *
 
 Finally, the least frequently used option is to specify that a function can be
 called with an arbitrary number of arguments.  These arguments will be wrapped
@@ -515,13 +497,13 @@ zero or more normal arguments may occur. ::
    def write_multiple_items(file, separator, *args):
        file.write(separator.join(args))
 
- 
+
 Normally, these ``variadic`` arguments will be last in the list of formal
-parameters, because they scoop up all remaining input arguments that are 
+parameters, because they scoop up all remaining input arguments that are
 passed to the function. Any formal parameters which occur after the ``*args``
-parameter are 'keyword-only' arguments, meaning that they can only be used as 
+parameter are 'keyword-only' arguments, meaning that they can only be used as
 keywords rather than positional arguments. ::
- 
+
    >>> def concat(*args, sep="/"):
    ...    return sep.join(args)
    ...
@@ -599,7 +581,7 @@ Documentation Strings
    single: strings, documentation
 
 Here are some conventions about the content and formatting of documentation
-strings. 
+strings.
 
 The first line should always be a short, concise summary of the object's
 purpose.  For brevity, it should not explicitly state the object's name or type,
@@ -628,11 +610,11 @@ Here is an example of a multi-line docstring::
 
    >>> def my_function():
    ...     """Do nothing, but document it.
-   ... 
+   ...
    ...     No, really, it doesn't do anything.
    ...     """
    ...     pass
-   ... 
+   ...
    >>> print(my_function.__doc__)
    Do nothing, but document it.
 

@@ -323,7 +323,7 @@ Decimal objects
       infinity       ::=  'Infinity' | 'Inf'
       nan            ::=  'NaN' [digits] | 'sNaN' [digits]
       numeric-value  ::=  decimal-part [exponent-part] | infinity
-      numeric-string ::=  [sign] numeric-value | [sign] nan  
+      numeric-string ::=  [sign] numeric-value | [sign] nan
 
    If *value* is a :class:`tuple`, it should have three components, a sign
    (:const:`0` for positive or :const:`1` for negative), a :class:`tuple` of
@@ -452,6 +452,29 @@ Decimal objects
       Decimal('2.718281828459045235360287471')
       >>> Decimal(321).exp()
       Decimal('2.561702493119680037517373933E+139')
+
+   .. method:: from_float(f)
+
+      Classmethod that converts a float to a decimal number, exactly.
+
+      Note `Decimal.from_float(0.1)` is not the same as `Decimal('0.1')`.
+      Since 0.1 is not exactly representable in binary floating point, the
+      value is stored as the nearest representable value which is
+      `0x1.999999999999ap-4`.  That equivalent value in decimal is
+      `0.1000000000000000055511151231257827021181583404541015625`.
+
+      .. doctest::
+
+          >>> Decimal.from_float(0.1)
+          Decimal('0.1000000000000000055511151231257827021181583404541015625')
+          >>> Decimal.from_float(float('nan'))
+          Decimal('NaN')
+          >>> Decimal.from_float(float('inf'))
+          Decimal('Infinity')
+          >>> Decimal.from_float(float('-inf'))
+          Decimal('-Infinity')
+
+      .. versionadded:: 3.1
 
    .. method:: fma(other, third[, context])
 
@@ -852,7 +875,7 @@ In addition to the three supplied contexts, new contexts can be created with the
    * :const:`ROUND_HALF_EVEN` (to nearest with ties going to nearest even integer),
    * :const:`ROUND_HALF_UP` (to nearest with ties going away from zero), or
    * :const:`ROUND_UP` (away from zero).
-   * :const:`ROUND_05UP` (away from zero if last digit after rounding towards zero 
+   * :const:`ROUND_05UP` (away from zero if last digit after rounding towards zero
      would have been 0 or 5; otherwise towards zero)
 
    The *traps* and *flags* fields list any signals to be set. Generally, new
@@ -909,6 +932,26 @@ In addition to the three supplied contexts, new contexts can be created with the
       This method implements the to-number operation of the IBM specification.
       If the argument is a string, no leading or trailing whitespace is
       permitted.
+
+   .. method:: create_decimal_from_float(f)
+
+      Creates a new Decimal instance from a float *f* but rounding using *self*
+      as the context.  Unlike the :meth:`Decimal.from_float` class method,
+      the context precision, rounding method, flags, and traps are applied to
+      the conversion.
+
+      .. doctest::
+
+         >>> context = Context(prec=5, rounding=ROUND_DOWN)
+         >>> context.create_decimal_from_float(math.pi)
+         Decimal('3.1415')
+         >>> context = Context(prec=5, traps=[Inexact])
+         >>> context.create_decimal_from_float(math.pi)
+         Traceback (most recent call last):
+             ...
+         decimal.Inexact: None
+
+      .. versionadded:: 3.1
 
    .. method:: Etiny()
 
@@ -1071,7 +1114,7 @@ In addition to the three supplied contexts, new contexts can be created with the
 
    .. method:: logical_and(x, y)
 
-      Applies the logical operation `and` between each operand's digits.
+      Applies the logical operation *and* between each operand's digits.
 
 
    .. method:: logical_invert(x)
@@ -1081,12 +1124,12 @@ In addition to the three supplied contexts, new contexts can be created with the
 
    .. method:: logical_or(x, y)
 
-      Applies the logical operation `or` between each operand's digits.
+      Applies the logical operation *or* between each operand's digits.
 
 
    .. method:: logical_xor(x, y)
 
-      Applies the logical operation `xor` between each operand's digits.
+      Applies the logical operation *xor* between each operand's digits.
 
 
    .. method:: max(x, y)
@@ -1194,8 +1237,8 @@ In addition to the three supplied contexts, new contexts can be created with the
 
    .. method:: remainder_near(x, y)
 
-      Returns `x - y * n`, where *n* is the integer nearest the exact value
-      of `x / y` (if the result is `0` then its sign will be the sign of *x*).
+      Returns ``x - y * n``, where *n* is the integer nearest the exact value
+      of ``x / y`` (if the result is 0 then its sign will be the sign of *x*).
 
 
    .. method:: rotate(x, y)
@@ -1312,7 +1355,7 @@ condition.
       sqrt(-x) and x > 0
       0 ** 0
       x ** (non-integer)
-      x ** Infinity      
+      x ** Infinity
 
 
 .. class:: Overflow
@@ -1415,7 +1458,7 @@ expanding the precision sufficiently to avoid loss of significance:
    Decimal('9.51111111')
    >>> u + (v + w)
    Decimal('9.51111111')
-   >>> 
+   >>>
    >>> u, v, w = Decimal(20000), Decimal(-6), Decimal('6.0000003')
    >>> (u*v) + (u*w)
    Decimal('0.0060000')
@@ -1554,7 +1597,7 @@ to work with the :class:`Decimal` class::
 
        """
        q = Decimal(10) ** -places      # 2 places --> '0.01'
-       sign, digits, exp = value.quantize(q).as_tuple()  
+       sign, digits, exp = value.quantize(q).as_tuple()
        result = []
        digits = list(map(str, digits))
        build, next = result.append, digits.pop
@@ -1611,12 +1654,12 @@ to work with the :class:`Decimal` class::
        getcontext().prec += 2
        i, lasts, s, fact, num = 0, 0, 1, 1, 1
        while s != lasts:
-           lasts = s    
+           lasts = s
            i += 1
            fact *= i
-           num *= x     
-           s += num / fact   
-       getcontext().prec -= 2        
+           num *= x
+           s += num / fact
+       getcontext().prec -= 2
        return +s
 
    def cos(x):
@@ -1633,13 +1676,13 @@ to work with the :class:`Decimal` class::
        getcontext().prec += 2
        i, lasts, s, fact, num, sign = 0, 0, 1, 1, 1, 1
        while s != lasts:
-           lasts = s    
+           lasts = s
            i += 2
            fact *= i * (i-1)
            num *= x * x
            sign *= -1
-           s += num / fact * sign 
-       getcontext().prec -= 2        
+           s += num / fact * sign
+       getcontext().prec -= 2
        return +s
 
    def sin(x):
@@ -1656,13 +1699,13 @@ to work with the :class:`Decimal` class::
        getcontext().prec += 2
        i, lasts, s, fact, num, sign = 1, 0, x, 1, x, 1
        while s != lasts:
-           lasts = s    
+           lasts = s
            i += 2
            fact *= i * (i-1)
            num *= x * x
            sign *= -1
-           s += num / fact * sign 
-       getcontext().prec -= 2        
+           s += num / fact * sign
+       getcontext().prec -= 2
        return +s
 
 
@@ -1696,7 +1739,7 @@ the :const:`Inexact` trap is set, it is also useful for validation:
    >>> Decimal('3.214').quantize(TWOPLACES)
    Decimal('3.21')
 
-   >>> # Validate that a number does not exceed two places 
+   >>> # Validate that a number does not exceed two places
    >>> Decimal('3.21').quantize(TWOPLACES, context=Context(traps=[Inexact]))
    Decimal('3.21')
 

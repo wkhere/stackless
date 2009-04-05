@@ -1016,12 +1016,13 @@ PyDoc_STR(
 Static objects:\n\
 \n\
 float_info -- a dict with information about the float implementation.\n\
+int_info -- a struct sequence with information about the int implementation.\n\
 maxsize -- the largest supported length of containers.\n\
 maxunicode -- the largest supported character\n\
 builtin_module_names -- tuple of module names built into this interpreter\n\
 subversion -- subversion information of the build as tuple\n\
 version -- the version of this interpreter as a string\n\
-version_info -- version information as a tuple\n\
+version_info -- version information as a named tuple\n\
 hexversion -- version information encoded as a single integer\n\
 copyright -- copyright notice pertaining to this interpreter\n\
 platform -- platform identifier\n\
@@ -1235,6 +1236,75 @@ make_flags(void)
 	return seq;
 }
 
+PyDoc_STRVAR(version_info__doc__,
+"sys.version_info\n\
+\n\
+Version information as a named tuple.");
+
+static PyTypeObject VersionInfoType;
+
+static PyStructSequence_Field version_info_fields[] = {
+	{"major", "Major release number"},
+	{"minor", "Minor release number"},
+	{"micro", "Patch release number"},
+	{"releaselevel", "'alpha', 'beta', 'candidate', or 'release'"},
+	{"serial", "Serial release number"},
+	{0}
+};
+
+static PyStructSequence_Desc version_info_desc = {
+	"sys.version_info",     /* name */
+	version_info__doc__,    /* doc */
+	version_info_fields,    /* fields */
+	5
+};
+
+static PyObject *
+make_version_info(void)
+{
+	PyObject *version_info;
+	char *s;
+	int pos = 0;
+
+	version_info = PyStructSequence_New(&VersionInfoType);
+	if (version_info == NULL) {
+		return NULL;
+	}
+
+	/*
+	 * These release level checks are mutually exclusive and cover
+	 * the field, so don't get too fancy with the pre-processor!
+	 */
+#if PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_ALPHA
+	s = "alpha";
+#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_BETA
+	s = "beta";
+#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_GAMMA
+	s = "candidate";
+#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_FINAL
+	s = "final";
+#endif
+
+#define SetIntItem(flag) \
+	PyStructSequence_SET_ITEM(version_info, pos++, PyLong_FromLong(flag))
+#define SetStrItem(flag) \
+	PyStructSequence_SET_ITEM(version_info, pos++, PyUnicode_FromString(flag))
+
+	SetIntItem(PY_MAJOR_VERSION);
+	SetIntItem(PY_MINOR_VERSION);
+	SetIntItem(PY_MICRO_VERSION);
+	SetStrItem(s);
+	SetIntItem(PY_RELEASE_SERIAL);
+#undef SetIntItem
+#undef SetStrItem
+
+	if (PyErr_Occurred()) {
+		Py_CLEAR(version_info);
+		return NULL;
+	}
+	return version_info;
+}
+
 static struct PyModuleDef sysmodule = {
 	PyModuleDef_HEAD_INIT,
 	"sys",
@@ -1246,8 +1316,6 @@ static struct PyModuleDef sysmodule = {
 	NULL,
 	NULL
 };
-
-
 
 PyObject *
 _PySys_Init(void)
@@ -1265,8 +1333,13 @@ _PySys_Init(void)
 		PyDict_SetItemString(sysdict, key, v);	\
 	Py_XDECREF(v)
 
+	/* Check that stdin is not a directory
+	Using shell redirection, you can redirect stdin to a directory,
+	crashing the Python interpreter. Catch this common mistake here
+	and output a useful error message. Note that under MS Windows,
+	the shell already prevents that. */
+#if !defined(MS_WINDOWS)
 	{
-		/* XXX: does this work on Win/Win64? (see posix_fstat) */
 		struct stat sb;
 		if (fstat(fileno(stdin), &sb) == 0 &&
 		    S_ISDIR(sb.st_mode)) {
@@ -1276,6 +1349,7 @@ _PySys_Init(void)
 			exit(EXIT_FAILURE);
 		}
 	}
+#endif
 
         /* stdin/stdout/stderr are now set by pythonrun.c */
 
@@ -1293,25 +1367,6 @@ _PySys_Init(void)
 					  svn_revision));
 	SET_SYS_FROM_STRING("dont_write_bytecode",
 			     PyBool_FromLong(Py_DontWriteBytecodeFlag));
-	/*
-	 * These release level checks are mutually exclusive and cover
-	 * the field, so don't get too fancy with the pre-processor!
-	 */
-#if PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_ALPHA
-	s = "alpha";
-#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_BETA
-	s = "beta";
-#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_GAMMA
-	s = "candidate";
-#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_FINAL
-	s = "final";
-#endif
-
-	SET_SYS_FROM_STRING("version_info",
-			    Py_BuildValue("iiiUi", PY_MAJOR_VERSION,
-					       PY_MINOR_VERSION,
-					       PY_MICRO_VERSION, s,
-					       PY_RELEASE_SERIAL));
 	SET_SYS_FROM_STRING("api_version",
 			    PyLong_FromLong(PYTHON_API_VERSION));
 	SET_SYS_FROM_STRING("copyright",
@@ -1329,6 +1384,8 @@ _PySys_Init(void)
 			    PyLong_FromSsize_t(PY_SSIZE_T_MAX));
 	SET_SYS_FROM_STRING("float_info",
 			    PyFloat_GetInfo());
+	SET_SYS_FROM_STRING("int_info",
+			    PyLong_GetInfo());
 	SET_SYS_FROM_STRING("maxunicode",
 			    PyLong_FromLong(PyUnicode_GetMax()));
 	SET_SYS_FROM_STRING("builtin_module_names",
@@ -1363,6 +1420,15 @@ _PySys_Init(void)
 		PyDict_SetItemString(sysdict, "warnoptions", warnoptions);
 	}
 
+	/* version_info */
+	if (VersionInfoType.tp_name == 0)
+		PyStructSequence_InitType(&VersionInfoType, &version_info_desc);
+	SET_SYS_FROM_STRING("version_info", make_version_info());
+	/* prevent user from creating new instances */
+	VersionInfoType.tp_init = NULL;
+	VersionInfoType.tp_new = NULL;
+
+	/* flags */
 	if (FlagsType.tp_name == 0)
 		PyStructSequence_InitType(&FlagsType, &flags_desc);
 	SET_SYS_FROM_STRING("flags", make_flags());
@@ -1491,7 +1557,7 @@ PySys_SetArgv(int argc, wchar_t **argv)
 {
 #if defined(HAVE_REALPATH)
 	wchar_t fullpath[MAXPATHLEN];
-#elif defined(MS_WINDOWS)
+#elif defined(MS_WINDOWS) && !defined(MS_WINCE)
 	wchar_t fullpath[MAX_PATH];
 #endif
 	PyObject *av = makeargvobject(argc, argv);
@@ -1537,7 +1603,10 @@ PySys_SetArgv(int argc, wchar_t **argv)
 #if SEP == '\\' /* Special case for MS filename syntax */
 		if (argc > 0 && argv0 != NULL && wcscmp(argv0, L"-c") != 0) {
 			wchar_t *q;
-#ifdef MS_WINDOWS
+#if defined(MS_WINDOWS) && !defined(MS_WINCE)
+			/* This code here replaces the first element in argv with the full
+			path that it represents. Under CE, there are no relative paths so
+			the argument must be the full path anyway. */
 			wchar_t *ptemp;
 			if (GetFullPathNameW(argv0,
 					   sizeof(fullpath)/sizeof(fullpath[0]),

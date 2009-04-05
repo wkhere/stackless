@@ -33,6 +33,7 @@ class HashEqualityTestCase(unittest.TestCase):
         # for 64-bit platforms
         self.same_hash(int(2**31), float(2**31))
         self.same_hash(int(-2**63), float(-2**63))
+        self.same_hash(int(2**63), float(2**63))
 
     def test_coerced_floats(self):
         self.same_hash(int(1.23e300), float(1.23e300))
@@ -55,13 +56,8 @@ class OnlyInequality(object):
     def __ne__(self, other):
         return self is not other
 
-class OnlyCmp(object):
-    def __cmp__(self, other):
-        return cmp(id(self), id(other))
-
 class InheritedHashWithEquality(FixedHash, OnlyEquality): pass
 class InheritedHashWithInequality(FixedHash, OnlyInequality): pass
-class InheritedHashWithCmp(FixedHash, OnlyCmp): pass
 
 class NoHash(object):
     __hash__ = None
@@ -74,7 +70,6 @@ class HashInheritanceTestCase(unittest.TestCase):
     fixed_expected = [FixedHash(),
                       InheritedHashWithEquality(),
                       InheritedHashWithInequality(),
-                      InheritedHashWithCmp(),
                       ]
     error_expected = [NoHash(),
                       OnlyEquality(),
@@ -103,9 +98,30 @@ class HashInheritanceTestCase(unittest.TestCase):
             self.assertFalse(isinstance(obj, Hashable), repr(obj))
 
 
+# Issue #4701: Check that some builtin types are correctly hashable
+class DefaultIterSeq(object):
+    seq = range(10)
+    def __len__(self):
+        return len(self.seq)
+    def __getitem__(self, index):
+        return self.seq[index]
+
+class HashBuiltinsTestCase(unittest.TestCase):
+    hashes_to_check = [range(10),
+                       enumerate(range(10)),
+                       iter(DefaultIterSeq()),
+                       iter(lambda: 0, 0),
+                      ]
+
+    def test_hashes(self):
+        _default_hash = object.__hash__
+        for obj in self.hashes_to_check:
+            self.assertEqual(hash(obj), _default_hash(obj))
+
 def test_main():
     support.run_unittest(HashEqualityTestCase,
-                         HashInheritanceTestCase)
+                              HashInheritanceTestCase,
+                              HashBuiltinsTestCase)
 
 
 if __name__ == "__main__":

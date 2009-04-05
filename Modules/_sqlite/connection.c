@@ -770,7 +770,7 @@ static int _progress_handler(void* user_arg)
             PyErr_Clear();
         }
 
-        /* abort query if error occured */
+        /* abort query if error occurred */
         rc = 1; 
     } else {
         rc = (int)PyObject_IsTrue(ret);
@@ -1350,7 +1350,7 @@ PyTypeObject pysqlite_ConnectionType = {
         0,                                              /* tp_print */
         0,                                              /* tp_getattr */
         0,                                              /* tp_setattr */
-        0,                                              /* tp_compare */
+        0,                                              /* tp_reserved */
         0,                                              /* tp_repr */
         0,                                              /* tp_as_number */
         0,                                              /* tp_as_sequence */

@@ -402,7 +402,7 @@ PyTypeObject PyMethodDescr_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)method_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -442,7 +442,7 @@ PyTypeObject PyClassMethodDescr_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)method_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -481,7 +481,7 @@ PyTypeObject PyMemberDescr_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)member_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -518,7 +518,7 @@ PyTypeObject PyGetSetDescr_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)getset_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -555,7 +555,7 @@ PyTypeObject PyWrapperDescr_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)wrapperdescr_repr,		/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -793,12 +793,6 @@ proxy_traverse(PyObject *self, visitproc visit, void *arg)
 	return 0;
 }
 
-static int
-proxy_compare(proxyobject *v, PyObject *w)
-{
-	return PyObject_Compare(v->dict, w);
-}
-
 static PyObject *
 proxy_richcompare(proxyobject *v, PyObject *w, int op)
 {
@@ -815,7 +809,7 @@ PyTypeObject PyDictProxy_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	(cmpfunc)proxy_compare,			/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	&proxy_as_sequence,			/* tp_as_sequence */
@@ -863,11 +857,16 @@ PyDictProxy_New(PyObject *dict)
 /* This has no reason to be in this file except that adding new files is a
    bit of a pain */
 
+/* forward */
+static PyTypeObject wrappertype;
+
 typedef struct {
 	PyObject_HEAD
 	PyWrapperDescrObject *descr;
 	PyObject *self;
 } wrapperobject;
+
+#define Wrapper_Check(v) (Py_TYPE(v) == &wrappertype)
 
 static void
 wrapper_dealloc(wrapperobject *wp)
@@ -880,13 +879,60 @@ wrapper_dealloc(wrapperobject *wp)
 	Py_TRASHCAN_SAFE_END(wp)
 }
 
-static int
-wrapper_compare(wrapperobject *a, wrapperobject *b)
+#define TEST_COND(cond) ((cond) ? Py_True : Py_False)
+
+static PyObject *
+wrapper_richcompare(PyObject *a, PyObject *b, int op)
 {
-	if (a->descr == b->descr)
-		return PyObject_Compare(a->self, b->self);
-	else
-		return (a->descr < b->descr) ? -1 : 1;
+	int result;
+	PyObject *v;
+	PyWrapperDescrObject *a_descr, *b_descr;
+
+	assert(a != NULL && b != NULL);
+
+	/* both arguments should be wrapperobjects */
+	if (!Wrapper_Check(a) || !Wrapper_Check(b)) {
+		v = Py_NotImplemented;
+		Py_INCREF(v);
+		return v;
+	}
+
+	/* compare by descriptor address; if the descriptors are the same,
+	   compare by the objects they're bound to */
+	a_descr = ((wrapperobject *)a)->descr;
+	b_descr = ((wrapperobject *)b)->descr;
+	if (a_descr == b_descr) {
+		a = ((wrapperobject *)a)->self;
+		b = ((wrapperobject *)b)->self;
+		return PyObject_RichCompare(a, b, op);
+	}
+
+	result = a_descr - b_descr;
+	switch (op) {
+	case Py_EQ:
+		v = TEST_COND(result == 0);
+		break;
+	case Py_NE:
+		v = TEST_COND(result != 0);
+		break;
+	case Py_LE:
+		v = TEST_COND(result <= 0);
+		break;
+	case Py_GE:
+		v = TEST_COND(result >= 0);
+		break;
+	case Py_LT:
+		v = TEST_COND(result < 0);
+		break;
+	case Py_GT:
+		v = TEST_COND(result > 0);
+		break;
+	default:
+		PyErr_BadArgument();
+		return NULL;
+	}
+	Py_INCREF(v);
+	return v;
 }
 
 static long
@@ -1009,7 +1055,7 @@ static PyTypeObject wrappertype = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	(cmpfunc)wrapper_compare,		/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)wrapper_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -1024,7 +1070,7 @@ static PyTypeObject wrappertype = {
  	0,					/* tp_doc */
 	wrapper_traverse,			/* tp_traverse */
  	0,					/* tp_clear */
-	0,					/* tp_richcompare */
+	wrapper_richcompare,			/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
@@ -1343,7 +1389,7 @@ PyTypeObject PyProperty_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

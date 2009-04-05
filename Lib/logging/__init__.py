@@ -1,4 +1,4 @@
-# Copyright 2001-2008 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2009 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -18,12 +18,13 @@
 Logging package for Python. Based on PEP 282 and comments thereto in
 comp.lang.python, and influenced by Apache's log4j system.
 
-Copyright (C) 2001-2008 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2009 Vinay Sajip. All Rights Reserved.
 
 To use, simply 'import logging' and log away!
 """
 
-import sys, os, time, io, traceback
+import sys, os, time, io, traceback, warnings
+
 __all__ = ['BASIC_FORMAT', 'BufferingFormatter', 'CRITICAL', 'DEBUG', 'ERROR',
            'FATAL', 'FileHandler', 'Filter', 'Filterer', 'Formatter', 'Handler',
            'INFO', 'LogRecord', 'Logger', 'Manager', 'NOTSET', 'PlaceHolder',
@@ -42,8 +43,8 @@ except ImportError:
 
 __author__  = "Vinay Sajip <vinay_sajip@red-dove.com>"
 __status__  = "production"
-__version__ = "0.5.0.5"
-__date__    = "24 January 2008"
+__version__ = "0.5.0.7"
+__date__    = "20 January 2009"
 
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
@@ -96,6 +97,11 @@ raiseExceptions = 1
 # If you don't want threading information in the log, set this to zero
 #
 logThreads = 1
+
+#
+# If you don't want multiprocessing information in the log, set this to zero
+#
+logMultiprocessing = 1
 
 #
 # If you don't want process information in the log, set this to zero
@@ -262,6 +268,11 @@ class LogRecord:
         else:
             self.thread = None
             self.threadName = None
+        if logMultiprocessing:
+            from multiprocessing import current_process
+            self.processName = current_process().name
+        else:
+            self.processName = None
         if logProcesses and hasattr(os, 'getpid'):
             self.process = os.getpid()
         else:
@@ -726,7 +737,6 @@ class StreamHandler(Handler):
         if strm is None:
             strm = sys.stderr
         self.stream = strm
-        self.formatter = None
 
     def flush(self):
         """
@@ -748,17 +758,19 @@ class StreamHandler(Handler):
         """
         try:
             msg = self.format(record)
+            stream = self.stream
             fs = "%s\n"
             if not _unicode: #if no unicode support...
-                self.stream.write(fs % msg)
+                stream.write(fs % msg)
             else:
                 try:
-                    if getattr(self.stream, 'encoding', None) is not None:
-                        self.stream.write(fs % msg.encode(self.stream.encoding))
+                    if (isinstance(msg, unicode) or
+                        getattr(stream, 'encoding', None) is None):
+                        stream.write(fs % msg)
                     else:
-                        self.stream.write(fs % msg)
+                        stream.write(fs % msg.encode(stream.encoding))
                 except UnicodeError:
-                    self.stream.write(fs % msg.encode("UTF-8"))
+                    stream.write(fs % msg.encode("UTF-8"))
             self.flush()
         except (KeyboardInterrupt, SystemExit):
             raise
@@ -781,10 +793,12 @@ class FileHandler(StreamHandler):
         self.mode = mode
         self.encoding = encoding
         if delay:
+            #We don't open the stream, but we still need to call the
+            #Handler constructor to set level, formatter, lock etc.
+            Handler.__init__(self)
             self.stream = None
         else:
-            stream = self._open()
-            StreamHandler.__init__(self, stream)
+            StreamHandler.__init__(self, self._open())
 
     def close(self):
         """
@@ -816,8 +830,7 @@ class FileHandler(StreamHandler):
         constructor, open it before calling the superclass's emit.
         """
         if self.stream is None:
-            stream = self._open()
-            StreamHandler.__init__(self, stream)
+            self.stream = self._open()
         StreamHandler.emit(self, record)
 
 #---------------------------------------------------------------------------
@@ -1114,7 +1127,12 @@ class Logger(Filterer):
         all the handlers of this logger to handle the record.
         """
         if _srcfile:
-            fn, lno, func = self.findCaller()
+            #IronPython doesn't track Python frames, so findCaller throws an
+            #exception. We trap it here so that IronPython can use logging.
+            try:
+                fn, lno, func = self.findCaller()
+            except ValueError:
+                fn, lno, func = "(unknown file)", 0, "(unknown function)"
         else:
             fn, lno, func = "(unknown file)", 0, "(unknown function)"
         if exc_info:
@@ -1483,3 +1501,56 @@ except ImportError: # for Python versions < 2.0
             old_exit(status)
 
     sys.exit = exithook
+
+# Null handler
+
+class NullHandler(Handler):
+    """
+    This handler does nothing. It's intended to be used to avoid the
+    "No handlers could be found for logger XXX" one-off warning. This is
+    important for library code, which may contain code to log events. If a user
+    of the library does not configure logging, the one-off warning might be
+    produced; to avoid this, the library developer simply needs to instantiate
+    a NullHandler and add it to the top-level logger of the library module or
+    package.
+    """
+    def emit(self, record):
+        pass
+
+# Warnings integration
+
+_warnings_showwarning = None
+
+def _showwarning(message, category, filename, lineno, file=None, line=None):
+    """
+    Implementation of showwarnings which redirects to logging, which will first
+    check to see if the file parameter is None. If a file is specified, it will
+    delegate to the original warnings implementation of showwarning. Otherwise,
+    it will call warnings.formatwarning and will log the resulting string to a
+    warnings logger named "py.warnings" with level logging.WARNING.
+    """
+    if file is not None:
+        if _warnings_showwarning is not None:
+            _warnings_showwarning(message, category, filename, lineno, file, line)
+    else:
+        s = warnings.formatwarning(message, category, filename, lineno, line)
+        logger = getLogger("py.warnings")
+        if not logger.handlers:
+            logger.addHandler(NullHandler())
+        logger.warning("%s", s)
+
+def captureWarnings(capture):
+    """
+    If capture is true, redirect all warnings to the logging package.
+    If capture is False, ensure that warnings are not redirected to logging
+    but to their original destinations.
+    """
+    global _warnings_showwarning
+    if capture:
+        if _warnings_showwarning is None:
+            _warnings_showwarning = warnings.showwarning
+            warnings.showwarning = _showwarning
+    else:
+        if _warnings_showwarning is not None:
+            warnings.showwarning = _warnings_showwarning
+            _warnings_showwarning = None

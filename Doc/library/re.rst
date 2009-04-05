@@ -16,7 +16,7 @@ those found in Perl.  The :mod:`re` module is always available.
 Both patterns and strings to be searched can be Unicode strings as well as
 8-bit strings. However, Unicode strings and 8-bit strings cannot be mixed:
 that is, you cannot match an Unicode string with a byte pattern or
-vice-versa; similarly, when asking for a substition, the replacement
+vice-versa; similarly, when asking for a substitution, the replacement
 string must be of the same type as both the pattern and the search string.
 
 Regular expressions use the backslash character (``'\'``) to indicate
@@ -221,7 +221,7 @@ The special characters are:
    ``'s'``, ``'u'``, ``'x'``.)  The group matches the empty string; the
    letters set the corresponding flags: :const:`re.a` (ASCII-only matching),
    :const:`re.I` (ignore case), :const:`re.L` (locale dependent),
-   :const:`re.M` (multi-line), :const:`re.S` (dot matches all), 
+   :const:`re.M` (multi-line), :const:`re.S` (dot matches all),
    and :const:`re.X` (verbose), for the entire regular expression. (The
    flags are described in :ref:`contents-of-module-re`.) This
    is useful if you wish to include the flags as part of the regular
@@ -460,19 +460,23 @@ form.
 
    The sequence ::
 
-      prog = re.compile(pat)
-      result = prog.match(str)
+      prog = re.compile(pattern)
+      result = prog.match(string)
 
    is equivalent to ::
 
-      result = re.match(pat, str)
+      result = re.match(pattern, string)
 
-   but the version using :func:`compile` is more efficient when the expression
-   will be used several times in a single program.
+   but using :func:`compile` and saving the resulting regular expression object
+   for reuse is more efficient when the expression will be used several times
+   in a single program.
 
-   .. (The compiled version of the last pattern passed to :func:`re.match` or
-      :func:`re.search` is cached, so programs that use only a single regular
-      expression at a time needn't worry about compiling regular expressions.)
+   .. note::
+
+      The compiled versions of the most recent patterns passed to
+      :func:`re.match`, :func:`re.search` or :func:`re.compile` are cached, so
+      programs that use only a few regular expressions at a time needn't worry
+      about compiling regular expressions.
 
 
 .. data:: A
@@ -487,7 +491,7 @@ form.
    counterpart ``(?u)``), but these are redundant in Python 3.0 since
    matches are Unicode by default for strings (and Unicode matching
    isn't allowed for bytes).
-   
+
 
 .. data:: I
           IGNORECASE
@@ -567,7 +571,7 @@ form.
       instead.
 
 
-.. function:: split(pattern, string[, maxsplit=0])
+.. function:: split(pattern, string[, maxsplit=0, flags=0])
 
    Split *string* by the occurrences of *pattern*.  If capturing parentheses are
    used in *pattern*, then the text of all groups in the pattern are also returned
@@ -581,6 +585,8 @@ form.
       ['Words', ', ', 'words', ', ', 'words', '.', '']
       >>> re.split('\W+', 'Words, words, words.', 1)
       ['Words', 'words, words.']
+      >>> re.split('[a-f]+', '0a3B9', flags=re.IGNORECASE)
+      ['0', '3', '9']
 
    If there are capturing groups in the separator and it matches at the start of
    the string, the result will start with an empty string.  The same holds for
@@ -600,6 +606,9 @@ form.
       ['foo']
       >>> re.split("(?m)^$", "foo\n\nbar\n")
       ['foo\n\nbar\n']
+
+   .. versionchanged:: 2.7,3.1
+      Added the optional flags argument.
 
 
 .. function:: findall(pattern, string[, flags])
@@ -621,7 +630,7 @@ form.
    match.
 
 
-.. function:: sub(pattern, repl, string[, count])
+.. function:: sub(pattern, repl, string[, count, flags])
 
    Return the string obtained by replacing the leftmost non-overlapping occurrences
    of *pattern* in *string* by the replacement *repl*.  If the pattern isn't found,
@@ -646,6 +655,8 @@ form.
       ...     else: return '-'
       >>> re.sub('-{1,2}', dashrepl, 'pro----gram-files')
       'pro--gram files'
+      >>> re.sub(r'\sAND\s', ' & ', 'Baked Beans And Spam', flags=re.IGNORECASE)
+      'Baked Beans & Spam'
 
    The pattern may be a string or an RE object; if you need to specify regular
    expression flags, you must use a RE object, or use embedded modifiers in a
@@ -666,11 +677,17 @@ form.
    character ``'0'``.  The backreference ``\g<0>`` substitutes in the entire
    substring matched by the RE.
 
+   .. versionchanged:: 2.7,3.1
+      Added the optional flags argument.
 
-.. function:: subn(pattern, repl, string[, count])
+
+.. function:: subn(pattern, repl, string[, count, flags])
 
    Perform the same operation as :func:`sub`, but return a tuple ``(new_string,
    number_of_subs_made)``.
+
+   .. versionchanged:: 2.7,3.1
+      Added the optional flags argument.
 
 
 .. function:: escape(string)
@@ -768,6 +785,11 @@ attributes:
 
    The flags argument used when the RE object was compiled, or ``0`` if no flags
    were provided.
+
+
+.. attribute:: RegexObject.groups
+
+   The number of capturing groups in the pattern.
 
 
 .. attribute:: RegexObject.groupindex
@@ -1006,14 +1028,14 @@ method of :class:`MatchObject` in the following manner:
 
    >>> pair.match("717ak").group(1)
    '7'
-   
+
    # Error because re.match() returns None, which doesn't have a group() method:
    >>> pair.match("718ak").group(1)
    Traceback (most recent call last):
      File "<pyshell#23>", line 1, in <module>
        re.match(r".*(.).*\1", "718ak").group(1)
    AttributeError: 'NoneType' object has no attribute 'group'
-   
+
    >>> pair.match("354aa").group(1)
    'a'
 
@@ -1105,7 +1127,7 @@ For example:
    string)`` or ``re.search(pattern, string)``.
 
 :func:`match` has an optional second parameter that gives an index in the string
-where the search is to start:
+where the search is to start::
 
    >>> pattern = re.compile("o")
    >>> pattern.match("dog")      # No match as "o" is not at the start of "dog."
@@ -1122,7 +1144,7 @@ where the search is to start:
 Making a Phonebook
 ^^^^^^^^^^^^^^^^^^
 
-:func:`split` splits a string into a list delimited by the passed pattern.  The 
+:func:`split` splits a string into a list delimited by the passed pattern.  The
 method is invaluable for converting textual data into data structures that can be
 easily read and modified by Python as demonstrated in the following example that
 creates a phonebook.
@@ -1131,7 +1153,7 @@ First, here is the input.  Normally it may come from a file, here we are using
 triple-quoted string syntax:
 
    >>> input = """Ross McFluff: 834.345.1254 155 Elm Street
-   ... 
+   ...
    ... Ronald Heathmore: 892.345.3428 436 Finley Avenue
    ... Frank Burger: 925.541.7625 662 South Dogwood Way
    ...

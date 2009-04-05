@@ -48,7 +48,7 @@ The module defines the following exception and functions:
 
 .. function:: unpack_from(fmt, buffer[,offset=0])
 
-   Unpack the *buffer* according to tthe given format. The result is a tuple even
+   Unpack the *buffer* according to the given format. The result is a tuple even
    if it contains exactly one item. The *buffer* must contain at least the amount
    of data required by the format (``len(buffer[offset:])`` must be at least
    ``calcsize(fmt)``).
@@ -133,6 +133,16 @@ For packing, the string is truncated or padded with null bytes as appropriate to
 make it fit. For unpacking, the resulting bytes object always has exactly the
 specified number of bytes.  As a special case, ``'0s'`` means a single, empty
 string (while ``'0c'`` means 0 characters).
+
+When packing a value ``x`` using one of the integer formats (``'b'``,
+``'B'``, ``'h'``, ``'H'``, ``'i'``, ``'I'``, ``'l'``, ``'L'``,
+``'q'``, ``'Q'``), if ``x`` is outside the valid range for that format
+then :exc:`struct.error` is raised.
+
+.. versionchanged:: 3.1
+   In 3.0, some of the integer formats wrapped out-of-range values and
+   raised :exc:`DeprecationWarning` instead of :exc:`struct.error`.
+
 
 The ``'p'`` format character encodes a "Pascal string", meaning a short
 variable-length string stored in a fixed number of bytes. The count is the total

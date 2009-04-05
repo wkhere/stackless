@@ -64,8 +64,21 @@ The :mod:`dis` module defines the following functions and constants:
 
 .. function:: disco(code[, lasti])
 
-   A synonym for disassemble.  It is more convenient to type, and kept for
-   compatibility with earlier Python releases.
+   A synonym for :func:`disassemble`.  It is more convenient to type, and kept
+   for compatibility with earlier Python releases.
+
+
+.. function:: findlinestarts(code)
+
+   This generator function uses the ``co_firstlineno`` and ``co_lnotab``
+   attributes of the code object *code* to find the offsets which are starts of
+   lines in the source code.  They are generated as ``(offset, lineno)`` pairs.
+
+
+.. function:: findlabels(code)
+
+   Detect all offsets in the code object *code* which are jump targets, and
+   return a list of these offsets.
 
 
 .. data:: opname
@@ -357,14 +370,25 @@ Miscellaneous opcodes.
    address to jump to (which should be a ``FOR_ITER`` instruction).
 
 
-.. opcode:: SET_ADD ()
+.. opcode:: SET_ADD (i)
 
-   Calls ``set.add(TOS1, TOS)``.  Used to implement set comprehensions.
+   Calls ``set.add(TOS1[-i], TOS)``.  Used to implement set comprehensions.
 
 
-.. opcode:: LIST_APPEND ()
+.. opcode:: LIST_APPEND (i)
 
-   Calls ``list.append(TOS1, TOS)``.  Used to implement list comprehensions.
+   Calls ``list.append(TOS[-i], TOS)``.  Used to implement list comprehensions.
+
+
+.. opcode:: MAP_ADD (i)
+
+   Calls ``dict.setitem(TOS1[-i], TOS, TOS1)``.  Used to implement dict
+   comprehensions.
+
+
+For all of the SET_ADD, LIST_APPEND and MAP_ADD instructions, while the
+added value or key/value pair is popped off, the container object remains on
+the stack so that it is available for further iterations of the loop.
 
 
 .. opcode:: LOAD_LOCALS ()
@@ -478,7 +502,7 @@ the more significant byte last.
    The low byte of *counts* is the number of values before the list value, the
    high byte of *counts* the number of values after it.  The resulting values
    are put onto the stack right-to-left.
-   
+
 
 .. opcode:: DUP_TOPX (count)
 
@@ -571,16 +595,26 @@ the more significant byte last.
    Increments bytecode counter by *delta*.
 
 
-.. opcode:: JUMP_IF_TRUE (delta)
+.. opcode:: POP_JUMP_IF_TRUE (target)
 
-   If TOS is true, increment the bytecode counter by *delta*.  TOS is left on the
-   stack.
+   If TOS is true, sets the bytecode counter to *target*.  TOS is popped.
 
 
-.. opcode:: JUMP_IF_FALSE (delta)
+.. opcode:: POP_JUMP_IF_FALSE (target)
 
-   If TOS is false, increment the bytecode counter by *delta*.  TOS is not
-   changed.
+   If TOS is false, sets the bytecode counter to *target*.  TOS is popped.
+
+
+.. opcode:: JUMP_IF_TRUE_OR_POP (target)
+
+   If TOS is true, sets the bytecode counter to *target* and leaves TOS
+   on the stack.  Otherwise (TOS is false), TOS is popped.
+
+
+.. opcode:: JUMP_IF_FALSE_OR_POP (target)
+
+   If TOS is false, sets the bytecode counter to *target* and leaves
+   TOS on the stack.  Otherwise (TOS is true), TOS is popped.
 
 
 .. opcode:: JUMP_ABSOLUTE (target)
@@ -677,7 +711,7 @@ the more significant byte last.
    opcode finds the keyword parameters first.  For each keyword argument, the value
    is on top of the key.  Below the keyword parameters, the positional parameters
    are on the stack, with the right-most parameter on top.  Below the parameters,
-   the function object to call is on the stack.  Pops all function arguments, and 
+   the function object to call is on the stack.  Pops all function arguments, and
    the function itself off the stack, and pushes the return value.
 
 

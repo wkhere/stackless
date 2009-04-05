@@ -54,7 +54,7 @@ class GzipFile:
     max_read_chunk = 10 * 1024 * 1024   # 10Mb
 
     def __init__(self, filename=None, mode=None,
-                 compresslevel=9, fileobj=None):
+                 compresslevel=9, fileobj=None, mtime=None):
         """Constructor for the GzipFile class.
 
         At least one of fileobj and filename must be given a
@@ -80,6 +80,15 @@ class GzipFile:
         The compresslevel argument is an integer from 1 to 9 controlling the
         level of compression; 1 is fastest and produces the least compression,
         and 9 is slowest and produces the most compression.  The default is 9.
+
+        The mtime argument is an optional numeric timestamp to be written
+        to the stream when compressing.  All gzip compressed streams
+        are required to contain a timestamp.  If omitted or None, the
+        current time is used.  This module ignores the timestamp when
+        decompressing; however, some programs, such as gunzip, make use
+        of it.  The format of the timestamp is the same as that of the
+        return value of time.time() and of the st_mtime member of the
+        object returned by os.stat().
 
         """
 
@@ -119,6 +128,7 @@ class GzipFile:
 
         self.fileobj = fileobj
         self.offset = 0
+        self.mtime = mtime
 
         if self.mode == WRITE:
             self._write_gzip_header()
@@ -157,7 +167,10 @@ class GzipFile:
         if fname:
             flags = FNAME
         self.fileobj.write(chr(flags).encode('latin-1'))
-        write32u(self.fileobj, int(time.time()))
+        mtime = self.mtime
+        if mtime is None:
+            mtime = time.time()
+        write32u(self.fileobj, int(mtime))
         self.fileobj.write(b'\002')
         self.fileobj.write(b'\377')
         if fname:
@@ -175,10 +188,10 @@ class GzipFile:
         if method != 8:
             raise IOError('Unknown compression method')
         flag = ord( self.fileobj.read(1) )
-        # modtime = self.fileobj.read(4)
+        self.mtime = read32(self.fileobj)
         # extraflag = self.fileobj.read(1)
         # os = self.fileobj.read(1)
-        self.fileobj.read(6)
+        self.fileobj.read(2)
 
         if flag & FEXTRA:
             # Read & discard the extra field, if present
@@ -459,6 +472,14 @@ class GzipFile:
         else:
             raise StopIteration
 
+    def __enter__(self):
+        if self.fileobj is None:
+            raise ValueError("I/O operation on closed GzipFile object")
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
 
 def _test():
     # Act like gzip; with -d, act like gunzip.
@@ -473,8 +494,8 @@ def _test():
     for arg in args:
         if decompress:
             if arg == "-":
-                f = GzipFile(filename="", mode="rb", fileobj=sys.stdin)
-                g = sys.stdout
+                f = GzipFile(filename="", mode="rb", fileobj=sys.stdin.buffer)
+                g = sys.stdout.buffer
             else:
                 if arg[-3:] != ".gz":
                     print("filename doesn't end in .gz:", repr(arg))
@@ -483,8 +504,8 @@ def _test():
                 g = builtins.open(arg[:-3], "wb")
         else:
             if arg == "-":
-                f = sys.stdin
-                g = GzipFile(filename="", mode="wb", fileobj=sys.stdout)
+                f = sys.stdin.buffer
+                g = GzipFile(filename="", mode="wb", fileobj=sys.stdout.buffer)
             else:
                 f = builtins.open(arg, "rb")
                 g = open(arg + ".gz", "wb")

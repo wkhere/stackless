@@ -115,7 +115,7 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 		ns = PyDict_New();
 	}
 	else {
-		PyObject *pargs = Py_BuildValue("OO", name, bases);
+		PyObject *pargs = PyTuple_Pack(2, name, bases);
 		if (pargs == NULL) {
 			Py_DECREF(prep);
 			Py_DECREF(meta);
@@ -136,7 +136,7 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 	cell = PyObject_CallFunctionObjArgs(func, ns, NULL);
 	if (cell != NULL) {
 		PyObject *margs;
-		margs = Py_BuildValue("OOO", name, bases, ns);
+		margs = PyTuple_Pack(3, name, bases, ns);
 		if (margs != NULL) {
 			cls = PyEval_CallObjectWithKeywords(meta, margs, mkw);
 			Py_DECREF(margs);
@@ -378,7 +378,6 @@ filter_next(filterobject *lz)
 	long ok;
 	PyObject *(*iternext)(PyObject *);
 
-	assert(PyIter_Check(it));
 	iternext = *Py_TYPE(it)->tp_iternext;
 	for (;;) {
 		item = iternext(it);
@@ -420,7 +419,7 @@ PyTypeObject PyFilter_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -497,32 +496,14 @@ PyDoc_STR(
 ;
 
 
-static PyObject *
-builtin_cmp(PyObject *self, PyObject *args)
-{
-	PyObject *a, *b;
-	int c;
-
-	if (!PyArg_UnpackTuple(args, "cmp", 2, 2, &a, &b))
-		return NULL;
-	if (PyObject_Cmp(a, b, &c) < 0)
-		return NULL;
-	return PyLong_FromLong((long)c);
-}
-
-PyDoc_STRVAR(cmp_doc,
-"cmp(x, y) -> integer\n\
-\n\
-Return negative if x<y, zero if x==y, positive if x>y.");
-
-
 static char *
-source_as_string(PyObject *cmd, char *funcname, char *what)
+source_as_string(PyObject *cmd, char *funcname, char *what, PyCompilerFlags *cf)
 {
 	char *str;
 	Py_ssize_t size;
 
 	if (PyUnicode_Check(cmd)) {
+		cf->cf_flags |= PyCF_IGNORE_COOKIE;
 		cmd = _PyUnicode_AsDefaultEncodedString(cmd, NULL);
 		if (cmd == NULL)
 			return NULL;
@@ -614,7 +595,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 		return result;
 	}
 
-	str = source_as_string(cmd, "compile", "string, bytes, AST or code");
+	str = source_as_string(cmd, "compile", "string, bytes, AST or code", &cf);
 	if (str == NULL)
 		return NULL;
 
@@ -728,14 +709,14 @@ builtin_eval(PyObject *self, PyObject *args)
 		return PyEval_EvalCode((PyCodeObject *) cmd, globals, locals);
 	}
 
-	str = source_as_string(cmd, "eval", "string, bytes or code");
+	cf.cf_flags = PyCF_SOURCE_IS_UTF8;
+	str = source_as_string(cmd, "eval", "string, bytes or code", &cf);
 	if (str == NULL)
 		return NULL;
 
 	while (*str == ' ' || *str == '\t')
 		str++;
 
-	cf.cf_flags = PyCF_SOURCE_IS_UTF8;
 	(void)PyEval_MergeCompilerFlags(&cf);
 	STACKLESS_PROMOTE_ALL();
 	result = PyRun_StringFlags(str, Py_eval_input, globals, locals, &cf);
@@ -762,7 +743,7 @@ builtin_exec(PyObject *self, PyObject *args)
 	PyObject *prog, *globals = Py_None, *locals = Py_None;
 	int plain = 0;
 
-	if (!PyArg_ParseTuple(args, "O|OO:exec", &prog, &globals, &locals))
+	if (!PyArg_UnpackTuple(args, "exec", 1, 3, &prog, &globals, &locals))
 		return NULL;
 	
 	if (globals == Py_None) {
@@ -809,12 +790,13 @@ builtin_exec(PyObject *self, PyObject *args)
 		STACKLESS_ASSERT();
 	}
 	else {
-		char *str = source_as_string(prog, "exec",
-					     "string, bytes or code");
+		char *str;
 		PyCompilerFlags cf;
+		cf.cf_flags = PyCF_SOURCE_IS_UTF8;
+		str = source_as_string(prog, "exec",
+					     "string, bytes or code", &cf);
 		if (str == NULL)
 			return NULL;
-		cf.cf_flags = PyCF_SOURCE_IS_UTF8;
 		STACKLESS_PROMOTE_ALL();
 		if (PyEval_MergeCompilerFlags(&cf))
 			v = PyRun_StringFlags(str, Py_file_input, globals,
@@ -836,8 +818,8 @@ builtin_exec(PyObject *self, PyObject *args)
 PyDoc_STRVAR(exec_doc,
 "exec(object[, globals[, locals]])\n\
 \n\
-Read and execute code from a object, which can be a string, a code\n\
-object or a file object.\n\
+Read and execute code from a object, which can be a string or a code\n\
+object.\n\
 The globals and locals are dictionaries, defaulting to the current\n\
 globals and locals.  If only globals is given, locals defaults to it.");
 
@@ -1053,7 +1035,7 @@ PyTypeObject PyMap_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -1734,15 +1716,14 @@ For most object types, eval(repr(object)) == object.");
 static PyObject *
 builtin_round(PyObject *self, PyObject *args, PyObject *kwds)
 {
-#define UNDEF_NDIGITS (-0x7fffffff) /* Unlikely ndigits value */
 	static PyObject *round_str = NULL;
-	int ndigits = UNDEF_NDIGITS;
+	PyObject *ndigits = NULL;
 	static char *kwlist[] = {"number", "ndigits", 0};
 	PyObject *number, *round;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|i:round",
-                kwlist, &number, &ndigits))
-                return NULL;
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O:round",
+					 kwlist, &number, &ndigits))
+		return NULL;
 
 	if (Py_TYPE(number)->tp_dict == NULL) {
 		if (PyType_Ready(Py_TYPE(number)) < 0)
@@ -1763,15 +1744,14 @@ builtin_round(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
-	if (ndigits == UNDEF_NDIGITS)
-                return PyObject_CallFunction(round, "O", number);
+	if (ndigits == NULL)
+		return PyObject_CallFunction(round, "O", number);
 	else
-                return PyObject_CallFunction(round, "Oi", number, ndigits);
-#undef UNDEF_NDIGITS
+		return PyObject_CallFunction(round, "OO", number, ndigits);
 }
 
 PyDoc_STRVAR(round_doc,
-"round(number[, ndigits]) -> floating point number\n\
+"round(number[, ndigits]) -> number\n\
 \n\
 Round a number to a given precision in decimal digits (default 0 digits).\n\
 This returns an int when called with one argument, otherwise the\n\
@@ -2160,7 +2140,6 @@ zip_next(zipobject *lz)
 		Py_INCREF(result);
 		for (i=0 ; i < tuplesize ; i++) {
 			it = PyTuple_GET_ITEM(lz->ittuple, i);
-			assert(PyIter_Check(it));
 			item = (*Py_TYPE(it)->tp_iternext)(it);
 			if (item == NULL) {
 				Py_DECREF(result);
@@ -2176,7 +2155,6 @@ zip_next(zipobject *lz)
 			return NULL;
 		for (i=0 ; i < tuplesize ; i++) {
 			it = PyTuple_GET_ITEM(lz->ittuple, i);
-			assert(PyIter_Check(it));
 			item = (*Py_TYPE(it)->tp_iternext)(it);
 			if (item == NULL) {
 				Py_DECREF(result);
@@ -2194,9 +2172,7 @@ PyDoc_STRVAR(zip_doc,
 Return a zip object whose .__next__() method returns a tuple where\n\
 the i-th element comes from the i-th iterable argument.  The .__next__()\n\
 method continues until the shortest iterable in the argument sequence\n\
-is exhausted and then it raises StopIteration.  Works like the zip()\n\
-function but consumes less memory by returning an iterator instead of\n\
-a list.");
+is exhausted and then it raises StopIteration.");
 
 PyTypeObject PyZip_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -2208,7 +2184,7 @@ PyTypeObject PyZip_Type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	0,				/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */
@@ -2253,7 +2229,6 @@ static PyMethodDef builtin_methods[] = {
  	{"ascii",	builtin_ascii,      METH_O, ascii_doc},
 	{"bin",		builtin_bin,	    METH_O, bin_doc},
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
- 	{"cmp",		builtin_cmp,        METH_VARARGS, cmp_doc},
  	{"compile",	(PyCFunction)builtin_compile,    METH_VARARGS | METH_KEYWORDS, compile_doc},
  	{"delattr",	builtin_delattr,    METH_VARARGS, delattr_doc},
  	{"dir",		builtin_dir,        METH_VARARGS, dir_doc},

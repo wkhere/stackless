@@ -31,7 +31,7 @@ returning data from the target object.
 
 .. index:: single: PyBufferProcs
 
-More information on the buffer interface is provided in the section 
+More information on the buffer interface is provided in the section
 :ref:`buffer-structs`, under the description for :ctype:`PyBufferProcs`.
 
 Buffer objects are useful as a way to expose the data from another object's
@@ -93,7 +93,7 @@ could be used to pass around structured data in its native, in-memory format.
       occur (striding in a contiguous memory block).
 
       Here is a function that returns a pointer to the element in an N-D array
-      pointed to by an N-dimesional index when there are both non-NULL strides
+      pointed to by an N-dimensional index when there are both non-NULL strides
       and suboffsets::
 
           void *get_item_pointer(int ndim, void *buf, Py_ssize_t *strides,
@@ -104,7 +104,7 @@ could be used to pass around structured data in its native, in-memory format.
                   pointer += strides[i] * indices[i];
                   if (suboffsets[i] >=0 ) {
                       pointer = *((char**)pointer) + suboffsets[i];
-                  }                     
+                  }
               }
               return (void*)pointer;
            }
@@ -252,7 +252,7 @@ Buffer related functions
 
 .. cfunction:: void PyBuffer_Release(PyObject *obj, Py_buffer *view)
 
-   Release the buffer *view* over *obj*.  This shouldd be called when the buffer
+   Release the buffer *view* over *obj*.  This should be called when the buffer
    is no longer being used as it may free memory from it.
 
 

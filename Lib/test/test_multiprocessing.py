@@ -17,21 +17,19 @@ import copy
 import socket
 import random
 import logging
+import test.support
 
 
-# Work around broken sem_open implementations
-try:
-    import multiprocessing.synchronize
-except ImportError as e:
-    from test.test_support import TestSkipped
-    raise TestSkipped(e)
+# Skip tests if _multiprocessing wasn't built.
+_multiprocessing = test.support.import_module('_multiprocessing')
+# Skip tests if sem_open implementation is broken.
+test.support.import_module('multiprocessing.synchronize')
 
 import multiprocessing.dummy
 import multiprocessing.connection
 import multiprocessing.managers
 import multiprocessing.heap
 import multiprocessing.pool
-import _multiprocessing
 
 from multiprocessing import util
 
@@ -61,6 +59,8 @@ else:
 
 HAVE_GETVALUE = not getattr(_multiprocessing,
                             'HAVE_BROKEN_SEM_GETVALUE', False)
+
+WIN32 = (sys.platform == "win32")
 
 #
 # Creates a wrapper for a function which records the time it takes to finish
@@ -547,6 +547,10 @@ class _TestLock(BaseTestCase):
         self.assertEqual(lock.release(), None)
         self.assertRaises((AssertionError, RuntimeError), lock.release)
 
+    def test_lock_context(self):
+        with self.Lock():
+            pass
+
 
 class _TestSemaphore(BaseTestCase):
 
@@ -830,9 +834,15 @@ class _TestValue(BaseTestCase):
         obj3 = val3.get_obj()
         self.assertEqual(lock, lock3)
 
-        arr4 = self.RawValue('i', 5)
+        arr4 = self.Value('i', 5, lock=False)
         self.assertFalse(hasattr(arr4, 'get_lock'))
         self.assertFalse(hasattr(arr4, 'get_obj'))
+
+        self.assertRaises(AttributeError, self.Value, 'i', 5, lock='navalue')
+
+        arr5 = self.RawValue('i', 5)
+        self.assertFalse(hasattr(arr5, 'get_lock'))
+        self.assertFalse(hasattr(arr5, 'get_obj'))
 
 
 class _TestArray(BaseTestCase):
@@ -888,9 +898,15 @@ class _TestArray(BaseTestCase):
         obj3 = arr3.get_obj()
         self.assertEqual(lock, lock3)
 
-        arr4 = self.RawArray('i', list(range(10)))
+        arr4 = self.Array('i', range(10), lock=False)
         self.assertFalse(hasattr(arr4, 'get_lock'))
         self.assertFalse(hasattr(arr4, 'get_obj'))
+        self.assertRaises(AttributeError,
+                          self.Array, 'i', range(10), lock='notalock')
+
+        arr5 = self.RawArray('i', range(10))
+        self.assertFalse(hasattr(arr5, 'get_lock'))
+        self.assertFalse(hasattr(arr5, 'get_obj'))
 
 #
 #
@@ -1044,8 +1060,10 @@ class _TestZZZNumberOfObjects(BaseTestCase):
         multiprocessing.active_children()  # discard dead process objs
         gc.collect()                       # do garbage collection
         refs = self.manager._number_of_objects()
+        debug_info = self.manager._debug_info()
         if refs != EXPECTED_NUMBER:
             print(self.manager._debug_info())
+            print(debug_info)
 
         self.assertEqual(refs, EXPECTED_NUMBER)
 
@@ -1173,6 +1191,32 @@ class _TestRemoteManager(BaseTestCase):
 
         # Make queue finalizer run before the server is stopped
         del queue
+        manager.shutdown()
+
+class _TestManagerRestart(BaseTestCase):
+
+    def _putter(self, address, authkey):
+        manager = QueueManager(
+            address=address, authkey=authkey, serializer=SERIALIZER)
+        manager.connect()
+        queue = manager.get_queue()
+        queue.put('hello world')
+
+    def test_rapid_restart(self):
+        authkey = os.urandom(32)
+        manager = QueueManager(
+            address=('localhost', 9999), authkey=authkey, serializer=SERIALIZER)
+        manager.start()
+
+        p = self.Process(target=self._putter, args=(manager.address, authkey))
+        p.start()
+        queue = manager.get_queue()
+        self.assertEqual(queue.get(), 'hello world')
+        del queue
+        manager.shutdown()
+        manager = QueueManager(
+            address=('localhost', 9999), authkey=authkey, serializer=SERIALIZER)
+        manager.start()
         manager.shutdown()
 
 #
@@ -1671,6 +1715,18 @@ class _TestLogging(BaseTestCase):
         logger.setLevel(level=LOG_LEVEL)
 
 #
+# Test to verify handle verification, see issue 3321
+#
+
+class TestInvalidHandle(unittest.TestCase):
+
+    def test_invalid_handles(self):
+        if WIN32:
+            return
+        conn = _multiprocessing.Connection(44977608)
+        self.assertRaises(IOError, conn.poll)
+        self.assertRaises(IOError, _multiprocessing.Connection, -1)
+#
 # Functions used to create test cases from the base ones in this module
 #
 
@@ -1774,7 +1830,7 @@ class OtherTest(unittest.TestCase):
                           multiprocessing.connection.answer_challenge,
                           _FakeConnection(), b'abc')
 
-testcases_other = [OtherTest]
+testcases_other = [OtherTest, TestInvalidHandle]
 
 #
 #
@@ -1786,7 +1842,7 @@ def test_main(run=None):
             lock = multiprocessing.RLock()
         except OSError:
             from test.support import TestSkipped
-            raise TestSkipped("OSError raises on RLock creation, see issue 3111!")
+            raise unittest.SkipTest("OSError raises on RLock creation, see issue 3111!")
 
     if run is None:
         from test.support import run_unittest as run

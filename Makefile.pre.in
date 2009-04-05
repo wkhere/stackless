@@ -200,6 +200,16 @@ MODULE_OBJS=	\
 # Used of signalmodule.o is not available
 SIGNAL_OBJS=	@SIGNAL_OBJS@
 
+IO_H=		Modules/_io/_iomodule.h
+
+IO_OBJS=	\
+		Modules/_io/_iomodule.o \
+		Modules/_io/iobase.o \
+		Modules/_io/fileio.o \
+		Modules/_io/bufferedio.o \
+		Modules/_io/textio.o \
+		Modules/_io/bytesio.o \
+		Modules/_io/stringio.o
 
 ##########################################################################
 # Grammar
@@ -254,6 +264,16 @@ ASDLGEN=	$(srcdir)/Parser/asdl_c.py
 
 ##########################################################################
 # Python
+
+OPCODETARGETS_H= \
+		$(srcdir)/Python/opcode_targets.h
+
+OPCODETARGETGEN= \
+		$(srcdir)/Python/makeopcodetargets.py
+
+OPCODETARGETGEN_FILES= \
+		$(OPCODETARGETGEN) $(srcdir)/Lib/opcode.py
+
 PYTHON_OBJS=	\
 		Python/_warnings.o \
 		Python/Python-ast.o \
@@ -280,7 +300,6 @@ PYTHON_OBJS=	\
 		Python/getargs.o \
 		Python/getcompiler.o \
 		Python/getcopyright.o \
-		Python/getmtime.o \
 		Python/getplatform.o \
 		Python/getversion.o \
 		Python/graminit.o \
@@ -427,14 +446,18 @@ $(LIBRARY): $(LIBRARY_OBJS)
 
 libpython$(VERSION).so: $(LIBRARY_OBJS)
 	if test $(INSTSONAME) != $(LDLIBRARY); then \
-		$(LDSHARED) $(LDFLAGS) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+		$(LDSHARED) $(LDFLAGS) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 		$(LN) -f $(INSTSONAME) $@; \
-	else\
-		$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+	else \
+		$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 	fi
 
+libpython$(VERSION).dylib: $(LIBRARY_OBJS)
+	 $(CC) -dynamiclib -Wl,-single_module $(LDFLAGS) -undefined dynamic_lookup -Wl,-install_name,$(prefix)/lib/libpython$(VERSION).dylib -Wl,-compatibility_version,$(VERSION) -Wl,-current_version,$(VERSION) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+		 
+
 libpython$(VERSION).sl: $(LIBRARY_OBJS)
-	$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST)
+	$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST)
 
 # This rule is here for OPENSTEP/Rhapsody/MacOSX. It builds a temporary
 # minimal framework (not including the Lib directory and such) in the current
@@ -525,6 +548,7 @@ Modules/getpath.o: $(srcdir)/Modules/getpath.c Makefile
 Modules/python.o: $(srcdir)/Modules/python.c
 	$(MAINCC) -c $(PY_CFLAGS) -o $@ $(srcdir)/Modules/python.c
 
+$(IO_OBJS): $(IO_H)
 
 $(GRAMMAR_H) $(GRAMMAR_C): $(PGEN) $(GRAMMAR_INPUT)
 		-@$(INSTALL) -d Include
@@ -573,16 +597,21 @@ BYTESTR_DEPS = \
 		$(srcdir)/Objects/stringlib/unicodedefs.h \
 		$(srcdir)/Objects/stringlib/localeutil.h
 
-Objects/stringobject.o: $(srcdir)/Objects/bytesobject.c $(BYTESTR_DEPS)
+Objects/bytesobject.o: $(srcdir)/Objects/bytesobject.c $(BYTESTR_DEPS)
 
-Objects/bytesobject.o: $(srcdir)/Objects/bytearrayobject.c $(BYTESTR_DEPS) 
+Objects/bytearrayobject.o: $(srcdir)/Objects/bytearrayobject.c $(BYTESTR_DEPS) 
 
 Objects/unicodeobject.o: $(srcdir)/Objects/unicodeobject.c \
-                                             $(BYTESTR_DEPS) \
-                                             $(srcdir)/Objects/stringlib/formatter.h
+				$(BYTESTR_DEPS) \
+				$(srcdir)/Objects/stringlib/formatter.h
+
+$(OPCODETARGETS_H): $(OPCODETARGETGEN_FILES)
+	$(OPCODETARGETGEN) $(OPCODETARGETS_H)
+
+Python/ceval.o: $(OPCODETARGETS_H)
 
 Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
-                                             $(BYTESTR_DEPS)
+				$(BYTESTR_DEPS)
 
 
 Stackless/core/slp_transfer.o: $(srcdir)/Stackless/core/slp_transfer.c
@@ -741,9 +770,10 @@ buildbottest:	all platform
 		fi
 		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall -rw
 
-QUICKTESTOPTS=	$(TESTOPTS) -x test_thread test_signal test_strftime \
-		test_unicodedata test_re test_sre test_select test_poll \
-		test_struct test_zlib
+QUICKTESTOPTS=	$(TESTOPTS) -x test_subprocess test_io test_lib2to3 \
+		test_multibytecodec test_urllib2_localnet test_itertools \
+		test_multiprocessing test_mailbox test_socket test_poll \
+		test_select test_zipfile
 quicktest:	all platform
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTPYTHON) $(TESTPROG) $(QUICKTESTOPTS)
@@ -815,13 +845,13 @@ altbininstall:	$(BUILDPYTHON)
 		fi; \
 	done
 	$(INSTALL_PROGRAM) $(BUILDPYTHON) $(DESTDIR)$(BINDIR)/python$(VERSION)$(EXE)
-	if test -f libpython$(VERSION)$(SO); then \
-		if test "$(SO)" = .dll; then \
-			$(INSTALL_SHARED) libpython$(VERSION)$(SO) $(DESTDIR)$(BINDIR); \
+	if test -f $(LDLIBRARY); then \
+		if test -n "$(DLLLIBRARY)" ; then \
+			$(INSTALL_SHARED) $(DLLLIBRARY) $(DESTDIR)$(BINDIR); \
 		else \
-			$(INSTALL_SHARED) libpython$(VERSION)$(SO) $(DESTDIR)$(LIBDIR)/$(INSTSONAME); \
-			if test libpython$(VERSION)$(SO) != $(INSTSONAME); then \
-				(cd $(DESTDIR)$(LIBDIR); $(LN) -sf $(INSTSONAME) libpython$(VERSION)$(SO)); \
+			$(INSTALL_SHARED) $(LDLIBRARY) $(DESTDIR)$(LIBDIR)/$(INSTSONAME); \
+			if test $(LDLIBRARY) != $(INSTSONAME); then \
+				(cd $(DESTDIR)$(LIBDIR); $(LN) -sf $(INSTSONAME) $(LDLIBRARY)) \
 			fi \
 		fi; \
 	else	true; \
@@ -855,6 +885,9 @@ LIBSUBDIRS=	tkinter site-packages test test/output test/data \
 		lib2to3 lib2to3/fixes lib2to3/pgen2 lib2to3/tests \
 		ctypes ctypes/test ctypes/macholib idlelib idlelib/Icons \
 		distutils distutils/command distutils/tests $(XMLLIBSUBDIRS) \
+		importlib importlib/test importlib/test/builtin \
+		importlib/test/extension importlib/test/frozen \
+		importlib/test/import_ importlib/test/source \
 		setuptools setuptools/command setuptools/tests setuptools.egg-info \
 		multiprocessing multiprocessing/dummy \
 		curses $(MACHDEPS)
@@ -941,7 +974,7 @@ $(srcdir)/Lib/$(PLATDIR):
 	export PYTHONPATH; PYTHONPATH="`pwd`/Lib"; \
 	export DYLD_FRAMEWORK_PATH; DYLD_FRAMEWORK_PATH="`pwd`"; \
 	export EXE; EXE="$(BUILDEXE)"; \
-	cd $(srcdir)/Lib/$(PLATDIR); ./regen
+	cd $(srcdir)/Lib/$(PLATDIR); $(RUNSHARED) ./regen
 
 # Install the include files
 INCLDIRSTOMAKE=$(INCLUDEDIR) $(CONFINCLUDEDIR) $(INCLUDEPY) $(CONFINCLUDEPY)
@@ -1105,7 +1138,7 @@ frameworkaltinstallunixtools4way:
 # This installs the Demos and Tools into the applications directory.
 # It is not part of a normal frameworkinstall
 frameworkinstallextras:
-	cd Mac && Make installextras DESTDIR="$(DESTDIR)"
+	cd Mac && $(MAKE) installextras DESTDIR="$(DESTDIR)"
 
 # This installs a few of the useful scripts in Tools/scripts
 scriptsinstall:

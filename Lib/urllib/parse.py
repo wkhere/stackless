@@ -19,7 +19,7 @@ uses_relative = ['ftp', 'http', 'gopher', 'nntp', 'imap',
 uses_netloc = ['ftp', 'http', 'gopher', 'nntp', 'telnet',
                'imap', 'wais', 'file', 'mms', 'https', 'shttp',
                'snews', 'prospero', 'rtsp', 'rtspu', 'rsync', '',
-               'svn', 'svn+ssh', 'sftp']
+               'svn', 'svn+ssh', 'sftp','nfs']
 non_hierarchical = ['gopher', 'hdl', 'mailto', 'news',
                     'telnet', 'wais', 'imap', 'snews', 'sip', 'sips']
 uses_params = ['ftp', 'hdl', 'prospero', 'http', 'imap',
@@ -479,12 +479,17 @@ def quote_plus(string, safe='', encoding=None, errors=None):
     HTML form values. Plus signs in the original string are escaped unless
     they are included in safe. It also does not have safe default to '/'.
     """
-    # Check if ' ' in string, where string may either be a str or bytes
-    if ' ' in string if isinstance(string, str) else b' ' in string:
-        string = quote(string,
-                       safe + ' ' if isinstance(safe, str) else safe + b' ')
-        return string.replace(' ', '+')
-    return quote(string, safe, encoding, errors)
+    # Check if ' ' in string, where string may either be a str or bytes.  If
+    # there are no spaces, the regular quote will produce the right answer.
+    if ((isinstance(string, str) and ' ' not in string) or
+        (isinstance(string, bytes) and b' ' not in string)):
+        return quote(string, safe, encoding, errors)
+    if isinstance(safe, str):
+        space = ' '
+    else:
+        space = b' '
+    string = quote(string, safe + space)
+    return string.replace(' ', '+')
 
 def quote_from_bytes(bs, safe='/'):
     """Like quote(), but accepts a bytes object rather than a str, and does
@@ -502,9 +507,9 @@ def quote_from_bytes(bs, safe='/'):
     except KeyError:
         quoter = Quoter(safe)
         _safe_quoters[cachekey] = quoter
-    return ''.join(map(quoter.__getitem__, bs))
+    return ''.join([quoter[char] for char in bs])
 
-def urlencode(query,doseq=0):
+def urlencode(query, doseq=0):
     """Encode a sequence of two-element tuples or dictionary into a URL query string.
 
     If any values in the query arg are sequences and doseq is true, each
@@ -515,28 +520,27 @@ def urlencode(query,doseq=0):
     input.
     """
 
-    if hasattr(query,"items"):
-        # mapping objects
+    if hasattr(query, "items"):
         query = query.items()
     else:
-        # it's a bother at times that strings and string-like objects are
-        # sequences...
+        # It's a bother at times that strings and string-like objects are
+        # sequences.
         try:
             # non-sequence items should not work with len()
             # non-empty strings will fail this
             if len(query) and not isinstance(query[0], tuple):
                 raise TypeError
-            # zero-length sequences of all types will get here and succeed,
-            # but that's a minor nit - since the original implementation
+            # Zero-length sequences of all types will get here and succeed,
+            # but that's a minor nit.  Since the original implementation
             # allowed empty dicts that type of behavior probably should be
             # preserved for consistency
         except TypeError:
-            ty,va,tb = sys.exc_info()
-            raise TypeError("not a valid non-string sequence or mapping object").with_traceback(tb)
+            ty, va, tb = sys.exc_info()
+            raise TypeError("not a valid non-string sequence "
+                            "or mapping object").with_traceback(tb)
 
     l = []
     if not doseq:
-        # preserve old behavior
         for k, v in query:
             k = quote_plus(str(k))
             v = quote_plus(str(v))
@@ -547,15 +551,9 @@ def urlencode(query,doseq=0):
             if isinstance(v, str):
                 v = quote_plus(v)
                 l.append(k + '=' + v)
-            elif isinstance(v, str):
-                # is there a reasonable way to convert to ASCII?
-                # encode generates a string, but "replace" or "ignore"
-                # lose information and "strict" can raise UnicodeError
-                v = quote_plus(v.encode("ASCII","replace"))
-                l.append(k + '=' + v)
             else:
                 try:
-                    # is this a sufficient test for sequence-ness?
+                    # Is this a sufficient test for sequence-ness?
                     x = len(v)
                 except TypeError:
                     # not a sequence
@@ -647,7 +645,7 @@ def splitpasswd(user):
     global _passwdprog
     if _passwdprog is None:
         import re
-        _passwdprog = re.compile('^([^:]*):(.*)$')
+        _passwdprog = re.compile('^([^:]*):(.*)$',re.S)
 
     match = _passwdprog.match(user)
     if match: return match.group(1, 2)

@@ -2,7 +2,7 @@
 ----------------------------------------------------------
 
 .. module:: email.mime
-   :synopsis: Build MIME messages. 
+   :synopsis: Build MIME messages.
 
 
 Ordinarily, you get a message object structure by passing a file or some text to
@@ -19,6 +19,7 @@ things easier.
 
 Here are the classes:
 
+.. currentmodule:: email.mime.base
 
 .. class:: MIMEBase(_maintype, _subtype, **_params)
 
@@ -39,6 +40,8 @@ Here are the classes:
    :mailheader:`MIME-Version` header (always set to ``1.0``).
 
 
+.. currentmodule:: email.mime.nonmultipart
+
 .. class:: MIMENonMultipart()
 
    Module: :mod:`email.mime.nonmultipart`
@@ -50,14 +53,16 @@ Here are the classes:
    :exc:`MultipartConversionError` exception is raised.
 
 
-.. class:: MIMEMultipart([subtype[, boundary[, _subparts[, _params]]]])
+.. currentmodule:: email.mime.multipart
+
+.. class:: MIMEMultipart([_subtype[, boundary[, _subparts[, _params]]]])
 
    Module: :mod:`email.mime.multipart`
 
    A subclass of :class:`MIMEBase`, this is an intermediate base class for MIME
    messages that are :mimetype:`multipart`.  Optional *_subtype* defaults to
    :mimetype:`mixed`, but can be used to specify the subtype of the message.  A
-   :mailheader:`Content-Type` header of :mimetype:`multipart/`*_subtype* will be
+   :mailheader:`Content-Type` header of :mimetype:`multipart/_subtype` will be
    added to the message object.  A :mailheader:`MIME-Version` header will also be
    added.
 
@@ -72,6 +77,8 @@ Here are the classes:
    the keyword arguments, or passed into the *_params* argument, which is a keyword
    dictionary.
 
+
+.. currentmodule:: email.mime.application
 
 .. class:: MIMEApplication(_data[, _subtype[, _encoder[, **_params]]])
 
@@ -92,6 +99,8 @@ Here are the classes:
 
    *_params* are passed straight through to the base class constructor.
 
+
+.. currentmodule:: email.mime.audio
 
 .. class:: MIMEAudio(_audiodata[, _subtype[, _encoder[, **_params]]])
 
@@ -116,6 +125,8 @@ Here are the classes:
    *_params* are passed straight through to the base class constructor.
 
 
+.. currentmodule:: email.mime.image
+
 .. class:: MIMEImage(_imagedata[, _subtype[, _encoder[, **_params]]])
 
    Module: :mod:`email.mime.image`
@@ -139,6 +150,8 @@ Here are the classes:
    *_params* are passed straight through to the :class:`MIMEBase` constructor.
 
 
+.. currentmodule:: email.mime.message
+
 .. class:: MIMEMessage(_msg[, _subtype])
 
    Module: :mod:`email.mime.message`
@@ -151,6 +164,8 @@ Here are the classes:
    Optional *_subtype* sets the subtype of the message; it defaults to
    :mimetype:`rfc822`.
 
+
+.. currentmodule:: email.mime.text
 
 .. class:: MIMEText(_text[, _subtype[, _charset]])
 

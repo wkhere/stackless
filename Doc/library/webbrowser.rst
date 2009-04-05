@@ -155,7 +155,7 @@ Here are some simple examples::
 
    url = 'http://www.python.org'
 
-   # Open URL in a new tab, if a browser window is already open. 
+   # Open URL in a new tab, if a browser window is already open.
    webbrowser.open_new_tab(url + '/doc')
 
    # Open URL in new window, raising the window if possible.
@@ -167,8 +167,8 @@ Here are some simple examples::
 Browser Controller Objects
 --------------------------
 
-Browser controllers provide two methods which parallel two of the module-level
-convenience functions:
+Browser controllers provide these methods which parallel three of the
+module-level convenience functions:
 
 
 .. method:: controller.open(url[, new[, autoraise=1]])

@@ -69,6 +69,57 @@ Used in:  PY_LONG_LONG
 #endif
 #endif /* HAVE_LONG_LONG */
 
+/* a build with 30-bit digits for Python long integers needs an exact-width
+ * 32-bit unsigned integer type to store those digits.  (We could just use
+ * type 'unsigned long', but that would be wasteful on a system where longs
+ * are 64-bits.)  On Unix systems, the autoconf macro AC_TYPE_UINT32_T defines
+ * uint32_t to be such a type unless stdint.h or inttypes.h defines uint32_t.
+ * However, it doesn't set HAVE_UINT32_T, so we do that here.
+ */
+#if (defined UINT32_MAX || defined uint32_t)
+#ifndef PY_UINT32_T
+#define HAVE_UINT32_T 1
+#define PY_UINT32_T uint32_t
+#endif
+#endif
+
+/* Macros for a 64-bit unsigned integer type; used for type 'twodigits' in the
+ * long integer implementation, when 30-bit digits are enabled.
+ */
+#if (defined UINT64_MAX || defined uint64_t)
+#ifndef PY_UINT64_T
+#define HAVE_UINT64_T 1
+#define PY_UINT64_T uint64_t
+#endif
+#endif
+
+/* Signed variants of the above */
+#if (defined INT32_MAX || defined int32_t)
+#ifndef PY_INT32_T
+#define HAVE_INT32_T 1
+#define PY_INT32_T int32_t
+#endif
+#endif
+#if (defined INT64_MAX || defined int64_t)
+#ifndef PY_INT64_T
+#define HAVE_INT64_T 1
+#define PY_INT64_T int64_t
+#endif
+#endif
+
+/* If PYLONG_BITS_IN_DIGIT is not defined then we'll use 30-bit digits if all
+   the necessary integer types are available, and we're on a 64-bit platform
+   (as determined by SIZEOF_VOID_P); otherwise we use 15-bit digits. */
+
+#ifndef PYLONG_BITS_IN_DIGIT
+#if (defined HAVE_UINT64_T && defined HAVE_INT64_T && \
+     defined HAVE_UINT32_T && defined HAVE_INT32_T && SIZEOF_VOID_P >= 8)
+#define PYLONG_BITS_IN_DIGIT 30
+#else
+#define PYLONG_BITS_IN_DIGIT 15
+#endif
+#endif
+
 /* uintptr_t is the C9X name for an unsigned integral type such that a
  * legitimate void* can be cast to uintptr_t and then back to void* again
  * without loss of information.  Similarly for intptr_t, wrt a signed
@@ -310,19 +361,23 @@ extern "C" {
  * C doesn't define whether a right-shift of a signed integer sign-extends
  * or zero-fills.  Here a macro to force sign extension:
  * Py_ARITHMETIC_RIGHT_SHIFT(TYPE, I, J)
- *    Return I >> J, forcing sign extension.
+ *    Return I >> J, forcing sign extension.  Arithmetically, return the
+ *    floor of I/2**J.
  * Requirements:
- *    I is of basic signed type TYPE (char, short, int, long, or long long).
- *    TYPE is one of char, short, int, long, or long long, although long long
- *    must not be used except on platforms that support it.
- *    J is an integer >= 0 and strictly less than the number of bits in TYPE
- *    (because C doesn't define what happens for J outside that range either).
+ *    I should have signed integer type.  In the terminology of C99, this can
+ *    be either one of the five standard signed integer types (signed char,
+ *    short, int, long, long long) or an extended signed integer type.
+ *    J is an integer >= 0 and strictly less than the number of bits in the
+ *    type of I (because C doesn't define what happens for J outside that
+ *    range either).
+ *    TYPE used to specify the type of I, but is now ignored.  It's been left
+ *    in for backwards compatibility with versions <= 2.6 or 3.0.
  * Caution:
  *    I may be evaluated more than once.
  */
 #ifdef SIGNED_RIGHT_SHIFT_ZERO_FILLS
 #define Py_ARITHMETIC_RIGHT_SHIFT(TYPE, I, J) \
-	((I) < 0 ? ~((~(unsigned TYPE)(I)) >> (J)) : (I) >> (J))
+	((I) < 0 ? -1-((-1-(I)) >> (J)) : (I) >> (J))
 #else
 #define Py_ARITHMETIC_RIGHT_SHIFT(TYPE, I, J) ((I) >> (J))
 #endif
@@ -614,6 +669,15 @@ extern pid_t forkpty(int *, char *, struct termios *, struct winsize *);
 #define Py_FORMAT_PARSETUPLE(func,p1,p2) __attribute__((format(func,p1,p2)))
 #else
 #define Py_FORMAT_PARSETUPLE(func,p1,p2)
+#endif
+
+/*
+ * Specify alignment on compilers that support it.
+ */
+#if defined(__GNUC__) && __GNUC__ >= 3
+#define Py_ALIGNED(x) __attribute__((aligned(x)))
+#else
+#define Py_ALIGNED(x)
 #endif
 
 /* Eliminate end-of-loop code not reached warnings from SunPro C

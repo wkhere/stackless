@@ -23,7 +23,7 @@ well as strings, but only using the Base64 standard alphabet.
 
 The modern interface provides:
 
-.. function:: b64encode(s[, altchars])
+.. function:: b64encode(s, altchars=None)
 
    Encode a string use Base64.
 
@@ -36,7 +36,7 @@ The modern interface provides:
    The encoded string is returned.
 
 
-.. function:: b64decode(s[, altchars])
+.. function:: b64decode(s, altchars=None)
 
    Decode a Base64 encoded string.
 
@@ -62,7 +62,8 @@ The modern interface provides:
 .. function:: urlsafe_b64encode(s)
 
    Encode string *s* using a URL-safe alphabet, which substitutes ``-`` instead of
-   ``+`` and ``_`` instead of ``/`` in the standard Base64 alphabet.
+   ``+`` and ``_`` instead of ``/`` in the standard Base64 alphabet.  The result
+   can still contain ``=``.
 
 
 .. function:: urlsafe_b64decode(s)
@@ -77,7 +78,7 @@ The modern interface provides:
    is returned.
 
 
-.. function:: b32decode(s[, casefold[, map01]])
+.. function:: b32decode(s, casefold=False, map01=None)
 
    Decode a Base32 encoded string.
 
@@ -104,7 +105,7 @@ The modern interface provides:
    *s* is the string to encode.  The encoded string is returned.
 
 
-.. function:: b16decode(s[, casefold])
+.. function:: b16decode(s, casefold=False)
 
    Decode a Base16 encoded string.
 
@@ -154,7 +155,7 @@ An example usage of the module:
    >>> import base64
    >>> encoded = base64.b64encode('data to be encoded')
    >>> encoded
-   'ZGF0YSB0byBiZSBlbmNvZGVk'
+   b'ZGF0YSB0byBiZSBlbmNvZGVk'
    >>> data = base64.b64decode(encoded)
    >>> data
    'data to be encoded'

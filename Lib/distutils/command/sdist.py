@@ -4,7 +4,10 @@ Implements the Distutils 'sdist' command (create a source distribution)."""
 
 __revision__ = "$Id$"
 
-import sys, os
+import os
+import string
+import sys
+from types import *
 from glob import glob
 from distutils.core import Command
 from distutils import dir_util, dep_util, file_util, archive_util
@@ -12,7 +15,7 @@ from distutils.text_file import TextFile
 from distutils.errors import *
 from distutils.filelist import FileList
 from distutils import log
-
+from distutils.util import convert_path
 
 def show_formats ():
     """Print all possible values for the 'formats' option (used by
@@ -249,6 +252,9 @@ class sdist (Command):
           - setup.py
           - test/test*.py
           - all pure Python modules mentioned in setup script
+          - all files pointed by package_data (build_py)
+          - all files defined in data_files.
+          - all files defined as scripts.
           - all C sources listed as part of extensions or C libraries
             in the setup script (doesn't catch C headers!)
         Warns if (README or README.txt) or setup.py are missing; everything
@@ -280,9 +286,34 @@ class sdist (Command):
             if files:
                 self.filelist.extend(files)
 
+        # build_py is used to get:
+        #  - python modules
+        #  - files defined in package_data
+        build_py = self.get_finalized_command('build_py')
+
+        # getting python files
         if self.distribution.has_pure_modules():
-            build_py = self.get_finalized_command('build_py')
             self.filelist.extend(build_py.get_source_files())
+
+        # getting package_data files
+        # (computed in build_py.data_files by build_py.finalize_options)
+        for pkg, src_dir, build_dir, filenames in build_py.data_files:
+            for filename in filenames:
+                self.filelist.append(os.path.join(src_dir, filename))
+
+        # getting distribution.data_files
+        if self.distribution.has_data_files():
+            for item in self.distribution.data_files:
+                if isinstance(item, str): # plain file
+                    item = convert_path(item)
+                    if os.path.isfile(item):
+                        self.filelist.append(item)
+                else:    # a (dirname, filenames) tuple
+                    dirname, filenames = item
+                    for f in filenames:
+                        f = convert_path(f)
+                        if os.path.isfile(f):
+                            self.filelist.append(f)
 
         if self.distribution.has_ext_modules():
             build_ext = self.get_finalized_command('build_ext')
@@ -332,9 +363,18 @@ class sdist (Command):
 
         self.filelist.exclude_pattern(None, prefix=build.build_base)
         self.filelist.exclude_pattern(None, prefix=base_dir)
-        self.filelist.exclude_pattern(r'(^|/)(RCS|CVS|\.svn|\.hg|\.git|\.bzr|_darcs)/.*', is_regex=1)
 
-    def write_manifest(self):
+        if sys.platform == 'win32':
+            seps = r'/|\\'
+        else:
+            seps = '/'
+
+        vcs_dirs = ['RCS', 'CVS', r'\.svn', r'\.hg', r'\.git', r'\.bzr',
+                    '_darcs']
+        vcs_ptrn = r'(^|%s)(%s)(%s).*' % (seps, '|'.join(vcs_dirs), seps)
+        self.filelist.exclude_pattern(vcs_ptrn, is_regex=1)
+
+    def write_manifest (self):
         """Write the file list in 'self.filelist' (presumably as filled in
         by 'add_defaults()' and 'read_template()') to the manifest file
         named by 'self.manifest'.
@@ -416,6 +456,10 @@ class sdist (Command):
 
         self.make_release_tree(base_dir, self.filelist.files)
         archive_files = []              # remember names of files we create
+        # tar archive must be created last to avoid overwrite and remove
+        if 'tar' in self.formats:
+            self.formats.append(self.formats.pop(self.formats.index('tar')))
+
         for fmt in self.formats:
             file = self.make_archive(base_name, fmt, base_dir=base_dir)
             archive_files.append(file)

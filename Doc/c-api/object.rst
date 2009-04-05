@@ -89,27 +89,6 @@ Object Protocol
    *opid*.
 
 
-.. cfunction:: int PyObject_Cmp(PyObject *o1, PyObject *o2, int *result)
-
-   .. index:: builtin: cmp
-
-   Compare the values of *o1* and *o2* using a routine provided by *o1*, if one
-   exists, otherwise with a routine provided by *o2*.  The result of the comparison
-   is returned in *result*.  Returns ``-1`` on failure.  This is the equivalent of
-   the Python statement ``result = cmp(o1, o2)``.
-
-
-.. cfunction:: int PyObject_Compare(PyObject *o1, PyObject *o2)
-
-   .. index:: builtin: cmp
-
-   Compare the values of *o1* and *o2* using a routine provided by *o1*, if one
-   exists, otherwise with a routine provided by *o2*.  Returns the result of the
-   comparison on success.  On error, the value returned is undefined; use
-   :cfunc:`PyErr_Occurred` to detect an error.  This is equivalent to the Python
-   expression ``cmp(o1, o2)``.
-
-
 .. cfunction:: PyObject* PyObject_Repr(PyObject *o)
 
    .. index:: builtin: repr
@@ -261,8 +240,6 @@ is considered sufficient for this determination.
    This function receives special treatment when stored in a ``tp_hash`` slot,
    allowing a type to explicitly indicate to the interpreter that it is not
    hashable.
-
-   .. versionadded:: 2.6
 
 
 .. cfunction:: int PyObject_IsTrue(PyObject *o)

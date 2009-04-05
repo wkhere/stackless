@@ -35,11 +35,20 @@ in various ways.  There is a separate error indicator for each thread.
    Either alphabetical or some kind of structure.
 
 
-.. cfunction:: void PyErr_Print()
+.. cfunction:: void PyErr_PrintEx(int set_sys_last_vars)
 
    Print a standard traceback to ``sys.stderr`` and clear the error indicator.
    Call this function only when the error indicator is set.  (Otherwise it will
    cause a fatal error!)
+
+   If *set_sys_last_vars* is nonzero, the variables :data:`sys.last_type`,
+   :data:`sys.last_value` and :data:`sys.last_traceback` will be set to the
+   type, value and traceback of the printed exception, respectively.
+
+
+.. cfunction:: void PyErr_Print()
+
+   Alias for ``PyErr_PrintEx(1)``.
 
 
 .. cfunction:: PyObject* PyErr_Occurred()
@@ -67,11 +76,10 @@ in various ways.  There is a separate error indicator for each thread.
 
 .. cfunction:: int PyErr_GivenExceptionMatches(PyObject *given, PyObject *exc)
 
-   Return true if the *given* exception matches the exception in *exc*.  If *exc*
-   is a class object, this also returns true when *given* is an instance of a
-   subclass.  If *exc* is a tuple, all exceptions in the tuple (and recursively in
-   subtuples) are searched for a match.  If *given* is *NULL*, a memory access
-   violation will occur.
+   Return true if the *given* exception matches the exception in *exc*.  If
+   *exc* is a class object, this also returns true when *given* is an instance
+   of a subclass.  If *exc* is a tuple, all exceptions in the tuple (and
+   recursively in subtuples) are searched for a match.
 
 
 .. cfunction:: void PyErr_NormalizeException(PyObject**exc, PyObject**val, PyObject**tb)
@@ -272,9 +280,10 @@ in various ways.  There is a separate error indicator for each thread.
 
 .. cfunction:: void PyErr_BadInternalCall()
 
-   This is a shorthand for ``PyErr_SetString(PyExc_TypeError, message)``, where
-   *message* indicates that an internal operation (e.g. a Python/C API function)
-   was invoked with an illegal argument.  It is mostly for internal use.
+   This is a shorthand for ``PyErr_SetString(PyExc_SystemError, message)``,
+   where *message* indicates that an internal operation (e.g. a Python/C API
+   function) was invoked with an illegal argument.  It is mostly for internal
+   use.
 
 
 .. cfunction:: int PyErr_WarnEx(PyObject *category, char *message, int stacklevel)
@@ -389,6 +398,52 @@ in various ways.  There is a separate error indicator for each thread.
    The function is called with a single argument *obj* that identifies the context
    in which the unraisable exception occurred. The repr of *obj* will be printed in
    the warning message.
+
+
+Exception Objects
+=================
+
+.. cfunction:: PyObject* PyException_GetTraceback(PyObject *ex)
+
+   Return the traceback associated with the exception as a new reference, as
+   accessible from Python through :attr:`__traceback__`.  If there is no
+   traceback associated, this returns *NULL*.
+
+
+.. cfunction:: int PyException_SetTraceback(PyObject *ex, PyObject *tb)
+
+   Set the traceback associated with the exception to *tb*.  Use ``Py_None`` to
+   clear it.
+
+
+.. cfunction:: PyObject* PyException_GetContext(PyObject *ex)
+
+   Return the context (another exception instance during whose handling *ex* was
+   raised) associated with the exception as a new reference, as accessible from
+   Python through :attr:`__context__`.  If there is no context associated, this
+   returns *NULL*.
+
+
+.. cfunction:: void PyException_SetContext(PyObject *ex, PyObject *ctx)
+
+   Set the context associated with the exception to *ctx*.  Use *NULL* to clear
+   it.  There is no type check to make sure that *ctx* is an exception instance.
+   This steals a reference to *ctx*.
+
+
+.. cfunction:: PyObject* PyException_GetCause(PyObject *ex)
+
+   Return the cause (another exception instance set by ``raise ... from ...``)
+   associated with the exception as a new reference, as accessible from Python
+   through :attr:`__cause__`.  If there is no cause associated, this returns
+   *NULL*.
+
+
+.. cfunction:: void PyException_SetCause(PyObject *ex, PyObject *ctx)
+
+   Set the cause associated with the exception to *ctx*.  Use *NULL* to clear
+   it.  There is no type check to make sure that *ctx* is an exception instance.
+   This steals a reference to *ctx*.
 
 
 .. _standardexceptions:

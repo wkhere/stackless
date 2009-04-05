@@ -326,15 +326,15 @@ only non-\ ``static`` item defined in the module file::
        return PyModule_Create(&spammodule);
    }
 
-Note that PyMODINIT_FUNC declares the function as ``void`` return type,
-declares any special linkage declarations required by the platform, and for  C++
+Note that PyMODINIT_FUNC declares the function as ``PyObject *`` return type,
+declares any special linkage declarations required by the platform, and for C++
 declares the function as ``extern "C"``.
 
 When the Python program imports module :mod:`spam` for the first time,
 :cfunc:`PyInit_spam` is called. (See below for comments about embedding Python.)
 It calls :cfunc:`PyModule_Create`, which returns a module object, and
 inserts built-in function objects into the newly created module based upon the
-table (an array of :ctype:`PyMethodDef` structures) found in the module definition. 
+table (an array of :ctype:`PyMethodDef` structures) found in the module definition.
 :cfunc:`PyModule_Create` returns a pointer to the module object
 that it creates.  It may abort with a fatal error for
 certain errors, or return *NULL* if the module could not be initialized
@@ -342,7 +342,7 @@ satisfactorily. The init function must return the module object to its caller,
 so that it then gets inserted into ``sys.modules``.
 
 When embedding Python, the :cfunc:`PyInit_spam` function is not called
-automatically unless there's an entry in the :cdata:`_PyImport_Inittab` table.
+automatically unless there's an entry in the :cdata:`PyImport_Inittab` table.
 To add the module to the initialization table, use :cfunc:`PyImport_AppendInittab`,
 optionally followed by an import of the module::
 
@@ -482,7 +482,7 @@ Later, when it is time to call the function, you call the C function
 :cfunc:`PyEval_CallObject`.  This function has two arguments, both pointers to
 arbitrary Python objects: the Python function, and the argument list.  The
 argument list must always be a tuple object, whose length is the number of
-arguments.  To call the Python function with no arguments, pass in NULL, or 
+arguments.  To call the Python function with no arguments, pass in NULL, or
 an empty tuple; to call it with one argument, pass a singleton tuple.
 :cfunc:`Py_BuildValue` returns a tuple when its format string consists of zero
 or more format codes between parentheses.  For example::
@@ -521,7 +521,7 @@ If this is not possible or desirable, the exception should be cleared by calling
    if (result == NULL)
        return NULL; /* Pass error back */
    ...use result...
-   Py_DECREF(result); 
+   Py_DECREF(result);
 
 Depending on the desired interface to the Python callback function, you may also
 have to provide an argument list to :cfunc:`PyEval_CallObject`.  In some cases
@@ -546,7 +546,7 @@ Note the placement of ``Py_DECREF(arglist)`` immediately after the call, before
 the error check!  Also note that strictly speaking this code is not complete:
 :cfunc:`Py_BuildValue` may run out of memory, and this should be checked.
 
-You may also call a function with keyword arguments by using 
+You may also call a function with keyword arguments by using
 :cfunc:`PyEval_CallObjectWithKeywords`.  As in the above example, we use
 :cfunc:`Py_BuildValue` to construct the dictionary. ::
 
@@ -687,7 +687,7 @@ Philbrick (philbrick@hks.com)::
 
    static PyObject *
    keywdarg_parrot(PyObject *self, PyObject *args, PyObject *keywds)
-   {  
+   {
        int voltage;
        char *state = "a stiff";
        char *action = "voom";
@@ -695,11 +695,11 @@ Philbrick (philbrick@hks.com)::
 
        static char *kwlist[] = {"voltage", "state", "action", "type", NULL};
 
-       if (!PyArg_ParseTupleAndKeywords(args, keywds, "i|sss", kwlist, 
+       if (!PyArg_ParseTupleAndKeywords(args, keywds, "i|sss", kwlist,
                                         &voltage, &state, &action, &type))
-           return NULL; 
+           return NULL;
 
-       printf("-- This parrot wouldn't %s if you put %i Volts through it.\n", 
+       printf("-- This parrot wouldn't %s if you put %i Volts through it.\n",
               action, voltage);
        printf("-- Lovely plumage, the %s -- It's %s!\n", type, state);
 
@@ -882,7 +882,7 @@ memory and should be avoided completely. [#]_
 The advantage of borrowing over owning a reference is that you don't need to
 take care of disposing of the reference on all possible paths through the code
 --- in other words, with a borrowed reference you don't run the risk of leaking
-when a premature exit is taken.  The disadvantage of borrowing over leaking is
+when a premature exit is taken.  The disadvantage of borrowing over owning is
 that there are some subtle situations where in seemingly correct code a borrowed
 reference can be used after the owner from which it was borrowed has in fact
 disposed of it.
@@ -1262,16 +1262,17 @@ All that a client module must do in order to have access to the function
 :cfunc:`import_spam` in its initialization function::
 
    PyMODINIT_FUNC
-   initclient(void)
+   PyInit_client(void)
    {
        PyObject *m;
 
-       m = Py_InitModule("client", ClientMethods);
+       m = PyModule_Create(&clientmodule);
        if (m == NULL)
-           return;
+           return NULL;
        if (import_spam() < 0)
-           return;
+           return NULL;
        /* additional initialization can happen here */
+       return m;
    }
 
 The main disadvantage of this approach is that the file :file:`spammodule.h` is

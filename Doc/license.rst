@@ -90,8 +90,11 @@ been GPL-compatible; the table below summarizes the various releases.
 +----------------+--------------+------------+------------+-----------------+
 | 2.6            | 2.5          | 2008       | PSF        | yes             |
 +----------------+--------------+------------+------------+-----------------+
-| 3.0            | 2.6          | 2007       | PSF        | yes             |
+| 2.6.1          | 2.6          | 2008       | PSF        | yes             |
 +----------------+--------------+------------+------------+-----------------+
+| 3.0            | 2.6          | 2008       | PSF        | yes             |
++----------------+--------------+------------+------------+-----------------+
+
 
 .. note::
 
@@ -120,7 +123,7 @@ Terms and conditions for accessing or otherwise using Python
    analyze, test, perform and/or display publicly, prepare derivative works,
    distribute, and otherwise use Python |release| alone or in any derivative
    version, provided, however, that PSF's License Agreement and PSF's notice of
-   copyright, i.e., "Copyright © 2001-2008 Python Software Foundation; All Rights
+   copyright, i.e., "Copyright © 2001-2009 Python Software Foundation; All Rights
    Reserved" are retained in Python |release| alone or in any derivative version
    prepared by Licensee.
 
@@ -382,8 +385,8 @@ Floating point exception control
 
 The source for the :mod:`fpectl` module includes the following notice::
 
-     ---------------------------------------------------------------------  
-    /                       Copyright (c) 1996.                           \ 
+     ---------------------------------------------------------------------
+    /                       Copyright (c) 1996.                           \
    |          The Regents of the University of California.                 |
    |                        All rights reserved.                           |
    |                                                                       |
@@ -415,7 +418,7 @@ The source for the :mod:`fpectl` module includes the following notice::
    |   opinions  of authors expressed herein do not necessarily state or   |
    |   reflect those of the United States Government or  the  University   |
    |   of  California,  and shall not be used for advertising or product   |
-    \  endorsement purposes.                                              / 
+    \  endorsement purposes.                                              /
      ---------------------------------------------------------------------
 
 

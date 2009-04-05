@@ -327,7 +327,7 @@ always available.
 
    The *default* argument allows to define a value which will be returned
    if the object type does not provide means to retrieve the size and would
-   cause a `TypeError`. 
+   cause a `TypeError`.
 
    func:`getsizeof` calls the object's __sizeof__ method and adds an additional
    garbage collector overhead if the object is managed by the garbage collector.
@@ -413,6 +413,25 @@ always available.
    same information.
 
 
+.. data:: int_info
+
+   A struct sequence that holds information about Python's
+   internal representation of integers.  The attributes are read only.
+
+   +-------------------------+----------------------------------------------+
+   | attribute               | explanation                                  |
+   +=========================+==============================================+
+   | :const:`bits_per_digit` | number of bits held in each digit.  Python   |
+   |                         | integers are stored internally in base       |
+   |                         | ``2**int_info.bits_per_digit``               |
+   +-------------------------+----------------------------------------------+
+   | :const:`sizeof_digit`   | size in bytes of the C type used to          |
+   |                         | represent a digit                            |
+   +-------------------------+----------------------------------------------+
+
+   .. versionadded:: 3.1
+
+
 .. function:: intern(string)
 
    Enter *string* in the table of "interned" strings and return the interned string
@@ -459,6 +478,22 @@ always available.
    characters are stored as UCS-2 or UCS-4.
 
 
+.. data:: meta_path
+
+    A list of :term:`finder` objects that have their :meth:`find_module`
+    methods called to see if one of the objects can find the module to be
+    imported. The :meth:`find_module` method is called at least with the
+    absolute name of the module being imported. If the module to be imported is
+    contained in package then the parent package's :attr:`__path__` attribute
+    is passed in as a second argument. The method returns :keyword:`None` if
+    the module cannot be found, else returns a :term:`loader`.
+
+    :data:`sys.meta_path` is searched before any implicit default finders or
+    :data:`sys.path`.
+
+    See :pep:`302` for the original specification.
+
+
 .. data:: modules
 
    This is a dictionary that maps module names to modules which have already been
@@ -484,6 +519,32 @@ always available.
    A program is free to modify this list for its own purposes.
 
 
+   .. seealso::
+      Module :mod:`site` This describes how to use .pth files to extend
+      :data:`sys.path`.
+
+
+.. data:: path_hooks
+
+    A list of callables that take a path argument to try to create a
+    :term:`finder` for the path. If a finder can be created, it is to be
+    returned by the callable, else raise :exc:`ImportError`.
+
+    Originally specified in :pep:`302`.
+
+
+.. data:: path_importer_cache
+
+    A dictionary acting as a cache for :term:`finder` objects. The keys are
+    paths that have been passed to :data:`sys.path_hooks` and the values are
+    the finders that are found. If a path is a valid file system path but no
+    explicit finder is found on :data:`sys.path_hooks` then :keyword:`None` is
+    stored to represent the implicit default finder should be used. If the path
+    is not an existing path then :class:`imp.NullImporter` is set.
+
+    Originally specified in :pep:`302`.
+
+
 .. data:: platform
 
    This string contains a platform identifier that can be used to append
@@ -500,10 +561,8 @@ always available.
    Windows          ``'win32'``
    Windows/Cygwin   ``'cygwin'``
    Mac OS X         ``'darwin'``
-   Mac OS 9         ``'mac'``
    OS/2             ``'os2'``
    OS/2 EMX         ``'os2emx'``
-   RiscOS           ``'riscos'``
    AtheOS           ``'atheos'``
    ================ ===========================
 
@@ -642,7 +701,7 @@ always available.
 
    The events have the following meaning:
 
-   ``'call'`` 
+   ``'call'``
       A function is called (or some other code block entered).  The
       global trace function is called; *arg* is ``None``; the return value
       specifies the local trace function.
@@ -704,10 +763,16 @@ always available.
    prompts of :func:`input`. The interpreter's own prompts
    and (almost all of) its error messages go to ``stderr``.  ``stdout`` and
    ``stderr`` needn't be built-in file objects: any object is acceptable as long
-   as it has a :meth:`write` method that takes a string argument.  (Changing these 
+   as it has a :meth:`write` method that takes a string argument.  (Changing these
    objects doesn't affect the standard I/O streams of processes executed by
    :func:`os.popen`, :func:`os.system` or the :func:`exec\*` family of functions in
    the :mod:`os` module.)
+
+   .. note::
+
+      The standard streams are in text mode by default.  To write or read binary
+      data to these, use the underlying binary buffer.  For example, to write
+      bytes to :data:`stdout`, use ``sys.stdout.buffer.write(b'abc')``.
 
 
 .. data:: __stdin__
@@ -760,8 +825,12 @@ always available.
    *micro*, *releaselevel*, and *serial*.  All values except *releaselevel* are
    integers; the release level is ``'alpha'``, ``'beta'``, ``'candidate'``, or
    ``'final'``.  The ``version_info`` value corresponding to the Python version 2.0
-   is ``(2, 0, 0, 'final', 0)``.
+   is ``(2, 0, 0, 'final', 0)``.  The components can also be accessed by name,
+   so ``sys.version_info[0]`` is equivalent to ``sys.version_info.major``
+   and so on.
 
+   .. versionchanged:: 2.7
+      Added named component attributes
 
 .. data:: warnoptions
 
@@ -777,11 +846,3 @@ always available.
    first three characters of :const:`version`.  It is provided in the :mod:`sys`
    module for informational purposes; modifying this value has no effect on the
    registry keys used by Python. Availability: Windows.
-
-
-.. seealso::
-
-   Module :mod:`site`
-      This describes how to use .pth files to extend ``sys.path``.
-
-

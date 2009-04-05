@@ -802,6 +802,10 @@ listextend(PyListObject *self, PyObject *b)
 
 	/* Guess a result list size. */
 	n = _PyObject_LengthHint(b, 8);
+	if (n == -1) {
+		Py_DECREF(it);
+		return NULL;
+	}
 	m = Py_SIZE(self);
 	mn = m + n;
 	if (mn >= m) {
@@ -1784,7 +1788,7 @@ PyTypeObject PySortWrapper_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -2565,7 +2569,7 @@ PyTypeObject PyList_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)list_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	&list_as_sequence,			/* tp_as_sequence */
@@ -2631,7 +2635,7 @@ PyTypeObject PyListIter_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -2753,7 +2757,7 @@ PyTypeObject PyListRevIter_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

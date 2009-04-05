@@ -7,7 +7,7 @@ that name.
 
 import sys
 import os
-import re
+import tokenize
 
 __all__ = ["getline", "clearcache", "checkcache"]
 
@@ -89,21 +89,20 @@ def updatecache(filename, module_globals=None):
             get_source = getattr(loader, 'get_source', None)
 
             if name and get_source:
-                if basename.startswith(name.split('.')[-1]+'.'):
-                    try:
-                        data = get_source(name)
-                    except (ImportError, IOError):
-                        pass
-                    else:
-                        if data is None:
-                            # No luck, the PEP302 loader cannot find the source
-                            # for this module.
-                            return []
-                        cache[filename] = (
-                            len(data), None,
-                            [line+'\n' for line in data.splitlines()], fullname
-                        )
-                        return cache[filename][2]
+                try:
+                    data = get_source(name)
+                except (ImportError, IOError):
+                    pass
+                else:
+                    if data is None:
+                        # No luck, the PEP302 loader cannot find the source
+                        # for this module.
+                        return []
+                    cache[filename] = (
+                        len(data), None,
+                        [line+'\n' for line in data.splitlines()], fullname
+                    )
+                    return cache[filename][2]
 
         # Try looking through the module search path.
 
@@ -121,27 +120,11 @@ def updatecache(filename, module_globals=None):
                     pass
         else:
             # No luck
-##          print '*** Cannot stat', filename, ':', msg
             return []
-##  print("Refreshing cache for %s..." % fullname)
-    try:
-        fp = open(fullname, 'rU')
+    with open(fullname, 'rb') as fp:
+        coding, line = tokenize.detect_encoding(fp.readline)
+    with open(fullname, 'r', encoding=coding) as fp:
         lines = fp.readlines()
-        fp.close()
-    except Exception as msg:
-##      print '*** Cannot open', fullname, ':', msg
-        return []
-    coding = "utf-8"
-    for line in lines[:2]:
-        m = re.search(r"coding[:=]\s*([-\w.]+)", line)
-        if m:
-            coding = m.group(1)
-            break
-    try:
-        lines = [line if isinstance(line, str) else str(line, coding)
-                 for line in lines]
-    except:
-        pass  # Hope for the best
     size, mtime = stat.st_size, stat.st_mtime
     cache[filename] = size, mtime, lines, fullname
     return lines

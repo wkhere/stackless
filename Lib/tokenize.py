@@ -26,8 +26,7 @@ __credits__ = ('GvR, ESR, Tim Peters, Thomas Wouters, Fred Drake, '
 
 import re, string, sys
 from token import *
-from codecs import lookup
-from itertools import chain, repeat
+from codecs import lookup, BOM_UTF8
 cookie_re = re.compile("coding[:=]\s*([-\w.]+)")
 
 import token
@@ -251,11 +250,11 @@ def detect_encoding(readline):
 
     It detects the encoding from the presence of a utf-8 bom or an encoding
     cookie as specified in pep-0263. If both a bom and a cookie are present,
-    but disagree, a SyntaxError will be raised.
+    but disagree, a SyntaxError will be raised. If the encoding cookie is an
+    invalid charset, raise a SyntaxError.
 
     If no encoding is specified, then the default of 'utf-8' will be returned.
     """
-    utf8_bom = b'\xef\xbb\xbf'
     bom_found = False
     encoding = None
     def read_or_stop():
@@ -268,18 +267,25 @@ def detect_encoding(readline):
         try:
             line_string = line.decode('ascii')
         except UnicodeDecodeError:
-            pass
-        else:
-            matches = cookie_re.findall(line_string)
-            if matches:
-                encoding = matches[0]
-                if bom_found and lookup(encoding).name != 'utf-8':
-                    # This behaviour mimics the Python interpreter
-                    raise SyntaxError('encoding problem: utf-8')
-                return encoding
+            return None
+
+        matches = cookie_re.findall(line_string)
+        if not matches:
+            return None
+        encoding = matches[0]
+        try:
+            codec = lookup(encoding)
+        except LookupError:
+            # This behaviour mimics the Python interpreter
+            raise SyntaxError("unknown encoding: " + encoding)
+
+        if bom_found and codec.name != 'utf-8':
+            # This behaviour mimics the Python interpreter
+            raise SyntaxError('encoding problem: utf-8')
+        return encoding
 
     first = read_or_stop()
-    if first.startswith(utf8_bom):
+    if first.startswith(BOM_UTF8):
         bom_found = True
         first = first[3:]
     if not first:
@@ -320,13 +326,15 @@ def tokenize(readline):
     which tells you which encoding was used to decode the bytes stream.
     """
     encoding, consumed = detect_encoding(readline)
-    def readline_generator():
+    def readline_generator(consumed):
+        for line in consumed:
+            yield line
         while True:
             try:
                 yield readline()
             except StopIteration:
                 return
-    chained = chain(consumed, readline_generator())
+    chained = readline_generator(consumed)
     return _tokenize(chained.__next__, encoding)
 
 

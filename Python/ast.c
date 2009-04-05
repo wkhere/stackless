@@ -191,7 +191,7 @@ num_stmts(const node *n)
         default: {
             char buf[128];
 
-            sprintf(buf, "Non-statement found: %d %d\n",
+            sprintf(buf, "Non-statement found: %d %d",
                     TYPE(n), NCH(n));
             Py_FatalError(buf);
         }
@@ -3137,6 +3137,7 @@ parsenumber(struct compiling *c, const char *s)
     int imflag;
 #endif
 
+    assert(s != NULL);
     errno = 0;
     end = s + strlen(s) - 1;
 #ifndef WITHOUT_COMPLEX

@@ -1,6 +1,10 @@
 """A multi-producer, multi-consumer queue."""
 
 from time import time as _time
+try:
+    import threading as _threading
+except ImportError:
+    import dummy_threading as _threading
 from collections import deque
 import heapq
 
@@ -20,26 +24,22 @@ class Queue:
     If maxsize is <= 0, the queue size is infinite.
     """
     def __init__(self, maxsize=0):
-        try:
-            import threading
-        except ImportError:
-            import dummy_threading as threading
         self.maxsize = maxsize
         self._init(maxsize)
         # mutex must be held whenever the queue is mutating.  All methods
         # that acquire mutex must release it before returning.  mutex
         # is shared between the three conditions, so acquiring and
         # releasing the conditions also acquires and releases mutex.
-        self.mutex = threading.Lock()
+        self.mutex = _threading.Lock()
         # Notify not_empty whenever an item is added to the queue; a
         # thread waiting to get is notified then.
-        self.not_empty = threading.Condition(self.mutex)
+        self.not_empty = _threading.Condition(self.mutex)
         # Notify not_full whenever an item is removed from the queue;
         # a thread waiting to put is notified then.
-        self.not_full = threading.Condition(self.mutex)
+        self.not_full = _threading.Condition(self.mutex)
         # Notify all_tasks_done whenever the number of unfinished tasks
         # drops to zero; thread waiting to join() is notified to resume
-        self.all_tasks_done = threading.Condition(self.mutex)
+        self.all_tasks_done = _threading.Condition(self.mutex)
         self.unfinished_tasks = 0
 
     def task_done(self):
@@ -91,14 +91,31 @@ class Queue:
         return n
 
     def empty(self):
-        """Return True if the queue is empty, False otherwise (not reliable!)."""
+        """Return True if the queue is empty, False otherwise (not reliable!).
+
+        This method is likely to be removed at some point.  Use qsize() == 0
+        as a direct substitute, but be aware that either approach risks a race
+        condition where a queue can grow before the result of empty() or
+        qsize() can be used.
+
+        To create code that needs to wait for all queued tasks to be
+        completed, the preferred technique is to use the join() method.
+
+        """
         self.mutex.acquire()
         n = not self._qsize()
         self.mutex.release()
         return n
 
     def full(self):
-        """Return True if the queue is full, False otherwise (not reliable!)."""
+        """Return True if the queue is full, False otherwise (not reliable!).
+
+        This method is likely to be removed at some point.  Use qsize() == n
+        as a direct substitute, but be aware that either approach risks a race
+        condition where a queue can shrink before the result of full() or
+        qsize() can be used.
+
+        """
         self.mutex.acquire()
         n = 0 < self.maxsize == self._qsize()
         self.mutex.release()

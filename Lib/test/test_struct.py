@@ -14,12 +14,8 @@ del sys
 try:
     import _struct
 except ImportError:
-    PY_STRUCT_RANGE_CHECKING = 0
-    PY_STRUCT_OVERFLOW_MASKING = 1
     PY_STRUCT_FLOAT_COERCE = 2
 else:
-    PY_STRUCT_RANGE_CHECKING = getattr(_struct, '_PY_STRUCT_RANGE_CHECKING', 0)
-    PY_STRUCT_OVERFLOW_MASKING = getattr(_struct, '_PY_STRUCT_OVERFLOW_MASKING', 0)
     PY_STRUCT_FLOAT_COERCE = getattr(_struct, '_PY_STRUCT_FLOAT_COERCE', 0)
 
 def string_reverse(s):
@@ -41,21 +37,6 @@ def with_warning_restore(func):
             warnings.filterwarnings("error", category=DeprecationWarning)
             return func(*args, **kw)
     return decorator
-
-@with_warning_restore
-def deprecated_err(func, *args):
-    try:
-        func(*args)
-    except (struct.error, TypeError):
-        pass
-    except DeprecationWarning:
-        if not PY_STRUCT_OVERFLOW_MASKING:
-            raise TestFailed("%s%s expected to raise DeprecationWarning" % (
-                func.__name__, args))
-    else:
-        raise TestFailed("%s%s did not raise error" % (
-            func.__name__, args))
-
 
 class StructTest(unittest.TestCase):
 
@@ -189,7 +170,7 @@ class StructTest(unittest.TestCase):
 
     def test_native_qQ(self):
         # can't pack -1 as unsigned regardless
-        self.assertRaises((struct.error, TypeError), struct.pack, "Q", -1)
+        self.assertRaises((struct.error, OverflowError), struct.pack, "Q", -1)
         # can't pack string as 'q' regardless
         self.assertRaises(struct.error, struct.pack, "q", "a")
         # ditto, but 'Q'
@@ -225,13 +206,8 @@ class StructTest(unittest.TestCase):
 
         class IntTester(unittest.TestCase):
 
-            # XXX Most std integer modes fail to test for out-of-range.
-            # The "i" and "l" codes appear to range-check OK on 32-bit boxes, but
-            # fail to check correctly on some 64-bit ones (Tru64 Unix + Compaq C
-            # reported by Mark Favas).
-            BUGGY_RANGE_CHECK = "bBhHiIlL"
-
             def __init__(self, formatpair, bytesize):
+                super(IntTester, self).__init__(methodName='test_one')
                 self.assertEqual(len(formatpair), 2)
                 self.formatpair = formatpair
                 for direction in "<>!=":
@@ -294,12 +270,10 @@ class StructTest(unittest.TestCase):
 
                 else:
                     # x is out of range -- verify pack realizes that.
-                    if not PY_STRUCT_RANGE_CHECKING and code in self.BUGGY_RANGE_CHECK:
-                        if verbose:
-                            print("Skipping buggy range check for code", code)
-                    else:
-                        deprecated_err(pack, ">" + code, x)
-                        deprecated_err(pack, "<" + code, x)
+                    self.assertRaises((struct.error, OverflowError),
+                                      pack, ">" + code, x)
+                    self.assertRaises((struct.error, OverflowError),
+                                      pack, "<" + code, x)
 
                 # Much the same for unsigned.
                 code = self.unsigned_code
@@ -343,12 +317,10 @@ class StructTest(unittest.TestCase):
 
                 else:
                     # x is out of range -- verify pack realizes that.
-                    if not PY_STRUCT_RANGE_CHECKING and code in self.BUGGY_RANGE_CHECK:
-                        if verbose:
-                            print("Skipping buggy range check for code", code)
-                    else:
-                        deprecated_err(pack, ">" + code, x)
-                        deprecated_err(pack, "<" + code, x)
+                    self.assertRaises((struct.error, OverflowError),
+                                      pack, ">" + code, x)
+                    self.assertRaises((struct.error, OverflowError),
+                                      pack, "<" + code, x)
 
             def run(self):
                 from random import randrange
@@ -446,20 +418,24 @@ class StructTest(unittest.TestCase):
         big = math.ldexp(big, 127 - 24)
         self.assertRaises(OverflowError, struct.pack, ">f", big)
 
-    if PY_STRUCT_RANGE_CHECKING:
-        def test_1229380(self):
-            # SF bug 1229380. No struct.pack exception for some out of
-            # range integers
-            import sys
-            for endian in ('', '>', '<'):
-                for fmt in ('B', 'H', 'I', 'L'):
-                    deprecated_err(struct.pack, endian + fmt, -1)
+    def test_1229380(self):
+        # SF bug 1229380. No struct.pack exception for some out of
+        # range integers
+        import sys
+        for endian in ('', '>', '<'):
+            for fmt in ('B', 'H', 'I', 'L'):
+                self.assertRaises((struct.error, OverflowError), struct.pack,
+                                  endian + fmt, -1)
 
-                deprecated_err(struct.pack, endian + 'B', 300)
-                deprecated_err(struct.pack, endian + 'H', 70000)
+            self.assertRaises((struct.error, OverflowError), struct.pack,
+                              endian + 'B', 300)
+            self.assertRaises((struct.error, OverflowError), struct.pack,
+                              endian + 'H', 70000)
 
-                deprecated_err(struct.pack, endian + 'I', sys.maxsize * 4)
-                deprecated_err(struct.pack, endian + 'L', sys.maxsize * 4)
+            self.assertRaises((struct.error, OverflowError), struct.pack,
+                              endian + 'I', sys.maxsize * 4)
+            self.assertRaises((struct.error, OverflowError), struct.pack,
+                              endian + 'L', sys.maxsize * 4)
 
     def XXXtest_1530559(self):
         # XXX This is broken: see the bug report
@@ -516,6 +492,10 @@ class StructTest(unittest.TestCase):
         small_buf = array.array('b', b' '*10)
         self.assertRaises(struct.error, s.pack_into, small_buf, 0, test_string)
         self.assertRaises(struct.error, s.pack_into, small_buf, 2, test_string)
+
+        # Test bogus offset (issue 3694)
+        sb = small_buf
+        self.assertRaises(TypeError, struct.pack_into, b'1', sb, None)
 
     def test_pack_into_fn(self):
         test_string = b'Reykjavik rocks, eow!'

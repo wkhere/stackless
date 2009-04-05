@@ -83,6 +83,7 @@ Thierry Bousch
 Sebastian Boving
 Monty Brandenberg
 Georg Brandl
+Christopher Brannon
 Terrence Brannon
 Dave Brennan
 Tom Bridgman
@@ -151,6 +152,7 @@ Simon Cross
 Drew Csillag
 John Cugini
 Tom Culliton
+Lisandro Dalcin
 Andrew Dalke
 Lars Damerow
 Eric Daniel
@@ -165,6 +167,7 @@ Roger Dev
 Raghuram Devarakonda
 Toby Dickenson
 Mark Dickinson
+Jack Diederich
 Humberto Diogenes
 Yves Dionne
 Daniel Dittmar
@@ -178,10 +181,11 @@ Paul Dubois
 Quinn Dunkan
 Robin Dunn
 Luke Dunstan
+Virgil Dupras
 Andy Dustman
 Gary Duzan
 Eugene Dvurechenski
-Josip Dzolonga 
+Josip Dzolonga
 Maxim Dzumanenko
 Walter Dörwald
 Hans Eckardt
@@ -232,6 +236,7 @@ Geoff Furnish
 Ulisses Furquim
 Hagen Fürstenau
 Achim Gaedke
+Martin von Gagern
 Lele Gaifax
 Santiago Gala
 Yitzchak Gale
@@ -246,12 +251,14 @@ Stephen M. Gava
 Harry Henry Gebel
 Marius Gedminas
 Thomas Gellekum
+Gabriel Genellina
 Christos Georgiou
 Ben Gertzfield
 Dinu Gherman
 Jonathan Giddy
 Johannes Gijsbers
 Michael Gilfix
+Tim Golden
 Chris Gonnerman
 David Goodger
 Hans de Graaff
@@ -313,6 +320,7 @@ Philip Homburg
 Naofumi Honda
 Jeffrey Honig
 Rob Hooft
+Michiel de Hoon
 Brian Hooper
 Randall Hopper
 Nadav Horesh
@@ -344,6 +352,7 @@ Drew Jenkins
 Flemming Kjær Jensen
 Jiba
 Orjan Johansen
+Fredrik Johansson
 Gregory K. Johnson
 Simon Johnston
 Evan Jones
@@ -372,6 +381,7 @@ Mads Kiilerich
 Taek Joo Kim
 Paul Kippes
 Steve Kirsch
+Sebastian Kirsche
 Ron Klatchko
 Bastian Kleineidam
 Bob Kline
@@ -403,6 +413,7 @@ John J. Lee
 Inyeol Lee
 Thomas Lee
 Christopher Lee
+Tennessee Leeuwenburg
 Luc Lefebvre
 Kip Lehman
 Joerg Lehmann
@@ -413,6 +424,7 @@ Christopher Tur Lesniewski-Laas
 Mark Levinson
 William Lewis
 Robert van Liere
+Ross Light
 Shawn Ligocki
 Martin Ligr
 Christopher Lindblad
@@ -427,6 +439,7 @@ Tom Loredo
 Jason Lowe
 Tony Lownds
 Ray Loyzaga
+Lukas Lueg
 Loren Luke
 Fredrik Lundh
 Mark Lutz
@@ -470,6 +483,7 @@ Damien Miller
 Chad Miller
 Jay T. Miller
 Roman Milner
+Andrii V. Mishkovskyi 
 Dustin J. Mitchell
 Dom Mitchell
 Doug Moen
@@ -480,6 +494,8 @@ James A Morrison
 Sjoerd Mullender
 Sape Mullender
 Michael Muller
+R. David Murray
+Piotr Meyer
 John Nagle
 Takahiro Nakayama
 Travers Naran
@@ -603,12 +619,14 @@ Sam Rushing
 Mark Russell
 Nick Russo
 Hajime Saitou
+George Sakkis
 Rich Salz
 Kevin Samborn
 Ilya Sandler
 Ty Sarna
 Ben Sayer
 Michael Scharf
+Andreas Schawo
 Neil Schemenauer
 David Scherer
 Gregor Schmid
@@ -674,7 +692,9 @@ Daniel Stutzbach
 Nathan Sullivan
 Mark Summerfield
 Hisao Suzuki
+Andrew Svetlov
 Kalle Svensson
+Andrew Svetlov
 Paul Swartz
 Thenault Sylvain
 Geoff Talvola
@@ -707,6 +727,7 @@ Lionel Ulmer
 Roger Upole
 Michael Urman
 Hector Urtubia
+Andi Vajda
 Atul Varma
 Dmitry Vasiliev
 Alexandre Vassalotti
@@ -755,6 +776,7 @@ Dik Winter
 Blake Winton
 Jean-Claude Wippler
 Lars Wirzenius
+Chris Withers
 Stefan Witzel
 David Wolever
 Klaus-Juergen Wolf

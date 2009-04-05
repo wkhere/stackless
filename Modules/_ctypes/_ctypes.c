@@ -179,7 +179,7 @@ static PyTypeObject DictRemover_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,			       		/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -566,13 +566,14 @@ CDataType_in_dll(PyObject *type, PyObject *args)
 #else
 	address = (void *)ctypes_dlsym(handle, name);
 	if (!address) {
-		PyErr_Format(PyExc_ValueError,
 #ifdef __CYGWIN__
 /* dlerror() isn't very helpful on cygwin */
+		PyErr_Format(PyExc_ValueError,
 			     "symbol '%s' not found (%s) ",
-			     name,
+			     name);
+#else
+		PyErr_SetString(PyExc_ValueError, ctypes_dlerror());
 #endif
-			     ctypes_dlerror());
 		return NULL;
 	}
 #endif
@@ -713,7 +714,7 @@ PyTypeObject StructType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,			       		/* tp_repr */
 	0,					/* tp_as_number */
 	&CDataType_as_sequence,			/* tp_as_sequence */
@@ -755,7 +756,7 @@ static PyTypeObject UnionType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,			       		/* tp_repr */
 	0,					/* tp_as_number */
 	&CDataType_as_sequence,		/* tp_as_sequence */
@@ -988,7 +989,7 @@ PyTypeObject PointerType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,			       		/* tp_repr */
 	0,					/* tp_as_number */
 	&CDataType_as_sequence,		/* tp_as_sequence */
@@ -1390,7 +1391,7 @@ PyTypeObject ArrayType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,			       		/* tp_repr */
 	0,					/* tp_as_number */
 	&CDataType_as_sequence,			/* tp_as_sequence */
@@ -2059,7 +2060,7 @@ PyTypeObject SimpleType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,			       		/* tp_repr */
 	0,					/* tp_as_number */
 	&CDataType_as_sequence,		/* tp_as_sequence */
@@ -2277,7 +2278,7 @@ PyTypeObject CFuncPtrType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,			       		/* tp_repr */
 	0,					/* tp_as_number */
 	&CDataType_as_sequence,			/* tp_as_sequence */
@@ -2560,7 +2561,7 @@ PyTypeObject CData_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -3208,13 +3209,14 @@ CFuncPtr_FromDll(PyTypeObject *type, PyObject *args, PyObject *kwds)
 #else
 	address = (PPROC)ctypes_dlsym(handle, name);
 	if (!address) {
-		PyErr_Format(PyExc_AttributeError,
 #ifdef __CYGWIN__
 /* dlerror() isn't very helpful on cygwin */
+		PyErr_Format(PyExc_AttributeError,
 			     "function '%s' not found (%s) ",
-			     name,
+			     name);
+#else
+		PyErr_SetString(PyExc_AttributeError, ctypes_dlerror());
 #endif
-			     ctypes_dlerror());
 		return NULL;
 	}
 #endif
@@ -3889,7 +3891,7 @@ PyTypeObject CFuncPtr_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)CFuncPtr_repr,		/* tp_repr */
 	&CFuncPtr_as_number,			/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -4032,7 +4034,7 @@ static PyTypeObject Struct_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -4074,7 +4076,7 @@ static PyTypeObject Union_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -4383,7 +4385,7 @@ PyTypeObject Array_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	&Array_as_sequence,			/* tp_as_sequence */
@@ -4615,7 +4617,7 @@ static PyTypeObject Simple_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	(reprfunc)&Simple_repr,			/* tp_repr */
 	&Simple_as_number,			/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -4992,7 +4994,7 @@ PyTypeObject Pointer_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	&Pointer_as_number,			/* tp_as_number */
 	&Pointer_as_sequence,			/* tp_as_sequence */
@@ -5086,7 +5088,7 @@ static PyTypeObject PyComError_Type = {
     0,                          /* tp_print */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_reserved */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */

@@ -7,18 +7,14 @@
 #    and Aahz <aahz at pobox.com>
 #    and Tim Peters
 
-# This module is currently Py2.3 compatible and should be kept that way
-# unless a major compelling advantage arises.  IOW, 2.3 compatibility is
-# strongly preferred, but not guaranteed.
-
-# Also, this module should be kept in sync with the latest updates of
-# the IBM specification as it evolves.  Those updates will be treated
+# This module should be kept in sync with the latest updates of the
+# IBM specification as it evolves.  Those updates will be treated
 # as bug fixes (deviation from the spec is a compatibility, usability
 # bug) and will be backported.  At this point the spec is stabilizing
 # and the updates are becoming fewer, smaller, and less significant.
 
 """
-This is a Py2.3 implementation of decimal floating point arithmetic based on
+This is an implementation of decimal floating point arithmetic based on
 the General Decimal Arithmetic Specification:
 
     www2.hursley.ibm.com/decimal/decarith.html
@@ -134,8 +130,9 @@ __all__ = [
     'setcontext', 'getcontext', 'localcontext'
 ]
 
-import numbers as _numbers
 import copy as _copy
+import math as _math
+import numbers as _numbers
 
 try:
     from collections import namedtuple as _namedtuple
@@ -217,7 +214,7 @@ class InvalidOperation(DecimalException):
         if args:
             ans = _dec_from_triple(args[0]._sign, args[0]._int, 'n', True)
             return ans._fix_nan(context)
-        return NaN
+        return _NaN
 
 class ConversionSyntax(InvalidOperation):
     """Trying to convert badly formed string.
@@ -227,7 +224,7 @@ class ConversionSyntax(InvalidOperation):
     syntax.  The result is [0,qNaN].
     """
     def handle(self, context, *args):
-        return NaN
+        return _NaN
 
 class DivisionByZero(DecimalException, ZeroDivisionError):
     """Division by 0.
@@ -243,7 +240,7 @@ class DivisionByZero(DecimalException, ZeroDivisionError):
     """
 
     def handle(self, context, sign, *args):
-        return Infsign[sign]
+        return _SignedInfinity[sign]
 
 class DivisionImpossible(InvalidOperation):
     """Cannot perform the division adequately.
@@ -254,7 +251,7 @@ class DivisionImpossible(InvalidOperation):
     """
 
     def handle(self, context, *args):
-        return NaN
+        return _NaN
 
 class DivisionUndefined(InvalidOperation, ZeroDivisionError):
     """Undefined result of division.
@@ -265,7 +262,7 @@ class DivisionUndefined(InvalidOperation, ZeroDivisionError):
     """
 
     def handle(self, context, *args):
-        return NaN
+        return _NaN
 
 class Inexact(DecimalException):
     """Had to round, losing information.
@@ -291,7 +288,7 @@ class InvalidContext(InvalidOperation):
     """
 
     def handle(self, context, *args):
-        return NaN
+        return _NaN
 
 class Rounded(DecimalException):
     """Number got rounded (not  necessarily changed during rounding).
@@ -341,15 +338,15 @@ class Overflow(Inexact, Rounded):
     def handle(self, context, sign, *args):
         if context.rounding in (ROUND_HALF_UP, ROUND_HALF_EVEN,
                                 ROUND_HALF_DOWN, ROUND_UP):
-            return Infsign[sign]
+            return _SignedInfinity[sign]
         if sign == 0:
             if context.rounding == ROUND_CEILING:
-                return Infsign[sign]
+                return _SignedInfinity[sign]
             return _dec_from_triple(sign, '9'*context.prec,
                             context.Emax-context.prec+1)
         if sign == 1:
             if context.rounding == ROUND_FLOOR:
-                return Infsign[sign]
+                return _SignedInfinity[sign]
             return _dec_from_triple(sign, '9'*context.prec,
                              context.Emax-context.prec+1)
 
@@ -500,7 +497,11 @@ def localcontext(ctx=None):
 
 ##### Decimal class #######################################################
 
-class Decimal(_numbers.Real):
+# Do not subclass Decimal from numbers.Real and do not register it as such
+# (because Decimals are not interoperable with floats).  See the notes in
+# numbers.py for more detail.
+
+class Decimal(object):
     """Floating point class for decimal arithmetic."""
 
     __slots__ = ('_exp','_int','_sign', '_is_special')
@@ -654,6 +655,46 @@ class Decimal(_numbers.Real):
 
         raise TypeError("Cannot convert %r to Decimal" % value)
 
+    # @classmethod, but @decorator is not valid Python 2.3 syntax, so
+    # don't use it (see notes on Py2.3 compatibility at top of file)
+    def from_float(cls, f):
+        """Converts a float to a decimal number, exactly.
+
+        Note that Decimal.from_float(0.1) is not the same as Decimal('0.1').
+        Since 0.1 is not exactly representable in binary floating point, the
+        value is stored as the nearest representable value which is
+        0x1.999999999999ap-4.  The exact equivalent of the value in decimal
+        is 0.1000000000000000055511151231257827021181583404541015625.
+
+        >>> Decimal.from_float(0.1)
+        Decimal('0.1000000000000000055511151231257827021181583404541015625')
+        >>> Decimal.from_float(float('nan'))
+        Decimal('NaN')
+        >>> Decimal.from_float(float('inf'))
+        Decimal('Infinity')
+        >>> Decimal.from_float(-float('inf'))
+        Decimal('-Infinity')
+        >>> Decimal.from_float(-0.0)
+        Decimal('-0')
+
+        """
+        if isinstance(f, int):                # handle integer inputs
+            return cls(f)
+        if _math.isinf(f) or _math.isnan(f):  # raises TypeError if not a float
+            return cls(repr(f))
+        if _math.copysign(1.0, f) == 1.0:
+            sign = 0
+        else:
+            sign = 1
+        n, d = abs(f).as_integer_ratio()
+        k = d.bit_length() - 1
+        result = _dec_from_triple(sign, str(n*5**k), -k)
+        if cls is Decimal:
+            return result
+        else:
+            return cls(result)
+    from_float = classmethod(from_float)
+
     def _isnan(self):
         """Returns whether the number is not actually one.
 
@@ -761,9 +802,16 @@ class Decimal(_numbers.Real):
         if self > other.  This routine is for internal use only."""
 
         if self._is_special or other._is_special:
-            return cmp(self._isinfinity(), other._isinfinity())
+            self_inf = self._isinfinity()
+            other_inf = other._isinfinity()
+            if self_inf == other_inf:
+                return 0
+            elif self_inf < other_inf:
+                return -1
+            else:
+                return 1
 
-        # check for zeros;  note that cmp(0, -0) should return 0
+        # check for zeros;  Decimal('0') == Decimal('-0')
         if not self:
             if not other:
                 return 0
@@ -783,7 +831,12 @@ class Decimal(_numbers.Real):
         if self_adjusted == other_adjusted:
             self_padded = self._int + '0'*(self._exp - other._exp)
             other_padded = other._int + '0'*(other._exp - self._exp)
-            return cmp(self_padded, other_padded) * (-1)**self._sign
+            if self_padded == other_padded:
+                return 0
+            elif self_padded < other_padded:
+                return -(-1)**self._sign
+            else:
+                return (-1)**self._sign
         elif self_adjusted > other_adjusted:
             return (-1)**self._sign
         else: # self_adjusted < other_adjusted
@@ -1173,12 +1226,12 @@ class Decimal(_numbers.Real):
             if self._isinfinity():
                 if not other:
                     return context._raise_error(InvalidOperation, '(+-)INF * 0')
-                return Infsign[resultsign]
+                return _SignedInfinity[resultsign]
 
             if other._isinfinity():
                 if not self:
                     return context._raise_error(InvalidOperation, '0 * (+-)INF')
-                return Infsign[resultsign]
+                return _SignedInfinity[resultsign]
 
         resultexp = self._exp + other._exp
 
@@ -1228,7 +1281,7 @@ class Decimal(_numbers.Real):
                 return context._raise_error(InvalidOperation, '(+-)INF/(+-)INF')
 
             if self._isinfinity():
-                return Infsign[sign]
+                return _SignedInfinity[sign]
 
             if other._isinfinity():
                 context._raise_error(Clamped, 'Division by infinity')
@@ -1328,7 +1381,7 @@ class Decimal(_numbers.Real):
                 ans = context._raise_error(InvalidOperation, 'divmod(INF, INF)')
                 return ans, ans
             else:
-                return (Infsign[sign],
+                return (_SignedInfinity[sign],
                         context._raise_error(InvalidOperation, 'INF % x'))
 
         if not other:
@@ -1476,7 +1529,7 @@ class Decimal(_numbers.Real):
             if other._isinfinity():
                 return context._raise_error(InvalidOperation, 'INF // INF')
             else:
-                return Infsign[self._sign ^ other._sign]
+                return _SignedInfinity[self._sign ^ other._sign]
 
         if not other:
             if self:
@@ -1514,13 +1567,13 @@ class Decimal(_numbers.Real):
 
     __trunc__ = __int__
 
-    @property
     def real(self):
         return self
+    real = property(real)
 
-    @property
     def imag(self):
         return Decimal(0)
+    imag = property(imag)
 
     def conjugate(self):
         return self
@@ -1716,13 +1769,9 @@ class Decimal(_numbers.Real):
         >>> round(Decimal('Inf'))
         Traceback (most recent call last):
           ...
-          ...
-          ...
         OverflowError: cannot round an infinity
         >>> round(Decimal('NaN'))
         Traceback (most recent call last):
-          ...
-          ...
           ...
         ValueError: cannot round a NaN
 
@@ -1820,12 +1869,12 @@ class Decimal(_numbers.Real):
                 if not other:
                     return context._raise_error(InvalidOperation,
                                                 'INF * 0 in fma')
-                product = Infsign[self._sign ^ other._sign]
+                product = _SignedInfinity[self._sign ^ other._sign]
             elif other._exp == 'F':
                 if not self:
                     return context._raise_error(InvalidOperation,
                                                 '0 * INF in fma')
-                product = Infsign[self._sign ^ other._sign]
+                product = _SignedInfinity[self._sign ^ other._sign]
         else:
             product = _dec_from_triple(self._sign ^ other._sign,
                                        str(int(self._int) * int(other._int)),
@@ -2175,7 +2224,7 @@ class Decimal(_numbers.Real):
             if not self:
                 return context._raise_error(InvalidOperation, '0 ** 0')
             else:
-                return Dec_p1
+                return _One
 
         # result has sign 1 iff self._sign is 1 and other is an odd integer
         result_sign = 0
@@ -2197,19 +2246,19 @@ class Decimal(_numbers.Real):
             if other._sign == 0:
                 return _dec_from_triple(result_sign, '0', 0)
             else:
-                return Infsign[result_sign]
+                return _SignedInfinity[result_sign]
 
         # Inf**(+ve or Inf) = Inf; Inf**(-ve or -Inf) = 0
         if self._isinfinity():
             if other._sign == 0:
-                return Infsign[result_sign]
+                return _SignedInfinity[result_sign]
             else:
                 return _dec_from_triple(result_sign, '0', 0)
 
         # 1**other = 1, but the choice of exponent and the flags
         # depend on the exponent of self, and on whether other is a
         # positive integer, a negative integer, or neither
-        if self == Dec_p1:
+        if self == _One:
             if other._isinteger():
                 # exp = max(self._exp*max(int(other), 0),
                 # 1-context.prec) but evaluating int(other) directly
@@ -2242,7 +2291,7 @@ class Decimal(_numbers.Real):
             if (other._sign == 0) == (self_adj < 0):
                 return _dec_from_triple(result_sign, '0', 0)
             else:
-                return Infsign[result_sign]
+                return _SignedInfinity[result_sign]
 
         # from here on, the result always goes through the call
         # to _fix at the end of this function.
@@ -2651,10 +2700,10 @@ class Decimal(_numbers.Real):
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
-                if on == 1 and sn != 2:
-                    return self._fix_nan(context)
-                if sn == 1 and on != 2:
-                    return other._fix_nan(context)
+                if on == 1 and sn == 0:
+                    return self._fix(context)
+                if sn == 1 and on == 0:
+                    return other._fix(context)
                 return self._check_nans(other, context)
 
         c = self._cmp(other)
@@ -2693,10 +2742,10 @@ class Decimal(_numbers.Real):
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
-                if on == 1 and sn != 2:
-                    return self._fix_nan(context)
-                if sn == 1 and on != 2:
-                    return other._fix_nan(context)
+                if on == 1 and sn == 0:
+                    return self._fix(context)
+                if sn == 1 and on == 0:
+                    return other._fix(context)
                 return self._check_nans(other, context)
 
         c = self._cmp(other)
@@ -2762,9 +2811,9 @@ class Decimal(_numbers.Real):
         """
         # if one is negative and the other is positive, it's easy
         if self._sign and not other._sign:
-            return Dec_n1
+            return _NegativeOne
         if not self._sign and other._sign:
-            return Dec_p1
+            return _One
         sign = self._sign
 
         # let's handle both NaN types
@@ -2774,51 +2823,51 @@ class Decimal(_numbers.Real):
             if self_nan == other_nan:
                 if self._int < other._int:
                     if sign:
-                        return Dec_p1
+                        return _One
                     else:
-                        return Dec_n1
+                        return _NegativeOne
                 if self._int > other._int:
                     if sign:
-                        return Dec_n1
+                        return _NegativeOne
                     else:
-                        return Dec_p1
-                return Dec_0
+                        return _One
+                return _Zero
 
             if sign:
                 if self_nan == 1:
-                    return Dec_n1
+                    return _NegativeOne
                 if other_nan == 1:
-                    return Dec_p1
+                    return _One
                 if self_nan == 2:
-                    return Dec_n1
+                    return _NegativeOne
                 if other_nan == 2:
-                    return Dec_p1
+                    return _One
             else:
                 if self_nan == 1:
-                    return Dec_p1
+                    return _One
                 if other_nan == 1:
-                    return Dec_n1
+                    return _NegativeOne
                 if self_nan == 2:
-                    return Dec_p1
+                    return _One
                 if other_nan == 2:
-                    return Dec_n1
+                    return _NegativeOne
 
         if self < other:
-            return Dec_n1
+            return _NegativeOne
         if self > other:
-            return Dec_p1
+            return _One
 
         if self._exp < other._exp:
             if sign:
-                return Dec_p1
+                return _One
             else:
-                return Dec_n1
+                return _NegativeOne
         if self._exp > other._exp:
             if sign:
-                return Dec_n1
+                return _NegativeOne
             else:
-                return Dec_p1
-        return Dec_0
+                return _One
+        return _Zero
 
 
     def compare_total_mag(self, other):
@@ -2859,11 +2908,11 @@ class Decimal(_numbers.Real):
 
         # exp(-Infinity) = 0
         if self._isinfinity() == -1:
-            return Dec_0
+            return _Zero
 
         # exp(0) = 1
         if not self:
-            return Dec_p1
+            return _One
 
         # exp(Infinity) = Infinity
         if self._isinfinity() == 1:
@@ -3015,15 +3064,15 @@ class Decimal(_numbers.Real):
 
         # ln(0.0) == -Infinity
         if not self:
-            return negInf
+            return _NegativeInfinity
 
         # ln(Infinity) = Infinity
         if self._isinfinity() == 1:
-            return Inf
+            return _Infinity
 
         # ln(1.0) == 0.0
-        if self == Dec_p1:
-            return Dec_0
+        if self == _One:
+            return _Zero
 
         # ln(negative) raises InvalidOperation
         if self._sign == 1:
@@ -3095,11 +3144,11 @@ class Decimal(_numbers.Real):
 
         # log10(0.0) == -Infinity
         if not self:
-            return negInf
+            return _NegativeInfinity
 
         # log10(Infinity) = Infinity
         if self._isinfinity() == 1:
-            return Inf
+            return _Infinity
 
         # log10(negative or -Infinity) raises InvalidOperation
         if self._sign == 1:
@@ -3151,7 +3200,7 @@ class Decimal(_numbers.Real):
 
         # logb(+/-Inf) = +Inf
         if self._isinfinity():
-            return Inf
+            return _Infinity
 
         # logb(0) = -Inf, DivisionByZero
         if not self:
@@ -3221,7 +3270,7 @@ class Decimal(_numbers.Real):
         (opa, opb) = self._fill_logical(context, self._int, other._int)
 
         # make the operation, and clean starting zeroes
-        result = "".join(str(int(a)|int(b)) for a,b in zip(opa,opb))
+        result = "".join([str(int(a)|int(b)) for a,b in zip(opa,opb)])
         return _dec_from_triple(0, result.lstrip('0') or '0', 0)
 
     def logical_xor(self, other, context=None):
@@ -3235,7 +3284,7 @@ class Decimal(_numbers.Real):
         (opa, opb) = self._fill_logical(context, self._int, other._int)
 
         # make the operation, and clean starting zeroes
-        result = "".join(str(int(a)^int(b)) for a,b in zip(opa,opb))
+        result = "".join([str(int(a)^int(b)) for a,b in zip(opa,opb)])
         return _dec_from_triple(0, result.lstrip('0') or '0', 0)
 
     def max_mag(self, other, context=None):
@@ -3251,10 +3300,10 @@ class Decimal(_numbers.Real):
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
-                if on == 1 and sn != 2:
-                    return self._fix_nan(context)
-                if sn == 1 and on != 2:
-                    return other._fix_nan(context)
+                if on == 1 and sn == 0:
+                    return self._fix(context)
+                if sn == 1 and on == 0:
+                    return other._fix(context)
                 return self._check_nans(other, context)
 
         c = self.copy_abs()._cmp(other.copy_abs())
@@ -3281,10 +3330,10 @@ class Decimal(_numbers.Real):
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
-                if on == 1 and sn != 2:
-                    return self._fix_nan(context)
-                if sn == 1 and on != 2:
-                    return other._fix_nan(context)
+                if on == 1 and sn == 0:
+                    return self._fix(context)
+                if sn == 1 and on == 0:
+                    return other._fix(context)
                 return self._check_nans(other, context)
 
         c = self.copy_abs()._cmp(other.copy_abs())
@@ -3308,7 +3357,7 @@ class Decimal(_numbers.Real):
             return ans
 
         if self._isinfinity() == -1:
-            return negInf
+            return _NegativeInfinity
         if self._isinfinity() == 1:
             return _dec_from_triple(0, '9'*context.prec, context.Etop())
 
@@ -3331,7 +3380,7 @@ class Decimal(_numbers.Real):
             return ans
 
         if self._isinfinity() == 1:
-            return Inf
+            return _Infinity
         if self._isinfinity() == -1:
             return _dec_from_triple(1, '9'*context.prec, context.Etop())
 
@@ -3538,18 +3587,16 @@ class Decimal(_numbers.Real):
             return self     # My components are also immutable
         return self.__class__(str(self))
 
-    # PEP 3101 support.  See also _parse_format_specifier and _format_align
-    def __format__(self, specifier, context=None):
+    # PEP 3101 support.  the _localeconv keyword argument should be
+    # considered private: it's provided for ease of testing only.
+    def __format__(self, specifier, context=None, _localeconv=None):
         """Format a Decimal instance according to the given specifier.
 
         The specifier should be a standard format specifier, with the
         form described in PEP 3101.  Formatting types 'e', 'E', 'f',
-        'F', 'g', 'G', and '%' are supported.  If the formatting type
-        is omitted it defaults to 'g' or 'G', depending on the value
-        of context.capitals.
-
-        At this time the 'n' format specifier type (which is supposed
-        to use the current locale) is not supported.
+        'F', 'g', 'G', 'n' and '%' are supported.  If the formatting
+        type is omitted it defaults to 'g' or 'G', depending on the
+        value of context.capitals.
         """
 
         # Note: PEP 3101 says that if the type is not present then
@@ -3560,17 +3607,20 @@ class Decimal(_numbers.Real):
         if context is None:
             context = getcontext()
 
-        spec = _parse_format_specifier(specifier)
+        spec = _parse_format_specifier(specifier, _localeconv=_localeconv)
 
-        # special values don't care about the type or precision...
+        # special values don't care about the type or precision
         if self._is_special:
-            return _format_align(str(self), spec)
+            sign = _format_sign(self._sign, spec)
+            body = str(self.copy_abs())
+            return _format_align(sign, body, spec)
 
         # a type of None defaults to 'g' or 'G', depending on context
-        # if type is '%', adjust exponent of self accordingly
         if spec['type'] is None:
             spec['type'] = ['g', 'G'][context.capitals]
-        elif spec['type'] == '%':
+
+        # if type is '%', adjust exponent of self accordingly
+        if spec['type'] == '%':
             self = _dec_from_triple(self._sign, self._int, self._exp+2)
 
         # round if necessary, taking rounding mode from the context
@@ -3579,53 +3629,45 @@ class Decimal(_numbers.Real):
         if precision is not None:
             if spec['type'] in 'eE':
                 self = self._round(precision+1, rounding)
-            elif spec['type'] in 'gG':
-                if len(self._int) > precision:
-                    self = self._round(precision, rounding)
             elif spec['type'] in 'fF%':
                 self = self._rescale(-precision, rounding)
+            elif spec['type'] in 'gG' and len(self._int) > precision:
+                self = self._round(precision, rounding)
         # special case: zeros with a positive exponent can't be
         # represented in fixed point; rescale them to 0e0.
-        elif not self and self._exp > 0 and spec['type'] in 'fF%':
+        if not self and self._exp > 0 and spec['type'] in 'fF%':
             self = self._rescale(0, rounding)
 
         # figure out placement of the decimal point
         leftdigits = self._exp + len(self._int)
-        if spec['type'] in 'fF%':
-            dotplace = leftdigits
-        elif spec['type'] in 'eE':
+        if spec['type'] in 'eE':
             if not self and precision is not None:
                 dotplace = 1 - precision
             else:
                 dotplace = 1
+        elif spec['type'] in 'fF%':
+            dotplace = leftdigits
         elif spec['type'] in 'gG':
             if self._exp <= 0 and leftdigits > -6:
                 dotplace = leftdigits
             else:
                 dotplace = 1
 
-        # figure out main part of numeric string...
-        if dotplace <= 0:
-            num = '0.' + '0'*(-dotplace) + self._int
-        elif dotplace >= len(self._int):
-            # make sure we're not padding a '0' with extra zeros on the right
-            assert dotplace==len(self._int) or self._int != '0'
-            num = self._int + '0'*(dotplace-len(self._int))
+        # find digits before and after decimal point, and get exponent
+        if dotplace < 0:
+            intpart = '0'
+            fracpart = '0'*(-dotplace) + self._int
+        elif dotplace > len(self._int):
+            intpart = self._int + '0'*(dotplace-len(self._int))
+            fracpart = ''
         else:
-            num = self._int[:dotplace] + '.' + self._int[dotplace:]
+            intpart = self._int[:dotplace] or '0'
+            fracpart = self._int[dotplace:]
+        exp = leftdigits-dotplace
 
-        # ...then the trailing exponent, or trailing '%'
-        if leftdigits != dotplace or spec['type'] in 'eE':
-            echar = {'E': 'E', 'e': 'e', 'G': 'E', 'g': 'e'}[spec['type']]
-            num = num + "{0}{1:+}".format(echar, leftdigits-dotplace)
-        elif spec['type'] == '%':
-            num = num + '%'
-
-        # add sign
-        if self._sign == 1:
-            num = '-' + num
-        return _format_align(num, spec)
-
+        # done with the decimal-specific stuff;  hand over the rest
+        # of the formatting to the _format_number function
+        return _format_number(self._sign, intpart, fracpart, exp, spec)
 
 def _dec_from_triple(sign, coefficient, exponent, special=False):
     """Create a decimal instance directly, without any validation,
@@ -3642,6 +3684,12 @@ def _dec_from_triple(sign, coefficient, exponent, special=False):
     self._is_special = special
 
     return self
+
+# Register Decimal as a kind of Number (an abstract base class).
+# However, do not register it as Real (because Decimals are not
+# interoperable with floats).
+_numbers.Number.register(Decimal)
+
 
 ##### Context class #######################################################
 
@@ -3829,6 +3877,23 @@ class Context(object):
             return self._raise_error(ConversionSyntax,
                                      "diagnostic info too long in NaN")
         return d._fix(self)
+
+    def create_decimal_from_float(self, f):
+        """Creates a new Decimal instance from a float but rounding using self
+        as the context.
+
+        >>> context = Context(prec=5, rounding=ROUND_DOWN)
+        >>> context.create_decimal_from_float(3.1415926535897932)
+        Decimal('3.1415')
+        >>> context = Context(prec=5, traps=[Inexact])
+        >>> context.create_decimal_from_float(3.1415926535897932)
+        Traceback (most recent call last):
+            ...
+        decimal.Inexact: None
+
+        """
+        d = Decimal.from_float(f)       # An exact conversion
+        return d._fix(self)             # Apply the context rounding
 
     # Methods
     def abs(self, a):
@@ -5444,14 +5509,13 @@ _all_zeros = re.compile('0*$').match
 _exact_half = re.compile('50*$').match
 
 ##### PEP3101 support functions ##############################################
-# The functions parse_format_specifier and format_align have little to do
-# with the Decimal class, and could potentially be reused for other pure
+# The functions in this section have little to do with the Decimal
+# class, and could potentially be reused or adapted for other pure
 # Python numeric classes that want to implement __format__
 #
 # A format specifier for Decimal looks like:
 #
-#   [[fill]align][sign][0][minimumwidth][.precision][type]
-#
+#   [[fill]align][sign][0][minimumwidth][,][.precision][type]
 
 _parse_format_specifier_regex = re.compile(r"""\A
 (?:
@@ -5461,14 +5525,23 @@ _parse_format_specifier_regex = re.compile(r"""\A
 (?P<sign>[-+ ])?
 (?P<zeropad>0)?
 (?P<minimumwidth>(?!0)\d+)?
+(?P<thousands_sep>,)?
 (?:\.(?P<precision>0|(?!0)\d+))?
-(?P<type>[eEfFgG%])?
+(?P<type>[eEfFgGn%])?
 \Z
 """, re.VERBOSE)
 
 del re
 
-def _parse_format_specifier(format_spec):
+# The locale module is only needed for the 'n' format specifier.  The
+# rest of the PEP 3101 code functions quite happily without it, so we
+# don't care too much if locale isn't present.
+try:
+    import locale as _locale
+except ImportError:
+    pass
+
+def _parse_format_specifier(format_spec, _localeconv=None):
     """Parse and validate a format specifier.
 
     Turns a standard numeric format specifier into a dict, with the
@@ -5478,9 +5551,13 @@ def _parse_format_specifier(format_spec):
       align: alignment type, either '<', '>', '=' or '^'
       sign: either '+', '-' or ' '
       minimumwidth: nonnegative integer giving minimum width
+      zeropad: boolean, indicating whether to pad with zeros
+      thousands_sep: string to use as thousands separator, or ''
+      grouping: grouping for thousands separators, in format
+        used by localeconv
+      decimal_point: string to use for decimal point
       precision: nonnegative integer giving precision, or None
       type: one of the characters 'eEfFgG%', or None
-      unicode: either True or False (always True for Python 3.x)
 
     """
     m = _parse_format_specifier_regex.match(format_spec)
@@ -5490,26 +5567,25 @@ def _parse_format_specifier(format_spec):
     # get the dictionary
     format_dict = m.groupdict()
 
-    # defaults for fill and alignment
+    # zeropad; defaults for fill and alignment.  If zero padding
+    # is requested, the fill and align fields should be absent.
     fill = format_dict['fill']
     align = format_dict['align']
-    if format_dict.pop('zeropad') is not None:
-        # in the face of conflict, refuse the temptation to guess
-        if fill is not None and fill != '0':
+    format_dict['zeropad'] = (format_dict['zeropad'] is not None)
+    if format_dict['zeropad']:
+        if fill is not None:
             raise ValueError("Fill character conflicts with '0'"
                              " in format specifier: " + format_spec)
-        if align is not None and align != '=':
+        if align is not None:
             raise ValueError("Alignment conflicts with '0' in "
                              "format specifier: " + format_spec)
-        fill = '0'
-        align = '='
     format_dict['fill'] = fill or ' '
     format_dict['align'] = align or '<'
 
+    # default sign handling: '-' for negative, '' for positive
     if format_dict['sign'] is None:
         format_dict['sign'] = '-'
 
-    # turn minimumwidth and precision entries into integers.
     # minimumwidth defaults to 0; precision remains None if not given
     format_dict['minimumwidth'] = int(format_dict['minimumwidth'] or '0')
     if format_dict['precision'] is not None:
@@ -5521,66 +5597,174 @@ def _parse_format_specifier(format_spec):
         if format_dict['type'] in 'gG' or format_dict['type'] is None:
             format_dict['precision'] = 1
 
-    # record whether return type should be str or unicode
-    format_dict['unicode'] = True
+    # determine thousands separator, grouping, and decimal separator, and
+    # add appropriate entries to format_dict
+    if format_dict['type'] == 'n':
+        # apart from separators, 'n' behaves just like 'g'
+        format_dict['type'] = 'g'
+        if _localeconv is None:
+            _localeconv = _locale.localeconv()
+        if format_dict['thousands_sep'] is not None:
+            raise ValueError("Explicit thousands separator conflicts with "
+                             "'n' type in format specifier: " + format_spec)
+        format_dict['thousands_sep'] = _localeconv['thousands_sep']
+        format_dict['grouping'] = _localeconv['grouping']
+        format_dict['decimal_point'] = _localeconv['decimal_point']
+    else:
+        if format_dict['thousands_sep'] is None:
+            format_dict['thousands_sep'] = ''
+        format_dict['grouping'] = [3, 0]
+        format_dict['decimal_point'] = '.'
 
     return format_dict
 
-def _format_align(body, spec_dict):
-    """Given an unpadded, non-aligned numeric string, add padding and
-    aligment to conform with the given format specifier dictionary (as
-    output from parse_format_specifier).
-
-    It's assumed that if body is negative then it starts with '-'.
-    Any leading sign ('-' or '+') is stripped from the body before
-    applying the alignment and padding rules, and replaced in the
-    appropriate position.
+def _format_align(sign, body, spec):
+    """Given an unpadded, non-aligned numeric string 'body' and sign
+    string 'sign', add padding and aligment conforming to the given
+    format specifier dictionary 'spec' (as produced by
+    parse_format_specifier).
 
     """
-    # figure out the sign; we only examine the first character, so if
-    # body has leading whitespace the results may be surprising.
-    if len(body) > 0 and body[0] in '-+':
-        sign = body[0]
-        body = body[1:]
-    else:
-        sign = ''
-
-    if sign != '-':
-        if spec_dict['sign'] in ' +':
-            sign = spec_dict['sign']
-        else:
-            sign = ''
-
     # how much extra space do we have to play with?
-    minimumwidth = spec_dict['minimumwidth']
-    fill = spec_dict['fill']
-    padding = fill*(max(minimumwidth - (len(sign+body)), 0))
+    minimumwidth = spec['minimumwidth']
+    fill = spec['fill']
+    padding = fill*(minimumwidth - len(sign) - len(body))
 
-    align = spec_dict['align']
+    align = spec['align']
     if align == '<':
-        result = padding + sign + body
-    elif align == '>':
         result = sign + body + padding
+    elif align == '>':
+        result = padding + sign + body
     elif align == '=':
         result = sign + padding + body
-    else: #align == '^'
+    elif align == '^':
         half = len(padding)//2
         result = padding[:half] + sign + body + padding[half:]
+    else:
+        raise ValueError('Unrecognised alignment field')
 
     return result
+
+def _group_lengths(grouping):
+    """Convert a localeconv-style grouping into a (possibly infinite)
+    iterable of integers representing group lengths.
+
+    """
+    # The result from localeconv()['grouping'], and the input to this
+    # function, should be a list of integers in one of the
+    # following three forms:
+    #
+    #   (1) an empty list, or
+    #   (2) nonempty list of positive integers + [0]
+    #   (3) list of positive integers + [locale.CHAR_MAX], or
+
+    from itertools import chain, repeat
+    if not grouping:
+        return []
+    elif grouping[-1] == 0 and len(grouping) >= 2:
+        return chain(grouping[:-1], repeat(grouping[-2]))
+    elif grouping[-1] == _locale.CHAR_MAX:
+        return grouping[:-1]
+    else:
+        raise ValueError('unrecognised format for grouping')
+
+def _insert_thousands_sep(digits, spec, min_width=1):
+    """Insert thousands separators into a digit string.
+
+    spec is a dictionary whose keys should include 'thousands_sep' and
+    'grouping'; typically it's the result of parsing the format
+    specifier using _parse_format_specifier.
+
+    The min_width keyword argument gives the minimum length of the
+    result, which will be padded on the left with zeros if necessary.
+
+    If necessary, the zero padding adds an extra '0' on the left to
+    avoid a leading thousands separator.  For example, inserting
+    commas every three digits in '123456', with min_width=8, gives
+    '0,123,456', even though that has length 9.
+
+    """
+
+    sep = spec['thousands_sep']
+    grouping = spec['grouping']
+
+    groups = []
+    for l in _group_lengths(grouping):
+        if l <= 0:
+            raise ValueError("group length should be positive")
+        # max(..., 1) forces at least 1 digit to the left of a separator
+        l = min(max(len(digits), min_width, 1), l)
+        groups.append('0'*(l - len(digits)) + digits[-l:])
+        digits = digits[:-l]
+        min_width -= l
+        if not digits and min_width <= 0:
+            break
+        min_width -= len(sep)
+    else:
+        l = max(len(digits), min_width, 1)
+        groups.append('0'*(l - len(digits)) + digits[-l:])
+    return sep.join(reversed(groups))
+
+def _format_sign(is_negative, spec):
+    """Determine sign character."""
+
+    if is_negative:
+        return '-'
+    elif spec['sign'] in ' +':
+        return spec['sign']
+    else:
+        return ''
+
+def _format_number(is_negative, intpart, fracpart, exp, spec):
+    """Format a number, given the following data:
+
+    is_negative: true if the number is negative, else false
+    intpart: string of digits that must appear before the decimal point
+    fracpart: string of digits that must come after the point
+    exp: exponent, as an integer
+    spec: dictionary resulting from parsing the format specifier
+
+    This function uses the information in spec to:
+      insert separators (decimal separator and thousands separators)
+      format the sign
+      format the exponent
+      add trailing '%' for the '%' type
+      zero-pad if necessary
+      fill and align if necessary
+    """
+
+    sign = _format_sign(is_negative, spec)
+
+    if fracpart:
+        fracpart = spec['decimal_point'] + fracpart
+
+    if exp != 0 or spec['type'] in 'eE':
+        echar = {'E': 'E', 'e': 'e', 'G': 'E', 'g': 'e'}[spec['type']]
+        fracpart += "{0}{1:+}".format(echar, exp)
+    if spec['type'] == '%':
+        fracpart += '%'
+
+    if spec['zeropad']:
+        min_width = spec['minimumwidth'] - len(fracpart) - len(sign)
+    else:
+        min_width = 0
+    intpart = _insert_thousands_sep(intpart, spec, min_width)
+
+    return _format_align(sign, intpart+fracpart, spec)
+
 
 ##### Useful Constants (internal use only) ################################
 
 # Reusable defaults
-Inf = Decimal('Inf')
-negInf = Decimal('-Inf')
-NaN = Decimal('NaN')
-Dec_0 = Decimal(0)
-Dec_p1 = Decimal(1)
-Dec_n1 = Decimal(-1)
+_Infinity = Decimal('Inf')
+_NegativeInfinity = Decimal('-Inf')
+_NaN = Decimal('NaN')
+_Zero = Decimal(0)
+_One = Decimal(1)
+_NegativeOne = Decimal(-1)
 
-# Infsign[sign] is infinity w/ that sign
-Infsign = (Inf, negInf)
+# _SignedInfinity[sign] is infinity w/ that sign
+_SignedInfinity = (_Infinity, _NegativeInfinity)
 
 
 

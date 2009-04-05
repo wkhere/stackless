@@ -21,15 +21,11 @@ import array
 import queue
 
 from traceback import format_exc
+from pickle import PicklingError
 from multiprocessing import Process, current_process, active_children, Pool, util, connection
 from multiprocessing.process import AuthenticationString
 from multiprocessing.forking import exit, Popen, assert_spawning, ForkingPickler
 from multiprocessing.util import Finalize, info
-
-try:
-    from cPickle import PicklingError
-except ImportError:
-    from pickle import PicklingError
 
 #
 # Register some things for pickling
@@ -143,7 +139,7 @@ class Server(object):
         self.listener = Listener(address=address, backlog=5)
         self.address = self.listener.address
 
-        self.id_to_obj = {0: (None, ())}
+        self.id_to_obj = {'0': (None, ())}
         self.id_to_refcount = {}
         self.mutex = threading.RLock()
         self.stop = 0
@@ -305,7 +301,7 @@ class Server(object):
             keys = list(self.id_to_obj.keys())
             keys.sort()
             for ident in keys:
-                if ident != 0:
+                if ident != '0':
                     result.append('  %s:       refcount=%s\n    %s' %
                                   (ident, self.id_to_refcount[ident],
                                    str(self.id_to_obj[ident][0])[:75]))
@@ -317,7 +313,7 @@ class Server(object):
         '''
         Number of shared objects
         '''
-        return len(self.id_to_obj) - 1      # don't count ident=0
+        return len(self.id_to_obj) - 1      # don't count ident='0'
 
     def shutdown(self, c):
         '''

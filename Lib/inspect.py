@@ -63,7 +63,7 @@ def isclass(object):
     Class objects provide these attributes:
         __doc__         documentation string
         __module__      name of module in which this class was defined"""
-    return isinstance(object, type) or hasattr(object, '__bases__')
+    return isinstance(object, type)
 
 def ismethod(object):
     """Return true if the object is an instance method.
@@ -158,9 +158,8 @@ def isgeneratorfunction(object):
     Generator function objects provides same attributes as functions.
 
     See isfunction.__doc__ for attributes listing."""
-    if (isfunction(object) or ismethod(object)) and \
-        object.__code__.co_flags & CO_GENERATOR:
-        return True
+    return bool((isfunction(object) or ismethod(object)) and
+                object.__code__.co_flags & CO_GENERATOR)
 
 def isgenerator(object):
     """Return true if the object is a generator.
@@ -250,7 +249,10 @@ def getmembers(object, predicate=None):
     Optionally, only return members that satisfy a given predicate."""
     results = []
     for key in dir(object):
-        value = getattr(object, key)
+        try:
+            value = getattr(object, key)
+        except AttributeError:
+            continue
         if not predicate or predicate(value):
             results.append((key, value))
     results.sort()
@@ -879,8 +881,8 @@ def formatargspec(args, varargs=None, varkw=None, defaults=None,
     specs = []
     if defaults:
         firstdefault = len(args) - len(defaults)
-    for i in range(len(args)):
-        spec = strseq(args[i], formatargandannotation, join)
+    for i, arg in enumerate(args):
+        spec = strseq(arg, formatargandannotation, join)
         if defaults and i >= firstdefault:
             spec = spec + formatvalue(defaults[i - firstdefault])
         specs.append(spec)
@@ -892,7 +894,7 @@ def formatargspec(args, varargs=None, varkw=None, defaults=None,
     if kwonlyargs:
         for kwonlyarg in kwonlyargs:
             spec = formatargandannotation(kwonlyarg)
-            if kwonlyarg in kwonlydefaults:
+            if kwonlydefaults and kwonlyarg in kwonlydefaults:
                 spec += formatvalue(kwonlydefaults[kwonlyarg])
             specs.append(spec)
     if varkw is not None:

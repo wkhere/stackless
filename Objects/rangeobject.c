@@ -123,7 +123,7 @@ range_length_obj(rangeobject *r)
     Algorithm is equal to that of get_len_of_range(), but it operates
     on PyObjects (which are assumed to be PyLong or PyInt objects).
     ---------------------------------------------------------------*/
-    int cmp_result, cmp_call;
+    int cmp_result;
     PyObject *lo, *hi;
     PyObject *step = NULL;
     PyObject *diff = NULL;
@@ -134,13 +134,12 @@ range_length_obj(rangeobject *r)
     PyObject *zero = PyLong_FromLong(0);
     if (zero == NULL)
         return NULL;
-    cmp_call = PyObject_Cmp(r->step, zero, &cmp_result);
+    cmp_result = PyObject_RichCompareBool(r->step, zero, Py_GT);
     Py_DECREF(zero);
-    if (cmp_call == -1)
+    if (cmp_result == -1)
         return NULL;
 
-    assert(cmp_result != 0);
-    if (cmp_result > 0) {
+    if (cmp_result == 1) {
         lo = r->start;
         hi = r->stop;
         step = r->step;
@@ -154,7 +153,7 @@ range_length_obj(rangeobject *r)
     }
 
     /* if (lo >= hi), return length of 0. */
-    if (PyObject_Compare(lo, hi) >= 0) {
+    if (PyObject_RichCompareBool(lo, hi, Py_GE) == 1) {
         Py_XDECREF(step);
         return PyLong_FromLong(0);
     }
@@ -290,7 +289,7 @@ PyTypeObject PyRange_Type = {
 	0,			/* tp_print */
 	0,			/* tp_getattr */
 	0,			/* tp_setattr */
-	0,			/* tp_compare */
+	0,			/* tp_reserved */
 	(reprfunc)range_repr,	/* tp_repr */
 	0,			/* tp_as_number */
 	&range_as_sequence,	/* tp_as_sequence */
@@ -393,7 +392,7 @@ PyTypeObject PyRangeIter_Type = {
 	0,                                      /* tp_print */
 	0,                                      /* tp_getattr */
 	0,                                      /* tp_setattr */
-	0,                                      /* tp_compare */
+	0,                                      /* tp_reserved */
 	0,                                      /* tp_repr */
 	0,                                      /* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -545,7 +544,7 @@ PyTypeObject PyLongRangeIter_Type = {
 	0,                                      /* tp_print */
 	0,                                      /* tp_getattr */
 	0,                                      /* tp_setattr */
-	0,                                      /* tp_compare */
+	0,                                      /* tp_reserved */
 	0,                                      /* tp_repr */
 	0,                                      /* tp_as_number */
 	0,					/* tp_as_sequence */

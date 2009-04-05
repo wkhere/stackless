@@ -1,4 +1,4 @@
-# -*- coding: Latin-1 -*-
+# -*- coding: latin-1 -*-
 
 """Heap queue algorithm (a.k.a. priority queue).
 
@@ -129,8 +129,7 @@ From all times, sorting has always been a Great Art! :-)
 __all__ = ['heappush', 'heappop', 'heapify', 'heapreplace', 'merge',
            'nlargest', 'nsmallest', 'heappushpop']
 
-from itertools import islice, repeat, count, tee
-from operator import itemgetter, neg
+from itertools import islice, repeat, count, tee, chain
 import bisect
 
 def heappush(heap, item):
@@ -195,7 +194,7 @@ def nlargest(n, iterable):
     heapify(result)
     _heappushpop = heappushpop
     for elem in it:
-        heappushpop(result, elem)
+        _heappushpop(result, elem)
     result.sort(reverse=True)
     return result
 
@@ -262,7 +261,7 @@ def _siftdown(heap, startpos, pos):
 #
 # Cutting the # of comparisons is important, since these routines have no
 # way to extract "the priority" from an array element, so that intelligence
-# is likely to be hiding in custom __cmp__ methods, or in array elements
+# is likely to be hiding in custom comparison methods, or in array elements
 # storing (priority, record) tuples.  Comparisons are thus potentially
 # expensive.
 #
@@ -308,7 +307,7 @@ def _siftup(heap, pos):
 
 # If available, use C implementation
 try:
-    from _heapq import heappush, heappop, heapify, heapreplace, nlargest, nsmallest, heappushpop
+    from _heapq import *
 except ImportError:
     pass
 
@@ -354,11 +353,36 @@ def nsmallest(n, iterable, key=None):
 
     Equivalent to:  sorted(iterable, key=key)[:n]
     """
+    # Short-cut for n==1 is to use min() when len(iterable)>0
+    if n == 1:
+        it = iter(iterable)
+        head = list(islice(it, 1))
+        if not head:
+            return []
+        if key is None:
+            return [min(chain(head, it))]
+        return [min(chain(head, it), key=key)]
+
+    # When n>=size, it's faster to use sort()
+    try:
+        size = len(iterable)
+    except (TypeError, AttributeError):
+        pass
+    else:
+        if n >= size:
+            return sorted(iterable, key=key)[:n]
+
+    # When key is none, use simpler decoration
+    if key is None:
+        it = zip(iterable, count())                         # decorate
+        result = _nsmallest(n, it)
+        return [r[0] for r in result]                       # undecorate
+
+    # General case, slowest method
     in1, in2 = tee(iterable)
-    keys = in1 if key is None else map(key, in1)
-    it = zip(keys, count(), in2)                           # decorate
+    it = zip(map(key, in1), count(), in2)                   # decorate
     result = _nsmallest(n, it)
-    return list(map(itemgetter(2), result))                 # undecorate
+    return [r[2] for r in result]                           # undecorate
 
 _nlargest = nlargest
 def nlargest(n, iterable, key=None):
@@ -366,11 +390,37 @@ def nlargest(n, iterable, key=None):
 
     Equivalent to:  sorted(iterable, key=key, reverse=True)[:n]
     """
+
+    # Short-cut for n==1 is to use max() when len(iterable)>0
+    if n == 1:
+        it = iter(iterable)
+        head = list(islice(it, 1))
+        if not head:
+            return []
+        if key is None:
+            return [max(chain(head, it))]
+        return [max(chain(head, it), key=key)]
+
+    # When n>=size, it's faster to use sort()
+    try:
+        size = len(iterable)
+    except (TypeError, AttributeError):
+        pass
+    else:
+        if n >= size:
+            return sorted(iterable, key=key, reverse=True)[:n]
+
+    # When key is none, use simpler decoration
+    if key is None:
+        it = zip(iterable, count(0,-1))                     # decorate
+        result = _nlargest(n, it)
+        return [r[0] for r in result]                       # undecorate
+
+    # General case, slowest method
     in1, in2 = tee(iterable)
-    keys = in1 if key is None else map(key, in1)
-    it = zip(keys, map(neg, count()), in2)                 # decorate
+    it = zip(map(key, in1), count(0,-1), in2)               # decorate
     result = _nlargest(n, it)
-    return list(map(itemgetter(2), result))                 # undecorate
+    return [r[2] for r in result]                           # undecorate
 
 if __name__ == "__main__":
     # Simple sanity test

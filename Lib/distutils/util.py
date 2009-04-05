@@ -99,7 +99,11 @@ def get_platform ():
         if not macver:
             macver = cfgvars.get('MACOSX_DEPLOYMENT_TARGET')
 
-        if not macver:
+        if 1:
+            # Always calculate the release of the running machine,
+            # needed to determine if we can build fat binaries or not.
+
+            macrelease = macver
             # Get the system version. Reading this plist is a documented
             # way to get the system version (see the documentation for
             # the Gestalt Manager)
@@ -115,16 +119,18 @@ def get_platform ():
                         r'<string>(.*?)</string>', f.read())
                 f.close()
                 if m is not None:
-                    macver = '.'.join(m.group(1).split('.')[:2])
+                    macrelease = '.'.join(m.group(1).split('.')[:2])
                 # else: fall back to the default behaviour
+
+        if not macver:
+            macver = macrelease
 
         if macver:
             from distutils.sysconfig import get_config_vars
             release = macver
             osname = "macosx"
 
-
-            if (release + '.') >= '10.4.' and \
+            if (macrelease + '.') >= '10.4.' and \
                     '-arch' in get_config_vars().get('CFLAGS', '').strip():
                 # The universal build will build fat binaries, but not on
                 # systems before 10.4
@@ -133,9 +139,13 @@ def get_platform ():
                 # 'universal' instead of 'fat'.
 
                 machine = 'fat'
+                cflags = get_config_vars().get('CFLAGS')
 
-                if '-arch x86_64' in get_config_vars().get('CFLAGS'):
-                    machine = 'universal'
+                if '-arch x86_64' in cflags:
+                    if '-arch i386' in cflags:
+                        machine = 'universal'
+                    else:
+                        machine = 'fat64'
 
             elif machine in ('PowerPC', 'Power_Macintosh'):
                 # Pick a sane name for the PPC architecture.
@@ -560,6 +570,39 @@ def run_2to3(files, fixer_names=None, options=None, explicit=None):
         fixer_names = get_fixers_from_package('lib2to3.fixes')
     r = DistutilsRefactoringTool(fixer_names, options=options)
     r.refactor(files, write=True)
+
+def copydir_run_2to3(src, dest, template=None, fixer_names=None,
+                     options=None, explicit=None):
+    """Recursively copy a directory, only copying new and changed files,
+    running run_2to3 over all newly copied Python modules afterward.
+
+    If you give a template string, it's parsed like a MANIFEST.in.
+    """
+    from distutils.dir_util import mkpath
+    from distutils.file_util import copy_file
+    from distutils.filelist import FileList
+    filelist = FileList()
+    curdir = os.getcwd()
+    os.chdir(src)
+    try:
+        filelist.findall()
+    finally:
+        os.chdir(curdir)
+    filelist.files[:] = filelist.allfiles
+    if template:
+        for line in template.splitlines():
+            line = line.strip()
+            if not line: continue
+            filelist.process_template_line(line)
+    copied = []
+    for filename in filelist.files:
+        outname = os.path.join(dest, filename)
+        mkpath(os.path.dirname(outname))
+        res = copy_file(os.path.join(src, filename), outname, update=1)
+        if res[1]: copied.append(outname)
+    run_2to3([fn for fn in copied if fn.lower().endswith('.py')],
+             fixer_names=fixer_names, options=options, explicit=explicit)
+    return copied
 
 class Mixin2to3:
     '''Mixin class for commands that run 2to3.

@@ -2,7 +2,6 @@
 
 import linecache
 import sys
-import types
 
 __all__ = ['extract_stack', 'extract_tb', 'format_exception',
            'format_exception_only', 'format_list', 'format_stack',
@@ -275,6 +274,8 @@ def format_exc(limit=None, chain=True):
 def print_last(limit=None, file=None, chain=True):
     """This is a shorthand for 'print_exception(sys.last_type,
     sys.last_value, sys.last_traceback, limit, file)'."""
+    if not hasattr(sys, "last_type"):
+        raise ValueError("no last exception")
     if file is None:
         file = sys.stderr
     print_exception(sys.last_type, sys.last_value, sys.last_traceback,

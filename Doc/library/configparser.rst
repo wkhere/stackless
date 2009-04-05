@@ -64,8 +64,11 @@ write-back, as will be the keys within each section.
    options within a section, and for the default values. This class does not
    support the magical interpolation behavior.
 
+   .. versionchanged:: 3.1
+      The default *dict_type* is :class:`collections.OrderedDict`.
 
-.. class:: ConfigParser([defaults])
+
+.. class:: ConfigParser([defaults[, dict_type]])
 
    Derived class of :class:`RawConfigParser` that implements the magical
    interpolation feature and adds optional arguments to the :meth:`get` and
@@ -80,8 +83,11 @@ write-back, as will be the keys within each section.
    option names to lower case), the values ``foo %(bar)s`` and ``foo %(BAR)s`` are
    equivalent.
 
+   .. versionchanged:: 3.1
+      The default *dict_type* is :class:`collections.OrderedDict`.
 
-.. class:: SafeConfigParser([defaults])
+
+.. class:: SafeConfigParser([defaults[, dict_type]])
 
    Derived class of :class:`ConfigParser` that implements a more-sane variant of
    the magical interpolation feature.  This implementation is more predictable as
@@ -89,6 +95,9 @@ write-back, as will be the keys within each section.
    compatible with older versions of Python.
 
    .. XXX Need to explain what's safer/more predictable about it.
+
+   .. versionchanged:: 3.1
+      The default *dict_type* is :class:`collections.OrderedDict`.
 
 
 .. exception:: NoSectionError
@@ -344,7 +353,7 @@ An example of writing to a configuration file::
    import configparser
 
    config = configparser.RawConfigParser()
-   
+
    # When adding sections or items, add them in the reverse order of
    # how you want them to be displayed in the actual file.
    # In addition, please note that using RawConfigParser's and the raw
@@ -359,7 +368,7 @@ An example of writing to a configuration file::
    config.set('Section1', 'baz', 'fun')
    config.set('Section1', 'bar', 'Python')
    config.set('Section1', 'foo', '%(bar)s is %(baz)s!')
-   
+
    # Writing our configuration file to 'example.cfg'
    with open('example.cfg', 'wb') as configfile:
        config.write(configfile)
@@ -399,7 +408,7 @@ To get interpolation, you will need to use a :class:`ConfigParser` or
    print(config.get('Section1', 'foo', 0, {'bar': 'Documentation',
                                            'baz': 'evil'}))
 
-Defaults are available in all three types of ConfigParsers. They are used in 
+Defaults are available in all three types of ConfigParsers. They are used in
 interpolation if an option used is not defined elsewhere. ::
 
    import configparser
@@ -407,7 +416,7 @@ interpolation if an option used is not defined elsewhere. ::
    # New instance with 'bar' and 'baz' defaulting to 'Life' and 'hard' each
    config = configparser.SafeConfigParser({'bar': 'Life', 'baz': 'hard'})
    config.read('example.cfg')
-   
+
    print(config.get('Section1', 'foo')) # -> "Python is fun!"
    config.remove_option('Section1', 'bar')
    config.remove_option('Section1', 'baz')

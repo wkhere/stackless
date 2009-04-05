@@ -342,7 +342,7 @@ _PyWeakref_RefType = {
     0,	                        /*tp_print*/
     0,                          /*tp_getattr*/
     0,                          /*tp_setattr*/
-    0,	                        /*tp_compare*/
+    0,	                        /*tp_reserved*/
     (reprfunc)weakref_repr,     /*tp_repr*/
     0,                          /*tp_as_number*/
     0,                          /*tp_as_sequence*/
@@ -488,8 +488,7 @@ WRAP_BINARY(proxy_rshift, PyNumber_Rshift)
 WRAP_BINARY(proxy_and, PyNumber_And)
 WRAP_BINARY(proxy_xor, PyNumber_Xor)
 WRAP_BINARY(proxy_or, PyNumber_Or)
-WRAP_UNARY(proxy_int, PyNumber_Int)
-WRAP_UNARY(proxy_long, PyNumber_Long)
+WRAP_UNARY(proxy_int, PyNumber_Long)
 WRAP_UNARY(proxy_float, PyNumber_Float)
 WRAP_BINARY(proxy_iadd, PyNumber_InPlaceAdd)
 WRAP_BINARY(proxy_isub, PyNumber_InPlaceSubtract)
@@ -595,7 +594,7 @@ static PyNumberMethods proxy_as_number = {
     proxy_xor,              /*nb_xor*/
     proxy_or,               /*nb_or*/
     proxy_int,              /*nb_int*/
-    proxy_long,             /*nb_long*/
+    0,                      /*nb_reserved*/
     proxy_float,            /*nb_float*/
     proxy_iadd,             /*nb_inplace_add*/
     proxy_isub,             /*nb_inplace_subtract*/
@@ -643,7 +642,7 @@ _PyWeakref_ProxyType = {
     0,				        /* tp_print */
     0,				        /* tp_getattr */
     0, 				        /* tp_setattr */
-    0,				        /* tp_compare */
+    0,				        /* tp_reserved */
     (reprfunc)proxy_repr,	        /* tp_repr */
     &proxy_as_number,		        /* tp_as_number */
     &proxy_as_sequence,		        /* tp_as_sequence */
@@ -676,7 +675,7 @@ _PyWeakref_CallableProxyType = {
     0,				        /* tp_print */
     0,				        /* tp_getattr */
     0, 				        /* tp_setattr */
-    0,				        /* tp_compare */
+    0,				        /* tp_reserved */
     (unaryfunc)proxy_repr,	        /* tp_repr */
     &proxy_as_number,		        /* tp_as_number */
     &proxy_as_sequence,		        /* tp_as_sequence */

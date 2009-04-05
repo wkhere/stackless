@@ -2,8 +2,6 @@
 #
 # For more information about this module, see PEP 324.
 #
-# This module should remain compatible with Python 2.2, see PEP 291.
-#
 # Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
 #
 # Licensed to PSF under a Contributor Agreement.
@@ -104,7 +102,7 @@ appearance of the main window and priority for the new process.
 (Windows only)
 
 
-This module also defines four shortcut functions:
+This module also defines some shortcut functions:
 
 call(*popenargs, **kwargs):
     Run command with arguments.  Wait for command to complete, then
@@ -151,6 +149,17 @@ getoutput(cmd):
     >>> subprocess.getoutput('ls /bin/ls')
     '/bin/ls'
 
+check_output(*popenargs, **kwargs):
+   Run command with arguments and return its output as a byte string.
+
+   If the exit code was non-zero it raises a CalledProcessError.  The
+   CalledProcessError object will have the return code in the returncode
+   attribute and output in the output attribute.
+
+   The arguments are the same as for the Popen constructor.  Example:
+
+      output = subprocess.check_output(["ls", "-l", "/dev/null"])
+
 
 Exceptions
 ----------
@@ -166,8 +175,8 @@ should prepare for OSErrors.
 
 A ValueError will be raised if Popen is called with invalid arguments.
 
-check_call() will raise CalledProcessError, if the called process
-returns a non-zero return code.
+check_call() and check_output() will raise CalledProcessError, if the
+called process returns a non-zero return code.
 
 
 Security
@@ -321,12 +330,15 @@ import signal
 
 # Exception classes used by this module.
 class CalledProcessError(Exception):
-    """This exception is raised when a process run by check_call() returns
-    a non-zero exit status.  The exit status will be stored in the
-    returncode attribute."""
-    def __init__(self, returncode, cmd):
+    """This exception is raised when a process run by check_call() or
+    check_output() returns a non-zero exit status.
+    The exit status will be stored in the returncode attribute;
+    check_output() will also store the output in the output attribute.
+    """
+    def __init__(self, returncode, cmd, output=None):
         self.returncode = returncode
         self.cmd = cmd
+        self.output = output
     def __str__(self):
         return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
 
@@ -364,7 +376,7 @@ else:
     import pickle
 
 __all__ = ["Popen", "PIPE", "STDOUT", "call", "check_call", "getstatusoutput",
-           "getoutput", "CalledProcessError"]
+           "getoutput", "check_output", "CalledProcessError"]
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
@@ -410,12 +422,45 @@ def check_call(*popenargs, **kwargs):
     check_call(["ls", "-l"])
     """
     retcode = call(*popenargs, **kwargs)
-    cmd = kwargs.get("args")
-    if cmd is None:
-        cmd = popenargs[0]
     if retcode:
+        cmd = kwargs.get("args")
+        if cmd is None:
+            cmd = popenargs[0]
         raise CalledProcessError(retcode, cmd)
-    return retcode
+    return 0
+
+
+def check_output(*popenargs, **kwargs):
+    """Run command with arguments and return its output as a byte string.
+
+    If the exit code was non-zero it raises a CalledProcessError.  The
+    CalledProcessError object will have the return code in the returncode
+    attribute and output in the output attribute.
+
+    The arguments are the same as for the Popen constructor.  Example:
+
+    >>> check_output(["ls", "-l", "/dev/null"])
+    'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
+
+    The stdout argument is not allowed as it is used internally.
+    To capture standard error in the result, use stderr=subprocess.STDOUT.
+
+    >>> check_output(["/bin/sh", "-c",
+                      "ls -l non_existent_file ; exit 0"],
+                     stderr=subprocess.STDOUT)
+    'ls: non_existent_file: No such file or directory\n'
+    """
+    if 'stdout' in kwargs:
+        raise ValueError('stdout argument not allowed, it will be overridden.')
+    process = Popen(*popenargs, stdout=PIPE, **kwargs)
+    output, unused_err = process.communicate()
+    retcode = process.poll()
+    if retcode:
+        cmd = kwargs.get("args")
+        if cmd is None:
+            cmd = popenargs[0]
+        raise CalledProcessError(retcode, cmd, output=output)
+    return output
 
 
 def list2cmdline(seq):
@@ -593,21 +638,13 @@ class Popen(object):
                             c2pread, c2pwrite,
                             errread, errwrite)
 
-        # On Windows, you cannot just redirect one or two handles: You
-        # either have to redirect all three or none. If the subprocess
-        # user has only redirected one or two handles, we are
-        # automatically creating PIPEs for the rest. We should close
-        # these after the process is started. See bug #1124861.
         if mswindows:
-            if stdin is None and p2cwrite is not None:
-                os.close(p2cwrite)
-                p2cwrite = None
-            if stdout is None and c2pread is not None:
-                os.close(c2pread)
-                c2pread = None
-            if stderr is None and errread is not None:
-                os.close(errread)
-                errread = None
+            if p2cwrite is not None:
+                p2cwrite = msvcrt.open_osfhandle(p2cwrite.Detach(), 0)
+            if c2pread is not None:
+                c2pread = msvcrt.open_osfhandle(c2pread.Detach(), 0)
+            if errread is not None:
+                errread = msvcrt.open_osfhandle(errread.Detach(), 0)
 
         if bufsize == 0:
             bufsize = 1  # Nearly unbuffered (XXX for now)
@@ -692,13 +729,10 @@ class Popen(object):
 
             if stdin is None:
                 p2cread = GetStdHandle(STD_INPUT_HANDLE)
-            if p2cread is not None:
-                pass
-            elif stdin is None or stdin == PIPE:
+                if p2cread is None:
+                    p2cread, _ = CreatePipe(None, 0)
+            elif stdin == PIPE:
                 p2cread, p2cwrite = CreatePipe(None, 0)
-                # Detach and turn into fd
-                p2cwrite = p2cwrite.Detach()
-                p2cwrite = msvcrt.open_osfhandle(p2cwrite, 0)
             elif isinstance(stdin, int):
                 p2cread = msvcrt.get_osfhandle(stdin)
             else:
@@ -708,13 +742,10 @@ class Popen(object):
 
             if stdout is None:
                 c2pwrite = GetStdHandle(STD_OUTPUT_HANDLE)
-            if c2pwrite is not None:
-                pass
-            elif stdout is None or stdout == PIPE:
+                if c2pwrite is None:
+                    _, c2pwrite = CreatePipe(None, 0)
+            elif stdout == PIPE:
                 c2pread, c2pwrite = CreatePipe(None, 0)
-                # Detach and turn into fd
-                c2pread = c2pread.Detach()
-                c2pread = msvcrt.open_osfhandle(c2pread, 0)
             elif isinstance(stdout, int):
                 c2pwrite = msvcrt.get_osfhandle(stdout)
             else:
@@ -724,13 +755,10 @@ class Popen(object):
 
             if stderr is None:
                 errwrite = GetStdHandle(STD_ERROR_HANDLE)
-            if errwrite is not None:
-                pass
-            elif stderr is None or stderr == PIPE:
+                if errwrite is None:
+                    _, errwrite = CreatePipe(None, 0)
+            elif stderr == PIPE:
                 errread, errwrite = CreatePipe(None, 0)
-                # Detach and turn into fd
-                errread = errread.Detach()
-                errread = msvcrt.open_osfhandle(errread, 0)
             elif stderr == STDOUT:
                 errwrite = c2pwrite
             elif isinstance(stderr, int):
@@ -805,7 +833,7 @@ class Popen(object):
                     # cause random failures on win9x.  Specifically a
                     # dialog: "Your program accessed mem currently in
                     # use at xxx" and a hopeful warning about the
-                    # stability of your system.  Cost is Ctrl+C wont
+                    # stability of your system.  Cost is Ctrl+C won't
                     # kill children.
                     creationflags |= CREATE_NEW_CONSOLE
 
@@ -1094,6 +1122,9 @@ class Popen(object):
             if data:
                 os.waitpid(self.pid, 0)
                 child_exception = pickle.loads(data)
+                for fd in (p2cwrite, c2pread, errread):
+                    if fd is not None:
+                        os.close(fd)
                 raise child_exception
 
 

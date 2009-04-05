@@ -73,6 +73,40 @@ class ProcessTestCase(unittest.TestCase):
         else:
             self.fail("Expected CalledProcessError")
 
+    def test_check_output(self):
+        # check_output() function with zero return code
+        output = subprocess.check_output(
+                [sys.executable, "-c", "print('BDFL')"])
+        self.assertTrue(b'BDFL' in output)
+
+    def test_check_output_nonzero(self):
+        # check_call() function with non-zero return code
+        try:
+            subprocess.check_output(
+                    [sys.executable, "-c", "import sys; sys.exit(5)"])
+        except subprocess.CalledProcessError as e:
+            self.assertEqual(e.returncode, 5)
+        else:
+            self.fail("Expected CalledProcessError")
+
+    def test_check_output_stderr(self):
+        # check_output() function stderr redirected to stdout
+        output = subprocess.check_output(
+                [sys.executable, "-c", "import sys; sys.stderr.write('BDFL')"],
+                stderr=subprocess.STDOUT)
+        self.assertTrue(b'BDFL' in output)
+
+    def test_check_output_stdout_arg(self):
+        # check_output() function stderr redirected to stdout
+        try:
+            output = subprocess.check_output(
+                    [sys.executable, "-c", "print('will not be run')"],
+                    stdout=sys.stdout)
+        except ValueError as e:
+            self.assertTrue('stdout' in e.args[0])
+        else:
+            self.fail("Expected ValueError when stdout arg supplied.")
+
     def test_call_kwargs(self):
         # call() function with keyword args
         newenv = os.environ.copy()
@@ -108,8 +142,9 @@ class ProcessTestCase(unittest.TestCase):
         self.assertEqual(p.stderr, None)
 
     def test_executable(self):
-        p = subprocess.Popen(["somethingyoudonthave",
-                              "-c", "import sys; sys.exit(47)"],
+        arg0 = os.path.join(os.path.dirname(sys.executable),
+                            "somethingyoudonthave")
+        p = subprocess.Popen([arg0, "-c", "import sys; sys.exit(47)"],
                              executable=sys.executable)
         p.wait()
         self.assertEqual(p.returncode, 47)
@@ -486,6 +521,22 @@ class ProcessTestCase(unittest.TestCase):
         # Again with keyword arg
         p = subprocess.Popen([sys.executable, "-c", "pass"], bufsize=None)
         self.assertEqual(p.wait(), 0)
+
+    def test_leaking_fds_on_error(self):
+        # see bug #5179: Popen leaks file descriptors to PIPEs if
+        # the child fails to execute; this will eventually exhaust
+        # the maximum number of open fds. 1024 seems a very common
+        # value for that limit, but Windows has 2048, so we loop
+        # 1024 times (each call leaked two fds).
+        for i in range(1024):
+            try:
+                subprocess.Popen(['nonexisting_i_hope'],
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            # Windows raises IOError
+            except (IOError, OSError) as err:
+                if err.errno != 2:  # ignore "no such file"
+                    raise
 
     #
     # POSIX tests

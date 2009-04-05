@@ -32,7 +32,7 @@ instances of :class:`Random` to get generators that don't share state.
 
 Class :class:`Random` can also be subclassed if you want to use a different
 basic generator of your own devising: in that case, override the :meth:`random`,
-:meth:`seed`, :meth:`getstate`, and :meth:`setstate`.
+:meth:`seed`, :meth:`getstate`, and :meth:`setstate` methods.
 Optionally, a new generator can supply a :meth:`getrandbits` method --- this
 allows :meth:`randrange` to produce selections over an arbitrarily large range.
 
@@ -66,17 +66,6 @@ Bookkeeping functions:
    the time :func:`setstate` was called.
 
 
-.. function:: jumpahead(n)
-
-   Change the internal state to one different from and likely far away from the
-   current state.  *n* is a non-negative integer which is used to scramble the
-   current state vector.  This is most useful in multi-threaded programs, in
-   conjunction with multiple instances of the :class:`Random` class:
-   :meth:`setstate` or :meth:`seed` can be used to force all instances into the
-   same internal state, and then :meth:`jumpahead` can be used to force the
-   instances' states far apart.
-
-
 .. function:: getrandbits(k)
 
    Returns a python integer with *k* random bits. This method is supplied with
@@ -96,7 +85,8 @@ Functions for integers:
 
 .. function:: randint(a, b)
 
-   Return a random integer *N* such that ``a <= N <= b``.
+   Return a random integer *N* such that ``a <= N <= b``.  Alias for
+   ``randrange(a, b+1)``.
 
 
 Functions for sequences:
@@ -149,13 +139,13 @@ be found in any statistics text.
 
 .. function:: uniform(a, b)
 
-   Return a random floating point number *N* such that ``a <= N < b`` for
-   ``a <= b`` and ``b <= N < a`` for ``b < a``.
+   Return a random floating point number *N* such that ``a <= N <= b`` for
+   ``a <= b`` and ``b <= N <= a`` for ``b < a``.
 
 
 .. function:: triangular(low, high, mode)
 
-   Return a random floating point number *N* such that ``low <= N < high`` and
+   Return a random floating point number *N* such that ``low <= N <= high`` and
    with the specified *mode* between those bounds.  The *low* and *high* bounds
    default to zero and one.  The *mode* argument defaults to the midpoint
    between the bounds, giving a symmetric distribution.
@@ -163,27 +153,30 @@ be found in any statistics text.
 
 .. function:: betavariate(alpha, beta)
 
-   Beta distribution.  Conditions on the parameters are ``alpha > 0`` and ``beta >
-   0``. Returned values range between 0 and 1.
+   Beta distribution.  Conditions on the parameters are ``alpha > 0`` and
+   ``beta > 0``. Returned values range between 0 and 1.
 
 
 .. function:: expovariate(lambd)
 
-   Exponential distribution.  *lambd* is 1.0 divided by the desired mean.  (The
-   parameter would be called "lambda", but that is a reserved word in Python.)
-   Returned values range from 0 to positive infinity.
+   Exponential distribution.  *lambd* is 1.0 divided by the desired
+   mean.  It should be nonzero.  (The parameter would be called
+   "lambda", but that is a reserved word in Python.)  Returned values
+   range from 0 to positive infinity if *lambd* is positive, and from
+   negative infinity to 0 if *lambd* is negative.
 
 
 .. function:: gammavariate(alpha, beta)
 
-   Gamma distribution.  (*Not* the gamma function!)  Conditions on the parameters
-   are ``alpha > 0`` and ``beta > 0``.
+   Gamma distribution.  (*Not* the gamma function!)  Conditions on the
+   parameters are ``alpha > 0`` and ``beta > 0``.
 
 
 .. function:: gauss(mu, sigma)
 
-   Gaussian distribution.  *mu* is the mean, and *sigma* is the standard deviation.
-   This is slightly faster than the :func:`normalvariate` function defined below.
+   Gaussian distribution.  *mu* is the mean, and *sigma* is the standard
+   deviation.  This is slightly faster than the :func:`normalvariate` function
+   defined below.
 
 
 .. function:: lognormvariate(mu, sigma)
@@ -225,7 +218,7 @@ Alternative Generators:
    Class that uses the :func:`os.urandom` function for generating random numbers
    from sources provided by the operating system. Not available on all systems.
    Does not rely on software state and sequences are not reproducible. Accordingly,
-   the :meth:`seed` and :meth:`jumpahead` methods have no effect and are ignored.
+   the :meth:`seed` method has no effect and is ignored.
    The :meth:`getstate` and :meth:`setstate` methods raise
    :exc:`NotImplementedError` if called.
 
@@ -260,3 +253,7 @@ Examples of basic usage::
    Modeling and Computer Simulation Vol. 8, No. 1, January pp.3-30 1998.
 
 
+   `Complementary-Multiply-with-Carry recipe
+   <http://code.activestate.com/recipes/576707/>`_ for a compatible alternative
+   random number generator with a long period and comparatively simple update
+   operations.

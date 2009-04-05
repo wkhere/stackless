@@ -51,8 +51,8 @@ definition occurs in a function block, the scope extends to any blocks contained
 within the defining one, unless a contained block introduces a different binding
 for the name.  The scope of names defined in a class block is limited to the
 class block; it does not extend to the code blocks of methods -- this includes
-generator expressions since they are implemented using a function scope.  This
-means that the following will fail::
+comprehensions and generator expressions since they are implemented using a
+function scope.  This means that the following will fail::
 
    class A:
        a = 42
@@ -86,9 +86,10 @@ subclass of :exc:`NameError`.
 The following constructs bind names: formal parameters to functions,
 :keyword:`import` statements, class and function definitions (these bind the
 class or function name in the defining block), and targets that are identifiers
-if occurring in an assignment, :keyword:`for` loop header, or in the second
-position of an :keyword:`except` clause header.  The :keyword:`import` statement
-of the form "``from ...import *``" binds all names defined in the imported
+if occurring in an assignment, :keyword:`for` loop header, or after
+:keyword:`as` in a :keyword:`with` statement or :keyword.`except` clause.
+The :keyword:`import` statement
+of the form ``from ... import *`` binds all names defined in the imported
 module, except those beginning with an underscore.  This form may only be used
 at the module level.
 

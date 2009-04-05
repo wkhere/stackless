@@ -61,6 +61,12 @@ The :mod:`queue` module defines the following classes and exceptions:
    Exception raised when non-blocking :meth:`put` (or :meth:`put_nowait`) is called
    on a :class:`Queue` object which is full.
 
+.. seealso::
+
+   :class:`collections.deque` is an alternative implementation of unbounded
+   queues with fast atomic :func:`append` and :func:`popleft` operations that
+   do not require locking.
+
 
 .. _queueobjects:
 
@@ -68,7 +74,7 @@ Queue Objects
 -------------
 
 Queue objects (:class:`Queue`, :class:`LifoQueue`, or :class:`PriorityQueue`)
-provide the public methods described below.  
+provide the public methods described below.
 
 
 .. method:: Queue.qsize()
@@ -76,6 +82,22 @@ provide the public methods described below.
    Return the approximate size of the queue.  Note, qsize() > 0 doesn't
    guarantee that a subsequent get() will not block, nor will qsize() < maxsize
    guarantee that put() will not block.
+
+
+.. method:: Queue.empty()
+
+   Return ``True`` if the queue is empty, ``False`` otherwise.  If empty()
+   returns ``True`` it doesn't guarantee that a subsequent call to put()
+   will not block.  Similarly, if empty() returns ``False`` it doesn't
+   guarantee that a subsequent call to get() will not block.
+
+
+.. method:: Queue.full()
+
+   Return ``True`` if the queue is full, ``False`` otherwise.  If full()
+   returns ``True`` it doesn't guarantee that a subsequent call to get()
+   will not block.  Similarly, if full() returns ``False`` it doesn't
+   guarantee that a subsequent call to put() will not block.
 
 
 .. method:: Queue.put(item[, block[, timeout]])
@@ -133,25 +155,25 @@ fully processed by daemon consumer threads.
    The count of unfinished tasks goes up whenever an item is added to the queue.
    The count goes down whenever a consumer thread calls :meth:`task_done` to
    indicate that the item was retrieved and all work on it is complete. When the
-   count of unfinished tasks drops to zero, join() unblocks.
+   count of unfinished tasks drops to zero, :meth:`join` unblocks.
 
 
 Example of how to wait for enqueued tasks to be completed::
 
-   def worker(): 
-       while True: 
-           item = q.get() 
-           do_work(item) 
-           q.task_done() 
+   def worker():
+       while True:
+           item = q.get()
+           do_work(item)
+           q.task_done()
 
-   q = Queue() 
-   for i in range(num_worker_threads): 
+   q = Queue()
+   for i in range(num_worker_threads):
         t = Thread(target=worker)
-        t.set_daemon(True)
-        t.start() 
+        t.daemon = True
+        t.start()
 
    for item in source():
-       q.put(item) 
+       q.put(item)
 
    q.join()       # block until all tasks are done
 

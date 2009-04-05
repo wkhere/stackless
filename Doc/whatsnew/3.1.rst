@@ -1,0 +1,320 @@
+****************************
+  What's New In Python 3.1
+****************************
+
+.. XXX Add trademark info for Apple, Microsoft.
+
+:Author: Raymond Hettinger
+:Release: |release|
+:Date: |today|
+
+.. $Id$
+   Rules for maintenance:
+
+   * Anyone can add text to this document.  Do not spend very much time
+   on the wording of your changes, because your text will probably
+   get rewritten to some degree.
+
+   * The maintainer will go through Misc/NEWS periodically and add
+   changes; it's therefore more important to add your changes to
+   Misc/NEWS than to this file.  (Note: I didn't get to this for 3.0.
+   GvR.)
+
+   * This is not a complete list of every single change; completeness
+   is the purpose of Misc/NEWS.  Some changes I consider too small
+   or esoteric to include.  If such a change is added to the text,
+   I'll just remove it.  (This is another reason you shouldn't spend
+   too much time on writing your addition.)
+
+   * If you want to draw your new text to the attention of the
+   maintainer, add 'XXX' to the beginning of the paragraph or
+   section.
+
+   * It's OK to just add a fragmentary note about a change.  For
+   example: "XXX Describe the transmogrify() function added to the
+   socket module."  The maintainer will research the change and
+   write the necessary text.
+
+   * You can comment out your additions if you like, but it's not
+   necessary (especially when a final release is some months away).
+
+   * Credit the author of a patch or bugfix.   Just the name is
+   sufficient; the e-mail address isn't necessary.  (Due to time
+   constraints I haven't managed to do this for 3.0.  GvR.)
+
+   * It's helpful to add the bug/patch number as a comment:
+
+   % Patch 12345
+   XXX Describe the transmogrify() function added to the socket
+   module.
+   (Contributed by P.Y. Developer.)
+
+   This saves the maintainer the effort of going through the SVN log
+   when researching a change.  (Again, I didn't get to this for 3.0.
+   GvR.)
+
+This article explains the new features in Python 3.1, compared to 3.0.
+
+.. Compare with previous release in 2 - 3 sentences here.
+.. add hyperlink when the documentation becomes available online.
+
+.. ======================================================================
+.. Large, PEP-level features and changes should be described here.
+.. Should there be a new section here for 3k migration?
+.. Or perhaps a more general section describing module changes/deprecation?
+.. sets module deprecated
+.. ======================================================================
+
+
+PEP 372: Ordered Dictionaries
+=============================
+
+Regular Python dictionaries iterate over key/value pairs in arbitrary order.
+Over the years, a number of authors have written alternative implementations
+that remember the order that the keys were originally inserted.  Based on
+the experiences from those implementations, the :mod:`collections` module
+now has an :class:`OrderedDict` class.
+
+The OrderedDict API is substantially the same as regular dictionaries
+but will iterate over keys and values in a guaranteed order depending on
+when a key was first inserted.  If a new entry overwrites an existing entry,
+the original insertion position is left unchanged.  Deleting an entry and
+reinserting it will move it to the end.
+
+The standard library now supports use of ordered dictionaries in several
+modules.  The :mod:`ConfigParser` module uses them by default.  This lets
+configuration files be read, modified, and then written back in their original
+order.  The :mod:`collections` module's :meth:`namedtuple._asdict` method now
+returns an ordered dictionary with the values appearing in the same order as
+the underlying tuple indicies.  The :mod:`json` module is being built-out with
+an *object_pairs_hook* to allow OrderedDicts to be built by the decoder.
+Support was also added for third-party tools like PyYAML.
+
+.. seealso::
+
+   :pep:`372` - Ordered Dictionaries
+      PEP written by Armin Ronacher and Raymond Hettinger.  Implementation
+      written by Raymond Hettinger.
+
+PEP 378: Format Specifier for Thousands Separator
+=================================================
+
+The builtin :func:`format` function and the :meth:`str.format` method use
+a mini-language that now includes a simple, non-locale aware way to format
+a number with a thousands separator.  That provides a way to humanize a
+program's output, improving its professional appearance and readability::
+
+    >>> format(Decimal('1234567.89'), ',f')
+    '1,234,567.89'
+
+The currently supported types are :class:`int` and :class:`decimal.Decimal`.
+Support for :class:`float` is expected before the beta release.
+Discussions are underway about how to specify alternative separators
+like dots, spaces, apostrophes, or underscores.  Locale-aware applications
+should use the existing *n* format specifier which already has some support
+for thousands separators.
+
+.. seealso::
+
+   :pep:`378` - Format Specifier for Thousands Separator
+      PEP written by Raymond Hettinger; implemented by Eric Smith and
+      Mark Dickinson.
+
+
+Other Language Changes
+======================
+
+Some smaller changes made to the core Python language are:
+
+* The :func:`int` type gained a ``bit_length`` method that returns the
+  number of bits necessary to represent its argument in binary::
+
+      >>> n = 37
+      >>> bin(37)
+      '0b100101'
+      >>> n.bit_length()
+      6
+      >>> n = 2**123-1
+      >>> n.bit_length()
+      123
+      >>> (n+1).bit_length()
+      124
+
+  (Contributed by Fredrik Johansson, Victor Stinner, Raymond Hettinger,
+  and Mark Dickinson; :issue:`3439`.)
+
+* Added a :class:`collections.Counter` class to support convenient
+  counting of unique items in a sequence or iterable::
+
+      >>> Counter(['red', 'blue', 'red', 'green', 'blue', 'blue'])
+      Counter({'blue': 3, 'red': 2, 'green': 1})
+
+  (Contributed by Raymond Hettinger; :issue:`1696199`.)
+
+* Add a new module, :mod:`ttk` for access to the Tk themed widget set. The
+  basic idea of ttk is to separate, to the extent possible, the code
+  implementing a widget's behavior from the code implementing its appearance.
+
+  (Contributed by Kevin Walzer and Guilherme Polo; :issue:`2618` and
+  :issue:`2983`.)
+
+* The :class:`gzip.GzipFile` and :class:`bz2.BZ2File` classs now support
+  the context manager protocol.
+
+  (Contributed by Jacques Frechet; :issue:`4272`.)
+
+* The :mod:`Decimal` module now supports two new methods to create a
+  decimal object that from a binary :class:`float`.  The conversion is
+  exact but can sometimes be surprising::
+
+      >>> Decimal.from_float(1.1)
+      Decimal('1.100000000000000088817841970012523233890533447265625')
+
+  The long decimal result shows the actual binary fraction being
+  stored for *1.1*.  The fraction has many digits because *1.1* cannot
+  be exactly represented in binary.
+
+  (Contributed by Raymond Hettinger and Mark Dickinson.)
+
+* The fields in :func:`format` strings can now be automatically
+  numbered::
+
+    >>> 'Sir {} of {}'.format('Gallahad', 'Camelot')
+    'Sir Gallahad of Camelot'
+
+  Formerly, the string would have required numbered fields such as:
+  ``'Sir {0} of {1}'``.
+
+  (Contributed by Eric Smith; :issue:`5237`.)
+
+* The :mod:`itertools` module grew two new functions.  The
+  :func:`itertools.combinations_with_replacement` function is one of
+  four for generating combinatorics including permutations and Cartesian
+  products.  The :func:`itertools.compress` function mimics its namesake
+  from APL.  Also, the existing :func:`itertools.count` function now has
+  an optional *step* argument and can accept any type of counting
+  sequence including :class:`fractions.Fraction` and
+  :class:`decimal.Decimal`.
+
+  (Contributed by Raymond Hettinger.)
+
+* :func:`collections.namedtuple` now supports a keyword argument
+  *rename* which lets invalid fieldnames be automatically converted to
+  positional names in the form _0, _1, etc.  This is useful when
+  the field names are being created by an external source such as a
+  CSV header, SQL field list, or user input.
+
+  (Contributed by Raymond Hettinger; :issue:`1818`.)
+
+* ``round`(x, n)`` now returns an integer if *x* is an integer.
+  Previously it returned a float.
+
+  (Contributed by Mark Dickinson; :issue:`4707`.)
+
+* The :func:`re.sub`, :func:`re.subn` and :func:`re.split` functions now
+  accept a flags parameter.
+
+  (Contributed by Gregory Smith.)
+
+* The :mod:`runpy` module which supports the ``-m`` command line switch
+  now supports the execution of packages by looking for and executing
+  a ``__main__`` submodule when a package name is supplied.
+
+  (Contributed by Andi Vajda; :issue:`4195`.)
+
+* The :mod:`pdb` module can now access and display source code loaded via
+  :mod:`zipimport` (or any other conformant :pep:`302` loader).
+
+  (Contributed by Alexander Belopolsky; :issue:`4201`.)
+
+*  :class:`functools.partial` objects can now be pickled.
+
+  (Suggested by Antoine Pitrou and Jesse Noller.  Implemented by
+  Jack Diedrich; :issue:`5228`.)
+
+* Add :mod:`pydoc` help topics for symbols so that ``help('@')``
+  works as expected in the interactive environment.
+
+  (Contributed by David Laban; :issue:`4739`.)
+
+* The :mod:`unittest` module now supports skipping individual tests or classes
+  of tests. And it supports marking a test as a expected failure, a test that
+  is known to be broken, but shouldn't be counted as a failure on a
+  TestResult.
+
+  (Contributed by Benjamin Peterson.)
+
+* A new module, :mod:`importlib` was added.  It provides a complete, portable,
+  pure Python reference implementation of the *import* statement and its
+  counterpart, the :func:`__import__` function.  It represents a substantial
+  step forward in documenting and defining the actions that take place during
+  imports.
+
+  (Contributed by Brett Cannon.)
+
+.. ======================================================================
+
+
+Optimizations
+-------------
+
+Major performance enhancements have been added:
+
+* The new I/O library (as defined in :pep:`3116`) was mostly written in
+  Python and quickly proved to be a problematic bottleneck in Python 3.0.
+  In Python 3.1, the I/O library has been entirely rewritten in C and is
+  2 to 20 times faster depending on the task at hand. The pure Python
+  version is still available for experimentation purposes through
+  the ``_pyio`` module.
+
+  (Contributed by Amaury Forgeot d'Arc and Antoine Pitrou.)
+
+* Added a heuristic so that tuples and dicts containing only untrackable objects
+  are not tracked by the garbage collector. This can reduce the size of
+  collections and therefore the garbage collection overhead on long-running
+  programs, depending on their particular use of datatypes.
+
+  (Contributed by Antoine Pitrou, :issue:`4688`.)
+
+* Enabling a configure option named ``--with-computed-gotos``
+  on compilers that support it (notably: gcc, SunPro, icc), the bytecode
+  evaluation loop is compiled with a new dispatch mechanism which gives
+  speedups of up to 20%, depending on the system, the compiler, and
+  the benchmark.
+
+  (Contributed by Antoine Pitrou along with a number of other participants,
+  :issue:`4753`).
+
+* The decoding of UTF-8, UTF-16 and LATIN-1 is now two to four times
+  faster.
+
+  (Contributed by Antoine Pitrou and Amaury Forgeot d'Arc, :issue:`4868`.)
+
+* The :mod:`json` module is getting a C extension to substantially improve
+  its performance.  The code is expected to be added in-time for the beta
+  release.
+
+  (Contributed by Bob Ippolito.)
+
+* Integers are now stored internally either in base 2**15 or in base
+  2**30, the base being determined at build time.  Previously, they
+  were always stored in base 2**15.  Using base 2**30 gives
+  significant performance improvements on 64-bit machines, but
+  benchmark results on 32-bit machines have been mixed.  Therefore,
+  the default is to use base 2**30 on 64-bit machines and base 2**15
+  on 32-bit machines; on Unix, there's a new configure option
+  ``--enable-big-digits`` that can be used to override this default.
+
+  Apart from the performance improvements this change should be invisible to
+  end users, with one exception: for testing and debugging purposes there's a
+  new :class:`structseq` ``sys.int_info`` that provides information about the
+  internal format, giving the number of bits per digit and the size in bytes
+  of the C type used to store each digit::
+
+     >>> import sys
+     >>> sys.int_info
+     sys.int_info(bits_per_digit=30, sizeof_digit=4)
+
+  (Contributed by Mark Dickinson; :issue:`4258`.)
+
+.. ======================================================================

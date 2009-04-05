@@ -53,9 +53,9 @@ As you can see, the module-specific markup consists of two directives, the
 
 .. describe:: module
 
-   This directive marks the beginning of the description of a module (or package
-   submodule, in which case the name should be fully qualified, including the
-   package name).
+   This directive marks the beginning of the description of a module, package,
+   or submodule. The name should be fully qualified (i.e. including the
+   package name for submodules).
 
    The ``platform`` option, if present, is a comma-separated list of the
    platforms on which the module is available (if it is available on all
@@ -285,14 +285,27 @@ Inline markup
 As said before, Sphinx uses interpreted text roles to insert semantic markup in
 documents.
 
-Variable names are an exception, they should be marked simply with ``*var*``.
+Names of local variables, such as function/method arguments, are an exception,
+they should be marked simply with ``*var*``.
 
 For all other roles, you have to write ``:rolename:`content```.
 
-.. note::
+There are some additional facilities that make cross-referencing roles more
+versatile:
 
-   For all cross-referencing roles, if you prefix the content with ``!``, no
-   reference/hyperlink will be created.
+* You may supply an explicit title and reference target, like in reST direct
+  hyperlinks: ``:role:`title <target>``` will refer to *target*, but the link
+  text will be *title*.
+
+* If you prefix the content with ``!``, no reference/hyperlink will be created.
+
+* For the Python object roles, if you prefix the content with ``~``, the link
+  text will only be the last component of the target.  For example,
+  ``:meth:`~Queue.Queue.get``` will refer to ``Queue.Queue.get`` but only
+  display ``get`` as the link text.
+
+  In HTML output, the link's ``title`` attribute (that is e.g. shown as a
+  tool-tip on mouse-hover) will always be the full target name.
 
 The following roles refer to objects in modules and are possibly hyperlinked if
 a matching identifier is found:
@@ -310,7 +323,7 @@ a matching identifier is found:
 
 .. describe:: data
 
-   The name of a module-level variable.
+   The name of a module-level variable or constant.
 
 .. describe:: const
 
@@ -508,7 +521,7 @@ in a different style:
    curly braces to indicate a "variable" part, as in ``:file:``.
 
    If you don't need the "variable part" indication, use the standard
-   ````code```` instead.   
+   ````code```` instead.
 
 .. describe:: var
 
@@ -598,8 +611,8 @@ units as well as normal text:
 
    Example::
 
-      .. versionadded:: 2.5
-         The `spam` parameter.
+      .. versionadded:: 3.1
+         The *spam* parameter.
 
    Note that there must be no blank line between the directive head and the
    explanation; this is to make these blocks visually continuous in the markup.
@@ -760,14 +773,14 @@ the definition of the symbol.  There is this directive:
    Blank lines are not allowed within ``productionlist`` directive arguments.
 
    The definition can contain token names which are marked as interpreted text
-   (e.g. ``sum ::= `integer` "+" `integer```) -- this generates cross-references
+   (e.g. ``unaryneg ::= "-" `integer```) -- this generates cross-references
    to the productions of these tokens.
 
    Note that no further reST parsing is done in the production, so that you
    don't have to escape ``*`` or ``|`` characters.
 
 
-.. XXX describe optional first parameter 
+.. XXX describe optional first parameter
 
 The following is an example taken from the Python Reference Manual::
 

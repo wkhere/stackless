@@ -6,8 +6,12 @@ import sys
 import tkinter
 
 def runningAsOSXApp():
-    """ Returns True iff running from the IDLE.app bundle on OSX """
-    return (sys.platform == 'darwin' and 'IDLE.app' in sys.argv[0])
+    """
+    Returns True if Python is running from within an app on OSX.
+    If so, assume that Python was built with Aqua Tcl/Tk rather than
+    X11 Tck/Tk.
+    """
+    return (sys.platform == 'darwin' and '.app' in sys.executable)
 
 def addOpenEventSupport(root, flist):
     """
@@ -89,7 +93,9 @@ def overrideRootMenu(root, flist):
 
     ###check if Tk version >= 8.4.14; if so, use hard-coded showprefs binding
     tkversion = root.tk.eval('info patchlevel')
-    if tkversion >= '8.4.14':
+    # Note: we cannot check if the string tkversion >= '8.4.14', because
+    # the string '8.4.7' is greater than the string '8.4.14'.
+    if tuple(map(int, tkversion.split('.'))) >= (8, 4, 14):
         Bindings.menudefs[0] =  ('application', [
                 ('About IDLE', '<<about-idle>>'),
                 None,

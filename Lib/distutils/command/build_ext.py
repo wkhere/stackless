@@ -7,7 +7,6 @@ extensions ASAP)."""
 __revision__ = "$Id$"
 
 import sys, os, re
-from site import USER_BASE, USER_SITE
 from distutils.core import Command
 from distutils.errors import *
 from distutils.sysconfig import customize_compiler, get_python_version
@@ -15,6 +14,14 @@ from distutils.dep_util import newer_group
 from distutils.extension import Extension
 from distutils.util import get_platform
 from distutils import log
+
+# this keeps compatibility from 2.3 to 2.5
+if sys.version < "2.6":
+    USER_BASE = None
+    HAS_USER_SITE = False
+else:
+    from site import USER_BASE
+    HAS_USER_SITE = True
 
 if os.name == 'nt':
     from distutils.msvccompiler import get_build_version
@@ -91,11 +98,14 @@ class build_ext(Command):
          "list of SWIG command line options"),
         ('swig=', None,
          "path to the SWIG executable"),
-        ('user', None,
-         "add user include, library and rpath"),
         ]
 
-    boolean_options = ['inplace', 'debug', 'force', 'swig-cpp', 'user']
+    boolean_options = ['inplace', 'debug', 'force', 'swig-cpp']
+
+    if HAS_USER_SITE:
+        user_options.append(('user', None,
+                             "add user include, library and rpath"))
+        boolean_options.append('user')
 
     help_options = [
         ('help-compiler', None,
@@ -247,10 +257,12 @@ class build_ext(Command):
                 # building python standard extensions
                 self.library_dirs.append('.')
 
-        # for extensions under Linux with a shared Python library,
+        # for extensions under Linux or Solaris with a shared Python library,
         # Python's library directory must be appended to library_dirs
-        if (sys.platform.startswith('linux') or sys.platform.startswith('gnu')) \
-                and sysconfig.get_config_var('Py_ENABLE_SHARED'):
+        sysconfig.get_config_var('Py_ENABLE_SHARED')
+        if ((sys.platform.startswith('linux') or sys.platform.startswith('gnu')
+             or sys.platform.startswith('sunos'))
+            and sysconfig.get_config_var('Py_ENABLE_SHARED')):
             if sys.executable.startswith(os.path.join(sys.exec_prefix, "bin")):
                 # building third party extensions
                 self.library_dirs.append(sysconfig.get_config_var('LIBDIR'))
@@ -461,7 +473,13 @@ class build_ext(Command):
         self.check_extensions_list(self.extensions)
 
         for ext in self.extensions:
-            self.build_extension(ext)
+            try:
+                self.build_extension(ext)
+            except (CCompilerError, DistutilsError, CompileError) as e:
+                if not ext.optional:
+                    raise
+                self.warn('building extension "%s" failed: %s' %
+                          (ext.name, e))
 
     def build_extension(self, ext):
         sources = ext.sources

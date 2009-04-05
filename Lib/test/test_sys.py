@@ -2,6 +2,8 @@
 import unittest, test.support
 import sys, io, os
 import struct
+import subprocess
+import textwrap
 
 class SysModuleTest(unittest.TestCase):
 
@@ -155,6 +157,49 @@ class SysModuleTest(unittest.TestCase):
         self.assertEqual(sys.getrecursionlimit(), 10000)
         sys.setrecursionlimit(oldlimit)
 
+    def test_recursionlimit_recovery(self):
+        # NOTE: this test is slightly fragile in that it depends on the current
+        # recursion count when executing the test being low enough so as to
+        # trigger the recursion recovery detection in the _Py_MakeEndRecCheck
+        # macro (see ceval.h).
+        oldlimit = sys.getrecursionlimit()
+        def f():
+            f()
+        try:
+            for i in (50, 1000):
+                # Issue #5392: stack overflow after hitting recursion limit twice
+                sys.setrecursionlimit(i)
+                self.assertRaises(RuntimeError, f)
+                self.assertRaises(RuntimeError, f)
+        finally:
+            sys.setrecursionlimit(oldlimit)
+
+    def test_recursionlimit_fatalerror(self):
+        # A fatal error occurs if a second recursion limit is hit when recovering
+        # from a first one.
+        if os.name == "nt":
+            raise unittest.SkipTest(
+                "under Windows, test would generate a spurious crash dialog")
+        code = textwrap.dedent("""
+            import sys
+
+            def f():
+                try:
+                    f()
+                except RuntimeError:
+                    f()
+
+            sys.setrecursionlimit(%d)
+            f()""")
+        for i in (50, 1000):
+            sub = subprocess.Popen([sys.executable, '-c', code % i],
+                stderr=subprocess.PIPE)
+            err = sub.communicate()[1]
+            self.assertTrue(sub.returncode, sub.returncode)
+            self.assertTrue(
+                b"Fatal Python error: Cannot recover from stack overflow" in err,
+                err)
+
     def test_getwindowsversion(self):
         if hasattr(sys, "getwindowsversion"):
             v = sys.getwindowsversion()
@@ -291,6 +336,9 @@ class SysModuleTest(unittest.TestCase):
         self.assert_(isinstance(sys.executable, str))
         self.assertEqual(len(sys.float_info), 11)
         self.assertEqual(sys.float_info.radix, 2)
+        self.assertEqual(len(sys.int_info), 2)
+        self.assert_(sys.int_info.bits_per_digit % 5 == 0)
+        self.assert_(sys.int_info.sizeof_digit >= 1)
         self.assert_(isinstance(sys.hexversion, int))
         self.assert_(isinstance(sys.maxsize, int))
         self.assert_(isinstance(sys.maxunicode, int))
@@ -298,13 +346,25 @@ class SysModuleTest(unittest.TestCase):
         self.assert_(isinstance(sys.prefix, str))
         self.assert_(isinstance(sys.version, str))
         vi = sys.version_info
-        self.assert_(isinstance(vi, tuple))
+        self.assert_(isinstance(vi[:], tuple))
         self.assertEqual(len(vi), 5)
         self.assert_(isinstance(vi[0], int))
         self.assert_(isinstance(vi[1], int))
         self.assert_(isinstance(vi[2], int))
         self.assert_(vi[3] in ("alpha", "beta", "candidate", "final"))
         self.assert_(isinstance(vi[4], int))
+        self.assert_(isinstance(vi.major, int))
+        self.assert_(isinstance(vi.minor, int))
+        self.assert_(isinstance(vi.micro, int))
+        self.assert_(vi.releaselevel in
+                     ("alpha", "beta", "candidate", "final"))
+        self.assert_(isinstance(vi.serial, int))
+        self.assertEqual(vi[0], vi.major)
+        self.assertEqual(vi[1], vi.minor)
+        self.assertEqual(vi[2], vi.micro)
+        self.assertEqual(vi[3], vi.releaselevel)
+        self.assertEqual(vi[4], vi.serial)
+        self.assert_(vi > (1,0,0))
 
     def test_43581(self):
         # Can't use sys.stdout, as this is a StringIO object when
@@ -383,6 +443,7 @@ class SizeofTest(unittest.TestCase):
         if hasattr(sys, "gettotalrefcount"):
             self.header += '2P'
             self.vheader += '2P'
+        self.longdigit = sys.int_info.sizeof_digit
         import _testcapi
         self.gc_headsize = _testcapi.SIZEOF_PYGC_HEAD
         self.file = open(test.support.TESTFN, 'wb')
@@ -417,7 +478,7 @@ class SizeofTest(unittest.TestCase):
         size = self.calcsize
         gc_header_size = self.gc_headsize
         # bool objects are not gc tracked
-        self.assertEqual(sys.getsizeof(True), size(vh) + self.H)
+        self.assertEqual(sys.getsizeof(True), size(vh) + self.longdigit)
         # but lists are
         self.assertEqual(sys.getsizeof([]), size(vh + 'PP') + gc_header_size)
 
@@ -425,8 +486,8 @@ class SizeofTest(unittest.TestCase):
         h = self.header
         vh = self.vheader
         size = self.calcsize
-        self.assertEqual(sys.getsizeof(True), size(vh) + self.H)
-        self.assertEqual(sys.getsizeof(True, -1), size(vh) + self.H)
+        self.assertEqual(sys.getsizeof(True), size(vh) + self.longdigit)
+        self.assertEqual(sys.getsizeof(True, -1), size(vh) + self.longdigit)
 
     def test_objecttypes(self):
         # check all types defined in Objects/
@@ -435,7 +496,7 @@ class SizeofTest(unittest.TestCase):
         size = self.calcsize
         check = self.check_sizeof
         # bool
-        check(True, size(vh) + self.H)
+        check(True, size(vh) + self.longdigit)
         # buffer
         # XXX
         # builtin_function_or_method
@@ -563,13 +624,14 @@ class SizeofTest(unittest.TestCase):
         check(reversed([]), size(h + 'lP'))
         # long
         check(0, size(vh))
-        check(1, size(vh) + self.H)
-        check(-1, size(vh) + self.H)
-        check(32768, size(vh) + 2*self.H)
-        check(32768*32768-1, size(vh) + 2*self.H)
-        check(32768*32768, size(vh) + 3*self.H)
+        check(1, size(vh) + self.longdigit)
+        check(-1, size(vh) + self.longdigit)
+        PyLong_BASE = 2**sys.int_info.bits_per_digit
+        check(PyLong_BASE, size(vh) + 2*self.longdigit)
+        check(PyLong_BASE**2-1, size(vh) + 2*self.longdigit)
+        check(PyLong_BASE**2, size(vh) + 3*self.longdigit)
         # memory
-        check(memoryview(b''), size(h + 'P PP2P2i5P'))
+        check(memoryview(b''), size(h + 'P PP2P2i7P'))
         # module
         check(unittest, size(h + '3P'))
         # None

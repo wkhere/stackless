@@ -276,6 +276,23 @@ deque_appendleft(dequeobject *deque, PyObject *item)
 
 PyDoc_STRVAR(appendleft_doc, "Add an element to the left side of the deque.");
 
+
+/* Run an iterator to exhaustion.  Shortcut for 
+   the extend/extendleft methods when maxlen == 0. */
+static PyObject*
+consume_iterator(PyObject *it)
+{
+	PyObject *item;
+
+	while ((item = PyIter_Next(it)) != NULL) {
+		Py_DECREF(item);
+	}
+	Py_DECREF(it);
+	if (PyErr_Occurred())
+		return NULL;
+	Py_RETURN_NONE;
+}
+
 static PyObject *
 deque_extend(dequeobject *deque, PyObject *iterable)
 {
@@ -284,6 +301,9 @@ deque_extend(dequeobject *deque, PyObject *iterable)
 	it = PyObject_GetIter(iterable);
 	if (it == NULL)
 		return NULL;
+
+	if (deque->maxlen == 0)
+		return consume_iterator(it);
 
 	while ((item = PyIter_Next(it)) != NULL) {
 		deque->state++;
@@ -322,6 +342,9 @@ deque_extendleft(dequeobject *deque, PyObject *iterable)
 	it = PyObject_GetIter(iterable);
 	if (it == NULL)
 		return NULL;
+
+	if (deque->maxlen == 0)
+		return consume_iterator(it);
 
 	while ((item = PyIter_Next(it)) != NULL) {
 		deque->state++;
@@ -789,6 +812,20 @@ deque_init(dequeobject *deque, PyObject *args, PyObject *kwdargs)
 	return 0;
 }
 
+static PyObject *
+deque_get_maxlen(dequeobject *deque)
+{
+	if (deque->maxlen == -1)
+		Py_RETURN_NONE;
+	return PyLong_FromSsize_t(deque->maxlen);
+}
+
+static PyGetSetDef deque_getset[] = {
+	{"maxlen", (getter)deque_get_maxlen, (setter)NULL,
+	 "maximum size of a deque or None if unbounded"},
+	{0}
+};
+
 static PySequenceMethods deque_as_sequence = {
 	(lenfunc)deque_len,		/* sq_length */
 	0,				/* sq_concat */
@@ -848,7 +885,7 @@ static PyTypeObject deque_type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	deque_repr,			/* tp_repr */
 	0,				/* tp_as_number */
 	&deque_as_sequence,		/* tp_as_sequence */
@@ -870,7 +907,7 @@ static PyTypeObject deque_type = {
 	0,				/* tp_iternext */
 	deque_methods,			/* tp_methods */
 	0,				/* tp_members */
-	0,				/* tp_getset */
+	deque_getset,	/* tp_getset */
 	0,				/* tp_base */
 	0,				/* tp_dict */
 	0,				/* tp_descr_get */
@@ -900,7 +937,7 @@ deque_iter(dequeobject *deque)
 {
 	dequeiterobject *it;
 
-	it = PyObject_New(dequeiterobject, &dequeiter_type);
+	it = PyObject_GC_New(dequeiterobject, &dequeiter_type);
 	if (it == NULL)
 		return NULL;
 	it->b = deque->leftblock;
@@ -909,14 +946,22 @@ deque_iter(dequeobject *deque)
 	it->deque = deque;
 	it->state = deque->state;
 	it->counter = deque->len;
+	PyObject_GC_Track(it);
 	return (PyObject *)it;
+}
+
+static int
+dequeiter_traverse(dequeiterobject *dio, visitproc visit, void *arg)
+{
+	Py_VISIT(dio->deque);
+	return 0;
 }
 
 static void
 dequeiter_dealloc(dequeiterobject *dio)
 {
 	Py_XDECREF(dio->deque);
-	Py_TYPE(dio)->tp_free(dio);
+	PyObject_GC_Del(dio);
 }
 
 static PyObject *
@@ -970,7 +1015,7 @@ static PyTypeObject dequeiter_type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -981,9 +1026,9 @@ static PyTypeObject dequeiter_type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
 	0,					/* tp_doc */
-	0,					/* tp_traverse */
+	(traverseproc)dequeiter_traverse,	/* tp_traverse */
 	0,					/* tp_clear */
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
@@ -1002,7 +1047,7 @@ deque_reviter(dequeobject *deque)
 {
 	dequeiterobject *it;
 
-	it = PyObject_New(dequeiterobject, &dequereviter_type);
+	it = PyObject_GC_New(dequeiterobject, &dequereviter_type);
 	if (it == NULL)
 		return NULL;
 	it->b = deque->rightblock;
@@ -1011,6 +1056,7 @@ deque_reviter(dequeobject *deque)
 	it->deque = deque;
 	it->state = deque->state;
 	it->counter = deque->len;
+	PyObject_GC_Track(it);
 	return (PyObject *)it;
 }
 
@@ -1052,7 +1098,7 @@ static PyTypeObject dequereviter_type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	0,					/* tp_compare */
+	0,					/* tp_reserved */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -1063,9 +1109,9 @@ static PyTypeObject dequereviter_type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
 	0,					/* tp_doc */
-	0,					/* tp_traverse */
+	(traverseproc)dequeiter_traverse,	/* tp_traverse */
 	0,					/* tp_clear */
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
@@ -1309,7 +1355,7 @@ static PyTypeObject defdict_type = {
 	0,				/* tp_print */
 	0,				/* tp_getattr */
 	0,				/* tp_setattr */
-	0,				/* tp_compare */
+	0,				/* tp_reserved */
 	(reprfunc)defdict_repr,		/* tp_repr */
 	0,				/* tp_as_number */
 	0,				/* tp_as_sequence */

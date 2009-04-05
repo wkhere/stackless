@@ -1,7 +1,7 @@
 .TH PYTHON "1" "$Date$"
 
-./" To view this file while editing, run it through groff:
-./"   groff -Tascii -man python.man | less
+.\" To view this file while editing, run it through groff:
+.\"   groff -Tascii -man python.man | less
 
 .SH NAME
 python \- an interpreted, interactive, object-oriented programming language
@@ -306,9 +306,6 @@ Recommended locations of the directories containing the include files
 needed for developing Python extensions and embedding the
 interpreter.
 .RE
-.IP \fI~/.pythonrc.py\fP
-User-specific initialization file loaded by the \fIuser\fP module;
-not used by default or by most applications.
 .SH ENVIRONMENT VARIABLES
 .IP PYTHONHOME
 Change the location of the standard Python libraries.  By default, the

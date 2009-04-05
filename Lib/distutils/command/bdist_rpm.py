@@ -122,10 +122,13 @@ class bdist_rpm(Command):
         # Allow a packager to explicitly force an architecture
         ('force-arch=', None,
          "Force an architecture onto the RPM build process"),
-       ]
+
+        ('quiet', 'q',
+         "Run the INSTALL phase of RPM building in quiet mode"),
+        ]
 
     boolean_options = ['keep-temp', 'use-rpm-opt-flags', 'rpm3-mode',
-                       'no-autoreq']
+                       'no-autoreq', 'quiet']
 
     negative_opt = {'no-keep-temp': 'keep-temp',
                     'no-rpm-opt-flags': 'use-rpm-opt-flags',
@@ -175,6 +178,7 @@ class bdist_rpm(Command):
         self.no_autoreq = 0
 
         self.force_arch = None
+        self.quiet = 0
 
     def finalize_options(self):
         self.set_undefined_options('bdist', ('bdist_base', 'bdist_base'))
@@ -311,6 +315,7 @@ class bdist_rpm(Command):
         if os.path.exists('/usr/bin/rpmbuild') or \
            os.path.exists('/bin/rpmbuild'):
             rpm_cmd = ['rpmbuild']
+
         if self.source_only: # what kind of RPMs?
             rpm_cmd.append('-bs')
         elif self.binary_only:
@@ -322,6 +327,10 @@ class bdist_rpm(Command):
                              '_topdir %s' % os.path.abspath(self.rpm_base)])
         if not self.keep_temp:
             rpm_cmd.append('--clean')
+
+        if self.quiet:
+            rpm_cmd.append('--quiet')
+
         rpm_cmd.append(spec_path)
         # Determine the binary rpm names that should be built out of this spec
         # file
@@ -474,13 +483,13 @@ class bdist_rpm(Command):
         # that we open and interpolate into the spec file, but the defaults
         # are just text that we drop in as-is.  Hmmm.
 
+        install_cmd = ('%s install -O1 --root=$RPM_BUILD_ROOT '
+                       '--record=INSTALLED_FILES') % def_setup_call
+
         script_options = [
             ('prep', 'prep_script', "%setup -n %{name}-%{unmangled_version}"),
             ('build', 'build_script', def_build),
-            ('install', 'install_script',
-             ("%s install "
-              "--root=$RPM_BUILD_ROOT "
-              "--record=INSTALLED_FILES") % def_setup_call),
+            ('install', 'install_script', install_cmd),
             ('clean', 'clean_script', "rm -rf $RPM_BUILD_ROOT"),
             ('verifyscript', 'verify_script', None),
             ('pre', 'pre_install', None),

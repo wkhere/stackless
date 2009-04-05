@@ -7,11 +7,12 @@
 extern "C" {
 #endif
 
-#define PyCF_MASK 0
+#define PyCF_MASK CO_FUTURE_BARRY_AS_BDFL
 #define PyCF_MASK_OBSOLETE 0
 #define PyCF_SOURCE_IS_UTF8  0x0100
 #define PyCF_DONT_IMPLY_DEDENT 0x0200
 #define PyCF_ONLY_AST 0x0400
+#define PyCF_IGNORE_COOKIE 0x0800
 
 typedef struct {
 	int cf_flags;  /* bitmask of CO_xxx flags relevant to future */

@@ -1,4 +1,4 @@
-from test.support import run_unittest, TestSkipped, verbose
+from test.support import run_unittest, verbose
 import unittest
 import locale
 import sys
@@ -9,7 +9,7 @@ enUS_locale = None
 def get_enUS_locale():
     global enUS_locale
     if sys.platform == 'darwin':
-        raise TestSkipped("Locale support on MacOSX is minimal")
+        raise unittest.SkipTest("Locale support on MacOSX is minimal")
     if sys.platform.startswith("win"):
         tlocs = ("En", "English")
     else:
@@ -22,7 +22,7 @@ def get_enUS_locale():
             continue
         break
     else:
-        raise TestSkipped(
+        raise unittest.SkipTest(
             "Test locale not supported (tried %s)" % (', '.join(tlocs)))
     enUS_locale = tloc
     locale.setlocale(locale.LC_NUMERIC, oldlocale)
@@ -103,6 +103,32 @@ class EnUSCookedTest(BaseCookedTest):
     }
 
 
+class FrFRCookedTest(BaseCookedTest):
+    # A cooked "fr_FR" locale with a space character as decimal separator
+    # and a non-ASCII currency symbol.
+
+    cooked_values = {
+        'currency_symbol': '\u20ac',
+        'decimal_point': ',',
+        'frac_digits': 2,
+        'grouping': [3, 3, 0],
+        'int_curr_symbol': 'EUR ',
+        'int_frac_digits': 2,
+        'mon_decimal_point': ',',
+        'mon_grouping': [3, 3, 0],
+        'mon_thousands_sep': ' ',
+        'n_cs_precedes': 0,
+        'n_sep_by_space': 1,
+        'n_sign_posn': 1,
+        'negative_sign': '-',
+        'p_cs_precedes': 0,
+        'p_sep_by_space': 1,
+        'p_sign_posn': 1,
+        'positive_sign': '',
+        'thousands_sep': ' '
+    }
+
+
 class BaseFormattingTest(object):
     #
     # Utility functions for formatting tests
@@ -150,6 +176,12 @@ class EnUSNumberFormatting(BaseFormattingTest):
         self._test_format("%+d", 4200, grouping=True, out='+4%s200' % self.sep)
         self._test_format("%+d", -4200, grouping=True, out='-4%s200' % self.sep)
 
+    def test_integer_grouping_and_padding(self):
+        self._test_format("%10d", 4200, grouping=True,
+            out=('4%s200' % self.sep).rjust(10))
+        self._test_format("%-10d", -4200, grouping=True,
+            out=('-4%s200' % self.sep).ljust(10))
+
     def test_simple(self):
         self._test_format("%f", 1024, grouping=0, out='1024.000000')
         self._test_format("%f", 102, grouping=0, out='102.000000')
@@ -187,6 +219,19 @@ class EnUSNumberFormatting(BaseFormattingTest):
                 (self.sep, self.sep))
 
 
+class TestFormatPatternArg(unittest.TestCase):
+    # Test handling of pattern argument of format
+
+    def test_onlyOnePattern(self):
+        # Issue 2522: accept exactly one % pattern, and no extra chars.
+        self.assertRaises(ValueError, locale.format, "%f\n", 'foo')
+        self.assertRaises(ValueError, locale.format, "%f\r", 'foo')
+        self.assertRaises(ValueError, locale.format, "%f\r\n", 'foo')
+        self.assertRaises(ValueError, locale.format, " %f", 'foo')
+        self.assertRaises(ValueError, locale.format, "%fg", 'foo')
+        self.assertRaises(ValueError, locale.format, "%^g", 'foo')
+
+
 class TestNumberFormatting(BaseLocalizedTest, EnUSNumberFormatting):
     # Test number formatting with a real English locale.
 
@@ -221,6 +266,49 @@ class TestCNumberFormatting(CCookedTest, BaseFormattingTest):
         self._test_format("%9.2f", 12345.67, grouping=True, out=' 12345.67')
 
 
+class TestFrFRNumberFormatting(FrFRCookedTest, BaseFormattingTest):
+    # Test number formatting with a cooked "fr_FR" locale.
+
+    def test_decimal_point(self):
+        self._test_format("%.2f", 12345.67, out='12345,67')
+
+    def test_grouping(self):
+        self._test_format("%.2f", 345.67, grouping=True, out='345,67')
+        self._test_format("%.2f", 12345.67, grouping=True, out='12 345,67')
+
+    def test_grouping_and_padding(self):
+        self._test_format("%6.2f", 345.67, grouping=True, out='345,67')
+        self._test_format("%7.2f", 345.67, grouping=True, out=' 345,67')
+        self._test_format("%8.2f", 12345.67, grouping=True, out='12 345,67')
+        self._test_format("%9.2f", 12345.67, grouping=True, out='12 345,67')
+        self._test_format("%10.2f", 12345.67, grouping=True, out=' 12 345,67')
+        self._test_format("%-6.2f", 345.67, grouping=True, out='345,67')
+        self._test_format("%-7.2f", 345.67, grouping=True, out='345,67 ')
+        self._test_format("%-8.2f", 12345.67, grouping=True, out='12 345,67')
+        self._test_format("%-9.2f", 12345.67, grouping=True, out='12 345,67')
+        self._test_format("%-10.2f", 12345.67, grouping=True, out='12 345,67 ')
+
+    def test_integer_grouping(self):
+        self._test_format("%d", 200, grouping=True, out='200')
+        self._test_format("%d", 4200, grouping=True, out='4 200')
+
+    def test_integer_grouping_and_padding(self):
+        self._test_format("%4d", 4200, grouping=True, out='4 200')
+        self._test_format("%5d", 4200, grouping=True, out='4 200')
+        self._test_format("%10d", 4200, grouping=True, out='4 200'.rjust(10))
+        self._test_format("%-4d", 4200, grouping=True, out='4 200')
+        self._test_format("%-5d", 4200, grouping=True, out='4 200')
+        self._test_format("%-10d", 4200, grouping=True, out='4 200'.ljust(10))
+
+    def test_currency(self):
+        euro = '\u20ac'
+        self._test_currency(50000, "50000,00 " + euro)
+        self._test_currency(50000, "50 000,00 " + euro, grouping=True)
+        # XXX is the trailing space a bug?
+        self._test_currency(50000, "50 000,00 EUR ",
+            grouping=True, international=True)
+
+
 class TestMiscellaneous(unittest.TestCase):
     def test_getpreferredencoding(self):
         # Invoke getpreferredencoding to make sure it does not cause exceptions.
@@ -239,13 +327,15 @@ class TestMiscellaneous(unittest.TestCase):
 def test_main():
     tests = [
         TestMiscellaneous,
+        TestFormatPatternArg,
         TestEnUSNumberFormatting,
-        TestCNumberFormatting
+        TestCNumberFormatting,
+        TestFrFRNumberFormatting,
     ]
-    # TestSkipped can't be raised inside unittests, handle it manually instead
+    # SkipTest can't be raised inside unittests, handle it manually instead
     try:
         get_enUS_locale()
-    except TestSkipped as e:
+    except unittest.SkipTest as e:
         if verbose:
             print("Some tests will be disabled: %s" % e)
     else:

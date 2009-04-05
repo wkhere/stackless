@@ -21,8 +21,6 @@ extern "C" {
 
 #define UNARY_INVERT	15
 
-#define SET_ADD	17
-#define LIST_APPEND	18
 #define BINARY_POWER	19
 
 #define BINARY_MULTIPLY	20
@@ -98,9 +96,11 @@ extern "C" {
 #define IMPORT_FROM	109	/* Index in name list */
 
 #define JUMP_FORWARD	110	/* Number of bytes to skip */
-#define JUMP_IF_FALSE	111	/* "" */
-#define JUMP_IF_TRUE	112	/* "" */
-#define JUMP_ABSOLUTE	113	/* Target byte offset from beginning of code */
+#define JUMP_IF_FALSE_OR_POP 111	/* Target byte offset from beginning of code */
+#define JUMP_IF_TRUE_OR_POP 112	/* "" */
+#define JUMP_ABSOLUTE	113	/* "" */
+#define POP_JUMP_IF_FALSE 114	/* "" */
+#define POP_JUMP_IF_TRUE 115	/* "" */
 
 #define LOAD_GLOBAL	116	/* Index in name list */
 
@@ -132,6 +132,10 @@ extern "C" {
 
 /* Support for opargs more than 16 bits long */
 #define EXTENDED_ARG  143
+
+#define LIST_APPEND     145
+#define SET_ADD         146
+#define MAP_ADD         147
 
 
 /* EXCEPT_HANDLER is a special, implicit block type which is created when

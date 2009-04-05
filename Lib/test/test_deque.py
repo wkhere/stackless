@@ -1,7 +1,8 @@
 from collections import deque
 import unittest
 from test import support, seq_tests
-from weakref import proxy
+import gc
+import weakref
 import copy
 import pickle
 from io import StringIO
@@ -50,7 +51,9 @@ class TestBasic(unittest.TestCase):
     def test_maxlen(self):
         self.assertRaises(ValueError, deque, 'abc', -1)
         self.assertRaises(ValueError, deque, 'abc', -2)
-        d = deque(range(10), maxlen=3)
+        it = iter(range(10))
+        d = deque(it, maxlen=3)
+        self.assertEqual(list(it), [])
         self.assertEqual(repr(d), 'deque([7, 8, 9], maxlen=3)')
         self.assertEqual(list(d), [7, 8, 9])
         self.assertEqual(d, deque(range(10), 3))
@@ -87,6 +90,31 @@ class TestBasic(unittest.TestCase):
             fo.close()
             support.unlink(support.TESTFN)
 
+    def test_maxlen_zero(self):
+        it = iter(range(100))
+        deque(it, maxlen=0)
+        self.assertEqual(list(it), [])
+
+        it = iter(range(100))
+        d = deque(maxlen=0)
+        d.extend(it)
+        self.assertEqual(list(it), [])
+
+        it = iter(range(100))
+        d = deque(maxlen=0)
+        d.extendleft(it)
+        self.assertEqual(list(it), [])
+
+    def test_maxlen_attribute(self):
+        self.assertEqual(deque().maxlen, None)
+        self.assertEqual(deque('abc').maxlen, None)
+        self.assertEqual(deque('abc', maxlen=4).maxlen, 4)
+        self.assertEqual(deque('abc', maxlen=2).maxlen, 2)
+        self.assertEqual(deque('abc', maxlen=0).maxlen, 0)
+        with self.assertRaises(AttributeError):
+            d = deque('abc')
+            d.maxlen = 10
+
     def test_comparisons(self):
         d = deque('xabc'); d.popleft()
         for e in [d, deque('abc'), deque('ab'), deque(), list(d)]:
@@ -102,7 +130,6 @@ class TestBasic(unittest.TestCase):
                 self.assertEqual(x <= y, list(x) <= list(y), (x,y))
                 self.assertEqual(x >  y, list(x) >  list(y), (x,y))
                 self.assertEqual(x >= y, list(x) >= list(y), (x,y))
-                self.assertEqual(cmp(x,y), cmp(list(x),list(y)), (x,y))
 
     def test_extend(self):
         d = deque('a')
@@ -375,7 +402,7 @@ class TestBasic(unittest.TestCase):
 
     def test_pickle(self):
         d = deque(range(200))
-        for i in (0, 1, 2):
+        for i in range(pickle.HIGHEST_PROTOCOL + 1):
             s = pickle.dumps(d, i)
             e = pickle.loads(s)
             self.assertNotEqual(id(d), id(e))
@@ -384,7 +411,7 @@ class TestBasic(unittest.TestCase):
 ##    def test_pickle_recursive(self):
 ##        d = deque('abc')
 ##        d.append(d)
-##        for i in (0, 1, 2):
+##        for i in range(pickle.HIGHEST_PROTOCOL + 1):
 ##            e = pickle.loads(pickle.dumps(d, i))
 ##            self.assertNotEqual(id(d), id(e))
 ##            self.assertEqual(id(e), id(e[-1]))
@@ -419,6 +446,22 @@ class TestBasic(unittest.TestCase):
         for i in range(100):
             d.append(1)
             gc.collect()
+
+    def test_container_iterator(self):
+        # Bug #3680: tp_traverse was not implemented for deque iterator objects
+        class C(object):
+            pass
+        for i in range(2):
+            obj = C()
+            ref = weakref.ref(obj)
+            if i == 0:
+                container = deque([obj, 1])
+            else:
+                container = reversed(deque([obj, 1]))
+            obj.x = iter(container)
+            del obj, container
+            gc.collect()
+            self.assert_(ref() is None, "Cycle was not collected")
 
 class TestVariousIteratorArgs(unittest.TestCase):
 
@@ -530,7 +573,7 @@ class TestSubclass(unittest.TestCase):
 
     def test_weakref(self):
         d = deque('gallahad')
-        p = proxy(d)
+        p = weakref.proxy(d)
         self.assertEqual(str(p), str(d))
         d = None
         self.assertRaises(ReferenceError, str, p)

@@ -7,6 +7,11 @@ from io import StringIO
 from distutils.core import Extension, Distribution
 from distutils.command.build_ext import build_ext
 from distutils import sysconfig
+from distutils.tests.support import TempdirManager
+from distutils.tests.support import LoggingSilencer
+from distutils.extension import Extension
+from distutils.errors import UnknownFileError
+from distutils.errors import CompileError
 
 import unittest
 from test import support
@@ -15,16 +20,27 @@ from test import support
 # Don't load the xx module more than once.
 ALREADY_TESTED = False
 
-class BuildExtTestCase(unittest.TestCase):
+def _get_source_filename():
+    srcdir = sysconfig.get_config_var('srcdir')
+    return os.path.join(srcdir, 'Modules', 'xxmodule.c')
+
+class BuildExtTestCase(TempdirManager,
+                       LoggingSilencer,
+                       unittest.TestCase):
     def setUp(self):
         # Create a simple test environment
         # Note that we're making changes to sys.path
-        self.tmp_dir = tempfile.mkdtemp(prefix="pythontest_")
+        super(BuildExtTestCase, self).setUp()
+        self.tmp_dir = self.mkdtemp()
         self.sys_path = sys.path[:]
         sys.path.append(self.tmp_dir)
-
-        xx_c = os.path.join(sysconfig.project_base, 'Modules', 'xxmodule.c')
-        shutil.copy(xx_c, self.tmp_dir)
+        shutil.copy(_get_source_filename(), self.tmp_dir)
+        if sys.version > "2.6":
+            import site
+            self.old_user_base = site.USER_BASE
+            site.USER_BASE = self.mkdtemp()
+            from distutils.command import build_ext
+            build_ext.USER_BASE = site.USER_BASE
 
     def test_build_ext(self):
         global ALREADY_TESTED
@@ -72,13 +88,88 @@ class BuildExtTestCase(unittest.TestCase):
         # Get everything back to normal
         support.unload('xx')
         sys.path = self.sys_path
-        # XXX on Windows the test leaves a directory with xx module in TEMP
-        shutil.rmtree(self.tmp_dir, os.name == 'nt' or sys.platform == 'cygwin')
+        if sys.version > "2.6":
+            import site
+            site.USER_BASE = self.old_user_base
+            from distutils.command import build_ext
+            build_ext.USER_BASE = self.old_user_base
+        super(BuildExtTestCase, self).tearDown()
+
+    def test_solaris_enable_shared(self):
+        dist = Distribution({'name': 'xx'})
+        cmd = build_ext(dist)
+        old = sys.platform
+
+        sys.platform = 'sunos' # fooling finalize_options
+        from distutils.sysconfig import  _config_vars
+        old_var = _config_vars.get('Py_ENABLE_SHARED')
+        _config_vars['Py_ENABLE_SHARED'] = 1
+        try:
+            cmd.ensure_finalized()
+        finally:
+            sys.platform = old
+            if old_var is None:
+                del _config_vars['Py_ENABLE_SHARED']
+            else:
+                _config_vars['Py_ENABLE_SHARED'] = old_var
+
+        # make sur we get some lobrary dirs under solaris
+        self.assert_(len(cmd.library_dirs) > 0)
+
+    def test_user_site(self):
+        # site.USER_SITE was introduced in 2.6
+        if sys.version < '2.6':
+            return
+
+        import site
+        dist = Distribution({'name': 'xx'})
+        cmd = build_ext(dist)
+
+        # making sure the suer option is there
+        options = [name for name, short, lable in
+                   cmd.user_options]
+        self.assert_('user' in options)
+
+        # setting a value
+        cmd.user = 1
+
+        # setting user based lib and include
+        lib = os.path.join(site.USER_BASE, 'lib')
+        incl = os.path.join(site.USER_BASE, 'include')
+        os.mkdir(lib)
+        os.mkdir(incl)
+
+        # let's run finalize
+        cmd.ensure_finalized()
+
+        # see if include_dirs and library_dirs
+        # were set
+        self.assert_(lib in cmd.library_dirs)
+        self.assert_(incl in cmd.include_dirs)
+
+    def test_optional_extension(self):
+
+        # this extension will fail, but let's ignore this failure
+        # with the optional argument.
+        modules = [Extension('foo', ['xxx'], optional=False)]
+        dist = Distribution({'name': 'xx', 'ext_modules': modules})
+        cmd = build_ext(dist)
+        cmd.ensure_finalized()
+        self.assertRaises((UnknownFileError, CompileError),
+                          cmd.run)  # should raise an error
+
+        modules = [Extension('foo', ['xxx'], optional=True)]
+        dist = Distribution({'name': 'xx', 'ext_modules': modules})
+        cmd = build_ext(dist)
+        cmd.ensure_finalized()
+        cmd.run()  # should pass
 
 def test_suite():
-    if not sysconfig.python_build:
+    src = _get_source_filename()
+    if not os.path.exists(src):
         if support.verbose:
-            print('test_build_ext: The test must be run in a python build dir')
+            print('test_build_ext: Cannot find source code (test'
+                  ' must run in python build dir)')
         return unittest.TestSuite()
     else: return unittest.makeSuite(BuildExtTestCase)
 

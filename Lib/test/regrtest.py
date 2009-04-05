@@ -35,6 +35,10 @@ If no test names are given, all tests are run.
 
 -v is incompatible with -g and does not compare test output files.
 
+-r randomizes test execution order. You can use --randseed=int to provide a
+int seed value for the randomizer; this is useful for reproducing troublesome
+test orders.
+
 -T turns on code coverage tracing with the trace module.
 
 -D specifies the directory where coverage files are put.
@@ -123,6 +127,8 @@ resources to test.  Currently only the following are defined:
 
     urlfetch -  It is okay to download files required on testing.
 
+    gui -       Run tests that require a running GUI.
+
 To enable all resources except one, use '-uall,-<resource>'.  For
 example, to run all the tests except for the bsddb tests, give the
 option '-uall,-bsddb'.
@@ -137,6 +143,7 @@ import sys
 import time
 import traceback
 import warnings
+import unittest
 from inspect import isabstract
 
 # I see no other way to suppress these warnings;
@@ -176,7 +183,7 @@ if sys.platform == 'darwin':
 from test import support
 
 RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network', 'bsddb',
-                  'decimal', 'compiler', 'subprocess', 'urlfetch')
+                  'decimal', 'compiler', 'subprocess', 'urlfetch', 'gui')
 
 
 def usage(msg):
@@ -188,7 +195,8 @@ def usage(msg):
 def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
          exclude=False, single=False, randomize=False, fromfile=None,
          findleaks=False, use_resources=None, trace=False, coverdir='coverage',
-         runleaks=False, huntrleaks=False, verbose2=False, print_slow=False):
+         runleaks=False, huntrleaks=False, verbose2=False, print_slow=False,
+         random_seed=None):
     """Execute a test suite.
 
     This also parses command-line options and modifies its behavior
@@ -206,9 +214,10 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
     files beginning with test_ will be used.
 
     The other default arguments (verbose, quiet, generate, exclude,
-    single, randomize, findleaks, use_resources, trace, coverdir, and
-    print_slow) allow programmers calling main() directly to set the
-    values that would normally be set by flags on the command line.
+    single, randomize, findleaks, use_resources, trace, coverdir,
+    print_slow, and random_seed) allow programmers calling main()
+    directly to set the values that would normally be set by flags
+    on the command line.
     """
 
     support.record_original_stdout(sys.stdout)
@@ -219,12 +228,15 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
                                     'findleaks', 'use=', 'threshold=', 'trace',
                                     'coverdir=', 'nocoverdir', 'runleaks',
                                     'huntrleaks=', 'verbose2', 'memlimit=',
-                                    'debug', 'start=', "nowindows"
+                                    'debug', 'start=', 'nowindows',
+                                    'randseed=',
                                     ])
     except getopt.error as msg:
         usage(msg)
 
     # Defaults
+    if random_seed is None:
+        random_seed = random.randrange(10000000)
     if use_resources is None:
         use_resources = []
     debug = False
@@ -252,6 +264,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
             print_slow = True
         elif o in ('-r', '--randomize'):
             randomize = True
+        elif o == '--randseed':
+            random_seed = int(a)
         elif o in ('-f', '--fromfile'):
             fromfile = a
         elif o in ('-l', '--findleaks'):
@@ -386,10 +400,13 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
         except ValueError:
             print("Couldn't find starting test (%s), using all tests" % start)
     if randomize:
+        random.seed(random_seed)
+        print("Using random seed", random_seed)
         random.shuffle(tests)
     if trace:
-        import trace
-        tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix],
+        import trace, tempfile
+        tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix,
+                                         tempfile.gettempdir()],
                              trace=False, count=True)
     test_times = []
     support.verbose = verbose      # Tell tests to be moderately quiet
@@ -612,7 +629,7 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
             print(test, "skipped --", msg)
             sys.stdout.flush()
         return -2
-    except (ImportError, support.TestSkipped) as msg:
+    except unittest.SkipTest as msg:
         if not quiet:
             print(test, "skipped --", msg)
             sys.stdout.flush()
@@ -876,6 +893,7 @@ _expectations = {
         test_fork1
         test_epoll
         test_dbm_gnu
+        test_dbm_ndbm
         test_grp
         test_ioctl
         test_largefile
@@ -1073,6 +1091,9 @@ _expectations = {
         test_pty
         test_socketserver
         test_tcl
+        test_tk
+        test_ttk_guionly
+        test_ttk_textonly
         test_timeout
         test_urllibnet
         test_multiprocessing
@@ -1088,6 +1109,9 @@ _expectations = {
         test_kqueue
         test_ossaudiodev
         test_tcl
+        test_tk
+        test_ttk_guionly
+        test_ttk_textonly
         test_zipimport
         test_zlib
         """,
@@ -1103,6 +1127,9 @@ _expectations = {
         test_ossaudiodev
         test_pep277
         test_tcl
+        test_tk
+        test_ttk_guionly
+        test_ttk_textonly
         test_multiprocessing
         """,
     'netbsd3':
@@ -1117,6 +1144,9 @@ _expectations = {
         test_ossaudiodev
         test_pep277
         test_tcl
+        test_tk
+        test_ttk_guionly
+        test_ttk_textonly
         test_multiprocessing
         """,
 }

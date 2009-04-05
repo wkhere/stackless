@@ -11,7 +11,11 @@
 
 """
 
-import sys, encodings, encodings.aliases
+import sys
+import encodings
+import encodings.aliases
+import re
+import collections
 from builtins import str as _builtin_str
 import functools
 
@@ -31,7 +35,7 @@ def _strcoll(a,b):
     """ strcoll(string,string) -> int.
         Compares two strings according to the locale.
     """
-    return cmp(a,b)
+    return (a > b) - (a < b)
 
 def _strxfrm(s):
     """ strxfrm(string) -> string.
@@ -115,6 +119,19 @@ def localeconv():
 # Author: Martin von Loewis
 # improved by Georg Brandl
 
+# Iterate over grouping intervals
+def _grouping_intervals(grouping):
+    for interval in grouping:
+        # if grouping is -1, we are done
+        if interval == CHAR_MAX:
+            return
+        # 0: re-use last group ad infinitum
+        if interval == 0:
+            while True:
+                yield last_interval
+        yield interval
+        last_interval = interval
+
 #perform the grouping from right to left
 def _group(s, monetary=False):
     conv = localeconv()
@@ -124,35 +141,44 @@ def _group(s, monetary=False):
         return (s, 0)
     result = ""
     seps = 0
-    spaces = ""
     if s[-1] == ' ':
-        sp = s.find(' ')
-        spaces = s[sp:]
-        s = s[:sp]
-    while s and grouping:
-        # if grouping is -1, we are done
-        if grouping[0] == CHAR_MAX:
+        stripped = s.rstrip()
+        right_spaces = s[len(stripped):]
+        s = stripped
+    else:
+        right_spaces = ''
+    left_spaces = ''
+    groups = []
+    for interval in _grouping_intervals(grouping):
+        if not s or s[-1] not in "0123456789":
+            # only non-digit characters remain (sign, spaces)
+            left_spaces = s
+            s = ''
             break
-        # 0: re-use last group ad infinitum
-        elif grouping[0] != 0:
-            #process last group
-            group = grouping[0]
-            grouping = grouping[1:]
-        if result:
-            result = s[-group:] + thousands_sep + result
-            seps += 1
-        else:
-            result = s[-group:]
-        s = s[:-group]
-        if s and s[-1] not in "0123456789":
-            # the leading string is only spaces and signs
-            return s + result + spaces, seps
-    if not result:
-        return s + spaces, seps
+        groups.append(s[-interval:])
+        s = s[:-interval]
     if s:
-        result = s + thousands_sep + result
-        seps += 1
-    return result + spaces, seps
+        groups.append(s)
+    groups.reverse()
+    return (
+        left_spaces + thousands_sep.join(groups) + right_spaces,
+        len(thousands_sep) * (len(groups) - 1)
+    )
+
+# Strip a given amount of excess padding from the given string
+def _strip_padding(s, amount):
+    lpos = 0
+    while amount and s[lpos] == ' ':
+        lpos += 1
+        amount -= 1
+    rpos = len(s) - 1
+    while amount and s[rpos] == ' ':
+        rpos -= 1
+        amount -= 1
+    return s[lpos:rpos+1]
+
+_percent_re = re.compile(r'%(?:\((?P<key>.*?)\))?'
+                         r'(?P<modifiers>[-#0-9 +*.hlL]*?)[eEfFgGdiouxXcrs%]')
 
 def format(percent, value, grouping=False, monetary=False, *additional):
     """Returns the locale-aware substitution of a %? specifier
@@ -161,9 +187,13 @@ def format(percent, value, grouping=False, monetary=False, *additional):
     additional is for format strings which contain one or more
     '*' modifiers."""
     # this is only for one-percent-specifier strings and this should be checked
-    if percent[0] != '%':
-        raise ValueError("format() must be given exactly one %char "
-                         "format specifier")
+    match = _percent_re.match(percent)
+    if not match or len(match.group())!= len(percent):
+        raise ValueError(("format() must be given exactly one %%char "
+                         "format specifier, %s not valid") % repr(percent))
+    return _format(percent, value, grouping, monetary, *additional)
+
+def _format(percent, value, grouping=False, monetary=False, *additional):
     if additional:
         formatted = percent % ((value,) + additional)
     else:
@@ -177,19 +207,15 @@ def format(percent, value, grouping=False, monetary=False, *additional):
         decimal_point = localeconv()[monetary and 'mon_decimal_point'
                                               or 'decimal_point']
         formatted = decimal_point.join(parts)
-        while seps:
-            sp = formatted.find(' ')
-            if sp == -1: break
-            formatted = formatted[:sp] + formatted[sp+1:]
-            seps -= 1
+        if seps:
+            formatted = _strip_padding(formatted, seps)
     elif percent[-1] in 'diu':
+        seps = 0
         if grouping:
-            formatted = _group(formatted, monetary=monetary)[0]
+            formatted, seps = _group(formatted, monetary=monetary)
+        if seps:
+            formatted = _strip_padding(formatted, seps)
     return formatted
-
-import re, operator
-_percent_re = re.compile(r'%(?:\((?P<key>.*?)\))?'
-                         r'(?P<modifiers>[-#0-9 +*.hlL]*?)[eEfFgGdiouxXcrs%]')
 
 def format_string(f, val, grouping=False):
     """Formats a string in the same way that the % formatting would use,
@@ -207,7 +233,7 @@ def format_string(f, val, grouping=False):
             del new_val[i+1:i+1+starcount]
             i += (1 + starcount)
         val = tuple(new_val)
-    elif operator.isMappingType(val):
+    elif isinstance(val, collections.Mapping):
         for perc in percents:
             key = perc.group("key")
             val[key] = format(perc.group(), val[key], grouping)

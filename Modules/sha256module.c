@@ -18,6 +18,7 @@
 
 #include "Python.h"
 #include "structmember.h"
+#include "hashlib.h"
 
 
 /* Endianness testing and definitions */
@@ -480,14 +481,17 @@ PyDoc_STRVAR(SHA256_update__doc__,
 static PyObject *
 SHA256_update(SHAobject *self, PyObject *args)
 {
-    unsigned char *cp;
-    int len;
+    PyObject *obj;
+    Py_buffer buf;
 
-    if (!PyArg_ParseTuple(args, "s#:update", &cp, &len))
+    if (!PyArg_ParseTuple(args, "O:update", &obj))
         return NULL;
 
-    sha_update(self, cp, len);
+    GET_BUFFER_VIEW_OR_ERROUT(obj, &buf);
 
+    sha_update(self, buf.buf, buf.len);
+
+    PyBuffer_Release(&buf);
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -545,7 +549,7 @@ static PyTypeObject SHA224type = {
     0,			/*tp_print*/
     0,          	/*tp_getattr*/
     0,                  /*tp_setattr*/
-    0,                  /*tp_compare*/
+    0,                  /*tp_reserved*/
     0,                  /*tp_repr*/
     0,                  /*tp_as_number*/
     0,                  /*tp_as_sequence*/
@@ -579,7 +583,7 @@ static PyTypeObject SHA256type = {
     0,			/*tp_print*/
     0,          	/*tp_getattr*/
     0,                  /*tp_setattr*/
-    0,                  /*tp_compare*/
+    0,                  /*tp_reserved*/
     0,                  /*tp_repr*/
     0,                  /*tp_as_number*/
     0,                  /*tp_as_sequence*/
@@ -614,25 +618,35 @@ SHA256_new(PyObject *self, PyObject *args, PyObject *kwdict)
 {
     static char *kwlist[] = {"string", NULL};
     SHAobject *new;
-    unsigned char *cp = NULL;
-    int len;
+    PyObject *data_obj = NULL;
+    Py_buffer buf;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwdict, "|s#:new", kwlist,
-                                     &cp, &len)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwdict, "|O:new", kwlist,
+                                     &data_obj)) {
         return NULL;
     }
 
-    if ((new = newSHA256object()) == NULL)
+    if (data_obj)
+        GET_BUFFER_VIEW_OR_ERROUT(data_obj, &buf);
+
+    if ((new = newSHA256object()) == NULL) {
+        if (data_obj)
+            PyBuffer_Release(&buf);
         return NULL;
+    }
 
     sha_init(new);
 
     if (PyErr_Occurred()) {
         Py_DECREF(new);
+        if (data_obj)
+            PyBuffer_Release(&buf);
         return NULL;
     }
-    if (cp)
-        sha_update(new, cp, len);
+    if (data_obj) {
+        sha_update(new, buf.buf, buf.len);
+        PyBuffer_Release(&buf);
+    }
 
     return (PyObject *)new;
 }
@@ -645,25 +659,35 @@ SHA224_new(PyObject *self, PyObject *args, PyObject *kwdict)
 {
     static char *kwlist[] = {"string", NULL};
     SHAobject *new;
-    unsigned char *cp = NULL;
-    int len;
+    PyObject *data_obj = NULL;
+    Py_buffer buf;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwdict, "|s#:new", kwlist,
-                                     &cp, &len)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwdict, "|O:new", kwlist,
+                                     &data_obj)) {
         return NULL;
     }
 
-    if ((new = newSHA224object()) == NULL)
+    if (data_obj)
+        GET_BUFFER_VIEW_OR_ERROUT(data_obj, &buf);
+
+    if ((new = newSHA224object()) == NULL) {
+        if (data_obj)
+            PyBuffer_Release(&buf);
         return NULL;
+    }
 
     sha224_init(new);
 
     if (PyErr_Occurred()) {
         Py_DECREF(new);
+        if (data_obj)
+            PyBuffer_Release(&buf);
         return NULL;
     }
-    if (cp)
-        sha_update(new, cp, len);
+    if (data_obj) {
+        sha_update(new, buf.buf, buf.len);
+        PyBuffer_Release(&buf);
+    }
 
     return (PyObject *)new;
 }

@@ -4,7 +4,7 @@
   Regular Expression HOWTO
 ****************************
 
-:Author: A.M. Kuchling
+:Author: A.M. Kuchling <amk@amk.ca>
 :Release: 0.05
 
 .. TODO:
@@ -540,6 +540,10 @@ of each one.
 | :const:`VERBOSE`, :const:`X`    | Enable verbose REs, which can be organized |
 |                                 | more cleanly and understandably.           |
 +---------------------------------+--------------------------------------------+
+| :const:`ASCII`, :const:`A`      | Makes several escapes like ``\w``, ``\b``, |
+|                                 | ``\s`` and ``\d`` match only on ASCII      |
+|                                 | characters with the respective property.   |
++---------------------------------+--------------------------------------------+
 
 
 .. data:: I
@@ -594,6 +598,15 @@ of each one.
    newline; without this flag, ``'.'`` will match anything *except* a newline.
 
 
+.. data:: A
+          ASCII
+   :noindex:
+
+   Make ``\w``, ``\W``, ``\b``, ``\B``, ``\s`` and ``\S`` perform ASCII-only
+   matching instead of full Unicode matching. This is only meaningful for
+   Unicode patterns, and is ignored for byte patterns.
+
+
 .. data:: X
           VERBOSE
    :noindex:
@@ -611,7 +624,7 @@ of each one.
    is to read? ::
 
       charref = re.compile(r"""
-       &[#]		     # Start of a numeric entity reference
+       &[#]                # Start of a numeric entity reference
        (
            0[0-7]+         # Octal form
          | [0-9]+          # Decimal form
@@ -917,7 +930,7 @@ module::
 
    InternalDate = re.compile(r'INTERNALDATE "'
            r'(?P<day>[ 123][0-9])-(?P<mon>[A-Z][a-z][a-z])-'
-   	r'(?P<year>[0-9][0-9][0-9][0-9])'
+           r'(?P<year>[0-9][0-9][0-9][0-9])'
            r' (?P<hour>[0-9][0-9]):(?P<min>[0-9][0-9]):(?P<sec>[0-9][0-9])'
            r' (?P<zonen>[-+])(?P<zoneh>[0-9][0-9])(?P<zonem>[0-9][0-9])'
            r'"')

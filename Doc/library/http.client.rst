@@ -59,8 +59,8 @@ The module provides the following classes:
 
 .. class:: HTTPResponse(sock[, debuglevel=0][, strict=0])
 
-   Class whose instances are returned upon successful connection.  Not instantiated
-   directly by user.
+   Class whose instances are returned upon successful connection.  Not
+   instantiated directly by user.
 
 
 The following exceptions are raised as appropriate:
@@ -351,14 +351,22 @@ HTTPConnection Objects
 
 .. method:: HTTPConnection.request(method, url[, body[, headers]])
 
-   This will send a request to the server using the HTTP request method *method*
-   and the selector *url*.  If the *body* argument is present, it should be a
-   string of data to send after the headers are finished. Alternatively, it may
-   be an open file object, in which case the contents of the file is sent; this
-   file object should support ``fileno()`` and ``read()`` methods. The header
-   Content-Length is automatically set to the correct value. The *headers*
-   argument should be a mapping of extra HTTP headers to send with the request.
+   This will send a request to the server using the HTTP request
+   method *method* and the selector *url*.  If the *body* argument is
+   present, it should be string or bytes object of data to send after
+   the headers are finished.  Strings are encoded as ISO-8859-1, the
+   default charset for HTTP.  To use other encodings, pass a bytes
+   object.  The Content-Length header is set to the length of the
+   string.
 
+   The *body* may also be an open file object, in which case the
+   contents of the file is sent; this file object should support
+   ``fileno()`` and ``read()`` methods. The header Content-Length is
+   automatically set to the length of the file as reported by
+   stat.
+
+   The *headers* argument should be a mapping of extra HTTP
+   headers to send with the request.
 
 .. method:: HTTPConnection.getresponse()
 
@@ -425,7 +433,10 @@ also send your request step by step, by using the four functions below.
 HTTPResponse Objects
 --------------------
 
-:class:`HTTPResponse` instances have the following methods and attributes:
+An :class:`HTTPResponse` instance wraps the HTTP response from the
+server.  It provides access to the request headers and the entity
+body.  The response is an iterable object and can be used in a with
+statement.
 
 
 .. method:: HTTPResponse.read([amt])
@@ -446,7 +457,9 @@ HTTPResponse Objects
 
 .. attribute:: HTTPResponse.msg
 
-   An :class:`email.message.Message` instance containing the response headers.
+   A :class:`http.client.HTTPMessage` instance containing the response
+   headers.  :class:`http.client.HTTPMessage` is a subclass of
+   :class:`email.message.Message`.
 
 
 .. attribute:: HTTPResponse.version
@@ -462,6 +475,12 @@ HTTPResponse Objects
 .. attribute:: HTTPResponse.reason
 
    Reason phrase returned by server.
+
+
+.. attribute:: HTTPResponse.debuglevel
+
+   A debugging hook.  If `debuglevel` is greater than zero, messages
+   will be printed to stdout as the response is read and parsed.
 
 
 Examples
@@ -497,3 +516,13 @@ Here is an example session that shows how to ``POST`` requests::
    >>> data = response.read()
    >>> conn.close()
 
+
+.. _httpmessage-objects:
+
+HTTPMessage Objects
+-------------------
+
+An :class:`http.client.HTTPMessage` instance holds the headers from an HTTP
+response.  It is implemented using the :class:`email.message.Message` class.
+
+.. XXX Define the methods that clients can depend upon between versions.

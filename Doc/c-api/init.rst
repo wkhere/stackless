@@ -350,16 +350,34 @@ Initialization, Finalization, and Threads
       single: Py_FatalError()
       single: argv (in module sys)
 
-   Set ``sys.argv`` based on *argc* and *argv*.  These parameters are similar to
-   those passed to the program's :cfunc:`main` function with the difference that
-   the first entry should refer to the script file to be executed rather than the
-   executable hosting the Python interpreter.  If there isn't a script that will be
-   run, the first entry in *argv* can be an empty string.  If this function fails
-   to initialize ``sys.argv``, a fatal condition is signalled using
-   :cfunc:`Py_FatalError`.
+   Set :data:`sys.argv` based on *argc* and *argv*.  These parameters are
+   similar to those passed to the program's :cfunc:`main` function with the
+   difference that the first entry should refer to the script file to be
+   executed rather than the executable hosting the Python interpreter.  If there
+   isn't a script that will be run, the first entry in *argv* can be an empty
+   string.  If this function fails to initialize :data:`sys.argv`, a fatal
+   condition is signalled using :cfunc:`Py_FatalError`.
+
+   This function also prepends the executed script's path to :data:`sys.path`.
+   If no script is executed (in the case of calling ``python -c`` or just the
+   interactive interpreter), the empty string is used instead.
 
    .. XXX impl. doesn't seem consistent in allowing 0/NULL for the params;
       check w/ Guido.
+
+
+.. cfunction:: void Py_SetPythonHome(char *home)
+
+   Set the default "home" directory, that is, the location of the standard
+   Python libraries.  The libraries are searched in
+   :file:`{home}/lib/python{version}` and :file:`{home}/lib/python{version}`.
+
+
+.. cfunction:: char* Py_GetPythonHome()
+
+   Return the default "home", that is, the value set by a previous call to
+   :cfunc:`Py_SetPythonHome`, or the value of the :envvar:`PYTHONHOME`
+   environment variable if it is set.
 
 
 .. _threads:
@@ -765,6 +783,50 @@ created.
    :cfunc:`PyGILState_Release` on the same thread.
 
 
+
+Asynchronous Notifications
+==========================
+
+A mechanism is provided to make asynchronous notifications to the the main
+interpreter thread.  These notifications take the form of a function
+pointer and a void argument.
+
+.. index:: single: setcheckinterval() (in module sys)
+
+Every check interval, when the interpreter lock is released and reacquired,
+python will also call any such provided functions.  This can be used for
+example by asynchronous IO handlers.  The notification can be scheduled
+from a worker thread and the actual call than made at the earliest
+convenience by the main thread where it has possession of the global
+interpreter lock and can perform any Python API calls.
+
+.. cfunction:: void Py_AddPendingCall( int (*func)(void *, void *arg) )
+
+   .. index:: single: Py_AddPendingCall()
+
+   Post a notification to the Python main thread.  If successful,
+   *func* will be called with the argument *arg* at the earliest
+   convenience.  *func* will be called having the global interpreter
+   lock held and can thus use the full Python API and can take any
+   action such as setting object attributes to signal IO completion.
+   It must return 0 on success, or -1 signalling an exception.
+   The notification function won't be interrupted to perform another
+   asynchronous notification recursively,
+   but it can still be interrupted to switch threads if the interpreter
+   lock is released, for example, if it calls back into python code.
+
+   This function returns 0 on success in which case the notification has been
+   scheduled.  Otherwise, for example if the notification buffer is full,
+   it returns -1 without setting any exception.
+
+   This function can be called on any thread, be it a Python thread or
+   some other system thread.  If it is a Python thread, it doesn't matter if
+   it holds the global interpreter lock or not.
+
+   .. versionadded:: 2.7
+
+
+
 .. _profiling:
 
 Profiling and Tracing
@@ -885,7 +947,7 @@ Python-level trace functions in previous versions.
 
    Return a tuple of function call counts.  There are constants defined for the
    positions within the tuple:
-   
+
    +-------------------------------+-------+
    | Name                          | Value |
    +===============================+=======+
@@ -911,7 +973,7 @@ Python-level trace functions in previous versions.
    +-------------------------------+-------+
    | :const:`PCALL_POP`            | 10    |
    +-------------------------------+-------+
-   
+
    :const:`PCALL_FAST_FUNCTION` means no argument tuple needs to be created.
    :const:`PCALL_FASTER_FUNCTION` means that the fast-path frame setup code is used.
 

@@ -130,10 +130,14 @@ class ProxyTests(unittest.TestCase):
             os.environ[k] = v
 
     def test_getproxies_environment_keep_no_proxies(self):
-        os.environ['NO_PROXY'] = 'localhost'
-        proxies = urllib.request.getproxies_environment()
-        # getproxies_environment use lowered case truncated (no '_proxy') keys
-        self.assertEquals('localhost', proxies['no'])
+        try:
+            os.environ['NO_PROXY'] = 'localhost'
+            proxies = urllib.request.getproxies_environment()
+            # getproxies_environment use lowered case truncated (no '_proxy') keys
+            self.assertEquals('localhost', proxies['no'])
+        finally:
+            # The old value will be restored by tearDown, if applicable.
+            del os.environ['NO_PROXY']
 
 
 class urlopen_HttpTests(unittest.TestCase):
@@ -142,7 +146,8 @@ class urlopen_HttpTests(unittest.TestCase):
     def fakehttp(self, fakedata):
         class FakeSocket(io.BytesIO):
             def sendall(self, str): pass
-            def makefile(self, mode, name): return self
+            def makefile(self, *args, **kwds):
+                return self
             def read(self, amt=None):
                 if self.closed: return b""
                 return io.BytesIO.read(self, amt)
@@ -374,7 +379,8 @@ class QuotingTests(unittest.TestCase):
         result = urllib.parse.quote(quote_by_default, safe=quote_by_default)
         self.assertEqual(quote_by_default, result,
                          "using quote(): %r != %r" % (quote_by_default, result))
-        result = urllib.parse.quote_plus(quote_by_default, safe=quote_by_default)
+        result = urllib.parse.quote_plus(quote_by_default,
+                                         safe=quote_by_default)
         self.assertEqual(quote_by_default, result,
                          "using quote_plus(): %r != %r" %
                          (quote_by_default, result))
@@ -406,7 +412,8 @@ class QuotingTests(unittest.TestCase):
         for char in should_quote:
             result = urllib.parse.quote(char)
             self.assertEqual(hexescape(char), result,
-                             "using quote(): %s should be escaped to %s, not %s" %
+                             "using quote(): "
+                             "%s should be escaped to %s, not %s" %
                              (char, hexescape(char), result))
             result = urllib.parse.quote_plus(char)
             self.assertEqual(hexescape(char), result,
@@ -765,6 +772,21 @@ class urlencode_Tests(unittest.TestCase):
         self.assertEqual(result.count('&'), 2,
                          "Expected 2 '&'s, got %s" % result.count('&'))
 
+    def test_empty_sequence(self):
+        self.assertEqual("", urllib.parse.urlencode({}))
+        self.assertEqual("", urllib.parse.urlencode([]))
+
+    def test_nonstring_values(self):
+        self.assertEqual("a=1", urllib.parse.urlencode({"a": 1}))
+        self.assertEqual("a=None", urllib.parse.urlencode({"a": None}))
+
+    def test_nonstring_seq_values(self):
+        self.assertEqual("a=1&a=2", urllib.parse.urlencode({"a": [1, 2]}, True))
+        self.assertEqual("a=None&a=a",
+                         urllib.parse.urlencode({"a": [None, "a"]}, True))
+        self.assertEqual("a=a&a=b",
+                         urllib.parse.urlencode({"a": {"a": 1, "b": 1}}, True))
+
 class Pathname_Tests(unittest.TestCase):
     """Test pathname2url() and url2pathname()"""
 
@@ -807,6 +829,21 @@ class Pathname_Tests(unittest.TestCase):
         self.assertEqual(expect, result,
                          "url2pathname() failed; %s != %s" %
                          (expect, result))
+
+class Utility_Tests(unittest.TestCase):
+    """Testcase to test the various utility functions in the urllib."""
+
+    def test_splitpasswd(self):
+        """Some of password examples are not sensible, but it is added to
+        confirming to RFC2617 and addressing issue4675.
+        """
+        self.assertEqual(('user', 'ab'),urllib.parse.splitpasswd('user:ab'))
+        self.assertEqual(('user', 'a\nb'),urllib.parse.splitpasswd('user:a\nb'))
+        self.assertEqual(('user', 'a\tb'),urllib.parse.splitpasswd('user:a\tb'))
+        self.assertEqual(('user', 'a\rb'),urllib.parse.splitpasswd('user:a\rb'))
+        self.assertEqual(('user', 'a\fb'),urllib.parse.splitpasswd('user:a\fb'))
+        self.assertEqual(('user', 'a\vb'),urllib.parse.splitpasswd('user:a\vb'))
+        self.assertEqual(('user', 'a:b'),urllib.parse.splitpasswd('user:a:b'))
 
 # Just commented them out.
 # Can't really tell why keep failing in windows and sparc.
@@ -898,6 +935,7 @@ def test_main():
         UnquotingTests,
         urlencode_Tests,
         Pathname_Tests,
+        Utility_Tests,
         #FTPWrapperTests,
     )
 

@@ -890,7 +890,7 @@ PyCursesWindow_GetKey(PyCursesWindowObject *self, PyObject *args)
     PyErr_SetString(PyCursesError, "no input");
     return NULL;
   } else if (rtn<=255)
-    return Py_BuildValue("c", rtn);
+    return Py_BuildValue("C", rtn);
   else
 #if defined(__NetBSD__)
     return PyUnicode_FromString(unctrl(rtn));
@@ -1662,7 +1662,7 @@ PyTypeObject PyCursesWindow_Type = {
 	0,			/*tp_print*/
 	(getattrfunc)0,		/*tp_getattr*/
 	(setattrfunc)0,		/*tp_setattr*/
-	0,			/*tp_compare*/
+	0,			/*tp_reserved*/
 	0,			/*tp_repr*/
 	0,			/*tp_as_number*/
 	0,			/*tp_as_sequence*/

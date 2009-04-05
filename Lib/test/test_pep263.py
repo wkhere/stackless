@@ -1,5 +1,4 @@
-#! -*- coding: koi8-r -*-
-# This file is marked as binary in the CVS, to prevent MacCVS from recoding it.
+# -*- coding: koi8-r -*-
 
 import unittest
 from test import support
@@ -30,6 +29,12 @@ class PEP263Test(unittest.TestCase):
             self.assertEquals(v.text, "print '\u5e74'")
         else:
             self.fail()
+
+    def test_issue4626(self):
+        c = compile("# coding=latin-1\n\u00c6 = '\u00c6'", "dummy", "exec")
+        d = {}
+        exec(c, d)
+        self.assertEquals(d['\xc6'], '\xc6')
 
 def test_main():
     support.run_unittest(PEP263Test)

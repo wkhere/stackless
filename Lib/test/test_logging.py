@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright 2001-2004 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2009 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -18,13 +18,14 @@
 
 """Test harness for the logging module. Run all tests.
 
-Copyright (C) 2001-2002 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2009 Vinay Sajip. All Rights Reserved.
 """
 
 import logging
 import logging.handlers
 import logging.config
 
+import codecs
 import copy
 import pickle
 import io
@@ -44,6 +45,7 @@ import threading
 import time
 import types
 import unittest
+import warnings
 import weakref
 
 
@@ -859,6 +861,7 @@ class MemoryTest(BaseTest):
             ('foo', 'DEBUG', '3'),
         ])
 
+
 class EncodingTest(BaseTest):
     def test_encoding_plain_file(self):
         # In Python 2.x, a plain file object is treated as having no encoding.
@@ -885,6 +888,55 @@ class EncodingTest(BaseTest):
             if os.path.isfile(fn):
                 os.remove(fn)
 
+    def test_encoding_cyrillic_unicode(self):
+        log = logging.getLogger("test")
+        #Get a message in Unicode: Do svidanya in Cyrillic (meaning goodbye)
+        message = '\u0434\u043e \u0441\u0432\u0438\u0434\u0430\u043d\u0438\u044f'
+        #Ensure it's written in a Cyrillic encoding
+        writer_class = codecs.getwriter('cp1251')
+        stream = io.BytesIO()
+        writer = writer_class(stream, 'strict')
+        handler = logging.StreamHandler(writer)
+        log.addHandler(handler)
+        try:
+            log.warning(message)
+        finally:
+            log.removeHandler(handler)
+            handler.close()
+        # check we wrote exactly those bytes, ignoring trailing \n etc
+        s = stream.getvalue()
+        #Compare against what the data should be when encoded in CP-1251
+        self.assertEqual(s, b'\xe4\xee \xf1\xe2\xe8\xe4\xe0\xed\xe8\xff\n')
+
+
+class WarningsTest(BaseTest):
+
+    def test_warnings(self):
+        logging.captureWarnings(True)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("always", category=UserWarning)
+            try:
+                file = io.StringIO()
+                h = logging.StreamHandler(file)
+                logger = logging.getLogger("py.warnings")
+                logger.addHandler(h)
+                warnings.warn("I'm warning you...")
+                logger.removeHandler(h)
+                s = file.getvalue()
+                h.close()
+                self.assertTrue(s.find("UserWarning: I'm warning you...\n") > 0)
+
+                #See if an explicit file uses the original implementation
+                file = io.StringIO()
+                warnings.showwarning("Explicit", UserWarning, "dummy.py", 42,
+                                        file, "Dummy line")
+                s = file.getvalue()
+                file.close()
+                self.assertEqual(s,
+                        "dummy.py:42: UserWarning: Explicit\n  Dummy line\n")
+            finally:
+                logging.captureWarnings(False)
+
 # Set the locale to the platform-dependent default.  I have no idea
 # why the test does this, but in any case we save the current locale
 # first and restore it at the end.
@@ -893,7 +945,7 @@ def test_main():
     run_unittest(BuiltinLevelsTest, BasicFilterTest,
                     CustomLevelsAndFiltersTest, MemoryHandlerTest,
                     ConfigFileTest, SocketHandlerTest, MemoryTest,
-                    EncodingTest)
+                    EncodingTest, WarningsTest)
 
 if __name__ == "__main__":
     test_main()

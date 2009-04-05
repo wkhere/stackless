@@ -1,10 +1,10 @@
 """Support code for distutils test cases."""
-
+import os
 import shutil
 import tempfile
 
 from distutils import log
-
+from distutils.core import Distribution
 
 class LoggingSilencer(object):
 
@@ -31,7 +31,7 @@ class TempdirManager(object):
         super().tearDown()
         while self.tempdirs:
             d = self.tempdirs.pop()
-            shutil.rmtree(d)
+            shutil.rmtree(d, os.name in ('nt', 'cygwin'))
 
     def mkdtemp(self):
         """Create a temporary directory that will be cleaned up.
@@ -42,6 +42,36 @@ class TempdirManager(object):
         self.tempdirs.append(d)
         return d
 
+    def write_file(self, path, content='xxx'):
+        """Writes a file in the given path.
+
+
+        path can be a string or a sequence.
+        """
+        if isinstance(path, (list, tuple)):
+            path = os.path.join(*path)
+        f = open(path, 'w')
+        try:
+            f.write(content)
+        finally:
+            f.close()
+
+    def create_dist(self, pkg_name='foo', **kw):
+        """Will generate a test environment.
+
+        This function creates:
+         - a Distribution instance using keywords
+         - a temporary directory with a package structure
+
+        It returns the package directory and the distribution
+        instance.
+        """
+        tmp_dir = self.mkdtemp()
+        pkg_dir = os.path.join(tmp_dir, pkg_name)
+        os.mkdir(pkg_dir)
+        dist = Distribution(attrs=kw)
+
+        return pkg_dir, dist
 
 class DummyCommand:
     """Class to store options for retrieval via set_undefined_options()."""

@@ -283,12 +283,12 @@ class MutableSet(Set):
 
     @abstractmethod
     def add(self, value):
-        """Return True if it was added, False if already there."""
+        """Add an element."""
         raise NotImplementedError
 
     @abstractmethod
     def discard(self, value):
-        """Return True if it was deleted, False if not there."""
+        """Remove an element.  Do not raise an exception if absent."""
         raise NotImplementedError
 
     def remove(self, value):
@@ -301,7 +301,7 @@ class MutableSet(Set):
         """Return the popped value.  Raise KeyError if empty."""
         it = iter(self)
         try:
-            value = it.__next__()
+            value = next(it)
         except StopIteration:
             raise KeyError
         self.discard(value)
@@ -320,10 +320,9 @@ class MutableSet(Set):
             self.add(value)
         return self
 
-    def __iand__(self, c: Container):
-        for value in self:
-            if value not in c:
-                self.discard(value)
+    def __iand__(self, it: Iterable):
+        for value in (self - it):
+            self.discard(value)
         return self
 
     def __ixor__(self, it: Iterable):
@@ -391,6 +390,9 @@ class MappingView(Sized):
 
     def __len__(self):
         return len(self._mapping)
+
+    def __repr__(self):
+        return '{0.__class__.__name__}({0._mapping!r})'.format(self)
 
 
 class KeysView(MappingView, Set):
@@ -546,6 +548,7 @@ class Sequence(Sized, Iterable, Container):
 
 Sequence.register(tuple)
 Sequence.register(str)
+Sequence.register(range)
 
 
 class ByteString(Sequence):

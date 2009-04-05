@@ -984,8 +984,8 @@ main (int argc, char **argv) {
     def move_file(self, src, dst):
         return move_file(src, dst, dry_run=self.dry_run)
 
-    def mkpath(self, name, mode=0o777):
-        mkpath(name, mode, self.dry_run)
+    def mkpath (self, name, mode=0o777):
+        mkpath(name, mode, dry_run=self.dry_run)
 
 
 # Map a sys.platform/os.name ('posix', 'nt') to the default compiler
@@ -1004,7 +1004,6 @@ _default_compilers = (
     # OS name mappings
     ('posix', 'unix'),
     ('nt', 'msvc'),
-    ('mac', 'mwerks'),
 
     )
 
@@ -1042,8 +1041,6 @@ compiler_class = { 'unix':    ('unixccompiler', 'UnixCCompiler',
                                "Mingw32 port of GNU C Compiler for Win32"),
                    'bcpp':    ('bcppcompiler', 'BCPPCompiler',
                                "Borland C++ Compiler"),
-                   'mwerks':  ('mwerkscompiler', 'MWerksCompiler',
-                               "MetroWerks CodeWarrior"),
                    'emx':     ('emxccompiler', 'EMXCCompiler',
                                "EMX port of GNU C Compiler for OS/2"),
                  }

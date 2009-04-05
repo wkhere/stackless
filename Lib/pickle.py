@@ -229,6 +229,11 @@ class _Pickler:
 
     def dump(self, obj):
         """Write a pickled representation of obj to the open file."""
+        # Check whether Pickler was initialized correctly. This is
+        # only needed to mimic the behavior of _pickle.Pickler.dump().
+        if not hasattr(self, "write"):
+            raise PicklingError("Pickler.__init__() was not called by "
+                                "%s.__init__()" % (self.__class__.__name__,))
         if self.proto >= 2:
             self.write(PROTO + bytes([self.proto]))
         self.save(obj)
@@ -472,7 +477,7 @@ class _Pickler:
             else:
                 self.write(LONG4 + pack("<i", n) + encoded)
             return
-        self.write(LONG + repr(obj).encode("ascii") + b'\n')
+        self.write(LONG + repr(obj).encode("ascii") + b'L\n')
     dispatch[int] = save_long
 
     def save_float(self, obj, pack=struct.pack):
@@ -824,6 +829,11 @@ class _Unpickler:
 
         Return the reconstituted object hierarchy specified in the file.
         """
+        # Check whether Unpickler was initialized correctly. This is
+        # only needed to mimic the behavior of _pickle.Unpickler.dump().
+        if not hasattr(self, "read"):
+            raise UnpicklingError("Unpickler.__init__() was not called by "
+                                  "%s.__init__()" % (self.__class__.__name__,))
         self.mark = object() # any new unique object
         self.stack = []
         self.append = self.stack.append
@@ -855,7 +865,7 @@ class _Unpickler:
         return k
 
     def persistent_load(self, pid):
-        raise UnpickingError("unsupported persistent id encountered")
+        raise UnpicklingError("unsupported persistent id encountered")
 
     dispatch = {}
 
@@ -915,6 +925,8 @@ class _Unpickler:
 
     def load_long(self):
         val = self.readline()[:-1].decode("ascii")
+        if val and val[-1] == 'L':
+            val = val[:-1]
         self.append(int(val, 0))
     dispatch[LONG[0]] = load_long
 

@@ -2,6 +2,7 @@
 """Interfaces for launching and remotely controlling Web browsers."""
 # Maintained by Georg Brandl.
 
+import io
 import os
 import shlex
 import sys
@@ -223,7 +224,7 @@ class UnixBrowser(BaseBrowser):
         cmdline = [self.name] + raise_opt + args
 
         if remote or self.background:
-            inout = open(os.devnull, "r+")
+            inout = io.open(os.devnull, "r+")
         else:
             # for TTY browsers, we need stdin/out
             inout = None
@@ -347,7 +348,6 @@ class Konqueror(BaseBrowser):
         else:
             action = "openURL"
 
-        import io
         devnull = io.open(os.devnull, "r+")
         # if possible, put browser in separate process group, so
         # keyboard interrupts don't affect browser as well as Python
