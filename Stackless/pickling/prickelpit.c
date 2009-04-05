@@ -1373,7 +1373,7 @@ dictview_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (PyTuple_Size(args) != 1)
 		return NULL;
 	dict = PyTuple_GetItem(args, 0);
-	inst = PyObject_New(dictviewobject, type->tp_base);
+	inst = PyObject_GC_New(dictviewobject, type->tp_base);
 	if (inst == NULL)
 		return NULL;
     Py_INCREF(dict);	

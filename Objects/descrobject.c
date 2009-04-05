@@ -866,7 +866,11 @@ typedef struct {
 	PyObject *self;
 } wrapperobject;
 
+#ifdef STACKLESS
+#define Wrapper_Check(v) (Py_TYPE(v) == &PyMethodWrapper_Type)
+#else
 #define Wrapper_Check(v) (Py_TYPE(v) == &wrappertype)
+#endif
 
 static void
 wrapper_dealloc(wrapperobject *wp)
