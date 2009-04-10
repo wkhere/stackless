@@ -213,7 +213,7 @@ This warning notwithstanding, options to SWIG can be currently passed like
 this::
 
    setup(...,
-         ext_modules=[Extension('_foo', ['foo.i'], 
+         ext_modules=[Extension('_foo', ['foo.i'],
                                 swig_opts=['-modern', '-I../include'])],
          py_modules=['foo'],
         )
@@ -562,6 +562,8 @@ This information includes:
 |                      | package may be downloaded |                 |        |
 +----------------------+---------------------------+-----------------+--------+
 | ``classifiers``      | a list of classifiers     | list of strings | \(4)   |
++----------------------+---------------------------+-----------------+--------+
+| ``platforms``        | a list of platforms       | list of strings |        |
 +----------------------+---------------------------+-----------------+--------+
 
 Notes:

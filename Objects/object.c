@@ -331,8 +331,17 @@ void _PyObject_Dump(PyObject* op)
 	if (op == NULL)
 		fprintf(stderr, "NULL\n");
 	else {
+#ifdef WITH_THREAD
+		PyGILState_STATE gil;
+#endif
 		fprintf(stderr, "object  : ");
+#ifdef WITH_THREAD
+		gil = PyGILState_Ensure();
+#endif
 		(void)PyObject_Print(op, stderr, 0);
+#ifdef WITH_THREAD
+		PyGILState_Release(gil);
+#endif
 		/* XXX(twouters) cast refcount to long until %zd is
 		   universally available */
 		fprintf(stderr, "\n"
@@ -1020,7 +1029,7 @@ _Py_HashDouble(double v)
 	fractpart = modf(v, &intpart);
 	if (fractpart == 0.0) {
 		/* This must return the same hash as an equal int or long. */
-		if (intpart > LONG_MAX || -intpart > LONG_MAX) {
+		if (intpart > LONG_MAX/2 || -intpart > LONG_MAX/2) {
 			/* Convert to long and use its hash. */
 			PyObject *plong;	/* converted to Python long */
 			if (Py_IS_INFINITY(intpart))
@@ -1097,6 +1106,17 @@ PyObject_Hash(PyObject *v)
 	PyTypeObject *tp = v->ob_type;
 	if (tp->tp_hash != NULL)
 		return (*tp->tp_hash)(v);
+	/* To keep to the general practice that inheriting
+	 * solely from object in C code should work without
+	 * an explicit call to PyType_Ready, we implicitly call
+	 * PyType_Ready here and then check the tp_hash slot again
+	 */
+	if (tp->tp_dict == NULL) {
+		if (PyType_Ready(tp) < 0)
+			return -1;
+		if (tp->tp_hash != NULL)
+			return (*tp->tp_hash)(v);
+	}
 	if (tp->tp_compare == NULL && RICHCOMPARE(tp) == NULL) {
 		return _Py_HashPointer(v); /* Use address as hash value */
 	}

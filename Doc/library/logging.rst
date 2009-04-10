@@ -121,7 +121,7 @@ Another useful feature of the logging API is the ability to produce different
 messages at different log levels.  This allows you to instrument your code with
 debug messages, for example, but turning the log level down so that those debug
 messages are not written for your production system.  The default levels are
-``CRITICAL``, ``ERROR``, ``WARNING``, ``INFO``, ``DEBUG`` and ``UNSET``.
+``CRITICAL``, ``ERROR``, ``WARNING``, ``INFO``, ``DEBUG`` and ``NOTSET``.
 
 The logger, handler, and log message call each specify a level.  The log message
 is only emitted if the handler and logger are configured to emit messages of
@@ -422,6 +422,8 @@ You can see that the config file approach has a few advantages over the Python
 code approach, mainly separation of configuration and code and the ability of
 noncoders to easily modify the logging properties.
 
+.. _library-config:
+
 Configuring Logging for a Library
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -524,39 +526,45 @@ provided:
 
 #. :class:`FileHandler` instances send error messages to disk files.
 
-#. :class:`BaseRotatingHandler` is the base class for handlers that rotate log
-   files at a certain point. It is not meant to be  instantiated directly. Instead,
-   use :class:`RotatingFileHandler` or :class:`TimedRotatingFileHandler`.
+#. :class:`handlers.BaseRotatingHandler` is the base class for handlers that
+   rotate log files at a certain point. It is not meant to be  instantiated
+   directly. Instead, use :class:`RotatingFileHandler` or
+   :class:`TimedRotatingFileHandler`.
 
-#. :class:`RotatingFileHandler` instances send error messages to disk files,
+#. :class:`handlers.RotatingFileHandler` instances send error messages to disk files,
    with support for maximum log file sizes and log file rotation.
 
-#. :class:`TimedRotatingFileHandler` instances send error messages to disk files
+#. :class:`handlers.TimedRotatingFileHandler` instances send error messages to disk files
    rotating the log file at certain timed intervals.
 
-#. :class:`SocketHandler` instances send error messages to TCP/IP sockets.
+#. :class:`handlers.SocketHandler` instances send error messages to TCP/IP sockets.
 
-#. :class:`DatagramHandler` instances send error messages to UDP sockets.
+#. :class:`handlers.DatagramHandler` instances send error messages to UDP sockets.
 
-#. :class:`SMTPHandler` instances send error messages to a designated email
+#. :class:`handlers.SMTPHandler` instances send error messages to a designated email
    address.
 
-#. :class:`SysLogHandler` instances send error messages to a Unix syslog daemon,
+#. :class:`handlers.SysLogHandler` instances send error messages to a Unix syslog daemon,
    possibly on a remote machine.
 
-#. :class:`NTEventLogHandler` instances send error messages to a Windows
+#. :class:`handlers.NTEventLogHandler` instances send error messages to a Windows
    NT/2000/XP event log.
 
-#. :class:`MemoryHandler` instances send error messages to a buffer in memory,
+#. :class:`handlers.MemoryHandler` instances send error messages to a buffer in memory,
    which is flushed whenever specific criteria are met.
 
-#. :class:`HTTPHandler` instances send error messages to an HTTP server using
+#. :class:`handlers.HTTPHandler` instances send error messages to an HTTP server using
    either ``GET`` or ``POST`` semantics.
 
-The :class:`StreamHandler` and :class:`FileHandler` classes are defined in the
-core logging package. The other handlers are defined in a sub- module,
-:mod:`logging.handlers`. (There is also another sub-module,
-:mod:`logging.config`, for configuration functionality.)
+#. :class:`handlers.WatchedFileHandler` instances watch the file they are logging to. If
+the file changes, it is closed and reopened using the file name. This handler
+is only useful on Unix-like systems; Windows does not support the underlying
+mechanism used.
+
+The :class:`StreamHandler` and :class:`FileHandler`
+classes are defined in the core logging package. The other handlers are
+defined in a sub- module, :mod:`logging.handlers`. (There is also another
+sub-module, :mod:`logging.config`, for configuration functionality.)
 
 Logged messages are formatted for presentation through instances of the
 :class:`Formatter` class. They are initialized with a format string suitable for
@@ -1544,6 +1552,8 @@ subclasses. However, the :meth:`__init__` method in subclasses needs to call
 StreamHandler
 ^^^^^^^^^^^^^
 
+.. module:: logging.handlers
+
 The :class:`StreamHandler` class, located in the core :mod:`logging` package,
 sends logging output to streams such as *sys.stdout*, *sys.stderr* or any
 file-like object (or, more precisely, any object which supports :meth:`write`
@@ -1598,6 +1608,9 @@ sends logging output to a disk file.  It inherits the output functionality from
 
       Outputs the record to the file.
 
+
+See :ref:`library-config` for more information on how to use
+:class:`NullHandler`.
 
 WatchedFileHandler
 ^^^^^^^^^^^^^^^^^^
@@ -2049,6 +2062,8 @@ supports sending logging messages to a Web server, using either ``GET`` or
 
 Formatter Objects
 -----------------
+
+.. currentmodule:: logging
 
 :class:`Formatter`\ s have the following attributes and methods. They are
 responsible for converting a :class:`LogRecord` to (usually) a string which can

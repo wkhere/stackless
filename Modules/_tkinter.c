@@ -1256,7 +1256,9 @@ Tkapp_CallProc(Tkapp_CallEvent *e, int flags)
 		*(e->res) = Tkapp_CallResult(e->self);
 	}
 	LEAVE_PYTHON
-  done:
+
+	Tkapp_CallDeallocArgs(objv, objStore, objc);
+done:
 	/* Wake up calling thread. */
 	Tcl_MutexLock(&call_mutex);
 	Tcl_ConditionNotify(&e->done);
@@ -1284,8 +1286,7 @@ Tkapp_Call(PyObject *selfptr, PyObject *args)
 	int objc, i;
 	PyObject *res = NULL;
 	TkappObject *self = (TkappObject*)selfptr;
-	/* Could add TCL_EVAL_GLOBAL if wrapped by GlobalCall... */
-	int flags = TCL_EVAL_DIRECT;
+	int flags = TCL_EVAL_DIRECT | TCL_EVAL_GLOBAL;
 
 	/* If args is a single tuple, replace with contents of tuple */
 	if (1 == PyTuple_Size(args)){
@@ -2029,7 +2030,7 @@ PythonCmd(ClientData clientData, Tcl_Interp *interp, int argc, char *argv[])
 		return PythonCmd_Error(interp);
 	}
 	else {
-		Tcl_SetObjResult(Tkapp_Interp(self), obj_res);
+		Tcl_SetObjResult(interp, obj_res);
 		rv = TCL_OK;
 	}
 

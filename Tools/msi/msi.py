@@ -115,6 +115,8 @@ pythondll_uuid = {
 
 # Compute the name that Sphinx gives to the docfile
 docfile = ""
+if micro:
+    docfile = str(micro)
 if level < 0xf:
     docfile = '%x%s' % (level, serial)
 docfile = 'python%s%s%s.chm' % (major, minor, docfile)
@@ -1015,6 +1017,7 @@ def add_files(db):
             lib.glob("*.pem")
             lib.glob("*.pck")
             lib.add_file("readme.txt", src="README")
+            lib.add_file("zipdir.zip")
         if dir=='decimaltestdata':
             lib.glob("*.decTest")
         if dir=='output':

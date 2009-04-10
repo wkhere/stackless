@@ -30,6 +30,7 @@ import os, sys
 import pickle, copy
 import unittest
 from decimal import *
+import numbers
 from test.test_support import (TestSkipped, run_unittest, run_doctest,
                                is_resource_enabled)
 import random
@@ -168,7 +169,6 @@ def outside_decNumber_bounds(v, context):
         -context.Emin > DEC_MAX_MATH):
         return True
     if not v._is_special and v and (
-        len(v._int) > DEC_MAX_MATH or
         v.adjusted() > DEC_MAX_MATH or
         v.adjusted() < 1-2*DEC_MAX_MATH):
         return True
@@ -704,6 +704,12 @@ class DecimalFormatTest(unittest.TestCase):
             ('.0g', '-sNaN', '-sNaN'),
 
             ('', '1.00', '1.00'),
+
+            # check alignment
+            ('<6', '123', '123   '),
+            ('>6', '123', '   123'),
+            ('^6', '123', ' 123  '),
+            ('=+6', '123', '+  123'),
             ]
         for fmt, d, result in test_values:
             self.assertEqual(format(Decimal(d), fmt), result)
@@ -1334,6 +1340,12 @@ class DecimalUsabilityTest(unittest.TestCase):
 
 
 class DecimalPythonAPItests(unittest.TestCase):
+
+    def test_abc(self):
+        self.assert_(issubclass(Decimal, numbers.Number))
+        self.assert_(not issubclass(Decimal, numbers.Real))
+        self.assert_(isinstance(Decimal(0), numbers.Number))
+        self.assert_(not isinstance(Decimal(0), numbers.Real))
 
     def test_pickle(self):
         d = Decimal('-3.141590000')

@@ -51,6 +51,12 @@ One additional method is supported:
    disk, if feasible.  This is called automatically when the shelf is closed with
    :meth:`close`.
 
+.. seealso::
+
+   `Persistent dictionary recipe <http://code.activestate.com/recipes/576642/>`_
+   with widely supported storage formats and having the speed of native
+   dictionaries.
+
 
 Restrictions
 ------------
@@ -142,7 +148,7 @@ object)::
 
    # as d was opened WITHOUT writeback=True, beware:
    d['xx'] = range(4)  # this works as expected, but...
-   d['xx'].append(5)   # *this doesn't!* -- d['xx'] is STILL range(4)!!!
+   d['xx'].append(5)   # *this doesn't!* -- d['xx'] is STILL range(4)!
 
    # having opened d without writeback=True, you need to code carefully:
    temp = d['xx']      # extracts the copy

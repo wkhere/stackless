@@ -164,7 +164,7 @@ class SimpleXMLRPCDispatcher:
     reason to instantiate this class directly.
     """
 
-    def __init__(self, allow_none, encoding):
+    def __init__(self, allow_none=False, encoding=None):
         self.funcs = {}
         self.instance = None
         self.allow_none = allow_none
@@ -598,8 +598,12 @@ class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
             self.handle_get()
         else:
             # POST data is normally available through stdin
+            try:
+                length = int(os.environ.get('CONTENT_LENGTH', None))
+            except (TypeError, ValueError):
+                length = -1
             if request_text is None:
-                request_text = sys.stdin.read()
+                request_text = sys.stdin.read(length)
 
             self.handle_xmlrpc(request_text)
 

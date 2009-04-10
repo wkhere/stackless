@@ -338,15 +338,13 @@ Notes:
       module: math
       single: floor() (in module math)
       single: ceil() (in module math)
+      single: trunc() (in module math)
       pair: numeric; conversions
-      pair: C; language
 
-   Conversion from floating point to (long or plain) integer may round or
-   truncate as in C; see functions :func:`math.floor` and :func:`math.ceil` for
-   well-defined conversions.
-
-   .. deprecated:: 2.6
-      Instead, convert floats to long explicitly with :func:`trunc`.
+   Conversion from floats using :func:`int` or :func:`long` truncates toward
+   zero like the related function, :func:`math.trunc`.  Use the function
+   :func:`math.floor` to round downward and :func:`math.ceil` to round
+   upward.
 
 (3)
    See :ref:`built-in-funcs` for a full description.
@@ -362,9 +360,9 @@ Notes:
    though the result's type is not necessarily int.
 
 (6)
-   float also accepts the strings "nan" and "inf" with an optional prefix "+" 
+   float also accepts the strings "nan" and "inf" with an optional prefix "+"
    or "-" for Not a Number (NaN) and positive or negative infinity.
-   
+
    .. versionadded:: 2.6
 
 (7)
@@ -377,7 +375,7 @@ All :class:`numbers.Real` types (:class:`int`, :class:`long`, and
 +--------------------+------------------------------------+--------+
 | Operation          | Result                             | Notes  |
 +====================+====================================+========+
-| ``trunc(x)``       | *x* truncated to Integral          |        |
+| ``math.trunc(x)``  | *x* truncated to Integral          |        |
 +--------------------+------------------------------------+--------+
 | ``round(x[, n])``  | *x* rounded to n digits,           |        |
 |                    | rounding half to even. If n is     |        |
@@ -458,7 +456,7 @@ The float type has some additional methods.
     original float and with a positive denominator.  Raises
     :exc:`OverflowError` on infinities and a :exc:`ValueError` on
     NaNs.
-    
+
     .. versionadded:: 2.6
 
 Two methods support conversion to
@@ -603,9 +601,9 @@ Sequence Types --- :class:`str`, :class:`unicode`, :class:`list`, :class:`tuple`
 
 There are six sequence types: strings, Unicode strings, lists, tuples, buffers,
 and xrange objects.
-(For other containers see the built in :class:`dict`, :class:`list`,
-:class:`set`, and :class:`tuple` classes, and the :mod:`collections`
-module.)
+
+For other containers see the built in :class:`dict` and :class:`set` classes,
+and the :mod:`collections` module.
 
 
 .. index::
@@ -797,9 +795,9 @@ string functions based on regular expressions.
 
 .. method:: str.count(sub[, start[, end]])
 
-   Return the number of occurrences of substring *sub* in the range [*start*,
-   *end*].  Optional arguments *start* and *end* are interpreted as in slice
-   notation.
+   Return the number of non-overlapping occurrences of substring *sub* in the
+   range [*start*, *end*].  Optional arguments *start* and *end* are
+   interpreted as in slice notation.
 
 
 .. method:: str.decode([encoding[, errors]])
@@ -1178,7 +1176,7 @@ string functions based on regular expressions.
    Return the numeric string left filled with zeros in a string of length
    *width*.  A sign prefix is handled correctly.  The original string is
    returned if *width* is less than ``len(s)``.
-   
+
 
    .. versionadded:: 2.2.2
 
@@ -1190,7 +1188,7 @@ The following methods are present only on unicode objects:
    otherwise. Numeric characters include digit characters, and all characters
    that have the Unicode numeric value property, e.g. U+2155,
    VULGAR FRACTION ONE FIFTH.
-   
+
 .. method:: unicode.isdecimal()
 
    Return ``True`` if there are only decimal characters in S, ``False``
@@ -1298,7 +1296,7 @@ The conversion types are:
 +------------+-----------------------------------------------------+-------+
 | ``'o'``    | Signed octal value.                                 | \(1)  |
 +------------+-----------------------------------------------------+-------+
-| ``'u'``    | Obselete type -- it is identical to ``'d'``.        | \(7)  |
+| ``'u'``    | Obsolete type -- it is identical to ``'d'``.        | \(7)  |
 +------------+-----------------------------------------------------+-------+
 | ``'x'``    | Signed hexadecimal (lowercase).                     | \(2)  |
 +------------+-----------------------------------------------------+-------+
@@ -1380,7 +1378,7 @@ that ``'\0'`` is the end of the string.
 .. XXX Examples?
 
 For safety reasons, floating point precisions are clipped to 50; ``%f``
-conversions for numbers whose absolute value is over 1e25 are replaced by ``%g``
+conversions for numbers whose absolute value is over 1e50 are replaced by ``%g``
 conversions. [#]_  All other errors raise exceptions.
 
 .. index::
@@ -1650,7 +1648,7 @@ The constructors for both classes work the same:
    .. method:: union(other, ...)
                set | other | ...
 
-      Return a new set with elements from both sets.
+      Return a new set with elements from the set and all others.
 
       .. versionchanged:: 2.6
          Accepts multiple input iterables.
@@ -1658,7 +1656,7 @@ The constructors for both classes work the same:
    .. method:: intersection(other, ...)
                set & other & ...
 
-      Return a new set with elements common to both sets.
+      Return a new set with elements common to the set and all others.
 
       .. versionchanged:: 2.6
          Accepts multiple input iterables.
@@ -1867,7 +1865,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       Return the item of *d* with key *key*.  Raises a :exc:`KeyError` if *key*
       is not in the map.
 
-      .. versionadded:: 2.5 
+      .. versionadded:: 2.5
          If a subclass of dict defines a method :meth:`__missing__`, if the key
          *key* is not present, the ``d[key]`` operation calls that method with
          the key *key* as argument.  The ``d[key]`` operation then returns or
@@ -1898,6 +1896,11 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       Equivalent to ``not key in d``.
 
       .. versionadded:: 2.2
+
+   .. describe:: iter(d)
+
+      Return an iterator over the keys of the dictionary.  This is a shortcut
+      for :meth:`iterkeys`.
 
    .. method:: clear()
 
@@ -1951,6 +1954,9 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       Return an iterator over the dictionary's ``(key, value)`` pairs.  See the
       note for :meth:`dict.items`.
 
+      Using :meth:`iteritems` while adding or deleting entries in the dictionary
+      will raise a :exc:`RuntimeError`.
+
       .. versionadded:: 2.2
 
    .. method:: iterkeys()
@@ -1958,12 +1964,18 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       Return an iterator over the dictionary's keys.  See the note for
       :meth:`dict.items`.
 
+      Using :meth:`iterkeys` while adding or deleting entries in the dictionary
+      will raise a :exc:`RuntimeError`.
+
       .. versionadded:: 2.2
 
    .. method:: itervalues()
 
       Return an iterator over the dictionary's values.  See the note for
       :meth:`dict.items`.
+
+      Using :meth:`itervalues` while adding or deleting entries in the
+      dictionary will raise a :exc:`RuntimeError`.
 
       .. versionadded:: 2.2
 
@@ -2186,7 +2198,7 @@ Files have the following methods:
    positioning); other values are ``os.SEEK_CUR`` or ``1`` (seek relative to the
    current position) and ``os.SEEK_END`` or ``2``  (seek relative to the file's
    end).  There is no return value.
-   
+
    For example, ``f.seek(2, os.SEEK_CUR)`` advances the position by two and
    ``f.seek(-3, os.SEEK_END)`` sets the position to the third to last.
 
@@ -2639,6 +2651,32 @@ types, where they are relevant.  Some of these are not reported by the
 .. attribute:: class.__name__
 
    The name of the class or type.
+
+
+The following attributes are only supported by :term:`new-style class`\ es.
+
+.. attribute:: class.__mro__
+
+   This attribute is a tuple of classes that are considered when looking for
+   base classes during method resolution.
+
+
+.. method:: class.mro()
+
+   This method can be overridden by a metaclass to customize the method
+   resolution order for its instances.  It is called at class instantiation, and
+   its result is stored in :attr:`__mro__`.
+
+
+.. method:: class.__subclasses__
+
+   Each new-style class keeps a list of weak references to its immediate
+   subclasses.  This method returns a list of all those references still alive.
+   Example::
+
+      >>> int.__subclasses__()
+      [<type 'bool'>]
+
 
 .. rubric:: Footnotes
 

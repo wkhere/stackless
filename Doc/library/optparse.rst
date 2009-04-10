@@ -548,8 +548,8 @@ Continuing with the parser defined above, adding an
 :class:`OptionGroup` to a parser is easy::
 
     group = OptionGroup(parser, "Dangerous Options",
-			"Caution: use these options at your own risk.  "
-			"It is believed that some of them bite.")
+                        "Caution: use these options at your own risk.  "
+                        "It is believed that some of them bite.")
     group.add_option("-g", action="store_true", help="Group option.")
     parser.add_option_group(group)
 
@@ -563,12 +563,12 @@ This would result in the following help output::
       -q, --quiet          be vewwy quiet (I'm hunting wabbits)
       -fFILE, --file=FILE  write output to FILE
       -mMODE, --mode=MODE  interaction mode: one of 'novice', 'intermediate'
-			   [default], 'expert'
+                           [default], 'expert'
 
       Dangerous Options:
-	Caution: use of these options is at your own risk.  It is believed that
-	some of them bite.
-	-g                 Group option.
+      Caution: use of these options is at your own risk.  It is believed that
+      some of them bite.
+      -g                 Group option.
 
 .. _optparse-printing-version-string:
 
@@ -799,7 +799,7 @@ And to define an option with only a long option string::
 The keyword arguments define attributes of the new Option object.  The most
 important option attribute is :attr:`action`, and it largely determines which
 other attributes are relevant or required.  If you pass irrelevant option
-attributes, or fail to pass required ones, :mod:`optparse` raises an 
+attributes, or fail to pass required ones, :mod:`optparse` raises an
 :exc:`OptionError` exception explaining your mistake.
 
 An option's *action* determines what :mod:`optparse` does when it encounters
@@ -1511,7 +1511,7 @@ Here's an example of a callback option that takes no arguments, and simply
 records that the option was seen::
 
    def record_foo_seen(option, opt_str, value, parser):
-       parser.saw_foo = True
+       parser.values.saw_foo = True
 
    parser.add_option("--foo", action="callback", callback=record_foo_seen)
 
@@ -1630,35 +1630,32 @@ directly).
 Nevertheless, here's a stab at a callback for an option with variable
 arguments::
 
-   def vararg_callback(option, opt_str, value, parser):
-       assert value is None
-       done = 0
-       value = []
-       rargs = parser.rargs
-       while rargs:
-           arg = rargs[0]
+    def vararg_callback(option, opt_str, value, parser):
+        assert value is None
+        value = []
 
-           # Stop if we hit an arg like "--foo", "-a", "-fx", "--file=f",
-           # etc.  Note that this also stops on "-3" or "-3.0", so if
-           # your option takes numeric values, you will need to handle
-           # this.
-           if ((arg[:2] == "--" and len(arg) > 2) or
-               (arg[:1] == "-" and len(arg) > 1 and arg[1] != "-")):
-               break
-           else:
-               value.append(arg)
-               del rargs[0]
+        def floatable(str):
+            try:
+                float(str)
+                return True
+            except ValueError:
+                return False
 
-       setattr(parser.values, option.dest, value)
+        for arg in parser.rargs:
+            # stop on --foo like options
+            if arg[:2] == "--" and len(arg) > 2:
+                break
+            # stop on -a, but not on -3 or -3.0
+            if arg[:1] == "-" and len(arg) > 1 and not floatable(arg):
+                break
+            value.append(arg)
+
+        del parser.rargs[:len(value)]
+        setattr(parser.values, option.dest, value)
 
    [...]
    parser.add_option("-c", "--callback", dest="vararg_attr",
                      action="callback", callback=vararg_callback)
-
-The main weakness with this particular implementation is that negative numbers
-in the arguments following ``"-c"`` will be interpreted as further options
-(probably causing an error), rather than as arguments to ``"-c"``.  Fixing this
-is left as an exercise for the reader.
 
 
 .. _optparse-extending-optparse:

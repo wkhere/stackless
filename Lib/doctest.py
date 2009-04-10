@@ -820,7 +820,15 @@ class DocTestFinder:
         # given object's docstring.
         try:
             file = inspect.getsourcefile(obj) or inspect.getfile(obj)
-            source_lines = linecache.getlines(file)
+            if module is not None:
+                # Supply the module globals in case the module was
+                # originally loaded via a PEP 302 loader and
+                # file is not a valid filesystem path
+                source_lines = linecache.getlines(file, module.__dict__)
+            else:
+                # No access to a loader, so assume it's a normal
+                # filesystem path
+                source_lines = linecache.getlines(file)
             if not source_lines:
                 source_lines = None
         except TypeError:
@@ -836,6 +844,8 @@ class DocTestFinder:
             globs = globs.copy()
         if extraglobs is not None:
             globs.update(extraglobs)
+        if '__name__' not in globs:
+            globs['__name__'] = '__main__'  # provide a default module name
 
         # Recursively expore `obj`, extracting DocTests.
         tests = []
@@ -854,12 +864,12 @@ class DocTestFinder:
         """
         if module is None:
             return True
+        elif inspect.getmodule(object) is not None:
+            return module is inspect.getmodule(object)
         elif inspect.isfunction(object):
             return module.__dict__ is object.func_globals
         elif inspect.isclass(object):
             return module.__name__ == object.__module__
-        elif inspect.getmodule(object) is not None:
-            return module is inspect.getmodule(object)
         elif hasattr(object, '__module__'):
             return module.__name__ == object.__module__
         elif isinstance(object, property):
@@ -1433,8 +1443,10 @@ class DocTestRunner:
         d = self._name2ft
         for name, (f, t) in other._name2ft.items():
             if name in d:
-                print "*** DocTestRunner.merge: '" + name + "' in both" \
-                    " testers; summing outcomes."
+                # Don't print here by default, since doing
+                #     so breaks some of the buildbots
+                #print "*** DocTestRunner.merge: '" + name + "' in both" \
+                #    " testers; summing outcomes."
                 f2, t2 = d[name]
                 f = f + f2
                 t = t + t2
@@ -1927,6 +1939,8 @@ def testfile(filename, module_relative=True, name=None, package=None,
         globs = globs.copy()
     if extraglobs is not None:
         globs.update(extraglobs)
+    if '__name__' not in globs:
+        globs['__name__'] = '__main__'
 
     if raise_on_error:
         runner = DebugRunner(verbose=verbose, optionflags=optionflags)

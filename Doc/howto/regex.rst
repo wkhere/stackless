@@ -1,10 +1,10 @@
 .. _regex-howto:
 
 ****************************
-  Regular Expression HOWTO  
+  Regular Expression HOWTO
 ****************************
 
-:Author: A.M. Kuchling
+:Author: A.M. Kuchling <amk@amk.ca>
 :Release: 0.05
 
 .. TODO:
@@ -540,6 +540,10 @@ of each one.
 | :const:`VERBOSE`, :const:`X`    | Enable verbose REs, which can be organized |
 |                                 | more cleanly and understandably.           |
 +---------------------------------+--------------------------------------------+
+| :const:`UNICODE`, :const:`U`    | Makes several escapes like ``\w``, ``\b``, |
+|                                 | ``\s`` and ``\d`` dependent on the Unicode |
+|                                 | character database.                        |
++---------------------------------+--------------------------------------------+
 
 
 .. data:: I
@@ -594,6 +598,14 @@ of each one.
    newline; without this flag, ``'.'`` will match anything *except* a newline.
 
 
+.. data:: U
+          UNICODE
+   :noindex:
+
+   Make ``\w``, ``\W``, ``\b``, ``\B``, ``\d``, ``\D``, ``\s`` and ``\S``
+   dependent on the Unicode character properties database.
+
+
 .. data:: X
           VERBOSE
    :noindex:
@@ -611,7 +623,7 @@ of each one.
    is to read? ::
 
       charref = re.compile(r"""
-       &[#]		     # Start of a numeric entity reference
+       &[#]                # Start of a numeric entity reference
        (
            0[0-7]+         # Octal form
          | [0-9]+          # Decimal form
@@ -732,7 +744,7 @@ given location, they can obviously be matched an infinite number of times.
       >>> p = re.compile('\bclass\b')
       >>> print p.search('no class at all')
       None
-      >>> print p.search('\b' + 'class' + '\b')  
+      >>> print p.search('\b' + 'class' + '\b')
       <re.MatchObject instance at 80c3ee0>
 
    Second, inside a character class, where there's no use for this assertion,
@@ -917,7 +929,7 @@ module::
 
    InternalDate = re.compile(r'INTERNALDATE "'
            r'(?P<day>[ 123][0-9])-(?P<mon>[A-Z][a-z][a-z])-'
-   	r'(?P<year>[0-9][0-9][0-9][0-9])'
+           r'(?P<year>[0-9][0-9][0-9][0-9])'
            r' (?P<hour>[0-9][0-9]):(?P<min>[0-9][0-9]):(?P<sec>[0-9][0-9])'
            r' (?P<zonen>[-+])(?P<zoneh>[0-9][0-9])(?P<zonem>[0-9][0-9])'
            r'"')
@@ -1236,9 +1248,9 @@ It's important to keep this distinction in mind.  Remember,  :func:`match` will
 only report a successful match which will start at 0; if the match wouldn't
 start at zero,  :func:`match` will *not* report it. ::
 
-   >>> print re.match('super', 'superstition').span()  
+   >>> print re.match('super', 'superstition').span()
    (0, 5)
-   >>> print re.match('super', 'insuperable')    
+   >>> print re.match('super', 'insuperable')
    None
 
 On the other hand, :func:`search` will scan forward through the string,

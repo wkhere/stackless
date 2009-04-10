@@ -86,7 +86,7 @@ static char *usage_3 = "\
 -x     : skip first line of source, allowing use of non-Unix forms of #!cmd\n\
 ";
 static char *usage_4 = "\
--3     : warn about Python 3.x incompatibilities\n\
+-3     : warn about Python 3.x incompatibilities that 2to3 cannot trivially fix\n\
 file   : program read from script file\n\
 -      : program read from stdin (default; interactive mode if a tty)\n\
 arg ...: arguments passed to program in sys.argv[1:]\n\n\
@@ -317,6 +317,8 @@ Py_Main(int argc, char **argv)
 
 		case '3':
 			Py_Py3kWarningFlag++;
+			if (!Py_DivisionWarningFlag)
+				Py_DivisionWarningFlag = 1;
 			break;
 
 		case 'Q':

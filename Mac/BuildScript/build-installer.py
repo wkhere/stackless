@@ -1,8 +1,9 @@
-#!/usr/bin/python2.3
+#!/usr/bin/python
 """
 This script is used to build the "official unofficial" universal build on
 Mac OS X. It requires Mac OS X 10.4, Xcode 2.2 and the 10.4u SDK to do its
-work.
+work.  64-bit or four-way universal builds require at least OS X 10.5 and
+the 10.5 SDK.
 
 Please ensure that this script keeps working with Python 2.3, to avoid
 bootstrap issues (/usr/bin/python is Python 2.3 on OSX 10.4)
@@ -18,11 +19,6 @@ VERBOSE = 1
 from plistlib import Plist
 
 import MacOS
-import Carbon.File
-import Carbon.Icn
-import Carbon.Res
-from Carbon.Files import kCustomIconResource, fsRdWrPerm, kHasCustomIcon
-from Carbon.Files import kFSCatInfoFinderInfo
 
 try:
     from plistlib import writePlist
@@ -68,7 +64,15 @@ DEPSRC = os.path.expanduser('~/Universal/other-sources')
 SDKPATH = "/Developer/SDKs/MacOSX10.4u.sdk"
 #SDKPATH = "/"
 
-ARCHLIST = ('i386', 'ppc',)
+universal_opts_map = { '32-bit': ('i386', 'ppc',),
+                       '64-bit': ('x86_64', 'ppc64',),
+                       'all': ('i386', 'ppc', 'x86_64', 'ppc64',) }
+
+UNIVERSALOPTS = tuple(universal_opts_map.keys())
+
+UNIVERSALARCHS = '32-bit'
+
+ARCHLIST = universal_opts_map[UNIVERSALARCHS]
 
 # Source directory (asume we're in Mac/BuildScript)
 SRCDIR = os.path.dirname(
@@ -76,6 +80,9 @@ SRCDIR = os.path.dirname(
             os.path.dirname(
                 os.path.abspath(__file__
         ))))
+
+# $MACOSX_DEPLOYMENT_TARGET -> minimum OS X level
+DEPTARGET = '10.3'
 
 USAGE = textwrap.dedent("""\
     Usage: build_python [options]
@@ -87,100 +94,108 @@ USAGE = textwrap.dedent("""\
     --third-party=DIR:   Store third-party sources here (default: %(DEPSRC)r)
     --sdk-path=DIR:      Location of the SDK (default: %(SDKPATH)r)
     --src-dir=DIR:       Location of the Python sources (default: %(SRCDIR)r)
+    --dep-target=10.n    OS X deployment target (default: %(DEPTARGET)r)
+    --universal-archs=x  universal architectures (options: %(UNIVERSALOPTS)r, default: %(UNIVERSALARCHS)r)
 """)% globals()
 
 
 # Instructions for building libraries that are necessary for building a
 # batteries included python.
-LIBRARY_RECIPES = [
-    dict(
-        name="Bzip2 1.0.3",
-        url="http://www.bzip.org/1.0.3/bzip2-1.0.3.tar.gz",
-        configure=None,
-        install='make install PREFIX=%s/usr/local/ CFLAGS="-arch %s -isysroot %s"'%(
-            shellQuote(os.path.join(WORKDIR, 'libraries')),
-            ' -arch '.join(ARCHLIST),
-            SDKPATH,
-        ),
-    ),
-    dict(
-        name="ZLib 1.2.3",
-        url="http://www.gzip.org/zlib/zlib-1.2.3.tar.gz",
-        configure=None,
-        install='make install prefix=%s/usr/local/ CFLAGS="-arch %s -isysroot %s"'%(
-            shellQuote(os.path.join(WORKDIR, 'libraries')),
-            ' -arch '.join(ARCHLIST),
-            SDKPATH,
-        ),
-    ),
-    dict(
-        # Note that GNU readline is GPL'd software
-        name="GNU Readline 5.1.4",
-        url="http://ftp.gnu.org/pub/gnu/readline/readline-5.1.tar.gz" ,
-        patchlevel='0',
-        patches=[
-            # The readline maintainers don't do actual micro releases, but
-            # just ship a set of patches.
-            'http://ftp.gnu.org/pub/gnu/readline/readline-5.1-patches/readline51-001',
-            'http://ftp.gnu.org/pub/gnu/readline/readline-5.1-patches/readline51-002',
-            'http://ftp.gnu.org/pub/gnu/readline/readline-5.1-patches/readline51-003',
-            'http://ftp.gnu.org/pub/gnu/readline/readline-5.1-patches/readline51-004',
-        ]
-    ),
+#   [The recipes are defined here for convenience but instantiated later after
+#    command line options have been processed.]
+def library_recipes():
+    return [
+      dict(
+          name="Bzip2 1.0.4",
+          url="http://www.bzip.org/1.0.4/bzip2-1.0.4.tar.gz",
+          checksum='fc310b254f6ba5fbb5da018f04533688',
+          configure=None,
+          install='make install PREFIX=%s/usr/local/ CFLAGS="-arch %s -isysroot %s"'%(
+              shellQuote(os.path.join(WORKDIR, 'libraries')),
+              ' -arch '.join(ARCHLIST),
+              SDKPATH,
+          ),
+      ),
+      dict(
+          name="ZLib 1.2.3",
+          url="http://www.gzip.org/zlib/zlib-1.2.3.tar.gz",
+          checksum='debc62758716a169df9f62e6ab2bc634',
+          configure=None,
+          install='make install prefix=%s/usr/local/ CFLAGS="-arch %s -isysroot %s"'%(
+              shellQuote(os.path.join(WORKDIR, 'libraries')),
+              ' -arch '.join(ARCHLIST),
+              SDKPATH,
+          ),
+      ),
+      dict(
+          # Note that GNU readline is GPL'd software
+          name="GNU Readline 5.1.4",
+          url="http://ftp.gnu.org/pub/gnu/readline/readline-5.1.tar.gz" ,
+          checksum='7ee5a692db88b30ca48927a13fd60e46',
+          patchlevel='0',
+          patches=[
+              # The readline maintainers don't do actual micro releases, but
+              # just ship a set of patches.
+              'http://ftp.gnu.org/pub/gnu/readline/readline-5.1-patches/readline51-001',
+              'http://ftp.gnu.org/pub/gnu/readline/readline-5.1-patches/readline51-002',
+              'http://ftp.gnu.org/pub/gnu/readline/readline-5.1-patches/readline51-003',
+              'http://ftp.gnu.org/pub/gnu/readline/readline-5.1-patches/readline51-004',
+          ]
+      ),
 
-    dict(
-        name="SQLite 3.6.3",
-        url="http://www.sqlite.org/sqlite-3.6.3.tar.gz",
-        checksum='93f742986e8bc2dfa34792e16df017a6feccf3a2',
-        configure_pre=[
-            '--enable-threadsafe',
-            '--enable-tempstore',
-            '--enable-shared=no',
-            '--enable-static=yes',
-            '--disable-tcl',
-        ]
-    ),
+      dict(
+          name="SQLite 3.6.11",
+          url="http://www.sqlite.org/sqlite-3.6.11.tar.gz",
+          checksum='7ebb099696ab76cc6ff65dd496d17858',
+          configure_pre=[
+              '--enable-threadsafe',
+              '--enable-tempstore',
+              '--enable-shared=no',
+              '--enable-static=yes',
+              '--disable-tcl',
+          ]
+      ),
 
-    dict(
-        name="NCurses 5.5",
-        url="http://ftp.gnu.org/pub/gnu/ncurses/ncurses-5.5.tar.gz",
-        configure_pre=[
-            "--without-cxx",
-            "--without-ada",
-            "--without-progs",
-            "--without-curses-h",
-            "--enable-shared",
-            "--with-shared",
-            "--datadir=/usr/share",
-            "--sysconfdir=/etc",
-            "--sharedstatedir=/usr/com",
-            "--with-terminfo-dirs=/usr/share/terminfo",
-            "--with-default-terminfo-dir=/usr/share/terminfo",
-            "--libdir=/Library/Frameworks/Python.framework/Versions/%s/lib"%(getVersion(),),
-            "--enable-termcap",
-        ],
-        patches=[
-            "ncurses-5.5.patch",
-        ],
-        useLDFlags=False,
-        install='make && make install DESTDIR=%s && cd %s/usr/local/lib && ln -fs ../../../Library/Frameworks/Python.framework/Versions/%s/lib/lib* .'%(
-            shellQuote(os.path.join(WORKDIR, 'libraries')),
-            shellQuote(os.path.join(WORKDIR, 'libraries')),
-            getVersion(),
-            ),
-    ),
-    dict(
-        name="Sleepycat DB 4.7.25",
-        url="http://download.oracle.com/berkeley-db/db-4.7.25.tar.gz",
-        #name="Sleepycat DB 4.3.29",
-        #url="http://downloads.sleepycat.com/db-4.3.29.tar.gz",
-        buildDir="build_unix",
-        configure="../dist/configure",
-        configure_pre=[
-            '--includedir=/usr/local/include/db4',
-        ]
-    ),
-]
+      dict(
+          name="NCurses 5.5",
+          url="http://ftp.gnu.org/pub/gnu/ncurses/ncurses-5.5.tar.gz",
+          checksum='e73c1ac10b4bfc46db43b2ddfd6244ef',
+          configure_pre=[
+              "--without-cxx",
+              "--without-ada",
+              "--without-progs",
+              "--without-curses-h",
+              "--enable-shared",
+              "--with-shared",
+              "--datadir=/usr/share",
+              "--sysconfdir=/etc",
+              "--sharedstatedir=/usr/com",
+              "--with-terminfo-dirs=/usr/share/terminfo",
+              "--with-default-terminfo-dir=/usr/share/terminfo",
+              "--libdir=/Library/Frameworks/Python.framework/Versions/%s/lib"%(getVersion(),),
+              "--enable-termcap",
+          ],
+          patches=[
+              "ncurses-5.5.patch",
+          ],
+          useLDFlags=False,
+          install='make && make install DESTDIR=%s && cd %s/usr/local/lib && ln -fs ../../../Library/Frameworks/Python.framework/Versions/%s/lib/lib* .'%(
+              shellQuote(os.path.join(WORKDIR, 'libraries')),
+              shellQuote(os.path.join(WORKDIR, 'libraries')),
+              getVersion(),
+              ),
+      ),
+      dict(
+          name="Sleepycat DB 4.7.25",
+          url="http://download.oracle.com/berkeley-db/db-4.7.25.tar.gz",
+          checksum='ec2b87e833779681a0c3a814aa71359e',
+          buildDir="build_unix",
+          configure="../dist/configure",
+          configure_pre=[
+              '--includedir=/usr/local/include/db4',
+          ]
+      ),
+    ]
 
 
 # Instructions for building packages inside the .mpkg.
@@ -215,8 +230,8 @@ PKG_RECIPES = [
         source="/usr/local/bin",
         readme="""\
             This package installs the unix tools in /usr/local/bin for
-            compatibility with older releases of MacPython. This package
-            is not necessary to use MacPython.
+            compatibility with older releases of Python. This package
+            is not necessary to use Python.
             """,
         required=False,
     ),
@@ -239,7 +254,7 @@ PKG_RECIPES = [
         long_name="Shell profile updater",
         readme="""\
             This packages updates your shell profile to make sure that
-            the MacPython tools are found by your shell in preference of
+            the Python tools are found by your shell in preference of
             the system provided Python tools.
 
             If you don't install this package you'll have to add
@@ -327,14 +342,16 @@ def parseOptions(args=None):
     """
     Parse arguments and update global settings.
     """
-    global WORKDIR, DEPSRC, SDKPATH, SRCDIR
+    global WORKDIR, DEPSRC, SDKPATH, SRCDIR, DEPTARGET
+    global UNIVERSALOPTS, UNIVERSALARCHS, ARCHLIST
 
     if args is None:
         args = sys.argv[1:]
 
     try:
         options, args = getopt.getopt(args, '?hb',
-                [ 'build-dir=', 'third-party=', 'sdk-path=' , 'src-dir='])
+                [ 'build-dir=', 'third-party=', 'sdk-path=' , 'src-dir=',
+                  'dep-target=', 'universal-archs=', 'help' ])
     except getopt.error, msg:
         print msg
         sys.exit(1)
@@ -344,7 +361,7 @@ def parseOptions(args=None):
         sys.exit(1)
 
     for k, v in options:
-        if k in ('-h', '-?'):
+        if k in ('-h', '-?', '--help'):
             print USAGE
             sys.exit(0)
 
@@ -360,6 +377,16 @@ def parseOptions(args=None):
         elif k in ('--src-dir',):
             SRCDIR=v
 
+        elif k in ('--dep-target', ):
+            DEPTARGET=v
+
+        elif k in ('--universal-archs', ):
+            if v in UNIVERSALOPTS:
+                UNIVERSALARCHS = v
+                ARCHLIST = universal_opts_map[UNIVERSALARCHS]
+            else:
+                raise NotImplementedError, v
+
         else:
             raise NotImplementedError, k
 
@@ -372,7 +399,9 @@ def parseOptions(args=None):
     print " * Source directory:", SRCDIR
     print " * Build directory: ", WORKDIR
     print " * SDK location:    ", SDKPATH
-    print " * third-party source:", DEPSRC
+    print " * Third-party source:", DEPSRC
+    print " * Deployment target:", DEPTARGET
+    print " * Universal architectures:", ARCHLIST
     print ""
 
 
@@ -482,6 +511,7 @@ def buildRecipe(recipe, basedir, archList):
         print "Using local copy of %s"%(name,)
 
     else:
+        print "Did not find local copy of %s"%(name,)
         print "Downloading %s"%(name,)
         downloadURL(url, sourceArchive)
         print "Archive for %s stored as %s"%(name, sourceArchive)
@@ -572,41 +602,31 @@ def buildLibraries():
     os.makedirs(os.path.join(universal, 'usr', 'local', 'lib'))
     os.makedirs(os.path.join(universal, 'usr', 'local', 'include'))
 
-    for recipe in LIBRARY_RECIPES:
+    for recipe in library_recipes():
         buildRecipe(recipe, universal, ARCHLIST)
 
 
 
 def buildPythonDocs():
-    # This stores the documentation as Resources/English.lproj/Docuentation
+    # This stores the documentation as Resources/English.lproj/Documentation
     # inside the framwork. pydoc and IDLE will pick it up there.
     print "Install python documentation"
     rootDir = os.path.join(WORKDIR, '_root')
-    version = getVersion()
+    buildDir = os.path.join('../../Doc')
     docdir = os.path.join(rootDir, 'pydocs')
-
-    novername = 'python-docs-html.tar.bz2'
-    name = 'html-%s.tar.bz2'%(getFullVersion(),)
-    sourceArchive = os.path.join(DEPSRC, name)
-    if os.path.exists(sourceArchive):
-        print "Using local copy of %s"%(name,)
-
-    else:
-        print "Downloading %s"%(novername,)
-        downloadURL('http://www.python.org/ftp/python/doc/%s/%s'%(
-            getFullVersion(), novername), sourceArchive)
-        print "Archive for %s stored as %s"%(name, sourceArchive)
-
-    extractArchive(os.path.dirname(docdir), sourceArchive)
-
-    os.rename(
-            os.path.join(
-                os.path.dirname(docdir), 'python-docs-html'),
-            docdir)
+    curDir = os.getcwd()
+    os.chdir(buildDir)
+    runCommand('make update')
+    runCommand('make html')
+    os.chdir(curDir)
+    if not os.path.exists(docdir):
+        os.mkdir(docdir)
+    os.rename(os.path.join(buildDir, 'build', 'html'),
+            os.path.join(docdir, 'python-docs-html'))
 
 
 def buildPython():
-    print "Building a universal python"
+    print "Building a universal python for %s architectures" % UNIVERSALARCHS
 
     buildDir = os.path.join(WORKDIR, '_bld', 'python')
     rootDir = os.path.join(WORKDIR, '_root')
@@ -629,10 +649,19 @@ def buildPython():
     # several paths.
     version = getVersion()
 
+    # Since the extra libs are not in their installed framework location
+    # during the build, augment the library path so that the interpreter
+    # will find them during its extension import sanity checks.
+    os.environ['DYLD_LIBRARY_PATH'] = os.path.join(WORKDIR,
+                                        'libraries', 'usr', 'local', 'lib')
     print "Running configure..."
-    runCommand("%s -C --enable-framework --enable-stacklessfewerregisters --enable-universalsdk=%s LDFLAGS='-g -L%s/libraries/usr/local/lib' OPT='-g -O3 -I%s/libraries/usr/local/include' 2>&1"%(
-        shellQuote(os.path.join(SRCDIR, 'configure')),
-        shellQuote(SDKPATH), shellQuote(WORKDIR)[1:-1],
+    runCommand("%s -C --enable-framework --enable-stacklessfewerregisters --enable-universalsdk=%s "
+               "--with-universal-archs=%s "
+               "LDFLAGS='-g -L%s/libraries/usr/local/lib' "
+               "OPT='-g -O3 -I%s/libraries/usr/local/include' 2>&1"%(
+        shellQuote(os.path.join(SRCDIR, 'configure')), shellQuote(SDKPATH),
+        UNIVERSALARCHS,
+        shellQuote(WORKDIR)[1:-1],
         shellQuote(WORKDIR)[1:-1]))
 
     print "Running make"
@@ -646,6 +675,7 @@ def buildPython():
     runCommand("make frameworkinstallextras DESTDIR=%s"%(
         shellQuote(rootDir)))
 
+    del os.environ['DYLD_LIBRARY_PATH']
     print "Copying required shared libraries"
     if os.path.exists(os.path.join(WORKDIR, 'libraries', 'Library')):
         runCommand("mv %s/* %s"%(
@@ -713,7 +743,7 @@ def patchFile(inPath, outPath):
     data = fileContents(inPath)
     data = data.replace('$FULL_VERSION', getFullVersion())
     data = data.replace('$VERSION', getVersion())
-    data = data.replace('$MACOSX_DEPLOYMENT_TARGET', '10.3 or later')
+    data = data.replace('$MACOSX_DEPLOYMENT_TARGET', ''.join((DEPTARGET, ' or later')))
     data = data.replace('$ARCHITECTURES', "i386, ppc")
     data = data.replace('$INSTALL_SIZE', installSize())
 
@@ -793,9 +823,9 @@ def packageFromRecipe(targetDir, recipe):
         vers = getFullVersion()
         major, minor = map(int, getVersion().split('.', 2))
         pl = Plist(
-                CFBundleGetInfoString="MacPython.%s %s"%(pkgname, vers,),
-                CFBundleIdentifier='org.python.MacPython.%s'%(pkgname,),
-                CFBundleName='MacPython.%s'%(pkgname,),
+                CFBundleGetInfoString="Python.%s %s"%(pkgname, vers,),
+                CFBundleIdentifier='org.python.Python.%s'%(pkgname,),
+                CFBundleName='Python.%s'%(pkgname,),
                 CFBundleShortVersionString=vers,
                 IFMajorVersion=major,
                 IFMinorVersion=minor,
@@ -816,7 +846,7 @@ def packageFromRecipe(targetDir, recipe):
 
         pl = Plist(
                     IFPkgDescriptionDescription=readme,
-                    IFPkgDescriptionTitle=recipe.get('long_name', "MacPython.%s"%(pkgname,)),
+                    IFPkgDescriptionTitle=recipe.get('long_name', "Python.%s"%(pkgname,)),
                     IFPkgDescriptionVersion=vers,
                 )
         writePlist(pl, os.path.join(packageContents, 'Resources', 'Description.plist'))
@@ -831,9 +861,9 @@ def makeMpkgPlist(path):
     major, minor = map(int, getVersion().split('.', 2))
 
     pl = Plist(
-            CFBundleGetInfoString="MacPython %s"%(vers,),
-            CFBundleIdentifier='org.python.MacPython',
-            CFBundleName='MacPython',
+            CFBundleGetInfoString="Python %s"%(vers,),
+            CFBundleIdentifier='org.python.Python',
+            CFBundleName='Python',
             CFBundleShortVersionString=vers,
             IFMajorVersion=major,
             IFMinorVersion=minor,
@@ -867,7 +897,7 @@ def buildInstaller():
         shutil.rmtree(outdir)
     os.mkdir(outdir)
 
-    pkgroot = os.path.join(outdir, 'MacPython.mpkg', 'Contents')
+    pkgroot = os.path.join(outdir, 'Python.mpkg', 'Contents')
     pkgcontents = os.path.join(pkgroot, 'Packages')
     os.makedirs(pkgcontents)
     for recipe in PKG_RECIPES:
@@ -884,7 +914,7 @@ def buildInstaller():
 
     makeMpkgPlist(os.path.join(pkgroot, 'Info.plist'))
     pl = Plist(
-                IFPkgDescriptionTitle="Universal Stackless MacPython",
+                IFPkgDescriptionTitle="Stackless Python",
                 IFPkgDescriptionVersion=getVersion(),
             )
 
@@ -924,10 +954,32 @@ def buildDMG():
     imagepath = imagepath + '.dmg'
 
     os.mkdir(outdir)
-    runCommand("hdiutil create -volname 'Universal Stackless MacPython %s' -srcfolder %s %s"%(
-            getFullVersion(),
+    volname='Stackless Python %s'%(getFullVersion())
+    runCommand("hdiutil create -format UDRW -volname %s -srcfolder %s %s"%(
+            shellQuote(volname),
             shellQuote(os.path.join(WORKDIR, 'installer')),
-            shellQuote(imagepath)))
+            shellQuote(imagepath + ".tmp.dmg" )))
+
+
+    if not os.path.exists(os.path.join(WORKDIR, "mnt")):
+        os.mkdir(os.path.join(WORKDIR, "mnt"))
+    runCommand("hdiutil attach %s -mountroot %s"%(
+        shellQuote(imagepath + ".tmp.dmg"), shellQuote(os.path.join(WORKDIR, "mnt"))))
+
+    # Custom icon for the DMG, shown when the DMG is mounted.
+    shutil.copy("../Icons/Disk Image.icns",
+            os.path.join(WORKDIR, "mnt", volname, ".VolumeIcon.icns"))
+    runCommand("/Developer/Tools/SetFile -a C %s/"%(
+            shellQuote(os.path.join(WORKDIR, "mnt", volname)),))
+
+    runCommand("hdiutil detach %s"%(shellQuote(os.path.join(WORKDIR, "mnt", volname))))
+
+    setIcon(imagepath + ".tmp.dmg", "../Icons/Disk Image.icns")
+    runCommand("hdiutil convert %s -format UDZO -o %s"%(
+            shellQuote(imagepath + ".tmp.dmg"), shellQuote(imagepath)))
+    setIcon(imagepath, "../Icons/Disk Image.icns")
+
+    os.unlink(imagepath + ".tmp.dmg")
 
     return imagepath
 
@@ -935,89 +987,27 @@ def buildDMG():
 def setIcon(filePath, icnsPath):
     """
     Set the custom icon for the specified file or directory.
-
-    For a directory the icon data is written in a file named 'Icon\r' inside
-    the directory. For both files and directories write the icon as an 'icns'
-    resource. Furthermore set kHasCustomIcon in the finder flags for filePath.
     """
-    ref, isDirectory = Carbon.File.FSPathMakeRef(icnsPath)
-    icon = Carbon.Icn.ReadIconFile(ref)
-    del ref
 
-    #
-    # Open the resource fork of the target, to add the icon later on.
-    # For directories we use the file 'Icon\r' inside the directory.
-    #
+    toolPath = os.path.join(os.path.dirname(__file__), "seticon.app/Contents/MacOS/seticon")
+    dirPath = os.path.dirname(__file__)
+    if not os.path.exists(toolPath) or os.stat(toolPath).st_mtime < os.stat(dirPath + '/seticon.m').st_mtime:
+        # NOTE: The tool is created inside an .app bundle, otherwise it won't work due
+        # to connections to the window server.
+        if not os.path.exists('seticon.app/Contents/MacOS'):
+            os.makedirs('seticon.app/Contents/MacOS')
+        runCommand("cc -o %s %s/seticon.m -framework Cocoa"%(
+            shellQuote(toolPath), shellQuote(dirPath)))
 
-    ref, isDirectory = Carbon.File.FSPathMakeRef(filePath)
-
-    if isDirectory:
-        # There is a problem with getting this into the pax(1) archive,
-        # just ignore directory icons for now.
-        return
-
-        tmpPath = os.path.join(filePath, "Icon\r")
-        if not os.path.exists(tmpPath):
-            fp = open(tmpPath, 'w')
-            fp.close()
-
-        tmpRef, _ = Carbon.File.FSPathMakeRef(tmpPath)
-        spec = Carbon.File.FSSpec(tmpRef)
-
-    else:
-        spec = Carbon.File.FSSpec(ref)
-
-    try:
-        Carbon.Res.HCreateResFile(*spec.as_tuple())
-    except MacOS.Error:
-        pass
-
-    # Try to create the resource fork again, this will avoid problems
-    # when adding an icon to a directory. I have no idea why this helps,
-    # but without this adding the icon to a directory will fail sometimes.
-    try:
-        Carbon.Res.HCreateResFile(*spec.as_tuple())
-    except MacOS.Error:
-        pass
-
-    refNum = Carbon.Res.FSpOpenResFile(spec, fsRdWrPerm)
-
-    Carbon.Res.UseResFile(refNum)
-
-    # Check if there already is an icon, remove it if there is.
-    try:
-        h = Carbon.Res.Get1Resource('icns', kCustomIconResource)
-    except MacOS.Error:
-        pass
-
-    else:
-        h.RemoveResource()
-        del h
-
-    # Add the icon to the resource for of the target
-    res = Carbon.Res.Resource(icon)
-    res.AddResource('icns', kCustomIconResource, '')
-    res.WriteResource()
-    res.DetachResource()
-    Carbon.Res.CloseResFile(refNum)
-
-    # And now set the kHasCustomIcon property for the target. Annoyingly,
-    # python doesn't seem to have bindings for the API that is needed for
-    # this. Cop out and call SetFile
-    os.system("/Developer/Tools/SetFile -a C %s"%(
-            shellQuote(filePath),))
-
-    if isDirectory:
-        os.system('/Developer/Tools/SetFile -a V %s'%(
-            shellQuote(tmpPath),
-        ))
+    runCommand("%s %s %s"%(shellQuote(os.path.abspath(toolPath)), shellQuote(icnsPath),
+        shellQuote(filePath)))
 
 def main():
     # First parse options and check if we can perform our work
     parseOptions()
     checkEnvironment()
 
-    os.environ['MACOSX_DEPLOYMENT_TARGET'] = '10.3'
+    os.environ['MACOSX_DEPLOYMENT_TARGET'] = DEPTARGET
 
     if os.path.exists(WORKDIR):
         shutil.rmtree(WORKDIR)
@@ -1028,11 +1018,21 @@ def main():
 
     # Now build python itself
     buildPython()
+
+    # And then build the documentation
+    # Remove the Deployment Target from the shell
+    # environment, it's no longer needed and
+    # an unexpected build target can cause problems
+    # when Sphinx and its dependencies need to
+    # be (re-)installed.
+    del os.environ['MACOSX_DEPLOYMENT_TARGET']
     buildPythonDocs()
+
+
+    # Prepare the applications folder
     fn = os.path.join(WORKDIR, "_root", "Applications",
                 "Python %s"%(getVersion(),), "Update Shell Profile.command")
-    patchFile("scripts/postflight.patch-profile",  fn)
-    os.chmod(fn, 0755)
+    patchScript("scripts/postflight.patch-profile",  fn)
 
     folder = os.path.join(WORKDIR, "_root", "Applications", "Python %s"%(
         getVersion(),))
@@ -1054,11 +1054,6 @@ def main():
     print >> fp, "# By:", pwd.getpwuid(os.getuid()).pw_gecos
     fp.close()
 
-    # Custom icon for the DMG, shown when the DMG is mounted.
-    shutil.copy("../Icons/Disk Image.icns",
-            os.path.join(WORKDIR, "installer", ".VolumeIcon.icns"))
-    os.system("/Developer/Tools/SetFile -a C %s"%(
-            os.path.join(WORKDIR, "installer", ".VolumeIcon.icns")))
 
 
     # And copy it to a DMG

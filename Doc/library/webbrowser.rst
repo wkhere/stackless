@@ -55,6 +55,10 @@ The following functions are defined:
    under many window managers this will occur regardless of the setting of this
    variable).
 
+   Note that on some platforms, trying to open a filename using this function,
+   may work and start the operating system's associated program.  However, this
+   is neither supported nor portable.
+
    .. versionchanged:: 2.5
       *new* can now be 2.
 
@@ -160,7 +164,7 @@ Here are some simple examples::
 
    url = 'http://www.python.org'
 
-   # Open URL in a new tab, if a browser window is already open. 
+   # Open URL in a new tab, if a browser window is already open.
    webbrowser.open_new_tab(url + '/doc')
 
    # Open URL in new window, raising the window if possible.
@@ -172,7 +176,7 @@ Here are some simple examples::
 Browser Controller Objects
 --------------------------
 
-Browser controllers provide two methods which parallel two of the module-level
+Browser controllers provide these methods which parallel two of the module-level
 convenience functions:
 
 

@@ -173,6 +173,106 @@ test_dict_iteration(PyObject* self)
 }
 
 
+/* Issue #4701: Check that PyObject_Hash implicitly calls
+ *   PyType_Ready if it hasn't already been called
+ */
+static PyTypeObject _HashInheritanceTester_Type = {
+	PyObject_HEAD_INIT(NULL)
+	0,			/* Number of items for varobject */
+	"hashinheritancetester",	/* Name of this type */
+	sizeof(PyObject),	/* Basic object size */
+	0,			/* Item size for varobject */
+	(destructor)PyObject_Del, /* tp_dealloc */
+	0,			/* tp_print */
+	0,			/* tp_getattr */
+	0,			/* tp_setattr */
+	0,			/* tp_compare */
+	0,			/* tp_repr */
+	0,			/* tp_as_number */
+	0,			/* tp_as_sequence */
+	0,			/* tp_as_mapping */
+	0,			/* tp_hash */
+	0,			/* tp_call */
+	0,			/* tp_str */
+	PyObject_GenericGetAttr,  /* tp_getattro */
+	0,			/* tp_setattro */
+	0,			/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,	/* tp_flags */
+	0,			/* tp_doc */
+	0,			/* tp_traverse */
+	0,			/* tp_clear */
+	0,			/* tp_richcompare */
+	0,			/* tp_weaklistoffset */
+	0,			/* tp_iter */
+	0,			/* tp_iternext */
+	0,			/* tp_methods */
+	0,			/* tp_members */
+	0,			/* tp_getset */
+	0,			/* tp_base */
+	0,			/* tp_dict */
+	0,			/* tp_descr_get */
+	0,			/* tp_descr_set */
+	0,			/* tp_dictoffset */
+	0,			/* tp_init */
+	0,			/* tp_alloc */
+	PyType_GenericNew,		/* tp_new */
+};
+
+static PyObject*
+test_lazy_hash_inheritance(PyObject* self)
+{
+	PyTypeObject *type;
+	PyObject *obj;
+	long hash;
+
+	type = &_HashInheritanceTester_Type;
+	obj = PyObject_New(PyObject, type);
+	if (obj == NULL) {
+		PyErr_Clear();
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: failed to create object");
+		return NULL;
+	}
+
+	if (type->tp_dict != NULL) {
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: type initialised too soon");
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	hash = PyObject_Hash(obj);
+	if ((hash == -1) && PyErr_Occurred()) {
+		PyErr_Clear();
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: could not hash object");
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	if (type->tp_dict == NULL) {
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: type not initialised by hash()");
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	if (type->tp_hash != PyType_Type.tp_hash) {
+		PyErr_SetString(
+			TestError,
+			"test_lazy_hash_inheritance: unexpected hash function");
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	Py_RETURN_NONE;
+}
+
+
 /* Tests of PyLong_{As, From}{Unsigned,}Long(), and (#ifdef HAVE_LONG_LONG)
    PyLong_{As, From}{Unsigned,}LongLong().
 
@@ -474,6 +574,8 @@ test_k_code(PyObject *self)
 
 #ifdef Py_USING_UNICODE
 
+static volatile int x;
+
 /* Test the u and u# codes for PyArg_ParseTuple. May leak memory in case
    of an error.
 */
@@ -486,7 +588,7 @@ test_u_code(PyObject *self)
 
 	/* issue4122: Undefined reference to _Py_ascii_whitespace on Windows */
 	/* Just use the macro and check that it compiles */
-	int x = Py_UNICODE_ISSPACE(25);
+	x = Py_UNICODE_ISSPACE(25);
 
         tuple = PyTuple_New(1);
         if (tuple == NULL)
@@ -516,6 +618,32 @@ test_u_code(PyObject *self)
 	Py_DECREF(tuple);
 	Py_INCREF(Py_None);
 	return Py_None;
+}
+
+static PyObject *
+test_empty_argparse(PyObject *self)
+{
+	/* Test that formats can begin with '|'. See issue #4720. */
+	PyObject *tuple, *dict = NULL;
+	static char *kwlist[] = {NULL};
+	int result;
+	tuple = PyTuple_New(0);
+	if (!tuple)
+		return NULL;
+	if ((result = PyArg_ParseTuple(tuple, "|:test_empty_argparse")) < 0)
+		goto done;
+	dict = PyDict_New();
+	if (!dict)
+		goto done;
+	result = PyArg_ParseTupleAndKeywords(tuple, dict, "|:test_empty_argparse", kwlist);
+  done:
+	Py_DECREF(tuple);
+	Py_XDECREF(dict);
+	if (result < 0)
+		return NULL;
+	else {
+		Py_RETURN_NONE;
+	}
 }
 
 static PyObject *
@@ -777,9 +905,11 @@ static PyMethodDef TestMethods[] = {
 	{"test_config",		(PyCFunction)test_config,	 METH_NOARGS},
 	{"test_list_api",	(PyCFunction)test_list_api,	 METH_NOARGS},
 	{"test_dict_iteration",	(PyCFunction)test_dict_iteration,METH_NOARGS},
+	{"test_lazy_hash_inheritance",	(PyCFunction)test_lazy_hash_inheritance,METH_NOARGS},
 	{"test_long_api",	(PyCFunction)test_long_api,	 METH_NOARGS},
 	{"test_long_numbits",	(PyCFunction)test_long_numbits,	 METH_NOARGS},
 	{"test_k_code",		(PyCFunction)test_k_code,	 METH_NOARGS},
+	{"test_empty_argparse", (PyCFunction)test_empty_argparse,METH_NOARGS},
 	{"test_null_strings",	(PyCFunction)test_null_strings,	 METH_NOARGS},
 	{"test_string_from_format", (PyCFunction)test_string_from_format, METH_NOARGS},
 	{"test_with_docstring", (PyCFunction)test_with_docstring, METH_NOARGS,
@@ -961,6 +1091,8 @@ init_testcapi(void)
 	m = Py_InitModule("_testcapi", TestMethods);
 	if (m == NULL)
 		return;
+
+	Py_TYPE(&_HashInheritanceTester_Type)=&PyType_Type;
 
 	Py_TYPE(&test_structmembersType)=&PyType_Type;
 	Py_INCREF(&test_structmembersType);

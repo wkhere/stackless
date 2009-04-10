@@ -8,12 +8,9 @@
 .. sectionauthor:: Andrew M. Kuchling <amk@amk.ca>
 
 
-
-
 This module provides regular expression matching operations similar to
 those found in Perl. Both patterns and strings to be searched can be
-Unicode strings as well as 8-bit strings.  The :mod:`re` module is
-always available.
+Unicode strings as well as 8-bit strings.
 
 Regular expressions use the backslash character (``'\'``) to indicate
 special forms or to allow special characters to be used without invoking
@@ -42,9 +39,6 @@ fine-tuning parameters.
       Book on regular expressions by Jeffrey Friedl, published by O'Reilly.  The
       second edition of the book no longer covers Python at all, but the first
       edition covered writing good regular expression patterns in great detail.
-
-   `Kodos <http://kodos.sf.net/>`_
-      is a graphical regular expression debugger written in Python.
 
 
 .. _re-syntax:
@@ -237,16 +231,18 @@ The special characters are:
 
 ``(?P<name>...)``
    Similar to regular parentheses, but the substring matched by the group is
-   accessible via the symbolic group name *name*.  Group names must be valid Python
-   identifiers, and each group name must be defined only once within a regular
-   expression.  A symbolic group is also a numbered group, just as if the group
-   were not named.  So the group named 'id' in the example below can also be
-   referenced as the numbered group 1.
+   accessible within the rest of the regular expression via the symbolic group
+   name *name*.  Group names must be valid Python identifiers, and each group
+   name must be defined only once within a regular expression.  A symbolic group
+   is also a numbered group, just as if the group were not named.  So the group
+   named ``id`` in the example below can also be referenced as the numbered group
+   ``1``.
 
    For example, if the pattern is ``(?P<id>[a-zA-Z_]\w*)``, the group can be
    referenced by its name in arguments to methods of match objects, such as
-   ``m.group('id')`` or ``m.end('id')``, and also by name in pattern text (for
-   example, ``(?P=id)``) and replacement text (such as ``\g<id>``).
+   ``m.group('id')`` or ``m.end('id')``, and also by name in the regular
+   expression itself (using ``(?P=id)``) and replacement text given to
+   ``.sub()`` (using ``\g<id>``).
 
 ``(?P=name)``
    Matches whatever text was matched by the earlier group named *name*.
@@ -440,19 +436,23 @@ form.
 
    The sequence ::
 
-      prog = re.compile(pat)
-      result = prog.match(str)
+      prog = re.compile(pattern)
+      result = prog.match(string)
 
    is equivalent to ::
 
-      result = re.match(pat, str)
+      result = re.match(pattern, string)
 
-   but the version using :func:`compile` is more efficient when the expression
-   will be used several times in a single program.
+   but using :func:`compile` and saving the resulting regular expression object
+   for reuse is more efficient when the expression will be used several times
+   in a single program.
 
-   .. (The compiled version of the last pattern passed to :func:`re.match` or
-      :func:`re.search` is cached, so programs that use only a single regular
-      expression at a time needn't worry about compiling regular expressions.)
+   .. note::
+
+      The compiled versions of the most recent patterns passed to
+      :func:`re.match`, :func:`re.search` or :func:`re.compile` are cached, so
+      programs that use only a few regular expressions at a time needn't worry
+      about compiling regular expressions.
 
 
 .. data:: I
@@ -750,6 +750,11 @@ attributes:
    were provided.
 
 
+.. attribute:: RegexObject.groups
+
+   The number of capturing groups in the pattern.
+
+
 .. attribute:: RegexObject.groupindex
 
    A dictionary mapping any symbolic group names defined by ``(?P<id>)`` to group
@@ -989,14 +994,14 @@ method of :class:`MatchObject` in the following manner:
 
    >>> pair.match("717ak").group(1)
    '7'
-   
+
    # Error because re.match() returns None, which doesn't have a group() method:
    >>> pair.match("718ak").group(1)
    Traceback (most recent call last):
      File "<pyshell#23>", line 1, in <module>
        re.match(r".*(.).*\1", "718ak").group(1)
    AttributeError: 'NoneType' object has no attribute 'group'
-   
+
    >>> pair.match("354aa").group(1)
    'a'
 
@@ -1088,7 +1093,7 @@ For example:
    string)`` or ``re.search(pattern, string)``.
 
 :func:`match` has an optional second parameter that gives an index in the string
-where the search is to start:
+where the search is to start::
 
    >>> pattern = re.compile("o")
    >>> pattern.match("dog")      # No match as "o" is not at the start of "dog."
@@ -1105,7 +1110,7 @@ where the search is to start:
 Making a Phonebook
 ^^^^^^^^^^^^^^^^^^
 
-:func:`split` splits a string into a list delimited by the passed pattern.  The 
+:func:`split` splits a string into a list delimited by the passed pattern.  The
 method is invaluable for converting textual data into data structures that can be
 easily read and modified by Python as demonstrated in the following example that
 creates a phonebook.
@@ -1114,7 +1119,7 @@ First, here is the input.  Normally it may come from a file, here we are using
 triple-quoted string syntax:
 
    >>> input = """Ross McFluff: 834.345.1254 155 Elm Street
-   ... 
+   ...
    ... Ronald Heathmore: 892.345.3428 436 Finley Avenue
    ... Frank Burger: 925.541.7625 662 South Dogwood Way
    ...

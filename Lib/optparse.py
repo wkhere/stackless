@@ -11,6 +11,7 @@ For support, use the optik-users@lists.sourceforge.net mailing list
 __version__ = "1.5.3"
 
 __all__ = ['Option',
+           'make_option',
            'SUPPRESS_HELP',
            'SUPPRESS_USAGE',
            'Values',
@@ -994,7 +995,7 @@ class OptionContainer:
         """add_option(Option)
            add_option(opt_str, ..., kwarg=val, ...)
         """
-        if type(args[0]) is types.StringType:
+        if type(args[0]) in types.StringTypes:
             option = self.option_class(*args, **kwargs)
         elif len(args) == 1 and not kwargs:
             option = args[0]

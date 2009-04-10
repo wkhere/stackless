@@ -60,7 +60,7 @@ Iterable.register(str)
 class Iterator(Iterable):
 
     @abstractmethod
-    def __next__(self):
+    def next(self):
         raise StopIteration
 
     def __iter__(self):
@@ -249,12 +249,12 @@ class MutableSet(Set):
 
     @abstractmethod
     def add(self, value):
-        """Return True if it was added, False if already there."""
+        """Add an element."""
         raise NotImplementedError
 
     @abstractmethod
     def discard(self, value):
-        """Return True if it was deleted, False if not there."""
+        """Remove an element.  Do not raise an exception if absent."""
         raise NotImplementedError
 
     def remove(self, value):
@@ -267,7 +267,7 @@ class MutableSet(Set):
         """Return the popped value.  Raise KeyError if empty."""
         it = iter(self)
         try:
-            value = it.__next__()
+            value = next(it)
         except StopIteration:
             raise KeyError
         self.discard(value)
@@ -286,10 +286,9 @@ class MutableSet(Set):
             self.add(value)
         return self
 
-    def __iand__(self, c):
-        for value in self:
-            if value not in c:
-                self.discard(value)
+    def __iand__(self, it):
+        for value in (self - it):
+            self.discard(value)
         return self
 
     def __ixor__(self, it):
@@ -519,6 +518,7 @@ class Sequence(Sized, Iterable, Container):
 Sequence.register(tuple)
 Sequence.register(basestring)
 Sequence.register(buffer)
+Sequence.register(xrange)
 
 
 class MutableSequence(Sequence):

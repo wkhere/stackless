@@ -63,18 +63,25 @@ unpack into new subdirectories of dist\.
 
 _tkinter
     Python wrapper for the Tk windowing system.  Requires building
-    Tcl/Tk first.  Following are instructions for Tcl/Tk 8.4.12.
+    Tcl/Tk first.  Following are instructions for Tcl/Tk 8.5.2.
 
     Get source
     ----------
     In the dist directory, run
-    svn export http://svn.python.org/projects/external/tcl8.4.12
-    svn export http://svn.python.org/projects/external/tk8.4.12
-    svn export http://svn.python.org/projects/external/tix-8.4.0
+    svn export http://svn.python.org/projects/external/tcl-8.5.2.1 tcl8.5.2
+    svn export http://svn.python.org/projects/external/tk-8.5.2.0 tk8.5.2
+    svn export http://svn.python.org/projects/external/tix-8.4.3.1 tix8.4.3
+
+    Debug Build
+    -----------
+    To build debug version, add DEBUG=1 to all nmake call bellow.
 
     Build Tcl first (done here w/ MSVC 6 on Win2K)
     ---------------
-    cd dist\tcl8.4.12\win
+    If your environment doesn't have struct _stat64, you need to apply
+    tcl852.patch in this directory to dist\tcl8.5.2\generic\tcl.h.
+
+    cd dist\tcl8.5.2\win
     run vcvars32.bat
     nmake -f makefile.vc
     nmake -f makefile.vc INSTALLDIR=..\..\tcltk install
@@ -84,16 +91,16 @@ _tkinter
     Optional:  run tests, via
         nmake -f makefile.vc test
 
-        all.tcl:        Total   10835   Passed  10096   Skipped 732     Failed  7
-        Sourced 129 Test Files.
-        Files with failing tests: exec.test expr.test io.test main.test string.test stri
+        all.tcl:        Total   24242   Passed  23358   Skipped 877     Failed  7
+        Sourced 137 Test Files.
+        Files with failing tests: exec.test http.test io.test main.test string.test stri
         ngObj.test
 
     Build Tk
     --------
-    cd dist\tk8.4.12\win
-    nmake -f makefile.vc TCLDIR=..\..\tcl8.4.12
-    nmake -f makefile.vc TCLDIR=..\..\tcl8.4.12 INSTALLDIR=..\..\tcltk install
+    cd dist\tk8.5.2\win
+    nmake -f makefile.vc TCLDIR=..\..\tcl8.5.2
+    nmake -f makefile.vc TCLDIR=..\..\tcl8.5.2 INSTALLDIR=..\..\tcltk install
 
     XXX Should we compile with OPTS=threads?
 
@@ -101,26 +108,26 @@ _tkinter
     XXX failed.  It popped up tons of little windows, and did lots of
     XXX stuff, and nothing blew up.
 
-   Built Tix
-   ---------
-   cd dist\tix-8.4.0\win
-   nmake -f python.mak
-   nmake -f python.mak install
+    Build Tix
+    ---------
+    cd dist\tix8.4.3\win
+    nmake -f python.mak TCL_MAJOR=8 TCL_MINOR=5 TCL_PATCH=2 MACHINE=IX86 DEBUG=0
+    nmake -f python.mak TCL_MAJOR=8 TCL_MINOR=5 TCL_PATCH=2 MACHINE=IX86 DEBUG=0 INSTALL_DIR=..\..\tcltk install
 
 bz2
     Python wrapper for the libbz2 compression library.  Homepage
-        http://sources.redhat.com/bzip2/
+        http://www.bzip.org/
     Download the source from the python.org copy into the dist
     directory:
 
-    svn export http://svn.python.org/projects/external/bzip2-1.0.3
+    svn export http://svn.python.org/projects/external/bzip2-1.0.5
 
     And requires building bz2 first.
 
-    cd dist\bzip2-1.0.3
+    cd dist\bzip2-1.0.5
     nmake -f makefile.msc
 
-    All of this managed to build bzip2-1.0.3\libbz2.lib, which the Python
+    All of this managed to build bzip2-1.0.5\libbz2.lib, which the Python
     project links in.
 
 
@@ -128,23 +135,23 @@ _bsddb
     To use the version of bsddb that Python is built with by default, invoke
     (in the dist directory)
 
-     svn export http://svn.python.org/projects/external/db-4.4.20
+     svn export http://svn.python.org/projects/external/db-4.7.25.0 db-4.7.25
 
-    Then open db-4.4.20\build_win32\Berkeley_DB.dsw and build the "db_static"
-    project for "Release" mode.
+    Then open db-4.7.25\build_windows\Berkeley_DB.dsw and build the
+    "db_static" project for "Release" mode.
 
     Alternatively, if you want to start with the original sources,
-    go to Sleepycat's download page:
-        http://www.sleepycat.com/downloads/releasehistorybdb.html
+    go to Oracle's download page:
+        http://www.oracle.com/technology/software/products/berkeley-db/db/
 
-    and download version 4.4.20.
+    and download version 4.7.25.
 
     With or without strong cryptography? You can choose either with or
     without strong cryptography, as per the instructions below.  By
     default, Python is built and distributed WITHOUT strong crypto.
 
     Unpack the sources; if you downloaded the non-crypto version, rename
-    the directory from db-4.4.20.NC to db-4.4.20.
+    the directory from db-4.7.25.NC to db-4.7.25.
 
     Now apply any patches that apply to your version.
 
@@ -196,13 +203,13 @@ _ssl
         http://www.openssl.org
 
     You (probably) don't want the "engine" code.  For example, get
-        openssl-0.9.6g.tar.gz
+        openssl-0.9.8g.tar.gz
     not
-        openssl-engine-0.9.6g.tar.gz
+        openssl-engine-0.9.8g.tar.gz
 
     Unpack into the "dist" directory, retaining the folder name from
     the archive - for example, the latest stable OpenSSL will install as
-        dist/openssl-0.9.6g
+        dist/openssl-0.9.8g
 
     You can (theoretically) use any version of OpenSSL you like - the
     build process will automatically select the latest version.

@@ -2,6 +2,8 @@ import array
 import unittest
 import struct
 import warnings
+warnings.filterwarnings("ignore", "struct integer overflow masking is deprecated",
+                        DeprecationWarning)
 
 from functools import wraps
 from test.test_support import TestFailed, verbose, run_unittest
@@ -461,6 +463,11 @@ class StructTest(unittest.TestCase):
                 self.check_float_coerce(endian + fmt, 1.0)
                 self.check_float_coerce(endian + fmt, 1.5)
 
+    def test_issue4228(self):
+        # Packing a long may yield either 32 or 64 bits
+        x = struct.pack('L', -1)[:4]
+        self.assertEqual(x, '\xff'*4)
+
     def test_unpack_from(self):
         test_string = 'abcd01234'
         fmt = '4s'
@@ -504,6 +511,10 @@ class StructTest(unittest.TestCase):
         small_buf = array.array('c', ' '*10)
         self.assertRaises(struct.error, s.pack_into, small_buf, 0, test_string)
         self.assertRaises(struct.error, s.pack_into, small_buf, 2, test_string)
+
+        # Test bogus offset (issue 3694)
+        sb = small_buf
+        self.assertRaises(TypeError, struct.pack_into, b'1', sb, None)
 
     def test_pack_into_fn(self):
         test_string = 'Reykjavik rocks, eow!'

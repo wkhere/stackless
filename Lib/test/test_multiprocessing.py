@@ -61,6 +61,8 @@ else:
 HAVE_GETVALUE = not getattr(_multiprocessing,
                             'HAVE_BROKEN_SEM_GETVALUE', False)
 
+WIN32 = (sys.platform == "win32")
+
 #
 # Creates a wrapper for a function which records the time it takes to finish
 #
@@ -546,6 +548,10 @@ class _TestLock(BaseTestCase):
         self.assertEqual(lock.release(), None)
         self.assertRaises((AssertionError, RuntimeError), lock.release)
 
+    def test_lock_context(self):
+        with self.Lock():
+            pass
+
 
 class _TestSemaphore(BaseTestCase):
 
@@ -829,9 +835,15 @@ class _TestValue(BaseTestCase):
         obj3 = val3.get_obj()
         self.assertEqual(lock, lock3)
 
-        arr4 = self.RawValue('i', 5)
+        arr4 = self.Value('i', 5, lock=False)
         self.assertFalse(hasattr(arr4, 'get_lock'))
         self.assertFalse(hasattr(arr4, 'get_obj'))
+
+        self.assertRaises(AttributeError, self.Value, 'i', 5, lock='navalue')
+
+        arr5 = self.RawValue('i', 5)
+        self.assertFalse(hasattr(arr5, 'get_lock'))
+        self.assertFalse(hasattr(arr5, 'get_obj'))
 
 
 class _TestArray(BaseTestCase):
@@ -887,9 +899,15 @@ class _TestArray(BaseTestCase):
         obj3 = arr3.get_obj()
         self.assertEqual(lock, lock3)
 
-        arr4 = self.RawArray('i', range(10))
+        arr4 = self.Array('i', range(10), lock=False)
         self.assertFalse(hasattr(arr4, 'get_lock'))
         self.assertFalse(hasattr(arr4, 'get_obj'))
+        self.assertRaises(AttributeError,
+                          self.Array, 'i', range(10), lock='notalock')
+
+        arr5 = self.RawArray('i', range(10))
+        self.assertFalse(hasattr(arr5, 'get_lock'))
+        self.assertFalse(hasattr(arr5, 'get_obj'))
 
 #
 #
@@ -1172,6 +1190,32 @@ class _TestRemoteManager(BaseTestCase):
 
         # Make queue finalizer run before the server is stopped
         del queue
+        manager.shutdown()
+
+class _TestManagerRestart(BaseTestCase):
+
+    def _putter(self, address, authkey):
+        manager = QueueManager(
+            address=address, authkey=authkey, serializer=SERIALIZER)
+        manager.connect()
+        queue = manager.get_queue()
+        queue.put('hello world')
+
+    def test_rapid_restart(self):
+        authkey = os.urandom(32)
+        manager = QueueManager(
+            address=('localhost', 9999), authkey=authkey, serializer=SERIALIZER)
+        manager.start()
+
+        p = self.Process(target=self._putter, args=(manager.address, authkey))
+        p.start()
+        queue = manager.get_queue()
+        self.assertEqual(queue.get(), 'hello world')
+        del queue
+        manager.shutdown()
+        manager = QueueManager(
+            address=('localhost', 9999), authkey=authkey, serializer=SERIALIZER)
+        manager.start()
         manager.shutdown()
 
 #
@@ -1670,6 +1714,18 @@ class _TestLogging(BaseTestCase):
         logger.setLevel(level=LOG_LEVEL)
 
 #
+# Test to verify handle verification, see issue 3321
+#
+
+class TestInvalidHandle(unittest.TestCase):
+
+    def test_invalid_handles(self):
+        if WIN32:
+            return
+        conn = _multiprocessing.Connection(44977608)
+        self.assertRaises(IOError, conn.poll)
+        self.assertRaises(IOError, _multiprocessing.Connection, -1)
+#
 # Functions used to create test cases from the base ones in this module
 #
 
@@ -1773,7 +1829,7 @@ class OtherTest(unittest.TestCase):
                           multiprocessing.connection.answer_challenge,
                           _FakeConnection(), b'abc')
 
-testcases_other = [OtherTest]
+testcases_other = [OtherTest, TestInvalidHandle]
 
 #
 #

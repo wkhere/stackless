@@ -480,13 +480,20 @@ class AbstractPickleTests(unittest.TestCase):
 
     if have_unicode:
         def test_unicode(self):
-            endcases = [unicode(''), unicode('<\\u>'), unicode('<\\\u1234>'),
-                        unicode('<\n>'),  unicode('<\\>')]
+            endcases = [u'', u'<\\u>', u'<\\\u1234>', u'<\n>',
+                        u'<\\>', u'<\\\U00012345>']
             for proto in protocols:
                 for u in endcases:
                     p = self.dumps(u, proto)
                     u2 = self.loads(p)
                     self.assertEqual(u2, u)
+
+        def test_unicode_high_plane(self):
+            t = u'\U00012345'
+            for proto in protocols:
+                p = self.dumps(t, proto)
+                t2 = self.loads(p)
+                self.assertEqual(t2, t)
 
     def test_ints(self):
         import sys
@@ -527,6 +534,16 @@ class AbstractPickleTests(unittest.TestCase):
             p = self.dumps(n, 2)
             got = self.loads(p)
             self.assertEqual(n, got)
+
+    def test_float(self):
+        test_values = [0.0, 4.94e-324, 1e-310, 7e-308, 6.626e-34, 0.1, 0.5,
+                       3.14, 263.44582062374053, 6.022e23, 1e30]
+        test_values = test_values + [-x for x in test_values]
+        for proto in protocols:
+            for value in test_values:
+                pickle = self.dumps(value, proto)
+                got = self.loads(pickle)
+                self.assertEqual(value, got)
 
     @run_with_locale('LC_ALL', 'de_DE', 'fr_FR')
     def test_float_format(self):

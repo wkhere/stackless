@@ -20,7 +20,7 @@ copying and removal. For operations on individual files, see also the
 
    Even the higher-level file copying functions (:func:`copy`, :func:`copy2`)
    can't copy all file metadata.
-   
+
    On POSIX platforms, this means that file owner and group are lost as well
    as ACLs.  On Mac OS, the resource fork and other metadata are not used.
    This means that resources will be lost and file type and creator codes will
@@ -43,7 +43,8 @@ copying and removal. For operations on individual files, see also the
 
    Copy the contents (no metadata) of the file named *src* to a file named *dst*.
    *dst* must be the complete target file name; look at :func:`copy` for a copy that
-   accepts a target directory path.
+   accepts a target directory path.  If *src* and *dst* are the same files,
+   :exc:`Error` is raised.
    The destination location must be writable; otherwise,  an :exc:`IOError` exception
    will be raised. If *dst* already exists, it will be replaced.   Special files
    such as character or block devices and pipes cannot be copied with this
@@ -123,7 +124,7 @@ copying and removal. For operations on individual files, see also the
       error. Copy permissions and times of directories using :func:`copystat`.
 
    .. versionchanged:: 2.6
-      Added the *ignore* argument to be able to influence what is being copied. 
+      Added the *ignore* argument to be able to influence what is being copied.
 
 
 .. function:: rmtree(path[, ignore_errors[, onerror]])
@@ -155,7 +156,7 @@ copying and removal. For operations on individual files, see also the
    Recursively move a file or directory to another location.
 
    If the destination is on the current filesystem, then simply use rename.
-   Otherwise, copy src to the dst and then remove src.
+   Otherwise, copy src (with :func:`copy2`) to the dst and then remove src.
 
    .. versionadded:: 2.3
 
@@ -188,7 +189,7 @@ provided by this module. ::
        os.makedirs(dst)
        errors = []
        for name in names:
-           if name in ignored_names:   
+           if name in ignored_names:
                continue
            srcname = os.path.join(src, name)
            dstname = os.path.join(dst, name)
@@ -220,7 +221,7 @@ provided by this module. ::
 Another example that uses the :func:`ignore_patterns` helper::
 
    from shutil import copytree, ignore_patterns
-   
+
    copytree(source, destination, ignore=ignore_patterns('*.pyc', 'tmp*'))
 
 This will copy everything except ``.pyc`` files and files or directories whose
@@ -230,7 +231,7 @@ Another example that uses the *ignore* argument to add a logging call::
 
    from shutil import copytree
    import logging
-   
+
    def _logpath(path, names):
        logging.info('Working in %s' % path)
        return []   # nothing will be ignored

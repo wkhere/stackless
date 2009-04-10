@@ -7,7 +7,8 @@ import unittest
 from array import array
 from weakref import proxy
 
-from test.test_support import TESTFN, findfile, check_warnings, run_unittest
+from test.test_support import (TESTFN, findfile, check_warnings, run_unittest,
+                               make_bad_fd)
 from UserList import UserList
 
 import _fileio
@@ -50,7 +51,7 @@ class AutoFileTests(unittest.TestCase):
         # verify expected attributes exist
         f = self.f
 
-        self.assertEquals(f.mode, "w")
+        self.assertEquals(f.mode, "wb")
         self.assertEquals(f.closed, False)
 
         # verify the attributes are readonly
@@ -109,6 +110,7 @@ class AutoFileTests(unittest.TestCase):
             _fileio._FileIO('.', 'r')
         except IOError as e:
             self.assertNotEqual(e.errno, 0)
+            self.assertEqual(e.filename, ".")
         else:
             self.fail("Should have raised IOError")
 
@@ -160,7 +162,7 @@ class OtherFileTests(unittest.TestCase):
 
     def testModeStrings(self):
         # check invalid mode strings
-        for mode in ("", "aU", "wU+", "rb", "rt"):
+        for mode in ("", "aU", "wU+", "rw", "rt"):
             try:
                 f = _fileio._FileIO(TESTFN, mode)
             except ValueError:
@@ -174,6 +176,10 @@ class OtherFileTests(unittest.TestCase):
         f = _fileio._FileIO(str(TESTFN), "w")
         f.close()
         os.unlink(TESTFN)
+
+    def testInvalidFd(self):
+        self.assertRaises(ValueError, _fileio._FileIO, -10)
+        self.assertRaises(OSError, _fileio._FileIO, make_bad_fd())
 
     def testBadModeArgument(self):
         # verify that we get a sensible error message for bad mode argument

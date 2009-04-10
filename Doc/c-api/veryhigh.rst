@@ -16,7 +16,7 @@ parameter.  The available start symbols are :const:`Py_eval_input`,
 :const:`Py_file_input`, and :const:`Py_single_input`.  These are described
 following the functions which accept them as parameters.
 
-Note also that several of these functions take :ctype:`FILE\*` parameters.  On
+Note also that several of these functions take :ctype:`FILE\*` parameters.  One
 particular issue which needs to be handled carefully is that the :ctype:`FILE`
 structure for different C libraries can be different and incompatible.  Under
 Windows (at least), it is possible for dynamically linked extensions to actually
@@ -35,6 +35,10 @@ the same library that the Python runtime is using.
    value will be the integer passed to the :func:`sys.exit` function, ``1`` if the
    interpreter exits due to an exception, or ``2`` if the parameter list does not
    represent a valid Python command line.
+
+   Note that if an otherwise unhandled :exc:`SystemError` is raised, this
+   function will not return ``1``, but exit the process, as long as
+   ``Py_InspectFlag`` is not set.
 
 
 .. cfunction:: int PyRun_AnyFile(FILE *fp, const char *filename)
@@ -77,6 +81,10 @@ the same library that the Python runtime is using.
    is created.  Returns ``0`` on success or ``-1`` if an exception was raised.  If
    there was an error, there is no way to get the exception information. For the
    meaning of *flags*, see below.
+
+   Note that if an otherwise unhandled :exc:`SystemError` is raised, this
+   function will not return ``-1``, but exit the process, as long as
+   ``Py_InspectFlag`` is not set.
 
 
 .. cfunction:: int PyRun_SimpleFile(FILE *fp, const char *filename)

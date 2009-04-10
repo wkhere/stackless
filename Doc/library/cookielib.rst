@@ -733,7 +733,7 @@ accessed using the following methods:
 The :class:`Cookie` class also defines the following method:
 
 
-.. method:: Cookie.is_expired([now=:const:`None`])
+.. method:: Cookie.is_expired([now=None])
 
    True if cookie has passed the time at which the server requested it should
    expire.  If *now* is given (in seconds since the epoch), return whether the
@@ -769,7 +769,7 @@ returned::
    import urllib2
    from cookielib import CookieJar, DefaultCookiePolicy
    policy = DefaultCookiePolicy(
-       rfc2965=True, strict_ns_domain=Policy.DomainStrict,
+       rfc2965=True, strict_ns_domain=DefaultCookiePolicy.DomainStrict,
        blocked_domains=["ads.net", ".ads.net"])
    cj = CookieJar(policy)
    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))

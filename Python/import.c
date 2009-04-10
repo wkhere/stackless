@@ -910,6 +910,49 @@ write_compiled_module(PyCodeObject *co, char *cpathname, struct stat *srcstat)
 		PySys_WriteStderr("# wrote %s\n", cpathname);
 }
 
+static void
+update_code_filenames(PyCodeObject *co, PyObject *oldname, PyObject *newname)
+{
+	PyObject *constants, *tmp;
+	Py_ssize_t i, n;
+
+	if (!_PyString_Eq(co->co_filename, oldname))
+		return;
+
+	tmp = co->co_filename;
+	co->co_filename = newname;
+	Py_INCREF(co->co_filename);
+	Py_DECREF(tmp);
+
+	constants = co->co_consts;
+	n = PyTuple_GET_SIZE(constants);
+	for (i = 0; i < n; i++) {
+		tmp = PyTuple_GET_ITEM(constants, i);
+		if (PyCode_Check(tmp))
+			update_code_filenames((PyCodeObject *)tmp,
+					      oldname, newname);
+	}
+}
+
+static int
+update_compiled_module(PyCodeObject *co, char *pathname)
+{
+	PyObject *oldname, *newname;
+
+	if (strcmp(PyString_AsString(co->co_filename), pathname) == 0)
+		return 0;
+
+	newname = PyString_FromString(pathname);
+	if (newname == NULL)
+		return -1;
+
+	oldname = co->co_filename;
+	Py_INCREF(oldname);
+	update_code_filenames(co, oldname, newname);
+	Py_DECREF(oldname);
+	Py_DECREF(newname);
+	return 1;
+}
 
 /* Load a source module from a given file and return its module
    object WITH INCREMENTED REFERENCE COUNT.  If there's a matching
@@ -949,6 +992,8 @@ load_source_module(char *name, char *pathname, FILE *fp)
 		co = read_compiled_module(cpathname, fpc);
 		fclose(fpc);
 		if (co == NULL)
+			return NULL;
+		if (update_compiled_module(co, pathname) < 0)
 			return NULL;
 		if (Py_VerboseFlag)
 			PySys_WriteStderr("import %s # precompiled from %s\n",
@@ -3154,24 +3199,11 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
 		return -1;
 	} else {
 #ifndef RISCOS
+#ifndef MS_WINDOWS
 		struct stat statbuf;
 		int rv;
 
 		rv = stat(path, &statbuf);
-#ifdef MS_WINDOWS
-		/* MS Windows stat() chokes on paths like C:\path\. Try to
-		 * recover *one* time by stripping off a trailing slash or
-		 * backslash. http://bugs.python.org/issue1293
- 		 */
-		if (rv != 0 && pathlen <= MAXPATHLEN &&
-		    (path[pathlen-1] == '/' || path[pathlen-1] == '\\')) {
-			char mangled[MAXPATHLEN+1];
-
-			strcpy(mangled, path);
-			mangled[pathlen-1] = '\0';
-			rv = stat(mangled, &statbuf);
-		}
-#endif
 		if (rv == 0) {
 			/* it exists */
 			if (S_ISDIR(statbuf.st_mode)) {
@@ -3181,7 +3213,24 @@ NullImporter_init(NullImporter *self, PyObject *args, PyObject *kwds)
 				return -1;
 			}
 		}
-#else
+#else /* MS_WINDOWS */
+		DWORD rv;
+		/* see issue1293 and issue3677:
+		 * stat() on Windows doesn't recognise paths like
+		 * "e:\\shared\\" and "\\\\whiterab-c2znlh\\shared" as dirs.
+		 */
+		rv = GetFileAttributesA(path);
+		if (rv != INVALID_FILE_ATTRIBUTES) {
+			/* it exists */
+			if (rv & FILE_ATTRIBUTE_DIRECTORY) {
+				/* it's a directory */
+				PyErr_SetString(PyExc_ImportError,
+						"existing directory");
+				return -1;
+			}
+		}
+#endif
+#else /* RISCOS */
 		if (object_exists(path)) {
 			/* it exists */
 			if (isdir(path)) {

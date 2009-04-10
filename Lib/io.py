@@ -238,8 +238,6 @@ def open(file, mode="r", buffering=None, encoding=None, errors=None,
         raise ValueError("invalid buffering size")
     if buffering == 0:
         if binary:
-            raw._name = file
-            raw._mode = mode
             return raw
         raise ValueError("can't have unbuffered text I/O")
     if updating:
@@ -251,11 +249,8 @@ def open(file, mode="r", buffering=None, encoding=None, errors=None,
     else:
         raise ValueError("unknown mode: %r" % mode)
     if binary:
-        buffer.name = file
-        buffer.mode = mode
         return buffer
     text = TextIOWrapper(buffer, encoding, errors, newline, line_buffering)
-    text.name = file
     text.mode = mode
     return text
 
@@ -622,6 +617,10 @@ class FileIO(_fileio._FileIO, RawIOBase):
     # that _fileio._FileIO inherits from io.RawIOBase (which would be hard
     # to do since _fileio.c is written in C).
 
+    def __init__(self, name, mode="r", closefd=True):
+        _fileio._FileIO.__init__(self, name, mode, closefd)
+        self._name = name
+
     def close(self):
         _fileio._FileIO.close(self)
         RawIOBase.close(self)
@@ -629,10 +628,6 @@ class FileIO(_fileio._FileIO, RawIOBase):
     @property
     def name(self):
         return self._name
-
-    @property
-    def mode(self):
-        return self._mode
 
 
 class BufferedIOBase(IOBase):
@@ -766,6 +761,14 @@ class _BufferedIOMixin(BufferedIOBase):
     @property
     def closed(self):
         return self.raw.closed
+
+    @property
+    def name(self):
+        return self.raw.name
+
+    @property
+    def mode(self):
+        return self.raw.mode
 
     ### Lower-level APIs ###
 
@@ -1164,7 +1167,7 @@ class BufferedRWPair(BufferedIOBase):
 
     @property
     def closed(self):
-        return self.writer.closed()
+        return self.writer.closed
 
 
 class BufferedRandom(BufferedWriter, BufferedReader):
@@ -1289,25 +1292,23 @@ class IncrementalNewlineDecoder(codecs.IncrementalDecoder):
     """
     def __init__(self, decoder, translate, errors='strict'):
         codecs.IncrementalDecoder.__init__(self, errors=errors)
-        self.buffer = b''
         self.translate = translate
         self.decoder = decoder
         self.seennl = 0
+        self.pendingcr = False
 
     def decode(self, input, final=False):
         # decode input (with the eventual \r from a previous pass)
-        if self.buffer:
-            input = self.buffer + input
-
         output = self.decoder.decode(input, final=final)
+        if self.pendingcr and (output or final):
+            output = "\r" + output
+            self.pendingcr = False
 
         # retain last \r even when not translating data:
         # then readline() is sure to get \r\n in one pass
         if output.endswith("\r") and not final:
             output = output[:-1]
-            self.buffer = b'\r'
-        else:
-            self.buffer = b''
+            self.pendingcr = True
 
         # Record which newlines are read
         crlf = output.count('\r\n')
@@ -1326,20 +1327,19 @@ class IncrementalNewlineDecoder(codecs.IncrementalDecoder):
 
     def getstate(self):
         buf, flag = self.decoder.getstate()
-        return buf + self.buffer, flag
+        flag <<= 1
+        if self.pendingcr:
+            flag |= 1
+        return buf, flag
 
     def setstate(self, state):
         buf, flag = state
-        if buf.endswith(b'\r'):
-            self.buffer = b'\r'
-            buf = buf[:-1]
-        else:
-            self.buffer = b''
-        self.decoder.setstate((buf, flag))
+        self.pendingcr = bool(flag & 1)
+        self.decoder.setstate((buf, flag >> 1))
 
     def reset(self):
         self.seennl = 0
-        self.buffer = b''
+        self.pendingcr = False
         self.decoder.reset()
 
     _LF = 1
@@ -1472,6 +1472,10 @@ class TextIOWrapper(TextIOBase):
     @property
     def closed(self):
         return self.buffer.closed
+
+    @property
+    def name(self):
+        return self.buffer.name
 
     def fileno(self):
         return self.buffer.fileno()

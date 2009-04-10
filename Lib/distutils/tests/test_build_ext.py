@@ -11,6 +11,10 @@ from distutils import sysconfig
 import unittest
 from test import test_support
 
+# http://bugs.python.org/issue4373
+# Don't load the xx module more than once.
+ALREADY_TESTED = False
+
 class BuildExtTestCase(unittest.TestCase):
     def setUp(self):
         # Create a simple test environment
@@ -23,6 +27,7 @@ class BuildExtTestCase(unittest.TestCase):
         shutil.copy(xx_c, self.tmp_dir)
 
     def test_build_ext(self):
+        global ALREADY_TESTED
         xx_c = os.path.join(self.tmp_dir, 'xxmodule.c')
         xx_ext = Extension('xx', [xx_c])
         dist = Distribution({'name': 'xx', 'ext_modules': [xx_ext]})
@@ -45,6 +50,11 @@ class BuildExtTestCase(unittest.TestCase):
         finally:
             sys.stdout = old_stdout
 
+        if ALREADY_TESTED:
+            return
+        else:
+            ALREADY_TESTED = True
+
         import xx
 
         for attr in ('error', 'foo', 'new', 'roj'):
@@ -64,6 +74,27 @@ class BuildExtTestCase(unittest.TestCase):
         sys.path = self.sys_path
         # XXX on Windows the test leaves a directory with xx module in TEMP
         shutil.rmtree(self.tmp_dir, os.name == 'nt' or sys.platform == 'cygwin')
+
+    def test_solaris_enable_shared(self):
+        dist = Distribution({'name': 'xx'})
+        cmd = build_ext(dist)
+        old = sys.platform
+
+        sys.platform = 'sunos' # fooling finalize_options
+        from distutils.sysconfig import  _config_vars
+        old_var = _config_vars.get('Py_ENABLE_SHARED')
+        _config_vars['Py_ENABLE_SHARED'] = 1
+        try:
+            cmd.ensure_finalized()
+        finally:
+            sys.platform = old
+            if old_var is None:
+                del _config_vars['Py_ENABLE_SHARED']
+            else:
+                _config_vars['Py_ENABLE_SHARED'] = old_var
+
+        # make sur we get some lobrary dirs under solaris
+        self.assert_(len(cmd.library_dirs) > 0)
 
 def test_suite():
     if not sysconfig.python_build:

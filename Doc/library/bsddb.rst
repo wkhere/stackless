@@ -17,7 +17,7 @@ strings, however, so to use other objects as keys or to store other kinds of
 objects the user must serialize them somehow, typically using
 :func:`marshal.dumps` or  :func:`pickle.dumps`.
 
-The :mod:`bsddb` module requires a Berkeley DB library version from 3.3 thru
+The :mod:`bsddb` module requires a Berkeley DB library version from 4.0 thru
 4.7.
 
 
@@ -172,7 +172,7 @@ Example::
    >>> import bsddb
    >>> db = bsddb.btopen('/tmp/spam.db', 'c')
    >>> for i in range(10): db['%d'%i] = '%d'% (i*i)
-   ... 
+   ...
    >>> db['3']
    '9'
    >>> db.keys()
@@ -185,7 +185,7 @@ Example::
    ('9', '81')
    >>> db.set_location('2')
    ('2', '4')
-   >>> db.previous() 
+   >>> db.previous()
    ('1', '1')
    >>> for k, v in db.iteritems():
    ...     print k, v

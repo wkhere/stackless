@@ -458,7 +458,8 @@ class PyBuildExt(build_ext):
         # _json speedups
         exts.append( Extension("_json", ["_json.c"]) )
         # Python C API test module
-        exts.append( Extension('_testcapi', ['_testcapimodule.c']) )
+        exts.append( Extension('_testcapi', ['_testcapimodule.c'],
+                               depends=['testcapi_long.h']) )
         # profilers (_lsprof is for cProfile.py)
         exts.append( Extension('_hotshot', ['_hotshot.c']) )
         exts.append( Extension('_lsprof', ['_lsprof.c', 'rotatingtree.c']) )
@@ -1019,11 +1020,22 @@ class PyBuildExt(build_ext):
                 exts.append( Extension('dbm', ['dbmmodule.c'],
                                        define_macros=[('HAVE_NDBM_H',None)],
                                        libraries = ndbm_libs ) )
-            elif (self.compiler.find_library_file(lib_dirs, 'gdbm')
-                  and find_file("gdbm/ndbm.h", inc_dirs, []) is not None):
-                exts.append( Extension('dbm', ['dbmmodule.c'],
-                                       define_macros=[('HAVE_GDBM_NDBM_H',None)],
-                                       libraries = ['gdbm'] ) )
+            elif self.compiler.find_library_file(lib_dirs, 'gdbm'):
+                gdbm_libs = ['gdbm']
+                if self.compiler.find_library_file(lib_dirs, 'gdbm_compat'):
+                    gdbm_libs.append('gdbm_compat')
+                if find_file("gdbm/ndbm.h", inc_dirs, []) is not None:
+                    exts.append( Extension(
+                        'dbm', ['dbmmodule.c'],
+                        define_macros=[('HAVE_GDBM_NDBM_H',None)],
+                        libraries = gdbm_libs ) )
+                elif find_file("gdbm-ndbm.h", inc_dirs, []) is not None:
+                    exts.append( Extension(
+                        'dbm', ['dbmmodule.c'],
+                        define_macros=[('HAVE_GDBM_DASH_NDBM_H',None)],
+                        libraries = gdbm_libs ) )
+                else:
+                    missing.append('dbm')
             elif db_incs is not None:
                 exts.append( Extension('dbm', ['dbmmodule.c'],
                                        library_dirs=dblib_dir,
@@ -1279,6 +1291,15 @@ class PyBuildExt(build_ext):
                 )
             libraries = []
 
+        elif platform.startswith('netbsd'):
+            macros = dict(                  # at least NetBSD 5
+                HAVE_SEM_OPEN=1,
+                HAVE_SEM_TIMEDWAIT=0,
+                HAVE_FD_TRANSFER=1,
+                HAVE_BROKEN_SEM_GETVALUE=1
+                )
+            libraries = []
+
         else:                                   # Linux and other unices
             macros = dict(
                 HAVE_SEM_OPEN=1,
@@ -1438,8 +1459,8 @@ class PyBuildExt(build_ext):
         # different the UNIX search logic is not sharable.
         from os.path import join, exists
         framework_dirs = [
-            '/System/Library/Frameworks/',
             '/Library/Frameworks',
+            '/System/Library/Frameworks/',
             join(os.getenv('HOME'), '/Library/Frameworks')
         ]
 

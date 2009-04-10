@@ -21,8 +21,13 @@ The :mod:`dummy_threading` module is provided for situations where
    deprecation of the ``camelCase`` names and they remain fully supported in
    both Python 2.x and 3.x.
 
-This module defines the following functions and objects:
+.. note::
 
+   Starting with Python 2.5, several Thread methods raise :exc:`RuntimeError`
+   instead of :exc:`AssertionError` if called erroneously.
+
+
+This module defines the following functions and objects:
 
 .. function:: active_count()
               activeCount()
@@ -210,7 +215,7 @@ changed through the :attr:`name` attribute.
 A thread can be flagged as a "daemon thread".  The significance of this flag is
 that the entire Python program exits when only daemon threads are left.  The
 initial value is inherited from the creating thread.  The flag can be set
-through the :attr:`daemon` attribute.
+through the :attr:`daemon` property.
 
 There is a "main thread" object; this corresponds to the initial thread of
 control in the Python program.  It is not a daemon thread.
@@ -332,10 +337,11 @@ impossible to detect the termination of alien threads.
 
 .. attribute:: Thread.daemon
 
-   The thread's daemon flag. This must be set before :meth:`start` is called,
-   otherwise :exc:`RuntimeError` is raised.
-
-   The initial value is inherited from the creating thread.
+   A boolean value indicating whether this thread is a daemon thread (True) or
+   not (False).  This must be set before :meth:`start` is called, otherwise
+   :exc:`RuntimeError` is raised.  Its initial value is inherited from the
+   creating thread; the main thread is not a daemon thread and therefore all
+   threads created in the main thread default to :attr:`daemon` = ``False``.
 
    The entire Python program exits when no alive non-daemon threads are left.
 

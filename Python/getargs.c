@@ -1108,7 +1108,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 								!= size) {
 				Py_DECREF(s);
 				return converterr(
-					"(encoded string without NULL bytes)",
+					"encoded string without NULL bytes",
 					arg, msgbuf, bufsize);
 			}
 			*buffer = PyMem_NEW(char, size + 1);
@@ -1601,7 +1601,7 @@ vgetargskeywords(PyObject *args, PyObject *keywords, const char *format,
 		}
 	}
 
-	if (!IS_END_OF_FORMAT(*format)) {
+	if (!IS_END_OF_FORMAT(*format) && *format != '|') {
 		PyErr_Format(PyExc_RuntimeError,
 			"more argument specifiers than keyword list entries "
 			"(remaining format:'%s')", format);

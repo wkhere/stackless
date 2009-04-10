@@ -8,24 +8,11 @@ markup.  This section contains the reference material for these facilities.
 Documentation for "standard" reST constructs is not included here, though
 they are used in the Python documentation.
 
-File-wide metadata
-------------------
+.. note::
 
-reST has the concept of "field lists"; these are a sequence of fields marked up
-like this::
-
-   :Field name: Field content
-
-A field list at the very top of a file is parsed as the "docinfo", which in
-normal documents can be used to record the author, date of publication and
-other metadata.  In Sphinx, the docinfo is used as metadata, too, but not
-displayed in the output.
-
-At the moment, only one metadata field is recognized:
-
-``nocomments``
-   If set, the web application won't display a comment form for a page generated
-   from this source file.
+   This is just an overview of Sphinx' extended markup capabilities; full
+   coverage can be found in `its own documentation
+   <http://sphinx.pocoo.org/contents.html>`_.
 
 
 Meta-information markup
@@ -87,7 +74,6 @@ As you can see, the module-specific markup consists of two directives, the
    The ``moduleauthor`` directive, which can appear multiple times, names the
    authors of the module code, just like ``sectionauthor`` names the author(s)
    of a piece of documentation.  It too does not result in any output currently.
-
 
 .. note::
 
@@ -272,7 +258,7 @@ Syntax highlighting is handled in a smart way:
   This language is used until the next ``highlightlang`` directive is
   encountered.
 
-* The valid values for the highlighting language are:
+* The values normally used for the highlighting language are:
 
   * ``python`` (the default)
   * ``c``
@@ -299,14 +285,27 @@ Inline markup
 As said before, Sphinx uses interpreted text roles to insert semantic markup in
 documents.
 
-Variable names are an exception, they should be marked simply with ``*var*``.
+Names of local variables, such as function/method arguments, are an exception,
+they should be marked simply with ``*var*``.
 
 For all other roles, you have to write ``:rolename:`content```.
 
-.. note::
+There are some additional facilities that make cross-referencing roles more
+versatile:
 
-   For all cross-referencing roles, if you prefix the content with ``!``, no
-   reference/hyperlink will be created.
+* You may supply an explicit title and reference target, like in reST direct
+  hyperlinks: ``:role:`title <target>``` will refer to *target*, but the link
+  text will be *title*.
+
+* If you prefix the content with ``!``, no reference/hyperlink will be created.
+
+* For the Python object roles, if you prefix the content with ``~``, the link
+  text will only be the last component of the target.  For example,
+  ``:meth:`~Queue.Queue.get``` will refer to ``Queue.Queue.get`` but only
+  display ``get`` as the link text.
+
+  In HTML output, the link's ``title`` attribute (that is e.g. shown as a
+  tool-tip on mouse-hover) will always be the full target name.
 
 The following roles refer to objects in modules and are possibly hyperlinked if
 a matching identifier is found:
@@ -324,7 +323,7 @@ a matching identifier is found:
 
 .. describe:: data
 
-   The name of a module-level variable.
+   The name of a module-level variable or constant.
 
 .. describe:: const
 
@@ -522,7 +521,7 @@ in a different style:
    curly braces to indicate a "variable" part, as in ``:file:``.
 
    If you don't need the "variable part" indication, use the standard
-   ````code```` instead.   
+   ````code```` instead.
 
 .. describe:: var
 
@@ -613,7 +612,7 @@ units as well as normal text:
    Example::
 
       .. versionadded:: 2.5
-         The `spam` parameter.
+         The *spam* parameter.
 
    Note that there must be no blank line between the directive head and the
    explanation; this is to make these blocks visually continuous in the markup.
@@ -774,14 +773,14 @@ the definition of the symbol.  There is this directive:
    Blank lines are not allowed within ``productionlist`` directive arguments.
 
    The definition can contain token names which are marked as interpreted text
-   (e.g. ``sum ::= `integer` "+" `integer```) -- this generates cross-references
+   (e.g. ``unaryneg ::= "-" `integer```) -- this generates cross-references
    to the productions of these tokens.
 
    Note that no further reST parsing is done in the production, so that you
    don't have to escape ``*`` or ``|`` characters.
 
 
-.. XXX describe optional first parameter 
+.. XXX describe optional first parameter
 
 The following is an example taken from the Python Reference Manual::
 
@@ -799,7 +798,7 @@ Substitutions
 -------------
 
 The documentation system provides three substitutions that are defined by default.
-They are set in the build configuration file, see :ref:`doc-build-config`.
+They are set in the build configuration file :file:`conf.py`.
 
 .. describe:: |release|
 

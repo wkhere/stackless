@@ -662,12 +662,14 @@ class _BZ2Proxy(object):
         b = [self.buf]
         x = len(self.buf)
         while x < size:
+            raw = self.fileobj.read(self.blocksize)
+            if not raw:
+                break
             try:
-                raw = self.fileobj.read(self.blocksize)
                 data = self.bz2obj.decompress(raw)
-                b.append(data)
             except EOFError:
                 break
+            b.append(data)
             x += len(data)
         self.buf = "".join(b)
 
@@ -2283,10 +2285,6 @@ class TarFile(object):
         """Set modification time of targetpath according to tarinfo.
         """
         if not hasattr(os, 'utime'):
-            return
-        if sys.platform == "win32" and tarinfo.isdir():
-            # According to msdn.microsoft.com, it is an error (EACCES)
-            # to use utime() on directories.
             return
         try:
             os.utime(targetpath, (tarinfo.mtime, tarinfo.mtime))

@@ -120,8 +120,23 @@ class AutoFileTests(unittest.TestCase):
         except:
             self.assertEquals(self.f.__exit__(*sys.exc_info()), None)
 
+    def testReadWhenWriting(self):
+        self.assertRaises(IOError, self.f.read)
 
 class OtherFileTests(unittest.TestCase):
+
+    def testOpenDir(self):
+        this_dir = os.path.dirname(__file__)
+        for mode in (None, "w"):
+            try:
+                if mode:
+                    f = open(this_dir, mode)
+                else:
+                    f = open(this_dir)
+            except IOError as e:
+                self.assertEqual(e.filename, this_dir)
+            else:
+                self.fail("opening a directory didn't raise an IOError")
 
     def testModeStrings(self):
         # check invalid mode strings
@@ -528,6 +543,20 @@ class StdoutTests(unittest.TestCase):
         try:
             sys.stdout = File()
             print "some text"
+        finally:
+            sys.stdout = save_stdout
+
+    def test_del_stdout_before_print(self):
+        # Issue 4597: 'print' with no argument wasn't reporting when
+        # sys.stdout was deleted.
+        save_stdout = sys.stdout
+        del sys.stdout
+        try:
+            print
+        except RuntimeError as e:
+            self.assertEquals(str(e), "lost sys.stdout")
+        else:
+            self.fail("Expected RuntimeError")
         finally:
             sys.stdout = save_stdout
 

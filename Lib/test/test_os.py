@@ -533,8 +533,113 @@ class Win32ErrorTests(unittest.TestCase):
     def test_chmod(self):
         self.assertRaises(WindowsError, os.utime, test_support.TESTFN, 0)
 
+class TestInvalidFD(unittest.TestCase):
+    singles = ["fchdir", "fdopen", "dup", "fdatasync", "fstat",
+               "fstatvfs", "fsync", "tcgetpgrp", "ttyname"]
+    #singles.append("close")
+    #We omit close because it doesn'r raise an exception on some platforms
+    def get_single(f):
+        def helper(self):
+            if  hasattr(os, f):
+                self.check(getattr(os, f))
+        return helper
+    for f in singles:
+        locals()["test_"+f] = get_single(f)
+
+    def check(self, f, *args):
+        self.assertRaises(OSError, f, test_support.make_bad_fd(), *args)
+
+    def test_isatty(self):
+        if hasattr(os, "isatty"):
+            self.assertEqual(os.isatty(test_support.make_bad_fd()), False)
+
+    def test_closerange(self):
+        if hasattr(os, "closerange"):
+            fd = test_support.make_bad_fd()
+            self.assertEqual(os.closerange(fd, fd + 10), None)
+
+    def test_dup2(self):
+        if hasattr(os, "dup2"):
+            self.check(os.dup2, 20)
+
+    def test_fchmod(self):
+        if hasattr(os, "fchmod"):
+            self.check(os.fchmod, 0)
+
+    def test_fchown(self):
+        if hasattr(os, "fchown"):
+            self.check(os.fchown, -1, -1)
+
+    def test_fpathconf(self):
+        if hasattr(os, "fpathconf"):
+            self.check(os.fpathconf, "PC_NAME_MAX")
+
+    #this is a weird one, it raises IOError unlike the others
+    def test_ftruncate(self):
+        if hasattr(os, "ftruncate"):
+            self.assertRaises(IOError, os.ftruncate, test_support.make_bad_fd(),
+                              0)
+
+    def test_lseek(self):
+        if hasattr(os, "lseek"):
+            self.check(os.lseek, 0, 0)
+
+    def test_read(self):
+        if hasattr(os, "read"):
+            self.check(os.read, 1)
+
+    def test_tcsetpgrpt(self):
+        if hasattr(os, "tcsetpgrp"):
+            self.check(os.tcsetpgrp, 0)
+
+    def test_write(self):
+        if hasattr(os, "write"):
+            self.check(os.write, " ")
+
 if sys.platform != 'win32':
     class Win32ErrorTests(unittest.TestCase):
+        pass
+
+    class PosixUidGidTests(unittest.TestCase):
+        if hasattr(os, 'setuid'):
+            def test_setuid(self):
+                if os.getuid() != 0:
+                    self.assertRaises(os.error, os.setuid, 0)
+                self.assertRaises(OverflowError, os.setuid, 1<<32)
+
+        if hasattr(os, 'setgid'):
+            def test_setgid(self):
+                if os.getuid() != 0:
+                    self.assertRaises(os.error, os.setgid, 0)
+                self.assertRaises(OverflowError, os.setgid, 1<<32)
+
+        if hasattr(os, 'seteuid'):
+            def test_seteuid(self):
+                if os.getuid() != 0:
+                    self.assertRaises(os.error, os.seteuid, 0)
+                self.assertRaises(OverflowError, os.seteuid, 1<<32)
+
+        if hasattr(os, 'setegid'):
+            def test_setegid(self):
+                if os.getuid() != 0:
+                    self.assertRaises(os.error, os.setegid, 0)
+                self.assertRaises(OverflowError, os.setegid, 1<<32)
+
+        if hasattr(os, 'setreuid'):
+            def test_setreuid(self):
+                if os.getuid() != 0:
+                    self.assertRaises(os.error, os.setreuid, 0, 0)
+                self.assertRaises(OverflowError, os.setreuid, 1<<32, 0)
+                self.assertRaises(OverflowError, os.setreuid, 0, 1<<32)
+
+        if hasattr(os, 'setregid'):
+            def test_setregid(self):
+                if os.getuid() != 0:
+                    self.assertRaises(os.error, os.setregid, 0, 0)
+                self.assertRaises(OverflowError, os.setregid, 1<<32, 0)
+                self.assertRaises(OverflowError, os.setregid, 0, 1<<32)
+else:
+    class PosixUidGidTests(unittest.TestCase):
         pass
 
 def test_main():
@@ -547,7 +652,9 @@ def test_main():
         MakedirTests,
         DevNullTests,
         URandomTests,
-        Win32ErrorTests
+        Win32ErrorTests,
+        TestInvalidFD,
+        PosixUidGidTests
     )
 
 if __name__ == "__main__":

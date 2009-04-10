@@ -56,12 +56,13 @@ Objects are never explicitly destroyed; however, when they become unreachable
 they may be garbage-collected.  An implementation is allowed to postpone garbage
 collection or omit it altogether --- it is a matter of implementation quality
 how garbage collection is implemented, as long as no objects are collected that
-are still reachable.  (Implementation note: the current implementation uses a
+are still reachable.  (Implementation note: CPython currently uses a
 reference-counting scheme with (optional) delayed detection of cyclically linked
 garbage, which collects most objects as soon as they become unreachable, but is
 not guaranteed to collect garbage containing circular references.  See the
 documentation of the :mod:`gc` module for information on controlling the
-collection of cyclic garbage.)
+collection of cyclic garbage.  Other implementations act differently and CPython
+may change.)
 
 Note that the use of the implementation's tracing or debugging facilities may
 keep objects alive that would normally be collectable. Also note that catching
@@ -1162,8 +1163,9 @@ of this is the :class:`NodeList` interface in the W3C's Document Object Model.)
 Basic customization
 -------------------
 
-
 .. method:: object.__new__(cls[, ...])
+
+   .. index:: pair: subclassing; immutable types
 
    Called to create a new instance of class *cls*.  :meth:`__new__` is a static
    method (special-cased so you need not declare it as such) that takes the class
@@ -1248,7 +1250,9 @@ Basic customization
       is printed to ``sys.stderr`` instead.  Also, when :meth:`__del__` is invoked in
       response to a module being deleted (e.g., when execution of the program is
       done), other globals referenced by the :meth:`__del__` method may already have
-      been deleted.  For this reason, :meth:`__del__` methods should do the absolute
+      been deleted or in the process of being torn down (e.g. the import
+      machinery shutting down).  For this reason, :meth:`__del__` methods
+      should do the absolute
       minimum needed to maintain external invariants.  Starting with version 1.5,
       Python guarantees that globals whose name begins with a single underscore are
       deleted from their module before other globals are deleted; if no other
@@ -1365,21 +1369,21 @@ Basic customization
       object: dictionary
       builtin: hash
 
-   Called for the key object for dictionary operations, and by the built-in
-   function :func:`hash`.  Should return an integer usable as a hash value
-   for dictionary operations.  The only required property is that objects which
-   compare equal have the same hash value; it is advised to somehow mix together
-   (e.g., using exclusive or) the hash values for the components of the object that
-   also play a part in comparison of objects.
+   Called by built-in function :func:`hash` and for operations on members of
+   hashed collections including :class:`set`, :class:`frozenset`, and
+   :class:`dict`.  :meth:`__hash__` should return an integer.  The only required
+   property is that objects which compare equal have the same hash value; it is
+   advised to somehow mix together (e.g. using exclusive or) the hash values for
+   the components of the object that also play a part in comparison of objects.
 
    If a class does not define a :meth:`__cmp__` or :meth:`__eq__` method it
    should not define a :meth:`__hash__` operation either; if it defines
    :meth:`__cmp__` or :meth:`__eq__` but not :meth:`__hash__`, its instances
-   will not be usable as dictionary keys.  If a class defines mutable objects
+   will not be usable in hashed collections.  If a class defines mutable objects
    and implements a :meth:`__cmp__` or :meth:`__eq__` method, it should not
-   implement :meth:`__hash__`, since the dictionary implementation requires that
-   a key's hash value is immutable (if the object's hash value changes, it will
-   be in the wrong hash bucket).
+   implement :meth:`__hash__`, since hashable collection implementations require
+   that a object's hash value is immutable (if the object's hash value changes,
+   it will be in the wrong hash bucket).
 
    User-defined classes have :meth:`__cmp__` and :meth:`__hash__` methods
    by default; with them, all objects compare unequal (except with themselves)
@@ -1389,13 +1393,13 @@ Basic customization
    change the meaning of :meth:`__cmp__` or :meth:`__eq__` such that the hash
    value returned is no longer appropriate (e.g. by switching to a value-based
    concept of equality instead of the default identity based equality) can
-   explicitly flag themselves as being unhashable by setting
-   ``__hash__ = None`` in the class definition. Doing so means that not only
-   will instances of the class raise an appropriate :exc:`TypeError` when
-   a program attempts to retrieve their hash value, but they will also be
-   correctly identified as unhashable when checking
-   ``isinstance(obj, collections.Hashable)`` (unlike classes which define
-   their own :meth:`__hash__` to explicitly raise :exc:`TypeError`).
+   explicitly flag themselves as being unhashable by setting ``__hash__ = None``
+   in the class definition. Doing so means that not only will instances of the
+   class raise an appropriate :exc:`TypeError` when a program attempts to
+   retrieve their hash value, but they will also be correctly identified as
+   unhashable when checking ``isinstance(obj, collections.Hashable)`` (unlike
+   classes which define their own :meth:`__hash__` to explicitly raise
+   :exc:`TypeError`).
 
    .. versionchanged:: 2.5
       :meth:`__hash__` may now also return a long integer object; the 32-bit
@@ -1410,11 +1414,12 @@ Basic customization
 
    .. index:: single: __len__() (mapping object method)
 
-   Called to implement truth value testing, and the built-in operation ``bool()``;
+   Called to implement truth value testing and the built-in operation ``bool()``;
    should return ``False`` or ``True``, or their integer equivalents ``0`` or
-   ``1``. When this method is not defined, :meth:`__len__` is called, if it is
-   defined (see below).  If a class defines neither :meth:`__len__` nor
-   :meth:`__nonzero__`, all its instances are considered true.
+   ``1``.  When this method is not defined, :meth:`__len__` is called, if it is
+   defined, and the object is considered true if its result is nonzero.
+   If a class defines neither :meth:`__len__` nor :meth:`__nonzero__`, all its
+   instances are considered true.
 
 
 .. method:: object.__unicode__(self)
@@ -2075,13 +2080,13 @@ left undefined.
             object.__ixor__(self, other)
             object.__ior__(self, other)
 
-   These methods are called to implement the augmented arithmetic operations
+   These methods are called to implement the augmented arithmetic assignments
    (``+=``, ``-=``, ``*=``, ``/=``, ``//=``, ``%=``, ``**=``, ``<<=``, ``>>=``,
    ``&=``, ``^=``, ``|=``).  These methods should attempt to do the operation
    in-place (modifying *self*) and return the result (which could be, but does
    not have to be, *self*).  If a specific method is not defined, the augmented
-   operation falls back to the normal methods.  For instance, to evaluate the
-   expression ``x += y``, where *x* is an instance of a class that has an
+   assignment falls back to the normal methods.  For instance, to execute the
+   statement ``x += y``, where *x* is an instance of a class that has an
    :meth:`__iadd__` method, ``x.__iadd__(y)`` is called.  If *x* is an instance
    of a class that does not define a :meth:`__iadd__` method, ``x.__add__(y)``
    and ``y.__radd__(x)`` are considered, as with the evaluation of ``x + y``.
@@ -2241,7 +2246,8 @@ will not be supported.
 
   In the current implementation, the built-in numeric types :class:`int`,
   :class:`long` and :class:`float` do not use coercion; the type :class:`complex`
-  however does use it.  The difference can become apparent when subclassing these
+  however does use coercion for binary operators and rich comparisons, despite
+  the above rules.  The difference can become apparent when subclassing these
   types.  Over time, the type :class:`complex` may be fixed to avoid coercion.
   All these types implement a :meth:`__coerce__` method, for use by the built-in
   :func:`coerce` function.
@@ -2369,7 +2375,7 @@ the instance when looking up special methods::
    True
 
 In addition to bypassing any instance attributes in the interest of
-correctness, implicit special method lookup may also bypass the
+correctness, implicit special method lookup generally also bypasses the
 :meth:`__getattribute__` method even of the object's metaclass::
 
    >>> class Meta(type):

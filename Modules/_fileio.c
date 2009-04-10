@@ -41,6 +41,9 @@ PyTypeObject PyFileIO_Type;
 
 #define PyFileIO_Check(op) (PyObject_TypeCheck((op), &PyFileIO_Type))
 
+static PyObject *
+portable_lseek(int fd, PyObject *posobj, int whence);
+
 /* Returns 0 on success, errno (which is < 0) on failure. */
 static int
 internal_close(PyFileIOObject *self)
@@ -61,10 +64,7 @@ static PyObject *
 fileio_close(PyFileIOObject *self)
 {
 	if (!self->closefd) {
-		if (PyErr_WarnEx(PyExc_RuntimeWarning,
-				 "Trying to close unclosable fd!", 3) < 0) {
-			return NULL;
-		}
+		self->fd = -1;
 		Py_RETURN_NONE;
 	}
 	errno = internal_close(self);
@@ -101,7 +101,7 @@ fileio_new(PyTypeObject *type, PyObject *args, PyObject *kews)
    directories, so we need a check.  */
 
 static int
-dircheck(PyFileIOObject* self)
+dircheck(PyFileIOObject* self, char *name)
 {
 #if defined(HAVE_FSTAT) && defined(S_IFDIR) && defined(EISDIR)
 	struct stat buf;
@@ -112,9 +112,27 @@ dircheck(PyFileIOObject* self)
 		PyObject *exc;
 		internal_close(self);
 
-		exc = PyObject_CallFunction(PyExc_IOError, "(is)",
-					    EISDIR, msg);
+		exc = PyObject_CallFunction(PyExc_IOError, "(iss)",
+					    EISDIR, msg, name);
 		PyErr_SetObject(PyExc_IOError, exc);
+		Py_XDECREF(exc);
+		return -1;
+	}
+#endif
+	return 0;
+}
+
+static int
+check_fd(int fd)
+{
+#if defined(HAVE_FSTAT)
+	struct stat buf;
+	if (fstat(fd, &buf) < 0 && errno == EBADF) {
+		PyObject *exc;
+		char *msg = strerror(EBADF);
+		exc = PyObject_CallFunction(PyExc_OSError, "(is)",
+					    EBADF, msg);
+		PyErr_SetObject(PyExc_OSError, exc);
 		Py_XDECREF(exc);
 		return -1;
 	}
@@ -154,6 +172,8 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 					"Negative filedescriptor");
 			return -1;
 		}
+		if (check_fd(fd))
+			return -1;
 	}
 	else {
 		PyErr_Clear();
@@ -211,6 +231,8 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 			flags |= O_CREAT;
 			append = 1;
 			break;
+		case 'b':
+			break;
 		case '+':
 			if (plus)
 				goto bad_mode;
@@ -266,14 +288,25 @@ fileio_init(PyObject *oself, PyObject *args, PyObject *kwds)
 		Py_END_ALLOW_THREADS
 		if (self->fd < 0) {
 #ifdef MS_WINDOWS
-			PyErr_SetFromErrnoWithUnicodeFilename(PyExc_IOError, widename);
-#else
-			PyErr_SetFromErrnoWithFilename(PyExc_IOError, name);
+			if (widename != NULL)
+				PyErr_SetFromErrnoWithUnicodeFilename(PyExc_IOError, widename);
+			else
 #endif
+				PyErr_SetFromErrnoWithFilename(PyExc_IOError, name);
 			goto error;
 		}
-		if(dircheck(self) < 0)
+		if(dircheck(self, name) < 0)
 			goto error;
+	}
+
+	if (append) {
+		/* For consistent behaviour, we explicitly seek to the
+		   end of file (otherwise, it might be done only on the
+		   first write()). */
+		PyObject *pos = portable_lseek(self->fd, NULL, 2);
+		if (pos == NULL)
+			goto error;
+		Py_DECREF(pos);
 	}
 
 	goto done;
@@ -685,12 +718,12 @@ mode_string(PyFileIOObject *self)
 {
 	if (self->readable) {
 		if (self->writable)
-			return "r+";
+			return "rb+";
 		else
-			return "r";
+			return "rb";
 	}
 	else
-		return "w";
+		return "wb";
 }
 
 static PyObject *
@@ -821,6 +854,12 @@ get_closed(PyFileIOObject *self, void *closure)
 }
 
 static PyObject *
+get_closefd(PyFileIOObject *self, void *closure)
+{
+	return PyBool_FromLong((long)(self->closefd));
+}
+
+static PyObject *
 get_mode(PyFileIOObject *self, void *closure)
 {
 	return PyString_FromString(mode_string(self));
@@ -828,6 +867,8 @@ get_mode(PyFileIOObject *self, void *closure)
 
 static PyGetSetDef fileio_getsetlist[] = {
 	{"closed", (getter)get_closed, NULL, "True if the file is closed"},
+	{"closefd", (getter)get_closefd, NULL, 
+		"True if the file descriptor will be closed"},
 	{"mode", (getter)get_mode, NULL, "String giving the file mode"},
 	{0},
 };

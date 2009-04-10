@@ -107,8 +107,9 @@ The :mod:`bdb` module also defines two classes:
 
       The *arg* parameter depends on the previous event.
 
-      For more information on trace functions, see :ref:`debugger-hooks`.  For
-      more information on code and frame objects, refer to :ref:`types`.
+      See the documentation for :func:`sys.settrace` for more information on the
+      trace function.  For more information on code and frame objects, refer to
+      :ref:`types`.
 
    .. method:: dispatch_line(frame)
 
@@ -324,7 +325,7 @@ Finally, the module defines the following functions:
 
    Check whether we should break here, depending on the way the breakpoint *b*
    was set.
-   
+
    If it was set via line number, it checks if ``b.line`` is the same as the one
    in the frame also passed as argument.  If the breakpoint was set via function
    name, we have to check we are in the right frame (the right function) and if
@@ -334,7 +335,7 @@ Finally, the module defines the following functions:
 
    Determine if there is an effective (active) breakpoint at this line of code.
    Return breakpoint number or 0 if none.
-	
+
    Called only if we know there is a breakpoint at this location.  Returns the
    breakpoint that was triggered and a flag that indicates if it is ok to delete
    a temporary breakpoint.

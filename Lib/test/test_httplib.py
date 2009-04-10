@@ -107,19 +107,23 @@ class BasicTest(TestCase):
         for hp in ("www.python.org:abc", "www.python.org:"):
             self.assertRaises(httplib.InvalidURL, httplib.HTTP, hp)
 
-        for hp, h, p in (("[fe80::207:e9ff:fe9b]:8000", "fe80::207:e9ff:fe9b", 8000),
+        for hp, h, p in (("[fe80::207:e9ff:fe9b]:8000", "fe80::207:e9ff:fe9b",
+                          8000),
                          ("www.python.org:80", "www.python.org", 80),
                          ("www.python.org", "www.python.org", 80),
                          ("[fe80::207:e9ff:fe9b]", "fe80::207:e9ff:fe9b", 80)):
             http = httplib.HTTP(hp)
             c = http._conn
-            if h != c.host: self.fail("Host incorrectly parsed: %s != %s" % (h, c.host))
-            if p != c.port: self.fail("Port incorrectly parsed: %s != %s" % (p, c.host))
+            if h != c.host:
+                self.fail("Host incorrectly parsed: %s != %s" % (h, c.host))
+            if p != c.port:
+                self.fail("Port incorrectly parsed: %s != %s" % (p, c.host))
 
     def test_response_headers(self):
         # test response with multiple message headers with the same field name.
         text = ('HTTP/1.1 200 OK\r\n'
-                'Set-Cookie: Customer="WILE_E_COYOTE"; Version="1"; Path="/acme"\r\n'
+                'Set-Cookie: Customer="WILE_E_COYOTE";'
+                ' Version="1"; Path="/acme"\r\n'
                 'Set-Cookie: Part_Number="Rocket_Launcher_0001"; Version="1";'
                 ' Path="/acme"\r\n'
                 '\r\n'
@@ -181,17 +185,37 @@ class BasicTest(TestCase):
                 resp.read()
             except httplib.IncompleteRead, i:
                 self.assertEquals(i.partial, 'hello world')
+                self.assertEqual(repr(i),'IncompleteRead(11 bytes read)')
+                self.assertEqual(str(i),'IncompleteRead(11 bytes read)')
             else:
                 self.fail('IncompleteRead expected')
             finally:
                 resp.close()
 
     def test_negative_content_length(self):
-        sock = FakeSocket('HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nHello\r\n')
+        sock = FakeSocket('HTTP/1.1 200 OK\r\n'
+                          'Content-Length: -1\r\n\r\nHello\r\n')
         resp = httplib.HTTPResponse(sock, method="GET")
         resp.begin()
         self.assertEquals(resp.read(), 'Hello\r\n')
         resp.close()
+
+    def test_incomplete_read(self):
+        sock = FakeSocket('HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nHello\r\n')
+        resp = httplib.HTTPResponse(sock, method="GET")
+        resp.begin()
+        try:
+            resp.read()
+        except httplib.IncompleteRead as i:
+            self.assertEquals(i.partial, 'Hello\r\n')
+            self.assertEqual(repr(i),
+                             "IncompleteRead(7 bytes read, 3 more expected)")
+            self.assertEqual(str(i),
+                             "IncompleteRead(7 bytes read, 3 more expected)")
+        else:
+            self.fail('IncompleteRead expected')
+        finally:
+            resp.close()
 
 
 class OfflineTest(TestCase):

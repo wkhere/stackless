@@ -232,6 +232,17 @@ class IOTest(unittest.TestCase):
             else:
                 self.fail("1/0 didn't raise an exception")
 
+    # issue 5008
+    def test_append_mode_tell(self):
+        with io.open(test_support.TESTFN, "wb") as f:
+            f.write(b"xxx")
+        with io.open(test_support.TESTFN, "ab", buffering=0) as f:
+            self.assertEqual(f.tell(), 3)
+        with io.open(test_support.TESTFN, "ab") as f:
+            self.assertEqual(f.tell(), 3)
+        with io.open(test_support.TESTFN, "a") as f:
+            self.assert_(f.tell() > 0)
+
     def test_destructor(self):
         record = []
         class MyFileIO(io.FileIO):
@@ -271,6 +282,30 @@ class IOTest(unittest.TestCase):
     def test_closefd(self):
         self.assertRaises(ValueError, io.open, test_support.TESTFN, 'w',
                           closefd=False)
+
+    def testReadClosed(self):
+        with io.open(test_support.TESTFN, "w") as f:
+            f.write("egg\n")
+        with io.open(test_support.TESTFN, "r") as f:
+            file = io.open(f.fileno(), "r", closefd=False)
+            self.assertEqual(file.read(), "egg\n")
+            file.seek(0)
+            file.close()
+            self.assertRaises(ValueError, file.read)
+
+    def test_no_closefd_with_filename(self):
+        # can't use closefd in combination with a file name
+        self.assertRaises(ValueError,
+                          io.open, test_support.TESTFN, "r", closefd=False)
+
+    def test_closefd_attr(self):
+        with io.open(test_support.TESTFN, "wb") as f:
+            f.write(b"egg\n")
+        with io.open(test_support.TESTFN, "r") as f:
+            self.assertEqual(f.buffer.raw.closefd, True)
+            file = io.open(f.fileno(), "r", closefd=False)
+            self.assertEqual(file.buffer.raw.closefd, False)
+
 
 class MemorySeekTestMixin:
 
@@ -530,8 +565,9 @@ class BufferedRWPairTest(unittest.TestCase):
         r = MockRawIO(())
         w = MockRawIO()
         pair = io.BufferedRWPair(r, w)
+        self.assertFalse(pair.closed)
 
-        # XXX need implementation
+        # XXX More Tests
 
 
 class BufferedRandomTest(unittest.TestCase):
@@ -656,8 +692,9 @@ class StatefulIncrementalDecoder(codecs.IncrementalDecoder):
     @classmethod
     def lookupTestDecoder(cls, name):
         if cls.codecEnabled and name == 'test_decoder':
+            latin1 = codecs.lookup('latin-1')
             return codecs.CodecInfo(
-                name='test_decoder', encode=None, decode=None,
+                name='test_decoder', encode=latin1.encode, decode=None,
                 incrementalencoder=None,
                 streamreader=None, streamwriter=None,
                 incrementaldecoder=cls)
@@ -816,8 +853,11 @@ class TextIOWrapperTest(unittest.TestCase):
             [ '\r\n', [ "unix\nwindows\r\n", "os9\rlast\nnonl" ] ],
             [ '\r', [ "unix\nwindows\r", "\nos9\r", "last\nnonl" ] ],
         ]
-
-        encodings = ('utf-8', 'latin-1')
+        encodings = (
+            'utf-8', 'latin-1',
+            'utf-16', 'utf-16-le', 'utf-16-be',
+            'utf-32', 'utf-32-le', 'utf-32-be',
+        )
 
         # Try a range of buffer sizes to test the case where \r is the last
         # character in TextIOWrapper._pending_line.
@@ -1171,59 +1211,90 @@ class TextIOWrapperTest(unittest.TestCase):
 
         self.assertEqual(buffer.seekable(), txt.seekable())
 
-    def test_newline_decoder(self):
-        import codecs
-        decoder = codecs.getincrementaldecoder("utf-8")()
-        decoder = io.IncrementalNewlineDecoder(decoder, translate=True)
+    def check_newline_decoder_utf8(self, decoder):
+        # UTF-8 specific tests for a newline decoder
+        def _check_decode(b, s, **kwargs):
+            # We exercise getstate() / setstate() as well as decode()
+            state = decoder.getstate()
+            self.assertEquals(decoder.decode(b, **kwargs), s)
+            decoder.setstate(state)
+            self.assertEquals(decoder.decode(b, **kwargs), s)
 
-        self.assertEquals(decoder.decode(b'\xe8\xa2\x88'), u"\u8888")
+        _check_decode(b'\xe8\xa2\x88', "\u8888")
 
-        self.assertEquals(decoder.decode(b'\xe8'), u"")
-        self.assertEquals(decoder.decode(b'\xa2'), u"")
-        self.assertEquals(decoder.decode(b'\x88'), u"\u8888")
+        _check_decode(b'\xe8', "")
+        _check_decode(b'\xa2', "")
+        _check_decode(b'\x88', "\u8888")
 
-        self.assertEquals(decoder.decode(b'\xe8'), u"")
+        _check_decode(b'\xe8', "")
+        _check_decode(b'\xa2', "")
+        _check_decode(b'\x88', "\u8888")
+
+        _check_decode(b'\xe8', "")
         self.assertRaises(UnicodeDecodeError, decoder.decode, b'', final=True)
 
-        decoder.setstate((b'', 0))
-        self.assertEquals(decoder.decode(b'\n'), u"\n")
-        self.assertEquals(decoder.decode(b'\r'), u"")
-        self.assertEquals(decoder.decode(b'', final=True), u"\n")
-        self.assertEquals(decoder.decode(b'\r', final=True), u"\n")
+        decoder.reset()
+        _check_decode(b'\n', "\n")
+        _check_decode(b'\r', "")
+        _check_decode(b'', "\n", final=True)
+        _check_decode(b'\r', "\n", final=True)
 
-        self.assertEquals(decoder.decode(b'\r'), u"")
-        self.assertEquals(decoder.decode(b'a'), u"\na")
+        _check_decode(b'\r', "")
+        _check_decode(b'a', "\na")
 
-        self.assertEquals(decoder.decode(b'\r\r\n'), u"\n\n")
-        self.assertEquals(decoder.decode(b'\r'), u"")
-        self.assertEquals(decoder.decode(b'\r'), u"\n")
-        self.assertEquals(decoder.decode(b'\na'), u"\na")
+        _check_decode(b'\r\r\n', "\n\n")
+        _check_decode(b'\r', "")
+        _check_decode(b'\r', "\n")
+        _check_decode(b'\na', "\na")
 
-        self.assertEquals(decoder.decode(b'\xe8\xa2\x88\r\n'), u"\u8888\n")
-        self.assertEquals(decoder.decode(b'\xe8\xa2\x88'), u"\u8888")
-        self.assertEquals(decoder.decode(b'\n'), u"\n")
-        self.assertEquals(decoder.decode(b'\xe8\xa2\x88\r'), u"\u8888")
-        self.assertEquals(decoder.decode(b'\n'), u"\n")
+        _check_decode(b'\xe8\xa2\x88\r\n', "\u8888\n")
+        _check_decode(b'\xe8\xa2\x88', "\u8888")
+        _check_decode(b'\n', "\n")
+        _check_decode(b'\xe8\xa2\x88\r', "\u8888")
+        _check_decode(b'\n', "\n")
 
+    def check_newline_decoder(self, decoder, encoding):
+        result = []
+        encoder = codecs.getincrementalencoder(encoding)()
+        def _decode_bytewise(s):
+            for b in encoder.encode(s):
+                result.append(decoder.decode(b))
+        self.assertEquals(decoder.newlines, None)
+        _decode_bytewise("abc\n\r")
+        self.assertEquals(decoder.newlines, '\n')
+        _decode_bytewise("\nabc")
+        self.assertEquals(decoder.newlines, ('\n', '\r\n'))
+        _decode_bytewise("abc\r")
+        self.assertEquals(decoder.newlines, ('\n', '\r\n'))
+        _decode_bytewise("abc")
+        self.assertEquals(decoder.newlines, ('\r', '\n', '\r\n'))
+        _decode_bytewise("abc\r")
+        self.assertEquals("".join(result), "abc\n\nabcabc\nabcabc")
+        decoder.reset()
+        self.assertEquals(decoder.decode("abc".encode(encoding)), "abc")
+        self.assertEquals(decoder.newlines, None)
+
+    def test_newline_decoder(self):
+        encodings = (
+            'utf-8', 'latin-1',
+            'utf-16', 'utf-16-le', 'utf-16-be',
+            'utf-32', 'utf-32-le', 'utf-32-be',
+        )
+        for enc in encodings:
+            decoder = codecs.getincrementaldecoder(enc)()
+            decoder = io.IncrementalNewlineDecoder(decoder, translate=True)
+            self.check_newline_decoder(decoder, enc)
         decoder = codecs.getincrementaldecoder("utf-8")()
         decoder = io.IncrementalNewlineDecoder(decoder, translate=True)
-        self.assertEquals(decoder.newlines, None)
-        decoder.decode(b"abc\n\r")
-        self.assertEquals(decoder.newlines, u'\n')
-        decoder.decode(b"\nabc")
-        self.assertEquals(decoder.newlines, ('\n', '\r\n'))
-        decoder.decode(b"abc\r")
-        self.assertEquals(decoder.newlines, ('\n', '\r\n'))
-        decoder.decode(b"abc")
-        self.assertEquals(decoder.newlines, ('\r', '\n', '\r\n'))
-        decoder.decode(b"abc\r")
-        decoder.reset()
-        self.assertEquals(decoder.decode(b"abc"), "abc")
-        self.assertEquals(decoder.newlines, None)
+        self.check_newline_decoder_utf8(decoder)
+
 
 # XXX Tests for open()
 
 class MiscIOTest(unittest.TestCase):
+
+    def tearDown(self):
+        test_support.unlink(test_support.TESTFN)
 
     def testImport__all__(self):
         for name in io.__all__:
@@ -1235,6 +1306,34 @@ class MiscIOTest(unittest.TestCase):
                 self.assert_(issubclass(obj, Exception), name)
             else:
                 self.assert_(issubclass(obj, io.IOBase))
+
+
+    def test_attributes(self):
+        f = io.open(test_support.TESTFN, "wb", buffering=0)
+        self.assertEquals(f.mode, "wb")
+        f.close()
+
+        f = io.open(test_support.TESTFN, "U")
+        self.assertEquals(f.name,            test_support.TESTFN)
+        self.assertEquals(f.buffer.name,     test_support.TESTFN)
+        self.assertEquals(f.buffer.raw.name, test_support.TESTFN)
+        self.assertEquals(f.mode,            "U")
+        self.assertEquals(f.buffer.mode,     "rb")
+        self.assertEquals(f.buffer.raw.mode, "rb")
+        f.close()
+
+        f = io.open(test_support.TESTFN, "w+")
+        self.assertEquals(f.mode,            "w+")
+        self.assertEquals(f.buffer.mode,     "rb+") # Does it really matter?
+        self.assertEquals(f.buffer.raw.mode, "rb+")
+
+        g = io.open(f.fileno(), "wb", closefd=False)
+        self.assertEquals(g.mode,     "wb")
+        self.assertEquals(g.raw.mode, "wb")
+        self.assertEquals(g.name,     f.fileno())
+        self.assertEquals(g.raw.name, f.fileno())
+        f.close()
+        g.close()
 
 
 def test_main():

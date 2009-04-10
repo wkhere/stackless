@@ -743,7 +743,7 @@ set.
    :attr:`__weakref__`, the type inherits its :attr:`tp_weaklistoffset` from its
    base type.
 
-The next two fields only exist if the :const:`Py_TPFLAGS_HAVE_CLASS` flag bit is
+The next two fields only exist if the :const:`Py_TPFLAGS_HAVE_ITER` flag bit is
 set.
 
 
@@ -1180,6 +1180,7 @@ Number Object Structures
             binaryfunc nb_inplace_add;
             binaryfunc nb_inplace_subtract;
             binaryfunc nb_inplace_multiply;
+            binaryfunc nb_inplace_divide;
             binaryfunc nb_inplace_remainder;
             ternaryfunc nb_inplace_power;
             binaryfunc nb_inplace_lshift;

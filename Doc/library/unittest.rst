@@ -80,6 +80,12 @@ graphical environments) without any need to derive from a specific class.
       Kent Beck's original paper on testing frameworks using the pattern shared by
       :mod:`unittest`.
 
+   `Nose <http://code.google.com/p/python-nose/>`_ and `py.test <http://pytest.org>`_
+      Third-party unittest frameworks with a lighter-weight syntax
+      for writing tests.  For example, ``assert func(10) == 42``.
+
+   `python-mock <http://python-mock.sourceforge.net/>`_ and `minimock <http://blog.ianbicking.org/minimock.html>`_
+      Tools for creating mock test objects (objects simulating external resources).
 
 .. _unittest-minimal-example:
 
@@ -595,7 +601,7 @@ failures.
             TestCase.failUnlessAlmostEqual(first, second[, places[, msg]])
 
    Test that *first* and *second* are approximately equal by computing the
-   difference, rounding to the given number of decimal *places* (default 7), 
+   difference, rounding to the given number of decimal *places* (default 7),
    and comparing to zero.
    Note that comparing a given number of decimal places is not the same as
    comparing a given number of significant digits. If the values do not compare
@@ -606,7 +612,7 @@ failures.
             TestCase.failIfAlmostEqual(first, second[, places[, msg]])
 
    Test that *first* and *second* are not approximately equal by computing the
-   difference, rounding to the given number of decimal *places* (default 7), 
+   difference, rounding to the given number of decimal *places* (default 7),
    and comparing to zero.
    Note that comparing a given number of decimal places is not the same as
    comparing a given number of significant digits. If the values do not compare

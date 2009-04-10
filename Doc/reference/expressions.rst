@@ -560,7 +560,7 @@ or list).  Slicings may be used as expressions or as targets in assignment or
 .. productionlist::
    slicing: `simple_slicing` | `extended_slicing`
    simple_slicing: `primary` "[" `short_slice` "]"
-   extended_slicing: `primary` "[" `slice_list` "]" 
+   extended_slicing: `primary` "[" `slice_list` "]"
    slice_list: `slice_item` ("," `slice_item`)* [","]
    slice_item: `expression` | `proper_slice` | `ellipsis`
    proper_slice: `short_slice` | `long_slice`
@@ -664,7 +664,7 @@ raised.  Otherwise, the list of filled slots is used as the argument list for
 the call.
 
 .. note::
-   
+
    An implementation may provide builtin functions whose positional parameters do
    not have names, even if they are 'named' for the purpose of documentation, and
    which therefore cannot be supplied by keyword.  In CPython, this is the case for
@@ -816,14 +816,14 @@ Raising a negative number to a fractional power results in a :exc:`ValueError`.
 
 .. _unary:
 
-Unary arithmetic operations
-===========================
+Unary arithmetic and bitwise operations
+=======================================
 
 .. index::
    triple: unary; arithmetic; operation
    triple: unary; bitwise; operation
 
-All unary arithmetic (and bitwise) operations have the same priority:
+All unary arithmetic and bitwise operations have the same priority:
 
 .. productionlist::
    u_expr: `power` | "-" `u_expr` | "+" `u_expr` | "~" `u_expr`
@@ -1276,12 +1276,9 @@ groups from right to left).
 +-----------------------------------------------+-------------------------------------+
 | :keyword:`not` *x*                            | Boolean NOT                         |
 +-----------------------------------------------+-------------------------------------+
-| :keyword:`in`, :keyword:`not` :keyword:`in`   | Membership tests                    |
-+-----------------------------------------------+-------------------------------------+
-| :keyword:`is`, :keyword:`is not`              | Identity tests                      |
-+-----------------------------------------------+-------------------------------------+
-| ``<``, ``<=``, ``>``, ``>=``, ``<>``, ``!=``, | Comparisons                         |
-| ``==``                                        |                                     |
+| :keyword:`in`, :keyword:`not` :keyword:`in`,  | Comparisons, including membership   |
+| :keyword:`is`, :keyword:`is not`, ``<``,      | tests and identity tests,           |
+| ``<=``, ``>``, ``>=``, ``<>``, ``!=``, ``==`` |                                     |
 +-----------------------------------------------+-------------------------------------+
 | ``|``                                         | Bitwise OR                          |
 +-----------------------------------------------+-------------------------------------+
@@ -1293,35 +1290,25 @@ groups from right to left).
 +-----------------------------------------------+-------------------------------------+
 | ``+``, ``-``                                  | Addition and subtraction            |
 +-----------------------------------------------+-------------------------------------+
-| ``*``, ``/``, ``%``                           | Multiplication, division, remainder |
+| ``*``, ``/``, ``//``, ``%``                   | Multiplication, division, remainder |
 +-----------------------------------------------+-------------------------------------+
-| ``+x``, ``-x``                                | Positive, negative                  |
+| ``+x``, ``-x``, ``~x``                        | Positive, negative, bitwise NOT     |
 +-----------------------------------------------+-------------------------------------+
-| ``~x``                                        | Bitwise not                         |
+| ``**``                                        | Exponentiation [#]_                 |
 +-----------------------------------------------+-------------------------------------+
-| ``**``                                        | Exponentiation                      |
+| ``x[index]``, ``x[index:index]``,             | Subscription, slicing,              |
+| ``x(arguments...)``, ``x.attribute``          | call, attribute reference           |
 +-----------------------------------------------+-------------------------------------+
-| ``x[index]``                                  | Subscription                        |
-+-----------------------------------------------+-------------------------------------+
-| ``x[index:index]``                            | Slicing                             |
-+-----------------------------------------------+-------------------------------------+
-| ``x(arguments...)``                           | Call                                |
-+-----------------------------------------------+-------------------------------------+
-| ``x.attribute``                               | Attribute reference                 |
-+-----------------------------------------------+-------------------------------------+
-| ``(expressions...)``                          | Binding or tuple display            |
-+-----------------------------------------------+-------------------------------------+
-| ``[expressions...]``                          | List display                        |
-+-----------------------------------------------+-------------------------------------+
-| ``{key:datum...}``                            | Dictionary display                  |
-+-----------------------------------------------+-------------------------------------+
-| ```expressions...```                          | String conversion                   |
+| ``(expressions...)``,                         | Binding or tuple display,           |
+| ``[expressions...]``,                         | list display,                       |
+| ``{key:datum...}``,                           | dictionary display,                 |
+| ```expressions...```                          | string conversion                   |
 +-----------------------------------------------+-------------------------------------+
 
 .. rubric:: Footnotes
 
 .. [#] In Python 2.3 and later releases, a list comprehension "leaks" the control
-   variables of each ``for`` it contains into the containing scope.  However, this 
+   variables of each ``for`` it contains into the containing scope.  However, this
    behavior is deprecated, and relying on it will not work in Python 3.0
 
 .. [#] While ``abs(x%y) < abs(y)`` is true mathematically, for floats it may not be
@@ -1354,7 +1341,10 @@ groups from right to left).
    only, but this caused surprises because people expected to be able to test a
    dictionary for emptiness by comparing it to ``{}``.
 
-.. [#] Due to automatic garbage-collection, free lists, and the dynamic nature of 
+.. [#] Due to automatic garbage-collection, free lists, and the dynamic nature of
    descriptors, you may notice seemingly unusual behaviour in certain uses of
    the :keyword:`is` operator, like those involving comparisons between instance
    methods, or constants.  Check their documentation for more info.
+
+.. [#] The power operator ``**`` binds less tightly than an arithmetic or
+   bitwise unary operator on its right, that is, ``2**-1`` is ``0.5``.

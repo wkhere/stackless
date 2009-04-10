@@ -379,7 +379,7 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 #define SOCKETCLOSE close
 #endif
 
-#if defined(HAVE_BLUETOOTH_H) || defined(HAVE_BLUETOOTH_BLUETOOTH_H)
+#if defined(HAVE_BLUETOOTH_H) || defined(HAVE_BLUETOOTH_BLUETOOTH_H) &&  !defined(__NetBSD__)
 #define USE_BLUETOOTH 1
 #if defined(__FreeBSD__)
 #define BTPROTO_L2CAP BLUETOOTH_PROTO_L2CAP
@@ -3334,7 +3334,11 @@ socket_gethostbyaddr(PyObject *self, PyObject *args)
 #ifdef HAVE_GETHOSTBYNAME_R_3_ARG
 	struct hostent_data data;
 #else
-	char buf[16384];
+	/* glibcs up to 2.10 assume that the buf argument to
+	   gethostbyaddr_r is 8-byte aligned, which at least llvm-gcc
+	   does not ensure. The attribute below instructs the compiler
+	   to maintain this alignment. */
+	char buf[16384] Py_ALIGNED(8);
 	int buf_len = (sizeof buf) - 1;
 	int errnop;
 #endif

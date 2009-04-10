@@ -256,17 +256,14 @@ class MiscReadTest(ReadTest):
     def test_extractall(self):
         # Test if extractall() correctly restores directory permissions
         # and times (see issue1735).
-        if sys.platform == "win32":
-            # Win32 has no support for utime() on directories or
-            # fine grained permissions.
-            return
-
         tar = tarfile.open(tarname, encoding="iso8859-1")
         directories = [t for t in tar if t.isdir()]
         tar.extractall(TEMPDIR, directories)
         for tarinfo in directories:
             path = os.path.join(TEMPDIR, tarinfo.name)
-            self.assertEqual(tarinfo.mode & 0777, os.stat(path).st_mode & 0777)
+            if sys.platform != "win32":
+                # Win32 has no support for fine grained permissions.
+                self.assertEqual(tarinfo.mode & 0777, os.stat(path).st_mode & 0777)
             self.assertEqual(tarinfo.mtime, os.path.getmtime(path))
         tar.close()
 
@@ -1143,6 +1140,30 @@ class Bz2WriteTest(WriteTest):
 class Bz2StreamWriteTest(StreamWriteTest):
     mode = "w|bz2"
 
+class Bz2PartialReadTest(unittest.TestCase):
+    # Issue5068: The _BZ2Proxy.read() method loops forever
+    # on an empty or partial bzipped file.
+
+    def _test_partial_input(self, mode):
+        class MyStringIO(StringIO.StringIO):
+            hit_eof = False
+            def read(self, n):
+                if self.hit_eof:
+                    raise AssertionError("infinite loop detected in tarfile.open()")
+                self.hit_eof = self.pos == self.len
+                return StringIO.StringIO.read(self, n)
+
+        data = bz2.compress(tarfile.TarInfo("foo").tobuf())
+        for x in range(len(data) + 1):
+            tarfile.open(fileobj=MyStringIO(data[:x]), mode=mode)
+
+    def test_partial_input(self):
+        self._test_partial_input("r")
+
+    def test_partial_input_bz2(self):
+        self._test_partial_input("r:bz2")
+
+
 def test_main():
     if not os.path.exists(TEMPDIR):
         os.mkdir(TEMPDIR)
@@ -1199,6 +1220,7 @@ def test_main():
             Bz2StreamReadTest,
             Bz2WriteTest,
             Bz2StreamWriteTest,
+            Bz2PartialReadTest,
         ]
 
     try:

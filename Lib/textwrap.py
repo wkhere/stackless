@@ -17,7 +17,7 @@ import string, re
 #except NameError:
 #    (True, False) = (1, 0)
 
-__all__ = ['TextWrapper', 'wrap', 'fill']
+__all__ = ['TextWrapper', 'wrap', 'fill', 'dedent']
 
 # Hardcode the recognized whitespace characters to the US-ASCII
 # whitespace characters.  The main reason for doing this is that in
@@ -86,7 +86,7 @@ class TextWrapper:
     # (after stripping out empty strings).
     wordsep_re = re.compile(
         r'(\s+|'                                  # any whitespace
-        r'[^\s\w]*\w+[a-zA-Z]-(?=\w+[a-zA-Z])|'   # hyphenated words
+        r'[^\s\w]*\w+[^0-9\W]-(?=\w+[^0-9\W])|'   # hyphenated words
         r'(?<=[\w\!\"\'\&\.\,\?])-{2,}(?=\w))')   # em-dash
 
     # This less funky little regex just split on recognized spaces. E.g.
@@ -124,6 +124,13 @@ class TextWrapper:
         self.drop_whitespace = drop_whitespace
         self.break_on_hyphens = break_on_hyphens
 
+        # recompile the regexes for Unicode mode -- done in this clumsy way for
+        # backwards compatibility because it's rather common to monkey-patch
+        # the TextWrapper class' wordsep_re attribute.
+        self.wordsep_re_uni = re.compile(self.wordsep_re.pattern, re.U)
+        self.wordsep_simple_re_uni = re.compile(
+            self.wordsep_simple_re.pattern, re.U)
+
 
     # -- Private methods -----------------------------------------------
     # (possibly useful for subclasses to override)
@@ -160,10 +167,17 @@ class TextWrapper:
           'use', ' ', 'the', ' ', '-b', ' ', option!'
         otherwise.
         """
-        if self.break_on_hyphens is True:
-            chunks = self.wordsep_re.split(text)
+        if isinstance(text, unicode):
+            if self.break_on_hyphens:
+                pat = self.wordsep_re_uni
+            else:
+                pat = self.wordsep_simple_re_uni
         else:
-            chunks = self.wordsep_simple_re.split(text)
+            if self.break_on_hyphens:
+                pat = self.wordsep_re
+            else:
+                pat = self.wordsep_simple_re
+        chunks = pat.split(text)
         chunks = filter(None, chunks)  # remove empty chunks
         return chunks
 

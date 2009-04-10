@@ -3,6 +3,9 @@
 #
 # Depends on `multiprocessing` package -- tested with `processing-0.60`
 #
+# Copyright (c) 2006-2008, R Oudkerk
+# All rights reserved.
+#
 
 __all__ = ['Cluster', 'Host', 'get_logger', 'current_process']
 
@@ -53,7 +56,7 @@ try:
     slot_count = cpu_count()
 except NotImplemented:
     slot_count = 1
-        
+
 #
 # Manager type which spawns subprocesses
 #
@@ -61,7 +64,7 @@ except NotImplemented:
 class HostManager(managers.SyncManager):
     '''
     Manager type used for spawning processes on a (presumably) foreign host
-    '''    
+    '''
     def __init__(self, address, authkey):
         managers.SyncManager.__init__(self, address, authkey)
         self._name = 'Host-unknown'
@@ -95,7 +98,7 @@ class HostManager(managers.SyncManager):
     @staticmethod
     def _finalize_host(address, authkey, name):
         managers.transact(address, authkey, 'shutdown')
-        
+
     def __repr__(self):
         return '<Host(%s)>' % self._name
 
@@ -112,12 +115,12 @@ class RemoteProcess(Process):
         Process.__init__(self)
         self._data = data
         self._main_path = main_path
-        
+
     def _bootstrap(self):
         forking.prepare({'main_path': self._main_path})
         self._target, self._args, self._kwargs = pickle.loads(self._data)
         return Process._bootstrap(self)
-        
+
     def get_identity(self):
         return self._identity
 
@@ -128,13 +131,13 @@ HostManager.register('_RemoteProcess', RemoteProcess)
 #
 
 class DistributedPool(pool.Pool):
-    
+
     def __init__(self, cluster, processes=None, initializer=None, initargs=()):
         self._cluster = cluster
         self.Process = cluster.Process
         pool.Pool.__init__(self, processes or len(cluster),
                            initializer, initargs)
-        
+
     def _setup_queues(self):
         self._inqueue = self._cluster._SettableQueue()
         self._outqueue = self._cluster._SettableQueue()
@@ -157,7 +160,7 @@ def LocalProcess(**kwds):
 class Cluster(managers.SyncManager):
     '''
     Represents collection of slots running on various hosts.
-    
+
     `Cluster` is a subclass of `SyncManager` so it allows creation of
     various types of shared objects.
     '''
@@ -172,12 +175,12 @@ class Cluster(managers.SyncManager):
             if file.endswith('.pyc') or file.endswith('.pyo'):
                 files[i] = file[:-4] + '.py'
         self._files = [os.path.abspath(file) for file in files]
-        
+
     def start(self):
         managers.SyncManager.start(self)
-        
+
         l = connection.Listener(family='AF_INET', authkey=self._authkey)
-        
+
         for i, host in enumerate(self._hostlist):
             host._start_manager(i, self._authkey, l.address, self._files)
 
@@ -201,13 +204,13 @@ class Cluster(managers.SyncManager):
         self._slot_iterator = itertools.cycle(self._slotlist)
         self._base_shutdown = self.shutdown
         del self.shutdown
-        
+
     def shutdown(self):
         for host in self._hostlist:
             if host.hostname != 'localhost':
                 host.manager.shutdown()
         self._base_shutdown()
-        
+
     def Process(self, group=None, target=None, name=None, args=(), kwargs={}):
         slot = self._slot_iterator.next()
         return slot.Process(
@@ -216,7 +219,7 @@ class Cluster(managers.SyncManager):
 
     def Pool(self, processes=None, initializer=None, initargs=()):
         return DistributedPool(self, processes, initializer, initargs)
-    
+
     def __getitem__(self, i):
         return self._slotlist[i]
 
@@ -245,7 +248,7 @@ class SettableQueue(Queue.Queue):
             self.not_empty.notifyAll()
         finally:
             self.not_empty.release()
-            
+
 Cluster.register('_SettableQueue', SettableQueue)
 
 #
@@ -278,7 +281,7 @@ class Host(object):
     def __init__(self, hostname, slots=None):
         self.hostname = hostname
         self.slots = slots
-        
+
     def _start_manager(self, index, authkey, address, files):
         if self.hostname != 'localhost':
             tempdir = copy_to_remote_temporary_directory(self.hostname, files)
@@ -327,7 +330,7 @@ def copy_to_remote_temporary_directory(host, files):
 # Code which runs a host manager
 #
 
-def main():   
+def main():
     # get data from parent over stdin
     data = pickle.load(sys.stdin)
     sys.stdin.close()
@@ -335,27 +338,27 @@ def main():
     # set some stuff
     _logger.setLevel(data['dist_log_level'])
     forking.prepare(data)
-    
+
     # create server for a `HostManager` object
     server = managers.Server(HostManager._registry, ('', 0), data['authkey'])
     current_process()._server = server
-    
+
     # report server address and number of cpus back to parent
     conn = connection.Client(data['parent_address'], authkey=data['authkey'])
     conn.send((data['index'], server.address, slot_count))
     conn.close()
-    
+
     # set name etc
     current_process().set_name('Host-%s:%s' % server.address)
     util._run_after_forkers()
-    
+
     # register a cleanup function
     def cleanup(directory):
         debug('removing directory %s', directory)
         shutil.rmtree(directory)
         debug('shutting down host manager')
     util.Finalize(None, cleanup, args=[data['dir']], exitpriority=0)
-    
+
     # start host manager
     debug('remote host manager starting in %s', data['dir'])
     server.serve_forever()

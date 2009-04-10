@@ -61,7 +61,7 @@ The object-oriented interface uses essentially two+two classes:
 
 The procedural interface provides functions which are derived from the methods
 of the classes :class:`Screen` and :class:`Turtle`.  They have the same names as
-the corresponding methods.  A screen object is automativally created whenever a
+the corresponding methods.  A screen object is automatically created whenever a
 function derived from a Screen method is called.  An (unnamed) turtle object is
 automatically created whenever any of the functions derived from a Turtle method
 is called.
@@ -325,8 +325,7 @@ Turtle motion
 
    :param y: a number (integer or float)
 
-   Set the turtle's first coordinate to *y*, leave second coordinate
-   unchanged.
+   Set the turtle's second coordinate to *y*, leave first coordinate unchanged.
 
    >>> turtle.position()
    (0.00, 40.00)
@@ -1587,7 +1586,7 @@ The public classes of the module :mod:`turtle`
 
    Subclass of TurtleScreen, with :ref:`four methods added <screenspecific>`.
 
-   
+
 .. class:: ScrolledCavas(master)
 
    :param master: some Tkinter widget to contain the ScrolledCanvas, i.e.
@@ -1609,16 +1608,16 @@ The public classes of the module :mod:`turtle`
    =========== ===========
    "polygon"   a polygon-tuple, i.e. a tuple of pairs of coordinates
    "image"     an image  (in this form only used internally!)
-   "compound"  ``None`` (a compund shape has to be constructed using the
+   "compound"  ``None`` (a compound shape has to be constructed using the
                :meth:`addcomponent` method)
    =========== ===========
-                
+
    .. method:: addcomponent(poly, fill, outline=None)
 
       :param poly: a polygon, i.e. a tuple of pairs of numbers
       :param fill: a color the *poly* will be filled with
       :param outline: a color for the poly's outline (if given)
-     
+
       Example:
 
       >>> poly = ((0,0),(10,-5),(0,10),(-10,-5))
@@ -1662,31 +1661,31 @@ facilities:
 
      >>> help(Screen.bgcolor)
      Help on method bgcolor in module turtle:
-    
+
      bgcolor(self, *args) unbound turtle.Screen method
          Set or return backgroundcolor of the TurtleScreen.
-    
+
          Arguments (if given): a color string or three numbers
          in the range 0..colormode or a 3-tuple of such numbers.
-    
-    
+
+
            >>> screen.bgcolor("orange")
            >>> screen.bgcolor()
            "orange"
            >>> screen.bgcolor(0.5,0,0.5)
            >>> screen.bgcolor()
            "#800080"
-    
+
      >>> help(Turtle.penup)
      Help on method penup in module turtle:
-    
+
      penup(self) unbound turtle.Turtle method
          Pull the pen up -- no drawing when moving.
-    
+
          Aliases: penup | pu | up
-    
+
          No argument
-    
+
          >>> turtle.penup()
 
 - The docstrings of the functions which are derived from methods have a modified
@@ -1694,32 +1693,32 @@ facilities:
 
      >>> help(bgcolor)
      Help on function bgcolor in module turtle:
-    
+
      bgcolor(*args)
          Set or return backgroundcolor of the TurtleScreen.
-    
+
          Arguments (if given): a color string or three numbers
          in the range 0..colormode or a 3-tuple of such numbers.
-    
+
          Example::
-    
+
            >>> bgcolor("orange")
            >>> bgcolor()
            "orange"
            >>> bgcolor(0.5,0,0.5)
            >>> bgcolor()
            "#800080"
-    
+
      >>> help(penup)
      Help on function penup in module turtle:
-    
+
      penup()
          Pull the pen up -- no drawing when moving.
-    
+
          Aliases: penup | pu | up
-    
+
          No argument
-    
+
          Example:
          >>> penup()
 
@@ -1831,7 +1830,7 @@ There is a set of demo scripts in the turtledemo directory located in the
 
 It contains:
 
-- a set of 15 demo scripts demonstrating differet features of the new module
+- a set of 15 demo scripts demonstrating different features of the new module
   :mod:`turtle`
 - a demo viewer :file:`turtleDemo.py` which can be used to view the sourcecode
   of the scripts and run them at the same time. 14 of the examples can be

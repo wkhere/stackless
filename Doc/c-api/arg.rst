@@ -46,12 +46,12 @@ variable(s) whose address should be passed.
    :ctype:`Py_ssize_t` rather than an int.
 
 ``s*`` (string, Unicode, or any buffer compatible object) [Py_buffer \*]
-  Similar to ``s#``, this code fills a Py_buffer structure provided by the caller.
-  The buffer gets locked, so that the caller can subsequently use the buffer even
-  inside a ``Py_BEGIN_ALLOW_THREADS`` block; the caller is responsible for calling
-  ``PyBuffer_Release`` with the structure after it has processed the data.
+   Similar to ``s#``, this code fills a Py_buffer structure provided by the caller.
+   The buffer gets locked, so that the caller can subsequently use the buffer even
+   inside a ``Py_BEGIN_ALLOW_THREADS`` block; the caller is responsible for calling
+   ``PyBuffer_Release`` with the structure after it has processed the data.
 
-  .. versionadded:: 2.6
+   .. versionadded:: 2.6
 
 ``z`` (string or ``None``) [const char \*]
    Like ``s``, but the Python object may also be ``None``, in which case the C
@@ -63,7 +63,7 @@ variable(s) whose address should be passed.
 ``z*`` (string or ``None`` or any buffer compatible object) [Py_buffer*]
    This is to ``s*`` as ``z`` is to ``s``.
 
-  .. versionadded:: 2.6
+   .. versionadded:: 2.6
 
 ``u`` (Unicode object) [Py_UNICODE \*]
    Convert a Python Unicode object to a C pointer to a NUL-terminated buffer of
@@ -136,8 +136,9 @@ variable(s) whose address should be passed.
    them. Instead, the implementation assumes that the string object uses the
    encoding passed in as parameter.
 
-``b`` (integer) [char]
-   Convert a Python integer to a tiny int, stored in a C :ctype:`char`.
+``b`` (integer) [unsigned char]
+   Convert a nonnegative Python integer to an unsigned tiny int, stored in a C
+   :ctype:`unsigned char`.
 
 ``B`` (integer) [unsigned char]
    Convert a Python integer to a tiny int without overflow checking, stored in a C
@@ -260,6 +261,7 @@ variable(s) whose address should be passed.
 
 ``w*`` (read-write byte-oriented buffer) [Py_buffer \*]
    This is to ``w`` what ``s*`` is to ``s``.
+
    .. versionadded:: 2.6
 
 ``(items)`` (tuple) [*matching-items*]
@@ -297,8 +299,8 @@ inside nested parentheses.  They are:
 
 ``;``
    The list of format units ends here; the string after the semicolon is used as
-   the error message *instead* of the default error message.  Clearly, ``:`` and
-   ``;`` mutually exclude each other.
+   the error message *instead* of the default error message.  ``:`` and ``;``
+   mutually exclude each other.
 
 Note that any Python object references which are provided to the caller are
 *borrowed* references; do not decrement their reference count!
@@ -533,3 +535,8 @@ and the following format units are left untouched.
 
    If there is an error in the format string, the :exc:`SystemError` exception is
    set and *NULL* returned.
+
+.. cfunction:: PyObject* Py_VaBuildValue(const char *format, va_list vargs)
+
+   Identical to :cfunc:`Py_BuildValue`, except that it accepts a va_list
+   rather than a variable number of arguments.

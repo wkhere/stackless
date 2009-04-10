@@ -49,7 +49,7 @@ High-level interface
    .. index:: module: mimetools
 
    The :meth:`info` method returns an instance of the class
-   :class:`mimetools.Message` containing meta-information associated with the
+   :class:`httplib.HTTPMessage` containing meta-information associated with the
    URL.  When the method is HTTP, these headers are those returned by the server
    at the head of the retrieved HTML page (including Content-Length and
    Content-Type).  When the method is FTP, a Content-Length header will be
@@ -123,7 +123,7 @@ High-level interface
    .. versionchanged:: 2.6
       Added :meth:`getcode` to returned object and support for the
       :envvar:`no_proxy` environment variable.
-      
+
    .. deprecated:: 2.6
       The :func:`urlopen` function has been removed in Python 3.0 in favor
       of :func:`urllib2.urlopen`.

@@ -139,6 +139,8 @@ class FractionTest(unittest.TestCase):
     def testFromFloat(self):
         self.assertRaises(TypeError, F.from_float, 3+4j)
         self.assertEquals((10, 1), _components(F.from_float(10)))
+        bigint = 1234567890123456789
+        self.assertEquals((bigint, 1), _components(F.from_float(bigint)))
         self.assertEquals((0, 1), _components(F.from_float(-0.0)))
         self.assertEquals((10, 1), _components(F.from_float(10.0)))
         self.assertEquals((-5, 2), _components(F.from_float(-2.5)))
@@ -391,6 +393,11 @@ class FractionTest(unittest.TestCase):
         self.assertEqual(r, loads(dumps(r)))
         self.assertEqual(id(r), id(copy(r)))
         self.assertEqual(id(r), id(deepcopy(r)))
+
+    def test_slots(self):
+        # Issue 4998
+        r = F(13, 7)
+        self.assertRaises(AttributeError, setattr, r, 'a', 10)
 
 def test_main():
     run_unittest(FractionTest, GcdTest)

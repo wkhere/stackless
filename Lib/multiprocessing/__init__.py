@@ -48,7 +48,7 @@ __all__ = [
     'allow_connection_pickling', 'BufferTooShort', 'TimeoutError',
     'Lock', 'RLock', 'Semaphore', 'BoundedSemaphore', 'Condition',
     'Event', 'Queue', 'JoinableQueue', 'Pool', 'Value', 'Array',
-    'RawValue', 'RawArray'
+    'RawValue', 'RawArray', 'SUBDEBUG', 'SUBWARNING',
     ]
 
 __author__ = 'R. Oudkerk (r.m.oudkerk@gmail.com)'
@@ -61,6 +61,7 @@ import os
 import sys
 
 from multiprocessing.process import Process, current_process, active_children
+from multiprocessing.util import SUBDEBUG, SUBWARNING
 
 #
 # Exceptions
@@ -113,7 +114,7 @@ def cpu_count():
             num = int(os.environ['NUMBER_OF_PROCESSORS'])
         except (ValueError, KeyError):
             num = 0
-    elif sys.platform == 'darwin':
+    elif 'bsd' in sys.platform or sys.platform == 'darwin':
         try:
             num = int(os.popen('sysctl -n hw.ncpu').read())
         except ValueError:

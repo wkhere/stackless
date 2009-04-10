@@ -109,7 +109,7 @@ The following exceptions are raised as appropriate:
 
    .. attribute:: code
 
-      An HTTP status code as defined in `RFC 2616 <http://www.faqs.org/rfcs/rfc2616.html>`_. 
+      An HTTP status code as defined in `RFC 2616 <http://www.faqs.org/rfcs/rfc2616.html>`_.
       This numeric value corresponds to a value found in the dictionary of
       codes as found in :attr:`BaseHTTPServer.BaseHTTPRequestHandler.responses`.
 
@@ -391,23 +391,23 @@ OpenerDirector Objects
 
 .. method:: OpenerDirector.add_handler(handler)
 
-   *handler* should be an instance of :class:`BaseHandler`.  The following methods
-   are searched, and added to the possible chains (note that HTTP errors are a
-   special case).
+   *handler* should be an instance of :class:`BaseHandler`.  The following
+   methods are searched, and added to the possible chains (note that HTTP errors
+   are a special case).
 
-   * :meth:`protocol_open` --- signal that the handler knows how to open *protocol*
-     URLs.
+   * :samp:`{protocol}_open` --- signal that the handler knows how to open
+     *protocol* URLs.
 
-   * :meth:`http_error_type` --- signal that the handler knows how to handle HTTP
-     errors with HTTP error code *type*.
+   * :samp:`http_error_{type}` --- signal that the handler knows how to handle
+     HTTP errors with HTTP error code *type*.
 
-   * :meth:`protocol_error` --- signal that the handler knows how to handle errors
-     from (non-\ ``http``) *protocol*.
+   * :samp:`{protocol}_error` --- signal that the handler knows how to handle
+     errors from (non-\ ``http``) *protocol*.
 
-   * :meth:`protocol_request` --- signal that the handler knows how to pre-process
-     *protocol* requests.
+   * :samp:`{protocol}_request` --- signal that the handler knows how to
+     pre-process *protocol* requests.
 
-   * :meth:`protocol_response` --- signal that the handler knows how to
+   * :samp:`{protocol}_response` --- signal that the handler knows how to
      post-process *protocol* responses.
 
 
@@ -441,24 +441,24 @@ OpenerDirector objects open URLs in three stages:
 The order in which these methods are called within each stage is determined by
 sorting the handler instances.
 
-#. Every handler with a method named like :meth:`protocol_request` has that
+#. Every handler with a method named like :samp:`{protocol}_request` has that
    method called to pre-process the request.
 
-#. Handlers with a method named like :meth:`protocol_open` are called to handle
+#. Handlers with a method named like :samp:`{protocol}_open` are called to handle
    the request. This stage ends when a handler either returns a non-\ :const:`None`
    value (ie. a response), or raises an exception (usually :exc:`URLError`).
    Exceptions are allowed to propagate.
 
    In fact, the above algorithm is first tried for methods named
-   :meth:`default_open`.  If all such methods return :const:`None`, the algorithm
-   is repeated for methods named like :meth:`protocol_open`.  If all such methods
-   return :const:`None`, the algorithm is repeated for methods named
-   :meth:`unknown_open`.
+   :meth:`default_open`.  If all such methods return :const:`None`, the
+   algorithm is repeated for methods named like :samp:`{protocol}_open`.  If all
+   such methods return :const:`None`, the algorithm is repeated for methods
+   named :meth:`unknown_open`.
 
    Note that the implementation of these methods may involve calls of the parent
    :class:`OpenerDirector` instance's :meth:`.open` and :meth:`.error` methods.
 
-#. Every handler with a method named like :meth:`protocol_response` has that
+#. Every handler with a method named like :samp:`{protocol}_response` has that
    method called to post-process the response.
 
 
@@ -514,8 +514,10 @@ The following members and methods should only be used by classes derived from
 .. method:: BaseHandler.protocol_open(req)
    :noindex:
 
+   ("protocol" is to be replaced by the protocol name.)
+
    This method is *not* defined in :class:`BaseHandler`, but subclasses should
-   define it if they want to handle URLs with the given protocol.
+   define it if they want to handle URLs with the given *protocol*.
 
    This method, if defined, will be called by the parent :class:`OpenerDirector`.
    Return values should be the same as for  :meth:`default_open`.
@@ -563,8 +565,10 @@ The following members and methods should only be used by classes derived from
 .. method:: BaseHandler.protocol_request(req)
    :noindex:
 
+   ("protocol" is to be replaced by the protocol name.)
+
    This method is *not* defined in :class:`BaseHandler`, but subclasses should
-   define it if they want to pre-process requests of the given protocol.
+   define it if they want to pre-process requests of the given *protocol*.
 
    This method, if defined, will be called by the parent :class:`OpenerDirector`.
    *req* will be a :class:`Request` object. The return value should be a
@@ -574,8 +578,10 @@ The following members and methods should only be used by classes derived from
 .. method:: BaseHandler.protocol_response(req, response)
    :noindex:
 
+   ("protocol" is to be replaced by the protocol name.)
+
    This method is *not* defined in :class:`BaseHandler`, but subclasses should
-   define it if they want to post-process responses of the given protocol.
+   define it if they want to post-process responses of the given *protocol*.
 
    This method, if defined, will be called by the parent :class:`OpenerDirector`.
    *req* will be a :class:`Request` object. *response* will be an object
@@ -596,14 +602,15 @@ HTTPRedirectHandler Objects
    precise meanings of the various redirection codes.
 
 
-.. method:: HTTPRedirectHandler.redirect_request(req, fp, code, msg, hdrs)
+.. method:: HTTPRedirectHandler.redirect_request(req, fp, code, msg, hdrs, newurl)
 
    Return a :class:`Request` or ``None`` in response to a redirect. This is called
    by the default implementations of the :meth:`http_error_30\*` methods when a
    redirection is received from the server.  If a redirection should take place,
    return a new :class:`Request` to allow :meth:`http_error_30\*` to perform the
-   redirect.  Otherwise, raise :exc:`HTTPError` if no other handler should try to
-   handle this URL, or return ``None`` if you can't but another handler might.
+   redirect to *newurl*.  Otherwise, raise :exc:`HTTPError` if no other handler
+   should try to handle this URL, or return ``None`` if you can't but another
+   handler might.
 
    .. note::
 
@@ -616,8 +623,8 @@ HTTPRedirectHandler Objects
 
 .. method:: HTTPRedirectHandler.http_error_301(req, fp, code, msg, hdrs)
 
-   Redirect to the ``Location:`` URL.  This method is called by the parent
-   :class:`OpenerDirector` when getting an HTTP 'moved permanently' response.
+   Redirect to the ``Location:`` or ``URI:`` URL.  This method is called by the
+   parent :class:`OpenerDirector` when getting an HTTP 'moved permanently' response.
 
 
 .. method:: HTTPRedirectHandler.http_error_302(req, fp, code, msg, hdrs)
@@ -660,7 +667,9 @@ ProxyHandler Objects
 .. method:: ProxyHandler.protocol_open(request)
    :noindex:
 
-   The :class:`ProxyHandler` will have a method :meth:`protocol_open` for every
+   ("protocol" is to be replaced by the protocol name.)
+
+   The :class:`ProxyHandler` will have a method :samp:`{protocol}_open` for every
    *protocol* which has a proxy in the *proxies* dictionary given in the
    constructor.  The method will modify requests to go through the proxy, by
    calling ``request.set_proxy()``, and call the next handler in the chain to
@@ -865,9 +874,10 @@ HTTPErrorProcessor Objects
    For 200 error codes, the response object is returned immediately.
 
    For non-200 error codes, this simply passes the job on to the
-   :meth:`protocol_error_code` handler methods, via :meth:`OpenerDirector.error`.
-   Eventually, :class:`urllib2.HTTPDefaultErrorHandler` will raise an
-   :exc:`HTTPError` if no other handler handles the error.
+   :samp:`{protocol}_error_code` handler methods, via
+   :meth:`OpenerDirector.error`.  Eventually,
+   :class:`urllib2.HTTPDefaultErrorHandler` will raise an :exc:`HTTPError` if no
+   other handler handles the error.
 
 
 .. _urllib2-examples:
