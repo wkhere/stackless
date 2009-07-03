@@ -272,6 +272,7 @@ PYTHON_OBJS=	\
 		Stackless/module/stacklessmodule.o \
 		Stackless/module/taskletobject.o \
 		Stackless/pickling/prickelpit.o \
+		Stackless/pickling/safe_pickle.o \
 		Python/compile.o \
 		Python/codecs.o \
 		Python/errors.o \
