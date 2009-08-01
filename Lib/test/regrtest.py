@@ -114,9 +114,6 @@ resources to test.  Currently only the following are defined:
     network -   It is okay to run tests that use external network
                 resource, e.g. testing SSL support for sockets.
 
-    bsddb -     It is okay to run the bsddb testsuite, which takes
-                a long time to complete.
-
     decimal -   Test the decimal module against a large suite that
                 verifies compliance with standards.
 
@@ -130,8 +127,8 @@ resources to test.  Currently only the following are defined:
     gui -       Run tests that require a running GUI.
 
 To enable all resources except one, use '-uall,-<resource>'.  For
-example, to run all the tests except for the bsddb tests, give the
-option '-uall,-bsddb'.
+example, to run all the tests except for the gui tests, give the
+option '-uall,-gui'.
 """
 
 import getopt
@@ -182,7 +179,7 @@ if sys.platform == 'darwin':
 
 from test import support
 
-RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network', 'bsddb',
+RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network',
                   'decimal', 'compiler', 'subprocess', 'urlfetch', 'gui')
 
 
@@ -598,6 +595,7 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
     else:
         cfp = io.StringIO()  # XXX Should use io.StringIO()
 
+    refleak = False  # True if the test leaked references.
     try:
         save_stdout = sys.stdout
         try:
@@ -619,7 +617,7 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
             if indirect_test is not None:
                 indirect_test()
             if huntrleaks:
-                dash_R(the_module, test, indirect_test, huntrleaks)
+                refleak = dash_R(the_module, test, indirect_test, huntrleaks)
             test_time = time.time() - start_time
             test_times.append((test_time, test))
         finally:
@@ -649,6 +647,8 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
             sys.stdout.flush()
         return 0
     else:
+        if refleak:
+            return 0
         if not cfp:
             return 1
         output = cfp.getvalue()
@@ -663,6 +663,7 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
 
 def cleanup_test_droppings(testname, verbose):
     import shutil
+    import stat
 
     # Try to clean up junk commonly left behind.  While tests shouldn't leave
     # any files or directories behind, when a test fails that can be tedious
@@ -687,12 +688,21 @@ def cleanup_test_droppings(testname, verbose):
         if verbose:
             print("%r left behind %s %r" % (testname, kind, name))
         try:
+            # if we have chmod, fix possible permissions problems
+            # that might prevent cleanup
+            if (hasattr(os, 'chmod')):
+                os.chmod(name, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
             nuker(name)
         except Exception as msg:
             print(("%r left behind %s %r and it couldn't be "
                 "removed: %s" % (testname, kind, name, msg)), file=sys.stderr)
 
 def dash_R(the_module, test, indirect_test, huntrleaks):
+    """Run a test multiple times, looking for reference leaks.
+
+    Returns:
+        False if the test didn't leak references; True if we detected refleaks.
+    """
     # This code is hackish and inelegant, but it seems to do the job.
     import copyreg, _abcoll
 
@@ -740,6 +750,8 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
         refrep = open(fname, "a")
         print(msg, file=refrep)
         refrep.close()
+        return True
+    return False
 
 def dash_R_cleanup(fs, ps, pic, abcs):
     import gc, copyreg
@@ -885,7 +897,6 @@ _expectations = {
     'win32':
         """
         test__locale
-        test_bsddb3
         test_crypt
         test_curses
         test_dbm
@@ -922,8 +933,6 @@ _expectations = {
    'mac':
         """
         test_atexit
-        test_bsddb
-        test_bsddb3
         test_bz2
         test_crypt
         test_curses
@@ -951,7 +960,6 @@ _expectations = {
         """,
     'unixware7':
         """
-        test_bsddb
         test_epoll
         test_largefile
         test_kqueue
@@ -963,7 +971,6 @@ _expectations = {
         """,
     'openunix8':
         """
-        test_bsddb
         test_epoll
         test_largefile
         test_kqueue
@@ -976,7 +983,6 @@ _expectations = {
     'sco_sv3':
         """
         test_asynchat
-        test_bsddb
         test_fork1
         test_epoll
         test_gettext
@@ -997,8 +1003,6 @@ _expectations = {
     'darwin':
         """
         test__locale
-        test_bsddb
-        test_bsddb3
         test_curses
         test_epoll
         test_dbm_gnu
@@ -1010,7 +1014,6 @@ _expectations = {
         """,
     'sunos5':
         """
-        test_bsddb
         test_curses
         test_dbm
         test_epoll
@@ -1023,7 +1026,6 @@ _expectations = {
         """,
     'hp-ux11':
         """
-        test_bsddb
         test_curses
         test_epoll
         test_dbm_gnu
@@ -1053,7 +1055,6 @@ _expectations = {
         """,
     'cygwin':
         """
-        test_bsddb3
         test_curses
         test_dbm
         test_epoll
@@ -1067,7 +1068,6 @@ _expectations = {
     'os2emx':
         """
         test_audioop
-        test_bsddb3
         test_curses
         test_epoll
         test_kqueue
@@ -1081,8 +1081,6 @@ _expectations = {
         """,
     'freebsd4':
         """
-        test_bsddb
-        test_bsddb3
         test_epoll
         test_dbm_gnu
         test_locale
@@ -1100,8 +1098,6 @@ _expectations = {
         """,
     'aix5':
         """
-        test_bsddb
-        test_bsddb3
         test_bz2
         test_epoll
         test_dbm_gnu
@@ -1117,8 +1113,6 @@ _expectations = {
         """,
     'openbsd3':
         """
-        test_bsddb
-        test_bsddb3
         test_ctypes
         test_epoll
         test_dbm_gnu
@@ -1134,8 +1128,6 @@ _expectations = {
         """,
     'netbsd3':
         """
-        test_bsddb
-        test_bsddb3
         test_ctypes
         test_curses
         test_epoll

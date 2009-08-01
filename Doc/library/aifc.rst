@@ -1,4 +1,3 @@
-
 :mod:`aifc` --- Read and write AIFF and AIFC files
 ==================================================
 
@@ -16,10 +15,11 @@ AIFF is Audio Interchange File Format, a format for storing digital audio
 samples in a file.  AIFF-C is a newer version of the format that includes the
 ability to compress the audio data.
 
-.. warning::
+.. note::
 
    Some operations may only work under IRIX; these will raise :exc:`ImportError`
-   when attempting to import the :mod:`cl` module, which is only available on IRIX.
+   when attempting to import the :mod:`cl` module, which is only available on
+   IRIX.
 
 Audio files have a number of parameters that describe the audio data. The
 sampling rate or frame rate is the number of times per second the sound is
@@ -74,14 +74,16 @@ following methods:
 
 .. method:: aifc.getcomptype()
 
-   Return a four-character string describing the type of compression used in the
-   audio file.  For AIFF files, the returned value is ``'NONE'``.
+   Return a bytes array of length 4 describing the type of compression
+   used in the audio file.  For AIFF files, the returned value is
+   ``b'NONE'``.
 
 
 .. method:: aifc.getcompname()
 
-   Return a human-readable description of the type of compression used in the audio
-   file.  For AIFF files, the returned value is ``'not compressed'``.
+   Return a bytes array convertible to a human-readable description
+   of the type of compression used in the audio file.  For AIFF files,
+   the returned value is ``b'not compressed'``.
 
 
 .. method:: aifc.getparams()
@@ -180,11 +182,12 @@ number of frames must be filled in.
       single: A-LAW
       single: G.722
 
-   Specify the compression type.  If not specified, the audio data will not be
-   compressed.  In AIFF files, compression is not possible.  The name parameter
-   should be a human-readable description of the compression type, the type
-   parameter should be a four-character string.  Currently the following
-   compression types are supported: NONE, ULAW, ALAW, G722.
+   Specify the compression type.  If not specified, the audio data will
+   not be compressed.  In AIFF files, compression is not possible.
+   The name parameter should be a human-readable description of the
+   compression type as a bytes array, the type parameter should be a
+   bytes array of length 4.  Currently the following compression types
+   are supported: ``b'NONE'``, ``b'ULAW'``, ``b'ALAW'``, ``b'G722'``.
 
 
 .. method:: aifc.setparams(nchannels, sampwidth, framerate, comptype, compname)

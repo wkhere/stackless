@@ -9,6 +9,7 @@ import os
 import os.path
 from test import support
 from test.support import TESTFN
+TESTFN2 = TESTFN + "2"
 
 class TestShutil(unittest.TestCase):
     def test_rmtree_errors(self):
@@ -45,9 +46,23 @@ class TestShutil(unittest.TestCase):
             shutil.rmtree(TESTFN)
 
     def check_args_to_onerror(self, func, arg, exc):
+        # test_rmtree_errors deliberately runs rmtree
+        # on a directory that is chmod 400, which will fail.
+        # This function is run when shutil.rmtree fails.
+        # 99.9% of the time it initially fails to remove
+        # a file in the directory, so the first time through
+        # func is os.remove.
+        # However, some Linux machines running ZFS on
+        # FUSE experienced a failure earlier in the process
+        # at os.listdir.  The first failure may legally
+        # be either.
         if self.errorState == 0:
-            self.assertEqual(func, os.remove)
-            self.assertEqual(arg, self.childpath)
+            if func is os.remove:
+                self.assertEqual(arg, self.childpath)
+            else:
+                self.assertIs(func, os.listdir,
+                              "func must be either os.remove or os.listdir")
+                self.assertEqual(arg, TESTFN)
             self.failUnless(issubclass(exc[0], OSError))
             self.errorState = 1
         else:
@@ -225,6 +240,38 @@ class TestShutil(unittest.TestCase):
                 self.assertRaises(OSError, shutil.rmtree, dst)
             finally:
                 shutil.rmtree(TESTFN, ignore_errors=True)
+
+    if hasattr(os, "mkfifo"):
+        # Issue #3002: copyfile and copytree block indefinitely on named pipes
+        def test_copyfile_named_pipe(self):
+            os.mkfifo(TESTFN)
+            try:
+                self.assertRaises(shutil.SpecialFileError,
+                                  shutil.copyfile, TESTFN, TESTFN2)
+                self.assertRaises(shutil.SpecialFileError,
+                                  shutil.copyfile, __file__, TESTFN)
+            finally:
+                os.remove(TESTFN)
+
+        def test_copytree_named_pipe(self):
+            os.mkdir(TESTFN)
+            try:
+                subdir = os.path.join(TESTFN, "subdir")
+                os.mkdir(subdir)
+                pipe = os.path.join(subdir, "mypipe")
+                os.mkfifo(pipe)
+                try:
+                    shutil.copytree(TESTFN, TESTFN2)
+                except shutil.Error as e:
+                    errors = e.args[0]
+                    self.assertEqual(len(errors), 1)
+                    src, dst, error_msg = errors[0]
+                    self.assertEqual("`%s` is a named pipe" % pipe, error_msg)
+                else:
+                    self.fail("shutil.Error should have been raised")
+            finally:
+                shutil.rmtree(TESTFN, ignore_errors=True)
+                shutil.rmtree(TESTFN2, ignore_errors=True)
 
 
 class TestMove(unittest.TestCase):

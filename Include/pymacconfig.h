@@ -17,6 +17,12 @@
 # undef SIZEOF_VOID_P
 # undef SIZEOF__BOOL
 # undef WORDS_BIGENDIAN
+# undef DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754
+# undef DOUBLE_IS_BIG_ENDIAN_IEEE754
+# undef DOUBLE_IS_LITTLE_ENDIAN_IEEE754
+/* we don't ever need to play with the x87 control word on OS X/Intel, so just
+   pretend that we can't, to avoid problems on Intel+PPC builds */
+# undef HAVE_GCC_ASM_FOR_X87
 
 #    undef VA_LIST_IS_ARRAY
 #    if defined(__LP64__) && defined(__x86_64__)
@@ -65,7 +71,22 @@
 
 #ifdef __BIG_ENDIAN__
 #define WORDS_BIGENDIAN 1
+#define DOUBLE_IS_BIG_ENDIAN_IEEE754
+#else
+#define DOUBLE_IS_LITTLE_ENDIAN_IEEE754
 #endif /* __BIG_ENDIAN */
+
+	/* 
+	 * The definition in pyconfig.h is only valid on the OS release
+	 * where configure ran on and not necessarily for all systems where
+	 * the executable can be used on. 
+	 * 
+	 * Specifically: OSX 10.4 has limited supported for '%zd', while
+	 * 10.5 has full support for '%zd'. A binary built on 10.5 won't
+	 * work properly on 10.4 unless we surpress the definition
+	 * of PY_FORMAT_SIZE_T
+	 */
+#undef	PY_FORMAT_SIZE_T
 
 
 #endif /* defined(_APPLE__) */

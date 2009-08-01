@@ -15,6 +15,18 @@
 /* Define if you have the Mach cthreads package */
 #undef C_THREADS
 
+/* Define if C doubles are 64-bit IEEE 754 binary format, stored in ARM
+   mixed-endian order (byte order 45670123) */
+#undef DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754
+
+/* Define if C doubles are 64-bit IEEE 754 binary format, stored with the most
+   significant byte first */
+#undef DOUBLE_IS_BIG_ENDIAN_IEEE754
+
+/* Define if C doubles are 64-bit IEEE 754 binary format, stored with the
+   least significant byte first */
+#undef DOUBLE_IS_LITTLE_ENDIAN_IEEE754
+
 /* Define if --enable-ipv6 is specified */
 #undef ENABLE_IPV6
 
@@ -73,6 +85,9 @@
 
 /* Define if pthread_sigmask() does not work on your system. */
 #undef HAVE_BROKEN_PTHREAD_SIGMASK
+
+/* define to 1 if your sem_getvalue is broken. */
+#undef HAVE_BROKEN_SEM_GETVALUE
 
 /* Define this if you have the type _Bool. */
 #undef HAVE_C99_BOOL
@@ -228,6 +243,10 @@
 
 /* Define to 1 if you have the `gai_strerror' function. */
 #undef HAVE_GAI_STRERROR
+
+/* Define if we can use gcc inline assembler to get and set x87 control word
+   */
+#undef HAVE_GCC_ASM_FOR_X87
 
 /* Define if you have the getaddrinfo function. */
 #undef HAVE_GETADDRINFO
@@ -400,6 +419,9 @@
 /* Define this if you have the makedev macro. */
 #undef HAVE_MAKEDEV
 
+/* Define to 1 if you have the `mbrtowc' function. */
+#undef HAVE_MBRTOWC
+
 /* Define to 1 if you have the `memmove' function. */
 #undef HAVE_MEMMOVE
 
@@ -502,8 +524,23 @@
 /* Define if you have readline 4.0 */
 #undef HAVE_RL_PRE_INPUT_HOOK
 
+/* Define to 1 if you have the `round' function. */
+#undef HAVE_ROUND
+
 /* Define to 1 if you have the `select' function. */
 #undef HAVE_SELECT
+
+/* Define to 1 if you have the `sem_getvalue' function. */
+#undef HAVE_SEM_GETVALUE
+
+/* Define to 1 if you have the `sem_open' function. */
+#undef HAVE_SEM_OPEN
+
+/* Define to 1 if you have the `sem_timedwait' function. */
+#undef HAVE_SEM_TIMEDWAIT
+
+/* Define to 1 if you have the `sem_unlink' function. */
+#undef HAVE_SEM_UNLINK
 
 /* Define to 1 if you have the `setegid' function. */
 #undef HAVE_SETEGID
@@ -806,6 +843,9 @@
 
 /* Define to 1 if you have the `wcscoll' function. */
 #undef HAVE_WCSCOLL
+
+/* Define to 1 if you have the `wcsftime' function. */
+#undef HAVE_WCSFTIME
 
 /* Define to 1 if you have the `wcsxfrm' function. */
 #undef HAVE_WCSXFRM

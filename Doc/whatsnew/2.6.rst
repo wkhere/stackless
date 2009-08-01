@@ -86,8 +86,6 @@ for each change.
 
 .. ========================================================================
 .. Large, PEP-level features and changes should be described here.
-.. Should there be a new section here for 3k migration?
-.. Or perhaps a more general section describing module changes/deprecation?
 .. ========================================================================
 
 Python 3.0
@@ -684,15 +682,15 @@ and :meth:`Semaphore` to create shared locks.)
         for N in range(1, 1000, 10):
             p.apply_async(factorial, (N, d))
 
-    # Mark pool as closed -- no more tasks can be added.
-    p.close()
+        # Mark pool as closed -- no more tasks can be added.
+        p.close()
 
-    # Wait for tasks to exit
-    p.join()
+        # Wait for tasks to exit
+        p.join()
 
-    # Output results
-    for k, v in sorted(d.items()):
-        print k, v
+        # Output results
+        for k, v in sorted(d.items()):
+            print k, v
 
 This will produce the output::
 
@@ -1678,7 +1676,7 @@ Some smaller changes made to the core Python language are:
   :attr:`__self__`, and :attr:`im_func` is also available as :attr:`__func__`.
   The old names are still supported in Python 2.6, but are gone in 3.0.
 
-* An obscure change: when you use the the :func:`locals` function inside a
+* An obscure change: when you use the :func:`locals` function inside a
   :keyword:`class` statement, the resulting dictionary no longer returns free
   variables.  (Free variables, in this case, are variables referenced in the
   :keyword:`class` statement  that aren't attributes of the class.)

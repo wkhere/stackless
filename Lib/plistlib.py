@@ -1,4 +1,4 @@
-"""plistlib.py -- a tool to generate and parse MacOSX .plist files.
+r"""plistlib.py -- a tool to generate and parse MacOSX .plist files.
 
 The PropertList (.plist) file format is a simple XML pickle supporting
 basic object types, like dictionaries, lists, numbers and strings.
@@ -263,13 +263,13 @@ class _InternalDict(dict):
             raise AttributeError(attr)
         from warnings import warn
         warn("Attribute access from plist dicts is deprecated, use d[key] "
-             "notation instead", PendingDeprecationWarning)
+             "notation instead", PendingDeprecationWarning, 2)
         return value
 
     def __setattr__(self, attr, value):
         from warnings import warn
         warn("Attribute access from plist dicts is deprecated, use d[key] "
-             "notation instead", PendingDeprecationWarning)
+             "notation instead", PendingDeprecationWarning, 2)
         self[attr] = value
 
     def __delattr__(self, attr):
@@ -279,14 +279,14 @@ class _InternalDict(dict):
             raise AttributeError(attr)
         from warnings import warn
         warn("Attribute access from plist dicts is deprecated, use d[key] "
-             "notation instead", PendingDeprecationWarning)
+             "notation instead", PendingDeprecationWarning, 2)
 
 class Dict(_InternalDict):
 
     def __init__(self, **kwargs):
         from warnings import warn
         warn("The plistlib.Dict class is deprecated, use builtin dict instead",
-             PendingDeprecationWarning)
+             PendingDeprecationWarning, 2)
         super().__init__(**kwargs)
 
 
@@ -299,7 +299,7 @@ class Plist(_InternalDict):
     def __init__(self, **kwargs):
         from warnings import warn
         warn("The Plist class is deprecated, use the readPlist() and "
-             "writePlist() functions instead", PendingDeprecationWarning)
+             "writePlist() functions instead", PendingDeprecationWarning, 2)
         super().__init__(**kwargs)
 
     def fromFile(cls, pathOrFile):
@@ -316,7 +316,7 @@ class Plist(_InternalDict):
 
 
 def _encodeBase64(s, maxlinelength=76):
-    # copied from base64.encodestring(), with added maxlinelength argument
+    # copied from base64.encodebytes(), with added maxlinelength argument
     maxbinsize = (maxlinelength//4)*3
     pieces = []
     for i in range(0, len(s), maxbinsize):
@@ -335,7 +335,7 @@ class Data:
 
     @classmethod
     def fromBase64(cls, data):
-        # base64.decodestring just calls binascii.a2b_base64;
+        # base64.decodebytes just calls binascii.a2b_base64;
         # it seems overkill to use both base64 and binascii.
         return cls(binascii.a2b_base64(data))
 

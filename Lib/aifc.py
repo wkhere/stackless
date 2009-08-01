@@ -144,9 +144,6 @@ class Error(Exception):
 
 _AIFC_version = 0xA2805140     # Version 1 of AIFF-C
 
-_skiplist = b'COMT', b'INST', b'MIDI', b'AESD', \
-      b'APPL', b'NAME', b'AUTH', b'(c) ', b'ANNO'
-
 def _read_long(file):
     try:
         return struct.unpack('>l', file.read(4))[0]
@@ -284,10 +281,11 @@ class Aifc_read:
         self._convert = None
         self._markers = []
         self._soundpos = 0
-        self._file = Chunk(file)
-        if self._file.getname() != b'FORM':
+        self._file = file
+        chunk = Chunk(file)
+        if chunk.getname() != b'FORM':
             raise Error('file does not start with FORM id')
-        formdata = self._file.read(4)
+        formdata = chunk.read(4)
         if formdata == b'AIFF':
             self._aifc = 0
         elif formdata == b'AIFC':
@@ -313,11 +311,6 @@ class Aifc_read:
                 self._version = _read_ulong(chunk)
             elif chunkname == b'MARK':
                 self._readmark(chunk)
-            elif chunkname in _skiplist:
-                pass
-            else:
-                raise Error('unrecognized chunk type ' +
-                            chunkname.decode('latin1'))
             chunk.skip()
         if not self._comm_chunk_read or not self._ssnd_chunk:
             raise Error('COMM chunk and/or SSND chunk missing')
@@ -339,7 +332,7 @@ class Aifc_read:
         self._soundpos = 0
 
     def close(self):
-        self._file = None
+        self._file.close()
 
     def tell(self):
         return self._soundpos
@@ -698,8 +691,9 @@ class Aifc_write:
               self._datalength != self._datawritten or \
               self._marklength:
             self._patchheader()
-        self._file.flush()
-        self._file = None
+        # Prevent ref cycles
+        self._convert = None
+        self._file.close()
 
     #
     # Internal methods.

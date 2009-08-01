@@ -225,6 +225,11 @@ class SysModuleTest(unittest.TestCase):
             sys.setdlopenflags(oldflags)
 
     def test_refcount(self):
+        # n here must be a global in order for this test to pass while
+        # tracing with a python function.  Tracing calls PyFrame_FastToLocals
+        # which will add a copy of any locals to the frame object, causing
+        # the reference count to increase by 2 instead of 1.
+        global n
         self.assertRaises(TypeError, sys.getrefcount)
         c = sys.getrefcount(None)
         n = None
@@ -339,6 +344,8 @@ class SysModuleTest(unittest.TestCase):
         self.assertEqual(len(sys.int_info), 2)
         self.assert_(sys.int_info.bits_per_digit % 5 == 0)
         self.assert_(sys.int_info.sizeof_digit >= 1)
+        self.assertEqual(type(sys.int_info.bits_per_digit), int)
+        self.assertEqual(type(sys.int_info.sizeof_digit), int)
         self.assert_(isinstance(sys.hexversion, int))
         self.assert_(isinstance(sys.maxsize, int))
         self.assert_(isinstance(sys.maxunicode, int))
@@ -627,9 +634,9 @@ class SizeofTest(unittest.TestCase):
         check(1, size(vh) + self.longdigit)
         check(-1, size(vh) + self.longdigit)
         PyLong_BASE = 2**sys.int_info.bits_per_digit
-        check(PyLong_BASE, size(vh) + 2*self.longdigit)
-        check(PyLong_BASE**2-1, size(vh) + 2*self.longdigit)
-        check(PyLong_BASE**2, size(vh) + 3*self.longdigit)
+        check(int(PyLong_BASE), size(vh) + 2*self.longdigit)
+        check(int(PyLong_BASE**2-1), size(vh) + 2*self.longdigit)
+        check(int(PyLong_BASE**2), size(vh) + 3*self.longdigit)
         # memory
         check(memoryview(b''), size(h + 'P PP2P2i7P'))
         # module
@@ -647,7 +654,7 @@ class SizeofTest(unittest.TestCase):
             def delx(self): del self.__x
             x = property(getx, setx, delx, "")
             check(x, size(h + '4Pi'))
-        # PyCObject
+        # PyCapsule
         # XXX
         # rangeiterator
         check(iter(range(1)), size(h + '4l'))

@@ -13,6 +13,7 @@ import subprocess
 import test.support
 
 encoding = 'utf-8'
+errors = 'surrogatepass'
 
 
 ### Run tests
@@ -20,7 +21,7 @@ encoding = 'utf-8'
 class UnicodeMethodsTest(unittest.TestCase):
 
     # update this, if the database changes
-    expectedchecksum = 'aef99984a58c8e1e5363a3175f2ff9608599a93e'
+    expectedchecksum = '6ec65b65835614ec00634c674bba0e50cd32c189'
 
     def test_method_checksum(self):
         h = hashlib.sha1()
@@ -61,7 +62,7 @@ class UnicodeMethodsTest(unittest.TestCase):
                 (char + 'ABC').title(),
 
                 ]
-            h.update(''.join(data).encode(encoding))
+            h.update(''.join(data).encode(encoding, errors))
         result = h.hexdigest()
         self.assertEqual(result, self.expectedchecksum)
 
@@ -258,6 +259,24 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         # the upper-case mapping: as delta, or as absolute value
         self.assert_("a".upper()=='A')
         self.assert_("\u1d79".upper()=='\ua77d')
+        self.assert_(".".upper()=='.')
+
+    def test_bug_5828(self):
+        self.assertEqual("\u1d79".lower(), "\u1d79")
+        # Only U+0000 should have U+0000 as its upper/lower/titlecase variant
+        self.assertEqual(
+            [
+                c for c in range(sys.maxunicode+1)
+                if "\x00" in chr(c).lower()+chr(c).upper()+chr(c).title()
+            ],
+            [0]
+        )
+
+    def test_bug_4971(self):
+        # LETTER DZ WITH CARON: DZ, Dz, dz
+        self.assertEqual("\u01c4".title(), "\u01c5")
+        self.assertEqual("\u01c5".title(), "\u01c5")
+        self.assertEqual("\u01c6".title(), "\u01c5")
 
 def test_main():
     test.support.run_unittest(

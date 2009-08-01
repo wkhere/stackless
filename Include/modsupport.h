@@ -43,6 +43,8 @@ PyAPI_FUNC(int) PyModule_AddStringConstant(PyObject *, const char *, const char 
 #define PyModule_AddIntMacro(m, c) PyModule_AddIntConstant(m, #c, c)
 #define PyModule_AddStringMacro(m, c) PyModule_AddStringConstant(m, #c, c)
 
+#define Py_CLEANUP_SUPPORTED 0x20000
+
 #define PYTHON_API_VERSION 1013
 #define PYTHON_API_STRING "1013"
 /* The API version is maintained (independently from the Python version)
@@ -90,10 +92,10 @@ PyAPI_FUNC(int) PyModule_AddStringConstant(PyObject *, const char *, const char 
 */
 
 #ifdef Py_TRACE_REFS
- /* When we are tracing reference counts, rename PyModule_New2 so
+ /* When we are tracing reference counts, rename PyModule_Create2 so
     modules compiled with incompatible settings will generate a
     link-time error. */
- #define PyModule_New2 PyModule_Create2TraceRefs
+ #define PyModule_Create2 PyModule_Create2TraceRefs
 #endif
 
 PyAPI_FUNC(PyObject *) PyModule_Create2(struct PyModuleDef*,

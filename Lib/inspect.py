@@ -518,7 +518,9 @@ def findsource(object):
     or code object.  The source code is returned as a list of all the lines
     in the file and the line number indexes a line in that list.  An IOError
     is raised if the source code cannot be retrieved."""
-    file = getsourcefile(object) or getfile(object)
+    file = getsourcefile(object)
+    if not file:
+        raise IOError('source code not available')
     module = getmodule(object, file)
     if module:
         lines = linecache.getlines(file, module.__dict__)
@@ -702,7 +704,7 @@ def walktree(classes, children, parent):
             results.append(walktree(children[c], children, c))
     return results
 
-def getclasstree(classes, unique=0):
+def getclasstree(classes, unique=False):
     """Arrange the given list of classes into a hierarchy of nested lists.
 
     Where a nested list appears, it contains classes derived from the class

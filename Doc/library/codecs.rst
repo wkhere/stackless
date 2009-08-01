@@ -1,4 +1,3 @@
-
 :mod:`codecs` --- Codec registry and base classes
 =================================================
 
@@ -226,33 +225,35 @@ utility functions:
    defaults to line buffered.
 
 
-.. function:: EncodedFile(file, input[, output[, errors]])
+.. function:: EncodedFile(file, data_encoding, file_encoding=None, errors='strict')
 
    Return a wrapped version of file which provides transparent encoding
    translation.
 
    Bytes written to the wrapped file are interpreted according to the given
-   *input* encoding and then written to the original file as bytes using the
-   *output* encoding.
+   *data_encoding* and then written to the original file as bytes using the
+   *file_encoding*.
 
-   If *output* is not given, it defaults to *input*.
+   If *file_encoding* is not given, it defaults to *data_encoding*.
 
-   *errors* may be given to define the error handling. It defaults to ``'strict'``,
-   which causes :exc:`ValueError` to be raised in case an encoding error occurs.
+   *errors* may be given to define the error handling. It defaults to
+   ``'strict'``, which causes :exc:`ValueError` to be raised in case an encoding
+   error occurs.
 
 
-.. function:: iterencode(iterable, encoding[, errors])
+.. function:: iterencode(iterator, encoding, errors='strict', **kwargs)
 
    Uses an incremental encoder to iteratively encode the input provided by
-   *iterable*. This function is a :term:`generator`.  *errors* (as well as any
+   *iterator*. This function is a :term:`generator`.  *errors* (as well as any
    other keyword argument) is passed through to the incremental encoder.
 
 
-.. function:: iterdecode(iterable, encoding[, errors])
+.. function:: iterdecode(iterator, encoding, errors='strict', **kwargs)
 
    Uses an incremental decoder to iteratively decode the input provided by
-   *iterable*. This function is a :term:`generator`.  *errors* (as well as any
+   *iterator*. This function is a :term:`generator`.  *errors* (as well as any
    other keyword argument) is passed through to the incremental decoder.
+
 
 The module also provides the following constants which are useful for reading
 and writing to platform dependent files:
@@ -321,6 +322,20 @@ and implemented by all standard Python codecs:
 | ``'backslashreplace'``  | Replace with backslashed escape sequences     |
 |                         | (only for encoding).                          |
 +-------------------------+-----------------------------------------------+
+| ``'surrogateescape'``   | Replace byte with surrogate U+DCxx.           |
++-------------------------+-----------------------------------------------+
+
+In addition, the following error handlers are specific to a single codec:
+
++-------------------+---------+-------------------------------------------+
+| Value             | Codec   | Meaning                                   |
++===================+=========+===========================================+
+|``'surrogatepass'``| utf-8   | Allow encoding and decoding of surrogate  |
+|                   |         | codes in UTF-8.                           |
++-------------------+---------+-------------------------------------------+
+
+.. versionadded:: 3.1
+   The ``'surrogateescape'`` and ``'surrogatepass'`` error handlers.
 
 The set of allowed values can be extended via :meth:`register_error`.
 

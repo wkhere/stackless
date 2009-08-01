@@ -41,6 +41,7 @@ PyObject *_PyIO_str_readline;
 PyObject *_PyIO_str_reset;
 PyObject *_PyIO_str_seek;
 PyObject *_PyIO_str_seekable;
+PyObject *_PyIO_str_setstate;
 PyObject *_PyIO_str_tell;
 PyObject *_PyIO_str_truncate;
 PyObject *_PyIO_str_writable;
@@ -48,6 +49,7 @@ PyObject *_PyIO_str_write;
 
 PyObject *_PyIO_empty_str;
 PyObject *_PyIO_empty_bytes;
+PyObject *_PyIO_zero;
 
 
 PyDoc_STRVAR(module_doc,
@@ -60,7 +62,7 @@ PyDoc_STRVAR(module_doc,
 "allowed to throw an IOError if they do not support a given operation.\n"
 "\n"
 "Extending IOBase is RawIOBase which deals simply with the reading and\n"
-"writing of raw bytes to a stream. FileIO subc lasses RawIOBase to provide\n"
+"writing of raw bytes to a stream. FileIO subclasses RawIOBase to provide\n"
 "an interface to OS files.\n"
 "\n"
 "BufferedIOBase deals with buffering on a raw byte stream (RawIOBase). Its\n"
@@ -92,7 +94,7 @@ PyDoc_STRVAR(module_doc,
  */
 
 static int
-BlockingIOError_init(PyBlockingIOErrorObject *self, PyObject *args,
+blockingioerror_init(PyBlockingIOErrorObject *self, PyObject *args,
                      PyObject *kwds)
 {
     PyObject *myerrno = NULL, *strerror = NULL;
@@ -121,7 +123,7 @@ BlockingIOError_init(PyBlockingIOErrorObject *self, PyObject *args,
     return 0;
 }
 
-static PyMemberDef BlockingIOError_members[] = {
+static PyMemberDef blockingioerror_members[] = {
     {"characters_written", T_PYSSIZET, offsetof(PyBlockingIOErrorObject, written), 0},
     {NULL}  /* Sentinel */
 };
@@ -156,14 +158,14 @@ static PyTypeObject _PyExc_BlockingIOError = {
     0,                          /* tp_iter */
     0,                          /* tp_iternext */
     0,                          /* tp_methods */
-    BlockingIOError_members,    /* tp_members */
+    blockingioerror_members,    /* tp_members */
     0,                          /* tp_getset */
     0,                          /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */
     0,                          /* tp_descr_set */
     0,                          /* tp_dictoffset */
-    (initproc)BlockingIOError_init, /* tp_init */
+    (initproc)blockingioerror_init, /* tp_init */
     0,                          /* tp_alloc */
     0,                          /* tp_new */
 };
@@ -734,6 +736,8 @@ PyInit__io(void)
         goto fail;
     if (!(_PyIO_str_seekable = PyUnicode_InternFromString("seekable")))
         goto fail;
+    if (!(_PyIO_str_setstate = PyUnicode_InternFromString("setstate")))
+        goto fail;
     if (!(_PyIO_str_tell = PyUnicode_InternFromString("tell")))
         goto fail;
     if (!(_PyIO_str_truncate = PyUnicode_InternFromString("truncate")))
@@ -746,6 +750,8 @@ PyInit__io(void)
     if (!(_PyIO_empty_str = PyUnicode_FromStringAndSize(NULL, 0)))
         goto fail;
     if (!(_PyIO_empty_bytes = PyBytes_FromStringAndSize(NULL, 0)))
+        goto fail;
+    if (!(_PyIO_zero = PyLong_FromLong(0L)))
         goto fail;
 
     state->initialized = 1;

@@ -1169,7 +1169,6 @@ static struct PyMethodDef xmlparse_methods[] = {
 */
 
 static char template_buffer[257];
-PyObject *template_string = NULL;
 
 static void
 init_template_buffer(void)
@@ -1987,8 +1986,8 @@ MODULE_INITFUNC(void)
     capi.SetUnknownEncodingHandler = XML_SetUnknownEncodingHandler;
     capi.SetUserData = XML_SetUserData;
     
-    /* export as cobject */
-    capi_object = PyCObject_FromVoidPtr(&capi, NULL);
+    /* export using capsule */
+    capi_object = PyCapsule_New(&capi, PyExpat_CAPSULE_NAME, NULL);
     if (capi_object)
         PyModule_AddObject(m, "expat_CAPI", capi_object);
     return m;

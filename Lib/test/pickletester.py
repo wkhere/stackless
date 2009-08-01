@@ -1,7 +1,9 @@
+import io
 import unittest
 import pickle
 import pickletools
 import copyreg
+from http.cookies import SimpleCookie
 
 from test.support import TestFailed, TESTFN, run_with_locale
 
@@ -341,6 +343,28 @@ DATA2_DIS = """\
 highest protocol among opcodes = 2
 """
 
+# set([1,2]) pickled from 2.x with protocol 2
+DATA3 = b'\x80\x02c__builtin__\nset\nq\x00]q\x01(K\x01K\x02e\x85q\x02Rq\x03.'
+
+# xrange(5) pickled from 2.x with protocol 2
+try:
+    import stackless
+    DATA4 = b'\x80\x02cstackless._wrap\nrange\nq\x00K\x00K\x05K\x01\x87q\x01Rq\x02)b.'
+except:
+    DATA4 = b'\x80\x02c__builtin__\nxrange\nq\x00K\x00K\x05K\x01\x87q\x01Rq\x02.'
+
+# a SimpleCookie() object pickled from 2.x with protocol 2
+DATA5 = (b'\x80\x02cCookie\nSimpleCookie\nq\x00)\x81q\x01U\x03key'
+         b'q\x02cCookie\nMorsel\nq\x03)\x81q\x04(U\x07commentq\x05U'
+         b'\x00q\x06U\x06domainq\x07h\x06U\x06secureq\x08h\x06U\x07'
+         b'expiresq\th\x06U\x07max-ageq\nh\x06U\x07versionq\x0bh\x06U'
+         b'\x04pathq\x0ch\x06U\x08httponlyq\rh\x06u}q\x0e(U\x0b'
+         b'coded_valueq\x0fU\x05valueq\x10h\x10h\x10h\x02h\x02ubs}q\x11b.')
+
+# set([3]) pickled from 2.x with protocol 2
+DATA6 = b'\x80\x02c__builtin__\nset\nq\x00]q\x01K\x03a\x85q\x02Rq\x03.'
+
+
 def create_data():
     c = C()
     c.foo = 1
@@ -430,6 +454,16 @@ class AbstractPickleTests(unittest.TestCase):
             x = self.loads(s)
             self.assertEqual(len(x), 1)
             self.assert_(x is x[0])
+
+    def test_recursive_tuple(self):
+        t = ([],)
+        t[0].append(t)
+        for proto in protocols:
+            s = self.dumps(t, proto)
+            x = self.loads(s)
+            self.assertEqual(len(x), 1)
+            self.assertEqual(len(x[0]), 1)
+            self.assert_(x is x[0][0])
 
     def test_recursive_dict(self):
         d = {}
@@ -842,7 +876,7 @@ class AbstractPickleTests(unittest.TestCase):
         self.assertEqual(x.bar, y.bar)
 
     def test_reduce_overrides_default_reduce_ex(self):
-        for proto in 0, 1, 2:
+        for proto in protocols:
             x = REX_one()
             self.assertEqual(x._reduce_called, 0)
             s = self.dumps(x, proto)
@@ -851,7 +885,7 @@ class AbstractPickleTests(unittest.TestCase):
             self.assertEqual(y._reduce_called, 0)
 
     def test_reduce_ex_called(self):
-        for proto in 0, 1, 2:
+        for proto in protocols:
             x = REX_two()
             self.assertEqual(x._proto, None)
             s = self.dumps(x, proto)
@@ -860,7 +894,7 @@ class AbstractPickleTests(unittest.TestCase):
             self.assertEqual(y._proto, None)
 
     def test_reduce_ex_overrides_reduce(self):
-        for proto in 0, 1, 2:
+        for proto in protocols:
             x = REX_three()
             self.assertEqual(x._proto, None)
             s = self.dumps(x, proto)
@@ -869,7 +903,7 @@ class AbstractPickleTests(unittest.TestCase):
             self.assertEqual(y._proto, None)
 
     def test_reduce_ex_calls_base(self):
-        for proto in 0, 1, 2:
+        for proto in protocols:
             x = REX_four()
             self.assertEqual(x._proto, None)
             s = self.dumps(x, proto)
@@ -878,7 +912,7 @@ class AbstractPickleTests(unittest.TestCase):
             self.assertEqual(y._proto, proto)
 
     def test_reduce_calls_base(self):
-        for proto in 0, 1, 2:
+        for proto in protocols:
             x = REX_five()
             self.assertEqual(x._reduce_called, 0)
             s = self.dumps(x, proto)
@@ -916,6 +950,57 @@ class AbstractPickleTests(unittest.TestCase):
                 self.dumps(D(), proto)
             except (pickle.PickleError):
                 pass
+
+    def test_many_puts_and_gets(self):
+        # Test that internal data structures correctly deal with lots of
+        # puts/gets.
+        keys = ("aaa" + str(i) for i in range(100))
+        large_dict = dict((k, [4, 5, 6]) for k in keys)
+        obj = [dict(large_dict), dict(large_dict), dict(large_dict)]
+
+        for proto in protocols:
+            dumped = self.dumps(obj, proto)
+            loaded = self.loads(dumped)
+            self.assertEqual(loaded, obj,
+                             "Failed protocol %d: %r != %r"
+                             % (proto, obj, loaded))
+
+    def test_attribute_name_interning(self):
+        # Test that attribute names of pickled objects are interned when
+        # unpickling.
+        for proto in protocols:
+            x = C()
+            x.foo = 42
+            x.bar = "hello"
+            s = self.dumps(x, proto)
+            y = self.loads(s)
+            x_keys = sorted(x.__dict__)
+            y_keys = sorted(y.__dict__)
+            for x_key, y_key in zip(x_keys, y_keys):
+                self.assertIs(x_key, y_key)
+
+    def test_unpickle_from_2x(self):
+        # Unpickle non-trivial data from Python 2.x.
+        loaded = self.loads(DATA3)
+        self.assertEqual(loaded, set([1, 2]))
+        loaded = self.loads(DATA4)
+        self.assertEqual(type(loaded), type(range(0)))
+        self.assertEqual(list(loaded), list(range(5)))
+        loaded = self.loads(DATA5)
+        self.assertEqual(type(loaded), SimpleCookie)
+        self.assertEqual(list(loaded.keys()), ["key"])
+        self.assertEqual(loaded["key"].value, "Set-Cookie: key=value")
+
+    def test_pickle_to_2x(self):
+        # Pickle non-trivial data with protocol 2, expecting that it yields
+        # the same result as Python 2.x did.
+        # NOTE: this test is a bit too strong since we can produce different
+        # bytecode that 2.x will still understand.
+        dumped = self.dumps(range(5), 2)
+        self.assertEqual(dumped, DATA4)
+        dumped = self.dumps(set([3]), 2)
+        self.assertEqual(dumped, DATA6)
+
 
 # Test classes for reduce_ex
 
@@ -1002,6 +1087,7 @@ class BadGetattr:
     def __getattr__(self, key):
         self.foo
 
+
 class AbstractPickleModuleTests(unittest.TestCase):
 
     def test_dump_closed_file(self):
@@ -1022,13 +1108,20 @@ class AbstractPickleModuleTests(unittest.TestCase):
         finally:
             os.remove(TESTFN)
 
+    def test_load_from_and_dump_to_file(self):
+        stream = io.BytesIO()
+        data = [123, {}, 124]
+        pickle.dump(data, stream)
+        stream.seek(0)
+        unpickled = pickle.load(stream)
+        self.assertEqual(unpickled, data)
+
     def test_highest_protocol(self):
         # Of course this needs to be changed when HIGHEST_PROTOCOL changes.
         self.assertEqual(pickle.HIGHEST_PROTOCOL, 3)
 
     def test_callapi(self):
-        from io import BytesIO
-        f = BytesIO()
+        f = io.BytesIO()
         # With and without keyword arguments
         pickle.dump(123, f, -1)
         pickle.dump(123, file=f, protocol=-1)
@@ -1039,7 +1132,6 @@ class AbstractPickleModuleTests(unittest.TestCase):
 
     def test_bad_init(self):
         # Test issue3664 (pickle can segfault from a badly initialized Pickler).
-        from io import BytesIO
         # Override initialization without calling __init__() of the superclass.
         class BadPickler(pickle.Pickler):
             def __init__(self): pass
@@ -1090,6 +1182,121 @@ class AbstractPersistentPicklerTests(unittest.TestCase):
         self.assertEqual(self.loads(self.dumps(L, 1)), L)
         self.assertEqual(self.id_count, 5)
         self.assertEqual(self.load_count, 5)
+
+
+class AbstractPicklerUnpicklerObjectTests(unittest.TestCase):
+
+    pickler_class = None
+    unpickler_class = None
+
+    def setUp(self):
+        assert self.pickler_class
+        assert self.unpickler_class
+
+    def test_clear_pickler_memo(self):
+        # To test whether clear_memo() has any effect, we pickle an object,
+        # then pickle it again without clearing the memo; the two serialized
+        # forms should be different. If we clear_memo() and then pickle the
+        # object again, the third serialized form should be identical to the
+        # first one we obtained.
+        data = ["abcdefg", "abcdefg", 44]
+        f = io.BytesIO()
+        pickler = self.pickler_class(f)
+
+        pickler.dump(data)
+        first_pickled = f.getvalue()
+
+        # Reset StringIO object.
+        f.seek(0)
+        f.truncate()
+
+        pickler.dump(data)
+        second_pickled = f.getvalue()
+
+        # Reset the Pickler and StringIO objects.
+        pickler.clear_memo()
+        f.seek(0)
+        f.truncate()
+
+        pickler.dump(data)
+        third_pickled = f.getvalue()
+
+        self.assertNotEqual(first_pickled, second_pickled)
+        self.assertEqual(first_pickled, third_pickled)
+
+    def test_priming_pickler_memo(self):
+        # Verify that we can set the Pickler's memo attribute.
+        data = ["abcdefg", "abcdefg", 44]
+        f = io.BytesIO()
+        pickler = self.pickler_class(f)
+
+        pickler.dump(data)
+        first_pickled = f.getvalue()
+
+        f = io.BytesIO()
+        primed = self.pickler_class(f)
+        primed.memo = pickler.memo
+
+        primed.dump(data)
+        primed_pickled = f.getvalue()
+
+        self.assertNotEqual(first_pickled, primed_pickled)
+
+    def test_priming_unpickler_memo(self):
+        # Verify that we can set the Unpickler's memo attribute.
+        data = ["abcdefg", "abcdefg", 44]
+        f = io.BytesIO()
+        pickler = self.pickler_class(f)
+
+        pickler.dump(data)
+        first_pickled = f.getvalue()
+
+        f = io.BytesIO()
+        primed = self.pickler_class(f)
+        primed.memo = pickler.memo
+
+        primed.dump(data)
+        primed_pickled = f.getvalue()
+
+        unpickler = self.unpickler_class(io.BytesIO(first_pickled))
+        unpickled_data1 = unpickler.load()
+
+        self.assertEqual(unpickled_data1, data)
+
+        primed = self.unpickler_class(io.BytesIO(primed_pickled))
+        primed.memo = unpickler.memo
+        unpickled_data2 = primed.load()
+
+        primed.memo.clear()
+
+        self.assertEqual(unpickled_data2, data)
+        self.assertTrue(unpickled_data2 is unpickled_data1)
+
+    def test_reusing_unpickler_objects(self):
+        data1 = ["abcdefg", "abcdefg", 44]
+        f = io.BytesIO()
+        pickler = self.pickler_class(f)
+        pickler.dump(data1)
+        pickled1 = f.getvalue()
+
+        data2 = ["abcdefg", 44, 44]
+        f = io.BytesIO()
+        pickler = self.pickler_class(f)
+        pickler.dump(data2)
+        pickled2 = f.getvalue()
+
+        f = io.BytesIO()
+        f.write(pickled1)
+        f.seek(0)
+        unpickler = self.unpickler_class(f)
+        self.assertEqual(unpickler.load(), data1)
+
+        f.seek(0)
+        f.truncate()
+        f.write(pickled2)
+        f.seek(0)
+        self.assertEqual(unpickler.load(), data2)
+
 
 if __name__ == "__main__":
     # Print some stuff that can be used to rewrite DATA{0,1,2}

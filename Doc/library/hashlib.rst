@@ -1,4 +1,3 @@
-
 :mod:`hashlib` --- Secure hashes and message digests
 ====================================================
 
@@ -104,6 +103,12 @@ A hash object has the following methods:
    a buffer of bytes.  Repeated calls are equivalent to a single call with the
    concatenation of all the arguments: ``m.update(a); m.update(b)`` is
    equivalent to ``m.update(a+b)``.
+
+   .. versionchanged:: 3.1
+
+      The Python GIL is released to allow other threads to run while
+      hash updates on data larger than 2048 bytes is taking place when
+      using hash algorithms supplied by OpenSSL.
 
 
 .. method:: hash.digest()

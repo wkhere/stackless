@@ -750,20 +750,22 @@ class _TestEvent(BaseTestCase):
 
         # Removed temporaily, due to API shear, this does not
         # work with threading._Event objects. is_set == isSet
-        #self.assertEqual(event.is_set(), False)
+        self.assertEqual(event.is_set(), False)
 
-        self.assertEqual(wait(0.0), None)
+        # Removed, threading.Event.wait() will return the value of the __flag
+        # instead of None. API Shear with the semaphore backed mp.Event
+        self.assertEqual(wait(0.0), False)
         self.assertTimingAlmostEqual(wait.elapsed, 0.0)
-        self.assertEqual(wait(TIMEOUT1), None)
+        self.assertEqual(wait(TIMEOUT1), False)
         self.assertTimingAlmostEqual(wait.elapsed, TIMEOUT1)
 
         event.set()
 
         # See note above on the API differences
-        # self.assertEqual(event.is_set(), True)
-        self.assertEqual(wait(), None)
+        self.assertEqual(event.is_set(), True)
+        self.assertEqual(wait(), True)
         self.assertTimingAlmostEqual(wait.elapsed, 0.0)
-        self.assertEqual(wait(TIMEOUT1), None)
+        self.assertEqual(wait(TIMEOUT1), True)
         self.assertTimingAlmostEqual(wait.elapsed, 0.0)
         # self.assertEqual(event.is_set(), True)
 
@@ -772,7 +774,7 @@ class _TestEvent(BaseTestCase):
         #self.assertEqual(event.is_set(), False)
 
         self.Process(target=self._test_event, args=(event,)).start()
-        self.assertEqual(wait(), None)
+        self.assertEqual(wait(), True)
 
 #
 #
@@ -1830,7 +1832,37 @@ class OtherTest(unittest.TestCase):
                           multiprocessing.connection.answer_challenge,
                           _FakeConnection(), b'abc')
 
-testcases_other = [OtherTest, TestInvalidHandle]
+#
+# Test Manager.start()/Pool.__init__() initializer feature - see issue 5585
+#
+
+def initializer(ns):
+    ns.test += 1
+
+class TestInitializers(unittest.TestCase):
+    def setUp(self):
+        self.mgr = multiprocessing.Manager()
+        self.ns = self.mgr.Namespace()
+        self.ns.test = 0
+
+    def tearDown(self):
+        self.mgr.shutdown()
+
+    def test_manager_initializer(self):
+        m = multiprocessing.managers.SyncManager()
+        self.assertRaises(TypeError, m.start, 1)
+        m.start(initializer, (self.ns,))
+        self.assertEqual(self.ns.test, 1)
+        m.shutdown()
+
+    def test_pool_initializer(self):
+        self.assertRaises(TypeError, multiprocessing.Pool, initializer=1)
+        p = multiprocessing.Pool(1, initializer, (self.ns,))
+        p.close()
+        p.join()
+        self.assertEqual(self.ns.test, 1)
+
+testcases_other = [OtherTest, TestInvalidHandle, TestInitializers]
 
 #
 #
@@ -1841,7 +1873,6 @@ def test_main(run=None):
         try:
             lock = multiprocessing.RLock()
         except OSError:
-            from test.support import TestSkipped
             raise unittest.SkipTest("OSError raises on RLock creation, see issue 3111!")
 
     if run is None:

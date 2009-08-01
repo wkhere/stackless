@@ -894,6 +894,7 @@ class EncodingTest(BaseTest):
         message = '\u0434\u043e \u0441\u0432\u0438\u0434\u0430\u043d\u0438\u044f'
         #Ensure it's written in a Cyrillic encoding
         writer_class = codecs.getwriter('cp1251')
+        writer_class.encoding = 'cp1251'
         stream = io.BytesIO()
         writer = writer_class(stream, 'strict')
         handler = logging.StreamHandler(writer)
@@ -912,10 +913,10 @@ class EncodingTest(BaseTest):
 class WarningsTest(BaseTest):
 
     def test_warnings(self):
-        logging.captureWarnings(True)
         with warnings.catch_warnings():
-            warnings.filterwarnings("always", category=UserWarning)
+            logging.captureWarnings(True)
             try:
+                warnings.filterwarnings("always", category=UserWarning)
                 file = io.StringIO()
                 h = logging.StreamHandler(file)
                 logger = logging.getLogger("py.warnings")

@@ -127,40 +127,6 @@ class TclTest(unittest.TestCase):
         tcl = self.interp
         self.assertRaises(TclError,tcl.eval,'package require DNE')
 
-    def testLoadTk(self):
-        import os
-        if 'DISPLAY' not in os.environ:
-            # skipping test of clean upgradeability
-            return
-        tcl = Tcl()
-        self.assertRaises(TclError,tcl.winfo_geometry)
-        tcl.loadtk()
-        self.assertEqual('1x1+0+0', tcl.winfo_geometry())
-        tcl.destroy()
-
-    def testLoadTkFailure(self):
-        import os
-        old_display = None
-        import sys
-        if sys.platform.startswith(('win', 'darwin', 'cygwin')):
-            return  # no failure possible on windows?
-        if 'DISPLAY' in os.environ:
-            old_display = os.environ['DISPLAY']
-            del os.environ['DISPLAY']
-            # on some platforms, deleting environment variables
-            # doesn't actually carry through to the process level
-            # because they don't support unsetenv
-            # If that's the case, abort.
-            display = os.popen('echo $DISPLAY').read().strip()
-            if display:
-                return
-        try:
-            tcl = Tcl()
-            self.assertRaises(TclError, tcl.winfo_geometry)
-            self.assertRaises(TclError, tcl.loadtk)
-        finally:
-            if old_display is not None:
-                os.environ['DISPLAY'] = old_display
 
 def test_main():
     support.run_unittest(TclTest, TkinterTest)

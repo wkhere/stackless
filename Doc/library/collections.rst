@@ -1,4 +1,3 @@
-
 :mod:`collections` --- Container datatypes
 ==========================================
 
@@ -169,7 +168,7 @@ For example::
    class is similar to bags or multisets in other languages.
 
    Elements are counted from an *iterable* or initialized from another
-   *mapping* (or counter)::
+   *mapping* (or counter):
 
         >>> c = Counter()                           # a new, empty counter
         >>> c = Counter('gallahad')                 # a new counter from an iterable
@@ -177,7 +176,7 @@ For example::
         >>> c = Counter(cats=4, dogs=8)             # a new counter from keyword args
 
    Counter objects have a dictionary interface except that they return a zero
-   count for missing items instead of raising a :exc:`KeyError`::
+   count for missing items instead of raising a :exc:`KeyError`:
 
         >>> c = Counter(['eggs', 'ham'])
         >>> c['bacon']                              # count of a missing element is zero
@@ -210,7 +209,7 @@ For example::
       Return a list of the *n* most common elements and their counts from the
       most common to the least.  If *n* is not specified, :func:`most_common`
       returns *all* elements in the counter.  Elements with equal counts are
-      ordered arbitrarily::
+      ordered arbitrarily:
 
             >>> Counter('abracadabra').most_common(3)
             [('a', 5), ('r', 2), ('b', 2)]
@@ -286,7 +285,7 @@ counts, but the output will exclude results with counts of zero or less.
 :class:`deque` objects
 ----------------------
 
-.. class:: deque([iterable[, maxlen]])
+.. class:: deque([iterable, [maxlen]])
 
    Returns a new deque object initialized left-to-right (using :meth:`append`) with
    data from *iterable*.  If *iterable* is not specified, the new deque is empty.
@@ -456,10 +455,9 @@ added elements by appending to the right and popping to the left::
         # moving_average([40, 30, 50, 46, 39, 44]) --> 40.0 42.0 45.0 43.0
         # http://en.wikipedia.org/wiki/Moving_average
         it = iter(iterable)
-        d = deque(itertools.islice(it, n))
+        d = deque(itertools.islice(it, n-1))
+        d.appendleft(0)
         s = sum(d)
-        if len(d) == n:
-            yield s / n
         for elem in it:
             s += elem - d.popleft()
             d.append(elem)
@@ -605,7 +603,7 @@ Named tuples assign meaning to each position in a tuple and allow for more reada
 self-documenting code.  They can be used wherever regular tuples are used, and
 they add the ability to access fields by name instead of position index.
 
-.. function:: namedtuple(typename, field_names, [verbose], [rename])
+.. function:: namedtuple(typename, field_names, verbose=False, rename=False)
 
    Returns a new tuple subclass named *typename*.  The new subclass is used to
    create tuple-like objects that have fields accessible by attribute lookup as
@@ -649,8 +647,8 @@ Example:
    <BLANKLINE>
            _fields = ('x', 'y')
    <BLANKLINE>
-           def __new__(cls, x, y):
-               return tuple.__new__(cls, (x, y))
+           def __new__(_cls, x, y):
+               return _tuple.__new__(_cls, (x, y))
    <BLANKLINE>
            @classmethod
            def _make(cls, iterable, new=tuple.__new__, len=len):
@@ -667,9 +665,9 @@ Example:
                'Return a new OrderedDict which maps field names to their values'
                return OrderedDict(zip(self._fields, self))
    <BLANKLINE>
-           def _replace(self, **kwds):
+           def _replace(_self, **kwds):
                'Return a new Point object replacing specified fields with new values'
-               result = self._make(map(kwds.pop, ('x', 'y'), self))
+               result = _self._make(map(kwds.pop, ('x', 'y'), _self))
                if kwds:
                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
                return result
@@ -677,8 +675,8 @@ Example:
            def __getnewargs__(self):
                return tuple(self)
    <BLANKLINE>
-           x = property(itemgetter(0))
-           y = property(itemgetter(1))
+           x = _property(_itemgetter(0))
+           y = _property(_itemgetter(1))
 
    >>> p = Point(11, y=22)     # instantiate with positional or keyword arguments
    >>> p[0] + p[1]             # indexable like the plain tuple (11, 22)
@@ -845,12 +843,19 @@ the items are returned in the order their keys were first added.
    a (key, value) pair.  The pairs are returned in LIFO order if *last* is
    true or FIFO order if false.
 
+In addition to the usual mapping methods, ordered dictionaries also support
+reverse iteration using :func:`reversed`.
+
 Equality tests between :class:`OrderedDict` objects are order-sensitive
 and are implemented as ``list(od1.items())==list(od2.items())``.
 Equality tests between :class:`OrderedDict` objects and other
 :class:`Mapping` objects are order-insensitive like regular dictionaries.
 This allows :class:`OrderedDict` objects to be substituted anywhere a
 regular dictionary is used.
+
+The :class:`OrderedDict` constructor and :meth:`update` method both accept
+keyword arguments, but their order is lost because Python's function call
+semantics pass-in keyword arguments using a regular unordered dictionary.
 
 .. seealso::
 

@@ -630,7 +630,7 @@ static PyObject *
 sys_getsizeof(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *res = NULL;
-	static PyObject *str__sizeof__, *gc_head_size = NULL;
+	static PyObject *str__sizeof__ = NULL, *gc_head_size = NULL;
 	static char *kwlist[] = {"object", "default", 0};
 	PyObject *o, *dflt = NULL;
 	PyObject *method;
@@ -638,13 +638,6 @@ sys_getsizeof(PyObject *self, PyObject *args, PyObject *kwds)
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O:getsizeof",
 					 kwlist, &o, &dflt))
 		return NULL;
-
-	/* Initialize static variable needed by _PyType_Lookup */
-	if (str__sizeof__ == NULL) {
-		str__sizeof__ = PyUnicode_InternFromString("__sizeof__");
-		if (str__sizeof__ == NULL)
-			return NULL;
-	}
 
         /* Initialize static variable for GC head size */
 	if (gc_head_size == NULL) {
@@ -656,14 +649,19 @@ sys_getsizeof(PyObject *self, PyObject *args, PyObject *kwds)
 	/* Make sure the type is initialized. float gets initialized late */
 	if (PyType_Ready(Py_TYPE(o)) < 0)
 		return NULL;
-	
-	method = _PyType_Lookup(Py_TYPE(o), str__sizeof__);
-	if (method == NULL)
-		PyErr_Format(PyExc_TypeError,
-			     "Type %.100s doesn't define __sizeof__",
-			     Py_TYPE(o)->tp_name);
-	else
-		res = PyObject_CallFunctionObjArgs(method, o, NULL);
+
+	method = _PyObject_LookupSpecial(o, "__sizeof__",
+					 &str__sizeof__);
+	if (method == NULL) {
+		if (!PyErr_Occurred())
+			PyErr_Format(PyExc_TypeError,
+				     "Type %.100s doesn't define __sizeof__",
+				     Py_TYPE(o)->tp_name);
+	}
+	else {
+		res = PyObject_CallFunctionObjArgs(method, NULL);
+		Py_DECREF(method);
+	}
 	
 	/* Has a default value been given */
 	if ((res == NULL) && (dflt != NULL) &&
@@ -1029,6 +1027,7 @@ platform -- platform identifier\n\
 executable -- pathname of this Python interpreter\n\
 prefix -- prefix used to find the Python library\n\
 exec_prefix -- prefix used to find the machine-specific Python library\n\
+float_repr_style -- string indicating the style of repr() output for floats\n\
 "
 )
 #ifdef MS_WINDOWS
@@ -1126,7 +1125,7 @@ svnversion_init(void)
 
 
 	svnversion = _Py_svnversion();
-	if (strcmp(svnversion, "exported") != 0)
+	if (strcmp(svnversion, "Unversioned directory") != 0 && strcmp(svnversion, "exported") != 0)
 		svn_revision = svnversion;
 	else if (istag) {
 		len = strlen(_patchlevel_revision);
@@ -1435,6 +1434,15 @@ _PySys_Init(void)
 	/* prevent user from creating new instances */
 	FlagsType.tp_init = NULL;
 	FlagsType.tp_new = NULL;
+
+	/* float repr style: 0.03 (short) vs 0.029999999999999999 (legacy) */
+#ifndef PY_NO_SHORT_FLOAT_REPR
+	SET_SYS_FROM_STRING("float_repr_style",
+			    PyUnicode_FromString("short"));
+#else
+	SET_SYS_FROM_STRING("float_repr_style",
+			    PyUnicode_FromString("legacy"));
+#endif
 
 #undef SET_SYS_FROM_STRING
 	if (PyErr_Occurred())

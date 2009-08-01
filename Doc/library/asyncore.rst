@@ -1,4 +1,3 @@
-
 :mod:`asyncore` --- Asynchronous socket handler
 ===============================================
 
@@ -81,7 +80,8 @@ any that have been added to the map during asynchronous service) is closed.
    +----------------------+----------------------------------------+
    | Event                | Description                            |
    +======================+========================================+
-   | ``handle_connect()`` | Implied by the first write event       |
+   | ``handle_connect()`` | Implied by the first read or write     |
+   |                      | event                                  |
    +----------------------+----------------------------------------+
    | ``handle_close()``   | Implied by a read event with no data   |
    |                      | available                              |

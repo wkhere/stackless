@@ -8,8 +8,8 @@
 
 
 The :mod:`test` package contains all regression tests for Python as well as the
-modules :mod:`test.test_support` and :mod:`test.regrtest`.
-:mod:`test.test_support` is used to enhance your tests while
+modules :mod:`test.support` and :mod:`test.regrtest`.
+:mod:`test.support` is used to enhance your tests while
 :mod:`test.regrtest` drives the testing suite.
 
 Each module in the :mod:`test` package whose name starts with ``test_`` is a
@@ -47,7 +47,7 @@ stated.
 A basic boilerplate is often used::
 
    import unittest
-   from test import test_support
+   from test import support
 
    class MyTestCase1(unittest.TestCase):
 
@@ -75,7 +75,7 @@ A basic boilerplate is often used::
    ... more test classes ...
 
    def test_main():
-       test_support.run_unittest(MyTestCase1,
+       support.run_unittest(MyTestCase1,
                                  MyTestCase2,
                                  ... list other tests ...
                                 )
@@ -273,7 +273,7 @@ The :mod:`test.support` module defines the following functions:
    following :func:`test_main` function::
 
       def test_main():
-          test_support.run_unittest(__name__)
+          support.run_unittest(__name__)
 
    This will run all tests defined in the named module.
 
@@ -322,6 +322,54 @@ The :mod:`test.support` module defines the following functions:
       assert s.getvalue() == "hello"
 
 
+.. function:: import_module(name, deprecated=False)
+
+   This function imports and returns the named module. Unlike a normal
+   import, this function raises :exc:`unittest.SkipTest` if the module
+   cannot be imported.
+
+   Module and package deprecation messages are suppressed during this import
+   if *deprecated* is :const:`True`.
+
+   .. versionadded:: 3.1
+
+
+.. function:: import_fresh_module(name, fresh=(), blocked=(), deprecated=False)
+
+   This function imports and returns a fresh copy of the named Python module
+   by removing the named module from ``sys.modules`` before doing the import.
+   Note that unlike :func:`reload`, the original module is not affected by
+   this operation.
+
+   *fresh* is an iterable of additional module names that are also removed
+   from the ``sys.modules`` cache before doing the import.
+
+   *blocked* is an iterable of module names that are replaced with :const:`0`
+   in the module cache during the import to ensure that attempts to import
+   them raise :exc:`ImportError`.
+
+   The named module and any modules named in the *fresh* and *blocked*
+   parameters are saved before starting the import and then reinserted into
+   ``sys.modules`` when the fresh import is complete.
+
+   Module and package deprecation messages are suppressed during this import
+   if *deprecated* is :const:`True`.
+
+   This function will raise :exc:`unittest.SkipTest` is the named module
+   cannot be imported.
+
+   Example use::
+
+      # Get copies of the warnings module for testing without
+      # affecting the version being used by the rest of the test suite
+      # One copy uses the C implementation, the other is forced to use
+      # the pure Python fallback implementation
+      py_warnings = import_fresh_module('warnings', blocked=['_warnings'])
+      c_warnings = import_fresh_module('warnings', fresh=['_warnings'])
+
+   .. versionadded:: 3.1
+
+
 The :mod:`test.support` module defines the following classes:
 
 .. class:: TransientResource(exc[, **kwargs])
@@ -336,8 +384,13 @@ The :mod:`test.support` module defines the following classes:
 .. class:: EnvironmentVarGuard()
 
    Class used to temporarily set or unset environment variables.  Instances can be
-   used as a context manager.
+   used as a context manager and have a complete dictionary interface for
+   querying/modifying the underlying ``os.environ``. After exit from the context
+   manager all changes to environment variables done through this instance will
+   be rolled back.
 
+   .. versionchanged:: 3.1
+      Added dictionary interface.
 
 .. method:: EnvironmentVarGuard.set(envvar, value)
 
@@ -347,6 +400,7 @@ The :mod:`test.support` module defines the following classes:
 .. method:: EnvironmentVarGuard.unset(envvar)
 
    Temporarily unset the environment variable ``envvar``.
+
 
 .. class:: WarningsRecorder()
 

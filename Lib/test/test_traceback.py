@@ -10,16 +10,6 @@ from test.support import TESTFN, unlink
 
 import traceback
 
-try:
-    raise KeyError
-except KeyError:
-    type_, value, tb = sys.exc_info()
-    file_ = StringIO()
-    traceback_print(tb, file_)
-    example_traceback = file_.getvalue()
-else:
-    raise Error("unable to create test traceback string")
-
 
 class SyntaxTracebackCases(unittest.TestCase):
     # For now, a very minimal set of tests.  I want to be sure that
@@ -36,6 +26,9 @@ class SyntaxTracebackCases(unittest.TestCase):
     def syntax_error_with_caret(self):
         compile("def fact(x):\n\treturn x!\n", "?", "exec")
 
+    def syntax_error_with_caret_2(self):
+        compile("1 +\n", "?", "exec")
+
     def syntax_error_without_caret(self):
         # XXX why doesn't compile raise the same traceback?
         import test.badsyntax_nocaret
@@ -50,6 +43,12 @@ class SyntaxTracebackCases(unittest.TestCase):
         self.assert_(err[1].strip() == "return x!")
         self.assert_("^" in err[2]) # third line has caret
         self.assertEqual(err[1].find("!"), err[2].find("^")) # in the right place
+
+        err = self.get_exception_format(self.syntax_error_with_caret_2,
+                                        SyntaxError)
+        self.assert_("^" in err[2]) # third line has caret
+        self.assert_(err[2].count('\n') == 1) # and no additional newline
+        self.assert_(err[1].find("+") == err[2].find("^")) # in the right place
 
     def test_nocaret(self):
         if is_jython:
@@ -158,9 +157,24 @@ class SyntaxTracebackCases(unittest.TestCase):
 
 class TracebackFormatTests(unittest.TestCase):
 
-    def test_traceback_indentation(self):
+    def test_traceback_format(self):
+        try:
+            raise KeyError('blah')
+        except KeyError:
+            type_, value, tb = sys.exc_info()
+            traceback_fmt = 'Traceback (most recent call last):\n' + \
+                            ''.join(traceback.format_tb(tb))
+            file_ = StringIO()
+            traceback_print(tb, file_)
+            python_fmt  = file_.getvalue()
+        else:
+            raise Error("unable to create test traceback string")
+
+        # Make sure that Python and the traceback module format the same thing
+        self.assertEquals(traceback_fmt, python_fmt)
+
         # Make sure that the traceback is properly indented.
-        tb_lines = example_traceback.splitlines()
+        tb_lines = python_fmt.splitlines()
         self.assertEquals(len(tb_lines), 3)
         banner, location, source_line = tb_lines
         self.assert_(banner.startswith('Traceback'))

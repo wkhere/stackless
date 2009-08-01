@@ -9,13 +9,13 @@
 .. index:: single: ttk
 
 The :mod:`tkinter.ttk` module provides access to the Tk themed widget set,
-which has been introduced in Tk 8.5. If you do not have Python compiled against
-Tk 8.5 you may still use this module as long as you have Tile installed, but
-then you will miss some features provided by the new Tk, like anti-aliased font
-rendering under X11, window transparency (on X11 you will need a composition
-window manager) and others.
+introduced in Tk 8.5. If Python has not been compiled against Tk 8.5, this
+module can still be accessed if *Tile* has been installed.  The former
+method using Tk 8.5 provides additional benefits including anti-aliased font
+rendering under X11 and window transparency (requiring a composition
+window manager on X11).
 
-The basic idea of :mod:`tkinter.ttk` is to separate, to the extent possible,
+The basic idea for :mod:`tkinter.ttk` is to separate, to the extent possible,
 the code implementing a widget's behavior from the code implementing its
 appearance.
 
@@ -23,58 +23,55 @@ appearance.
 .. seealso::
 
    `Tk Widget Styling Support <http://www.tcl.tk/cgi-bin/tct/tip/48>`_
-      The document which brought up theming support for Tk
+      A document introducing theming support for Tk
 
 
 Using Ttk
 ---------
 
-Basically, to start using Ttk, you have to import its module::
+To start using Ttk, import its module::
 
    from tkinter import ttk
 
-But if you already have some code that does::
-
-   from tkinter import *
-
-You may optionally want to use::
+To override the basic Tk widgets, the import should follow the Tk import::
 
    from tkinter import *
    from tkinter.ttk import *
 
-And then several :mod:`tkinter.ttk` widgets (:class:`Button`,
+That code causes several :mod:`tkinter.ttk` widgets (:class:`Button`,
 :class:`Checkbutton`, :class:`Entry`, :class:`Frame`, :class:`Label`,
 :class:`LabelFrame`, :class:`Menubutton`, :class:`PanedWindow`,
-:class:`Radiobutton`, :class:`Scale` and :class:`Scrollbar`) will
-automatically substitute the Tk widgets.
+:class:`Radiobutton`, :class:`Scale` and :class:`Scrollbar`) to
+automatically replace the Tk widgets.
 
-This has the direct benefit of using the new widgets which gives better
-look & feel across platforms, but you should be aware that they are not
-totally compatible. The main difference you will find out is that widget
-options such as "fg", "bg" and others related to widget styling are no
-longer present in Ttk widgets, instead you will have to use :class:`ttk.Style`
-to achieve the same (or better) styling.
+This has the direct benefit of using the new widgets which gives a better
+look and feel across platforms; however, the replacement widgets are not
+completely compatible. The main difference is that widget options such as
+"fg", "bg" and others related to widget styling are no
+longer present in Ttk widgets.  Instead, use  the :class:`ttk.Style` class
+for improved styling effects.
+
 
 .. seealso::
 
-   `Converting existing applications to use the Tile widgets <http://tktable.sourceforge.net/tile/doc/converting.txt>`_
-     A text which talks in Tcl terms about differences typically found when
-     moving applications to use the new widgets.
+   `Converting existing applications to use Tile widgets <http://tktable.sourceforge.net/tile/doc/converting.txt>`_
+     A monograph (using Tcl terminology) about differences typically
+     encountered when moving applications to use the new widgets.
 
 
 Ttk Widgets
 -----------
 
-Ttk comes with 17 widgets, where 11 of these already existed in tkinter:
+Ttk comes with 17 widgets, eleven of which already existed in tkinter:
 :class:`Button`, :class:`Checkbutton`, :class:`Entry`, :class:`Frame`,
 :class:`Label`, :class:`LabelFrame`, :class:`Menubutton`, :class:`PanedWindow`,
-:class:`Radiobutton`, :class:`Scale` and :class:`Scrollbar`. The others 6 are
+:class:`Radiobutton`, :class:`Scale` and :class:`Scrollbar`. The other six are
 new: :class:`Combobox`, :class:`Notebook`, :class:`Progressbar`,
 :class:`Separator`, :class:`Sizegrip` and :class:`Treeview`. And all them are
 subclasses of :class:`Widget`.
 
-Like it was told before, you will notice changes in look & feel as well in the
-styling code. To demonstrate the latter, a very simple example is shown below.
+Using the Ttk widgets gives the application an improved look and feel.
+As discussed above, there are differences in how the styling is coded.
 
 Tk code::
 
@@ -90,7 +87,7 @@ Ttk code::
    l1 = ttk.Label(text="Test", style="BW.TLabel")
    l2 = ttk.Label(text="Test", style="BW.TLabel")
 
-For more information about TtkStyling_ read the :class:`Style` class
+For more information about TtkStyling_, see the :class:`Style` class
 documentation.
 
 Widget
@@ -159,6 +156,9 @@ Label Options
 
 The following options are supported by labels, buttons and other button-like
 widgets.
+
+.. tabularcolumns:: |p{0.2\textwidth}|p{0.7\textwidth}|
+..
 
    +--------------+-----------------------------------------------------------+
    | option       | description                                               |
@@ -249,7 +249,7 @@ an exclamation point indicating that the bit is off.
 ttk.Widget
 ^^^^^^^^^^
 
-Besides the methods described below, the class :class:`ttk.Widget` supports the
+Besides the methods described below, the :class:`ttk.Widget` supports the
 methods :meth:`tkinter.Widget.cget` and :meth:`tkinter.Widget.configure`.
 
 .. class:: Widget
@@ -484,7 +484,7 @@ ttk.Notebook
 
       The tab will not be displayed, but the associated window remains
       managed by the notebook and its configuration remembered. Hidden tabs
-      may be restored with the add command.
+      may be restored with the :meth:`add` command.
 
 
    .. method:: identify(x, y)
@@ -503,7 +503,7 @@ ttk.Notebook
 
       Inserts a pane at the specified position.
 
-      *pos* is either the string end, an integer index, or the name of a
+      *pos* is either the string "end", an integer index, or the name of a
       managed child. If *child* is already managed by the notebook, moves it to
       the specified position.
 
@@ -523,7 +523,7 @@ ttk.Notebook
 
       Query or modify the options of the specific *tab_id*.
 
-      If *kw* is not given, returns a dict of the tab option values. If
+      If *kw* is not given, returns a dictionary of the tab option values. If
       *option* is specified, returns the value of that *option*. Otherwise,
       sets the options to the corresponding values.
 
@@ -540,24 +540,24 @@ ttk.Notebook
       This will extend the bindings for the toplevel window containing the
       notebook as follows:
 
-      * Control-Tab: selects the tab following the currently selected one
-      * Shift-Control-Tab: selects the tab preceding the currently selected one
+      * Control-Tab: selects the tab following the currently selected one.
+      * Shift-Control-Tab: selects the tab preceding the currently selected one.
       * Alt-K: where K is the mnemonic (underlined) character of any tab, will
         select that tab.
 
       Multiple notebooks in a single toplevel may be enabled for traversal,
       including nested notebooks. However, notebook traversal only works
-      properly if all panes have as master the notebook they are in.
+      properly if all panes have the notebook they are in as master.
 
 
 Progressbar
 -----------
 
 The :class:`ttk.Progressbar` widget shows the status of a long-running
-operation. It can operate in two modes: determinate mode shows the amount
-completed relative to the total amount of work to be done, and indeterminate
-mode provides an animated display to let the user know that something is
-happening.
+operation. It can operate in two modes:  1) the determinate mode which shows the
+amount completed relative to the total amount of work to be done and 2) the
+indeterminate mode which provides an animated display to let the user know that
+work is progressing.
 
 
 Options
@@ -580,12 +580,12 @@ This widget accepts the following specific options:
    +----------+---------------------------------------------------------------+
    | value    | The current value of the progress bar. In "determinate" mode, |
    |          | this represents the amount of work completed. In              |
-   |          | "indeterminate" mode, it is interpreted as modulo maximum;    |
+   |          | "indeterminate" mode, it is interpreted as modulo *maximum*;  |
    |          | that is, the progress bar completes one "cycle" when its value|
-   |          | increases by maximum.                                         |
+   |          | increases by *maximum*.                                       |
    +----------+---------------------------------------------------------------+
    | variable | A name which is linked to the option value. If specified, the |
-   |          | value of the progressbar is automatically set to the value of |
+   |          | value of the progress bar is automatically set to the value of|
    |          | this name whenever the latter is modified.                    |
    +----------+---------------------------------------------------------------+
    | phase    | Read-only option. The widget periodically increments the value|
@@ -602,14 +602,14 @@ ttk.Progressbar
 
    .. method:: start([interval])
 
-      Begin autoincrement mode: schedules a recurring timer even that calls
+      Begin autoincrement mode: schedules a recurring timer event that calls
       :meth:`Progressbar.step` every *interval* milliseconds. If omitted,
       *interval* defaults to 50 milliseconds.
 
 
    .. method:: step([amount])
 
-      Increments progressbar's value by *amount*.
+      Increments the progress bar's value by *amount*.
 
       *amount* defaults to 1.0 if omitted.
 
@@ -617,7 +617,7 @@ ttk.Progressbar
    .. method:: stop()
 
       Stop autoincrement mode: cancels any recurring timer event initiated by
-      :meth:`Progressbar.start` for this progressbar.
+      :meth:`Progressbar.start` for this progress bar.
 
 
 Separator
@@ -626,7 +626,7 @@ Separator
 The :class:`ttk.Separator` widget displays a horizontal or vertical separator
 bar.
 
-It has no other method besides the ones inherited from :class:`ttk.Widget`.
+It has no other methods besides the ones inherited from :class:`ttk.Widget`.
 
 
 Options
@@ -645,18 +645,18 @@ This widget accepts the following specific option:
 Sizegrip
 --------
 
-The :class:`ttk.Sizegrip` widget (also known as grow box) allows the user to
+The :class:`ttk.Sizegrip` widget (also known as a grow box) allows the user to
 resize the containing toplevel window by pressing and dragging the grip.
 
-This widget has no specific options neither specific methods, besides the
+This widget has neither specific options nor specific methods, besides the
 ones inherited from :class:`ttk.Widget`.
 
 
 Platform-specific notes
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-* On Mac OSX, toplevel windows automatically include a built-in size grip
-  by default. Adding a Sizegrip there is harmless, since the built-in
+* On MacOS X, toplevel windows automatically include a built-in size grip
+  by default. Adding a :class:`Sizegrip` is harmless, since the built-in
   grip will just mask the widget.
 
 
@@ -664,8 +664,8 @@ Bugs
 ^^^^
 
 * If the containing toplevel's position was specified relative to the right
-  or bottom of the screen (e.g. ....), the Sizegrip widget will not resize
-  the window.
+  or bottom of the screen (e.g. ....), the :class:`Sizegrip` widget will
+  not resize the window.
 * This widget supports only "southeast" resizing.
 
 
@@ -678,16 +678,16 @@ values. The data values are displayed in successive columns after the tree
 label.
 
 The order in which data values are displayed may be controlled by setting
-the widget option displaycolumns. The tree widget can also display column
+the widget option ``displaycolumns``. The tree widget can also display column
 headings. Columns may be accessed by number or symbolic names listed in the
 widget option columns. See `Column Identifiers`_.
 
 Each item is identified by an unique name. The widget will generate item IDs
 if they are not supplied by the caller. There is a distinguished root item,
-named {}. The root item itself is not displayed; its children appear at the
+named ``{}``. The root item itself is not displayed; its children appear at the
 top level of the hierarchy.
 
-Each item also has a list of tags, which can be used to associate even bindings
+Each item also has a list of tags, which can be used to associate event bindings
 with individual items and control the appearance of the item.
 
 The Treeview widget supports horizontal and vertical scrolling, according to
@@ -698,7 +698,10 @@ the options described in `Scrollable Widget Options`_ and the methods
 Options
 ^^^^^^^
 
-This widget accepts the following specific option:
+This widget accepts the following specific options:
+
+.. tabularcolumns:: |p{0.2\textwidth}|p{0.7\textwidth}|
+..
 
    +----------------+--------------------------------------------------------+
    | option         | description                                            |
@@ -726,8 +729,8 @@ This widget accepts the following specific option:
    |                | be changed.                                            |
    |                |                                                        |
    |                | Note that the application code and tag bindings can set|
-   |                | the selection however they wish, regardless the value  |
-   |                | of this option.                                        |
+   |                | the selection however they wish, regardless of the     |
+   |                | value  of this option.                                 |
    +----------------+--------------------------------------------------------+
    | show           | A list containing zero or more of the following values,|
    |                | specifying which elements of the tree to display.      |
@@ -738,7 +741,7 @@ This widget accepts the following specific option:
    |                | The default is "tree headings", i.e., show all         |
    |                | elements.                                              |
    |                |                                                        |
-   |                | **Note**: Column #0 always refer to the tree column,   |
+   |                | **Note**: Column #0 always refers to the tree column,  |
    |                | even if show="tree" is not specified.                  |
    +----------------+--------------------------------------------------------+
 
@@ -858,11 +861,11 @@ ttk.Treeview
 
    .. method:: set_children(item, *newchildren)
 
-      Replaces item's child with *newchildren*.
+      Replaces *item*'s child with *newchildren*.
 
-      Children present in item that are not present in *newchildren* are
-      detached from tree. No items in *newchildren* may be an ancestor of
-      item. Note that not specifying *newchildren* results in detaching
+      Children present in *item* that are not present in *newchildren* are
+      detached from the tree. No items in *newchildren* may be an ancestor of
+      *item*. Note that not specifying *newchildren* results in detaching
       *item*'s children.
 
 
@@ -877,16 +880,16 @@ ttk.Treeview
       The valid options/values are:
 
       * id
-         Returns the column name, this is a read-only option.
+         Returns the column name. This is a read-only option.
       * anchor: One of the standard Tk anchor values.
          Specifies how the text in this column should be aligned with respect
          to the cell.
       * minwidth: width
          The minimum width of the column in pixels. The treeview widget will
-         not make the column any smaller than the specified by this option when
+         not make the column any smaller than specified by this option when
          the widget is resized or the user drags a column.
       * stretch: True/False
-         Specifies wheter or not the column's width should be adjusted when
+         Specifies whether the column's width should be adjusted when
          the widget is resized.
       * width: width
          The width of the column in pixels.
@@ -912,8 +915,7 @@ ttk.Treeview
 
    .. method:: exists(item)
 
-      Returns True if the specified *item* is present in the three,
-      False otherwise.
+      Returns True if the specified *item* is present in the tree.
 
 
    .. method:: focus([item=None])
@@ -942,7 +944,7 @@ ttk.Treeview
       * command: callback
          A callback to be invoked when the heading label is pressed.
 
-      To configure the tree column heading, call this with column = "#0"
+      To configure the tree column heading, call this with column = "#0".
 
 
    .. method:: identify(component, x, y)
@@ -985,7 +987,7 @@ ttk.Treeview
 
    .. method:: identify_element(x, y)
 
-      Returns the element at position x, y.
+      Returns the element at position *x*, *y*.
 
       Availability: Tk 8.6.
 
@@ -997,16 +999,16 @@ ttk.Treeview
 
    .. method:: insert(parent, index[, iid=None[, **kw]])
 
-      Creates a new item and return the item identifier of the newly created
+      Creates a new item and returns the item identifier of the newly created
       item.
 
       *parent* is the item ID of the parent item, or the empty string to create
       a new top-level item. *index* is an integer, or the value "end",
       specifying where in the list of parent's children to insert the new item.
       If *index* is less than or equal to zero, the new node is inserted at
-      the beginning, if *index* is greater than or equal to the current number
+      the beginning; if *index* is greater than or equal to the current number
       of children, it is inserted at the end. If *iid* is specified, it is used
-      as the item identifier, *iid* must not already exist in the tree.
+      as the item identifier; *iid* must not already exist in the tree.
       Otherwise, a new unique identifier is generated.
 
       See `Item Options`_ for the list of available points.
@@ -1026,9 +1028,9 @@ ttk.Treeview
 
       Moves *item* to position *index* in *parent*'s list of children.
 
-      It is illegal to move an item under one of its descendants. If index is
-      less than or equal to zero, item is moved to the beginning, if greater
-      than or equal to the number of children, it is moved to the end. If item
+      It is illegal to move an item under one of its descendants. If *index* is
+      less than or equal to zero, *item* is moved to the beginning; if greater
+      than or equal to the number of children, it is moved to the end. If *item*
       was detached it is reattached.
 
 
@@ -1101,7 +1103,7 @@ ttk.Treeview
    .. method:: tag_bind(tagname[, sequence=None[, callback=None]])
 
       Bind a callback for the given event *sequence* to the tag *tagname*.
-      When an event is delivered to an item, the *callbacks* for each of the
+      When an event is delivered to an item, the callbacks for each of the
       item's tags option are called.
 
 
@@ -1119,7 +1121,7 @@ ttk.Treeview
 
       If *item* is specified, returns 1 or 0 depending on whether the specified
       *item* has the given *tagname*. Otherwise, returns a list of all items
-      which have the specified tag.
+      that have the specified tag.
 
       Availability: Tk 8.6
 
@@ -1159,13 +1161,13 @@ option. If you don't know the class name of a widget, use the method
 
    .. method:: configure(style, query_opt=None, **kw)
 
-      Query or sets the default value of the specified option(s) in *style*.
+      Query or set the default value of the specified option(s) in *style*.
 
       Each key in *kw* is an option and each value is a string identifying
       the value for that option.
 
       For example, to change every default button to be a flat button with
-      some padding and a different background color you could do::
+      some padding and a different background color::
 
          from tkinter import ttk
          import tkinter
@@ -1185,10 +1187,10 @@ option. If you don't know the class name of a widget, use the method
 
       Query or sets dynamic values of the specified option(s) in *style*.
 
-      Each key in kw is an option and each value should be a list or a
-      tuple (usually) containing statespecs grouped in tuples, or list, or
-      something else of your preference. A statespec is compound of one or more
-      states and then a value.
+      Each key in *kw* is an option and each value should be a list or a
+      tuple (usually) containing statespecs grouped in tuples, lists, or
+      some other preference. A statespec is a compound of one
+      or more states and then a value.
 
       An example may make it more understandable::
 
@@ -1208,12 +1210,10 @@ option. If you don't know the class name of a widget, use the method
          root.mainloop()
 
 
-      There is a thing to note in this previous short example:
-
-       * The order of the (states, value) sequences for an option does matter,
-         if you changed the order to [('active', 'blue'), ('pressed', 'red')]
-         in the foreground option, for example, you would get a blue foreground
-         when the widget were in active or pressed states.
+      Note that the order of the (states, value) sequences for an option does
+      matter, if the order is changed to ``[('active', 'blue'), ('pressed',
+      'red')]`` in the foreground option, for example, the result would be a
+      blue foreground when the widget were in active or pressed states.
 
 
    .. method:: lookup(style, option[, state=None[, default=None]])
@@ -1224,7 +1224,7 @@ option. If you don't know the class name of a widget, use the method
       states. If the *default* argument is set, it is used as a fallback value
       in case no specification for option is found.
 
-      To check what font a Button uses by default, you would do::
+      To check what font a Button uses by default::
 
          from tkinter import ttk
 
@@ -1236,13 +1236,13 @@ option. If you don't know the class name of a widget, use the method
       Define the widget layout for given *style*. If *layoutspec* is omitted,
       return the layout specification for given style.
 
-      *layoutspec*, if specified, is expected to be a list, or some other
-      sequence type (excluding string), where each item should be a tuple and
+      *layoutspec*, if specified, is expected to be a list or some other
+      sequence type (excluding strings), where each item should be a tuple and
       the first item is the layout name and the second item should have the
       format described described in `Layouts`_.
 
-      To understand the format, check this example below (it is not intended
-      to do anything useful)::
+      To understand the format, see the following example (it is not
+      intended to do anything useful)::
 
          from tkinter import ttk
          import tkinter
@@ -1268,12 +1268,12 @@ option. If you don't know the class name of a widget, use the method
 
    .. method:: element_create(elementname, etype, *args, **kw)
 
-      Create a new element in the current theme of given *etype* which is
+      Create a new element in the current theme, of the given *etype* which is
       expected to be either "image", "from" or "vsapi". The latter is only
       available in Tk 8.6a for Windows XP and Vista and is not described here.
 
       If "image" is used, *args* should contain the default image name followed
-      by statespec/value pairs (this is the imagespec), *kw* may have the
+      by statespec/value pairs (this is the imagespec), and *kw* may have the
       following options:
 
        * border=padding
@@ -1296,11 +1296,12 @@ option. If you don't know the class name of a widget, use the method
           Specifies a minimum width for the element. If less than zero, the
           base image's width is used as a default.
 
-      But if "from" is used, then :meth:`element_create` will clone an existing
-      element. *args* is expected to contain a themename, which is from where
+      If "from" is used as the value of *etype*,
+      :meth:`element_create` will clone an existing
+      element. *args* is expected to contain a themename, from which
       the element will be cloned, and optionally an element to clone from.
       If this element to clone from is not specified, an empty element will
-      be used. *kw* is discarded here.
+      be used. *kw* is discarded.
 
 
    .. method:: element_names()
@@ -1334,7 +1335,7 @@ option. If you don't know the class name of a widget, use the method
       :meth:`Style.configure`, :meth:`Style.map`, :meth:`Style.layout` and
       :meth:`Style.element_create` respectively.
 
-      As an example, lets change the Combobox for the default theme a bit::
+      As an example, let's change the Combobox for the default theme a bit::
 
          from tkinter import ttk
          import tkinter
@@ -1367,7 +1368,7 @@ option. If you don't know the class name of a widget, use the method
 
    .. method:: theme_use([themename])
 
-      If *themename* is not given, returns the theme in use, otherwise, set
+      If *themename* is not given, returns the theme in use.  Otherwise, sets
       the current theme to *themename*, refreshes all widgets and emits a
       <<ThemeChanged>> event.
 
@@ -1375,13 +1376,14 @@ option. If you don't know the class name of a widget, use the method
 Layouts
 ^^^^^^^
 
-A layout can be just None, if takes no options, or a dict of options specifying
-how to arrange the element. The layout mechanism uses a simplified
-version of the pack geometry manager: given an initial cavity, each element is
-allocated a parcel. Valid options/values are:
+A layout can be just None, if it takes no options, or a dict of
+options specifying how to arrange the element. The layout mechanism
+uses a simplified version of the pack geometry manager: given an
+initial cavity, each element is allocated a parcel. Valid
+options/values are:
 
  * side: whichside
-    Specifies which side of the cavity to place the the element; one of
+    Specifies which side of the cavity to place the element; one of
     top, right, bottom or left. If omitted, the element occupies the
     entire cavity.
 

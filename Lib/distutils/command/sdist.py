@@ -9,6 +9,8 @@ import string
 import sys
 from types import *
 from glob import glob
+from warnings import warn
+
 from distutils.core import Command
 from distutils import dir_util, dep_util, file_util, archive_util
 from distutils.text_file import TextFile
@@ -17,24 +19,29 @@ from distutils.filelist import FileList
 from distutils import log
 from distutils.util import convert_path
 
-def show_formats ():
+def show_formats():
     """Print all possible values for the 'formats' option (used by
     the "--help-formats" command-line option).
     """
     from distutils.fancy_getopt import FancyGetopt
     from distutils.archive_util import ARCHIVE_FORMATS
-    formats=[]
+    formats = []
     for format in ARCHIVE_FORMATS.keys():
         formats.append(("formats=" + format, None,
                         ARCHIVE_FORMATS[format][2]))
     formats.sort()
-    pretty_printer = FancyGetopt(formats)
-    pretty_printer.print_help(
+    FancyGetopt(formats).print_help(
         "List of available source distribution formats:")
 
-class sdist (Command):
+class sdist(Command):
 
     description = "create a source distribution (tarball, zip file, etc.)"
+
+    def checking_metadata(self):
+        """Callable used for the check sub-command.
+
+        Placed here so user_options can view it"""
+        return self.metadata_check
 
     user_options = [
         ('template=', 't',
@@ -65,11 +72,14 @@ class sdist (Command):
         ('dist-dir=', 'd',
          "directory to put the source distribution archive(s) in "
          "[default: dist]"),
+        ('medata-check', None,
+         "Ensure that all required elements of meta-data "
+         "are supplied. Warn if any missing. [default]"),
         ]
 
     boolean_options = ['use-defaults', 'prune',
                        'manifest-only', 'force-manifest',
-                       'keep-temp']
+                       'keep-temp', 'metadata-check']
 
     help_options = [
         ('help-formats', None,
@@ -79,8 +89,10 @@ class sdist (Command):
     negative_opt = {'no-defaults': 'use-defaults',
                     'no-prune': 'prune' }
 
-    default_format = { 'posix': 'gztar',
-                       'nt': 'zip' }
+    default_format = {'posix': 'gztar',
+                      'nt': 'zip' }
+
+    sub_commands = [('check', checking_metadata)]
 
     def initialize_options(self):
         # 'template' and 'manifest' are, respectively, the names of
@@ -101,7 +113,7 @@ class sdist (Command):
         self.dist_dir = None
 
         self.archive_files = None
-
+        self.metadata_check = 1
 
     def finalize_options(self):
         if self.manifest is None:
@@ -126,15 +138,14 @@ class sdist (Command):
         if self.dist_dir is None:
             self.dist_dir = "dist"
 
-
     def run(self):
         # 'filelist' contains the list of files that will make up the
         # manifest
         self.filelist = FileList()
 
-        # Ensure that all required meta-data is given; warn if not (but
-        # don't die, it's not *that* serious!)
-        self.check_metadata()
+        # Run sub commands
+        for cmd_name in self.get_sub_commands():
+            self.run_command(cmd_name)
 
         # Do whatever it takes to get the list of files to process
         # (process the manifest template, read an existing manifest,
@@ -150,34 +161,12 @@ class sdist (Command):
         self.make_distribution()
 
     def check_metadata(self):
-        """Ensure that all required elements of meta-data (name, version,
-        URL, (author and author_email) or (maintainer and
-        maintainer_email)) are supplied by the Distribution object; warn if
-        any are missing.
-        """
-        metadata = self.distribution.metadata
-
-        missing = []
-        for attr in ('name', 'version', 'url'):
-            if not (hasattr(metadata, attr) and getattr(metadata, attr)):
-                missing.append(attr)
-
-        if missing:
-            self.warn("missing required meta-data: " +
-                      ", ".join(missing))
-
-        if metadata.author:
-            if not metadata.author_email:
-                self.warn("missing meta-data: if 'author' supplied, " +
-                          "'author_email' must be supplied too")
-        elif metadata.maintainer:
-            if not metadata.maintainer_email:
-                self.warn("missing meta-data: if 'maintainer' supplied, " +
-                          "'maintainer_email' must be supplied too")
-        else:
-            self.warn("missing meta-data: either (author and author_email) " +
-                      "or (maintainer and maintainer_email) " +
-                      "must be supplied")
+        """Deprecated API."""
+        warn("distutils.command.sdist.check_metadata is deprecated, \
+              use the check command instead", PendingDeprecationWarning)
+        check = self.distribution.get_command_obj('check')
+        check.ensure_finalized()
+        check.run()
 
     def get_file_list(self):
         """Figure out the list of files to include in the source
@@ -244,7 +233,6 @@ class sdist (Command):
         # Don't regenerate the manifest, just read it in.
         else:
             self.read_manifest()
-
 
     def add_defaults(self):
         """Add all the default files to self.filelist:
@@ -374,7 +362,7 @@ class sdist (Command):
         vcs_ptrn = r'(^|%s)(%s)(%s).*' % (seps, '|'.join(vcs_dirs), seps)
         self.filelist.exclude_pattern(vcs_ptrn, is_regex=1)
 
-    def write_manifest (self):
+    def write_manifest(self):
         """Write the file list in 'self.filelist' (presumably as filled in
         by 'add_defaults()' and 'read_template()') to the manifest file
         named by 'self.manifest'.

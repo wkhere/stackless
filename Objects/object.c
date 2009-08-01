@@ -3,6 +3,7 @@
 
 #include "Python.h"
 #include "sliceobject.h" /* For PyEllipsis_Type */
+#include "frameobject.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -349,11 +350,17 @@ _PyObject_Dump(PyObject* op)
 	if (op == NULL)
 		fprintf(stderr, "NULL\n");
 	else {
+#ifdef WITH_THREAD
 		PyGILState_STATE gil;
+#endif
 		fprintf(stderr, "object  : ");
+#ifdef WITH_THREAD
 		gil = PyGILState_Ensure();
+#endif
 		(void)PyObject_Print(op, stderr, 0);
+#ifdef WITH_THREAD
 		PyGILState_Release(gil);
+#endif
 		/* XXX(twouters) cast refcount to long until %zd is
 		   universally available */
 		fprintf(stderr, "\n"
@@ -467,12 +474,6 @@ PyObject_Bytes(PyObject *v)
 	PyObject *result, *func;
 	static PyObject *bytesstring = NULL;
 
-	if (bytesstring == NULL) {
-		bytesstring = PyUnicode_InternFromString("__bytes__");
-		if (bytesstring == NULL)
-			return NULL;
-	}
-
 	if (v == NULL)
 		return PyBytes_FromString("<NULL>");
 
@@ -481,10 +482,10 @@ PyObject_Bytes(PyObject *v)
 		return v;
 	}
 
-        /* Doesn't create a reference */
-	func = _PyType_Lookup(Py_TYPE(v), bytesstring);
+	func = _PyObject_LookupSpecial(v, "__bytes__", &bytesstring);
 	if (func != NULL) {
-            result = PyObject_CallFunctionObjArgs(func, v, NULL);
+            result = PyObject_CallFunctionObjArgs(func, NULL);
+	    Py_DECREF(func);
             if (result == NULL)
 		return NULL;
             if (!PyBytes_Check(result)) {
@@ -496,7 +497,8 @@ PyObject_Bytes(PyObject *v)
             }
             return result;
 	}
-        PyErr_Clear();
+	else if (PyErr_Occurred())
+		return NULL;
 	return PyBytes_FromObject(v);
 }
 
@@ -1473,37 +1475,137 @@ void
 _Py_ReadyTypes(void)
 {
 	if (PyType_Ready(&PyType_Type) < 0)
-		Py_FatalError("Can't initialize 'type'");
+		Py_FatalError("Can't initialize type type");
 
 	if (PyType_Ready(&_PyWeakref_RefType) < 0)
-		Py_FatalError("Can't initialize 'weakref'");
+		Py_FatalError("Can't initialize weakref type");
+
+	if (PyType_Ready(&_PyWeakref_CallableProxyType) < 0)
+		Py_FatalError("Can't initialize callable weakref proxy type");
+
+	if (PyType_Ready(&_PyWeakref_ProxyType) < 0)
+		Py_FatalError("Can't initialize weakref proxy type");
 
 	if (PyType_Ready(&PyBool_Type) < 0)
-		Py_FatalError("Can't initialize 'bool'");
+		Py_FatalError("Can't initialize bool type");
 
 	if (PyType_Ready(&PyByteArray_Type) < 0)
-		Py_FatalError("Can't initialize 'bytes'");
+		Py_FatalError("Can't initialize bytearray type");
 
 	if (PyType_Ready(&PyBytes_Type) < 0)
 		Py_FatalError("Can't initialize 'str'");
 
 	if (PyType_Ready(&PyList_Type) < 0)
-		Py_FatalError("Can't initialize 'list'");
+		Py_FatalError("Can't initialize list type");
 
 	if (PyType_Ready(&PyNone_Type) < 0)
-		Py_FatalError("Can't initialize type(None)");
+		Py_FatalError("Can't initialize None type");
 
 	if (PyType_Ready(Py_Ellipsis->ob_type) < 0)
 		Py_FatalError("Can't initialize type(Ellipsis)");
 
 	if (PyType_Ready(&PyNotImplemented_Type) < 0)
-		Py_FatalError("Can't initialize type(NotImplemented)");
+		Py_FatalError("Can't initialize NotImplemented type");
 
-	if (PyType_Ready(&PyCode_Type) < 0)
-		Py_FatalError("Can't initialize 'code'");
+	if (PyType_Ready(&PyTraceBack_Type) < 0)
+		Py_FatalError("Can't initialize traceback type");
+
+	if (PyType_Ready(&PySuper_Type) < 0)
+		Py_FatalError("Can't initialize super type");
+
+	if (PyType_Ready(&PyBaseObject_Type) < 0)
+		Py_FatalError("Can't initialize object type");
+
+	if (PyType_Ready(&PyRange_Type) < 0)
+		Py_FatalError("Can't initialize range type");
+
+	if (PyType_Ready(&PyDict_Type) < 0)
+		Py_FatalError("Can't initialize dict type");
+
+	if (PyType_Ready(&PySet_Type) < 0)
+		Py_FatalError("Can't initialize set type");
+
+	if (PyType_Ready(&PyUnicode_Type) < 0)
+		Py_FatalError("Can't initialize str type");
+
+	if (PyType_Ready(&PySlice_Type) < 0)
+		Py_FatalError("Can't initialize slice type");
+
+	if (PyType_Ready(&PyStaticMethod_Type) < 0)
+		Py_FatalError("Can't initialize static method type");
+
+#ifndef WITHOUT_COMPLEX
+	if (PyType_Ready(&PyComplex_Type) < 0)
+		Py_FatalError("Can't initialize complex type");
+#endif
+	if (PyType_Ready(&PyFloat_Type) < 0)
+		Py_FatalError("Can't initialize float type");
+
+	if (PyType_Ready(&PyLong_Type) < 0)
+		Py_FatalError("Can't initialize int type");
+
+	if (PyType_Ready(&PyFrozenSet_Type) < 0)
+		Py_FatalError("Can't initialize frozenset type");
+
+	if (PyType_Ready(&PyProperty_Type) < 0)
+		Py_FatalError("Can't initialize property type");
+
+	if (PyType_Ready(&PyMemoryView_Type) < 0)
+		Py_FatalError("Can't initialize memoryview type");
+
+	if (PyType_Ready(&PyTuple_Type) < 0)
+		Py_FatalError("Can't initialize tuple type");
+
+	if (PyType_Ready(&PyEnum_Type) < 0)
+		Py_FatalError("Can't initialize enumerate type");
+
+	if (PyType_Ready(&PyReversed_Type) < 0)
+		Py_FatalError("Can't initialize reversed type");
 
 	if (PyType_Ready(&PyStdPrinter_Type) < 0)
 		Py_FatalError("Can't initialize StdPrinter");
+
+	if (PyType_Ready(&PyCode_Type) < 0)
+		Py_FatalError("Can't initialize code type");
+
+	if (PyType_Ready(&PyFrame_Type) < 0)
+		Py_FatalError("Can't initialize frame type");
+
+	if (PyType_Ready(&PyCFunction_Type) < 0)
+		Py_FatalError("Can't initialize builtin function type");
+
+	if (PyType_Ready(&PyMethod_Type) < 0)
+		Py_FatalError("Can't initialize method type");
+
+	if (PyType_Ready(&PyFunction_Type) < 0)
+		Py_FatalError("Can't initialize function type");
+
+	if (PyType_Ready(&PyDictProxy_Type) < 0)
+		Py_FatalError("Can't initialize dict proxy type");
+
+	if (PyType_Ready(&PyGen_Type) < 0)
+		Py_FatalError("Can't initialize generator type");
+
+	if (PyType_Ready(&PyGetSetDescr_Type) < 0)
+		Py_FatalError("Can't initialize get-set descriptor type");
+
+	if (PyType_Ready(&PyWrapperDescr_Type) < 0)
+		Py_FatalError("Can't initialize wrapper type");
+
+	if (PyType_Ready(&PyEllipsis_Type) < 0)
+		Py_FatalError("Can't initialize ellipsis type");
+
+	if (PyType_Ready(&PyMemberDescr_Type) < 0)
+		Py_FatalError("Can't initialize member descriptor type");
+
+	if (PyType_Ready(&PyFilter_Type) < 0)
+		Py_FatalError("Can't initialize filter type");
+
+	if (PyType_Ready(&PyMap_Type) < 0)
+		Py_FatalError("Can't initialize map type");
+
+	if (PyType_Ready(&PyZip_Type) < 0)
+		Py_FatalError("Can't initialize zip type");
 }
 
 
@@ -1618,9 +1720,12 @@ _Py_GetObjects(PyObject *self, PyObject *args)
 
 #endif
 
-
 /* Hack to force loading of cobject.o */
 PyTypeObject *_Py_cobject_hack = &PyCObject_Type;
+
+
+/* Hack to force loading of pycapsule.o */
+PyTypeObject *_PyCapsule_hack = &PyCapsule_Type;
 
 
 /* Hack to force loading of abstract.o */

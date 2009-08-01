@@ -1,4 +1,3 @@
-
 :mod:`marshal` --- Internal Python object serialization
 =======================================================
 
@@ -73,7 +72,7 @@ The module defines these functions:
    file must be an open file object opened in binary mode (``'rb'`` or
    ``'r+b'``).
 
-   .. warning::
+   .. note::
 
       If an object containing an unsupported type was marshalled with :func:`dump`,
       :func:`load` will substitute ``None`` for the unmarshallable type.

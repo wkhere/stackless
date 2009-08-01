@@ -154,6 +154,8 @@ the queue, use :meth:`pop` with ``0`` as the index.  For example::
    ['Michael', 'Terry', 'Graham']
 
 
+.. _tut-listcomps:
+
 List Comprehensions
 -------------------
 
@@ -162,12 +164,11 @@ Common applications are to make lists where each element is the result of
 some operations applied to each member of the sequence, or to create a
 subsequence of those elements that satisfy a certain condition.
 
-
-Each list comprehension consists of an expression followed by a :keyword:`for`
-clause, then zero or more :keyword:`for` or :keyword:`if` clauses.  The result
-will be a list resulting from evaluating the expression in the context of the
-:keyword:`for` and :keyword:`if` clauses which follow it.  If the expression
-would evaluate to a tuple, it must be parenthesized.
+A list comprehension consists of brackets containing an expression followed
+by a :keyword:`for` clause, then zero or more :keyword:`for` or :keyword:`if`
+clauses.  The result will be a list resulting from evaluating the expression in
+the context of the :keyword:`for` and :keyword:`if` clauses which follow it.  If
+the expression would evaluate to a tuple, it must be parenthesized.
 
 Here we take a list of numbers and return a list of three times each number::
 
@@ -347,13 +348,11 @@ The reverse operation is also possible::
 
    >>> x, y, z = t
 
-This is called, appropriately enough, *sequence unpacking*. Sequence unpacking
-requires the list of variables on the left to have the same number of elements
-as the length of the sequence.  Note that multiple assignment is really just a
-combination of tuple packing and sequence unpacking!
-
-There is a small bit of asymmetry here:  packing multiple values always creates
-a tuple, and unpacking works for any sequence.
+This is called, appropriately enough, *sequence unpacking* and works for any
+sequence on the right-hand side.  Sequence unpacking requires that there are as
+many variables on the left side of the equals sign as there are elements in the
+sequence.  Note that multiple assignment is really just a combination of tuple
+packing and sequence unpacking.
 
 .. XXX Add a bit on the difference between tuples and lists.
 
@@ -368,9 +367,9 @@ with no duplicate elements.  Basic uses include membership testing and
 eliminating duplicate entries.  Set objects also support mathematical operations
 like union, intersection, difference, and symmetric difference.
 
-Curly braces or the :func:`set` function can be use to create sets. Note:
-To create an empty set you have to use set(), not {}; the latter creates
-an empty dictionary, a data structure that we discuss in the next section.
+Curly braces or the :func:`set` function can be use to create sets. Note: To
+create an empty set you have to use ``set()``, not ``{}``; the latter creates an
+empty dictionary, a data structure that we discuss in the next section.
 
 Here is a brief demonstration::
 
@@ -404,7 +403,7 @@ Here is a brief demonstration::
    >>> a ^ b                              # letters in a or b but not both
    {'r', 'd', 'b', 'm', 'z', 'l'}
 
-Like for lists, there is a set comprehension syntax::
+Like :ref:`for lists <tut-listcomps>`, there is a set comprehension syntax::
 
    >>> a = {x for x in 'abracadabra' if x not in 'abc'}
    >>> a
@@ -441,9 +440,9 @@ value associated with that key is forgotten.  It is an error to extract a value
 using a non-existent key.
 
 Performing ``list(d.keys())`` on a dictionary returns a list of all the keys
-used in the dictionary, in arbitrary order (if you want it sorted, just apply
-the :meth:`sorted` function instead).  To check whether a single key is
-in the dictionary, use the :keyword:`in` keyword.
+used in the dictionary, in arbitrary order (if you want it sorted, just use
+``sorted(d.keys())`` instead). [1]_  To check whether a single key is in the
+dictionary, use the :keyword:`in` keyword.
 
 Here is a small example using a dictionary::
 
@@ -466,9 +465,8 @@ Here is a small example using a dictionary::
    >>> 'jack' not in tel
    False
 
-The :func:`dict` constructor builds dictionaries directly from lists of
-key-value pairs stored as tuples.  When the pairs form a pattern, list
-comprehensions can compactly specify the key-value list. ::
+The :func:`dict` constructor builds dictionaries directly from sequences of
+key-value pairs::
 
    >>> dict([('sape', 4139), ('guido', 4127), ('jack', 4098)])
    {'sape': 4139, 'jack': 4098, 'guido': 4127}
@@ -486,7 +484,6 @@ keyword arguments::
    {'sape': 4139, 'jack': 4098, 'guido': 4127}
 
 
-.. XXX Find out the right way to do these DUBOIS
 .. _tut-loopidioms:
 
 Looping Techniques
@@ -607,9 +604,9 @@ sequence is exhausted. If two items to be compared are themselves sequences of
 the same type, the lexicographical comparison is carried out recursively.  If
 all items of two sequences compare equal, the sequences are considered equal.
 If one sequence is an initial sub-sequence of the other, the shorter sequence is
-the smaller (lesser) one.  Lexicographical ordering for strings uses the ASCII
-ordering for individual characters.  Some examples of comparisons between
-sequences of the same type::
+the smaller (lesser) one.  Lexicographical ordering for strings uses the Unicode
+codepoint number to order individual characters.  Some examples of comparisons
+between sequences of the same type::
 
    (1, 2, 3)              < (1, 2, 4)
    [1, 2, 3]              < [1, 2, 4]
@@ -624,3 +621,10 @@ provided that the objects have appropriate comparison methods.  For example,
 mixed numeric types are compared according to their numeric value, so 0 equals
 0.0, etc.  Otherwise, rather than providing an arbitrary ordering, the
 interpreter will raise a :exc:`TypeError` exception.
+
+
+.. rubric:: Footnotes
+
+.. [1] Calling ``d.keys()`` will return a :dfn:`dictionary view` object.  It
+       supports operations like membership test and iteration, but its contents
+       are not independent of the original dictionary -- it is only a *view*.

@@ -1,10 +1,8 @@
-
 :mod:`os.path` --- Common pathname manipulations
 ================================================
 
 .. module:: os.path
    :synopsis: Operations on pathnames.
-
 
 .. index:: single: path; operations
 
@@ -25,10 +23,21 @@ applications should use string objects to access all files.
    their parameters.  The result is an object of the same type, if a path or
    file name is returned.
 
-.. warning::
 
-   On Windows, many of these functions do not properly support UNC pathnames.
-   :func:`splitunc` and :func:`ismount` do handle them correctly.
+.. note::
+
+   Since different operating systems have different path name conventions, there
+   are several versions of this module in the standard library.  The
+   :mod:`os.path` module is always the path module suitable for the operating
+   system Python is running on, and therefore usable for local paths.  However,
+   you can also import and use the individual modules if you want to manipulate
+   a path that is *always* in one of the different formats.  They all have the
+   same interface:
+
+   * :mod:`posixpath` for UNIX-style paths
+   * :mod:`ntpath` for Windows paths
+   * :mod:`macpath` for old-style MacOS paths
+   * :mod:`os2emxpath` for OS/2 EMX paths
 
 
 .. function:: abspath(path)
@@ -189,9 +198,9 @@ applications should use string objects to access all files.
 
 .. function:: normcase(path)
 
-   Normalize the case of a pathname.  On Unix and MacOSX, this returns the path unchanged; on
-   case-insensitive filesystems, it converts the path to lowercase.  On Windows, it
-   also converts forward slashes to backward slashes.
+   Normalize the case of a pathname.  On Unix and Mac OS X, this returns the
+   path unchanged; on case-insensitive filesystems, it converts the path to
+   lowercase.  On Windows, it also converts forward slashes to backward slashes.
 
 
 .. function:: normpath(path)
@@ -253,9 +262,19 @@ applications should use string objects to access all files.
 .. function:: splitdrive(path)
 
    Split the pathname *path* into a pair ``(drive, tail)`` where *drive* is either
-   a drive specification or the empty string.  On systems which do not use drive
+   a mount point or the empty string.  On systems which do not use drive
    specifications, *drive* will always be the empty string.  In all cases, ``drive
    + tail`` will be the same as *path*.
+
+   On Windows, splits a pathname into drive/UNC sharepoint and relative path.
+
+   If the path contains a drive letter, drive will contain everything
+   up to and including the colon.
+   e.g. ``splitdrive("c:/dir")`` returns ``("c:", "/dir")``
+
+   If the path contains a UNC path, drive will contain the host name
+   and share, up to but not including the fourth separator.
+   e.g. ``splitdrive("//host/computer/dir")`` returns ``("//host/computer", "/dir")``
 
 
 .. function:: splitext(path)
@@ -267,6 +286,9 @@ applications should use string objects to access all files.
 
 
 .. function:: splitunc(path)
+
+   .. deprecated:: 3.1
+      Use *splitdrive* instead.
 
    Split the pathname *path* into a pair ``(unc, rest)`` so that *unc* is the UNC
    mount point (such as ``r'\\host\mount'``), if present, and *rest* the rest of

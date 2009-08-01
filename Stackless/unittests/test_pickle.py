@@ -246,13 +246,15 @@ class TestConcretePickledTasklets(TestPickledTasklets):
         self.run_pickled(recurse, recurse, 13)
 
     def testRecursiveEmbedded(self):
-        def rectest(nrec, lev=0):
-            if self.verbose: print(nrec, lev)
+        # Avoid self references in this function, to prevent crappy unit testing framework
+        # magic from getting pickled and refusing to unpickle.
+        def rectest(verbose, nrec, lev=0):
+            if verbose: print(str(nrec), lev)
             if lev < nrec:
-                rectest(nrec, lev+1)
+                rectest(verbose, nrec, lev+1)
             else:
                 schedule()
-        self.run_pickled(rectest, 13)
+        self.run_pickled(rectest, self.verbose, 13)
 
     def testFakeModules(self):
         types.ModuleType('fakemodule!')

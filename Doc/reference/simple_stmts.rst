@@ -815,12 +815,8 @@ then you will end up importing ``pkg.mod``. If you execute ``from ..subpkg2
 imprt mod`` from within ``pkg.subpkg1`` you will import ``pkg.subpkg2.mod``.
 The specification for relative imports is contained within :pep:`328`.
 
-
-.. index:: builtin: __import__
-
-The built-in function :func:`__import__` is provided to support applications
-that determine which modules need to be loaded dynamically; refer to
-:ref:`built-in-funcs` for additional information.
+:func:`importlib.import_module` is provided to support applications that
+determine which modules need to be loaded dynamically.
 
 
 .. _future:
@@ -896,6 +892,11 @@ for the rest of the interpreter session.  If an interpreter is started with the
 :option:`-i` option, is passed a script name to execute, and the script includes
 a future statement, it will be in effect in the interactive session started
 after the script is executed.
+
+.. seealso::
+
+   :pep:`236` - Back to the __future__
+      The original proposal for the __future__ mechanism.
 
 
 .. _global:

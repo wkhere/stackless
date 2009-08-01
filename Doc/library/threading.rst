@@ -537,12 +537,12 @@ needs to wake up one consumer thread.
 
 .. method:: Condition.notify()
 
-   Wake up a thread waiting on this condition, if any. Wait until notified or until
-   a timeout occurs. If the calling thread has not acquired the lock when this
-   method is called, a :exc:`RuntimeError` is raised.
+   Wake up a thread waiting on this condition, if any.  If the calling thread
+   has not acquired the lock when this method is called, a :exc:`RuntimeError`
+   is raised.
 
-   This method wakes up one of the threads waiting for the condition variable, if
-   any are waiting; it is a no-op if no threads are waiting.
+   This method wakes up one of the threads waiting for the condition variable,
+   if any are waiting; it is a no-op if no threads are waiting.
 
    The current implementation wakes up exactly one thread, if any are waiting.
    However, it's not safe to rely on this behavior.  A future, optimized
@@ -676,13 +676,19 @@ An event object manages an internal flag that can be set to true with the
 
 .. method:: Event.wait([timeout])
 
-   Block until the internal flag is true. If the internal flag is true on entry,
-   return immediately.  Otherwise, block until another thread calls :meth:`set` to
-   set the flag to true, or until the optional timeout occurs.
+   Block until the internal flag is true.  If the internal flag is true on entry,
+   return immediately.  Otherwise, block until another thread calls :meth:`set`
+   to set the flag to true, or until the optional timeout occurs.
 
    When the timeout argument is present and not ``None``, it should be a floating
    point number specifying a timeout for the operation in seconds (or fractions
    thereof).
+
+   This method returns the internal flag on exit, so it will always return
+   ``True`` except if a timeout is given and the operation times out.
+
+   .. versionchanged:: 3.1
+      Previously, the method always returned ``None``.
 
 
 .. _timer-objects:

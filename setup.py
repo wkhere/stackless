@@ -424,8 +424,6 @@ class PyBuildExt(build_ext):
         exts.append( Extension("_heapq", ["_heapqmodule.c"]) )
         # operator.add() and similar goodies
         exts.append( Extension('operator', ['operator.c']) )
-        # _functools
-        exts.append( Extension("_functools", ["_functoolsmodule.c"]) )
         # C-optimized pickle replacement
         exts.append( Extension("_pickle", ["_pickle.c", '../Stackless/pickling/safe_pickle.c']) )
         # atexit
@@ -439,22 +437,6 @@ class PyBuildExt(build_ext):
         exts.append( Extension('_lsprof', ['_lsprof.c', 'rotatingtree.c']) )
         # static Unicode character database
         exts.append( Extension('unicodedata', ['unicodedata.c']) )
-        # access to ISO C locale support
-        data = open('pyconfig.h').read()
-        m = re.search(r"#s*define\s+WITH_LIBINTL\s+1\s*", data)
-        if m is not None:
-            locale_libs = ['intl']
-        else:
-            locale_libs = []
-        if platform == 'darwin':
-            locale_extra_link_args = ['-framework', 'CoreFoundation']
-        else:
-            locale_extra_link_args = []
-
-
-        exts.append( Extension('_locale', ['_localemodule.c'],
-                               libraries=locale_libs,
-                               extra_link_args=locale_extra_link_args) )
 
         # Modules with some UNIX dependencies -- on by default:
         # (If you have a really backward UNIX, select and socket may not be
@@ -650,6 +632,42 @@ class PyBuildExt(build_ext):
         # implementation independent wrapper for these; dbm/dumb.py provides
         # similar functionality (but slower of course) implemented in Python.
 
+        # Sleepycat^WOracle Berkeley DB interface.
+        #  http://www.oracle.com/database/berkeley-db/db/index.html
+        #
+        # This requires the Sleepycat^WOracle DB code. The supported versions
+        # are set below.  Visit the URL above to download
+        # a release.  Most open source OSes come with one or more
+        # versions of BerkeleyDB already installed.
+
+        max_db_ver = (4, 7)
+        min_db_ver = (3, 3)
+        db_setup_debug = False   # verbose debug prints from this script?
+
+        def allow_db_ver(db_ver):
+            """Returns a boolean if the given BerkeleyDB version is acceptable.
+
+            Args:
+              db_ver: A tuple of the version to verify.
+            """
+            if not (min_db_ver <= db_ver <= max_db_ver):
+                return False
+            return True
+
+        def gen_db_minor_ver_nums(major):
+            if major == 4:
+                for x in range(max_db_ver[1]+1):
+                    if allow_db_ver((4, x)):
+                        yield x
+            elif major == 3:
+                for x in (3,):
+                    if allow_db_ver((3, x)):
+                        yield x
+            else:
+                raise ValueError("unknown major BerkeleyDB version", major)
+
+        # construct a list of paths to look for the header file in on
+        # top of the normal inc_dirs.
         db_inc_paths = [
             '/usr/include/db4',
             '/usr/local/include/db4',
@@ -661,8 +679,124 @@ class PyBuildExt(build_ext):
             '/sw/include/db4',
             '/sw/include/db3',
         ]
+        # 4.x minor number specific paths
+        for x in gen_db_minor_ver_nums(4):
+            db_inc_paths.append('/usr/include/db4%d' % x)
+            db_inc_paths.append('/usr/include/db4.%d' % x)
+            db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
+            db_inc_paths.append('/usr/local/include/db4%d' % x)
+            db_inc_paths.append('/pkg/db-4.%d/include' % x)
+            db_inc_paths.append('/opt/db-4.%d/include' % x)
+            # MacPorts default (http://www.macports.org/)
+            db_inc_paths.append('/opt/local/include/db4%d' % x)
+        # 3.x minor number specific paths
+        for x in gen_db_minor_ver_nums(3):
+            db_inc_paths.append('/usr/include/db3%d' % x)
+            db_inc_paths.append('/usr/local/BerkeleyDB.3.%d/include' % x)
+            db_inc_paths.append('/usr/local/include/db3%d' % x)
+            db_inc_paths.append('/pkg/db-3.%d/include' % x)
+            db_inc_paths.append('/opt/db-3.%d/include' % x)
 
-        db_incs = None
+        # Add some common subdirectories for Sleepycat DB to the list,
+        # based on the standard include directories. This way DB3/4 gets
+        # picked up when it is installed in a non-standard prefix and
+        # the user has added that prefix into inc_dirs.
+        std_variants = []
+        for dn in inc_dirs:
+            std_variants.append(os.path.join(dn, 'db3'))
+            std_variants.append(os.path.join(dn, 'db4'))
+            for x in gen_db_minor_ver_nums(4):
+                std_variants.append(os.path.join(dn, "db4%d"%x))
+                std_variants.append(os.path.join(dn, "db4.%d"%x))
+            for x in gen_db_minor_ver_nums(3):
+                std_variants.append(os.path.join(dn, "db3%d"%x))
+                std_variants.append(os.path.join(dn, "db3.%d"%x))
+
+        db_inc_paths = std_variants + db_inc_paths
+        db_inc_paths = [p for p in db_inc_paths if os.path.exists(p)]
+
+        db_ver_inc_map = {}
+
+        class db_found(Exception): pass
+        try:
+            # See whether there is a Sleepycat header in the standard
+            # search path.
+            for d in inc_dirs + db_inc_paths:
+                f = os.path.join(d, "db.h")
+                if db_setup_debug: print("db: looking for db.h in", f)
+                if os.path.exists(f):
+                    f = open(f).read()
+                    m = re.search(r"#define\WDB_VERSION_MAJOR\W(\d+)", f)
+                    if m:
+                        db_major = int(m.group(1))
+                        m = re.search(r"#define\WDB_VERSION_MINOR\W(\d+)", f)
+                        db_minor = int(m.group(1))
+                        db_ver = (db_major, db_minor)
+
+                        # Avoid 4.6 prior to 4.6.21 due to a BerkeleyDB bug
+                        if db_ver == (4, 6):
+                            m = re.search(r"#define\WDB_VERSION_PATCH\W(\d+)", f)
+                            db_patch = int(m.group(1))
+                            if db_patch < 21:
+                                print("db.h:", db_ver, "patch", db_patch,
+                                      "being ignored (4.6.x must be >= 4.6.21)")
+                                continue
+
+                        if ( (db_ver not in db_ver_inc_map) and
+                            allow_db_ver(db_ver) ):
+                            # save the include directory with the db.h version
+                            # (first occurrence only)
+                            db_ver_inc_map[db_ver] = d
+                            if db_setup_debug:
+                                print("db.h: found", db_ver, "in", d)
+                        else:
+                            # we already found a header for this library version
+                            if db_setup_debug: print("db.h: ignoring", d)
+                    else:
+                        # ignore this header, it didn't contain a version number
+                        if db_setup_debug:
+                            print("db.h: no version number version in", d)
+
+            db_found_vers = list(db_ver_inc_map.keys())
+            db_found_vers.sort()
+
+            while db_found_vers:
+                db_ver = db_found_vers.pop()
+                db_incdir = db_ver_inc_map[db_ver]
+
+                # check lib directories parallel to the location of the header
+                db_dirs_to_check = [
+                    db_incdir.replace("include", 'lib64'),
+                    db_incdir.replace("include", 'lib'),
+                ]
+                db_dirs_to_check = list(filter(os.path.isdir, db_dirs_to_check))
+
+                # Look for a version specific db-X.Y before an ambiguoius dbX
+                # XXX should we -ever- look for a dbX name?  Do any
+                # systems really not name their library by version and
+                # symlink to more general names?
+                for dblib in (('db-%d.%d' % db_ver),
+                              ('db%d%d' % db_ver),
+                              ('db%d' % db_ver[0])):
+                    dblib_file = self.compiler.find_library_file(
+                                    db_dirs_to_check + lib_dirs, dblib )
+                    if dblib_file:
+                        dblib_dir = [ os.path.abspath(os.path.dirname(dblib_file)) ]
+                        raise db_found
+                    else:
+                        if db_setup_debug: print("db lib: ", dblib, "not found")
+
+        except db_found:
+            if db_setup_debug:
+                print("bsddb using BerkeleyDB lib:", db_ver, dblib)
+                print("bsddb lib dir:", dblib_dir, " inc dir:", db_incdir)
+            db_incs = [db_incdir]
+            dblibs = [dblib]
+        else:
+            if db_setup_debug: print("db: no appropriate library found")
+            db_incs = None
+            dblibs = []
+            dblib_dir = None
 
         # The sqlite interface
         sqlite_setup_debug = False   # verbose debug prints from this script?
@@ -761,37 +895,69 @@ class PyBuildExt(build_ext):
 
         # The standard Unix dbm module:
         if platform not in ['cygwin']:
-            if find_file("ndbm.h", inc_dirs, []) is not None:
-                # Some systems have -lndbm, others don't
-                if self.compiler.find_library_file(lib_dirs, 'ndbm'):
-                    ndbm_libs = ['ndbm']
-                else:
-                    ndbm_libs = []
-                exts.append( Extension('_dbm', ['_dbmmodule.c'],
-                                       define_macros=[('HAVE_NDBM_H',None)],
-                                       libraries = ndbm_libs ) )
-            elif self.compiler.find_library_file(lib_dirs, 'gdbm'):
-                gdbm_libs = ['gdbm']
-                if self.compiler.find_library_file(lib_dirs, 'gdbm_compat'):
-                    gdbm_libs.append('gdbm_compat')
-                if find_file("gdbm/ndbm.h", inc_dirs, []) is not None:
-                    exts.append( Extension(
-                        '_dbm', ['_dbmmodule.c'],
-                        define_macros=[('HAVE_GDBM_NDBM_H',None)],
-                        libraries = gdbm_libs ) )
-                elif find_file("gdbm-ndbm.h", inc_dirs, []) is not None:
-                    exts.append( Extension(
-                        '_dbm', ['_dbmmodule.c'],
-                        define_macros=[('HAVE_GDBM_DASH_NDBM_H',None)],
-                        libraries = gdbm_libs ) )
-            elif db_incs is not None:
-                exts.append( Extension('_dbm', ['_dbmmodule.c'],
-                                       library_dirs=dblib_dir,
-                                       runtime_library_dirs=dblib_dir,
-                                       include_dirs=db_incs,
-                                       define_macros=[('HAVE_BERKDB_H',None),
-                                                      ('DB_DBM_HSEARCH',None)],
-                                       libraries=dblibs))
+            config_args = [arg.strip("'")
+                           for arg in sysconfig.get_config_var("CONFIG_ARGS").split()]
+            dbm_args = [arg.split('=')[-1] for arg in config_args
+                        if arg.startswith('--with-dbmliborder=')]
+            if dbm_args:
+                dbm_order = dbm_args[-1].split(":")
+            else:
+                dbm_order = "ndbm:gdbm:bdb".split(":")
+            dbmext = None
+            for cand in dbm_order:
+                if cand == "ndbm":
+                    if find_file("ndbm.h", inc_dirs, []) is not None:
+                        # Some systems have -lndbm, others don't
+                        if self.compiler.find_library_file(lib_dirs, 'ndbm'):
+                            ndbm_libs = ['ndbm']
+                        else:
+                            ndbm_libs = []
+                        print("building dbm using ndbm")
+                        dbmext = Extension('_dbm', ['_dbmmodule.c'],
+                                           define_macros=[
+                                               ('HAVE_NDBM_H',None),
+                                               ],
+                                           libraries=ndbm_libs)
+                        break
+
+                elif cand == "gdbm":
+                    if self.compiler.find_library_file(lib_dirs, 'gdbm'):
+                        gdbm_libs = ['gdbm']
+                        if self.compiler.find_library_file(lib_dirs, 'gdbm_compat'):
+                            gdbm_libs.append('gdbm_compat')
+                        if find_file("gdbm/ndbm.h", inc_dirs, []) is not None:
+                            print("building dbm using gdbm")
+                            dbmext = Extension(
+                                '_dbm', ['_dbmmodule.c'],
+                                define_macros=[
+                                    ('HAVE_GDBM_NDBM_H', None),
+                                    ],
+                                libraries = gdbm_libs)
+                            break
+                        if find_file("gdbm-ndbm.h", inc_dirs, []) is not None:
+                            print("building dbm using gdbm")
+                            dbmext = Extension(
+                                '_dbm', ['_dbmmodule.c'],
+                                define_macros=[
+                                    ('HAVE_GDBM_DASH_NDBM_H', None),
+                                    ],
+                                libraries = gdbm_libs)
+                            break
+                elif cand == "bdb":
+                    if db_incs is not None:
+                        print("building dbm using bdb")
+                        dbmext = Extension('_dbm', ['_dbmmodule.c'],
+                                           library_dirs=dblib_dir,
+                                           runtime_library_dirs=dblib_dir,
+                                           include_dirs=db_incs,
+                                           define_macros=[
+                                               ('HAVE_BERKDB_H', None),
+                                               ('DB_DBM_HSEARCH', None),
+                                               ],
+                                           libraries=dblibs)
+                        break
+            if dbmext is not None:
+                exts.append(dbmext)
             else:
                 missing.append('_dbm')
 
@@ -988,56 +1154,29 @@ class PyBuildExt(build_ext):
             libraries = ['ws2_32']
 
         elif platform == 'darwin':          # Mac OSX
-            macros = dict(
-                HAVE_SEM_OPEN=1,
-                HAVE_SEM_TIMEDWAIT=0,
-                HAVE_FD_TRANSFER=1,
-                HAVE_BROKEN_SEM_GETVALUE=1
-                )
+            macros = dict()
             libraries = []
 
         elif platform == 'cygwin':          # Cygwin
-            macros = dict(
-                HAVE_SEM_OPEN=1,
-                HAVE_SEM_TIMEDWAIT=1,
-                HAVE_FD_TRANSFER=0,
-                HAVE_BROKEN_SEM_UNLINK=1
-                )
+            macros = dict()
             libraries = []
 
         elif platform in ('freebsd4', 'freebsd5', 'freebsd6', 'freebsd7', 'freebsd8'):
             # FreeBSD's P1003.1b semaphore support is very experimental
             # and has many known problems. (as of June 2008)
-            macros = dict(                  # FreeBSD
-                HAVE_SEM_OPEN=0,
-                HAVE_SEM_TIMEDWAIT=0,
-                HAVE_FD_TRANSFER=1,
-                )
+            macros = dict()
             libraries = []
 
         elif platform.startswith('openbsd'):
-            macros = dict(                  # OpenBSD
-                HAVE_SEM_OPEN=0,            # Not implemented
-                HAVE_SEM_TIMEDWAIT=0,
-                HAVE_FD_TRANSFER=1,
-                )
+            macros = dict()
             libraries = []
 
         elif platform.startswith('netbsd'):
-            macros = dict(                  # at least NetBSD 5
-                HAVE_SEM_OPEN=1,
-                HAVE_SEM_TIMEDWAIT=0,
-                HAVE_FD_TRANSFER=1,
-                HAVE_BROKEN_SEM_GETVALUE=1
-                )
+            macros = dict()
             libraries = []
 
         else:                                   # Linux and other unices
-            macros = dict(
-                HAVE_SEM_OPEN=1,
-                HAVE_SEM_TIMEDWAIT=1,
-                HAVE_FD_TRANSFER=1
-                )
+            macros = dict()
             libraries = ['rt']
 
         if platform == 'win32':
@@ -1052,8 +1191,7 @@ class PyBuildExt(build_ext):
             multiprocessing_srcs = [ '_multiprocessing/multiprocessing.c',
                                      '_multiprocessing/socket_connection.c'
                                    ]
-
-            if macros.get('HAVE_SEM_OPEN', False):
+            if sysconfig.get_config_var('HAVE_SEM_OPEN'):
                 multiprocessing_srcs.append('_multiprocessing/semaphore.c')
 
         if sysconfig.get_config_var('WITH_THREAD'):
@@ -1528,10 +1666,8 @@ def main():
           # called unless there's at least one extension module defined.
           ext_modules=[Extension('_struct', ['_struct.c'])],
 
-          # Scripts to install
-          scripts = ['Tools/scripts/pydoc', 'Tools/scripts/idle',
-                     'Tools/scripts/2to3',
-                     'Lib/smtpd.py']
+          scripts = ["Tools/scripts/pydoc3", "Tools/scripts/idle3",
+                     "Tools/scripts/2to3"]
         )
 
 # --install-platlib

@@ -232,7 +232,7 @@ class BinaryTestCase(unittest.TestCase):
 
     def test_decode(self):
         d = b'\x01\x02\x03abc123\xff\xfe'
-        de = base64.encodestring(d)
+        de = base64.encodebytes(d)
         t1 = xmlrpclib.Binary()
         t1.decode(de)
         self.assertEqual(str(t1), str(d, "latin-1"))
@@ -571,25 +571,25 @@ class CGIHandlerTestCase(unittest.TestCase):
         self.cgi = None
 
     def test_cgi_get(self):
-        os.environ['REQUEST_METHOD'] = 'GET'
-        # if the method is GET and no request_text is given, it runs handle_get
-        # get sysout output
-        tmp = sys.stdout
-        sys.stdout = open(support.TESTFN, "w")
-        self.cgi.handle_request()
-        sys.stdout.close()
-        sys.stdout = tmp
+        with support.EnvironmentVarGuard() as env:
+            env['REQUEST_METHOD'] = 'GET'
+            # if the method is GET and no request_text is given, it runs handle_get
+            # get sysout output
+            tmp = sys.stdout
+            sys.stdout = open(support.TESTFN, "w")
+            self.cgi.handle_request()
+            sys.stdout.close()
+            sys.stdout = tmp
 
-        # parse Status header
-        handle = open(support.TESTFN, "r").read()
-        status = handle.split()[1]
-        message = ' '.join(handle.split()[2:4])
+            # parse Status header
+            handle = open(support.TESTFN, "r").read()
+            status = handle.split()[1]
+            message = ' '.join(handle.split()[2:4])
 
-        self.assertEqual(status, '400')
-        self.assertEqual(message, 'Bad Request')
+            self.assertEqual(status, '400')
+            self.assertEqual(message, 'Bad Request')
 
-        os.remove(support.TESTFN)
-        os.environ['REQUEST_METHOD'] = ''
+            os.remove(support.TESTFN)
 
     def test_cgi_xmlrpc_response(self):
         data = """<?xml version='1.0'?>
@@ -612,11 +612,9 @@ class CGIHandlerTestCase(unittest.TestCase):
         sys.stdin = open("xmldata.txt", "r")
         sys.stdout = open(support.TESTFN, "w")
 
-        os.environ['CONTENT_LENGTH'] = str(len(data))
-        try:
+        with support.EnvironmentVarGuard() as env:
+            env['CONTENT_LENGTH'] = str(len(data))
             self.cgi.handle_request()
-        finally:
-            del os.environ['CONTENT_LENGTH']
 
         sys.stdin.close()
         sys.stdout.close()

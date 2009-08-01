@@ -225,10 +225,9 @@ the following::
    several lines of text just as you would do in C.
        Note that whitespace at the beginning of the line is significant.
 
-If we make the string literal a "raw" string, however, the ``\n`` sequences are
-not converted to newlines, but the backslash at the end of the line, and the
-newline character in the source, are both included in the string as data.  Thus,
-the example::
+If we make the string literal a "raw" string, ``\n`` sequences are not converted
+to newlines, but the backslash at the end of the line, and the newline character
+in the source, are both included in the string as data.  Thus, the example::
 
    hello = r"This is a rather long string containing\n\
    several lines of text much as you would do in C."
@@ -239,23 +238,6 @@ would print::
 
    This is a rather long string containing\n\
    several lines of text much as you would do in C.
-
-Or, strings can be surrounded in a pair of matching triple-quotes: ``"""`` or
-``'''``.  End of lines do not need to be escaped when using triple-quotes, but
-they will be included in the string. ::
-
-   print("""
-   Usage: thingy [OPTIONS]
-        -h                        Display this usage message
-        -H hostname               Hostname to connect to
-   """)
-
-produces the following output::
-
-   Usage: thingy [OPTIONS]
-        -h                        Display this usage message
-        -H hostname               Hostname to connect to
-
 
 Strings can be concatenated (glued together) with the ``+`` operator, and
 repeated with ``*``::
@@ -307,11 +289,11 @@ position in the string results in an error::
    >>> word[0] = 'x'
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
-   TypeError: 'str' object doesn't support item assignment
+   TypeError: 'str' object does not support item assignment
    >>> word[:1] = 'Splat'
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
-   TypeError: 'str' object doesn't support slice assignment
+   TypeError: 'str' object does not support slice assignment
 
 However, creating a new string with the combined content is easy and efficient::
 

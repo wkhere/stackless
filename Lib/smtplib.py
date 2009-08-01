@@ -540,12 +540,14 @@ class SMTP:
         """
 
         def encode_cram_md5(challenge, user, password):
-            challenge = base64.decodestring(challenge)
-            response = user + " " + hmac.HMAC(password, challenge).hexdigest()
-            return encode_base64(response)
+            challenge = base64.decodebytes(challenge)
+            response = user + " " + hmac.HMAC(password.encode('ascii'),
+                                              challenge).hexdigest()
+            return encode_base64(response.encode('ascii'), eol='')
 
         def encode_plain(user, password):
-            return encode_base64("\0%s\0%s" % (user, password))
+            s = "\0%s\0%s" % (user, password)
+            return encode_base64(s.encode('ascii'), eol='')
 
 
         AUTH_PLAIN = "PLAIN"
@@ -583,10 +585,10 @@ class SMTP:
                 AUTH_PLAIN + " " + encode_plain(user, password))
         elif authmethod == AUTH_LOGIN:
             (code, resp) = self.docmd("AUTH",
-                "%s %s" % (AUTH_LOGIN, encode_base64(user)))
+                "%s %s" % (AUTH_LOGIN, encode_base64(user.encode('ascii'), eol='')))
             if code != 334:
                 raise SMTPAuthenticationError(code, resp)
-            (code, resp) = self.docmd(encode_base64(password))
+            (code, resp) = self.docmd(encode_base64(password.encode('ascii'), eol=''))
         elif authmethod is None:
             raise SMTPException("No suitable authentication method found.")
         if code not in (235, 503):
@@ -757,9 +759,10 @@ if _have_ssl:
 
         def _get_socket(self, host, port, timeout):
             if self.debuglevel > 0: print('connect:', (host, port), file=stderr)
-            self.sock = socket.create_connection((host, port), timeout)
-            self.sock = ssl.wrap_socket(self.sock, self.keyfile, self.certfile)
-            self.file = SSLFakeFile(self.sock)
+            new_socket = socket.create_connection((host, port), timeout)
+            new_socket = ssl.wrap_socket(new_socket, self.keyfile, self.certfile)
+            self.file = SSLFakeFile(new_socket)
+            return new_socket
 
     __all__.append("SMTP_SSL")
 

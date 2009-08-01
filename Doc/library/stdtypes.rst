@@ -479,7 +479,7 @@ debugging, and in numerical work.
    exponent.
 
 
-.. method:: float.fromhex(s)
+.. classmethod:: float.fromhex(s)
 
    Class method to return the float represented by a hexadecimal
    string *s*.  The string *s* may have leading and trailing
@@ -800,14 +800,14 @@ functions based on regular expressions.
 
 .. method:: str.encode([encoding[, errors]])
 
-   Return an encoded version of the string.  Default encoding is the current
-   default string encoding.  *errors* may be given to set a different error
-   handling scheme.  The default for *errors* is ``'strict'``, meaning that
-   encoding errors raise a :exc:`UnicodeError`.  Other possible values are
-   ``'ignore'``, ``'replace'``, ``'xmlcharrefreplace'``, ``'backslashreplace'`` and
-   any other name registered via :func:`codecs.register_error`, see section
-   :ref:`codec-base-classes`. For a list of possible encodings, see section
-   :ref:`standard-encodings`.
+   Return an encoded version of the string as a bytes object.  Default encoding
+   is the current default string encoding.  *errors* may be given to set a
+   different error handling scheme.  The default for *errors* is ``'strict'``,
+   meaning that encoding errors raise a :exc:`UnicodeError`.  Other possible
+   values are ``'ignore'``, ``'replace'``, ``'xmlcharrefreplace'``,
+   ``'backslashreplace'`` and any other name registered via
+   :func:`codecs.register_error`, see section :ref:`codec-base-classes`. For a
+   list of possible encodings, see section :ref:`standard-encodings`.
 
 
 .. method:: str.endswith(suffix[, start[, end]])
@@ -967,7 +967,7 @@ functions based on regular expressions.
       'example.com'
 
 
-.. method:: str.maketrans(x[, y[, z]])
+.. staticmethod:: str.maketrans(x[, y[, z]])
 
    This static method returns a translation table usable for :meth:`str.translate`.
 
@@ -1321,9 +1321,9 @@ that ``'\0'`` is the end of the string.
 
 .. XXX Examples?
 
-For safety reasons, floating point precisions are clipped to 50; ``%f``
-conversions for numbers whose absolute value is over 1e50 are replaced by ``%g``
-conversions. [#]_  All other errors raise exceptions.
+.. versionchanged:: 3.1
+   ``%f`` conversions for numbers whose absolute value is over 1e50 are no
+   longer replaced by ``%g`` conversions.
 
 .. index::
    module: string
@@ -1512,10 +1512,22 @@ Wherever one of these methods needs to interpret the bytes as characters
       b = a.replace(b"a", b"f")
 
 
+.. method:: bytes.decode([encoding[, errors]])
+            bytearray.decode([encoding[, errors]])
+
+   Return a string decoded from the given bytes.  Default encoding is the
+   current default string encoding.  *errors* may be given to set a different
+   error handling scheme.  The default for *errors* is ``'strict'``, meaning
+   that encoding errors raise a :exc:`UnicodeError`.  Other possible values are
+   ``'ignore'``, ``'replace'`` and any other name registered via
+   :func:`codecs.register_error`, see section :ref:`codec-base-classes`. For a
+   list of possible encodings, see section :ref:`standard-encodings`.
+
+
 The bytes and bytearray types have an additional class method:
 
-.. method:: bytes.fromhex(string)
-            bytearray.fromhex(string)
+.. classmethod:: bytes.fromhex(string)
+                 bytearray.fromhex(string)
 
    This :class:`bytes` class method returns a bytes or bytearray object,
    decoding the given string object.  The string must contain two hexadecimal
@@ -1524,23 +1536,36 @@ The bytes and bytearray types have an additional class method:
    >>> bytes.fromhex('f0 f1f2  ')
    b'\xf0\xf1\xf2'
 
-The translate method differs in semantics from the version available on strings:
+
+The maketrans and translate methods differ in semantics from the versions
+available on strings:
 
 .. method:: bytes.translate(table[, delete])
+            bytearray.translate(table[, delete])
 
    Return a copy of the bytes or bytearray object where all bytes occurring in
    the optional argument *delete* are removed, and the remaining bytes have been
    mapped through the given translation table, which must be a bytes object of
    length 256.
 
-   You can use the :func:`string.maketrans` helper function to create a
-   translation table.
+   You can use the :func:`bytes.maketrans` method to create a translation table.
 
    Set the *table* argument to ``None`` for translations that only delete
    characters::
 
       >>> b'read this short text'.translate(None, b'aeiou')
       b'rd ths shrt txt'
+
+
+.. staticmethod:: bytes.maketrans(from, to)
+                  bytearray.maketrans(from, to)
+
+   This static method returns a translation table usable for
+   :meth:`bytes.translate` that will map each character in *from* into the
+   character at the same position in *to*; *from* and *to* must be bytes objects
+   and have the same length.
+
+   .. versionadded:: 3.1
 
 
 .. _types-set:
@@ -1834,6 +1859,11 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
 
       Equivalent to ``not key in d``.
 
+   .. describe:: iter(d)
+
+      Return an iterator over the keys of the dictionary.  This is a shortcut
+      for :meth:`iterkeys`.
+
    .. method:: clear()
 
       Remove all items from the dictionary.
@@ -1842,7 +1872,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
 
       Return a shallow copy of the dictionary.
 
-   .. method:: fromkeys(seq[, value])
+   .. classmethod:: fromkeys(seq[, value])
 
       Create a new dictionary with keys from *seq* and values set to *value*.
 
@@ -1930,6 +1960,9 @@ support membership tests:
    will directly correspond.  This allows the creation of ``(value, key)`` pairs
    using :func:`zip`: ``pairs = zip(d.values(), d.keys())``.  Another way to
    create the same list is ``pairs = [(v, k) for (k, v) in d.items()]``.
+
+   Iterating views while adding or deleting entries in the dictionary may raise
+   a :exc:`RuntimeError` or fail to iterate over all entries.
 
 .. describe:: x in dictview
 
@@ -2309,7 +2342,7 @@ simple bytes or complex data structures.
       >>> v = memoryview(data)
       >>> v.readonly
       False
-      >>> v[0] = 'z'
+      >>> v[0] = b'z'
       >>> data
       bytearray(b'zbcefg')
       >>> v[1:4] = b'123'
@@ -2666,10 +2699,26 @@ types, where they are relevant.  Some of these are not reported by the
    The name of the class or type.
 
 
+The following attributes are only supported by :term:`new-style class`\ es.
+
+.. attribute:: class.__mro__
+
+   This attribute is a tuple of classes that are considered when looking for
+   base classes during method resolution.
+
+
+.. method:: class.mro()
+
+   This method can be overridden by a metaclass to customize the method
+   resolution order for its instances.  It is called at class instantiation, and
+   its result is stored in :attr:`__mro__`.
+
+
 .. method:: class.__subclasses__
 
-   All classes keep a list of weak references to their immediate subclasses.
-   This method returns a list of all those references still alive.  Example::
+   Each new-style class keeps a list of weak references to its immediate
+   subclasses.  This method returns a list of all those references still alive.
+   Example::
 
       >>> int.__subclasses__()
       [<type 'bool'>]
@@ -2687,10 +2736,6 @@ types, where they are relevant.  Some of these are not reported by the
 
 .. [#] To format only a tuple you should therefore provide a singleton tuple whose only
    element is the tuple to be formatted.
-
-.. [#] These numbers are fairly arbitrary.  They are intended to avoid printing endless
-   strings of meaningless digits without hampering correct use and without having
-   to know the exact precision of floating point values on a particular machine.
 
 .. [#] The advantage of leaving the newline on is that returning an empty string is
    then an unambiguous EOF indication.  It is also possible (in cases where it

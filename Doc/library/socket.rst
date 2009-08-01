@@ -381,11 +381,14 @@ The module :mod:`socket` exports the following constants and functions:
    library and needs objects of type :ctype:`struct in_addr`, which is the C type
    for the 32-bit packed binary this function returns.
 
+   :func:`inet_aton` also accepts strings with less than three dots; see the
+   Unix manual page :manpage:`inet(3)` for details.
+
    If the IPv4 address string passed to this function is invalid,
    :exc:`socket.error` will be raised. Note that exactly what is valid depends on
    the underlying C implementation of :cfunc:`inet_aton`.
 
-   :func:`inet_aton` does not support IPv6, and :func:`getnameinfo` should be used
+   :func:`inet_aton` does not support IPv6, and :func:`inet_pton` should be used
    instead for IPv4/v6 dual stack support.
 
 
@@ -400,7 +403,7 @@ The module :mod:`socket` exports the following constants and functions:
 
    If the byte sequence passed to this function is not exactly 4 bytes in
    length, :exc:`socket.error` will be raised. :func:`inet_ntoa` does not
-   support IPv6, and :func:`getnameinfo` should be used instead for IPv4/v6 dual
+   support IPv6, and :func:`inet_ntop` should be used instead for IPv4/v6 dual
    stack support.
 
 

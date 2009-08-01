@@ -47,9 +47,14 @@
 #define TYPE_SET		'<'
 #define TYPE_FROZENSET  	'>'
 
+#define WFERR_OK 0
+#define WFERR_UNMARSHALLABLE 1
+#define WFERR_NESTEDTOODEEP 2
+#define WFERR_NOMEMORY 3
+
 typedef struct {
 	FILE *fp;
-	int error;
+	int error;  /* see WFERR_* values */
 	int depth;
 	/* If fp == NULL, the following are valid: */
 	PyObject *str;
@@ -182,7 +187,7 @@ w_object(PyObject *v, WFILE *p)
 	p->depth++;
 
 	if (p->depth > MAX_MARSHAL_STACK_DEPTH) {
-		p->error = 2;
+		p->error = WFERR_NESTEDTOODEEP;
 	}
 	else if (v == NULL) {
 		w_byte(TYPE_NULL, p);
@@ -229,19 +234,24 @@ w_object(PyObject *v, WFILE *p)
 			unsigned char buf[8];
 			if (_PyFloat_Pack8(PyFloat_AsDouble(v), 
 					   buf, 1) < 0) {
-				p->error = 1;
+				p->error = WFERR_UNMARSHALLABLE;
 				return;
 			}
 			w_byte(TYPE_BINARY_FLOAT, p);
 			w_string((char*)buf, 8, p);
 		}
 		else {
-			char buf[256]; /* Plenty to format any double */
-			n = _PyFloat_Repr(PyFloat_AS_DOUBLE(v),
-					  buf, sizeof(buf));
+			char *buf = PyOS_double_to_string(PyFloat_AS_DOUBLE(v),
+                                                          'g', 17, 0, NULL);
+			if (!buf) {
+				p->error = WFERR_NOMEMORY;
+				return;
+			}
+			n = strlen(buf);
 			w_byte(TYPE_FLOAT, p);
 			w_byte((int)n, p);
 			w_string(buf, (int)n, p);
+			PyMem_Free(buf);
 		}
 	}
 #ifndef WITHOUT_COMPLEX
@@ -250,30 +260,41 @@ w_object(PyObject *v, WFILE *p)
 			unsigned char buf[8];
 			if (_PyFloat_Pack8(PyComplex_RealAsDouble(v),
 					   buf, 1) < 0) {
-				p->error = 1;
+				p->error = WFERR_UNMARSHALLABLE;
 				return;
 			}
 			w_byte(TYPE_BINARY_COMPLEX, p);
 			w_string((char*)buf, 8, p);
 			if (_PyFloat_Pack8(PyComplex_ImagAsDouble(v), 
 					   buf, 1) < 0) {
-				p->error = 1;
+				p->error = WFERR_UNMARSHALLABLE;
 				return;
 			}
 			w_string((char*)buf, 8, p);
 		}
 		else {
-			char buf[256]; /* Plenty to format any double */
+			char *buf;
 			w_byte(TYPE_COMPLEX, p);
-			n = _PyFloat_Repr(PyComplex_RealAsDouble(v),
-					  buf, sizeof(buf));
+			buf = PyOS_double_to_string(PyComplex_RealAsDouble(v),
+                                                    'g', 17, 0, NULL);
+			if (!buf) {
+				p->error = WFERR_NOMEMORY;
+				return;
+			}
 			n = strlen(buf);
 			w_byte((int)n, p);
 			w_string(buf, (int)n, p);
-			n = _PyFloat_Repr(PyComplex_ImagAsDouble(v),
-					  buf, sizeof(buf));
+			PyMem_Free(buf);
+			buf = PyOS_double_to_string(PyComplex_ImagAsDouble(v),
+                                                    'g', 17, 0, NULL);
+			if (!buf) {
+				p->error = WFERR_NOMEMORY;
+				return;
+			}
+			n = strlen(buf);
 			w_byte((int)n, p);
 			w_string(buf, (int)n, p);
+			PyMem_Free(buf);
 		}
 	}
 #endif
@@ -283,7 +304,7 @@ w_object(PyObject *v, WFILE *p)
 		if (n > INT_MAX) {
 			/* huge strings are not supported */
 			p->depth--;
-			p->error = 1;
+			p->error = WFERR_UNMARSHALLABLE;
 			return;
 		}
 		w_long((long)n, p);
@@ -291,17 +312,19 @@ w_object(PyObject *v, WFILE *p)
 	}
 	else if (PyUnicode_CheckExact(v)) {
 	        PyObject *utf8;
-		utf8 = PyUnicode_AsUTF8String(v);
+		utf8 = PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(v),
+					    PyUnicode_GET_SIZE(v),
+					    "surrogatepass");
 		if (utf8 == NULL) {
 			p->depth--;
-			p->error = 1;
+			p->error = WFERR_UNMARSHALLABLE;
 			return;
 		}
 		w_byte(TYPE_UNICODE, p);
 		n = PyBytes_GET_SIZE(utf8);
 		if (n > INT_MAX) {
 			p->depth--;
-			p->error = 1;
+			p->error = WFERR_UNMARSHALLABLE;
 			return;
 		}
 		w_long((long)n, p);
@@ -346,14 +369,14 @@ w_object(PyObject *v, WFILE *p)
 		n = PyObject_Size(v);
 		if (n == -1) {
 			p->depth--;
-			p->error = 1;
+			p->error = WFERR_UNMARSHALLABLE;
 			return;
 		}
 		w_long((long)n, p);
 		it = PyObject_GetIter(v);
 		if (it == NULL) {
 			p->depth--;
-			p->error = 1;
+			p->error = WFERR_UNMARSHALLABLE;
 			return;
 		}
 		while ((value = PyIter_Next(it)) != NULL) {
@@ -363,7 +386,7 @@ w_object(PyObject *v, WFILE *p)
 		Py_DECREF(it);
 		if (PyErr_Occurred()) {
 			p->depth--;
-			p->error = 1;
+			p->error = WFERR_UNMARSHALLABLE;
 			return;
 		}
 	}
@@ -393,14 +416,14 @@ w_object(PyObject *v, WFILE *p)
                 Py_buffer view;
 		if ((*pb->bf_getbuffer)(v, &view, PyBUF_SIMPLE) != 0) {
                         w_byte(TYPE_UNKNOWN, p);
-                        p->error = 1;
+                        p->error = WFERR_UNMARSHALLABLE;
                 }
 		w_byte(TYPE_STRING, p);
                 n = view.len;
                 s = view.buf;                        
 		if (n > INT_MAX) {
 			p->depth--;
-			p->error = 1;
+			p->error = WFERR_UNMARSHALLABLE;
 			return;
 		}
 		w_long((long)n, p);
@@ -410,7 +433,7 @@ w_object(PyObject *v, WFILE *p)
 	}
 	else {
 		w_byte(TYPE_UNKNOWN, p);
-		p->error = 1;
+		p->error = WFERR_UNMARSHALLABLE;
 	}
 	p->depth--;
 }
@@ -421,7 +444,7 @@ PyMarshal_WriteLongToFile(long x, FILE *fp, int version)
 {
 	WFILE wf;
 	wf.fp = fp;
-	wf.error = 0;
+	wf.error = WFERR_OK;
 	wf.depth = 0;
 	wf.strings = NULL;
 	wf.version = version;
@@ -433,7 +456,7 @@ PyMarshal_WriteObjectToFile(PyObject *x, FILE *fp, int version)
 {
 	WFILE wf;
 	wf.fp = fp;
-	wf.error = 0;
+	wf.error = WFERR_OK;
 	wf.depth = 0;
 	wf.strings = (version > 0) ? PyDict_New() : NULL;
 	wf.version = version;
@@ -647,18 +670,17 @@ r_object(RFILE *p)
 		{
 			char buf[256];
 			double dx;
+			retval = NULL;
 			n = r_byte(p);
 			if (n == EOF || r_string(buf, (int)n, p) != n) {
 				PyErr_SetString(PyExc_EOFError,
 					"EOF read where object expected");
-				retval = NULL;
 				break;
 			}
 			buf[n] = '\0';
-			retval = NULL;
-			PyFPE_START_PROTECT("atof", break)
-			dx = PyOS_ascii_atof(buf);
-			PyFPE_END_PROTECT(dx)
+			dx = PyOS_string_to_double(buf, NULL, NULL);
+			if (dx == -1.0 && PyErr_Occurred())
+				break;
 			retval = PyFloat_FromDouble(dx);
 			break;
 		}
@@ -687,29 +709,27 @@ r_object(RFILE *p)
 		{
 			char buf[256];
 			Py_complex c;
-			n = r_byte(p);
-			if (n == EOF || r_string(buf, (int)n, p) != n) {
-				PyErr_SetString(PyExc_EOFError,
-					"EOF read where object expected");
-				retval = NULL;
-				break;
-			}
-			buf[n] = '\0';
 			retval = NULL;
-			PyFPE_START_PROTECT("atof", break;)
-			c.real = PyOS_ascii_atof(buf);
-			PyFPE_END_PROTECT(c)
 			n = r_byte(p);
 			if (n == EOF || r_string(buf, (int)n, p) != n) {
 				PyErr_SetString(PyExc_EOFError,
 					"EOF read where object expected");
-				retval = NULL;
 				break;
 			}
 			buf[n] = '\0';
-			PyFPE_START_PROTECT("atof", break)
-			c.imag = PyOS_ascii_atof(buf);
-			PyFPE_END_PROTECT(c)
+			c.real = PyOS_string_to_double(buf, NULL, NULL);
+			if (c.real == -1.0 && PyErr_Occurred())
+				break;
+			n = r_byte(p);
+			if (n == EOF || r_string(buf, (int)n, p) != n) {
+				PyErr_SetString(PyExc_EOFError,
+					"EOF read where object expected");
+				break;
+			}
+			buf[n] = '\0';
+			c.imag = PyOS_string_to_double(buf, NULL, NULL);
+			if (c.imag == -1.0 && PyErr_Occurred())
+				break;
 			retval = PyComplex_FromCComplex(c);
 			break;
 		}
@@ -789,7 +809,7 @@ r_object(RFILE *p)
 			retval = NULL;
 			break;
 		}
-		v = PyUnicode_DecodeUTF8(buffer, n, NULL);
+		v = PyUnicode_DecodeUTF8(buffer, n, "surrogatepass");
 		PyMem_DEL(buffer);
 		retval = v;
 		break;
@@ -1133,7 +1153,7 @@ PyMarshal_WriteObjectToString(PyObject *x, int version)
 		return NULL;
 	wf.ptr = PyBytes_AS_STRING((PyBytesObject *)wf.str);
 	wf.end = wf.ptr + PyBytes_Size(wf.str);
-	wf.error = 0;
+	wf.error = WFERR_OK;
 	wf.depth = 0;
 	wf.version = version;
 	wf.strings = (version > 0) ? PyDict_New() : NULL;
@@ -1150,11 +1170,14 @@ PyMarshal_WriteObjectToString(PyObject *x, int version)
 		if (_PyBytes_Resize(&wf.str, (Py_ssize_t)(wf.ptr - base)) < 0)
 			return NULL;
 	}
-	if (wf.error) {
+	if (wf.error != WFERR_OK) {
 		Py_XDECREF(wf.str);
-		PyErr_SetString(PyExc_ValueError,
-				(wf.error==1)?"unmarshallable object"
-				:"object too deeply nested to marshal");
+                if (wf.error == WFERR_NOMEMORY)
+                    PyErr_NoMemory();
+                else
+                    PyErr_SetString(PyExc_ValueError,
+                      (wf.error==WFERR_UNMARSHALLABLE)?"unmarshallable object"
+                       :"object too deeply nested to marshal");
 		return NULL;
 	}
 	if (wf.str != NULL) {
@@ -1185,6 +1208,19 @@ marshal_dump(PyObject *self, PyObject *args)
 	Py_DECREF(s);
 	return res;
 }
+
+PyDoc_STRVAR(dump_doc,
+"dump(value, file[, version])\n\
+\n\
+Write the value on the open file. The value must be a supported type.\n\
+The file must be an open file object such as sys.stdout or returned by\n\
+open() or os.popen(). It must be opened in binary mode ('wb' or 'w+b').\n\
+\n\
+If the value has (or contains an object that has) an unsupported type, a\n\
+ValueError exception is raised — but garbage data will also be written\n\
+to the file. The object will not be properly read back by load()\n\
+\n\
+The version argument indicates the data format that dump should use.");
 
 static PyObject *
 marshal_load(PyObject *self, PyObject *f)
@@ -1220,6 +1256,19 @@ marshal_load(PyObject *self, PyObject *f)
 	return result;
 }
 
+PyDoc_STRVAR(load_doc,
+"load(file)\n\
+\n\
+Read one value from the open file and return it. If no valid value is\n\
+read (e.g. because the data has a different Python version’s\n\
+incompatible marshal format), raise EOFError, ValueError or TypeError.\n\
+The file must be an open file object opened in binary mode ('rb' or\n\
+'r+b').\n\
+\n\
+Note: If an object containing an unsupported type was marshalled with\n\
+dump(), load() will substitute None for the unmarshallable type.");
+
+
 static PyObject *
 marshal_dumps(PyObject *self, PyObject *args)
 {
@@ -1229,6 +1278,16 @@ marshal_dumps(PyObject *self, PyObject *args)
 		return NULL;
 	return PyMarshal_WriteObjectToString(x, version);
 }
+
+PyDoc_STRVAR(dumps_doc,
+"dumps(value[, version])\n\
+\n\
+Return the string that would be written to a file by dump(value, file).\n\
+The value must be a supported type. Raise a ValueError exception if\n\
+value has (or contains an object that has) an unsupported type.\n\
+\n\
+The version argument indicates the data format that dumps should use.");
+
 
 static PyObject *
 marshal_loads(PyObject *self, PyObject *args)
@@ -1253,18 +1312,56 @@ marshal_loads(PyObject *self, PyObject *args)
 	return result;
 }
 
+PyDoc_STRVAR(loads_doc,
+"loads(string)\n\
+\n\
+Convert the string to a value. If no valid value is found, raise\n\
+EOFError, ValueError or TypeError. Extra characters in the string are\n\
+ignored.");
+
 static PyMethodDef marshal_methods[] = {
-	{"dump",	marshal_dump,	METH_VARARGS},
-	{"load",	marshal_load,	METH_O},
-	{"dumps",	marshal_dumps,	METH_VARARGS},
-	{"loads",	marshal_loads,	METH_VARARGS},
+	{"dump",	marshal_dump,	METH_VARARGS,	dump_doc},
+	{"load",	marshal_load,	METH_O,		load_doc},
+	{"dumps",	marshal_dumps,	METH_VARARGS,	dumps_doc},
+	{"loads",	marshal_loads,	METH_VARARGS,	loads_doc},
 	{NULL,		NULL}		/* sentinel */
 };
+
+
+PyDoc_STRVAR(module_doc,
+"This module contains functions that can read and write Python values in\n\
+a binary format. The format is specific to Python, but independent of\n\
+machine architecture issues.\n\
+\n\
+Not all Python object types are supported; in general, only objects\n\
+whose value is independent from a particular invocation of Python can be\n\
+written and read by this module. The following types are supported:\n\
+None, integers, floating point numbers, strings, bytes, bytearrays,\n\
+tuples, lists, sets, dictionaries, and code objects, where it\n\
+should be understood that tuples, lists and dictionaries are only\n\
+supported as long as the values contained therein are themselves\n\
+supported; and recursive lists and dictionaries should not be written\n\
+(they will cause infinite loops).\n\
+\n\
+Variables:\n\
+\n\
+version -- indicates the format that the module uses. Version 0 is the\n\
+    historical format, version 1 shares interned strings and version 2\n\
+    uses a binary format for floating point numbers.\n\
+\n\
+Functions:\n\
+\n\
+dump() -- write value to a file\n\
+load() -- read value from a file\n\
+dumps() -- write value to a string\n\
+loads() -- read value from a string");
+
+
 
 static struct PyModuleDef marshalmodule = {
 	PyModuleDef_HEAD_INIT,
 	"marshal",
-	NULL,
+	module_doc,
 	0,
 	marshal_methods,
 	NULL,
@@ -1272,8 +1369,6 @@ static struct PyModuleDef marshalmodule = {
 	NULL,
 	NULL
 };
-
-
 
 PyMODINIT_FUNC
 PyMarshal_Init(void)

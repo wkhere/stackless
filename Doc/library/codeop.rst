@@ -1,4 +1,3 @@
-
 :mod:`codeop` --- Compile Python code
 =====================================
 
@@ -26,7 +25,7 @@ of doing them both.
 
 To do just the former:
 
-.. function:: compile_command(source[, filename[, symbol]])
+.. function:: compile_command(source, filename="<input>", symbol="single")
 
    Tries to compile *source*, which should be a string of Python code and return a
    code object if *source* is valid Python code. In that case, the filename
@@ -42,7 +41,7 @@ To do just the former:
    (``'single'``, the default) or as an :term:`expression` (``'eval'``).  Any
    other value will cause :exc:`ValueError` to  be raised.
 
-   .. warning::
+   .. note::
 
       It is possible (but not likely) that the parser stops parsing with a
       successful outcome before reaching the end of the source; in this case,

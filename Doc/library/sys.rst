@@ -266,6 +266,19 @@ always available.
       The information in the table is simplified.
 
 
+.. data:: float_repr_style
+
+   A string indicating how the :func:`repr` function behaves for
+   floats.  If the string has value ``'short'`` then for a finite
+   float ``x``, ``repr(x)`` aims to produce a short string with the
+   property that ``float(repr(x)) == x``.  This is the usual behaviour
+   in Python 3.1 and later.  Otherwise, ``float_repr_style`` has value
+   ``'legacy'`` and ``repr(x)`` behaves in the same way as it did in
+   versions of Python prior to 3.1.
+
+   .. versionadded:: 3.1
+
+
 .. function:: getcheckinterval()
 
    Return the interpreter's "check interval"; see :func:`setcheckinterval`.
@@ -768,11 +781,21 @@ always available.
    :func:`os.popen`, :func:`os.system` or the :func:`exec\*` family of functions in
    the :mod:`os` module.)
 
-   .. note::
+   The standard streams are in text mode by default.  To write or read binary
+   data to these, use the underlying binary buffer.  For example, to write bytes
+   to :data:`stdout`, use ``sys.stdout.buffer.write(b'abc')``.  Using
+   :meth:`io.TextIOBase.detach` streams can be made binary by default.  This
+   function sets :data:`stdin` and :data:`stdout` to binary::
 
-      The standard streams are in text mode by default.  To write or read binary
-      data to these, use the underlying binary buffer.  For example, to write
-      bytes to :data:`stdout`, use ``sys.stdout.buffer.write(b'abc')``.
+      def make_streams_binary():
+          sys.stdin = sys.stdin.detach()
+          sys.stdout = sys.stdout.detach()
+
+   Note that the streams can be replaced with objects (like
+   :class:`io.StringIO`) that do not support the
+   :attr:`~io.BufferedIOBase.buffer` attribute or the
+   :meth:`~io.BufferedIOBase.detach` method and can raise :exc:`AttributeError`
+   or :exc:`io.UnsupportedOperation`.
 
 
 .. data:: __stdin__
@@ -780,16 +803,20 @@ always available.
           __stderr__
 
    These objects contain the original values of ``stdin``, ``stderr`` and
-   ``stdout`` at the start of the program.  They are used during finalization, and
-   could be useful to restore the actual files to known working file objects in
-   case they have been overwritten with a broken object.
+   ``stdout`` at the start of the program.  They are used during finalization,
+   and could be useful to print to the actual standard stream no matter if the
+   ``sys.std*`` object has been redirected.
 
-  .. note::
+   It can also be used to restore the actual files to known working file objects
+   in case they have been overwritten with a broken object.  However, the
+   preferred way to do this is to explicitly save the previous stream before
+   replacing it, and restore the saved object.
 
-    Under some conditions ``stdin``, ``stdout`` and ``stderr`` as well as the
-    original values ``__stdin__``, ``__stdout__`` and ``__stderr__`` can be
-    None. It is usually the case for Windows GUI apps that aren't connected to
-    a console and Python apps started with :program:`pythonw`.
+   .. note::
+       Under some conditions ``stdin``, ``stdout`` and ``stderr`` as well as the
+       original values ``__stdin__``, ``__stdout__`` and ``__stderr__`` can be
+       None. It is usually the case for Windows GUI apps that aren't connected
+       to a console and Python apps started with :program:`pythonw`.
 
 
 .. data:: tracebacklimit
@@ -829,7 +856,7 @@ always available.
    so ``sys.version_info[0]`` is equivalent to ``sys.version_info.major``
    and so on.
 
-   .. versionchanged:: 2.7
+   .. versionchanged:: 3.1
       Added named component attributes
 
 .. data:: warnoptions

@@ -1,4 +1,3 @@
-
 :mod:`math` --- Mathematical functions
 ======================================
 
@@ -277,7 +276,7 @@ Hyperbolic functions
 
 
 Constants
-=========
+---------
 
 .. data:: pi
 

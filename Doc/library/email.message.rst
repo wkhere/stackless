@@ -36,7 +36,7 @@ Here are the methods of the :class:`Message` class:
    The constructor takes no arguments.
 
 
-   .. method:: as_string([unixfrom])
+   .. method:: as_string(unixfrom=False, maxheaderlen=0)
 
       Return the entire message flattened as a string.  When optional *unixfrom*
       is ``True``, the envelope header is included in the returned string.
@@ -45,8 +45,8 @@ Here are the methods of the :class:`Message` class:
       Note that this method is provided as a convenience and may not always
       format the message the way you want.  For example, by default it mangles
       lines that begin with ``From``.  For more flexibility, instantiate a
-      :class:`Generator` instance and use its :meth:`flatten` method directly.
-      For example::
+      :class:`~email.generator.Generator` instance and use its :meth:`flatten`
+      method directly.  For example::
 
          from io import StringIO
          from email.generator import Generator
@@ -88,7 +88,7 @@ Here are the methods of the :class:`Message` class:
       :meth:`set_payload` instead.
 
 
-   .. method:: get_payload([i[, decode]])
+   .. method:: get_payload(i=None, decode=False)
 
       Return the current payload, which will be a list of
       :class:`Message` objects when :meth:`is_multipart` is ``True``, or a
@@ -113,7 +113,7 @@ Here are the methods of the :class:`Message` class:
       *decode* is ``False``.
 
 
-   .. method:: set_payload(payload[, charset])
+   .. method:: set_payload(payload, charset=None)
 
       Set the entire message object's payload to *payload*.  It is the client's
       responsibility to ensure the payload invariants.  Optional *charset* sets
@@ -122,11 +122,12 @@ Here are the methods of the :class:`Message` class:
    .. method:: set_charset(charset)
 
       Set the character set of the payload to *charset*, which can either be a
-      :class:`Charset` instance (see :mod:`email.charset`), a string naming a
-      character set, or ``None``.  If it is a string, it will be converted to a
-      :class:`Charset` instance.  If *charset* is ``None``, the ``charset``
-      parameter will be removed from the :mailheader:`Content-Type`
-      header. Anything else will generate a :exc:`TypeError`.
+      :class:`~email.charset.Charset` instance (see :mod:`email.charset`), a
+      string naming a character set, or ``None``.  If it is a string, it will
+      be converted to a :class:`~email.charset.Charset` instance.  If *charset*
+      is ``None``, the ``charset`` parameter will be removed from the
+      :mailheader:`Content-Type` header. Anything else will generate a
+      :exc:`TypeError`.
 
       The message will be assumed to be of type :mimetype:`text/\*` encoded with
       *charset.input_charset*.  It will be converted to *charset.output_charset*
@@ -137,8 +138,8 @@ Here are the methods of the :class:`Message` class:
 
    .. method:: get_charset()
 
-      Return the :class:`Charset` instance associated with the message's
-      payload.
+      Return the :class:`~email.charset.Charset` instance associated with the
+      message's payload.
 
    The following methods implement a mapping-like interface for accessing the
    message's :rfc:`2822` headers.  Note that there are some semantic differences
@@ -200,7 +201,8 @@ Here are the methods of the :class:`Message` class:
    .. method:: __delitem__(name)
 
       Delete all occurrences of the field with name *name* from the message's
-      headers.  No exception is raised if the named field isn't present in the headers.
+      headers.  No exception is raised if the named field isn't present in the
+      headers.
 
 
    .. method:: Message.__contains__(name)
@@ -225,7 +227,7 @@ Here are the methods of the :class:`Message` class:
       values.
 
 
-   .. method:: get(name[, failobj])
+   .. method:: get(name, failobj=None)
 
       Return the value of the named header field.  This is identical to
       :meth:`__getitem__` except that optional *failobj* is returned if the
@@ -234,7 +236,7 @@ Here are the methods of the :class:`Message` class:
    Here are some additional useful methods:
 
 
-   .. method:: get_all(name[, failobj])
+   .. method:: get_all(name, failobj=None)
 
       Return a list of all the values for the field named *name*. If there are
       no such named headers in the message, *failobj* is returned (defaults to
@@ -314,7 +316,7 @@ Here are the methods of the :class:`Message` class:
       :mailheader:`Content-Type` header.
 
 
-   .. method:: get_params([failobj[, header[, unquote]]])
+   .. method:: get_params(failobj=None, header='content-type', unquote=True)
 
       Return the message's :mailheader:`Content-Type` parameters, as a list.
       The elements of the returned list are 2-tuples of key/value pairs, as
@@ -329,7 +331,7 @@ Here are the methods of the :class:`Message` class:
       search instead of :mailheader:`Content-Type`.
 
 
-   .. method:: get_param(param[, failobj[, header[, unquote]]])
+   .. method:: get_param(param, failobj=None, header='content-type', unquote=True)
 
       Return the value of the :mailheader:`Content-Type` header's parameter
       *param* as a string.  If the message has no :mailheader:`Content-Type`
@@ -349,20 +351,20 @@ Here are the methods of the :class:`Message` class:
 
       If your application doesn't care whether the parameter was encoded as in
       :rfc:`2231`, you can collapse the parameter value by calling
-      :func:`email.Utils.collapse_rfc2231_value`, passing in the return value
+      :func:`email.utils.collapse_rfc2231_value`, passing in the return value
       from :meth:`get_param`.  This will return a suitably decoded Unicode
       string whn the value is a tuple, or the original string unquoted if it
       isn't.  For example::
 
          rawparam = msg.get_param('foo')
-         param = email.Utils.collapse_rfc2231_value(rawparam)
+         param = email.utils.collapse_rfc2231_value(rawparam)
 
       In any case, the parameter value (either the returned string, or the
       ``VALUE`` item in the 3-tuple) is always unquoted, unless *unquote* is set
       to ``False``.
 
 
-   .. method:: set_param(param, value[, header[, requote[, charset[, language]]]])
+   .. method:: set_param(param, value, header='Content-Type', requote=True, charset=None, language='')
 
       Set a parameter in the :mailheader:`Content-Type` header.  If the
       parameter already exists in the header, its value will be replaced with
@@ -380,7 +382,7 @@ Here are the methods of the :class:`Message` class:
       should be strings.
 
 
-   .. method:: del_param(param[, header[, requote]])
+   .. method:: del_param(param, header='content-type', requote=True)
 
       Remove the given parameter completely from the :mailheader:`Content-Type`
       header.  The header will be re-written in place without the parameter or
@@ -389,7 +391,7 @@ Here are the methods of the :class:`Message` class:
       alternative to :mailheader:`Content-Type`.
 
 
-   .. method:: set_type(type[, header][, requote])
+   .. method:: set_type(type, header='Content-Type', requote=True)
 
       Set the main type and subtype for the :mailheader:`Content-Type`
       header. *type* must be a string in the form :mimetype:`maintype/subtype`,
@@ -405,22 +407,22 @@ Here are the methods of the :class:`Message` class:
       header is also added.
 
 
-   .. method:: get_filename([failobj])
+   .. method:: get_filename(failobj=None)
 
       Return the value of the ``filename`` parameter of the
       :mailheader:`Content-Disposition` header of the message.  If the header
       does not have a ``filename`` parameter, this method falls back to looking
       for the ``name`` parameter.  If neither is found, or the header is
       missing, then *failobj* is returned.  The returned string will always be
-      unquoted as per :meth:`Utils.unquote`.
+      unquoted as per :func:`email.utils.unquote`.
 
 
-   .. method:: get_boundary([failobj])
+   .. method:: get_boundary(failobj=None)
 
       Return the value of the ``boundary`` parameter of the
       :mailheader:`Content-Type` header of the message, or *failobj* if either
       the header is missing, or has no ``boundary`` parameter.  The returned
-      string will always be unquoted as per :meth:`Utils.unquote`.
+      string will always be unquoted as per :func:`email.utils.unquote`.
 
 
    .. method:: set_boundary(boundary)
@@ -438,17 +440,17 @@ Here are the methods of the :class:`Message` class:
       have been present in the original :mailheader:`Content-Type` header.
 
 
-   .. method:: get_content_charset([failobj])
+   .. method:: get_content_charset(failobj=None)
 
       Return the ``charset`` parameter of the :mailheader:`Content-Type` header,
       coerced to lower case.  If there is no :mailheader:`Content-Type` header, or if
       that header has no ``charset`` parameter, *failobj* is returned.
 
       Note that this method differs from :meth:`get_charset` which returns the
-      :class:`Charset` instance for the default encoding of the message body.
+      :class:`~email.charset.Charset` instance for the default encoding of the message body.
 
 
-   .. method:: get_charsets([failobj])
+   .. method:: get_charsets(failobj=None)
 
       Return a list containing the character set names in the message.  If the
       message is a :mimetype:`multipart`, then the list will contain one element
@@ -495,10 +497,11 @@ Here are the methods of the :class:`Message` class:
       text can become visible.
 
       The *preamble* attribute contains this leading extra-armor text for MIME
-      documents.  When the :class:`Parser` discovers some text after the headers
-      but before the first boundary string, it assigns this text to the
-      message's *preamble* attribute.  When the :class:`Generator` is writing
-      out the plain text representation of a MIME message, and it finds the
+      documents.  When the :class:`~email.parser.Parser` discovers some text
+      after the headers but before the first boundary string, it assigns this
+      text to the message's *preamble* attribute.  When the
+      :class:`~email.generator.Generator` is writing out the plain text
+      representation of a MIME message, and it finds the
       message has a *preamble* attribute, it will write this text in the area
       between the headers and the first boundary.  See :mod:`email.parser` and
       :mod:`email.generator` for details.

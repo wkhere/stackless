@@ -13,17 +13,13 @@ Sequence Protocol
 
 
 .. cfunction:: Py_ssize_t PySequence_Size(PyObject *o)
+               Py_ssize_t PySequence_Length(PyObject *o)
 
    .. index:: builtin: len
 
    Returns the number of objects in sequence *o* on success, and ``-1`` on failure.
    For objects that do not provide sequence protocol, this is equivalent to the
    Python expression ``len(o)``.
-
-
-.. cfunction:: Py_ssize_t PySequence_Length(PyObject *o)
-
-   Alternate name for :cfunc:`PySequence_Size`.
 
 
 .. cfunction:: PyObject* PySequence_Concat(PyObject *o1, PyObject *o2)
@@ -54,7 +50,7 @@ Sequence Protocol
 
 .. cfunction:: PyObject* PySequence_GetItem(PyObject *o, Py_ssize_t i)
 
-   Return the *i*th element of *o*, or *NULL* on failure. This is the equivalent of
+   Return the *i*\ th element of *o*, or *NULL* on failure. This is the equivalent of
    the Python expression ``o[i]``.
 
 
@@ -66,14 +62,14 @@ Sequence Protocol
 
 .. cfunction:: int PySequence_SetItem(PyObject *o, Py_ssize_t i, PyObject *v)
 
-   Assign object *v* to the *i*th element of *o*.  Returns ``-1`` on failure.  This
+   Assign object *v* to the *i*\ th element of *o*.  Returns ``-1`` on failure.  This
    is the equivalent of the Python statement ``o[i] = v``.  This function *does
    not* steal a reference to *v*.
 
 
 .. cfunction:: int PySequence_DelItem(PyObject *o, Py_ssize_t i)
 
-   Delete the *i*th element of object *o*.  Returns ``-1`` on failure.  This is the
+   Delete the *i*\ th element of object *o*.  Returns ``-1`` on failure.  This is the
    equivalent of the Python statement ``del o[i]``.
 
 
@@ -135,7 +131,7 @@ Sequence Protocol
 
 .. cfunction:: PyObject* PySequence_Fast_GET_ITEM(PyObject *o, Py_ssize_t i)
 
-   Return the *i*th element of *o*, assuming that *o* was returned by
+   Return the *i*\ th element of *o*, assuming that *o* was returned by
    :cfunc:`PySequence_Fast`, *o* is not *NULL*, and that *i* is within bounds.
 
 
@@ -151,7 +147,7 @@ Sequence Protocol
 
 .. cfunction:: PyObject* PySequence_ITEM(PyObject *o, Py_ssize_t i)
 
-   Return the *i*th element of *o* or *NULL* on failure. Macro form of
+   Return the *i*\ th element of *o* or *NULL* on failure. Macro form of
    :cfunc:`PySequence_GetItem` but without checking that
    :cfunc:`PySequence_Check(o)` is true and without adjustment for negative
    indices.

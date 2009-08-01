@@ -36,6 +36,11 @@ class OrderedDict(dict, MutableMapping):
     # Those hard references disappear when a key is deleted from an OrderedDict.
 
     def __init__(self, *args, **kwds):
+        '''Initialize an ordered dictionary.  Signature is the same as for
+        regular dictionaries, but keyword arguments are not recommended
+        because their insertion order is arbitrary.
+
+        '''
         if len(args) > 1:
             raise TypeError('expected at most 1 arguments, got %d' % len(args))
         try:
@@ -47,12 +52,14 @@ class OrderedDict(dict, MutableMapping):
         self.update(*args, **kwds)
 
     def clear(self):
+        'od.clear() -> None.  Remove all items from od.'
         root = self.__root
         root.prev = root.next = root
         self.__map.clear()
         dict.clear(self)
 
     def __setitem__(self, key, value):
+        'od.__setitem__(i, y) <==> od[i]=y'
         # Setting a new item creates a new link which goes at the end of the linked
         # list, and the inherited dictionary is updated with the new key/value pair.
         if key not in self:
@@ -64,6 +71,7 @@ class OrderedDict(dict, MutableMapping):
         dict.__setitem__(self, key, value)
 
     def __delitem__(self, key):
+        'od.__delitem__(y) <==> del od[y]'
         # Deleting an existing item uses self.__map to find the link which is
         # then removed by updating the links in the predecessor and successor nodes.
         dict.__delitem__(self, key)
@@ -72,6 +80,7 @@ class OrderedDict(dict, MutableMapping):
         link.next.prev = link.prev
 
     def __iter__(self):
+        'od.__iter__() <==> iter(od)'
         # Traverse the linked list in order.
         root = self.__root
         curr = root.next
@@ -80,6 +89,7 @@ class OrderedDict(dict, MutableMapping):
             curr = curr.next
 
     def __reversed__(self):
+        'od.__reversed__() <==> reversed(od)'
         # Traverse the linked list in reverse order.
         root = self.__root
         curr = root.prev
@@ -88,6 +98,7 @@ class OrderedDict(dict, MutableMapping):
             curr = curr.prev
 
     def __reduce__(self):
+        'Return state information for pickling'
         items = [[k, self[k]] for k in self]
         tmp = self.__map, self.__root
         del self.__map, self.__root
@@ -105,34 +116,52 @@ class OrderedDict(dict, MutableMapping):
     items = MutableMapping.items
 
     def popitem(self, last=True):
+        '''od.popitem() -> (k, v), return and remove a (key, value) pair.
+        Pairs are returned in LIFO order if last is true or FIFO order if false.
+
+        '''
         if not self:
             raise KeyError('dictionary is empty')
-        key = next(reversed(self)) if last else next(iter(self))
+        key = next(reversed(self) if last else iter(self))
         value = self.pop(key)
         return key, value
 
     def __repr__(self):
+        'od.__repr__() <==> repr(od)'
         if not self:
             return '%s()' % (self.__class__.__name__,)
         return '%s(%r)' % (self.__class__.__name__, list(self.items()))
 
     def copy(self):
+        'od.copy() -> a shallow copy of od'
         return self.__class__(self)
 
     @classmethod
     def fromkeys(cls, iterable, value=None):
+        '''OD.fromkeys(S[, v]) -> New ordered dictionary with keys from S
+        and values equal to v (which defaults to None).
+
+        '''
         d = cls()
         for key in iterable:
             d[key] = value
         return d
 
     def __eq__(self, other):
+        '''od.__eq__(y) <==> od==y.  Comparison to another OD is order-sensitive
+        while comparison to a regular mapping is order-insensitive.
+
+        '''
         if isinstance(other, OrderedDict):
             return len(self)==len(other) and \
                    all(p==q for p, q in zip(self.items(), other.items()))
         return dict.__eq__(self, other)
 
     def __ne__(self, other):
+        '''od.__ne__(y) <==> od!=y.  Comparison to another OD is order-sensitive
+        while comparison to a regular mapping is order-insensitive.
+
+        '''
         return not self == other
 
 
@@ -203,8 +232,8 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
         '%(typename)s(%(argtxt)s)' \n
         __slots__ = () \n
         _fields = %(field_names)r \n
-        def __new__(cls, %(argtxt)s):
-            return tuple.__new__(cls, (%(argtxt)s)) \n
+        def __new__(_cls, %(argtxt)s):
+            return _tuple.__new__(_cls, (%(argtxt)s)) \n
         @classmethod
         def _make(cls, iterable, new=tuple.__new__, len=len):
             'Make a new %(typename)s object from a sequence or iterable'
@@ -217,23 +246,23 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
         def _asdict(self):
             'Return a new OrderedDict which maps field names to their values'
             return OrderedDict(zip(self._fields, self)) \n
-        def _replace(self, **kwds):
+        def _replace(_self, **kwds):
             'Return a new %(typename)s object replacing specified fields with new values'
-            result = self._make(map(kwds.pop, %(field_names)r, self))
+            result = _self._make(map(kwds.pop, %(field_names)r, _self))
             if kwds:
                 raise ValueError('Got unexpected field names: %%r' %% kwds.keys())
             return result \n
         def __getnewargs__(self):
             return tuple(self) \n\n''' % locals()
     for i, name in enumerate(field_names):
-        template += '        %s = property(itemgetter(%d))\n' % (name, i)
+        template += '        %s = _property(_itemgetter(%d))\n' % (name, i)
     if verbose:
         print(template)
 
     # Execute the template string in a temporary namespace and
     # support tracing utilities by setting a value for frame.f_globals['__name__']
-    namespace = dict(itemgetter=_itemgetter, __name__='namedtuple_%s' % typename,
-                     OrderedDict=OrderedDict)
+    namespace = dict(_itemgetter=_itemgetter, __name__='namedtuple_%s' % typename,
+                     OrderedDict=OrderedDict, _property=property, _tuple=tuple)
     try:
         exec(template, namespace)
     except SyntaxError as e:
@@ -242,9 +271,12 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
 
     # For pickling to work, the __module__ variable needs to be set to the frame
     # where the named tuple is created.  Bypass this step in enviroments where
-    # sys._getframe is not defined (Jython for example).
-    if hasattr(_sys, '_getframe'):
+    # sys._getframe is not defined (Jython for example) or sys._getframe is not
+    # defined for arguments greater than 0 (IronPython).
+    try:
         result.__module__ = _sys._getframe(1).f_globals.get('__name__', '__main__')
+    except (AttributeError, ValueError):
+        pass
 
     return result
 

@@ -317,7 +317,7 @@ This example, as usual, demonstrates some new Python features:
   and ``methodname`` is the name of a method that is defined by the object's type.
   Different types define different methods.  Methods of different types may have
   the same name without causing ambiguity.  (It is possible to define your own
-  object types and methods, using *classes*, as discussed later in this tutorial.)
+  object types and methods, using *classes*, see :ref:`tut-classes`)
   The method :meth:`append` shown in the example is defined for list objects; it
   adds a new element at the end of the list.  In this example it is equivalent to
   ``result = result + [b]``, but more efficient.
@@ -344,15 +344,23 @@ defined to allow.  For example::
    def ask_ok(prompt, retries=4, complaint='Yes or no, please!'):
        while True:
            ok = input(prompt)
-           if ok in ('y', 'ye', 'yes'): return True
-           if ok in ('n', 'no', 'nop', 'nope'): return False
+           if ok in ('y', 'ye', 'yes'):
+               return True
+           if ok in ('n', 'no', 'nop', 'nope'):
+               return False
            retries = retries - 1
            if retries < 0:
                raise IOError('refusenik user')
            print(complaint)
 
-This function can be called either like this: ``ask_ok('Do you really want to
-quit?')`` or like this: ``ask_ok('OK to overwrite the file?', 2)``.
+This function can be called in several ways:
+
+* giving only the mandatory argument:
+  ``ask_ok('Do you really want to quit?')``
+* giving one of the optional arguments:
+  ``ask_ok('OK to overwrite the file?', 2)``
+* or even giving all arguments:
+  ``ask_ok('OK to overwrite the file?', 2, 'Come on, only yes or no!')``
 
 This example also introduces the :keyword:`in` keyword. This tests whether or
 not a sequence contains a certain value.
@@ -667,7 +675,12 @@ extracted for you:
   (see :ref:`tut-firstclasses` for more on classes and methods).
 
 * Don't use fancy encodings if your code is meant to be used in international
-  environments.  Plain ASCII works best in any case.
+  environments.  Python's default, UTF-8, or even plain ASCII work best in any
+  case.
+
+* Likewise, don't use non-ASCII characters in identifiers if there is only the
+  slightest chance people speaking a different language will read or maintain
+  the code.
 
 
 .. rubric:: Footnotes

@@ -47,7 +47,7 @@ provided by this module.
 The following function is the primary interface of this module:
 
 
-.. function:: input([files[, inplace[, backup[, mode[, openhook]]]]])
+.. function:: input(files=None, inplace=False, backup='', bufsize=0, mode='r', openhook=None)
 
    Create an instance of the :class:`FileInput` class.  The instance will be used
    as global state for the functions of this module, and is also returned to use
@@ -115,7 +115,7 @@ The class which implements the sequence behavior provided by the module is
 available for subclassing as well:
 
 
-.. class:: FileInput([files[, inplace[, backup[, mode[, openhook]]]]])
+.. class:: FileInput(files=None, inplace=False, backup='', bufsize=0, mode='r', openhook=None)
 
    Class :class:`FileInput` is the implementation; its methods :meth:`filename`,
    :meth:`fileno`, :meth:`lineno`, :meth:`filelineno`, :meth:`isfirstline`,
@@ -144,7 +144,7 @@ and the backup file remains around; by default, the extension is ``'.bak'`` and
 it is deleted when the output file is closed.  In-place filtering is disabled
 when standard input is read.
 
-.. warning::
+.. note::
 
    The current implementation does not work for MS-DOS 8+3 filesystems.
 

@@ -1,9 +1,9 @@
-
 :mod:`curses` --- Terminal handling for character-cell displays
 ===============================================================
 
 .. module:: curses
-   :synopsis: An interface to the curses library, providing portable terminal handling.
+   :synopsis: An interface to the curses library, providing portable
+              terminal handling.
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
 .. sectionauthor:: Eric Raymond <esr@thyrsus.com>
 
@@ -531,7 +531,7 @@ The module :mod:`curses` defines the following functions:
    capability, or is canceled or absent from the terminal description.
 
 
-.. function:: tparm(str[,...])
+.. function:: tparm(str[, ...])
 
    Instantiates the string *str* with the supplied parameters, where  *str* should
    be a parameterized string obtained from the terminfo  database.  E.g.
@@ -793,7 +793,8 @@ the following methods:
 
    Get a character. Note that the integer returned does *not* have to be in ASCII
    range: function keys, keypad keys and so on return numbers higher than 256. In
-   no-delay mode, -1 is returned if there is  no input.
+   no-delay mode, -1 is returned if there is no input, else :func:`getch` waits
+   until a key is pressed.
 
 
 .. method:: window.getkey([y, x])

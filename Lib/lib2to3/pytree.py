@@ -1,7 +1,8 @@
 # Copyright 2006 Google, Inc. All Rights Reserved.
 # Licensed to PSF under a Contributor Agreement.
 
-"""Python parse tree definitions.
+"""
+Python parse tree definitions.
 
 This is a very concrete parse tree; we need to keep every token and
 even the comments and whitespace between tokens.
@@ -12,6 +13,7 @@ There's also a pattern matching implementation here.
 __author__ = "Guido van Rossum <guido@python.org>"
 
 import sys
+import warnings
 from io import StringIO
 
 
@@ -31,7 +33,8 @@ def type_repr(type_num):
 
 class Base(object):
 
-    """Abstract base class for Node and Leaf.
+    """
+    Abstract base class for Node and Leaf.
 
     This provides some default functionality and boilerplate using the
     template pattern.
@@ -51,7 +54,8 @@ class Base(object):
         return object.__new__(cls)
 
     def __eq__(self, other):
-        """Compares two nodes for equality.
+        """
+        Compare two nodes for equality.
 
         This calls the method _eq().
         """
@@ -60,7 +64,8 @@ class Base(object):
         return self._eq(other)
 
     def __ne__(self, other):
-        """Compares two nodes for inequality.
+        """
+        Compare two nodes for inequality.
 
         This calls the method _eq().
         """
@@ -69,53 +74,62 @@ class Base(object):
         return not self._eq(other)
 
     def _eq(self, other):
-        """Compares two nodes for equality.
+        """
+        Compare two nodes for equality.
 
-        This is called by __eq__ and __ne__.  It is only called if the
-        two nodes have the same type.  This must be implemented by the
-        concrete subclass.  Nodes should be considered equal if they
-        have the same structure, ignoring the prefix string and other
-        context information.
+        This is called by __eq__ and __ne__.  It is only called if the two nodes
+        have the same type.  This must be implemented by the concrete subclass.
+        Nodes should be considered equal if they have the same structure,
+        ignoring the prefix string and other context information.
         """
         raise NotImplementedError
 
     def clone(self):
-        """Returns a cloned (deep) copy of self.
+        """
+        Return a cloned (deep) copy of self.
 
         This must be implemented by the concrete subclass.
         """
         raise NotImplementedError
 
     def post_order(self):
-        """Returns a post-order iterator for the tree.
+        """
+        Return a post-order iterator for the tree.
 
         This must be implemented by the concrete subclass.
         """
         raise NotImplementedError
 
     def pre_order(self):
-        """Returns a pre-order iterator for the tree.
+        """
+        Return a pre-order iterator for the tree.
 
         This must be implemented by the concrete subclass.
         """
         raise NotImplementedError
 
     def set_prefix(self, prefix):
-        """Sets the prefix for the node (see Leaf class).
-
-        This must be implemented by the concrete subclass.
         """
-        raise NotImplementedError
+        Set the prefix for the node (see Leaf class).
+
+        DEPRECATED; use the prefix property directly.
+        """
+        warnings.warn("set_prefix() is deprecated; use the prefix property",
+                      DeprecationWarning, stacklevel=2)
+        self.prefix = prefix
 
     def get_prefix(self):
-        """Returns the prefix for the node (see Leaf class).
-
-        This must be implemented by the concrete subclass.
         """
-        raise NotImplementedError
+        Return the prefix for the node (see Leaf class).
+
+        DEPRECATED; use the prefix property directly.
+        """
+        warnings.warn("get_prefix() is deprecated; use the prefix property",
+                      DeprecationWarning, stacklevel=2)
+        return self.prefix
 
     def replace(self, new):
-        """Replaces this node with a new one in the parent."""
+        """Replace this node with a new one in the parent."""
         assert self.parent is not None, str(self)
         assert new is not None
         if not isinstance(new, list):
@@ -138,7 +152,7 @@ class Base(object):
         self.parent = None
 
     def get_lineno(self):
-        """Returns the line number which generated the invocant node."""
+        """Return the line number which generated the invocant node."""
         node = self
         while not isinstance(node, Leaf):
             if not node.children:
@@ -152,8 +166,10 @@ class Base(object):
         self.was_changed = True
 
     def remove(self):
-        """Remove the node from the tree. Returns the position of the node
-        in its parent's children before it was removed."""
+        """
+        Remove the node from the tree. Returns the position of the node in its
+        parent's children before it was removed.
+        """
         if self.parent:
             for i, node in enumerate(self.parent.children):
                 if node is self:
@@ -162,10 +178,12 @@ class Base(object):
                     self.parent = None
                     return i
 
-    def get_next_sibling(self):
-        """Return the node immediately following the invocant in their
-        parent's children list. If the invocant does not have a next
-        sibling, return None."""
+    @property
+    def next_sibling(self):
+        """
+        The node immediately following the invocant in their parent's children
+        list. If the invocant does not have a next sibling, it is None
+        """
         if self.parent is None:
             return None
 
@@ -177,10 +195,12 @@ class Base(object):
                 except IndexError:
                     return None
 
-    def get_prev_sibling(self):
-        """Return the node immediately preceding the invocant in their
-        parent's children list. If the invocant does not have a previous
-        sibling, return None."""
+    @property
+    def prev_sibling(self):
+        """
+        The node immediately preceding the invocant in their parent's children
+        list. If the invocant does not have a previous sibling, it is None.
+        """
         if self.parent is None:
             return None
 
@@ -192,12 +212,18 @@ class Base(object):
                 return self.parent.children[i-1]
 
     def get_suffix(self):
-        """Return the string immediately following the invocant node. This
-        is effectively equivalent to node.get_next_sibling().get_prefix()"""
-        next_sib = self.get_next_sibling()
+        """
+        Return the string immediately following the invocant node. This is
+        effectively equivalent to node.next_sibling.prefix
+        """
+        next_sib = self.next_sibling
         if next_sib is None:
             return ""
-        return next_sib.get_prefix()
+        return next_sib.prefix
+
+    if sys.version_info < (3, 0):
+        def __str__(self):
+            return str(self).encode("ascii")
 
 
 class Node(Base):
@@ -205,7 +231,8 @@ class Node(Base):
     """Concrete implementation for interior nodes."""
 
     def __init__(self, type, children, context=None, prefix=None):
-        """Initializer.
+        """
+        Initializer.
 
         Takes a type constant (a symbol number >= 256), a sequence of
         child nodes, and an optional context keyword argument.
@@ -219,78 +246,85 @@ class Node(Base):
             assert ch.parent is None, repr(ch)
             ch.parent = self
         if prefix is not None:
-            self.set_prefix(prefix)
+            self.prefix = prefix
 
     def __repr__(self):
-        """Returns a canonical string representation."""
+        """Return a canonical string representation."""
         return "%s(%s, %r)" % (self.__class__.__name__,
                                type_repr(self.type),
                                self.children)
 
-    def __str__(self):
-        """Returns a pretty string representation.
+    def __unicode__(self):
+        """
+        Return a pretty string representation.
 
         This reproduces the input source exactly.
         """
         return "".join(map(str, self.children))
 
+    if sys.version_info > (3, 0):
+        __str__ = __unicode__
+
     def _eq(self, other):
-        """Compares two nodes for equality."""
+        """Compare two nodes for equality."""
         return (self.type, self.children) == (other.type, other.children)
 
     def clone(self):
-        """Returns a cloned (deep) copy of self."""
+        """Return a cloned (deep) copy of self."""
         return Node(self.type, [ch.clone() for ch in self.children])
 
     def post_order(self):
-        """Returns a post-order iterator for the tree."""
+        """Return a post-order iterator for the tree."""
         for child in self.children:
             for node in child.post_order():
                 yield node
         yield self
 
     def pre_order(self):
-        """Returns a pre-order iterator for the tree."""
+        """Return a pre-order iterator for the tree."""
         yield self
         for child in self.children:
             for node in child.post_order():
                 yield node
 
-    def set_prefix(self, prefix):
-        """Sets the prefix for the node.
-
-        This passes the responsibility on to the first child.
+    @property
+    def prefix(self):
         """
-        if self.children:
-            self.children[0].set_prefix(prefix)
-
-    def get_prefix(self):
-        """Returns the prefix for the node.
-
-        This passes the call on to the first child.
+        The whitespace and comments preceding this node in the input.
         """
         if not self.children:
             return ""
-        return self.children[0].get_prefix()
+        return self.children[0].prefix
+
+    @prefix.setter
+    def prefix(self, prefix):
+        if self.children:
+            self.children[0].prefix = prefix
 
     def set_child(self, i, child):
-        """Equivalent to 'node.children[i] = child'. This method also sets the
-        child's parent attribute appropriately."""
+        """
+        Equivalent to 'node.children[i] = child'. This method also sets the
+        child's parent attribute appropriately.
+        """
         child.parent = self
         self.children[i].parent = None
         self.children[i] = child
         self.changed()
 
     def insert_child(self, i, child):
-        """Equivalent to 'node.children.insert(i, child)'. This method also
-        sets the child's parent attribute appropriately."""
+        """
+        Equivalent to 'node.children.insert(i, child)'. This method also sets
+        the child's parent attribute appropriately.
+        """
         child.parent = self
         self.children.insert(i, child)
         self.changed()
 
     def append_child(self, child):
-        """Equivalent to 'node.children.append(child)'. This method also
-        sets the child's parent attribute appropriately."""
+        """
+        Equivalent to 'node.children.append(child)'. This method also sets the
+        child's parent attribute appropriately.
+        """
         child.parent = self
         self.children.append(child)
         self.changed()
@@ -301,70 +335,79 @@ class Leaf(Base):
     """Concrete implementation for leaf nodes."""
 
     # Default values for instance variables
-    prefix = ""  # Whitespace and comments preceding this token in the input
-    lineno = 0   # Line where this token starts in the input
-    column = 0   # Column where this token tarts in the input
+    _prefix = ""  # Whitespace and comments preceding this token in the input
+    lineno = 0    # Line where this token starts in the input
+    column = 0    # Column where this token tarts in the input
 
     def __init__(self, type, value, context=None, prefix=None):
-        """Initializer.
+        """
+        Initializer.
 
-        Takes a type constant (a token number < 256), a string value,
-        and an optional context keyword argument.
+        Takes a type constant (a token number < 256), a string value, and an
+        optional context keyword argument.
         """
         assert 0 <= type < 256, type
         if context is not None:
-            self.prefix, (self.lineno, self.column) = context
+            self._prefix, (self.lineno, self.column) = context
         self.type = type
         self.value = value
         if prefix is not None:
-            self.prefix = prefix
+            self._prefix = prefix
 
     def __repr__(self):
-        """Returns a canonical string representation."""
+        """Return a canonical string representation."""
         return "%s(%r, %r)" % (self.__class__.__name__,
                                self.type,
                                self.value)
 
-    def __str__(self):
-        """Returns a pretty string representation.
+    def __unicode__(self):
+        """
+        Return a pretty string representation.
 
         This reproduces the input source exactly.
         """
         return self.prefix + str(self.value)
 
+    if sys.version_info > (3, 0):
+        __str__ = __unicode__
+
     def _eq(self, other):
-        """Compares two nodes for equality."""
+        """Compare two nodes for equality."""
         return (self.type, self.value) == (other.type, other.value)
 
     def clone(self):
-        """Returns a cloned (deep) copy of self."""
+        """Return a cloned (deep) copy of self."""
         return Leaf(self.type, self.value,
                     (self.prefix, (self.lineno, self.column)))
 
     def post_order(self):
-        """Returns a post-order iterator for the tree."""
+        """Return a post-order iterator for the tree."""
         yield self
 
     def pre_order(self):
-        """Returns a pre-order iterator for the tree."""
+        """Return a pre-order iterator for the tree."""
         yield self
 
-    def set_prefix(self, prefix):
-        """Sets the prefix for the node."""
-        self.changed()
-        self.prefix = prefix
+    @property
+    def prefix(self):
+        """
+        The whitespace and comments preceding this token in the input.
+        """
+        return self._prefix
 
-    def get_prefix(self):
-        """Returns the prefix for the node."""
-        return self.prefix
+    @prefix.setter
+    def prefix(self, prefix):
+        self.changed()
+        self._prefix = prefix
 
 
 def convert(gr, raw_node):
-    """Converts raw node information to a Node or Leaf instance.
+    """
+    Convert raw node information to a Node or Leaf instance.
 
-    This is passed to the parser driver which calls it whenever a
-    reduction of a grammar rule produces a new complete node, so that
-    the tree is build strictly bottom-up.
+    This is passed to the parser driver which calls it whenever a reduction of a
+    grammar rule produces a new complete node, so that the tree is build
+    strictly bottom-up.
     """
     type, value, context, children = raw_node
     if children or type in gr.number2symbol:
@@ -379,7 +422,8 @@ def convert(gr, raw_node):
 
 class BasePattern(object):
 
-    """A pattern is a tree matching pattern.
+    """
+    A pattern is a tree matching pattern.
 
     It looks for a specific node type (token or symbol), and
     optionally for a specific content.
@@ -409,14 +453,16 @@ class BasePattern(object):
         return "%s(%s)" % (self.__class__.__name__, ", ".join(map(repr, args)))
 
     def optimize(self):
-        """A subclass can define this as a hook for optimizations.
+        """
+        A subclass can define this as a hook for optimizations.
 
         Returns either self or another node with the same effect.
         """
         return self
 
     def match(self, node, results=None):
-        """Does this pattern exactly match a node?
+        """
+        Does this pattern exactly match a node?
 
         Returns True if it matches, False if not.
 
@@ -440,7 +486,8 @@ class BasePattern(object):
         return True
 
     def match_seq(self, nodes, results=None):
-        """Does this pattern exactly match a sequence of nodes?
+        """
+        Does this pattern exactly match a sequence of nodes?
 
         Default implementation for non-wildcard patterns.
         """
@@ -449,7 +496,8 @@ class BasePattern(object):
         return self.match(nodes[0], results)
 
     def generate_matches(self, nodes):
-        """Generator yielding all matches for this pattern.
+        """
+        Generator yielding all matches for this pattern.
 
         Default implementation for non-wildcard patterns.
         """
@@ -461,7 +509,8 @@ class BasePattern(object):
 class LeafPattern(BasePattern):
 
     def __init__(self, type=None, content=None, name=None):
-        """Initializer.  Takes optional type, content, and name.
+        """
+        Initializer.  Takes optional type, content, and name.
 
         The type, if given must be a token type (< 256).  If not given,
         this matches any *leaf* node; the content may still be required.
@@ -486,7 +535,8 @@ class LeafPattern(BasePattern):
         return BasePattern.match(self, node, results)
 
     def _submatch(self, node, results=None):
-        """Match the pattern's content to the node's children.
+        """
+        Match the pattern's content to the node's children.
 
         This assumes the node type matches and self.content is not None.
 
@@ -505,7 +555,8 @@ class NodePattern(BasePattern):
     wildcards = False
 
     def __init__(self, type=None, content=None, name=None):
-        """Initializer.  Takes optional type, content, and name.
+        """
+        Initializer.  Takes optional type, content, and name.
 
         The type, if given, must be a symbol type (>= 256).  If the
         type is None this matches *any* single node (leaf or not),
@@ -533,7 +584,8 @@ class NodePattern(BasePattern):
         self.name = name
 
     def _submatch(self, node, results=None):
-        """Match the pattern's content to the node's children.
+        """
+        Match the pattern's content to the node's children.
 
         This assumes the node type matches and self.content is not None.
 
@@ -561,7 +613,8 @@ class NodePattern(BasePattern):
 
 class WildcardPattern(BasePattern):
 
-    """A wildcard pattern can match zero or more nodes.
+    """
+    A wildcard pattern can match zero or more nodes.
 
     This has all the flexibility needed to implement patterns like:
 
@@ -573,7 +626,8 @@ class WildcardPattern(BasePattern):
     """
 
     def __init__(self, content=None, min=0, max=HUGE, name=None):
-        """Initializer.
+        """
+        Initializer.
 
         Args:
             content: optional sequence of subsequences of patterns;
@@ -641,7 +695,8 @@ class WildcardPattern(BasePattern):
         return False
 
     def generate_matches(self, nodes):
-        """Generator yielding matches for a sequence of nodes.
+        """
+        Generator yielding matches for a sequence of nodes.
 
         Args:
             nodes: sequence of nodes
@@ -744,7 +799,8 @@ class WildcardPattern(BasePattern):
 class NegatedPattern(BasePattern):
 
     def __init__(self, content=None):
-        """Initializer.
+        """
+        Initializer.
 
         The argument is either a pattern or None.  If it is None, this
         only matches an empty sequence (effectively '$' in regex
@@ -776,7 +832,8 @@ class NegatedPattern(BasePattern):
 
 
 def generate_matches(patterns, nodes):
-    """Generator yielding matches for a sequence of patterns and nodes.
+    """
+    Generator yielding matches for a sequence of patterns and nodes.
 
     Args:
         patterns: a sequence of patterns

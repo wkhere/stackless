@@ -4,22 +4,21 @@ Classes:
     dircmp
 
 Functions:
-    cmp(f1, f2, shallow=1) -> int
+    cmp(f1, f2, shallow=True) -> int
     cmpfiles(a, b, common) -> ([], [], [])
 
 """
 
 import os
 import stat
-import contextlib
 from itertools import filterfalse
 
-__all__ = ["cmp","dircmp","cmpfiles"]
+__all__ = ["cmp", "dircmp", "cmpfiles"]
 
 _cache = {}
-BUFSIZE=8*1024
+BUFSIZE = 8*1024
 
-def cmp(f1, f2, shallow=1):
+def cmp(f1, f2, shallow=True):
     """Compare two files.
 
     Arguments:
@@ -63,7 +62,7 @@ def _sig(st):
 
 def _do_cmp(f1, f2):
     bufsize = BUFSIZE
-    with contextlib.nested(open(f1, 'rb'), open(f2, 'rb')) as (fp1, fp2):
+    with open(f1, 'rb') as fp1, open(f2, 'rb') as fp2:
         while True:
             b1 = fp1.read(bufsize)
             b2 = fp2.read(bufsize)
@@ -77,7 +76,7 @@ def _do_cmp(f1, f2):
 class dircmp:
     """A class that manages the comparison of 2 directories.
 
-    dircmp(a,b,ignore=None,hide=None)
+    dircmp(a, b, ignore=None, hide=None)
       A and B are directories.
       IGNORE is a list of names to ignore,
         defaults to ['RCS', 'CVS', 'tags'].
@@ -238,7 +237,7 @@ class dircmp:
         self.methodmap[attr](self)
         return getattr(self, attr)
 
-def cmpfiles(a, b, common, shallow=1):
+def cmpfiles(a, b, common, shallow=True):
     """Compare common files in two directories.
 
     a, b -- directory names

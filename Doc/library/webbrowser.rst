@@ -22,7 +22,7 @@ override the platform default list of browsers, as a os.pathsep-separated list
 of browsers to try in order.  When the value of a list part contains the string
 ``%s``, then it is  interpreted as a literal browser command line to be used
 with the argument URL substituted for ``%s``; if the part does not contain
-``%s``, it is simply interpreted as the name of the browser to launch.
+``%s``, it is simply interpreted as the name of the browser to launch. [1]_
 
 For non-Unix platforms, or when a remote browser is available on Unix, the
 controlling process will not wait for the user to finish with the browser, but
@@ -54,6 +54,10 @@ The following functions are defined:
    possible.  If *autoraise* is true, the window is raised if possible (note that
    under many window managers this will occur regardless of the setting of this
    variable).
+
+   Note that on some platforms, trying to open a filename using this function,
+   may work and start the operating system's associated program.  However, this
+   is neither supported nor portable.
 
 
 .. function:: open_new(url)
@@ -189,3 +193,9 @@ module-level convenience functions:
 
    Open *url* in a new page ("tab") of the browser handled by this controller, if
    possible, otherwise equivalent to :func:`open_new`.
+
+
+.. rubric:: Footnotes
+
+.. [1] Executables named here without a full path will be searched in the
+       directories given in the :envvar:`PATH` environment variable.

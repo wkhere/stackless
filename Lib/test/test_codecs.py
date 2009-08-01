@@ -541,6 +541,17 @@ class UTF8Test(ReadTest):
         self.check_state_handling_decode(self.encoding,
                                          u, u.encode(self.encoding))
 
+    def test_lone_surrogates(self):
+        self.assertRaises(UnicodeEncodeError, "\ud800".encode, "utf-8")
+        self.assertRaises(UnicodeDecodeError, b"\xed\xa0\x80".decode, "utf-8")
+
+    def test_surrogatepass_handler(self):
+        self.assertEquals("abc\ud800def".encode("utf-8", "surrogatepass"),
+                          b"abc\xed\xa0\x80def")
+        self.assertEquals(b"abc\xed\xa0\x80def".decode("utf-8", "surrogatepass"),
+                          "abc\ud800def")
+        self.assertTrue(codecs.lookup_error("surrogatepass"))
+
 class UTF7Test(ReadTest):
     encoding = "utf-7"
 
@@ -861,6 +872,12 @@ class UnicodeInternalTest(unittest.TestCase):
                               "UnicodeInternalTest")
             self.assertEquals(("ab", 12), ignored)
 
+    def test_encode_length(self):
+        # Issue 3739
+        encoder = codecs.getencoder("unicode_internal")
+        self.assertEquals(encoder("a")[1], 1)
+        self.assertEquals(encoder("\xe9\u0142")[1], 2)
+
 # From http://www.gnu.org/software/libidn/draft-josefsson-idn-test-vectors.html
 nameprep_tests = [
     # 3.1 Map to nothing.
@@ -1023,12 +1040,12 @@ class NameprepTest(unittest.TestCase):
                 # Skipped
                 continue
             # The Unicode strings are given in UTF-8
-            orig = str(orig, "utf-8")
+            orig = str(orig, "utf-8", "surrogatepass")
             if prepped is None:
                 # Input contains prohibited characters
                 self.assertRaises(UnicodeError, nameprep, orig)
             else:
-                prepped = str(prepped, "utf-8")
+                prepped = str(prepped, "utf-8", "surrogatepass")
                 try:
                     self.assertEquals(nameprep(orig), prepped)
                 except Exception as e:
@@ -1306,8 +1323,7 @@ class BasicUnicodeTest(unittest.TestCase, MixInCheckStateHandling):
                 name = "latin_1"
             self.assertEqual(encoding.replace("_", "-"), name.replace("_", "-"))
             (b, size) = codecs.getencoder(encoding)(s)
-            if encoding != "unicode_internal":
-                self.assertEqual(size, len(s), "%r != %r (encoding=%r)" % (size, len(s), encoding))
+            self.assertEqual(size, len(s), "%r != %r (encoding=%r)" % (size, len(s), encoding))
             (chars, size) = codecs.getdecoder(encoding)(b)
             self.assertEqual(chars, s, "%r != %r (encoding=%r)" % (chars, s, encoding))
 
@@ -1505,6 +1521,34 @@ class TypesTest(unittest.TestCase):
         self.assertEquals(codecs.raw_unicode_escape_decode(r"\u1234"), ("\u1234", 6))
         self.assertEquals(codecs.raw_unicode_escape_decode(br"\u1234"), ("\u1234", 6))
 
+class SurrogateEscapeTest(unittest.TestCase):
+
+    def test_utf8(self):
+        # Bad byte
+        self.assertEqual(b"foo\x80bar".decode("utf-8", "surrogateescape"),
+                         "foo\udc80bar")
+        self.assertEqual("foo\udc80bar".encode("utf-8", "surrogateescape"),
+                         b"foo\x80bar")
+        # bad-utf-8 encoded surrogate
+        self.assertEqual(b"\xed\xb0\x80".decode("utf-8", "surrogateescape"),
+                         "\udced\udcb0\udc80")
+        self.assertEqual("\udced\udcb0\udc80".encode("utf-8", "surrogateescape"),
+                         b"\xed\xb0\x80")
+
+    def test_ascii(self):
+        # bad byte
+        self.assertEqual(b"foo\x80bar".decode("ascii", "surrogateescape"),
+                         "foo\udc80bar")
+        self.assertEqual("foo\udc80bar".encode("ascii", "surrogateescape"),
+                         b"foo\x80bar")
+
+    def test_charmap(self):
+        # bad byte: \xa5 is unmapped in iso-8859-3
+        self.assertEqual(b"foo\xa5bar".decode("iso-8859-3", "surrogateescape"),
+                         "foo\udca5bar")
+        self.assertEqual("foo\udca5bar".encode("iso-8859-3", "surrogateescape"),
+                         b"foo\xa5bar")
+
 
 def test_main():
     support.run_unittest(
@@ -1532,6 +1576,7 @@ def test_main():
         CharmapTest,
         WithStmtTest,
         TypesTest,
+        SurrogateEscapeTest,
     )
 
 

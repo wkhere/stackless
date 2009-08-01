@@ -30,7 +30,7 @@
    name, such as ``'dbm.ndbm'`` or ``'dbm.gnu'``.
 
 
-.. function:: open(filename[, flag[, mode]])
+.. function:: open(filename, flag='r', mode=0o666)
 
    Open the database file *filename* and return a corresponding object.
 
@@ -38,11 +38,23 @@
    determine its type and the appropriate module is used; if it does not exist,
    the first module listed above that can be imported is used.
 
-   The optional *flag* argument can be ``'r'`` to open an existing database for
-   reading only, ``'w'`` to open an existing database for reading and writing,
-   ``'c'`` to create the database if it doesn't exist, or ``'n'``, which will
-   always create a new empty database.  If not specified, the default value is
-   ``'r'``.
+   The optional *flag* argument can be:
+
+   +---------+-------------------------------------------+
+   | Value   | Meaning                                   |
+   +=========+===========================================+
+   | ``'r'`` | Open existing database for reading only   |
+   |         | (default)                                 |
+   +---------+-------------------------------------------+
+   | ``'w'`` | Open existing database for reading and    |
+   |         | writing                                   |
+   +---------+-------------------------------------------+
+   | ``'c'`` | Open database for reading and writing,    |
+   |         | creating it if it doesn't exist           |
+   +---------+-------------------------------------------+
+   | ``'n'`` | Always create a new, empty database, open |
+   |         | for reading and writing                   |
+   +---------+-------------------------------------------+
 
    The optional *mode* argument is the Unix mode of the file, used only when the
    database has to be created.  It defaults to octal ``0o666`` (and will be
@@ -121,7 +133,7 @@ supported.
    raised for general mapping errors like specifying an incorrect key.
 
 
-.. function:: open(filename, [flag, [mode]])
+.. function:: open(filename[, flag[, mode]])
 
    Open a ``gdbm`` database and return a :class:`gdbm` object.  The *filename*
    argument is the name of the database file.

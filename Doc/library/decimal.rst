@@ -1,4 +1,3 @@
-
 :mod:`decimal` --- Decimal fixed point and floating point arithmetic
 ====================================================================
 
@@ -30,9 +29,9 @@ arithmetic.  It offers several advantages over the :class:`float` datatype:
   people learn at school." -- excerpt from the decimal arithmetic specification.
 
 * Decimal numbers can be represented exactly.  In contrast, numbers like
-  :const:`1.1` do not have an exact representation in binary floating point. End
-  users typically would not expect :const:`1.1` to display as
-  :const:`1.1000000000000001` as it does with binary floating point.
+  :const:`1.1` and :const:`2.2` do not have an exact representations in binary
+  floating point. End users typically would not expect ``1.1 + 2.2`` to display
+  as :const:`3.3000000000000003` as it does with binary floating point.
 
 * The exactness carries over into arithmetic.  In decimal floating point, ``0.1
   + 0.1 + 0.1 - 0.3`` is exactly equal to zero.  In binary floating point, the result
@@ -103,7 +102,7 @@ reset them before monitoring a calculation.
 .. seealso::
 
    * IBM's General Decimal Arithmetic Specification, `The General Decimal Arithmetic
-     Specification <http://www2.hursley.ibm.com/decimal/decarith.html>`_.
+     Specification <http://speleotrove.com/decimal/decarith.html>`_.
 
    * IEEE standard 854-1987, `Unofficial IEEE 854 Text
      <http://754r.ucbtest.org/standards/854.pdf>`_.
@@ -305,7 +304,7 @@ Decimal objects
 ---------------
 
 
-.. class:: Decimal([value [, context]])
+.. class:: Decimal(value="0", context=None)
 
    Construct a new :class:`Decimal` object based from *value*.
 
@@ -1746,7 +1745,7 @@ the :const:`Inexact` trap is set, it is also useful for validation:
    >>> Decimal('3.214').quantize(TWOPLACES, context=Context(traps=[Inexact]))
    Traceback (most recent call last):
       ...
-   Inexact
+   Inexact: None
 
 Q. Once I have valid two place inputs, how do I maintain that invariant
 throughout an application?

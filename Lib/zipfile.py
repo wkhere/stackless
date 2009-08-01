@@ -959,7 +959,9 @@ class ZipFile:
         """
         # build the destination pathname, replacing
         # forward slashes to platform specific separators.
-        if targetpath[-1:] in (os.path.sep, os.path.altsep):
+        # Strip trailing path separator, unless it represents the root.
+        if (targetpath[-1:] in (os.path.sep, os.path.altsep)
+            and len(os.path.splitdrive(targetpath)[1]) > 1):
             targetpath = targetpath[:-1]
 
         # don't include leading "/" from file name if present
@@ -976,7 +978,8 @@ class ZipFile:
             os.makedirs(upperdirs)
 
         if member.filename[-1] == '/':
-            os.mkdir(targetpath)
+            if not os.path.isdir(targetpath):
+                os.mkdir(targetpath)
             return targetpath
 
         source = self.open(member, pwd=pwd)
@@ -1052,28 +1055,27 @@ class ZipFile:
             self.fp.write(zinfo.FileHeader())
             return
 
-        fp = io.open(filename, "rb")
-        # Must overwrite CRC and sizes with correct data later
-        zinfo.CRC = CRC = 0
-        zinfo.compress_size = compress_size = 0
-        zinfo.file_size = file_size = 0
-        self.fp.write(zinfo.FileHeader())
-        if zinfo.compress_type == ZIP_DEFLATED:
-            cmpr = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
-                 zlib.DEFLATED, -15)
-        else:
-            cmpr = None
-        while 1:
-            buf = fp.read(1024 * 8)
-            if not buf:
-                break
-            file_size = file_size + len(buf)
-            CRC = crc32(buf, CRC) & 0xffffffff
-            if cmpr:
-                buf = cmpr.compress(buf)
-                compress_size = compress_size + len(buf)
-            self.fp.write(buf)
-        fp.close()
+        with open(filename, "rb") as fp:
+            # Must overwrite CRC and sizes with correct data later
+            zinfo.CRC = CRC = 0
+            zinfo.compress_size = compress_size = 0
+            zinfo.file_size = file_size = 0
+            self.fp.write(zinfo.FileHeader())
+            if zinfo.compress_type == ZIP_DEFLATED:
+                cmpr = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
+                     zlib.DEFLATED, -15)
+            else:
+                cmpr = None
+            while 1:
+                buf = fp.read(1024 * 8)
+                if not buf:
+                    break
+                file_size = file_size + len(buf)
+                CRC = crc32(buf, CRC) & 0xffffffff
+                if cmpr:
+                    buf = cmpr.compress(buf)
+                    compress_size = compress_size + len(buf)
+                self.fp.write(buf)
         if cmpr:
             buf = cmpr.flush()
             compress_size = compress_size + len(buf)
@@ -1130,7 +1132,7 @@ class ZipFile:
         self.fp.flush()
         if zinfo.flag_bits & 0x08:
             # Write CRC and file sizes after the file data
-            self.fp.write(struct.pack("<lLL", zinfo.CRC, zinfo.compress_size,
+            self.fp.write(struct.pack("<LLL", zinfo.CRC, zinfo.compress_size,
                   zinfo.file_size))
         self.filelist.append(zinfo)
         self.NameToInfo[zinfo.filename] = zinfo
@@ -1397,9 +1399,8 @@ def main(args = None):
             tgtdir = os.path.dirname(tgt)
             if not os.path.exists(tgtdir):
                 os.makedirs(tgtdir)
-            fp = io.open(tgt, 'wb')
-            fp.write(zf.read(path))
-            fp.close()
+            with open(tgt, 'wb') as fp:
+                fp.write(zf.read(path))
         zf.close()
 
     elif args[0] == '-c':

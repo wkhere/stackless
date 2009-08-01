@@ -8,9 +8,18 @@ m4_define(PYTHON_VERSION, 3.1)
 
 AC_REVISION($Revision$)
 AC_PREREQ(2.61)
-AC_INIT(python, PYTHON_VERSION, http://www.python.org/python-bugs)
+AC_INIT(python, PYTHON_VERSION, http://bugs.python.org/)
 AC_CONFIG_SRCDIR([Include/object.h])
 AC_CONFIG_HEADER(pyconfig.h)
+
+dnl Ensure that if prefix is specified, it does not end in a slash. If
+dnl it does, we get path names containing '//' which is both ugly and
+dnl can cause trouble.
+
+dnl Last slash shouldn't be stripped if prefix=/
+if test "$prefix" != "/"; then
+    prefix=`echo "$prefix" | sed -e 's/\/$//g'`
+fi    
 
 dnl This is for stuff that absolutely must end up in pyconfig.h.
 dnl Please use pyport.h instead, if possible.
@@ -156,7 +165,7 @@ AC_ARG_ENABLE(framework,
 		PYTHONFRAMEWORKPREFIX=$enableval
 		PYTHONFRAMEWORKINSTALLDIR=$PYTHONFRAMEWORKPREFIX/$PYTHONFRAMEWORKDIR
 		FRAMEWORKINSTALLFIRST="frameworkinstallstructure"
-		FRAMEWORKALTINSTALLFIRST="frameworkinstallstructure bininstall maninstall"
+		FRAMEWORKALTINSTALLFIRST="frameworkinstallstructure "
 		if test "$UNIVERSAL_ARCHS" = "all"
 		then
 			FRAMEWORKINSTALLLAST="frameworkinstallmaclib frameworkinstallapps4way frameworkinstallunixtools4way"
@@ -614,6 +623,25 @@ then
 fi
 AC_MSG_RESULT($LINKCC)
 
+# GNULD is set to "yes" if the GNU linker is used.  If this goes wrong
+# make sure we default having it set to "no": this is used by
+# distutils.unixccompiler to know if it should add --enable-new-dtags
+# to linker command lines, and failing to detect GNU ld simply results
+# in the same bahaviour as before.
+AC_SUBST(GNULD)
+AC_MSG_CHECKING(for GNU ld)
+ac_prog=ld
+if test "$GCC" = yes; then
+       ac_prog=`$CC -print-prog-name=ld`
+fi
+case `"$ac_prog" -V 2>&1 < /dev/null` in
+      *GNU*)
+          GNULD=yes;;
+      *)
+          GNULD=no;;
+esac
+AC_MSG_RESULT($GNULD)
+
 AC_MSG_CHECKING(for --enable-shared)
 AC_ARG_ENABLE(shared,
               AC_HELP_STRING(--enable-shared, disable/enable building shared python library))
@@ -734,13 +762,20 @@ AC_PROG_RANLIB
 AC_SUBST(AR)
 AC_CHECK_PROGS(AR, ar aal, ar)
 
+# tweak ARFLAGS only if the user didn't set it on the command line
+AC_SUBST(ARFLAGS)
+if test -z "$ARFLAGS"
+then
+        ARFLAGS="rc"
+fi
+
 AC_SUBST(SVNVERSION)
 AC_CHECK_PROG(SVNVERSION, svnversion, found, not-found)
 if test $SVNVERSION = found
 then
 	SVNVERSION="svnversion \$(srcdir)"
 else
-	SVNVERSION="echo exported"
+	SVNVERSION="echo Unversioned directory"
 fi
 
 case $MACHDEP in
@@ -1505,6 +1540,10 @@ then
          [Define if you want to produce an OpenStep/Rhapsody framework
          (shared library plus accessory files).])
 	AC_MSG_RESULT(yes)
+	if test $enable_shared = "yes"
+	then
+		AC_MSG_ERROR([Specifying both --enable-shared and --enable-framework is not supported, use only --enable-framework instead])
+	fi
 else
 	AC_MSG_RESULT(no)
 fi
@@ -1719,15 +1758,7 @@ then
 	Linux*|GNU*) LINKFORSHARED="-Xlinker -export-dynamic";;
 	# -u libsys_s pulls in all symbols in libsys
 	Darwin/*) 
-		# -u _PyMac_Error is needed to pull in the mac toolbox glue,
-		# which is
-		# not used by the core itself but which needs to be in the core so
-		# that dynamically loaded extension modules have access to it.
-		# -prebind is no longer used, because it actually seems to give a
-		# slowdown in stead of a speedup, maybe due to the large number of
-		# dynamic loads Python does.
-
-		LINKFORSHARED="$extra_undefs"
+		LINKFORSHARED="$extra_undefs -framework CoreFoundation"
 		if test "$enable_framework"
 		then
 			LINKFORSHARED="$LINKFORSHARED "'$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
@@ -1810,8 +1841,9 @@ fi
 
 # check if we need libintl for locale functions
 AC_CHECK_LIB(intl, textdomain,
-	AC_DEFINE(WITH_LIBINTL, 1,
-	[Define to 1 if libintl is needed for locale functions.]))
+	[AC_DEFINE(WITH_LIBINTL, 1,
+	[Define to 1 if libintl is needed for locale functions.])
+        LIBS="-lintl $LIBS"])
 
 # checks for system dependent C++ extensions support
 case "$ac_sys_system" in
@@ -1845,6 +1877,24 @@ AC_ARG_WITH(system_ffi,
             AC_HELP_STRING(--with-system-ffi, build _ctypes module using an installed ffi library))
 
 AC_MSG_RESULT($with_system_ffi)
+
+# Check for --with-dbmliborder
+AC_MSG_CHECKING(for --with-dbmliborder)
+AC_ARG_WITH(dbmliborder,
+            AC_HELP_STRING([--with-dbmliborder=db1:db2:...], [order to check db backends for dbm. Valid value is a colon separated string with the backend names `ndbm', `gdbm' and `bdb'.]),
+[
+if test x$with_dbmliborder = xyes
+then
+AC_MSG_ERROR([proper usage is --with-dbmliborder=db1:db2:...])
+else
+  for db in `echo $with_dbmliborder | sed 's/:/ /g'`; do
+    if test x$db != xndbm && test x$db != xgdbm && test x$db != xbdb
+    then
+      AC_MSG_ERROR([proper usage is --with-dbmliborder=db1:db2:...])
+    fi
+  done
+fi])
+AC_MSG_RESULT($with_dbmliborder)
 
 # Determine if signalmodule should be used.
 AC_SUBST(USE_SIGNAL_MODULE)
@@ -2394,14 +2444,16 @@ AC_CHECK_FUNCS(alarm setitimer getitimer bind_textdomain_codeset chown \
  clock confstr ctermid execv fchmod fchown fork fpathconf ftime ftruncate \
  gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
  getpriority getpwent getspnam getspent getsid getwd \
- kill killpg lchmod lchown lstat mkfifo mknod mktime \
+ kill killpg lchmod lchown lstat mbrtowc mkfifo mknod mktime \
  mremap nice pathconf pause plock poll pthread_init \
  putenv readlink realpath \
- select setegid seteuid setgid \
+ select sem_open sem_timedwait sem_getvalue sem_unlink setegid seteuid \
+ setgid \
  setlocale setregid setreuid setsid setpgid setpgrp setuid setvbuf snprintf \
  sigaction siginterrupt sigrelse strftime strlcpy \
  sysconf tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
- truncate uname unsetenv utimes waitpid wait3 wait4 wcscoll wcsxfrm _getpty)
+ truncate uname unsetenv utimes waitpid wait3 wait4 \
+ wcscoll wcsftime wcsxfrm _getpty)
 
 # For some functions, having a definition is not sufficient, since
 # we want to take their address.
@@ -3073,12 +3125,107 @@ else AC_MSG_ERROR([proper usage is --with-libc=STRING])
 fi],
 [AC_MSG_RESULT(default LIBC="$LIBC")])
 
-# ************************************
-# * Check for mathematical functions *
-# ************************************
+# **************************************************
+# * Check for various properties of floating point *
+# **************************************************
 
-LIBS_SAVE=$LIBS
-LIBS="$LIBS $LIBM"
+AC_MSG_CHECKING(whether C doubles are little-endian IEEE 754 binary64)
+AC_CACHE_VAL(ac_cv_little_endian_double, [
+AC_TRY_RUN([
+#include <string.h>
+int main() {
+    double x = 9006104071832581.0;
+    if (memcmp(&x, "\x05\x04\x03\x02\x01\xff\x3f\x43", 8) == 0)
+        return 0;
+    else
+        return 1;
+}
+],
+ac_cv_little_endian_double=yes,
+ac_cv_little_endian_double=no,
+ac_cv_little_endian_double=no)])
+AC_MSG_RESULT($ac_cv_little_endian_double)
+if test "$ac_cv_little_endian_double" = yes
+then
+  AC_DEFINE(DOUBLE_IS_LITTLE_ENDIAN_IEEE754, 1,
+  [Define if C doubles are 64-bit IEEE 754 binary format, stored
+   with the least significant byte first])
+fi
+
+AC_MSG_CHECKING(whether C doubles are big-endian IEEE 754 binary64)
+AC_CACHE_VAL(ac_cv_big_endian_double, [
+AC_TRY_RUN([
+#include <string.h>
+int main() {
+    double x = 9006104071832581.0;
+    if (memcmp(&x, "\x43\x3f\xff\x01\x02\x03\x04\x05", 8) == 0)
+        return 0;
+    else
+        return 1;
+}
+],
+ac_cv_big_endian_double=yes,
+ac_cv_big_endian_double=no,
+ac_cv_big_endian_double=no)])
+AC_MSG_RESULT($ac_cv_big_endian_double)
+if test "$ac_cv_big_endian_double" = yes
+then
+  AC_DEFINE(DOUBLE_IS_BIG_ENDIAN_IEEE754, 1,
+  [Define if C doubles are 64-bit IEEE 754 binary format, stored
+   with the most significant byte first])
+fi
+
+# Some ARM platforms use a mixed-endian representation for doubles.
+# While Python doesn't currently have full support for these platforms
+# (see e.g., issue 1762561), we can at least make sure that float <-> string
+# conversions work.
+AC_MSG_CHECKING(whether C doubles are ARM mixed-endian IEEE 754 binary64)
+AC_CACHE_VAL(ac_cv_mixed_endian_double, [
+AC_TRY_RUN([
+#include <string.h>
+int main() {
+    double x = 9006104071832581.0;
+    if (memcmp(&x, "\x01\xff\x3f\x43\x05\x04\x03\x02", 8) == 0)
+        return 0;
+    else
+        return 1;
+}
+],
+ac_cv_mixed_endian_double=yes,
+ac_cv_mixed_endian_double=no,
+ac_cv_mixed_endian_double=no)])
+AC_MSG_RESULT($ac_cv_mixed_endian_double)
+if test "$ac_cv_mixed_endian_double" = yes
+then
+  AC_DEFINE(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754, 1,
+  [Define if C doubles are 64-bit IEEE 754 binary format, stored
+   in ARM mixed-endian order (byte order 45670123)])
+fi
+
+# The short float repr introduced in Python 3.1 requires the
+# correctly-rounded string <-> double conversion functions from
+# Python/dtoa.c, which in turn require that the FPU uses 53-bit
+# rounding; this is a problem on x86, where the x87 FPU has a default
+# rounding precision of 64 bits.  For gcc/x86, we try to fix this by
+# using inline assembler to get and set the x87 FPU control word.
+if test "$GCC" = yes && test -n "`$CC -dM -E - </dev/null | grep i386`"
+then
+    # Check that it's okay to use gcc inline assembler to get and set
+    # x87 control word.  It should be, but you never know...
+    AC_MSG_CHECKING(whether we can use gcc inline assembler to get and set x87 control word)
+    AC_TRY_COMPILE([], [
+      unsigned short cw;
+      __asm__ __volatile__ ("fnstcw %0" : "=m" (cw));
+      __asm__ __volatile__ ("fldcw %0" : : "m" (cw));
+    ],
+    [have_gcc_asm_for_x87=yes], [have_gcc_asm_for_x87=no])
+    AC_MSG_RESULT($have_gcc_asm_for_x87)
+    if test "$have_gcc_asm_for_x87" = yes
+    then
+        AC_DEFINE(HAVE_GCC_ASM_FOR_X87, 1,
+        [Define if we can use gcc inline assembler to get and set x87 control word])
+    fi
+fi
 
 # Detect whether system arithmetic is subject to x87-style double
 # rounding issues.  The result of this test has little meaning on non
@@ -3086,7 +3233,9 @@ LIBS="$LIBS $LIBM"
 # mode is round-to-nearest and double rounding issues are present, and
 # 0 otherwise.  See http://bugs.python.org/issue2937 for more info.
 AC_MSG_CHECKING(for x87-style double rounding)
-AC_CACHE_VAL(ac_cv_x87_double_rounding, [
+# $BASECFLAGS may affect the result
+ac_save_cc="$CC"
+CC="$CC $BASECFLAGS"
 AC_TRY_RUN([
 #include <stdlib.h>
 #include <math.h>
@@ -3109,7 +3258,8 @@ int main() {
 ],
 ac_cv_x87_double_rounding=no,
 ac_cv_x87_double_rounding=yes,
-ac_cv_x87_double_rounding=no)])
+ac_cv_x87_double_rounding=no)
+CC="$ac_save_cc"
 AC_MSG_RESULT($ac_cv_x87_double_rounding)
 if test "$ac_cv_x87_double_rounding" = yes
 then
@@ -3117,6 +3267,12 @@ then
   [Define if arithmetic is subject to x87-style double rounding issue])
 fi
 
+# ************************************
+# * Check for mathematical functions *
+# ************************************
+
+LIBS_SAVE=$LIBS
+LIBS="$LIBS $LIBM"
 
 # On FreeBSD 6.2, it appears that tanh(-0.) returns 0. instead of
 # -0. on some architectures.
@@ -3144,10 +3300,38 @@ then
   [Define if tanh(-0.) is -0., or if platform doesn't have signed zeros])
 fi
 
-AC_CHECK_FUNCS([acosh asinh atanh copysign expm1 finite hypot log1p])
+AC_CHECK_FUNCS([acosh asinh atanh copysign expm1 finite hypot log1p round])
 AC_CHECK_DECLS([isinf, isnan, isfinite], [], [], [[#include <math.h>]])
 
 LIBS=$LIBS_SAVE
+
+# Multiprocessing check for broken sem_getvalue
+AC_MSG_CHECKING(for broken sem_getvalue)
+AC_TRY_RUN([
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <semaphore.h>
+#include <sys/stat.h>
+
+int main(void){
+  sem_t *a = sem_open("/autoconf", O_CREAT, S_IRUSR|S_IWUSR, 0);
+  int count;
+  int res;
+  if(a==SEM_FAILED){
+    perror("sem_open");
+    return 1;
+
+  }
+  res = sem_getvalue(a, &count);
+  sem_close(a);
+  return res==-1 ? 1 : 0;
+}
+]
+,AC_MSG_RESULT(no),
+ AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_BROKEN_SEM_GETVALUE, 1, define to 1 if your sem_getvalue is broken.)
+)
 
 # determine what size digit to use for Python's longs
 AC_MSG_CHECKING([digit size for Python's longs])
@@ -3745,7 +3929,7 @@ esac
 
 
 # generate output files
-AC_CONFIG_FILES(Makefile.pre Modules/Setup.config)
+AC_CONFIG_FILES(Makefile.pre Modules/Setup.config Misc/python.pc)
 AC_OUTPUT
 
 echo "creating Modules/Setup"

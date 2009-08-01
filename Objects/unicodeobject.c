@@ -154,6 +154,11 @@ const unsigned char _Py_ascii_whitespace[] = {
     0, 0, 0, 0, 0, 0, 0, 0
 };
 
+static PyObject *unicode_encode_call_errorhandler(const char *errors,
+       PyObject **errorHandler,const char *encoding, const char *reason,
+       const Py_UNICODE *unicode, Py_ssize_t size, PyObject **exceptionObject,
+       Py_ssize_t startpos, Py_ssize_t endpos, Py_ssize_t *newpos);
+
 /* Same for linebreaks */
 static unsigned char ascii_linebreak[] = {
     0, 0, 0, 0, 0, 0, 0, 0,
@@ -718,16 +723,26 @@ PyUnicode_FromFormatV(const char *format, va_list vargs)
     count = vargs;
 #endif
 #endif
-    /* step 1: count the number of %S/%R/%A format specifications
-     * (we call PyObject_Str()/PyObject_Repr()/PyObject_ASCII() for
-     * these objects once during step 3 and put the result in
-     an array) */
+    /* step 1: count the number of %S/%R/%A/%s format specifications
+     * (we call PyObject_Str()/PyObject_Repr()/PyObject_ASCII()/
+     * PyUnicode_DecodeUTF8() for these objects once during step 3 and put the
+     * result in an array) */
     for (f = format; *f; f++) {
-        if (*f == '%' && (*(f+1)=='S' || *(f+1)=='R' || *(f+1)=='A'))
-            ++callcount;
+         if (*f == '%') {
+             if (*(f+1)=='%')
+                 continue;
+             if (*(f+1)=='S' || *(f+1)=='R' || *(f+1)=='A')
+                 ++callcount;
+             while (ISDIGIT((unsigned)*f))
+                 width = (width*10) + *f++ - '0';
+             while (*++f && *f != '%' && !ISALPHA((unsigned)*f))
+                 ;
+             if (*f == 's')
+                 ++callcount;
+         }
     }
     /* step 2: allocate memory for the results of
-     * PyObject_Str()/PyObject_Repr() calls */
+     * PyObject_Str()/PyObject_Repr()/PyUnicode_DecodeUTF8() calls */
     if (callcount) {
         callresults = PyObject_Malloc(sizeof(PyObject *)*callcount);
         if (!callresults) {
@@ -776,35 +791,13 @@ PyUnicode_FromFormatV(const char *format, va_list vargs)
             case 's':
             {
                 /* UTF-8 */
-                unsigned char*s;
-                s = va_arg(count, unsigned char*);
-                while (*s) {
-                    if (*s < 128) {
-                        n++; s++;
-                    } else if (*s < 0xc0) {
-                        /* invalid UTF-8 */
-                        n++; s++;
-                    } else if (*s < 0xc0) {
-                        n++;
-                        s++; if(!*s)break;
-                        s++;
-                    } else if (*s < 0xe0) {
-                        n++;
-                        s++; if(!*s)break;
-                        s++; if(!*s)break;
-                        s++;
-                    } else {
-#ifdef Py_UNICODE_WIDE
-                        n++;
-#else
-                        n+=2;
-#endif
-                        s++; if(!*s)break;
-                        s++; if(!*s)break;
-                        s++; if(!*s)break;
-                        s++;
-                    }
-                }
+                const char *s = va_arg(count, const char*);
+                PyObject *str = PyUnicode_DecodeUTF8(s, strlen(s), "replace");
+                if (!str)
+                    goto fail;
+                n += PyUnicode_GET_SIZE(str);
+                /* Remember the str and switch to the next slot */
+                *callresult++ = str;
                 break;
             }
             case 'U':
@@ -973,19 +966,15 @@ PyUnicode_FromFormatV(const char *format, va_list vargs)
                 break;
             case 's':
             {
-                /* Parameter must be UTF-8 encoded.
-                   In case of encoding errors, use
-                   the replacement character. */
-                PyObject *u;
-                p = va_arg(vargs, char*);
-                u = PyUnicode_DecodeUTF8(p, strlen(p),
-                                         "replace");
-                if (!u)
-                    goto fail;
-                Py_UNICODE_COPY(s, PyUnicode_AS_UNICODE(u),
-                                PyUnicode_GET_SIZE(u));
-                s += PyUnicode_GET_SIZE(u);
-                Py_DECREF(u);
+                /* unused, since we already have the result */
+                (void) va_arg(vargs, char *);
+                Py_UNICODE_COPY(s, PyUnicode_AS_UNICODE(*callresult),
+                                PyUnicode_GET_SIZE(*callresult));
+                s += PyUnicode_GET_SIZE(*callresult);
+                /* We're done with the unicode()/repr() => forget it */
+                Py_DECREF(*callresult);
+                /* switch to next unicode()/repr() result */
+                ++callresult;
                 break;
             }
             case 'U':
@@ -1541,6 +1530,57 @@ PyUnicode_DecodeFSDefaultAndSize(const char *s, Py_ssize_t size)
     }
 }
 
+/* Convert the argument to a bytes object, according to the file
+   system encoding */
+
+int
+PyUnicode_FSConverter(PyObject* arg, void* addr)
+{
+    PyObject *output = NULL;
+    Py_ssize_t size;
+    void *data;
+    if (arg == NULL) {
+        Py_DECREF(*(PyObject**)addr);
+        return 1;
+    }
+    if (PyBytes_Check(arg) || PyByteArray_Check(arg)) {
+        output = arg;
+        Py_INCREF(output);
+    }
+    else {
+        arg = PyUnicode_FromObject(arg);
+        if (!arg)
+            return 0;
+        output = PyUnicode_AsEncodedObject(arg, 
+                                           Py_FileSystemDefaultEncoding,
+                                           "surrogateescape");
+        Py_DECREF(arg);
+        if (!output)
+            return 0;
+        if (!PyBytes_Check(output)) {
+            Py_DECREF(output);
+            PyErr_SetString(PyExc_TypeError, "encoder failed to return bytes");
+            return 0;
+        }
+    }
+    if (PyBytes_Check(output)) {
+         size = PyBytes_GET_SIZE(output);
+         data = PyBytes_AS_STRING(output);
+    } 
+    else {
+         size = PyByteArray_GET_SIZE(output);
+         data = PyByteArray_AS_STRING(output);
+    }
+    if (size != strlen(data)) {
+        PyErr_SetString(PyExc_TypeError, "embedded NUL character");
+        Py_DECREF(output);
+        return 0;
+    }
+    *(PyObject**)addr = output;
+    return Py_CLEANUP_SUPPORTED;
+}
+
+
 char*
 _PyUnicode_AsStringAndSize(PyObject *unicode, Py_ssize_t *psize)
 {
@@ -1713,69 +1753,84 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
 
 /* --- UTF-7 Codec -------------------------------------------------------- */
 
-/* see RFC2152 for details */
+/* See RFC2152 for details.  We encode conservatively and decode liberally. */
+
+/* Three simple macros defining base-64. */
+
+/* Is c a base-64 character? */
+
+#define IS_BASE64(c) \
+    (((c) >= 'A' && (c) <= 'Z') ||     \
+     ((c) >= 'a' && (c) <= 'z') ||     \
+     ((c) >= '0' && (c) <= '9') ||     \
+     (c) == '+' || (c) == '/')
+
+/* given that c is a base-64 character, what is its base-64 value? */
+
+#define FROM_BASE64(c)                                                  \
+    (((c) >= 'A' && (c) <= 'Z') ? (c) - 'A' :                           \
+     ((c) >= 'a' && (c) <= 'z') ? (c) - 'a' + 26 :                      \
+     ((c) >= '0' && (c) <= '9') ? (c) - '0' + 52 :                      \
+     (c) == '+' ? 62 : 63)
+
+/* What is the base-64 character of the bottom 6 bits of n? */
+
+#define TO_BASE64(n)  \
+    ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[(n) & 0x3f])
+
+/* DECODE_DIRECT: this byte encountered in a UTF-7 string should be
+ * decoded as itself.  We are permissive on decoding; the only ASCII
+ * byte not decoding to itself is the + which begins a base64
+ * string. */
+
+#define DECODE_DIRECT(c)                                \
+    ((c) <= 127 && (c) != '+')
+
+/* The UTF-7 encoder treats ASCII characters differently according to
+ * whether they are Set D, Set O, Whitespace, or special (i.e. none of
+ * the above).  See RFC2152.  This array identifies these different
+ * sets:
+ * 0 : "Set D"
+ *     alphanumeric and '(),-./:?
+ * 1 : "Set O"
+ *     !"#$%&*;<=>@[]^_`{|}
+ * 2 : "whitespace"
+ *     ht nl cr sp
+ * 3 : special (must be base64 encoded)
+ *     everything else (i.e. +\~ and non-printing codes 0-8 11-12 14-31 127)
+ */
 
 static
-char utf7_special[128] = {
-    /* indicate whether a UTF-7 character is special i.e. cannot be directly
-       encoded:
-       0 - not special
-       1 - special
-       2 - whitespace (optional)
-       3 - RFC2152 Set O (optional) */
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    2, 3, 3, 3, 3, 3, 3, 0, 0, 0, 3, 1, 0, 0, 0, 1,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 0,
-    3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1, 3, 3, 3,
-    3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 1, 1,
-
+char utf7_category[128] = {
+/* nul soh stx etx eot enq ack bel bs  ht  nl  vt  np  cr  so  si  */
+    3,  3,  3,  3,  3,  3,  3,  3,  3,  2,  2,  3,  3,  2,  3,  3,
+/* dle dc1 dc2 dc3 dc4 nak syn etb can em  sub esc fs  gs  rs  us  */
+    3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
+/* sp   !   "   #   $   %   &   '   (   )   *   +   ,   -   .   /  */
+    2,  1,  1,  1,  1,  1,  1,  0,  0,  0,  1,  3,  0,  0,  0,  0,
+/*  0   1   2   3   4   5   6   7   8   9   :   ;   <   =   >   ?  */
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  0,
+/*  @   A   B   C   D   E   F   G   H   I   J   K   L   M   N   O  */
+    1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+/*  P   Q   R   S   T   U   V   W   X   Y   Z   [   \   ]   ^   _  */
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  3,  1,  1,  1,
+/*  `   a   b   c   d   e   f   g   h   i   j   k   l   m   n   o  */
+    1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+/*  p   q   r   s   t   u   v   w   x   y   z   {   |   }   ~  del */
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  3,  3,
 };
 
-/* Note: The comparison (c) <= 0 is a trick to work-around gcc
-   warnings about the comparison always being false; since
-   utf7_special[0] is 1, we can safely make that one comparison
-   true  */
+/* ENCODE_DIRECT: this character should be encoded as itself.  The
+ * answer depends on whether we are encoding set O as itself, and also
+ * on whether we are encoding whitespace as itself.  RFC2152 makes it
+ * clear that the answers to these questions vary between
+ * applications, so this code needs to be flexible.  */
 
-#define SPECIAL(c, encodeO, encodeWS)                   \
-    ((c) > 127 || (c) <= 0 || utf7_special[(c)] == 1 || \
-     (encodeWS && (utf7_special[(c)] == 2)) ||          \
-     (encodeO && (utf7_special[(c)] == 3)))
-
-#define B64(n)                                                          \
-    ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[(n) & 0x3f])
-#define B64CHAR(c)                              \
-    (ISALNUM(c) || (c) == '+' || (c) == '/')
-#define UB64(c)                                         \
-    ((c) == '+' ? 62 : (c) == '/' ? 63 : (c) >= 'a' ?   \
-     (c) - 71 : (c) >= 'A' ? (c) - 65 : (c) + 4 )
-
-#define ENCODE(out, ch, bits)                   \
-    while (bits >= 6) {                         \
-        *out++ = B64(ch >> (bits-6));           \
-        bits -= 6;                              \
-    }
-
-#define DECODE(out, ch, bits, surrogate)                                \
-    while (bits >= 16) {                                                \
-        Py_UNICODE outCh = (Py_UNICODE) ((ch >> (bits-16)) & 0xffff);   \
-        bits -= 16;                                                     \
-        if (surrogate) {                                                \
-            /* We have already generated an error for the high surrogate \
-               so let's not bother seeing if the low surrogate is correct or not */ \
-            surrogate = 0;                                              \
-        } else if (0xDC00 <= outCh && outCh <= 0xDFFF) {                \
-            /* This is a surrogate pair. Unfortunately we can't represent \
-               it in a 16-bit character */                              \
-            surrogate = 1;                                              \
-            errmsg = "code pairs are not supported";                    \
-            goto utf7Error;                                             \
-        } else {                                                        \
-            *out++ = outCh;                                             \
-        }                                                               \
-    }
+#define ENCODE_DIRECT(c, directO, directWS)             \
+    ((c) < 128 && (c) > 0 &&                            \
+     ((utf7_category[(c)] == 0) ||                      \
+      (directWS && (utf7_category[(c)] == 2)) ||        \
+      (directO && (utf7_category[(c)] == 1))))
 
 PyObject *PyUnicode_DecodeUTF7(const char *s,
                                Py_ssize_t size,
@@ -1783,6 +1838,13 @@ PyObject *PyUnicode_DecodeUTF7(const char *s,
 {
     return PyUnicode_DecodeUTF7Stateful(s, size, errors, NULL);
 }
+
+/* The decoder.  The only state we preserve is our read position,
+ * i.e. how many characters we have consumed.  So if we end in the
+ * middle of a shift sequence we have to back off the read position
+ * and the output to the beginning of the sequence, otherwise we lose
+ * all the shift state (seen bits, number of bits seen, high
+ * surrogate). */
 
 PyObject *PyUnicode_DecodeUTF7Stateful(const char *s,
                                        Py_ssize_t size,
@@ -1798,9 +1860,10 @@ PyObject *PyUnicode_DecodeUTF7Stateful(const char *s,
     Py_UNICODE *p;
     const char *errmsg = "";
     int inShift = 0;
-    unsigned int bitsleft = 0;
-    unsigned long charsleft = 0;
-    int surrogate = 0;
+    Py_UNICODE *shiftOutStart;
+    unsigned int base64bits = 0;
+    unsigned long base64buffer = 0;
+    Py_UNICODE surrogate = 0;
     PyObject *errorHandler = NULL;
     PyObject *exc = NULL;
 
@@ -1814,6 +1877,7 @@ PyObject *PyUnicode_DecodeUTF7Stateful(const char *s,
     }
 
     p = unicode->str;
+    shiftOutStart = p;
     e = s + size;
 
     while (s < e) {
@@ -1821,72 +1885,101 @@ PyObject *PyUnicode_DecodeUTF7Stateful(const char *s,
       restart:
         ch = (unsigned char) *s;
 
-        if (inShift) {
-            if ((ch == '-') || !B64CHAR(ch)) {
+        if (inShift) { /* in a base-64 section */
+            if (IS_BASE64(ch)) { /* consume a base-64 character */
+                base64buffer = (base64buffer << 6) | FROM_BASE64(ch);
+                base64bits += 6;
+                s++;
+                if (base64bits >= 16) {
+                    /* we have enough bits for a UTF-16 value */
+                    Py_UNICODE outCh = (Py_UNICODE)
+                                       (base64buffer >> (base64bits-16));
+                    base64bits -= 16;
+                    base64buffer &= (1 << base64bits) - 1; /* clear high bits */
+                    if (surrogate) {
+                        /* expecting a second surrogate */
+                        if (outCh >= 0xDC00 && outCh <= 0xDFFF) {
+#ifdef Py_UNICODE_WIDE
+                            *p++ = (((surrogate & 0x3FF)<<10)
+                                    | (outCh & 0x3FF)) + 0x10000;
+#else
+                            *p++ = surrogate;
+                            *p++ = outCh;
+#endif
+                            surrogate = 0;
+                        }
+                        else {
+                            surrogate = 0;
+                            errmsg = "second surrogate missing";
+                            goto utf7Error;
+                        }
+                    }
+                    else if (outCh >= 0xD800 && outCh <= 0xDBFF) {
+                        /* first surrogate */
+                        surrogate = outCh;
+                    }
+                    else if (outCh >= 0xDC00 && outCh <= 0xDFFF) {
+                        errmsg = "unexpected second surrogate";
+                        goto utf7Error;
+                    }
+                    else {
+                        *p++ = outCh;
+                    }
+                }
+            }
+            else { /* now leaving a base-64 section */
                 inShift = 0;
                 s++;
-
-                /* p, charsleft, bitsleft, surrogate = */ DECODE(p, charsleft, bitsleft, surrogate);
-                if (bitsleft >= 6) {
-                    /* The shift sequence has a partial character in it. If
-                       bitsleft < 6 then we could just classify it as padding
-                       but that is not the case here */
-
-                    errmsg = "partial character in shift sequence";
+                if (surrogate) {
+                    errmsg = "second surrogate missing at end of shift sequence";
                     goto utf7Error;
                 }
-                /* According to RFC2152 the remaining bits should be zero. We
-                   choose to signal an error/insert a replacement character
-                   here so indicate the potential of a misencoded character. */
-
-                /* On x86, a << b == a << (b%32) so make sure that bitsleft != 0 */
-                if (bitsleft && charsleft << (sizeof(charsleft) * 8 - bitsleft)) {
-                    errmsg = "non-zero padding bits in shift sequence";
-                    goto utf7Error;
-                }
-
-                if (ch == '-') {
-                    if ((s < e) && (*(s) == '-')) {
-                        *p++ = '-';
-                        inShift = 1;
+                if (base64bits > 0) { /* left-over bits */
+                    if (base64bits >= 6) {
+                        /* We've seen at least one base-64 character */
+                        errmsg = "partial character in shift sequence";
+                        goto utf7Error;
                     }
-                } else if (SPECIAL(ch,0,0)) {
-                    errmsg = "unexpected special character";
-                    goto utf7Error;
-                } else  {
+                    else {
+                        /* Some bits remain; they should be zero */
+                        if (base64buffer != 0) {
+                            errmsg = "non-zero padding bits in shift sequence";
+                            goto utf7Error;
+                        }
+                    }
+                }
+                if (ch != '-') {
+                    /* '-' is absorbed; other terminating
+                       characters are preserved */
                     *p++ = ch;
                 }
-            } else {
-                charsleft = (charsleft << 6) | UB64(ch);
-                bitsleft += 6;
-                s++;
-                /* p, charsleft, bitsleft, surrogate = */ DECODE(p, charsleft, bitsleft, surrogate);
             }
         }
         else if ( ch == '+' ) {
             startinpos = s-starts;
-            s++;
-            if (s < e && *s == '-') {
+            s++; /* consume '+' */
+            if (s < e && *s == '-') { /* '+-' encodes '+' */
                 s++;
                 *p++ = '+';
-            } else
-            {
+            }
+            else { /* begin base64-encoded section */
                 inShift = 1;
-                bitsleft = 0;
+                shiftOutStart = p;
+                base64bits = 0;
             }
         }
-        else if (SPECIAL(ch,0,0)) {
-            startinpos = s-starts;
-            errmsg = "unexpected special character";
-            s++;
-            goto utf7Error;
-        }
-        else {
+        else if (DECODE_DIRECT(ch)) { /* character decodes as itself */
             *p++ = ch;
             s++;
         }
+        else {
+            startinpos = s-starts;
+            s++;
+            errmsg = "unexpected special character";
+            goto utf7Error;
+        }
         continue;
-      utf7Error:
+utf7Error:
         outpos = p-PyUnicode_AS_UNICODE(unicode);
         endinpos = s-starts;
         if (unicode_decode_call_errorhandler(
@@ -1897,23 +1990,35 @@ PyObject *PyUnicode_DecodeUTF7Stateful(const char *s,
             goto onError;
     }
 
-    if (inShift && !consumed) {
-        outpos = p-PyUnicode_AS_UNICODE(unicode);
-        endinpos = size;
-        if (unicode_decode_call_errorhandler(
-                errors, &errorHandler,
-                "utf7", "unterminated shift sequence",
-                &starts, &e, &startinpos, &endinpos, &exc, &s,
-                &unicode, &outpos, &p))
-            goto onError;
-        if (s < e)
-            goto restart;
+    /* end of string */
+
+    if (inShift && !consumed) { /* in shift sequence, no more to follow */
+        /* if we're in an inconsistent state, that's an error */
+        if (surrogate ||
+                (base64bits >= 6) ||
+                (base64bits > 0 && base64buffer != 0)) {
+            outpos = p-PyUnicode_AS_UNICODE(unicode);
+            endinpos = size;
+            if (unicode_decode_call_errorhandler(
+                    errors, &errorHandler,
+                    "utf7", "unterminated shift sequence",
+                    &starts, &e, &startinpos, &endinpos, &exc, &s,
+                    &unicode, &outpos, &p))
+                goto onError;
+            if (s < e)
+                goto restart;
+        }
     }
+
+    /* return state */
     if (consumed) {
-        if(inShift)
+        if (inShift) {
+            p = shiftOutStart; /* back off output */
             *consumed = startinpos;
-        else
+        }
+        else {
             *consumed = s-starts;
+        }
     }
 
     if (_PyUnicode_Resize(&unicode, p - PyUnicode_AS_UNICODE(unicode)) < 0)
@@ -1933,27 +2038,27 @@ PyObject *PyUnicode_DecodeUTF7Stateful(const char *s,
 
 PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
                                Py_ssize_t size,
-                               int encodeSetO,
-                               int encodeWhiteSpace,
+                               int base64SetO,
+                               int base64WhiteSpace,
                                const char *errors)
 {
     PyObject *v;
     /* It might be possible to tighten this worst case */
-    Py_ssize_t cbAllocated = 5 * size;
+    Py_ssize_t allocated = 5 * size;
     int inShift = 0;
     Py_ssize_t i = 0;
-    unsigned int bitsleft = 0;
-    unsigned long charsleft = 0;
+    unsigned int base64bits = 0;
+    unsigned long base64buffer = 0;
     char * out;
     char * start;
 
     if (size == 0)
         return PyBytes_FromStringAndSize(NULL, 0);
 
-    if (cbAllocated / 5 != size)
+    if (allocated / 5 != size)
         return PyErr_NoMemory();
 
-    v = PyBytes_FromStringAndSize(NULL, cbAllocated);
+    v = PyBytes_FromStringAndSize(NULL, allocated);
     if (v == NULL)
         return NULL;
 
@@ -1961,78 +2066,76 @@ PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
     for (;i < size; ++i) {
         Py_UNICODE ch = s[i];
 
-        if (!inShift) {
-            if (ch == '+') {
-                *out++ = '+';
-                *out++ = '-';
-            } else if (SPECIAL(ch, encodeSetO, encodeWhiteSpace)) {
-                charsleft = ch;
-                bitsleft = 16;
-                *out++ = '+';
-                /* out, charsleft, bitsleft = */ ENCODE(out, charsleft, bitsleft);
-                inShift = bitsleft > 0;
-            } else {
-                *out++ = (char) ch;
-            }
-        } else {
-            if (!SPECIAL(ch, encodeSetO, encodeWhiteSpace)) {
-                *out++ = B64(charsleft << (6-bitsleft));
-                charsleft = 0;
-                bitsleft = 0;
-                /* Characters not in the BASE64 set implicitly unshift the sequence
-                   so no '-' is required, except if the character is itself a '-' */
-                if (B64CHAR(ch) || ch == '-') {
-                    *out++ = '-';
+        if (inShift) {
+            if (ENCODE_DIRECT(ch, !base64SetO, !base64WhiteSpace)) {
+                /* shifting out */
+                if (base64bits) { /* output remaining bits */
+                    *out++ = TO_BASE64(base64buffer << (6-base64bits));
+                    base64buffer = 0;
+                    base64bits = 0;
                 }
                 inShift = 0;
-                *out++ = (char) ch;
-            } else {
-                bitsleft += 16;
-                charsleft = (charsleft << 16) | ch;
-                /* out, charsleft, bitsleft = */ ENCODE(out, charsleft, bitsleft);
-
-                /* If the next character is special then we don't need to terminate
-                   the shift sequence. If the next character is not a BASE64 character
-                   or '-' then the shift sequence will be terminated implicitly and we
-                   don't have to insert a '-'. */
-
-                if (bitsleft == 0) {
-                    if (i + 1 < size) {
-                        Py_UNICODE ch2 = s[i+1];
-
-                        if (SPECIAL(ch2, encodeSetO, encodeWhiteSpace)) {
-
-                        } else if (B64CHAR(ch2) || ch2 == '-') {
-                            *out++ = '-';
-                            inShift = 0;
-                        } else {
-                            inShift = 0;
-                        }
-
-                    }
-                    else {
-                        *out++ = '-';
-                        inShift = 0;
-                    }
+                /* Characters not in the BASE64 set implicitly unshift the sequence
+                   so no '-' is required, except if the character is itself a '-' */
+                if (IS_BASE64(ch) || ch == '-') {
+                    *out++ = '-';
                 }
+                *out++ = (char) ch;
+            }
+            else {
+                goto encode_char;
             }
         }
+        else { /* not in a shift sequence */
+            if (ch == '+') {
+                *out++ = '+';
+                        *out++ = '-';
+            }
+            else if (ENCODE_DIRECT(ch, !base64SetO, !base64WhiteSpace)) {
+                *out++ = (char) ch;
+            }
+            else {
+                *out++ = '+';
+                inShift = 1;
+                goto encode_char;
+            }
+        }
+        continue;
+encode_char:
+#ifdef Py_UNICODE_WIDE
+        if (ch >= 0x10000) {
+            /* code first surrogate */
+            base64bits += 16;
+            base64buffer = (base64buffer << 16) | 0xd800 | ((ch-0x10000) >> 10);
+            while (base64bits >= 6) {
+                *out++ = TO_BASE64(base64buffer >> (base64bits-6));
+                base64bits -= 6;
+            }
+            /* prepare second surrogate */
+            ch =  0xDC00 | ((ch-0x10000) & 0x3FF);
+        }
+#endif
+        base64bits += 16;
+        base64buffer = (base64buffer << 16) | ch;
+        while (base64bits >= 6) {
+            *out++ = TO_BASE64(base64buffer >> (base64bits-6));
+            base64bits -= 6;
+        }
     }
-    if (bitsleft) {
-        *out++= B64(charsleft << (6-bitsleft) );
+    if (base64bits)
+        *out++= TO_BASE64(base64buffer << (6-base64bits) );
+    if (inShift)
         *out++ = '-';
-    }
     if (_PyBytes_Resize(&v, out - start) < 0)
         return NULL;
     return v;
 }
 
-#undef SPECIAL
-#undef B64
-#undef B64CHAR
-#undef UB64
-#undef ENCODE
-#undef DECODE
+#undef IS_BASE64
+#undef FROM_BASE64
+#undef TO_BASE64
+#undef DECODE_DIRECT
+#undef ENCODE_DIRECT
 
 /* --- UTF-8 Codec -------------------------------------------------------- */
 
@@ -2214,14 +2317,7 @@ PyObject *PyUnicode_DecodeUTF8Stateful(const char *s,
                 goto utf8Error;
             }
             ch = ((s[0] & 0x0f) << 12) + ((s[1] & 0x3f) << 6) + (s[2] & 0x3f);
-            if (ch < 0x0800) {
-                /* Note: UTF-8 encodings of surrogates are considered
-                   legal UTF-8 sequences;
-
-                   XXX For wide builds (UCS-4) we should probably try
-                   to recombine the surrogates into a single code
-                   unit.
-                */
+            if (ch < 0x0800 || (ch >= 0xd800 && ch <= 0xDFFF)) {
                 errmsg = "illegal encoding";
                 startinpos = s-starts;
                 endinpos = startinpos+3;
@@ -2328,6 +2424,8 @@ PyUnicode_EncodeUTF8(const Py_UNICODE *s,
     Py_ssize_t nallocated;      /* number of result bytes allocated */
     Py_ssize_t nneeded;            /* number of result bytes needed */
     char stackbuf[MAX_SHORT_UNICHARS * 4];
+    PyObject *errorHandler = NULL;
+    PyObject *exc = NULL;
 
     assert(s != NULL);
     assert(size >= 0);
@@ -2367,6 +2465,7 @@ PyUnicode_EncodeUTF8(const Py_UNICODE *s,
         else {
             /* Encode UCS2 Unicode ordinals */
             if (ch < 0x10000) {
+#ifndef Py_UNICODE_WIDE
                 /* Special case: check for high surrogate */
                 if (0xD800 <= ch && ch <= 0xDBFF && i != size) {
                     Py_UCS4 ch2 = s[i];
@@ -2378,6 +2477,36 @@ PyUnicode_EncodeUTF8(const Py_UNICODE *s,
                         goto encodeUCS4;
                     }
                     /* Fall through: handles isolated high surrogates */
+                }
+#endif
+                if (ch >= 0xd800 && ch <= 0xdfff) {
+                    Py_ssize_t newpos;
+                    PyObject *rep;
+                    char *prep;
+                    int k;
+                    rep = unicode_encode_call_errorhandler
+                        (errors, &errorHandler, "utf-8", "surrogates not allowed", 
+                         s, size, &exc, i-1, i, &newpos);
+                    if (!rep)
+                        goto error;
+                    /* Implementation limitations: only support error handler that return
+                       bytes, and only support up to four replacement bytes. */
+                    if (!PyBytes_Check(rep)) {
+                        PyErr_SetString(PyExc_TypeError, "error handler should have returned bytes");
+                        Py_DECREF(rep);
+                        goto error;
+                    }
+                    if (PyBytes_Size(rep) > 4) {
+                        PyErr_SetString(PyExc_TypeError, "error handler returned too many bytes");
+                        Py_DECREF(rep);
+                        goto error;
+                    }
+                    prep = PyBytes_AsString(rep);
+                    for(k = PyBytes_Size(rep); k > 0; k--)
+                        *p++ = *prep++;
+                    Py_DECREF(rep);
+                    continue;
+                    
                 }
                 *p++ = (char)(0xe0 | (ch >> 12));
                 *p++ = (char)(0x80 | ((ch >> 6) & 0x3f));
@@ -2405,7 +2534,14 @@ PyUnicode_EncodeUTF8(const Py_UNICODE *s,
         assert(nneeded <= nallocated);
         _PyBytes_Resize(&result, nneeded);
     }
+    Py_XDECREF(errorHandler);
+    Py_XDECREF(exc);
     return result;
+ error:
+    Py_XDECREF(errorHandler);
+    Py_XDECREF(exc);
+    Py_XDECREF(result);
+    return NULL;
 
 #undef MAX_SHORT_UNICHARS
 }
@@ -3249,16 +3385,7 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
             message = "malformed \\N character escape";
             if (ucnhash_CAPI == NULL) {
                 /* load the unicode data module */
-                PyObject *m, *api;
-                m = PyImport_ImportModuleNoBlock("unicodedata");
-                if (m == NULL)
-                    goto ucnhashError;
-                api = PyObject_GetAttrString(m, "ucnhash_CAPI");
-                Py_DECREF(m);
-                if (api == NULL)
-                    goto ucnhashError;
-                ucnhash_CAPI = (_PyUnicode_Name_CAPI *)PyCObject_AsVoidPtr(api);
-                Py_DECREF(api);
+                ucnhash_CAPI = (_PyUnicode_Name_CAPI *)PyCapsule_Import(PyUnicodeData_CAPSULE_NAME, 1);
                 if (ucnhash_CAPI == NULL)
                     goto ucnhashError;
             }
@@ -3897,7 +4024,7 @@ static PyObject *unicode_encode_call_errorhandler(const char *errors,
                                                   Py_ssize_t startpos, Py_ssize_t endpos,
                                                   Py_ssize_t *newpos)
 {
-    static char *argparse = "O!n;encoding error handler must return (str, int) tuple";
+    static char *argparse = "On;encoding error handler must return (str/bytes, int) tuple";
 
     PyObject *restuple;
     PyObject *resunicode;
@@ -3918,12 +4045,17 @@ static PyObject *unicode_encode_call_errorhandler(const char *errors,
     if (restuple == NULL)
         return NULL;
     if (!PyTuple_Check(restuple)) {
-        PyErr_SetString(PyExc_TypeError, &argparse[4]);
+        PyErr_SetString(PyExc_TypeError, &argparse[3]);
         Py_DECREF(restuple);
         return NULL;
     }
-    if (!PyArg_ParseTuple(restuple, argparse, &PyUnicode_Type,
+    if (!PyArg_ParseTuple(restuple, argparse,
                           &resunicode, newpos)) {
+        Py_DECREF(restuple);
+        return NULL;
+    }
+    if (!PyUnicode_Check(resunicode) && !PyBytes_Check(resunicode)) {
+        PyErr_SetString(PyExc_TypeError, &argparse[3]);
         Py_DECREF(restuple);
         return NULL;
     }
@@ -4064,6 +4196,23 @@ static PyObject *unicode_encode_ucs1(const Py_UNICODE *p,
                                                               collstart-startp, collend-startp, &newpos);
                 if (repunicode == NULL)
                     goto onError;
+                if (PyBytes_Check(repunicode)) {
+                    /* Directly copy bytes result to output. */
+                    repsize = PyBytes_Size(repunicode);
+                    if (repsize > 1) {
+                        /* Make room for all additional bytes. */
+                        if (_PyBytes_Resize(&res, ressize+repsize-1)) {
+                            Py_DECREF(repunicode);
+                            goto onError;
+                        }
+                        ressize += repsize-1;
+                    }
+                    memcpy(str, PyBytes_AsString(repunicode), repsize);
+                    str += repsize;
+                    p = startp + newpos;
+                    Py_DECREF(repunicode);
+                    break;
+                }
                 /* need more space? (at least enough for what we
                    have+the replacement+the rest of the string, so
                    we won't have to check space for encodable characters) */
@@ -5027,6 +5176,25 @@ int charmap_encoding_error(
                                                       collstartpos, collendpos, &newpos);
         if (repunicode == NULL)
             return -1;
+        if (PyBytes_Check(repunicode)) {
+            /* Directly copy bytes result to output. */
+            Py_ssize_t outsize = PyBytes_Size(*res);
+            Py_ssize_t requiredsize;
+            repsize = PyBytes_Size(repunicode);
+            requiredsize = *respos + repsize;
+            if (requiredsize > outsize)
+                /* Make room for all additional bytes. */
+                if (charmapencode_resize(res, respos, requiredsize)) {
+                    Py_DECREF(repunicode);
+                    return -1;
+                }
+            memcpy(PyBytes_AsString(*res) + *respos,
+                   PyBytes_AsString(repunicode),  repsize);
+            *respos += repsize;
+            *inpos = newpos;
+            Py_DECREF(repunicode);
+            break;
+        }
         /* generate replacement  */
         repsize = PyUnicode_GET_SIZE(repunicode);
         for (uni2 = PyUnicode_AS_UNICODE(repunicode); repsize-->0; ++uni2) {
@@ -5588,6 +5756,12 @@ int PyUnicode_EncodeDecimal(Py_UNICODE *s,
                                                           collstart-s, collend-s, &newpos);
             if (repunicode == NULL)
                 goto onError;
+            if (!PyUnicode_Check(repunicode)) {
+                /* Byte results not supported, since they have no decimal property. */
+                PyErr_SetString(PyExc_TypeError, "error handler should return unicode");
+                Py_DECREF(repunicode);
+                goto onError;
+            }
             /* generate replacement  */
             repsize = PyUnicode_GET_SIZE(repunicode);
             for (uni2 = PyUnicode_AS_UNICODE(repunicode); repsize-->0; ++uni2) {
@@ -6656,7 +6830,7 @@ unicode_center(PyUnicodeObject *self, PyObject *args)
 
 /* This code should go into some future Unicode collation support
    module. The basic comparison should compare ordinals on a naive
-   basis (this is what Java does and thus JPython too). */
+   basis (this is what Java does and thus Jython too). */
 
 /* speedy UTF-16 code point order comparison */
 /* gleaned from: */
@@ -7738,8 +7912,10 @@ unicode_repeat(PyUnicodeObject *str, Py_ssize_t len)
     Py_ssize_t nchars;
     size_t nbytes;
 
-    if (len < 0)
-        len = 0;
+    if (len < 1) {
+        Py_INCREF(unicode_empty);
+        return (PyObject *)unicode_empty;
+    }
 
     if (len == 1 && PyUnicode_CheckExact(str)) {
         /* no repeat, return original string */
@@ -7751,7 +7927,7 @@ unicode_repeat(PyUnicodeObject *str, Py_ssize_t len)
      * needed doesn't overflow size_t
      */
     nchars = len * str->length;
-    if (len && nchars / len != str->length) {
+    if (nchars / len != str->length) {
         PyErr_SetString(PyExc_OverflowError,
                         "repeated string is too long");
         return NULL;
@@ -7768,14 +7944,11 @@ unicode_repeat(PyUnicodeObject *str, Py_ssize_t len)
 
     p = u->str;
 
-    if (str->length == 1 && len > 0) {
+    if (str->length == 1) {
         Py_UNICODE_FILL(p, str->str[0], len);
     } else {
-        Py_ssize_t done = 0; /* number of characters copied this far */
-        if (done < nchars) {
-            Py_UNICODE_COPY(p, str->str, str->length);
-            done = str->length;
-        }
+        Py_ssize_t done = str->length; /* number of characters copied this far */
+        Py_UNICODE_COPY(p, str->str, str->length);
         while (done < nchars) {
             Py_ssize_t n = (done <= nchars-done) ? done : nchars-done;
             Py_UNICODE_COPY(p+done, p, n);
@@ -8374,7 +8547,7 @@ unicode_maketrans(PyUnicodeObject *null, PyObject *args)
         }
     } else {
         /* x must be a dict */
-        if (!PyDict_Check(x)) {
+        if (!PyDict_CheckExact(x)) {
             PyErr_SetString(PyExc_TypeError, "if you give only one argument "
                             "to maketrans it must be a dict");
             goto err;
@@ -8793,99 +8966,29 @@ getnextarg(PyObject *args, Py_ssize_t arglen, Py_ssize_t *p_argidx)
     return NULL;
 }
 
-static Py_ssize_t
-strtounicode(Py_UNICODE *buffer, const char *charbuffer)
+/* Returns a new reference to a PyUnicode object, or NULL on failure. */
+
+static PyObject *
+formatfloat(PyObject *v, int flags, int prec, int type)
 {
-    register Py_ssize_t i;
-    Py_ssize_t len = strlen(charbuffer);
-    for (i = len - 1; i >= 0; i--)
-        buffer[i] = (Py_UNICODE) charbuffer[i];
-
-    return len;
-}
-
-static int
-doubletounicode(Py_UNICODE *buffer, size_t len, const char *format, double x)
-{
-    Py_ssize_t result;
-
-    PyOS_ascii_formatd((char *)buffer, len, format, x);
-    result = strtounicode(buffer, (char *)buffer);
-    return Py_SAFE_DOWNCAST(result, Py_ssize_t, int);
-}
-
-#if 0
-static int
-longtounicode(Py_UNICODE *buffer, size_t len, const char *format, long x)
-{
-    Py_ssize_t result;
-
-    PyOS_snprintf((char *)buffer, len, format, x);
-    result = strtounicode(buffer, (char *)buffer);
-    return Py_SAFE_DOWNCAST(result, Py_ssize_t, int);
-}
-#endif
-
-/* XXX To save some code duplication, formatfloat/long/int could have been
-   shared with stringobject.c, converting from 8-bit to Unicode after the
-   formatting is done. */
-
-static int
-formatfloat(Py_UNICODE *buf,
-            size_t buflen,
-            int flags,
-            int prec,
-            int type,
-            PyObject *v)
-{
-    /* fmt = '%#.' + `prec` + `type`
-       worst case length = 3 + 10 (len of INT_MAX) + 1 = 14 (use 20)*/
-    char fmt[20];
+    char *p;
+    PyObject *result;
     double x;
 
     x = PyFloat_AsDouble(v);
     if (x == -1.0 && PyErr_Occurred())
-        return -1;
+        return NULL;
+
     if (prec < 0)
         prec = 6;
-    /* make sure that the decimal representation of precision really does
-       need at most 10 digits: platforms with sizeof(int) == 8 exist! */
-    if (prec > 0x7fffffffL) {
-        PyErr_SetString(PyExc_OverflowError,
-                        "outrageously large precision "
-                        "for formatted float");
-        return -1;
-    }
 
-    if (type == 'f' && fabs(x) >= 1e50)
-        type = 'g';
-    /* Worst case length calc to ensure no buffer overrun:
-
-       'g' formats:
-       fmt = %#.<prec>g
-       buf = '-' + [0-9]*prec + '.' + 'e+' + (longest exp
-       for any double rep.)
-       len = 1 + prec + 1 + 2 + 5 = 9 + prec
-
-       'f' formats:
-       buf = '-' + [0-9]*x + '.' + [0-9]*prec (with x < 50)
-       len = 1 + 50 + 1 + prec = 52 + prec
-
-       If prec=0 the effective precision is 1 (the leading digit is
-       always given), therefore increase the length by one.
-
-    */
-    if (((type == 'g' || type == 'G') &&
-         buflen <= (size_t)10 + (size_t)prec) ||
-        (type == 'f' && buflen <= (size_t)53 + (size_t)prec)) {
-        PyErr_SetString(PyExc_OverflowError,
-                        "formatted float is too long (precision too large?)");
-        return -1;
-    }
-    PyOS_snprintf(fmt, sizeof(fmt), "%%%s.%d%c",
-                  (flags&F_ALT) ? "#" : "",
-                  prec, type);
-    return doubletounicode(buf, buflen, fmt, x);
+    p = PyOS_double_to_string(x, type, prec,
+                              (flags & F_ALT) ? Py_DTSF_ALT : 0, NULL);
+    if (p == NULL)
+        return NULL;
+    result = PyUnicode_FromStringAndSize(p, strlen(p));
+    PyMem_Free(p);
+    return result;
 }
 
 static PyObject*
@@ -8903,84 +9006,6 @@ formatlong(PyObject *val, int flags, int prec, int type)
     Py_DECREF(str);
     return result;
 }
-
-#if 0
-static int
-formatint(Py_UNICODE *buf,
-          size_t buflen,
-          int flags,
-          int prec,
-          int type,
-          PyObject *v)
-{
-    /* fmt = '%#.' + `prec` + 'l' + `type`
-     * worst case length = 3 + 19 (worst len of INT_MAX on 64-bit machine)
-     *                     + 1 + 1
-     *                   = 24
-     */
-    char fmt[64]; /* plenty big enough! */
-    char *sign;
-    long x;
-
-    x = PyLong_AsLong(v);
-    if (x == -1 && PyErr_Occurred())
-        return -1;
-    if (x < 0 && type == 'u') {
-        type = 'd';
-    }
-    if (x < 0 && (type == 'x' || type == 'X' || type == 'o'))
-        sign = "-";
-    else
-        sign = "";
-    if (prec < 0)
-        prec = 1;
-
-    /* buf = '+'/'-'/'' + '0'/'0x'/'' + '[0-9]'*max(prec, len(x in octal))
-     * worst case buf = '-0x' + [0-9]*prec, where prec >= 11
-     */
-    if (buflen <= 14 || buflen <= (size_t)3 + (size_t)prec) {
-        PyErr_SetString(PyExc_OverflowError,
-                        "formatted integer is too long (precision too large?)");
-        return -1;
-    }
-
-    if ((flags & F_ALT) &&
-        (type == 'x' || type == 'X' || type == 'o')) {
-        /* When converting under %#o, %#x or %#X, there are a number
-         * of issues that cause pain:
-         * - for %#o, we want a different base marker than C
-         * - when 0 is being converted, the C standard leaves off
-         *   the '0x' or '0X', which is inconsistent with other
-         *   %#x/%#X conversions and inconsistent with Python's
-         *   hex() function
-         * - there are platforms that violate the standard and
-         *   convert 0 with the '0x' or '0X'
-         *   (Metrowerks, Compaq Tru64)
-         * - there are platforms that give '0x' when converting
-         *   under %#X, but convert 0 in accordance with the
-         *   standard (OS/2 EMX)
-         *
-         * We can achieve the desired consistency by inserting our
-         * own '0x' or '0X' prefix, and substituting %x/%X in place
-         * of %#x/%#X.
-         *
-         * Note that this is the same approach as used in
-         * formatint() in stringobject.c
-         */
-        PyOS_snprintf(fmt, sizeof(fmt), "%s0%c%%.%dl%c",
-                      sign, type, prec, type);
-    }
-    else {
-        PyOS_snprintf(fmt, sizeof(fmt), "%s%%%s.%dl%c",
-                      sign, (flags&F_ALT) ? "#" : "",
-                      prec, type);
-    }
-    if (sign[0])
-        return longtounicode(buf, buflen, fmt, -x);
-    else
-        return longtounicode(buf, buflen, fmt, x);
-}
-#endif
 
 static int
 formatchar(Py_UNICODE *buf,
@@ -9043,14 +9068,9 @@ formatchar(Py_UNICODE *buf,
 }
 
 /* fmt%(v1,v2,...) is roughly equivalent to sprintf(fmt, v1, v2, ...)
-
-   FORMATBUFLEN is the length of the buffer in which the floats, ints, &
-   chars are formatted. XXX This is a magic number. Each formatting
-   routine does bounds checking to ensure no overflow, but a better
-   solution may be to malloc a buffer of appropriate size for each
-   format. For now, the current solution is sufficient.
+   FORMATBUFLEN is the length of the buffer in which chars are formatted.
 */
-#define FORMATBUFLEN (size_t)120
+#define FORMATBUFLEN (size_t)10
 
 PyObject *PyUnicode_Format(PyObject *format,
                            PyObject *args)
@@ -9115,7 +9135,7 @@ PyObject *PyUnicode_Format(PyObject *format,
             Py_UNICODE *pbuf;
             Py_UNICODE sign;
             Py_ssize_t len;
-            Py_UNICODE formatbuf[FORMATBUFLEN]; /* For format{float,int,char}() */
+            Py_UNICODE formatbuf[FORMATBUFLEN]; /* For formatchar() */
 
             fmt++;
             if (*fmt == '(') {
@@ -9360,13 +9380,11 @@ PyObject *PyUnicode_Format(PyObject *format,
             case 'F':
             case 'g':
             case 'G':
-                if (c == 'F')
-                    c = 'f';
-                pbuf = formatbuf;
-                len = formatfloat(pbuf, sizeof(formatbuf)/sizeof(Py_UNICODE),
-                                  flags, prec, c, v);
-                if (len < 0)
+                temp = formatfloat(v, flags, prec, c);
+                if (!temp)
                     goto onError;
+                pbuf = PyUnicode_AS_UNICODE(temp);
+                len = PyUnicode_GET_SIZE(temp);
                 sign = 1;
                 if (flags & F_ZERO)
                     fill = '0';

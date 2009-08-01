@@ -600,14 +600,6 @@ type___instancecheck__(PyObject *type, PyObject *inst)
 
 
 static PyObject *
-type_get_instancecheck(PyObject *type, void *context)
-{
-	static PyMethodDef ml = {"__instancecheck__",
-				 type___instancecheck__, METH_O };
-	return PyCFunction_New(&ml, type);
-}
-
-static PyObject *
 type___subclasscheck__(PyObject *type, PyObject *inst)
 {
 	switch (_PyObject_RealIsSubclass(inst, type)) {
@@ -620,13 +612,6 @@ type___subclasscheck__(PyObject *type, PyObject *inst)
 	}
 }
 
-static PyObject *
-type_get_subclasscheck(PyObject *type, void *context)
-{
-	static PyMethodDef ml = {"__subclasscheck__",
-				 type___subclasscheck__, METH_O };
-	return PyCFunction_New(&ml, type);
-}
 
 static PyGetSetDef type_getsets[] = {
 	{"__name__", (getter)type_name, (setter)type_set_name, NULL},
@@ -636,8 +621,6 @@ static PyGetSetDef type_getsets[] = {
 	 (setter)type_set_abstractmethods, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
 	{"__doc__", (getter)type_get_doc, NULL, NULL},
-	{"__instancecheck__", (getter)type_get_instancecheck, NULL, NULL},
-	{"__subclasscheck__", (getter)type_get_subclasscheck, NULL, NULL},
 	{0}
 };
 
@@ -878,6 +861,9 @@ subtype_dealloc(PyObject *self)
 			assert(base);
 		}
 
+		/* Extract the type again; tp_del may have changed it */
+		type = Py_TYPE(self);
+
 		/* Call the base tp_dealloc() */
 		assert(basedealloc);
 		basedealloc(self);
@@ -958,6 +944,9 @@ subtype_dealloc(PyObject *self)
 			}
 		}
 	}
+
+	/* Extract the type again; tp_del may have changed it */
+	type = Py_TYPE(self);
 
 	/* Call the base tp_dealloc(); first retrack self if
 	 * basedealloc knows about gc.
@@ -1120,6 +1109,8 @@ PyType_IsSubtype(PyTypeObject *a, PyTypeObject *b)
      when the _PyType_Lookup() call fails;
 
    - lookup_method() always raises an exception upon errors.
+
+   - _PyObject_LookupSpecial() exported for the benefit of other places.
 */
 
 static PyObject *
@@ -1150,6 +1141,12 @@ lookup_method(PyObject *self, char *attrstr, PyObject **attrobj)
 	if (res == NULL && !PyErr_Occurred())
 		PyErr_SetObject(PyExc_AttributeError, *attrobj);
 	return res;
+}
+
+PyObject *
+_PyObject_LookupSpecial(PyObject *self, char *attrstr, PyObject **attrobj)
+{
+	return lookup_maybe(self, attrstr, attrobj);
 }
 
 /* A variation of PyObject_CallMethod that uses lookup_method()
@@ -2188,17 +2185,13 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 			char *doc_str;
 			char *tp_doc;
 
-			doc_str = _PyUnicode_AsStringAndSize(doc, &len);
+			doc_str = _PyUnicode_AsString(doc);
 			if (doc_str == NULL) {
 				Py_DECREF(type);
 				return NULL;
 			}
-			if ((Py_ssize_t)strlen(doc_str) != len) {
-				PyErr_SetString(PyExc_TypeError,
-						"__doc__ contains null-bytes");
-				Py_DECREF(type);
-				return NULL;
-			}
+			/* Silently truncate the docstring if it contains null bytes. */
+			len = strlen(doc_str);
 			tp_doc = (char *)PyObject_MALLOC(len + 1);
 			if (tp_doc == NULL) {
 				Py_DECREF(type);
@@ -2533,6 +2526,10 @@ static PyMethodDef type_methods[] = {
 	 METH_VARARGS | METH_KEYWORDS | METH_CLASS,
          PyDoc_STR("__prepare__() -> dict\n"
                    "used to create the namespace for the class statement")},
+	{"__instancecheck__", type___instancecheck__, METH_O,
+	 PyDoc_STR("__instancecheck__() -> check if an object is an instance")},
+	{"__subclasscheck__", type___subclasscheck__, METH_O,
+	 PyDoc_STR("__subclasschck__ -> check if an class is a subclass")},
 	{0}
 };
 

@@ -34,7 +34,7 @@
 
 %define name python
 #--start constants--
-%define version 3.1a2
+%define version 3.1
 %define libver 3.1
 #--end constants--
 %define release 1pydotorg
@@ -360,7 +360,6 @@ rm -f mainpkg.files tools.files
 %{__prefix}/%{libdirname}/python%{libvers}/email/mime
 %{__prefix}/%{libdirname}/python%{libvers}/sqlite3
 %{__prefix}/%{libdirname}/python%{libvers}/compiler
-%{__prefix}/%{libdirname}/python%{libvers}/bsddb
 %{__prefix}/%{libdirname}/python%{libvers}/hotshot
 %{__prefix}/%{libdirname}/python%{libvers}/logging
 %{__prefix}/%{libdirname}/python%{libvers}/lib-old

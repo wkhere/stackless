@@ -225,7 +225,7 @@ PKG_RECIPES = [
             is not necessary to use Python.
             """,
         required=False,
-        selected='unselected',
+        selected='selected',
     ),
     dict(
         name="PythonDocumentation",
@@ -614,10 +614,9 @@ def buildPythonDocs():
     runCommand('make update')
     runCommand('make html')
     os.chdir(curDir)
-    if not os.path.exists(docdir):
-        os.mkdir(docdir)
-    os.rename(os.path.join(buildDir, 'build', 'html'),
-            os.path.join(docdir, 'python-docs-html'))
+    if os.path.exists(docdir):
+        os.rmdir(docdir)
+    os.rename(os.path.join(buildDir, 'build', 'html'), docdir)
 
 
 def buildPython():
@@ -663,7 +662,7 @@ def buildPython():
     runCommand("make")
 
     print "Running make frameworkinstall"
-    runCommand("make frameworkinstall DESTDIR=%s"%(
+    runCommand("make install DESTDIR=%s"%(
         shellQuote(rootDir)))
 
     print "Running make frameworkinstallextras"

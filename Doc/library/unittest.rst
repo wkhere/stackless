@@ -60,8 +60,7 @@ so a new fixture is created for each test.
 
 Test suites are implemented by the :class:`TestSuite` class.  This class allows
 individual tests and test suites to be aggregated; when the suite is executed,
-all tests added directly to the suite and in "child" test suites are run.  A
-:class:`ClassTestSuite` contains the test cases of a class.
+all tests added directly to the suite and in "child" test suites are run.
 
 A test runner is an object that provides a single method,
 :meth:`~TestRunner.run`, which accepts a :class:`TestCase` or :class:`TestSuite`
@@ -608,10 +607,10 @@ Test cases
                assert_(expr[, msg])
                failUnless(expr[, msg])
 
-      Signal a test failure if *expr* is false; the explanation for the error
+      Signal a test failure if *expr* is false; the explanation for the failure
       will be *msg* if given, otherwise it will be :const:`None`.
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.1
          :meth:`failUnless`.
 
 
@@ -630,10 +629,10 @@ Test cases
       registers :meth:`addTypeEqualityFunc` the type specific equality function
       will be called in order to generate a more useful default error message.
 
-      .. versionchanged:: 2.7
+      .. versionchanged:: 3.1
          Added the automatic calling of type specific equality function.
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.1
          :meth:`failUnlessEqual`.
 
 
@@ -647,7 +646,7 @@ Test cases
       default value for *msg* can be computed to include representations of both
       *first* and *second*.
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.1
          :meth:`failIfEqual`.
 
 
@@ -663,7 +662,7 @@ Test cases
       compare equal, the test will fail with the explanation given by *msg*, or
       :const:`None`.
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.1
          :meth:`failUnlessAlmostEqual`.
 
 
@@ -679,7 +678,7 @@ Test cases
       compare equal, the test will fail with the explanation given by *msg*, or
       :const:`None`.
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.1
          :meth:`failIfAlmostEqual`.
 
 
@@ -689,13 +688,13 @@ Test cases
                assertLessEqual(first, second, msg=None)
 
       Test that *first* is respectively >, >=, < or <= than *second* depending
-      on the method name.  If not, the test will fail with the nice explanation
+      on the method name.  If not, the test will fail with an explanation
       or with the explanation given by *msg*::
 
          >>> self.assertGreaterEqual(3, 4)
          AssertionError: "3" unexpectedly not greater than or equal to "4"
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertMultiLineEqual(self, first, second, msg=None)
@@ -706,7 +705,7 @@ Test cases
 
       If specified *msg* will be used as the error message on failure.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertRegexpMatches(text, regexp[, msg=None]):
@@ -716,18 +715,18 @@ Test cases
       a regular expression object or a string containing a regular expression
       suitable for use by :func:`re.search`.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertIn(first, second, msg=None)
                assertNotIn(first, second, msg=None)
 
-      Tests that *first* is or is not in *second* with a nice explanitory error
+      Tests that *first* is or is not in *second* with an explanatory error
       message as appropriate.
 
       If specified *msg* will be used as the error message on failure.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertSameElements(expected, actual, msg=None)
@@ -738,7 +737,7 @@ Test cases
 
       If specified *msg* will be used as the error message on failure.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertSetEqual(set1, set2, msg=None)
@@ -751,7 +750,7 @@ Test cases
 
       If specified *msg* will be used as the error message on failure.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertDictEqual(expected, actual, msg=None)
@@ -761,18 +760,18 @@ Test cases
 
       If specified *msg* will be used as the error message on failure.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertDictContainsSubset(expected, actual, msg=None)
 
-      Tests whether the key value pairs in dictionary *actual* are a
+      Tests whether the key/value pairs in dictionary *actual* are a
       superset of those in *expected*.  If not, an error message listing
       the missing keys and mismatched values is generated.
 
       If specified *msg* will be used as the error message on failure.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertListEqual(list1, list2, msg=None)
@@ -784,7 +783,7 @@ Test cases
 
       If specified *msg* will be used as the error message on failure.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertSequenceEqual(seq1, seq2, msg=None, seq_type=None)
@@ -799,7 +798,7 @@ Test cases
       This method is used to implement :meth:`assertListEqual` and
       :meth:`assertTupleEqual`.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertRaises(exception[, callable, ...])
@@ -821,7 +820,7 @@ Test cases
       .. versionchanged:: 3.1
          Added the ability to use :meth:`assertRaises` as a context manager.
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.1
          :meth:`failUnlessRaises`.
 
 
@@ -840,14 +839,14 @@ Test cases
          with self.assertRaisesRegexp(ValueError, 'literal'):
             int('XYZ')
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertIsNone(expr[, msg])
 
       This signals a test failure if *expr* is not None.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    .. method:: assertIsNotNone(expr[, msg])
@@ -855,7 +854,24 @@ Test cases
       The inverse of the :meth:`assertIsNone` method.
       This signals a test failure if *expr* is None.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
+
+
+   .. method:: assertIs(expr1, expr2[, msg])
+
+      This signals a test failure if *expr1* and *expr2* don't evaluate to the same
+      object.
+
+      .. versionadded:: 3.1
+
+
+   .. method:: assertIsNot(expr1, expr2[, msg])
+
+      The inverse of the :meth:`assertIs` method.
+      This signals a test failure if *expr1* and *expr2* evaluate to the same
+      object.
+
+      .. versionadded:: 3.1
 
 
    .. method:: assertFalse(expr[, msg])
@@ -865,7 +881,7 @@ Test cases
       This signals a test failure if *expr* is true, with *msg* or :const:`None`
       for the error message.
 
-      .. deprecated:: 2.7
+      .. deprecated:: 3.1
          :meth:`failIf`.
 
 
@@ -899,7 +915,7 @@ Test cases
       The class setting can be overridden in individual tests by assigning an
       instance attribute to True or False before calling the assert methods.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
 
 
    Testing frameworks can use the following methods to collect information on
@@ -936,8 +952,7 @@ Test cases
       returns the first line of the test method's docstring, if available,
       along with the method name.
 
-      .. versionchanged:: 2.7
-
+      .. versionchanged:: 3.1
          In earlier versions this only returned the first line of the test
          method's docstring, if available or the :const:`None`.  That led to
          undesirable behavior of not printing the test name when someone was
@@ -951,12 +966,42 @@ Test cases
       been asked to compare are exactly *typeobj* (not subclasses).
       *function* must take two positional arguments and a third msg=None
       keyword argument just as :meth:`assertEqual` does.  It must raise
-      self.failureException when inequality between the first two
+      ``self.failureException`` when inequality between the first two
       parameters is detected.
 
       One good use of custom equality checking functions for a type
-      is to raise self.failureException with an error message useful
-      for debugging the by explaining the inequalities in detail.
+      is to raise ``self.failureException`` with an error message useful
+      for debugging the problem by explaining the inequalities in detail.
+
+      .. versionadded:: 3.1
+
+
+   .. method:: addCleanup(function[, *args[, **kwargs]])
+
+      Add a function to be called after :meth:`tearDown` to cleanup resources
+      used during the test. Functions will be called in reverse order to the
+      order they are added (LIFO). They are called with any arguments and
+      keyword arguments passed into :meth:`addCleanup` when they are
+      added.
+
+      If :meth:`setUp` fails, meaning that :meth:`tearDown` is not called,
+      then any cleanup functions added will still be called.
+
+      .. versionadded:: 2.7
+
+
+   .. method:: doCleanups()
+
+      This method is called uncoditionally after :meth:`tearDown`, or
+      after :meth:`setUp` if :meth:`setUp` raises an exception.
+
+      It is responsible for calling all the cleanup functions added by
+      :meth:`addCleanup`. If you need cleanup functions to be called
+      *prior* to :meth:`tearDown` then you can call :meth:`doCleanups`
+      yourself.
+
+      :meth:`doCleanups` pops methods off the stack of cleanup
+      functions one at a time, so it can be called at any time.
 
       .. versionadded:: 2.7
 
@@ -986,11 +1031,10 @@ Grouping tests
    test suites that will be used to build the suite initially. Additional methods
    are provided to add test cases and suites to the collection later on.
 
-   :class:`TestSuite` (including :class:`ClassTestSuite`) objects behave much
-   like :class:`TestCase` objects, except they do not actually implement a test.
-   Instead, they are used to aggregate tests into groups of tests that should be
-   run together. Some additional methods are available to add tests to
-   :class:`TestSuite` instances:
+   :class:`TestSuite` objects behave much like :class:`TestCase` objects, except
+   they do not actually implement a test.  Instead, they are used to aggregate
+   tests into groups of tests that should be run together. Some additional
+   methods are available to add tests to :class:`TestSuite` instances:
 
 
    .. method:: TestSuite.addTest(test)
@@ -1029,16 +1073,22 @@ Grouping tests
       Return the number of tests represented by this test object, including all
       individual tests and sub-suites.
 
+
+   .. method:: __iter__()
+
+      Tests grouped by a :class:`TestSuite` are always accessed by iteration.
+      Subclasses can lazily provide tests by overriding :meth:`__iter__`. Note
+      that this method maybe called several times on a single suite
+      (for example when counting tests or comparing for equality)
+      so the tests returned must be the same for repeated iterations.
+
+      .. versionchanged:: 2.7
+         In earlier versions the :class:`TestSuite` accessed tests directly rather
+         than through iteration, so overriding :meth:`__iter__` wasn't sufficient
+         for providing tests.
+
    In the typical usage of a :class:`TestSuite` object, the :meth:`run` method
    is invoked by a :class:`TestRunner` rather than by the end-user test harness.
-
-
-.. class:: ClassTestSuite(tests, collected_from)
-
-   This subclass of :class:`TestSuite` repesents an aggregation of individuals
-   tests from one :class:`TestCase` class.  *tests* is an iterable of
-   :class:`TestCase` instances created from the class.  *collected_from* is the
-   class they came from.
 
 
 Loading and running tests
@@ -1068,7 +1118,7 @@ Loading and running tests
       creates an instance of the class for each test method defined for the
       class.
 
-      .. warning::
+      .. note::
 
          While using a hierarchy of :class:`TestCase`\ -derived classes can be
          convenient in sharing fixtures and helper functions, defining test
@@ -1142,12 +1192,6 @@ Loading and running tests
       This affects all the :meth:`loadTestsFrom\*` methods.
 
 
-   .. attribute:: classSuiteClass
-
-      Callable object that constructs a test suite for the tests cases from one
-      class.  The default value is :class:`ClassTestSuite`.
-
-
 .. class:: TestResult
 
    This class is used to compile information about which tests have succeeded
@@ -1172,7 +1216,6 @@ Loading and running tests
       A list containing 2-tuples of :class:`TestCase` instances and strings
       holding formatted tracebacks. Each tuple represents a test which raised an
       unexpected exception.
-
 
    .. attribute:: failures
 
@@ -1249,6 +1292,20 @@ Loading and running tests
       The default implementation does nothing.
 
 
+   .. method:: startTestRun(test)
+
+      Called once before any tests are executed.
+
+      .. versionadded:: 2.7
+
+
+   .. method:: stopTestRun(test)
+
+      Called once before any tests are executed.
+
+      .. versionadded:: 2.7
+
+
    .. method:: addError(test, err)
 
       Called when the test case *test* raises an unexpected exception *err* is a
@@ -1318,8 +1375,14 @@ Loading and running tests
    has a few configurable parameters, but is essentially very simple.  Graphical
    applications which run test suites should provide alternate implementations.
 
+   .. method:: _makeResult()
 
-.. function:: main([module[, defaultTest[, argv[, testRunner[, testLoader]]]]])
+      This method returns the instance of ``TestResult`` used by :meth:`run`.
+      It is not intended to be called directly, but can be overridden in
+      subclasses to provide a custom ``TestResult``.
+
+
+.. function:: main([module[, defaultTest[, argv[, testRunner[, testLoader[, exit]]]]]])
 
    A command-line program that runs a set of tests; this is primarily for making
    test modules conveniently executable.  The simplest use for this function is to
@@ -1329,4 +1392,18 @@ Loading and running tests
           unittest.main()
 
    The *testRunner* argument can either be a test runner class or an already
-   created instance of it.
+   created instance of it. By default ``main`` calls :func:`sys.exit` with
+   an exit code indicating success or failure of the tests run.
+
+   ``main`` supports being used from the interactive interpreter by passing in the
+   argument ``exit=False``. This displays the result on standard output without
+   calling :func:`sys.exit`::
+
+      >>> from unittest import main
+      >>> main(module='test_module', exit=False)
+
+   Calling ``main`` actually returns an instance of the ``TestProgram`` class.
+   This stores the result of the tests run as the ``result`` attribute.
+
+   .. versionchanged:: 2.7
+      The ``exit`` parameter was added.

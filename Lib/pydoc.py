@@ -414,9 +414,10 @@ class HTMLDoc(Doc):
 
     def page(self, title, contents):
         """Format an HTML page."""
-        return '''
-<!doctype html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+        return '''\
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 <html><head><title>Python: %s</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 </head><body bgcolor="#f0f0f8">
 %s
 </body></html>''' % (title, contents)
@@ -1510,7 +1511,7 @@ def writedoc(thing, forceload=0):
     try:
         object, name = resolve(thing, forceload)
         page = html.page(describe(object), html.document(object, name))
-        file = open(name + '.html', 'w')
+        file = open(name + '.html', 'w', encoding='utf-8')
         file.write(page)
         file.close()
         print('wrote', name + '.html')
@@ -1529,11 +1530,11 @@ class Helper:
     # These dictionaries map a topic name to either an alias, or a tuple
     # (label, seealso-items).  The "label" is the label of the corresponding
     # section in the .rst file under Doc/ and an index into the dictionary
-    # in pydoc_topics.py.
+    # in pydoc_data/topics.py.
     #
     # CAUTION: if you change one of these dictionaries, be sure to adapt the
     #          list of needed labels in Doc/tools/sphinxext/pyspecific.py and
-    #          regenerate the pydoc_topics.py file by running
+    #          regenerate the pydoc_data/topics.py file by running
     #              make pydoc-topics
     #          in Doc/ and copying the output file into the Lib/ directory.
 
@@ -1739,6 +1740,7 @@ has the same effect as typing a particular string at the help> prompt.
 
     def help(self, request):
         if type(request) is type(''):
+            request = request.strip()
             if request == 'help': self.intro()
             elif request == 'keywords': self.listkeywords()
             elif request == 'symbols': self.listsymbols()
@@ -1808,11 +1810,11 @@ Here is a list of available topics.  Enter any topic name to get more help.
 
     def showtopic(self, topic, more_xrefs=''):
         try:
-            import pydoc_topics
+            import pydoc_data.topics
         except ImportError:
             self.output.write('''
 Sorry, topic and keyword documentation is not available because the
-module "pydoc_topics" could not be found.
+module "pydoc_data.topics" could not be found.
 ''')
             return
         target = self.topics.get(topic, self.keywords.get(topic))
@@ -1824,7 +1826,7 @@ module "pydoc_topics" could not be found.
 
         label, xrefs = target
         try:
-            doc = pydoc_topics.topics[label]
+            doc = pydoc_data.topics.topics[label]
         except KeyError:
             self.output.write('no documentation found for %s\n' % repr(topic))
             return
@@ -1922,8 +1924,12 @@ class ModuleScanner:
             if key is None:
                 callback(None, modname, '')
             else:
-                loader = importer.find_module(modname)
-                if hasattr(loader,'get_source'):
+                try:
+                    loader = importer.find_module(modname)
+                except SyntaxError:
+                    # raised by tests for bad coding cookies or BOM
+                    continue
+                if hasattr(loader, 'get_source'):
                     try:
                         source = loader.get_source(modname)
                     except UnicodeDecodeError:
@@ -1932,7 +1938,7 @@ class ModuleScanner:
                         continue
                     import io
                     desc = source_synopsis(io.StringIO(source)) or ''
-                    if hasattr(loader,'get_filename'):
+                    if hasattr(loader, 'get_filename'):
                         path = loader.get_filename(modname)
                     else:
                         path = None

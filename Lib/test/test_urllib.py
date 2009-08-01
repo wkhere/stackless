@@ -117,27 +117,19 @@ class urlopen_FileTests(unittest.TestCase):
 class ProxyTests(unittest.TestCase):
 
     def setUp(self):
-        # Save all proxy related env vars
-        self._saved_environ = dict([(k, v) for k, v in os.environ.items()
-                                    if k.lower().find('proxy') >= 0])
-        # Delete all proxy related env vars
-        for k in self._saved_environ:
-            del os.environ[k]
+        # Records changes to env vars
+        self.env = support.EnvironmentVarGuard()
 
     def tearDown(self):
         # Restore all proxy related env vars
-        for k, v in self._saved_environ.items():
-            os.environ[k] = v
+        self.env.__exit__()
+        del self.env
 
     def test_getproxies_environment_keep_no_proxies(self):
-        try:
-            os.environ['NO_PROXY'] = 'localhost'
-            proxies = urllib.request.getproxies_environment()
-            # getproxies_environment use lowered case truncated (no '_proxy') keys
-            self.assertEquals('localhost', proxies['no'])
-        finally:
-            # The old value will be restored by tearDown, if applicable.
-            del os.environ['NO_PROXY']
+        self.env.set('NO_PROXY', 'localhost')
+        proxies = urllib.request.getproxies_environment()
+        # getproxies_environment use lowered case truncated (no '_proxy') keys
+        self.assertEquals('localhost', proxies['no'])
 
 
 class urlopen_HttpTests(unittest.TestCase):
@@ -518,6 +510,21 @@ class QuotingTests(unittest.TestCase):
         self.assertEqual(expect, result,
                          "using quote(): %r != %r" % (expect, result))
 
+    def test_quote_plus_with_unicode(self):
+        # Encoding (latin-1) test for quote_plus
+        given = "\xa2\xd8 \xff"
+        expect = "%A2%D8+%FF"
+        result = urllib.parse.quote_plus(given, encoding="latin-1")
+        self.assertEqual(expect, result,
+                         "using quote_plus(): %r != %r" % (expect, result))
+        # Errors test for quote_plus
+        given = "ab\u6f22\u5b57 cd"
+        expect = "ab%3F%3F+cd"
+        result = urllib.parse.quote_plus(given, encoding="latin-1",
+                                         errors="replace")
+        self.assertEqual(expect, result,
+                         "using quote_plus(): %r != %r" % (expect, result))
+
 class UnquotingTests(unittest.TestCase):
     """Tests for unquote() and unquote_plus()
 
@@ -845,6 +852,18 @@ class Utility_Tests(unittest.TestCase):
         self.assertEqual(('user', 'a\vb'),urllib.parse.splitpasswd('user:a\vb'))
         self.assertEqual(('user', 'a:b'),urllib.parse.splitpasswd('user:a:b'))
 
+
+class URLopener_Tests(unittest.TestCase):
+    """Testcase to test the open method of URLopener class."""
+
+    def test_quoted_open(self):
+        class DummyURLopener(urllib.request.URLopener):
+            def open_spam(self, url):
+                return url
+
+        self.assertEqual(DummyURLopener().open(
+            'spam://example/ /'),'//example/%20/')
+
 # Just commented them out.
 # Can't really tell why keep failing in windows and sparc.
 # Everywhere else they work ok, but on those machines, someteimes
@@ -936,6 +955,7 @@ def test_main():
         urlencode_Tests,
         Pathname_Tests,
         Utility_Tests,
+        URLopener_Tests,
         #FTPWrapperTests,
     )
 

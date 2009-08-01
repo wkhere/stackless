@@ -1,4 +1,3 @@
-
 .. _compound:
 
 *******************
@@ -183,10 +182,10 @@ the next item assigned to it.
 Names in the target list are not deleted when the loop is finished, but if the
 sequence is empty, it will not have been assigned to at all by the loop.  Hint:
 the built-in function :func:`range` returns an iterator of integers suitable to
-emulate the effect of Pascal's ``for i := a to b do``; e.g., ``range(3)``
+emulate the effect of Pascal's ``for i := a to b do``; e.g., ``list(range(3))``
 returns the list ``[0, 1, 2]``.
 
-.. warning::
+.. note::
 
    .. index::
       single: loop; over mutable sequence
@@ -348,9 +347,10 @@ This allows common :keyword:`try`...\ :keyword:`except`...\ :keyword:`finally`
 usage patterns to be encapsulated for convenient reuse.
 
 .. productionlist::
-   with_stmt: "with" `expression` ["as" `target`] ":" `suite`
+   with_stmt: "with" with_item ("," with_item)* ":" `suite`
+   with_item: `expression` ["as" `target`]
 
-The execution of the :keyword:`with` statement proceeds as follows:
+The execution of the :keyword:`with` statement with one "item" proceeds as follows:
 
 #. The context expression is evaluated to obtain a context manager.
 
@@ -382,6 +382,21 @@ The execution of the :keyword:`with` statement proceeds as follows:
    If the suite was exited for any reason other than an exception, the return
    value from :meth:`__exit__` is ignored, and execution proceeds at the normal
    location for the kind of exit that was taken.
+
+With more than one item, the context managers are processed as if multiple
+:keyword:`with` statements were nested::
+
+   with A() as a, B() as b:
+       suite
+
+is equivalent to ::
+
+   with A() as a:
+       with B() as b:
+           suite
+
+.. versionchanged:: 3.1
+   Support for multiple context expressions.
 
 .. seealso::
 

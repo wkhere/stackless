@@ -6,11 +6,25 @@ Originally distributed as Optik.
 
 For support, use the optik-users@lists.sourceforge.net mailing list
 (http://lists.sourceforge.net/lists/listinfo/optik-users).
+
+Simple usage example:
+
+   from optparse import OptionParser
+
+   parser = OptionParser()
+   parser.add_option("-f", "--file", dest="filename",
+                     help="write report to FILE", metavar="FILE")
+   parser.add_option("-q", "--quiet",
+                     action="store_false", dest="verbose", default=True,
+                     help="don't print status messages to stdout")
+
+   (options, args) = parser.parse_args()
 """
 
 __version__ = "1.5.3"
 
 __all__ = ['Option',
+           'make_option',
            'SUPPRESS_HELP',
            'SUPPRESS_USAGE',
            'Values',

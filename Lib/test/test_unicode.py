@@ -688,6 +688,10 @@ class UnicodeTest(
         self.assertRaises(IndexError, "{:s}".format)
         self.assertRaises(IndexError, "{}".format)
 
+        # issue 6089
+        self.assertRaises(ValueError, "{0[0]x}".format, [None])
+        self.assertRaises(ValueError, "{0[0](10)}".format, [None])
+
         # can't have a replacement on the field name portion
         self.assertRaises(TypeError, '{0[{1}]}'.format, 'abcdefg', 4)
 
@@ -779,6 +783,14 @@ class UnicodeTest(
                 return '\u1234'
         self.assertEqual('%s' % Wrapper(), '\u1234')
 
+        # issue 3382
+        NAN = float('nan')
+        INF = float('inf')
+        self.assertEqual('%f' % NAN, 'nan')
+        self.assertEqual('%F' % NAN, 'NAN')
+        self.assertEqual('%f' % INF, 'inf')
+        self.assertEqual('%F' % INF, 'INF')
+
     @support.run_with_locale('LC_ALL', 'de_DE', 'fr_FR')
     def test_format_float(self):
         # should not format with a comma, but always with C locale
@@ -867,31 +879,44 @@ class UnicodeTest(
             ('+?', b'+-?'),
             (r'\\?', b'+AFwAXA?'),
             (r'\\\?', b'+AFwAXABc?'),
-            (r'++--', b'+-+---')
+            (r'++--', b'+-+---'),
+            ('\U000abcde', b'+2m/c3g-'),                  # surrogate pairs
+            ('/', b'/'),
         ]
 
         for (x, y) in utfTests:
             self.assertEqual(x.encode('utf-7'), y)
 
-        # surrogates not supported
+        # Unpaired surrogates not supported
         self.assertRaises(UnicodeError, str, b'+3ADYAA-', 'utf-7')
 
-        self.assertEqual(str(b'+3ADYAA-', 'utf-7', 'replace'), '\ufffd')
+        self.assertEqual(str(b'+3ADYAA-', 'utf-7', 'replace'), '\ufffd\ufffd')
 
         # Issue #2242: crash on some Windows/MSVC versions
-        self.assertRaises(UnicodeDecodeError, b'+\xc1'.decode, 'utf-7')
+        self.assertEqual(b'+\xc1'.decode('utf-7'), '\xc1')
+
+        # Direct encoded characters
+        set_d = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'(),-./:?"
+        # Optional direct characters
+        set_o = '!"#$%&*;<=>@[]^_`{|}'
+        for c in set_d:
+            self.assertEqual(c.encode('utf7'), c.encode('ascii'))
+            self.assertEqual(c.encode('ascii').decode('utf7'), c)
+        for c in set_o:
+            self.assertEqual(c.encode('ascii').decode('utf7'), c)
 
     def test_codecs_utf8(self):
         self.assertEqual(''.encode('utf-8'), b'')
         self.assertEqual('\u20ac'.encode('utf-8'), b'\xe2\x82\xac')
-        self.assertEqual('\ud800\udc02'.encode('utf-8'), b'\xf0\x90\x80\x82')
-        self.assertEqual('\ud84d\udc56'.encode('utf-8'), b'\xf0\xa3\x91\x96')
-        self.assertEqual('\ud800'.encode('utf-8'), b'\xed\xa0\x80')
-        self.assertEqual('\udc00'.encode('utf-8'), b'\xed\xb0\x80')
-        self.assertEqual(
-            ('\ud800\udc02'*1000).encode('utf-8'),
-            b'\xf0\x90\x80\x82'*1000
-        )
+        if sys.maxunicode == 65535:
+            self.assertEqual('\ud800\udc02'.encode('utf-8'), b'\xf0\x90\x80\x82')
+            self.assertEqual('\ud84d\udc56'.encode('utf-8'), b'\xf0\xa3\x91\x96')
+        self.assertEqual('\ud800'.encode('utf-8', 'surrogatepass'), b'\xed\xa0\x80')
+        self.assertEqual('\udc00'.encode('utf-8', 'surrogatepass'), b'\xed\xb0\x80')
+        if sys.maxunicode == 65535:
+            self.assertEqual(
+                ('\ud800\udc02'*1000).encode('utf-8'),
+                b'\xf0\x90\x80\x82'*1000)
         self.assertEqual(
             '\u6b63\u78ba\u306b\u8a00\u3046\u3068\u7ffb\u8a33\u306f'
             '\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u3002\u4e00'

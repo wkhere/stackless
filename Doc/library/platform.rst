@@ -1,6 +1,5 @@
-
-:mod:`platform` ---  Access to underlying platform's identifying data.
-======================================================================
+:mod:`platform` ---  Access to underlying platform's identifying data
+=====================================================================
 
 .. module:: platform
    :synopsis: Retrieves as much platform identifying data as possible.
@@ -161,7 +160,7 @@ Java Platform
 
 .. function:: java_ver(release='', vendor='', vminfo=('','',''), osinfo=('','',''))
 
-   Version interface for JPython.
+   Version interface for Jython.
 
    Returns a tuple ``(release, vendor, vminfo, osinfo)`` with *vminfo* being a
    tuple ``(vm_name, vm_release, vm_vendor)`` and *osinfo* being a tuple

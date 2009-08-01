@@ -1,4 +1,3 @@
-
 :mod:`fcntl` --- The :func:`fcntl` and :func:`ioctl` system calls
 =================================================================
 
@@ -65,13 +64,13 @@ The module defines the following functions:
    so long as the buffer you pass is as least as long as what the operating system
    wants to put there, things should work.
 
-   If *mutate_flag* is true (the default), then the buffer is (in effect) passed to the
-   underlying :func:`ioctl` system call, the latter's return code is passed back to
-   the calling Python, and the buffer's new contents reflect the action of the
-   :func:`ioctl`.  This is a slight simplification, because if the supplied buffer
-   is less than 1024 bytes long it is first copied into a static buffer 1024 bytes
-   long which is then passed to :func:`ioctl` and copied back into the supplied
-   buffer.
+   If *mutate_flag* is true (the default), then the buffer is (in effect) passed
+   to the underlying :func:`ioctl` system call, the latter's return code is
+   passed back to the calling Python, and the buffer's new contents reflect the
+   action of the :func:`ioctl`.  This is a slight simplification, because if the
+   supplied buffer is less than 1024 bytes long it is first copied into a static
+   buffer 1024 bytes long which is then passed to :func:`ioctl` and copied back
+   into the supplied buffer.
 
    An example::
 
@@ -91,7 +90,7 @@ The module defines the following functions:
 
    Perform the lock operation *op* on file descriptor *fd* (file objects providing
    a :meth:`fileno` method are accepted as well). See the Unix manual
-   :manpage:`flock(3)` for details.  (On some systems, this function is emulated
+   :manpage:`flock(2)` for details.  (On some systems, this function is emulated
    using :cfunc:`fcntl`.)
 
 
@@ -146,7 +145,6 @@ lay-out for the *lockdata* variable is system dependent --- therefore using the
 
    Module :mod:`os`
       If the locking flags :const:`O_SHLOCK` and :const:`O_EXLOCK` are present
-      in the :mod:`os` module, the :func:`os.open` function provides a more
-      platform-independent alternative to the :func:`lockf` and :func:`flock`
-      functions.
+      in the :mod:`os` module (on BSD only), the :func:`os.open` function
+      provides an alternative to the :func:`lockf` and :func:`flock` functions.
 

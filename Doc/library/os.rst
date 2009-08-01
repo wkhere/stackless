@@ -51,13 +51,28 @@ the :mod:`os` module, but using them is of course a threat to portability!
    ``'ce'``, ``'java'``.
 
 
-.. data:: path
+.. _os-filenames:
 
-   The corresponding operating system dependent standard module for pathname
-   operations, such as :mod:`posixpath` or :mod:`ntpath`.  Thus, given the proper
-   imports, ``os.path.split(file)`` is equivalent to but more portable than
-   ``posixpath.split(file)``.  Note that this is also an importable module: it may
-   be imported directly as :mod:`os.path`.
+File Names, Command Line Arguments, and Environment Variables
+-------------------------------------------------------------
+
+In Python, file names, command line arguments, and environment
+variables are represented using the string type. On some systems,
+decoding these strings to and from bytes is necessary before passing
+them to the operating system. Python uses the file system encoding to
+perform this conversion (see :func:`sys.getfilesystemencoding`).
+
+.. versionchanged:: 3.1
+   On some systems, conversion using the file system encoding may
+   fail. In this case, Python uses the ``surrogateescape`` encoding
+   error handler, which means that undecodable bytes are replaced by a
+   Unicode character U+DCxx on decoding, and these are again
+   translated to the original byte on encoding.
+
+
+The file system encoding must guarantee to successfully decode all
+bytes below 128. If the file system encoding fails to provide this
+guarantee, API functions may raise UnicodeErrors.
 
 
 .. _os-procinfo:
@@ -371,9 +386,9 @@ by file descriptors.
    .. note::
 
       This function is intended for low-level I/O and must be applied to a file
-      descriptor as returned by :func:`open` or :func:`pipe`.  To close a "file
+      descriptor as returned by :func:`os.open` or :func:`pipe`.  To close a "file
       object" returned by the built-in function :func:`open` or by :func:`popen` or
-      :func:`fdopen`, use its :meth:`close` method.
+      :func:`fdopen`, use its :meth:`~file.close` method.
 
 
 .. function:: closerange(fd_low, fd_high)
@@ -423,6 +438,9 @@ by file descriptors.
 
    Force write of file with filedescriptor *fd* to disk. Does not force update of
    metadata. Availability: Unix.
+
+   .. note::
+      This function is not available on MacOS.
 
 
 .. function:: fpathconf(fd, name)
@@ -499,8 +517,8 @@ by file descriptors.
    .. note::
 
       This function is intended for low-level I/O.  For normal usage, use the built-in
-      function :func:`open`, which returns a "file object" with :meth:`read` and
-      :meth:`write` methods (and many more).  To wrap a file descriptor in a "file
+      function :func:`open`, which returns a "file object" with :meth:`~file.read` and
+      :meth:`~file.write` methods (and many more).  To wrap a file descriptor in a "file
       object", use :func:`fdopen`.
 
 
@@ -529,22 +547,22 @@ by file descriptors.
    .. note::
 
       This function is intended for low-level I/O and must be applied to a file
-      descriptor as returned by :func:`open` or :func:`pipe`.  To read a "file object"
+      descriptor as returned by :func:`os.open` or :func:`pipe`.  To read a "file object"
       returned by the built-in function :func:`open` or by :func:`popen` or
-      :func:`fdopen`, or :data:`sys.stdin`, use its :meth:`read` or :meth:`readline`
-      methods.
+      :func:`fdopen`, or :data:`sys.stdin`, use its :meth:`~file.read` or
+      :meth:`~file.readline` methods.
 
 
 .. function:: tcgetpgrp(fd)
 
    Return the process group associated with the terminal given by *fd* (an open
-   file descriptor as returned by :func:`open`). Availability: Unix.
+   file descriptor as returned by :func:`os.open`). Availability: Unix.
 
 
 .. function:: tcsetpgrp(fd, pg)
 
    Set the process group associated with the terminal given by *fd* (an open file
-   descriptor as returned by :func:`open`) to *pg*. Availability: Unix.
+   descriptor as returned by :func:`os.open`) to *pg*. Availability: Unix.
 
 
 .. function:: ttyname(fd)
@@ -562,13 +580,13 @@ by file descriptors.
    .. note::
 
       This function is intended for low-level I/O and must be applied to a file
-      descriptor as returned by :func:`open` or :func:`pipe`.  To write a "file
+      descriptor as returned by :func:`os.open` or :func:`pipe`.  To write a "file
       object" returned by the built-in function :func:`open` or by :func:`popen` or
-      :func:`fdopen`, or :data:`sys.stdout` or :data:`sys.stderr`, use its :meth:`write`
-      method.
+      :func:`fdopen`, or :data:`sys.stdout` or :data:`sys.stderr`, use its
+      :meth:`~file.write` method.
 
 The following constants are options for the *flags* parameter to the
-:func:`open` function.  They can be combined using the bitwise OR operator
+:func:`~os.open` function.  They can be combined using the bitwise OR operator
 ``|``.  Some of them are not available on all platforms.  For descriptions of
 their availability and use, consult the :manpage:`open(2)` manual page on Unix
 or `the MSDN <http://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>` on Windows.
@@ -645,7 +663,7 @@ Files and Directories
    .. note::
 
       Using :func:`access` to check if a user is authorized to e.g. open a file before
-      actually doing so using :func:`open` creates a  security hole, because the user
+      actually doing so using :func:`open` creates a security hole, because the user
       might exploit the short time interval  between checking and opening the file to
       manipulate it.
 
@@ -697,12 +715,8 @@ Files and Directories
 
 .. function:: getcwd()
 
-   Return a string representing the current working directory.  On Unix
-   platforms, this function may raise :exc:`UnicodeDecodeError` if the name of
-   the current directory is not decodable in the file system encoding.  Use
-   :func:`getcwdb` if you need the call to never fail. Availability: Unix,
-   Windows.
-
+   Return a string representing the current working directory.
+   Availability: Unix, Windows.
 
 .. function:: getcwdb()
 
@@ -809,10 +823,8 @@ Files and Directories
    entries ``'.'`` and ``'..'`` even if they are present in the directory.
    Availability: Unix, Windows.
 
-   This function can be called with a bytes or string argument.  In the bytes
-   case, all filenames will be listed as returned by the underlying API.  In the
-   string case, filenames will be decoded using the file system encoding, and
-   skipped if a decoding error occurs.
+   This function can be called with a bytes or string argument, and returns
+   filenames of the same datatype.
 
 
 .. function:: lstat(path)
@@ -1458,8 +1470,8 @@ written in Python, such as a mail server's external command delivery program.
 
    (Note that the :mod:`subprocess` module provides more powerful facilities for
    spawning new processes and retrieving their results; using that module is
-   preferable to using these functions.  Check specially the *Replacing Older
-   Functions with the subprocess Module* section in that documentation page.)
+   preferable to using these functions.  Check especially the
+   :ref:`subprocess-replacements` section.)
 
    If *mode* is :const:`P_NOWAIT`, this function returns the process id of the new
    process; if *mode* is :const:`P_WAIT`, returns the process's exit code if it
@@ -1491,7 +1503,9 @@ written in Python, such as a mail server's external command delivery program.
    which is used to define the environment variables for the new process (they are
    used instead of the current process' environment); the functions
    :func:`spawnl`, :func:`spawnlp`, :func:`spawnv`, and :func:`spawnvp` all cause
-   the new process to inherit the environment of the current process.
+   the new process to inherit the environment of the current process.  Note that
+   keys and values in the *env* dictionary must be strings; invalid keys or
+   values will cause the function to fail, with a return value of ``127``.
 
    As an example, the following calls to :func:`spawnlp` and :func:`spawnvpe` are
    equivalent::

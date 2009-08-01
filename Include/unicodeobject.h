@@ -198,6 +198,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_FromStringAndSize PyUnicodeUCS2_FromStringAndSize
 # define PyUnicode_FromUnicode PyUnicodeUCS2_FromUnicode
 # define PyUnicode_FromWideChar PyUnicodeUCS2_FromWideChar
+# define PyUnicode_FSConverter PyUnicodeUCS2_FSConverter
 # define PyUnicode_GetDefaultEncoding PyUnicodeUCS2_GetDefaultEncoding
 # define PyUnicode_GetMax PyUnicodeUCS2_GetMax
 # define PyUnicode_GetSize PyUnicodeUCS2_GetSize
@@ -296,6 +297,7 @@ typedef PY_UNICODE_TYPE Py_UNICODE;
 # define PyUnicode_FromStringAndSize PyUnicodeUCS4_FromStringAndSize
 # define PyUnicode_FromUnicode PyUnicodeUCS4_FromUnicode
 # define PyUnicode_FromWideChar PyUnicodeUCS4_FromWideChar
+# define PyUnicode_FSConverter PyUnicodeUCS4_FSConverter
 # define PyUnicode_GetDefaultEncoding PyUnicodeUCS4_GetDefaultEncoding
 # define PyUnicode_GetMax PyUnicodeUCS4_GetMax
 # define PyUnicode_GetSize PyUnicodeUCS4_GetSize
@@ -693,25 +695,6 @@ PyAPI_FUNC(PyObject *) _PyUnicode_AsDefaultEncodedString(
     PyObject *unicode,
     const char *errors);
 
-/* Decode a null-terminated string using Py_FileSystemDefaultEncoding.
-
-   If the encoding is supported by one of the built-in codecs (i.e., UTF-8,
-   UTF-16, UTF-32, Latin-1 or MBCS), otherwise fallback to UTF-8 and replace
-   invalid characters with '?'.
-
-   The function is intended to be used for paths and file names only
-   during bootstrapping process where the codecs are not set up.
-*/
-
-PyAPI_FUNC(PyObject*) PyUnicode_DecodeFSDefault(
-    const char *s               /* encoded string */
-    );
-
-PyAPI_FUNC(PyObject*) PyUnicode_DecodeFSDefaultAndSize(
-    const char *s,               /* encoded string */
-    Py_ssize_t size              /* size */
-    );
-
 /* Returns a pointer to the default encoding (normally, UTF-8) of the
    Unicode object unicode and the size of the encoded representation
    in bytes stored in *size.
@@ -858,10 +841,8 @@ PyAPI_FUNC(PyObject*) PyUnicode_DecodeUTF7Stateful(
 PyAPI_FUNC(PyObject*) PyUnicode_EncodeUTF7(
     const Py_UNICODE *data, 	/* Unicode char buffer */
     Py_ssize_t length,	 	/* number of Py_UNICODE chars to encode */
-    int encodeSetO,             /* force the encoder to encode characters in
-                                   Set O, as described in RFC2152 */
-    int encodeWhiteSpace,       /* force the encoder to encode space, tab,
-                                   carriage return and linefeed characters */
+    int base64SetO,		/* Encode RFC2152 Set O characters in base64 */
+    int base64WhiteSpace,	/* Encode whitespace (sp, ht, nl, cr) in base64 */
     const char *errors		/* error handling */
     );
 
@@ -1254,6 +1235,33 @@ PyAPI_FUNC(int) PyUnicode_EncodeDecimal(
     const char *errors		/* error handling */
     );
 
+/* --- File system encoding ---------------------------------------------- */
+
+/* ParseTuple converter which converts a Unicode object into the file
+   system encoding, using the PEP 383 error handler; bytes objects are
+   output as-is. */
+
+PyAPI_FUNC(int) PyUnicode_FSConverter(PyObject*, void*);
+
+/* Decode a null-terminated string using Py_FileSystemDefaultEncoding.
+
+   If the encoding is supported by one of the built-in codecs (i.e., UTF-8,
+   UTF-16, UTF-32, Latin-1 or MBCS), otherwise fallback to UTF-8 and replace
+   invalid characters with '?'.
+
+   The function is intended to be used for paths and file names only
+   during bootstrapping process where the codecs are not set up.
+*/
+
+PyAPI_FUNC(PyObject*) PyUnicode_DecodeFSDefault(
+    const char *s               /* encoded string */
+    );
+
+PyAPI_FUNC(PyObject*) PyUnicode_DecodeFSDefaultAndSize(
+    const char *s,               /* encoded string */
+    Py_ssize_t size              /* size */
+    );
+
 /* --- Methods & Slots ----------------------------------------------------
 
    These are capable of handling Unicode objects and strings on input
@@ -1482,24 +1490,22 @@ PyAPI_FUNC(PyObject *) _PyUnicode_XStrip(
    into the string pointed to by buffer.  For the argument descriptions,
    see Objects/stringlib/localeutil.h */
 
-PyAPI_FUNC(int) _PyUnicode_InsertThousandsGroupingLocale(Py_UNICODE *buffer,
-						  Py_ssize_t n_buffer,
-						  Py_ssize_t n_digits,
-						  Py_ssize_t buf_size,
-						  Py_ssize_t *count,
-						  int append_zero_char);
+PyAPI_FUNC(Py_ssize_t) _PyUnicode_InsertThousandsGroupingLocale(Py_UNICODE *buffer,
+                                                   Py_ssize_t n_buffer,
+                                                   Py_UNICODE *digits,
+                                                   Py_ssize_t n_digits,
+                                                   Py_ssize_t min_width);
 
 /* Using explicit passed-in values, insert the thousands grouping
    into the string pointed to by buffer.  For the argument descriptions,
    see Objects/stringlib/localeutil.h */
-PyAPI_FUNC(int) _PyUnicode_InsertThousandsGrouping(Py_UNICODE *buffer,
-						 Py_ssize_t n_buffer,
-						 Py_ssize_t n_digits,
-						 Py_ssize_t buf_size,
-						 Py_ssize_t *count,
-                                                 int append_zero_char,
-                                                 const char *grouping,
-                                                 const char *thousands_sep);
+PyAPI_FUNC(Py_ssize_t) _PyUnicode_InsertThousandsGrouping(Py_UNICODE *buffer,
+                                                   Py_ssize_t n_buffer,
+                                                   Py_UNICODE *digits,
+                                                   Py_ssize_t n_digits,
+                                                   Py_ssize_t min_width,
+                                                   const char *grouping,
+                                                   const char *thousands_sep);
 /* === Characters Type APIs =============================================== */
 
 /* Helper array used by Py_UNICODE_ISSPACE(). */

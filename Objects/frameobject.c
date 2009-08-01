@@ -71,7 +71,7 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 	int new_iblock = 0;		/* The new value of f_iblock */
 	unsigned char *code = NULL;	/* The bytecode for the frame... */
 	Py_ssize_t code_len = 0;	/* ...and its length */
-	char *lnotab = NULL;		/* Iterating over co_lnotab */
+	unsigned char *lnotab = NULL;	/* Iterating over co_lnotab */
 	Py_ssize_t lnotab_len = 0;	/* (ditto) */
 	int offset = 0;			/* (ditto) */
 	int line = 0;			/* (ditto) */
@@ -100,7 +100,8 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 	if (!f->f_trace)
 	{
 		PyErr_Format(PyExc_ValueError,
-			     "f_lineno can only be set by a trace function");
+			     "f_lineno can only be set by a"
+			     " line trace function");
 		return -1;
 	}
 
@@ -124,20 +125,28 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 			     new_lineno);
 		return -1;
 	}
-
-	/* Find the bytecode offset for the start of the given line, or the
-	 * first code-owning line after it. */
-	PyBytes_AsStringAndSize(f->f_code->co_lnotab, &lnotab, &lnotab_len);
-	addr = 0;
-	line = f->f_code->co_firstlineno;
-	new_lasti = -1;
-	for (offset = 0; offset < lnotab_len; offset += 2) {
-		addr += lnotab[offset];
-		line += lnotab[offset+1];
-		if (line >= new_lineno) {
-			new_lasti = addr;
-			new_lineno = line;
-			break;
+	else if (new_lineno == f->f_code->co_firstlineno) {
+		new_lasti = 0;
+		new_lineno = f->f_code->co_firstlineno;
+	}
+	else {
+		/* Find the bytecode offset for the start of the given
+		 * line, or the first code-owning line after it. */
+		char *tmp;
+		PyBytes_AsStringAndSize(f->f_code->co_lnotab,
+					&tmp, &lnotab_len);
+		lnotab = (unsigned char *) tmp;
+		addr = 0;
+		line = f->f_code->co_firstlineno;
+		new_lasti = -1;
+		for (offset = 0; offset < lnotab_len; offset += 2) {
+			addr += lnotab[offset];
+			line += lnotab[offset+1];
+			if (line >= new_lineno) {
+				new_lasti = addr;
+				new_lineno = line;
+				break;
+			}
 		}
 	}
 
@@ -601,7 +610,9 @@ static PyObject *builtin_object;
 int _PyFrame_Init()
 {
 	builtin_object = PyUnicode_InternFromString("__builtins__");
-	return (builtin_object != NULL);
+	if (builtin_object == NULL)
+		return 0;
+	return 1;
 }
 
 PyFrameObject *

@@ -334,9 +334,9 @@ Other options
 
 There are still some other options which can be used to handle special cases.
 
-The :option:`optional` option is a boolean; if it is true, that specifies that
-a build failure in the extension should not abort the build process, but simply
-not install the failing extension.
+The :option:`optional` option is a boolean; if it is true,
+a build failure in the extension will not abort the build process, but
+instead simply not install the failing extension.
 
 The :option:`extra_objects` option is a list of object files to be passed to the
 linker. These files must not have extensions, as the default extension for the
@@ -454,9 +454,10 @@ way.  From the PyXML setup script::
           scripts=['scripts/xmlproc_parse', 'scripts/xmlproc_val']
           )
 
-.. versionchanged:: 2.7
-    All the scripts will also be added to the ``MANIFEST``
-    file if no template is provided. See :ref:`manifest`.
+.. versionchanged:: 3.1
+   All the scripts will also be added to the ``MANIFEST`` file if no template is
+   provided.  See :ref:`manifest`.
+
 
 .. _distutils-installing-package-data:
 
@@ -501,9 +502,9 @@ The corresponding call to :func:`setup` might be::
           )
 
 
-.. versionchanged:: 2.7
-    All the files that match ``package_data`` will be added to the ``MANIFEST``
-    file if no template is provided. See :ref:`manifest`.
+.. versionchanged:: 3.1
+   All the files that match ``package_data`` will be added to the ``MANIFEST``
+   file if no template is provided.  See :ref:`manifest`.
 
 
 .. _distutils-additional-files:
@@ -542,10 +543,9 @@ without specifying a target directory, but this is not recommended, and the
 files directly in the target directory, an empty string should be given as the
 directory.
 
-.. versionchanged:: 2.7
-    All the files that match ``data_files`` will be added to the ``MANIFEST``
-    file if no template is provided. See :ref:`manifest`.
-
+.. versionchanged:: 3.1
+   All the files that match ``data_files`` will be added to the ``MANIFEST``
+   file if no template is provided.  See :ref:`manifest`.
 
 
 .. _meta-data:
@@ -589,6 +589,8 @@ This information includes:
 +----------------------+---------------------------+-----------------+--------+
 | ``platforms``        | a list of platforms       | list of strings |        |
 +----------------------+---------------------------+-----------------+--------+
+| ``license``          | license for the package   | short string    | \(6)   |
++----------------------+---------------------------+-----------------+--------+
 
 Notes:
 
@@ -609,6 +611,13 @@ Notes:
 (5)
     The ``long_description`` field is used by PyPI when you are registering a
     package, to build its home page.
+
+(6)
+    The ``license`` field is a text indicating the license covering the
+    package where the license is not a selection from the "License" Trove
+    classifiers. See the ``Classifier`` field. Notice that
+    there's a ``licence`` distribution option which is deprecated but still
+    acts as an alias for ``license``.
 
 'short string'
     A single line of text, not more than 200 characters.

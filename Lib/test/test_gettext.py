@@ -58,10 +58,6 @@ LOCALEDIR = os.path.join('xx', 'LC_MESSAGES')
 MOFILE = os.path.join(LOCALEDIR, 'gettext.mo')
 UMOFILE = os.path.join(LOCALEDIR, 'ugettext.mo')
 MMOFILE = os.path.join(LOCALEDIR, 'metadata.mo')
-try:
-    LANG = os.environ['LANGUAGE']
-except:
-    LANG = 'en'
 
 
 class GettextBaseTest(unittest.TestCase):
@@ -69,18 +65,20 @@ class GettextBaseTest(unittest.TestCase):
         if not os.path.isdir(LOCALEDIR):
             os.makedirs(LOCALEDIR)
         fp = open(MOFILE, 'wb')
-        fp.write(base64.decodestring(GNU_MO_DATA))
+        fp.write(base64.decodebytes(GNU_MO_DATA))
         fp.close()
         fp = open(UMOFILE, 'wb')
-        fp.write(base64.decodestring(UMO_DATA))
+        fp.write(base64.decodebytes(UMO_DATA))
         fp.close()
         fp = open(MMOFILE, 'wb')
-        fp.write(base64.decodestring(MMO_DATA))
+        fp.write(base64.decodebytes(MMO_DATA))
         fp.close()
-        os.environ['LANGUAGE'] = 'xx'
+        self.env = support.EnvironmentVarGuard()
+        self.env['LANGUAGE'] = 'xx'
 
     def tearDown(self):
-        os.environ['LANGUAGE'] = LANG
+        self.env.__exit__()
+        del self.env
         shutil.rmtree(os.path.split(LOCALEDIR)[0])
 
 

@@ -5,6 +5,8 @@ if __name__ != 'test.support':
 
 import contextlib
 import errno
+import functools
+import gc
 import socket
 import sys
 import os
@@ -13,6 +15,7 @@ import shutil
 import warnings
 import unittest
 import importlib
+import collections
 
 __all__ = ["Error", "TestFailed", "ResourceDenied", "import_module",
            "verbose", "use_resources", "max_memuse", "record_original_stdout",
@@ -22,7 +25,8 @@ __all__ = ["Error", "TestFailed", "ResourceDenied", "import_module",
            "vereq", "sortdict", "check_syntax_error", "open_urlresource",
            "check_warnings", "CleanImport", "EnvironmentVarGuard",
            "TransientResource", "captured_output", "captured_stdout",
-           "TransientResource", "transient_internet", "run_with_locale",
+           "time_out", "socket_peer_reset", "ioerror_peer_reset",
+           "run_with_locale",
            "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
            "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
            "reap_children", "cpython_only", "check_impl_detail", "get_attribute"]
@@ -41,22 +45,97 @@ class ResourceDenied(unittest.SkipTest):
     and unexpected skips.
     """
 
+@contextlib.contextmanager
+def _ignore_deprecated_imports(ignore=True):
+    """Context manager to suppress package and module deprecation
+    warnings when importing them.
+
+    If ignore is False, this context manager has no effect."""
+    if ignore:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", ".+ (module|package)",
+                                    DeprecationWarning)
+            yield
+    else:
+        yield
+
+
 def import_module(name, deprecated=False):
     """Import and return the module to be tested, raising SkipTest if
     it is not available.
 
     If deprecated is True, any module or package deprecation messages
     will be suppressed."""
-    with warnings.catch_warnings():
-        if deprecated:
-            warnings.filterwarnings("ignore", ".+ (module|package)",
-                                    DeprecationWarning)
+    with _ignore_deprecated_imports(deprecated):
         try:
-            module = importlib.import_module(name)
+            return importlib.import_module(name)
         except ImportError as msg:
             raise unittest.SkipTest(str(msg))
-        else:
-            return module
+
+
+def _save_and_remove_module(name, orig_modules):
+    """Helper function to save and remove a module from sys.modules
+
+       Return value is True if the module was in sys.modules and
+       False otherwise."""
+    saved = True
+    try:
+        orig_modules[name] = sys.modules[name]
+    except KeyError:
+        saved = False
+    else:
+        del sys.modules[name]
+    return saved
+
+
+def _save_and_block_module(name, orig_modules):
+    """Helper function to save and block a module in sys.modules
+
+       Return value is True if the module was in sys.modules and
+       False otherwise."""
+    saved = True
+    try:
+        orig_modules[name] = sys.modules[name]
+    except KeyError:
+        saved = False
+    sys.modules[name] = 0
+    return saved
+
+
+def import_fresh_module(name, fresh=(), blocked=(), deprecated=False):
+    """Imports and returns a module, deliberately bypassing the sys.modules cache
+    and importing a fresh copy of the module. Once the import is complete,
+    the sys.modules cache is restored to its original state.
+
+    Modules named in fresh are also imported anew if needed by the import.
+
+    Importing of modules named in blocked is prevented while the fresh import
+    takes place.
+
+    If deprecated is True, any module or package deprecation messages
+    will be suppressed."""
+    # NOTE: test_heapq and test_warnings include extra sanity checks to make
+    # sure that this utility function is working as expected
+    with _ignore_deprecated_imports(deprecated):
+        # Keep track of modules saved for later restoration as well
+        # as those which just need a blocking entry removed
+        orig_modules = {}
+        names_to_remove = []
+        _save_and_remove_module(name, orig_modules)
+        try:
+            for fresh_name in fresh:
+                _save_and_remove_module(fresh_name, orig_modules)
+            for blocked_name in blocked:
+                if not _save_and_block_module(blocked_name, orig_modules):
+                    names_to_remove.append(blocked_name)
+            fresh_module = importlib.import_module(name)
+        finally:
+            for orig_name, module in orig_modules.items():
+                sys.modules[orig_name] = module
+            for name_to_remove in names_to_remove:
+                del sys.modules[name_to_remove]
+        return fresh_module
+
 
 def get_attribute(obj, name):
     """Get an attribute, raising SkipTest if AttributeError is raised."""
@@ -435,36 +514,57 @@ class CleanImport(object):
         sys.modules.update(self.original_modules)
 
 
-class EnvironmentVarGuard(object):
+class EnvironmentVarGuard(collections.MutableMapping):
 
     """Class to help protect the environment variable properly.  Can be used as
     a context manager."""
 
     def __init__(self):
         self._environ = os.environ
-        self._unset = set()
-        self._reset = dict()
+        self._changed = {}
 
-    def set(self, envvar, value):
-        if envvar not in self._environ:
-            self._unset.add(envvar)
-        else:
-            self._reset[envvar] = self._environ[envvar]
+    def __getitem__(self, envvar):
+        return self._environ[envvar]
+
+    def __setitem__(self, envvar, value):
+        # Remember the initial value on the first access
+        if envvar not in self._changed:
+            self._changed[envvar] = self._environ.get(envvar)
         self._environ[envvar] = value
 
-    def unset(self, envvar):
+    def __delitem__(self, envvar):
+        # Remember the initial value on the first access
+        if envvar not in self._changed:
+            self._changed[envvar] = self._environ.get(envvar)
         if envvar in self._environ:
-            self._reset[envvar] = self._environ[envvar]
             del self._environ[envvar]
+
+    def keys(self):
+        return self._environ.keys()
+
+    def __iter__(self):
+        return iter(self._environ)
+
+    def __len__(self):
+        return len(self._environ)
+
+    def set(self, envvar, value):
+        self[envvar] = value
+
+    def unset(self, envvar):
+        del self[envvar]
 
     def __enter__(self):
         return self
 
     def __exit__(self, *ignore_exc):
-        for envvar, value in self._reset.items():
-            self._environ[envvar] = value
-        for unset in self._unset:
-            del self._environ[unset]
+        for (k, v) in self._changed.items():
+            if v is None:
+                if k in self._environ:
+                    del self._environ[k]
+            else:
+                self._environ[k] = v
+
 
 class TransientResource(object):
 
@@ -492,13 +592,11 @@ class TransientResource(object):
                 raise ResourceDenied("an optional resource is not available")
 
 
-def transient_internet():
-    """Return a context manager that raises ResourceDenied when various issues
-    with the Internet connection manifest themselves as exceptions."""
-    time_out = TransientResource(IOError, errno=errno.ETIMEDOUT)
-    socket_peer_reset = TransientResource(socket.error, errno=errno.ECONNRESET)
-    ioerror_peer_reset = TransientResource(IOError, errno=errno.ECONNRESET)
-    return contextlib.nested(time_out, socket_peer_reset, ioerror_peer_reset)
+# Context managers that raise ResourceDenied when various issues
+# with the Internet connection manifest themselves as exceptions.
+time_out = TransientResource(IOError, errno=errno.ETIMEDOUT)
+socket_peer_reset = TransientResource(socket.error, errno=errno.ECONNRESET)
+ioerror_peer_reset = TransientResource(IOError, errno=errno.ECONNRESET)
 
 
 @contextlib.contextmanager
@@ -532,7 +630,6 @@ def gc_collect():
     longer than expected.  This function tries its best to force all garbage
     objects to disappear.
     """
-    import gc
     gc.collect()
     gc.collect()
     gc.collect()
@@ -728,8 +825,8 @@ def _parse_guards(guards):
     # Returns a tuple ({platform_name: run_me}, default_value)
     if not guards:
         return ({'cpython': True}, False)
-    is_true = guards.values()[0]
-    assert guards.values() == [is_true] * len(guards)   # all True or all False
+    is_true = list(guards.values())[0]
+    assert list(guards.values()) == [is_true] * len(guards)   # all True or all False
     return (guards, not is_true)
 
 # Use the following check to guard CPython's implementation-specific tests --
@@ -835,6 +932,16 @@ def threading_cleanup(num_active, num_limbo):
     while len(threading._limbo) != num_limbo and count < _MAX_COUNT:
         count += 1
         time.sleep(0.1)
+
+def reap_threads(func):
+    @functools.wraps(func)
+    def decorator(*args):
+        key = threading_setup()
+        try:
+            return func(*args)
+        finally:
+            threading_cleanup(*key)
+    return decorator
 
 def reap_children():
     """Use this function at the end of test_main() whenever sub-processes

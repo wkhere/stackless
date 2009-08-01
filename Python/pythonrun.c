@@ -220,7 +220,7 @@ Py_InitializeEx(int install_sigs)
 		Py_FatalError("Py_Initialize: can't init longs");
 
 	if (!PyByteArray_Init())
-		Py_FatalError("Py_Initialize: can't init bytes");
+		Py_FatalError("Py_Initialize: can't init bytearray");
 
 	_PyFloat_Init();
 
@@ -270,6 +270,22 @@ Py_InitializeEx(int install_sigs)
 
 	_PyImportHooks_Init();
 
+#if defined(HAVE_LANGINFO_H) && defined(CODESET)
+	/* On Unix, set the file system encoding according to the
+	   user's preference, if the CODESET names a well-known
+	   Python codec, and Py_FileSystemDefaultEncoding isn't
+	   initialized by other means. Also set the encoding of
+	   stdin and stdout if these are terminals.  */
+
+	codeset = get_codeset();
+	if (codeset) {
+		if (!Py_FileSystemDefaultEncoding)
+			Py_FileSystemDefaultEncoding = codeset;
+		else
+			free(codeset);
+	}
+#endif
+
 	if (install_sigs)
 		initsigs(); /* Signal handling stuff, including initintr() */
 		
@@ -296,22 +312,6 @@ Py_InitializeEx(int install_sigs)
 #ifdef WITH_THREAD
 	_PyGILState_Init(interp, tstate);
 #endif /* WITH_THREAD */
-
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
-	/* On Unix, set the file system encoding according to the
-	   user's preference, if the CODESET names a well-known
-	   Python codec, and Py_FileSystemDefaultEncoding isn't
-	   initialized by other means. Also set the encoding of
-	   stdin and stdout if these are terminals.  */
-
-	codeset = get_codeset();
-	if (codeset) {
-		if (!Py_FileSystemDefaultEncoding)
-			Py_FileSystemDefaultEncoding = codeset;
-		else
-			free(codeset);
-	}
-#endif
 }
 
 void

@@ -28,13 +28,14 @@ _RATIONAL_FORMAT = re.compile(r"""
     (?P<sign>[-+]?)            # an optional sign, then
     (?=\d|\.\d)                # lookahead for digit or .digit
     (?P<num>\d*)               # numerator (possibly empty)
-    (?:                        # followed by an optional
-       /(?P<denom>\d+)         # / and denominator
+    (?:                        # followed by
+       (?:/(?P<denom>\d+))?    # an optional denominator
     |                          # or
-       \.(?P<decimal>\d*)      # decimal point and fractional part
-    )?
+       (?:\.(?P<decimal>\d*))? # an optional fractional part
+       (?:E(?P<exp>[-+]?\d+))? # and optional exponent
+    )
     \s*\Z                      # and optional whitespace to finish
-""", re.VERBOSE)
+""", re.VERBOSE | re.IGNORECASE)
 
 
 class Fraction(numbers.Rational):
@@ -53,7 +54,7 @@ class Fraction(numbers.Rational):
     __slots__ = ('_numerator', '_denominator')
 
     # We're immutable, so use __new__ not __init__
-    def __new__(cls, numerator=0, denominator=1):
+    def __new__(cls, numerator=0, denominator=None):
         """Constructs a Rational.
 
         Takes a string like '3/2' or '1.5', another Rational, or a
@@ -62,40 +63,55 @@ class Fraction(numbers.Rational):
         """
         self = super(Fraction, cls).__new__(cls)
 
-        if not isinstance(numerator, int) and denominator == 1:
-            if isinstance(numerator, str):
-                # Handle construction from strings.
-                input = numerator
-                m = _RATIONAL_FORMAT.match(input)
-                if m is None:
-                    raise ValueError('Invalid literal for Fraction: %r' % input)
-                numerator = m.group('num')
-                decimal = m.group('decimal')
-                if decimal:
-                    # The literal is a decimal number.
-                    numerator = int(numerator + decimal)
-                    denominator = 10**len(decimal)
-                else:
-                    # The literal is an integer or fraction.
-                    numerator = int(numerator)
-                    # Default denominator to 1.
-                    denominator = int(m.group('denom') or 1)
+        if denominator is None:
+            if isinstance(numerator, numbers.Rational):
+                self._numerator = numerator.numerator
+                self._denominator = numerator.denominator
+                return self
 
+            elif isinstance(numerator, str):
+                # Handle construction from strings.
+                m = _RATIONAL_FORMAT.match(numerator)
+                if m is None:
+                    raise ValueError('Invalid literal for Fraction: %r' %
+                                     numerator)
+                numerator = int(m.group('num') or '0')
+                denom = m.group('denom')
+                if denom:
+                    denominator = int(denom)
+                else:
+                    denominator = 1
+                    decimal = m.group('decimal')
+                    if decimal:
+                        scale = 10**len(decimal)
+                        numerator = numerator * scale + int(decimal)
+                        denominator *= scale
+                    exp = m.group('exp')
+                    if exp:
+                        exp = int(exp)
+                        if exp >= 0:
+                            numerator *= 10**exp
+                        else:
+                            denominator *= 10**-exp
                 if m.group('sign') == '-':
                     numerator = -numerator
 
-            elif isinstance(numerator, numbers.Rational):
-                # Handle copies from other rationals. Integrals get
-                # caught here too, but it doesn't matter because
-                # denominator is already 1.
-                other_rational = numerator
-                numerator = other_rational.numerator
-                denominator = other_rational.denominator
+            else:
+                raise TypeError("argument should be a string "
+                                "or a Rational instance")
+
+        elif (isinstance(numerator, numbers.Rational) and
+            isinstance(denominator, numbers.Rational)):
+            numerator, denominator = (
+                numerator.numerator * denominator.denominator,
+                denominator.numerator * numerator.denominator
+                )
+        else:
+            raise TypeError("both arguments should be "
+                            "Rational instances")
 
         if denominator == 0:
             raise ZeroDivisionError('Fraction(%s, 0)' % numerator)
-        numerator = operator.index(numerator)
-        denominator = operator.index(denominator)
         g = gcd(numerator, denominator)
         self._numerator = numerator // g
         self._denominator = denominator // g

@@ -10,17 +10,18 @@ Buffer Protocol
 
    Returns a pointer to a read-only memory location usable as character-based
    input.  The *obj* argument must support the single-segment character buffer
-   interface.  On success, returns ``0``, sets *buffer* to the memory location and
-   *buffer_len* to the buffer length.  Returns ``-1`` and sets a :exc:`TypeError`
-   on error.
+   interface.  On success, returns ``0``, sets *buffer* to the memory location
+   and *buffer_len* to the buffer length.  Returns ``-1`` and sets a
+   :exc:`TypeError` on error.
 
 
 .. cfunction:: int PyObject_AsReadBuffer(PyObject *obj, const void **buffer, Py_ssize_t *buffer_len)
 
-   Returns a pointer to a read-only memory location containing arbitrary data.  The
-   *obj* argument must support the single-segment readable buffer interface.  On
-   success, returns ``0``, sets *buffer* to the memory location and *buffer_len* to
-   the buffer length.  Returns ``-1`` and sets a :exc:`TypeError` on error.
+   Returns a pointer to a read-only memory location containing arbitrary data.
+   The *obj* argument must support the single-segment readable buffer
+   interface.  On success, returns ``0``, sets *buffer* to the memory location
+   and *buffer_len* to the buffer length.  Returns ``-1`` and sets a
+   :exc:`TypeError` on error.
 
 
 .. cfunction:: int PyObject_CheckReadBuffer(PyObject *o)
@@ -32,6 +33,7 @@ Buffer Protocol
 .. cfunction:: int PyObject_AsWriteBuffer(PyObject *obj, void **buffer, Py_ssize_t *buffer_len)
 
    Returns a pointer to a writable memory location.  The *obj* argument must
-   support the single-segment, character buffer interface.  On success, returns
-   ``0``, sets *buffer* to the memory location and *buffer_len* to the buffer
-   length.  Returns ``-1`` and sets a :exc:`TypeError` on error.
+   support the single-segment, character buffer interface.  On success,
+   returns ``0``, sets *buffer* to the memory location and *buffer_len* to the
+   buffer length.  Returns ``-1`` and sets a :exc:`TypeError` on error.
+

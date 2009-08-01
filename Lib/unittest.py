@@ -59,7 +59,7 @@ import warnings
 ##############################################################################
 # Exported classes and functions
 ##############################################################################
-__all__ = ['TestResult', 'TestCase', 'TestSuite', 'ClassTestSuite',
+__all__ = ['TestResult', 'TestCase', 'TestSuite',
            'TextTestRunner', 'TestLoader', 'FunctionTestCase', 'main',
            'defaultTestLoader', 'SkipTest', 'skip', 'skipIf', 'skipUnless',
            'expectedFailure']
@@ -173,9 +173,21 @@ class TestResult(object):
         "Called when the given test is about to be run"
         self.testsRun = self.testsRun + 1
 
+    def startTestRun(self):
+        """Called once before any tests are executed.
+
+        See startTest for a method called before each test.
+        """
+
     def stopTest(self, test):
         "Called when the given test has been run"
         pass
+
+    def stopTestRun(self):
+        """Called once after all tests are executed.
+
+        See stopTest for a method called after each test.
+        """
 
     def addError(self, test, err):
         """Called when an error has occurred. 'err' is a tuple of values as
@@ -262,7 +274,7 @@ class _AssertRaisesContext(object):
     def __enter__(self):
         pass
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, tb):
         if exc_type is None:
             try:
                 exc_name = self.expected.__name__
@@ -341,12 +353,14 @@ class TestCase(object):
            not have a method with the specified name.
         """
         self._testMethodName = methodName
+        self._resultForDoCleanups = None
         try:
             testMethod = getattr(self, methodName)
         except AttributeError:
             raise ValueError("no such test method in %s: %s" % \
                   (self.__class__, methodName))
         self._testMethodDoc = testMethod.__doc__
+        self._cleanups = []
 
         # Map types to custom assertEqual functions that will compare
         # instances of said type in more detail to generate a more useful
@@ -372,6 +386,14 @@ class TestCase(object):
                     useful error message when the two arguments are not equal.
         """
         self._type_equality_funcs[typeobj] = _AssertWrapper(function)
+
+    def addCleanup(self, function, *args, **kwargs):
+        """Add a function, with arguments, to be called when the test is
+        completed. Functions added are called on a LIFO basis and are
+        called after tearDown on test failure or success.
+
+        Cleanup items are called even if setUp fails (unlike tearDown)."""
+        self._cleanups.append((function, args, kwargs))
 
     def setUp(self):
         "Hook method for setting up the test fixture before exercising it."
@@ -428,45 +450,77 @@ class TestCase(object):
                (_strclass(self.__class__), self._testMethodName)
 
     def run(self, result=None):
+        orig_result = result
         if result is None:
             result = self.defaultTestResult()
+            startTestRun = getattr(result, 'startTestRun', None)
+            if startTestRun is not None:
+                startTestRun()
+
+        self._resultForDoCleanups = result
         result.startTest(self)
+        if getattr(self.__class__, "__unittest_skip__", False):
+            # If the whole class was skipped.
+            try:
+                result.addSkip(self, self.__class__.__unittest_skip_why__)
+            finally:
+                result.stopTest(self)
+            return
         testMethod = getattr(self, self._testMethodName)
         try:
-            try:
-                self.setUp()
-            except SkipTest as e:
-                result.addSkip(self, str(e))
-                return
-            except Exception:
-                result.addError(self, sys.exc_info())
-                return
-
             success = False
             try:
-                testMethod()
-            except self.failureException:
-                result.addFailure(self, sys.exc_info())
-            except _ExpectedFailure as e:
-                result.addExpectedFailure(self, e.exc_info)
-            except _UnexpectedSuccess:
-                result.addUnexpectedSuccess(self)
+                self.setUp()
             except SkipTest as e:
                 result.addSkip(self, str(e))
             except Exception:
                 result.addError(self, sys.exc_info())
             else:
-                success = True
+                try:
+                    testMethod()
+                except self.failureException:
+                    result.addFailure(self, sys.exc_info())
+                except _ExpectedFailure as e:
+                    result.addExpectedFailure(self, e.exc_info)
+                except _UnexpectedSuccess:
+                    result.addUnexpectedSuccess(self)
+                except SkipTest as e:
+                    result.addSkip(self, str(e))
+                except Exception:
+                    result.addError(self, sys.exc_info())
+                else:
+                    success = True
 
-            try:
-                self.tearDown()
-            except Exception:
-                result.addError(self, sys.exc_info())
-                success = False
+                try:
+                    self.tearDown()
+                except Exception:
+                    result.addError(self, sys.exc_info())
+                    success = False
+
+            cleanUpSuccess = self.doCleanups()
+            success = success and cleanUpSuccess
             if success:
                 result.addSuccess(self)
         finally:
             result.stopTest(self)
+            if orig_result is None:
+                stopTestRun = getattr(result, 'stopTestRun', None)
+                if stopTestRun is not None:
+                    stopTestRun()
+
+    def doCleanups(self):
+        """Execute all cleanup functions. Normally called for you after
+        tearDown."""
+        result = self._resultForDoCleanups
+        ok = True
+        while self._cleanups:
+            function, args, kwargs = self._cleanups.pop(-1)
+            try:
+                function(*args, **kwargs)
+            except Exception:
+                ok = False
+                result.addError(self, sys.exc_info())
+        return ok
 
     def __call__(self, *args, **kwds):
         return self.run(*args, **kwds)
@@ -678,23 +732,32 @@ class TestCase(object):
             if seq1 == seq2:
                 return
 
+            seq1_repr = repr(seq1)
+            seq2_repr = repr(seq2)
+            if len(seq1_repr) > 30:
+                seq1_repr = seq1_repr[:30] + '...'
+            if len(seq2_repr) > 30:
+                seq2_repr = seq2_repr[:30] + '...'
+            elements = (seq_type_name.capitalize(), seq1_repr, seq2_repr)
+            differing = '%ss differ: %s != %s\n' % elements
+
             for i in range(min(len1, len2)):
                 try:
                     item1 = seq1[i]
                 except (TypeError, IndexError, NotImplementedError):
-                    differing = ('Unable to index element %d of first %s\n' %
+                    differing += ('\nUnable to index element %d of first %s\n' %
                                  (i, seq_type_name))
                     break
 
                 try:
                     item2 = seq2[i]
                 except (TypeError, IndexError, NotImplementedError):
-                    differing = ('Unable to index element %d of second %s\n' %
+                    differing += ('\nUnable to index element %d of second %s\n' %
                                  (i, seq_type_name))
                     break
 
                 if item1 != item2:
-                    differing = ('First differing element %d:\n%s\n%s\n' %
+                    differing += ('\nFirst differing element %d:\n%s\n%s\n' %
                                  (i, item1, item2))
                     break
             else:
@@ -702,28 +765,26 @@ class TestCase(object):
                     type(seq1) != type(seq2)):
                     # The sequences are the same, but have differing types.
                     return
-                # A catch-all message for handling arbitrary user-defined
-                # sequences.
-                differing = '%ss differ:\n' % seq_type_name.capitalize()
-                if len1 > len2:
-                    differing = ('First %s contains %d additional '
-                                 'elements.\n' % (seq_type_name, len1 - len2))
-                    try:
-                        differing += ('First extra element %d:\n%s\n' %
-                                      (len2, seq1[len2]))
-                    except (TypeError, IndexError, NotImplementedError):
-                        differing += ('Unable to index element %d '
-                                      'of first %s\n' % (len2, seq_type_name))
-                elif len1 < len2:
-                    differing = ('Second %s contains %d additional '
-                                 'elements.\n' % (seq_type_name, len2 - len1))
-                    try:
-                        differing += ('First extra element %d:\n%s\n' %
-                                      (len1, seq2[len1]))
-                    except (TypeError, IndexError, NotImplementedError):
-                        differing += ('Unable to index element %d '
-                                      'of second %s\n' % (len1, seq_type_name))
-        standardMsg = differing + '\n'.join(difflib.ndiff(pprint.pformat(seq1).splitlines(),
+
+            if len1 > len2:
+                differing += ('\nFirst %s contains %d additional '
+                             'elements.\n' % (seq_type_name, len1 - len2))
+                try:
+                    differing += ('First extra element %d:\n%s\n' %
+                                  (len2, seq1[len2]))
+                except (TypeError, IndexError, NotImplementedError):
+                    differing += ('Unable to index element %d '
+                                  'of first %s\n' % (len2, seq_type_name))
+            elif len1 < len2:
+                differing += ('\nSecond %s contains %d additional '
+                             'elements.\n' % (seq_type_name, len2 - len1))
+                try:
+                    differing += ('First extra element %d:\n%s\n' %
+                                  (len1, seq2[len1]))
+                except (TypeError, IndexError, NotImplementedError):
+                    differing += ('Unable to index element %d '
+                                  'of second %s\n' % (len1, seq_type_name))
+        standardMsg = differing + '\n' + '\n'.join(difflib.ndiff(pprint.pformat(seq1).splitlines(),
                                             pprint.pformat(seq2).splitlines()))
         msg = self._formatMessage(msg, standardMsg)
         self.fail(msg)
@@ -805,6 +866,18 @@ class TestCase(object):
         """Just like self.assertTrue(a not in b), but with a nicer default message."""
         if member in container:
             standardMsg = '%r unexpectedly found in %r' % (member, container)
+            self.fail(self._formatMessage(msg, standardMsg))
+
+    def assertIs(self, expr1, expr2, msg=None):
+        """Just like self.assertTrue(a is b), but with a nicer default message."""
+        if expr1 is not expr2:
+            standardMsg = '%r is not %r' % (expr1, expr2)
+            self.fail(self._formatMessage(msg, standardMsg))
+
+    def assertIsNot(self, expr1, expr2, msg=None):
+        """Just like self.assertTrue(a is not b), but with a nicer default message."""
+        if expr1 is expr2:
+            standardMsg = 'unexpectedly identical: %r' % (expr1,)
             self.fail(self._formatMessage(msg, standardMsg))
 
     def assertDictEqual(self, d1, d2, msg=None):
@@ -1020,12 +1093,12 @@ class TestSuite(object):
         self.addTests(tests)
 
     def __repr__(self):
-        return "<%s tests=%s>" % (_strclass(self.__class__), self._tests)
+        return "<%s tests=%s>" % (_strclass(self.__class__), list(self))
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return self._tests == other._tests
+        return list(self) == list(other)
 
     def __ne__(self, other):
         return not self == other
@@ -1035,7 +1108,7 @@ class TestSuite(object):
 
     def countTestCases(self):
         cases = 0
-        for test in self._tests:
+        for test in self:
             cases += test.countTestCases()
         return cases
 
@@ -1055,7 +1128,7 @@ class TestSuite(object):
             self.addTest(test)
 
     def run(self, result):
-        for test in self._tests:
+        for test in self:
             if result.shouldStop:
                 break
             test(result)
@@ -1066,39 +1139,8 @@ class TestSuite(object):
 
     def debug(self):
         """Run the tests without collecting errors in a TestResult"""
-        for test in self._tests:
+        for test in self:
             test.debug()
-
-
-class ClassTestSuite(TestSuite):
-    """
-    Suite of tests derived from a single TestCase class.
-    """
-
-    def __init__(self, tests, class_collected_from):
-        super(ClassTestSuite, self).__init__(tests)
-        self.collected_from = class_collected_from
-
-    def id(self):
-        module = getattr(self.collected_from, "__module__", None)
-        if module is not None:
-            return "{0}.{1}".format(module, self.collected_from.__name__)
-        return self.collected_from.__name__
-
-    def run(self, result):
-        if getattr(self.collected_from, "__unittest_skip__", False):
-            # ClassTestSuite result pretends to be a TestCase enough to be
-            # reported.
-            result.startTest(self)
-            try:
-                result.addSkip(self, self.collected_from.__unittest_skip_why__)
-            finally:
-                result.stopTest(self)
-        else:
-            result = super(ClassTestSuite, self).run(result)
-        return result
-
-    shortDescription = id
 
 
 class FunctionTestCase(TestCase):
@@ -1148,8 +1190,7 @@ class FunctionTestCase(TestCase):
                      self._testFunc, self._description))
 
     def __str__(self):
-        return "%s (%s)" % (_strclass(self.__class__),
-                            self.__testFunc.__name__)
+        return "%s (%s)" % (_strclass(self.__class__), self._testFunc.__name__)
 
     def __repr__(self):
         return "<%s testFunc=%s>" % (_strclass(self.__class__), self._testFunc)
@@ -1187,7 +1228,6 @@ class TestLoader(object):
     testMethodPrefix = 'test'
     sortTestMethodsUsing = staticmethod(three_way_cmp)
     suiteClass = TestSuite
-    classSuiteClass = ClassTestSuite
 
     def loadTestsFromTestCase(self, testCaseClass):
         """Return a suite of all tests cases contained in testCaseClass"""
@@ -1197,8 +1237,7 @@ class TestLoader(object):
         testCaseNames = self.getTestCaseNames(testCaseClass)
         if not testCaseNames and hasattr(testCaseClass, 'runTest'):
             testCaseNames = ['runTest']
-        suite = self.classSuiteClass(map(testCaseClass, testCaseNames),
-                                     testCaseClass)
+        suite = self.suiteClass(map(testCaseClass, testCaseNames))
         return suite
 
     def loadTestsFromModule(self, module):
@@ -1437,7 +1476,15 @@ class TextTestRunner(object):
         "Run the given test case or test suite."
         result = self._makeResult()
         startTime = time.time()
-        test(result)
+        startTestRun = getattr(result, 'startTestRun', None)
+        if startTestRun is not None:
+            startTestRun()
+        try:
+            test(result)
+        finally:
+            stopTestRun = getattr(result, 'stopTestRun', None)
+            if stopTestRun is not None:
+                stopTestRun()
         stopTime = time.time()
         timeTaken = stopTime - startTime
         result.printErrors()
@@ -1499,7 +1546,7 @@ Examples:
 """
     def __init__(self, module='__main__', defaultTest=None,
                  argv=None, testRunner=TextTestRunner,
-                 testLoader=defaultTestLoader):
+                 testLoader=defaultTestLoader, exit=True):
         if isinstance(module, str):
             self.module = __import__(module)
             for part in module.split('.')[1:]:
@@ -1508,6 +1555,8 @@ Examples:
             self.module = module
         if argv is None:
             argv = sys.argv
+
+        self.exit = exit
         self.verbosity = 1
         self.defaultTest = defaultTest
         self.testRunner = testRunner
@@ -1559,8 +1608,9 @@ Examples:
         else:
             # it is assumed to be a TestRunner instance
             testRunner = self.testRunner
-        result = testRunner.run(self.test)
-        sys.exit(not result.wasSuccessful())
+        self.result = testRunner.run(self.test)
+        if self.exit:
+            sys.exit(not self.result.wasSuccessful())
 
 main = TestProgram
 

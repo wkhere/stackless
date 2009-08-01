@@ -273,6 +273,10 @@ SOURCE=..\..\Objects\bytesobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Objects\capsule.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\cellobject.c
 # End Source File
 # Begin Source File
@@ -338,6 +342,10 @@ SOURCE=..\..\Objects\dictobject.c
 # Begin Source File
 
 SOURCE=..\dl_nt.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\dtoa.c
 # End Source File
 # Begin Source File
 
@@ -596,6 +604,10 @@ SOURCE=..\..\Modules\posixmodule.c
 # Begin Source File
 
 SOURCE=..\..\Python\pyarena.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\pyctype.c
 # End Source File
 # Begin Source File
 

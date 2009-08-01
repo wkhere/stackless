@@ -31,7 +31,7 @@ cookie_re = re.compile("coding[:=]\s*([-\w.]+)")
 
 import token
 __all__ = [x for x in dir(token) if x[0] != '_'] + ["COMMENT", "tokenize",
-           "detect_encoding", "NL", "untokenize", "ENCODING"]
+           "detect_encoding", "NL", "untokenize", "ENCODING", "TokenInfo"]
 del token
 
 COMMENT = N_TOKENS
@@ -41,6 +41,47 @@ tok_name[NL] = 'NL'
 ENCODING = N_TOKENS + 2
 tok_name[ENCODING] = 'ENCODING'
 N_TOKENS += 3
+
+class TokenInfo(tuple):
+    'TokenInfo(type, string, start, end, line)'
+
+    __slots__ = ()
+
+    _fields = ('type', 'string', 'start', 'end', 'line')
+
+    def __new__(cls, type, string, start, end, line):
+        return tuple.__new__(cls, (type, string, start, end, line))
+
+    @classmethod
+    def _make(cls, iterable, new=tuple.__new__, len=len):
+        'Make a new TokenInfo object from a sequence or iterable'
+        result = new(cls, iterable)
+        if len(result) != 5:
+            raise TypeError('Expected 5 arguments, got %d' % len(result))
+        return result
+
+    def __repr__(self):
+        return 'TokenInfo(type=%r, string=%r, start=%r, end=%r, line=%r)' % self
+
+    def _asdict(self):
+        'Return a new dict which maps field names to their values'
+        return dict(zip(self._fields, self))
+
+    def _replace(self, **kwds):
+        'Return a new TokenInfo object replacing specified fields with new values'
+        result = self._make(map(kwds.pop, ('type', 'string', 'start', 'end', 'line'), self))
+        if kwds:
+            raise ValueError('Got unexpected field names: %r' % kwds.keys())
+        return result
+
+    def __getnewargs__(self):
+        return tuple(self)
+
+    type = property(lambda t: t[0])
+    string = property(lambda t: t[1])
+    start = property(lambda t: t[2])
+    end = property(lambda t: t[3])
+    line = property(lambda t: t[4])
 
 def group(*choices): return '(' + '|'.join(choices) + ')'
 def any(*choices): return group(*choices) + '*'
@@ -346,7 +387,7 @@ def _tokenize(readline, encoding):
     indents = [0]
 
     if encoding is not None:
-        yield (ENCODING, encoding, (0, 0), (0, 0), '')
+        yield TokenInfo(ENCODING, encoding, (0, 0), (0, 0), '')
     while True:             # loop over lines in stream
         try:
             line = readline()
@@ -364,12 +405,12 @@ def _tokenize(readline, encoding):
             endmatch = endprog.match(line)
             if endmatch:
                 pos = end = endmatch.end(0)
-                yield (STRING, contstr + line[:end],
+                yield TokenInfo(STRING, contstr + line[:end],
                        strstart, (lnum, end), contline + line)
                 contstr, needcont = '', 0
                 contline = None
             elif needcont and line[-2:] != '\\\n' and line[-3:] != '\\\r\n':
-                yield (ERRORTOKEN, contstr + line,
+                yield TokenInfo(ERRORTOKEN, contstr + line,
                            strstart, (lnum, len(line)), contline)
                 contstr = ''
                 contline = None
@@ -394,25 +435,25 @@ def _tokenize(readline, encoding):
                 if line[pos] == '#':
                     comment_token = line[pos:].rstrip('\r\n')
                     nl_pos = pos + len(comment_token)
-                    yield (COMMENT, comment_token,
+                    yield TokenInfo(COMMENT, comment_token,
                            (lnum, pos), (lnum, pos + len(comment_token)), line)
-                    yield (NL, line[nl_pos:],
+                    yield TokenInfo(NL, line[nl_pos:],
                            (lnum, nl_pos), (lnum, len(line)), line)
                 else:
-                    yield ((NL, COMMENT)[line[pos] == '#'], line[pos:],
+                    yield TokenInfo((NL, COMMENT)[line[pos] == '#'], line[pos:],
                            (lnum, pos), (lnum, len(line)), line)
                 continue
 
             if column > indents[-1]:           # count indents or dedents
                 indents.append(column)
-                yield (INDENT, line[:pos], (lnum, 0), (lnum, pos), line)
+                yield TokenInfo(INDENT, line[:pos], (lnum, 0), (lnum, pos), line)
             while column < indents[-1]:
                 if column not in indents:
                     raise IndentationError(
                         "unindent does not match any outer indentation level",
                         ("<tokenize>", lnum, pos, line))
                 indents = indents[:-1]
-                yield (DEDENT, '', (lnum, pos), (lnum, pos), line)
+                yield TokenInfo(DEDENT, '', (lnum, pos), (lnum, pos), line)
 
         else:                                  # continued statement
             if not line:
@@ -428,20 +469,20 @@ def _tokenize(readline, encoding):
 
                 if (initial in numchars or                  # ordinary number
                     (initial == '.' and token != '.' and token != '...')):
-                    yield (NUMBER, token, spos, epos, line)
+                    yield TokenInfo(NUMBER, token, spos, epos, line)
                 elif initial in '\r\n':
-                    yield (NL if parenlev > 0 else NEWLINE,
+                    yield TokenInfo(NL if parenlev > 0 else NEWLINE,
                            token, spos, epos, line)
                 elif initial == '#':
                     assert not token.endswith("\n")
-                    yield (COMMENT, token, spos, epos, line)
+                    yield TokenInfo(COMMENT, token, spos, epos, line)
                 elif token in triple_quoted:
                     endprog = endprogs[token]
                     endmatch = endprog.match(line, pos)
                     if endmatch:                           # all on one line
                         pos = endmatch.end(0)
                         token = line[start:pos]
-                        yield (STRING, token, spos, (lnum, pos), line)
+                        yield TokenInfo(STRING, token, spos, (lnum, pos), line)
                     else:
                         strstart = (lnum, start)           # multiple lines
                         contstr = line[start:]
@@ -458,23 +499,23 @@ def _tokenize(readline, encoding):
                         contline = line
                         break
                     else:                                  # ordinary string
-                        yield (STRING, token, spos, epos, line)
+                        yield TokenInfo(STRING, token, spos, epos, line)
                 elif initial in namechars:                 # ordinary name
-                    yield (NAME, token, spos, epos, line)
+                    yield TokenInfo(NAME, token, spos, epos, line)
                 elif initial == '\\':                      # continued stmt
                     continued = 1
                 else:
                     if initial in '([{': parenlev = parenlev + 1
                     elif initial in ')]}': parenlev = parenlev - 1
-                    yield (OP, token, spos, epos, line)
+                    yield TokenInfo(OP, token, spos, epos, line)
             else:
-                yield (ERRORTOKEN, line[pos],
+                yield TokenInfo(ERRORTOKEN, line[pos],
                            (lnum, pos), (lnum, pos+1), line)
                 pos = pos + 1
 
     for indent in indents[1:]:                 # pop remaining indent levels
-        yield (DEDENT, '', (lnum, 0), (lnum, 0), '')
-    yield (ENDMARKER, '', (lnum, 0), (lnum, 0), '')
+        yield TokenInfo(DEDENT, '', (lnum, 0), (lnum, 0), '')
+    yield TokenInfo(ENDMARKER, '', (lnum, 0), (lnum, 0), '')
 
 
 # An undocumented, backwards compatible, API for all the places in the standard

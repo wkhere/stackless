@@ -279,7 +279,15 @@ finally:
 	tstate = PyThreadState_GET();
 	if (++tstate->recursion_depth > Py_GetRecursionLimit()) {
 	    --tstate->recursion_depth;
-	    PyErr_SetObject(PyExc_RuntimeError, PyExc_RecursionErrorInst);
+	    /* throw away the old exception... */
+	    Py_DECREF(*exc);
+	    Py_DECREF(*val);
+	    /* ... and use the recursion error instead */
+	    *exc = PyExc_RuntimeError;
+	    *val = PyExc_RecursionErrorInst;
+	    Py_INCREF(*exc);
+	    Py_INCREF(*val);
+	    /* just keeping the old traceback */
 	    return;
 	}
 	PyErr_NormalizeException(exc, val, tb);
@@ -453,7 +461,7 @@ PyErr_SetFromErrnoWithFilename(PyObject *exc, const char *filename)
 	return result;
 }
 
-#ifdef Py_WIN_WIDE_FILENAMES
+#ifdef MS_WINDOWS
 PyObject *
 PyErr_SetFromErrnoWithUnicodeFilename(PyObject *exc, const Py_UNICODE *filename)
 {
@@ -464,7 +472,7 @@ PyErr_SetFromErrnoWithUnicodeFilename(PyObject *exc, const Py_UNICODE *filename)
 	Py_XDECREF(name);
 	return result;
 }
-#endif /* Py_WIN_WIDE_FILENAMES */
+#endif /* MS_WINDOWS */
 
 PyObject *
 PyErr_SetFromErrno(PyObject *exc)
@@ -541,7 +549,6 @@ PyObject *PyErr_SetExcFromWindowsErrWithFilename(
 	return ret;
 }
 
-#ifdef Py_WIN_WIDE_FILENAMES
 PyObject *PyErr_SetExcFromWindowsErrWithUnicodeFilename(
 	PyObject *exc,
 	int ierr,
@@ -556,7 +563,6 @@ PyObject *PyErr_SetExcFromWindowsErrWithUnicodeFilename(
 	Py_XDECREF(name);
 	return ret;
 }
-#endif /* Py_WIN_WIDE_FILENAMES */
 
 PyObject *PyErr_SetExcFromWindowsErr(PyObject *exc, int ierr)
 {
@@ -580,7 +586,6 @@ PyObject *PyErr_SetFromWindowsErrWithFilename(
 	return result;
 }
 
-#ifdef Py_WIN_WIDE_FILENAMES
 PyObject *PyErr_SetFromWindowsErrWithUnicodeFilename(
 	int ierr,
 	const Py_UNICODE *filename)
@@ -594,7 +599,6 @@ PyObject *PyErr_SetFromWindowsErrWithUnicodeFilename(
 	Py_XDECREF(name);
 	return result;
 }
-#endif /* Py_WIN_WIDE_FILENAMES */
 #endif /* MS_WINDOWS */
 
 void

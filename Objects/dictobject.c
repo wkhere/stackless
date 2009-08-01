@@ -717,7 +717,7 @@ PyDict_GetItem(PyObject *op, PyObject *key)
 	/* We can arrive here with a NULL tstate during initialization:
 	   try running "python -Wi" for an example related to string
 	   interning.  Let's just hope that no exception occurs then... */
-	tstate = _PyThreadState_Current;
+	tstate = PyThreadState_GET();
 	if (tstate != NULL && tstate->curexc_type != NULL) {
 		/* preserve the existing exception */
 		PyObject *err_type, *err_value, *err_tb;
@@ -1126,15 +1126,19 @@ dict_subscript(PyDictObject *mp, register PyObject *key)
 	if (v == NULL) {
 		if (!PyDict_CheckExact(mp)) {
 			/* Look up __missing__ method if we're a subclass. */
-		    	PyObject *missing;
+		    	PyObject *missing, *res;
 			static PyObject *missing_str = NULL;
-			if (missing_str == NULL)
-				missing_str =
-				  PyUnicode_InternFromString("__missing__");
-			missing = _PyType_Lookup(Py_TYPE(mp), missing_str);
-			if (missing != NULL)
-				return PyObject_CallFunctionObjArgs(missing,
-					(PyObject *)mp, key, NULL);
+			missing = _PyObject_LookupSpecial((PyObject *)mp,
+							  "__missing__",
+							  &missing_str);
+			if (missing != NULL) {
+				res = PyObject_CallFunctionObjArgs(missing,
+								   key, NULL);
+				Py_DECREF(missing);
+				return res;
+			}
+			else if (PyErr_Occurred())
+				return NULL;
 		}
 		set_key_error(key);
 		return NULL;

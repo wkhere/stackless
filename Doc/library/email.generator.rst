@@ -16,14 +16,14 @@ functionality of the bundled generator; you could write one from scratch
 yourself.  However the bundled generator knows how to generate most email in a
 standards-compliant way, should handle MIME and non-MIME email messages just
 fine, and is designed so that the transformation from flat text, to a message
-structure via the :class:`Parser` class, and back to flat text, is idempotent
-(the input is identical to the output).
+structure via the :class:`~email.parser.Parser` class, and back to flat text,
+is idempotent (the input is identical to the output).
 
 Here are the public methods of the :class:`Generator` class, imported from the
 :mod:`email.generator` module:
 
 
-.. class:: Generator(outfp[, mangle_from_[, maxheaderlen]])
+.. class:: Generator(outfp, mangle_from_=True, maxheaderlen=78)
 
    The constructor for the :class:`Generator` class takes a file-like object called
    *outfp* for an argument.  *outfp* must support the :meth:`write` method and be
@@ -41,13 +41,13 @@ Here are the public methods of the :class:`Generator` class, imported from the
    Optional *maxheaderlen* specifies the longest length for a non-continued header.
    When a header line is longer than *maxheaderlen* (in characters, with tabs
    expanded to 8 spaces), the header will be split as defined in the
-   :mod:`email.header.Header` class.  Set to zero to disable header wrapping.  The
-   default is 78, as recommended (but not required) by :rfc:`2822`.
+   :class:`~email.header.Header` class.  Set to zero to disable header wrapping.
+   The default is 78, as recommended (but not required) by :rfc:`2822`.
 
    The other public :class:`Generator` methods are:
 
 
-   .. method:: flatten(msg[, unixfrom])
+   .. method:: flatten(msg, unixfrom=False)
 
       Print the textual representation of the message object structure rooted at
       *msg* to the output file specified when the :class:`Generator` instance
@@ -84,7 +84,7 @@ except that non-\ :mimetype:`text` parts are substituted with a format string
 representing the part.
 
 
-.. class:: DecodedGenerator(outfp[, mangle_from_[, maxheaderlen[, fmt]]])
+.. class:: DecodedGenerator(outfp[, mangle_from_=True, maxheaderlen=78, fmt=None)
 
    This class, derived from :class:`Generator` walks through all the subparts of a
    message.  If the subpart is of main type :mimetype:`text`, then it prints the

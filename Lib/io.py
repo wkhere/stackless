@@ -47,13 +47,14 @@ __author__ = ("Guido van Rossum <guido@python.org>, "
               "Mike Verdone <mike.verdone@gmail.com>, "
               "Mark Russell <mark.russell@zen.co.uk>, "
               "Antoine Pitrou <solipsis@pitrou.net>, "
-              "Amaury Forgeot d'Arc <amauryfa@gmail.com>")
+              "Amaury Forgeot d'Arc <amauryfa@gmail.com>, "
+              "Benjamin Peterson <benjamin@python.org>")
 
 __all__ = ["BlockingIOError", "open", "IOBase", "RawIOBase", "FileIO",
            "BytesIO", "StringIO", "BufferedIOBase",
            "BufferedReader", "BufferedWriter", "BufferedRWPair",
            "BufferedRandom", "TextIOBase", "TextIOWrapper",
-           "SEEK_SET", "SEEK_CUR", "SEEK_END"]
+           "UnsupportedOperation", "SEEK_SET", "SEEK_CUR", "SEEK_END"]
 
 
 import _io

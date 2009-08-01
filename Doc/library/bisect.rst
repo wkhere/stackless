@@ -1,4 +1,3 @@
-
 :mod:`bisect` --- Array bisection algorithm
 ===========================================
 
@@ -17,43 +16,35 @@ example of the algorithm (the boundary conditions are already right!).
 The following functions are provided:
 
 
-.. function:: bisect_left(list, item[, lo[, hi]])
+.. function:: bisect_left(a, x, lo=0, hi=len(a))
 
-   Locate the proper insertion point for *item* in *list* to maintain sorted order.
-   The parameters *lo* and *hi* may be used to specify a subset of the list which
-   should be considered; by default the entire list is used.  If *item* is already
-   present in *list*, the insertion point will be before (to the left of) any
-   existing entries.  The return value is suitable for use as the first parameter
-   to ``list.insert()``.  This assumes that *list* is already sorted.
-
-
-.. function:: bisect_right(list, item[, lo[, hi]])
-
-   Similar to :func:`bisect_left`, but returns an insertion point which comes after
-   (to the right of) any existing entries of *item* in *list*.
+   Locate the proper insertion point for *x* in *a* to maintain sorted order.
+   The parameters *lo* and *hi* may be used to specify a subset of the list
+   which should be considered; by default the entire list is used.  If *x* is
+   already present in *a*, the insertion point will be before (to the left of)
+   any existing entries.  The return value is suitable for use as the first
+   parameter to ``list.insert()``.  This assumes that *a* is already sorted.
 
 
-.. function:: bisect(...)
+.. function:: bisect_right(a, x, lo=0, hi=len(a))
+              bisect(a, x, lo=0, hi=len(a))
 
-   Alias for :func:`bisect_right`.
-
-
-.. function:: insort_left(list, item[, lo[, hi]])
-
-   Insert *item* in *list* in sorted order.  This is equivalent to
-   ``list.insert(bisect.bisect_left(list, item, lo, hi), item)``.  This assumes
-   that *list* is already sorted.
+   Similar to :func:`bisect_left`, but returns an insertion point which comes
+   after (to the right of) any existing entries of *x* in *a*.
 
 
-.. function:: insort_right(list, item[, lo[, hi]])
+.. function:: insort_left(a, x, lo=0, hi=len(a))
 
-   Similar to :func:`insort_left`, but inserting *item* in *list* after any
-   existing entries of *item*.
+   Insert *x* in *a* in sorted order.  This is equivalent to
+   ``a.insert(bisect.bisect_left(a, x, lo, hi), x)``.  This assumes that *a* is
+   already sorted.
 
 
-.. function:: insort(...)
+.. function:: insort_right(a, x, lo=0, hi=len(a))
+              insort(a, x, lo=0, hi=len(a))
 
-   Alias for :func:`insort_right`.
+   Similar to :func:`insort_left`, but inserting *x* in *a* after any existing
+   entries of *x*.
 
 
 Examples
@@ -77,4 +68,22 @@ is a 'B', etc.
    >>> map(grade, [33, 99, 77, 44, 12, 88])
    ['E', 'A', 'B', 'D', 'F', 'A']
 
+Unlike the :func:`sorted` function, it does not make sense for the :func:`bisect`
+functions to have *key* or *reversed* arguments because that would lead to an
+inefficent design (successive calls to bisect functions would not "remember"
+all of the previous key lookups).
 
+Instead, it is better to search a list of precomputed keys to find the index
+of the record in question::
+
+    >>> data = [('red', 5), ('blue', 1), ('yellow', 8), ('black', 0)]
+    >>> data.sort(key=lambda r: r[1])
+    >>> keys = [r[1] for r in data]         # precomputed list of keys
+    >>> data[bisect_left(keys, 0)]
+    ('black', 0)
+    >>> data[bisect_left(keys, 1)]
+    ('blue', 1)
+    >>> data[bisect_left(keys, 5)]
+    ('red', 5)
+    >>> data[bisect_left(keys, 8)]
+    ('yellow', 8)

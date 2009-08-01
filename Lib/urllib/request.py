@@ -1398,6 +1398,7 @@ class URLopener:
     def open(self, fullurl, data=None):
         """Use URLopener().open(file) instead of open(file, 'r')."""
         fullurl = unwrap(to_bytes(fullurl))
+        fullurl = quote(fullurl, safe="%/:=&?~#+!$,;'@()*[]")
         if self.tempcache and fullurl in self.tempcache:
             filename, headers = self.tempcache[fullurl]
             fp = open(filename, 'rb')
@@ -1757,7 +1758,8 @@ class URLopener:
         msg.append('Content-type: %s' % type)
         if encoding == 'base64':
             import base64
-            data = base64.decodestring(data)
+            # XXX is this encoding/decoding ok?
+            data = base64.decodebytes(data.encode('ascii')).decode('latin1')
         else:
             data = unquote(data)
         msg.append('Content-Length: %d' % len(data))
@@ -2244,18 +2246,11 @@ elif os.name == 'nt':
         # '<local>' string by the localhost entry and the corresponding
         # canonical entry.
         proxyOverride = proxyOverride.split(';')
-        i = 0
-        while i < len(proxyOverride):
-            if proxyOverride[i] == '<local>':
-                proxyOverride[i:i+1] = ['localhost',
-                                        '127.0.0.1',
-                                        socket.gethostname(),
-                                        socket.gethostbyname(
-                                            socket.gethostname())]
-            i += 1
-        # print proxyOverride
         # now check if we match one of the registry values.
         for test in proxyOverride:
+            if test == '<local>':
+                if '.' not in rawHost:
+                    return 1
             test = test.replace(".", r"\.")     # mask dots
             test = test.replace("*", r".*")     # change glob sequence
             test = test.replace("?", r".")      # change glob char

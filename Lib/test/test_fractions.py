@@ -60,13 +60,19 @@ class FractionTest(unittest.TestCase):
         self.assertEquals((7, 15), _components(F(7, 15)))
         self.assertEquals((10**23, 1), _components(F(10**23)))
 
+        self.assertEquals((3, 77), _components(F(F(3, 7), 11)))
+        self.assertEquals((-9, 5), _components(F(2, F(-10, 9))))
+        self.assertEquals((2486, 2485), _components(F(F(22, 7), F(355, 113))))
+
         self.assertRaisesMessage(ZeroDivisionError, "Fraction(12, 0)",
                                  F, 12, 0)
         self.assertRaises(TypeError, F, 1.5)
         self.assertRaises(TypeError, F, 1.5 + 3j)
 
-        self.assertRaises(TypeError, F, F(1, 2), 3)
         self.assertRaises(TypeError, F, "3/2", 3)
+        self.assertRaises(TypeError, F, 3, 0j)
+        self.assertRaises(TypeError, F, 3, 1j)
+
 
     def testFromString(self):
         self.assertEquals((5, 1), _components(F("5")))
@@ -78,6 +84,11 @@ class FractionTest(unittest.TestCase):
         self.assertEquals((-16, 5), _components(F(" -3.2 ")))
         self.assertEquals((-3, 1), _components(F(" -3. ")))
         self.assertEquals((3, 5), _components(F(" .6 ")))
+        self.assertEquals((1, 3125), _components(F("32.e-5")))
+        self.assertEquals((1000000, 1), _components(F("1E+06")))
+        self.assertEquals((-12300, 1), _components(F("-1.23e4")))
+        self.assertEquals((0, 1), _components(F(" .0e+0\t")))
+        self.assertEquals((0, 1), _components(F("-0.000e0")))
 
         self.assertRaisesMessage(
             ZeroDivisionError, "Fraction(3, 0)",
@@ -85,6 +96,9 @@ class FractionTest(unittest.TestCase):
         self.assertRaisesMessage(
             ValueError, "Invalid literal for Fraction: '3/'",
             F, "3/")
+        self.assertRaisesMessage(
+            ValueError, "Invalid literal for Fraction: '/2'",
+            F, "/2")
         self.assertRaisesMessage(
             ValueError, "Invalid literal for Fraction: '3 /2'",
             F, "3 /2")
@@ -100,10 +114,6 @@ class FractionTest(unittest.TestCase):
             # Avoid treating '.' as a regex special character.
             ValueError, "Invalid literal for Fraction: '3a2'",
             F, "3a2")
-        self.assertRaisesMessage(
-            # Only parse ordinary decimals, not scientific form.
-            ValueError, "Invalid literal for Fraction: '3.2e4'",
-            F, "3.2e4")
         self.assertRaisesMessage(
             # Don't accept combinations of decimals and rationals.
             ValueError, "Invalid literal for Fraction: '3/7.2'",

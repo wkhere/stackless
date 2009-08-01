@@ -120,7 +120,10 @@ docfile = ""
 if micro:
     docfile = str(micro)
 if level < 0xf:
-    docfile = '%x%s' % (level, serial)
+    if level == 0xC:
+        docfile = "rc%s" % (serial,)
+    else:
+        docfile = '%x%s' % (level, serial)
 docfile = 'python%s%s%s.chm' % (major, minor, docfile)
 
 # Build the mingw import library, libpythonXY.a
@@ -1015,10 +1018,10 @@ def add_files(db):
             lib.add_file("test_difflib_expect.html")
             lib.add_file("check_soundcard.vbs")
             lib.add_file("empty.vbs")
+            lib.add_file("Sine-1000Hz-300ms.aif")
             lib.glob("*.uue")
             lib.glob("*.pem")
             lib.glob("*.pck")
-            lib.add_file("readme.txt", src="README")
             lib.add_file("zipdir.zip")
         if dir=='decimaltestdata':
             lib.glob("*.decTest")
@@ -1206,10 +1209,10 @@ def add_registry(db):
     if have_tcl:
         tcl_verbs=[
              ("py.IDLE", -1, pat % (testprefix, "", ewi), "",
-              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -n -e "%1"',
+              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -e "%1"',
               "REGISTRY.tcl"),
              ("pyw.IDLE", -1, pat % (testprefix, "NoCon", ewi), "",
-              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -n -e "%1"',
+              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -e "%1"',
               "REGISTRY.tcl"),
         ]
     add_data(db, "Registry",

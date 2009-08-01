@@ -59,12 +59,13 @@ Objects are never explicitly destroyed; however, when they become unreachable
 they may be garbage-collected.  An implementation is allowed to postpone garbage
 collection or omit it altogether --- it is a matter of implementation quality
 how garbage collection is implemented, as long as no objects are collected that
-are still reachable.  (Implementation note: the current implementation uses a
+are still reachable.  (Implementation note: CPython currently uses a
 reference-counting scheme with (optional) delayed detection of cyclically linked
 garbage, which collects most objects as soon as they become unreachable, but is
 not guaranteed to collect garbage containing circular references.  See the
 documentation of the :mod:`gc` module for information on controlling the
-collection of cyclic garbage.)
+collection of cyclic garbage.  Other implementations act differently and CPython
+may change.)
 
 Note that the use of the implementation's tracing or debugging facilities may
 keep objects alive that would normally be collectable. Also note that catching
@@ -1540,6 +1541,38 @@ explored including logging, interface checking, automatic delegation, automatic
 property creation, proxies, frameworks, and automatic resource
 locking/synchronization.
 
+Here is an example of a metaclass that uses an :class:`collections.OrderedDict`
+to remember the order that class members were defined::
+
+    class OrderedClass(type):
+
+         @classmethod
+         def __prepare__(metacls, name, bases, **kwds):
+            return collections.OrderedDict()
+
+         def __new__(cls, name, bases, classdict):
+            result = type.__new__(cls, name, bases, dict(classdict))
+            result.members = tuple(classdict)
+            return result
+
+    class A(metaclass=OrderedClass):
+        def one(self): pass
+        def two(self): pass
+        def three(self): pass
+        def four(self): pass
+
+    >>> A.members
+    ('__module__', 'one', 'two', 'three', 'four')
+
+When the class definition for *A* gets executed, the process begins with
+calling the metaclass's :meth:`__prepare__` method which returns an empty
+:class:`collections.OrderedDict`.  That mapping records the methods and
+attributes of *A* as they are defined within the body of the class statement.
+Once those definitions are executed, the ordered dictionary is fully populated
+and the metaclass's :meth:`__new__` method gets invoked.  That method builds
+the new type and it saves the ordered dictionary keys in an attribute
+called *members*.
+
 
 .. _callable-types:
 
@@ -1667,11 +1700,11 @@ through the container; for mappings, :meth:`__iter__` should be the same as
    reverse iteration.  It should return a new iterator object that iterates
    over all the objects in the container in reverse order.
 
-   If the :meth:`__reversed__` method is not provided, the
-   :func:`reversed` builtin will fall back to using the sequence protocol
-   (:meth:`__len__` and :meth:`__getitem__`).  Objects should normally
-   only provide :meth:`__reversed__` if they do not support the sequence
-   protocol and an efficient implementation of reverse iteration is possible.
+   If the :meth:`__reversed__` method is not provided, the :func:`reversed`
+   builtin will fall back to using the sequence protocol (:meth:`__len__` and
+   :meth:`__getitem__`).  Objects that support the sequence protocol should
+   only provide :meth:`__reversed__` if they can provide an implementation
+   that is more efficient than the one provided by :func:`reversed`.
 
 
 The membership test operators (:keyword:`in` and :keyword:`not in`) are normally

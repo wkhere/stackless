@@ -10,18 +10,8 @@ from test import warning_tests
 
 import warnings as original_warnings
 
-sys.modules['_warnings'] = 0
-del sys.modules['warnings']
-
-import warnings as py_warnings
-
-del sys.modules['_warnings']
-del sys.modules['warnings']
-
-import warnings as c_warnings
-
-sys.modules['warnings'] = original_warnings
-
+py_warnings = support.import_fresh_module('warnings', blocked=['_warnings'])
+c_warnings = support.import_fresh_module('warnings', fresh=['_warnings'])
 
 @contextmanager
 def warnings_state(module):
@@ -351,8 +341,20 @@ class WarnTests(unittest.TestCase):
 class CWarnTests(BaseTest, WarnTests):
     module = c_warnings
 
+    # As an early adopter, we sanity check the
+    # test.support.import_fresh_module utility function
+    def test_accelerated(self):
+        self.assertFalse(original_warnings is self.module)
+        self.assertFalse(hasattr(self.module.warn, '__code__'))
+
 class PyWarnTests(BaseTest, WarnTests):
     module = py_warnings
+
+    # As an early adopter, we sanity check the
+    # test.support.import_fresh_module utility function
+    def test_pure_python(self):
+        self.assertFalse(original_warnings is self.module)
+        self.assertTrue(hasattr(self.module.warn, '__code__'))
 
 
 class WCmdLineTests(unittest.TestCase):

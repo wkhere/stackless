@@ -1,6 +1,7 @@
 
 import unittest, struct
 import os
+import sys
 from test import support
 import math
 from math import isinf, isnan, copysign, ldexp
@@ -9,6 +10,10 @@ import random, fractions
 
 INF = float("inf")
 NAN = float("nan")
+
+#locate file with float format test values
+test_dir = os.path.dirname(__file__) or os.curdir
+format_testfile = os.path.join(test_dir, 'formatfloat_testcases.txt')
 
 class GeneralFloatCases(unittest.TestCase):
 
@@ -24,6 +29,10 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(ValueError, float, "+-3.14")
         self.assertRaises(ValueError, float, "-+3.14")
         self.assertRaises(ValueError, float, "--3.14")
+        self.assertRaises(ValueError, float, ".nan")
+        self.assertRaises(ValueError, float, "+.inf")
+        self.assertRaises(ValueError, float, ".")
+        self.assertRaises(ValueError, float, "-.")
         self.assertEqual(float(b"  \u0663.\u0661\u0664  ".decode('raw-unicode-escape')), 3.14)
 
     @support.run_with_locale('LC_NUMERIC', 'fr_FR', 'de_DE')
@@ -78,11 +87,18 @@ class GeneralFloatCases(unittest.TestCase):
             def __float__(self):
                 return 42
 
+        # Issue 5759: __float__ not called on str subclasses (though it is on
+        # unicode subclasses).
+        class FooStr(str):
+            def __float__(self):
+                return float(str(self)) + 1
+
         self.assertAlmostEqual(float(Foo0()), 42.)
         self.assertAlmostEqual(float(Foo1()), 42.)
         self.assertAlmostEqual(float(Foo2()), 42.)
         self.assertAlmostEqual(float(Foo3(21)), 42.)
         self.assertRaises(TypeError, float, Foo4(42))
+        self.assertAlmostEqual(float(FooStr('8')), 9.)
 
     def test_floatasratio(self):
         for f, ratio in [
@@ -268,6 +284,13 @@ class FormatTestCase(unittest.TestCase):
         self.assertEqual(format(0.01, ''), '0.01')
         self.assertEqual(format(0.01, 'g'), '0.01')
 
+        # empty presentation type should format in the same way as str
+        # (issue 5920)
+        x = 100/7.
+        self.assertEqual(format(x, ''), str(x))
+        self.assertEqual(format(x, '-'), str(x))
+        self.assertEqual(format(x, '>'), str(x))
+        self.assertEqual(format(x, '2'), str(x))
 
         self.assertEqual(format(1.0, 'f'), '1.000000')
 
@@ -297,6 +320,32 @@ class FormatTestCase(unittest.TestCase):
                 self.assertRaises(ValueError, format, 1e-100, format_spec)
                 self.assertRaises(ValueError, format, -1e-100, format_spec)
 
+        # issue 3382
+        self.assertEqual(format(NAN, 'f'), 'nan')
+        self.assertEqual(format(NAN, 'F'), 'NAN')
+        self.assertEqual(format(INF, 'f'), 'inf')
+        self.assertEqual(format(INF, 'F'), 'INF')
+
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_format_testfile(self):
+        for line in open(format_testfile):
+            if line.startswith('--'):
+                continue
+            line = line.strip()
+            if not line:
+                continue
+
+            lhs, rhs = map(str.strip, line.split('->'))
+            fmt, arg = lhs.split()
+            self.assertEqual(fmt % float(arg), rhs)
+            self.assertEqual(fmt % -float(arg), '-' + rhs)
+
+    def test_issue5864(self):
+        self.assertEquals(format(123.456, '.4'), '123.5')
+        self.assertEquals(format(1234.56, '.4'), '1.235e+03')
+        self.assertEquals(format(12345.6, '.4'), '1.235e+04')
+
 class ReprTestCase(unittest.TestCase):
     def test_repr(self):
         floats_file = open(os.path.join(os.path.split(__file__)[0],
@@ -308,6 +357,137 @@ class ReprTestCase(unittest.TestCase):
             v = eval(line)
             self.assertEqual(v, eval(repr(v)))
         floats_file.close()
+
+    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+                         "applies only when using short float repr style")
+    def test_short_repr(self):
+        # test short float repr introduced in Python 3.1.  One aspect
+        # of this repr is that we get some degree of str -> float ->
+        # str roundtripping.  In particular, for any numeric string
+        # containing 15 or fewer significant digits, those exact same
+        # digits (modulo trailing zeros) should appear in the output.
+        # No more repr(0.03) -> "0.029999999999999999"!
+
+        test_strings = [
+            # output always includes *either* a decimal point and at
+            # least one digit after that point, or an exponent.
+            '0.0',
+            '1.0',
+            '0.01',
+            '0.02',
+            '0.03',
+            '0.04',
+            '0.05',
+            '1.23456789',
+            '10.0',
+            '100.0',
+            # values >= 1e16 get an exponent...
+            '1000000000000000.0',
+            '9999999999999990.0',
+            '1e+16',
+            '1e+17',
+            # ... and so do values < 1e-4
+            '0.001',
+            '0.001001',
+            '0.00010000000000001',
+            '0.0001',
+            '9.999999999999e-05',
+            '1e-05',
+            # values designed to provoke failure if the FPU rounding
+            # precision isn't set correctly
+            '8.72293771110361e+25',
+            '7.47005307342313e+26',
+            '2.86438000439698e+28',
+            '8.89142905246179e+28',
+            '3.08578087079232e+35',
+            ]
+
+        for s in test_strings:
+            negs = '-'+s
+            self.assertEqual(s, repr(float(s)))
+            self.assertEqual(negs, repr(float(negs)))
+
+class RoundTestCase(unittest.TestCase):
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_inf_nan(self):
+        self.assertRaises(OverflowError, round, INF)
+        self.assertRaises(OverflowError, round, -INF)
+        self.assertRaises(ValueError, round, NAN)
+
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_large_n(self):
+        for n in [324, 325, 400, 2**31-1, 2**31, 2**32, 2**100]:
+            self.assertEqual(round(123.456, n), 123.456)
+            self.assertEqual(round(-123.456, n), -123.456)
+            self.assertEqual(round(1e300, n), 1e300)
+            self.assertEqual(round(1e-320, n), 1e-320)
+        self.assertEqual(round(1e150, 300), 1e150)
+        self.assertEqual(round(1e300, 307), 1e300)
+        self.assertEqual(round(-3.1415, 308), -3.1415)
+        self.assertEqual(round(1e150, 309), 1e150)
+        self.assertEqual(round(1.4e-315, 315), 1e-315)
+
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_small_n(self):
+        for n in [-308, -309, -400, 1-2**31, -2**31, -2**31-1, -2**100]:
+            self.assertEqual(round(123.456, n), 0.0)
+            self.assertEqual(round(-123.456, n), -0.0)
+            self.assertEqual(round(1e300, n), 0.0)
+            self.assertEqual(round(1e-320, n), 0.0)
+
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_overflow(self):
+        self.assertRaises(OverflowError, round, 1.6e308, -308)
+        self.assertRaises(OverflowError, round, -1.7e308, -308)
+
+    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+                         "applies only when using short float repr style")
+    def test_previous_round_bugs(self):
+        # particular cases that have occurred in bug reports
+        self.assertEqual(round(562949953421312.5, 1),
+                          562949953421312.5)
+        self.assertEqual(round(56294995342131.5, 3),
+                         56294995342131.5)
+        # round-half-even
+        self.assertEqual(round(25.0, -1), 20.0)
+        self.assertEqual(round(35.0, -1), 40.0)
+        self.assertEqual(round(45.0, -1), 40.0)
+        self.assertEqual(round(55.0, -1), 60.0)
+        self.assertEqual(round(65.0, -1), 60.0)
+        self.assertEqual(round(75.0, -1), 80.0)
+        self.assertEqual(round(85.0, -1), 80.0)
+        self.assertEqual(round(95.0, -1), 100.0)
+
+    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+                         "applies only when using short float repr style")
+    def test_matches_float_format(self):
+        # round should give the same results as float formatting
+        for i in range(500):
+            x = i/1000.
+            self.assertEqual(float(format(x, '.0f')), round(x, 0))
+            self.assertEqual(float(format(x, '.1f')), round(x, 1))
+            self.assertEqual(float(format(x, '.2f')), round(x, 2))
+            self.assertEqual(float(format(x, '.3f')), round(x, 3))
+
+        for i in range(5, 5000, 10):
+            x = i/1000.
+            self.assertEqual(float(format(x, '.0f')), round(x, 0))
+            self.assertEqual(float(format(x, '.1f')), round(x, 1))
+            self.assertEqual(float(format(x, '.2f')), round(x, 2))
+            self.assertEqual(float(format(x, '.3f')), round(x, 3))
+
+        for i in range(500):
+            x = random.random()
+            self.assertEqual(float(format(x, '.0f')), round(x, 0))
+            self.assertEqual(float(format(x, '.1f')), round(x, 1))
+            self.assertEqual(float(format(x, '.2f')), round(x, 2))
+            self.assertEqual(float(format(x, '.3f')), round(x, 3))
+
+
 
 # Beginning with Python 2.6 float has cross platform compatible
 # ways to create and represent inf and nan
@@ -352,6 +532,11 @@ class InfNanTest(unittest.TestCase):
         self.assertRaises(ValueError, float, "-INFI")
         self.assertRaises(ValueError, float, "infinitys")
 
+        self.assertRaises(ValueError, float, "++Inf")
+        self.assertRaises(ValueError, float, "-+inf")
+        self.assertRaises(ValueError, float, "+-infinity")
+        self.assertRaises(ValueError, float, "--Infinity")
+
     def test_inf_as_str(self):
         self.assertEqual(repr(1e300 * 1e300), "inf")
         self.assertEqual(repr(-1e300 * 1e300), "-inf")
@@ -382,6 +567,11 @@ class InfNanTest(unittest.TestCase):
         self.assertRaises(ValueError, float, "na")
         self.assertRaises(ValueError, float, "+na")
         self.assertRaises(ValueError, float, "-na")
+
+        self.assertRaises(ValueError, float, "++nan")
+        self.assertRaises(ValueError, float, "-+NAN")
+        self.assertRaises(ValueError, float, "+-NaN")
+        self.assertRaises(ValueError, float, "--nAn")
 
     def test_nan_as_str(self):
         self.assertEqual(repr(1e300 * 1e300 * 0), "nan")
@@ -435,6 +625,11 @@ class HexFloatTestCase(unittest.TestCase):
             'snan',
             'NaNs',
             'nna',
+            'an',
+            'nf',
+            'nfinity',
+            'inity',
+            'iinity',
             '0xnan',
             '',
             ' ',
@@ -481,6 +676,32 @@ class HexFloatTestCase(unittest.TestCase):
             else:
                 self.fail('Expected float.fromhex(%r) to raise ValueError; '
                           'got %r instead' % (x, result))
+
+
+    def test_whitespace(self):
+        value_pairs = [
+            ('inf', INF),
+            ('-Infinity', -INF),
+            ('nan', NAN),
+            ('1.0', 1.0),
+            ('-0x.2', -0.125),
+            ('-0.0', -0.0)
+            ]
+        whitespace = [
+            '',
+            ' ',
+            '\t',
+            '\n',
+            '\n \t',
+            '\f',
+            '\v',
+            '\r'
+            ]
+        for inp, expected in value_pairs:
+            for lead in whitespace:
+                for trail in whitespace:
+                    got = fromHex(lead + inp + trail)
+                    self.identical(got, expected)
 
 
     def test_from_hex(self):
@@ -798,6 +1019,7 @@ def test_main():
         IEEEFormatTestCase,
         FormatTestCase,
         ReprTestCase,
+        RoundTestCase,
         InfNanTest,
         HexFloatTestCase,
         )

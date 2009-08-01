@@ -8,6 +8,7 @@
 .. moduleauthor:: Mark Russell <mark.russell@zen.co.uk>
 .. moduleauthor:: Antoine Pitrou <solipsis@pitrou.net>
 .. moduleauthor:: Amaury Forgeot d'Arc <amauryfa@gmail.com>
+.. moduleauthor:: Benjamin Peterson <benjamin@python.org>
 .. sectionauthor:: Benjamin Peterson <benjamin@python.org>
 
 The :mod:`io` module provides the Python interfaces to stream handling.  The
@@ -50,7 +51,7 @@ Module Interface
    classes.  :func:`open` uses the file's blksize (as obtained by
    :func:`os.stat`) if possible.
 
-.. function:: open(file[, mode[, buffering[, encoding[, errors[, newline[, closefd=True]]]]]])
+.. function:: open(file, mode='r', buffering=None, encoding=None, errors=None, newline=None, closefd=True)
 
    Open *file* and return a corresponding stream.  If the file cannot be opened,
    an :exc:`IOError` is raised.
@@ -249,7 +250,7 @@ I/O Base Classes
       Return ``True`` if the stream can be read from.  If False, :meth:`read`
       will raise :exc:`IOError`.
 
-   .. method:: readline([limit])
+   .. method:: readline(limit=-1)
 
       Read and return one line from the stream.  If *limit* is specified, at
       most *limit* bytes will be read.
@@ -258,13 +259,13 @@ I/O Base Classes
       the *newlines* argument to :func:`open` can be used to select the line
       terminator(s) recognized.
 
-   .. method:: readlines([hint])
+   .. method:: readlines(hint=-1)
 
       Read and return a list of lines from the stream.  *hint* can be specified
       to control the number of lines read: no more lines will be read if the
       total size (in bytes/characters) of all lines so far exceeds *hint*.
 
-   .. method:: seek(offset[, whence])
+   .. method:: seek(offset, whence=SEEK_SET)
 
       Change the stream position to the given byte *offset*.  *offset* is
       interpreted relative to the position indicated by *whence*.  Values for
@@ -279,7 +280,7 @@ I/O Base Classes
 
       Return the new absolute position.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.1
          The ``SEEK_*`` constants
 
    .. method:: seekable()
@@ -291,7 +292,7 @@ I/O Base Classes
 
       Return the current stream position.
 
-   .. method:: truncate([size])
+   .. method:: truncate(size=None)
 
       Truncate the file to at most *size* bytes.  *size* defaults to the current
       file position, as returned by :meth:`tell`.
@@ -316,7 +317,7 @@ I/O Base Classes
    In addition to the attributes and methods from :class:`IOBase`,
    RawIOBase provides the following methods:
 
-   .. method:: read([n])
+   .. method:: read(n=-1)
 
       Read and return all the bytes from the stream until EOF, or if *n* is
       specified, up to *n* bytes.  Only one system call is ever made.  An empty
@@ -361,7 +362,20 @@ I/O Base Classes
    :class:`BufferedIOBase` provides or overrides these methods in addition to
    those from :class:`IOBase`:
 
-   .. method:: read([n])
+   .. method:: detach()
+
+      Separate the underlying raw stream from the buffer and return it.
+
+      After the raw stream has been detached, the buffer is in an unusable
+      state.
+
+      Some buffers, like :class:`BytesIO`, do not have the concept of a single
+      raw stream to return from this method.  They raise
+      :exc:`UnsupportedOperation`.
+
+      .. versionadded:: 3.1
+
+   .. method:: read(n=-1)
 
       Read and return up to *n* bytes.  If the argument is omitted, ``None``, or
       negative, data is read and returned until EOF is reached.  An empty bytes
@@ -376,7 +390,7 @@ I/O Base Classes
       A :exc:`BlockingIOError` is raised if the underlying raw stream has no
       data at the moment.
 
-   .. method:: read1([n])
+   .. method:: read1(n=-1)
 
       Read and return up to *n* bytes, with at most one call to the underlying
       raw stream's :meth:`~RawIOBase.read` method.
@@ -405,7 +419,7 @@ I/O Base Classes
 Raw File I/O
 ------------
 
-.. class:: FileIO(name[, mode])
+.. class:: FileIO(name, mode='r', closefd=True)
 
    :class:`FileIO` represents a file containing bytes data.  It implements
    the :class:`RawIOBase` interface (and therefore the :class:`IOBase`
@@ -429,7 +443,7 @@ Raw File I/O
       The file name.  This is the file descriptor of the file when no name is
       given in the constructor.
 
-   .. method:: read([n])
+   .. method:: read(n=-1)
 
       Read and return at most *n* bytes.  Only one system call is made, so it is
       possible that less data than was requested is returned.  Use :func:`len`
@@ -476,7 +490,7 @@ Buffered Streams
       current stream position, as returned by :meth:`tell`.
 
 
-.. class:: BufferedReader(raw[, buffer_size])
+.. class:: BufferedReader(raw, buffer_size=DEFAULT_BUFFER_SIZE)
 
    A buffer for a readable, sequential :class:`RawIOBase` object.  It inherits
    :class:`BufferedIOBase`.
@@ -490,11 +504,9 @@ Buffered Streams
 
    .. method:: peek([n])
 
-      Return 1 (or *n* if specified) bytes from a buffer without advancing the
-      position.  Only a single read on the raw stream is done to satisfy the
-      call. The number of bytes returned may be less than requested since at
-      most all the buffer's bytes from the current position to the end are
-      returned.
+      Return bytes from the stream without advancing the position.  At most one
+      single read on the raw stream is done to satisfy the call. The number of
+      bytes returned may be less or more than requested.
 
    .. method:: read([n])
 
@@ -508,7 +520,7 @@ Buffered Streams
       Otherwise, one raw stream read call is made.
 
 
-.. class:: BufferedWriter(raw[, buffer_size[, max_buffer_size]])
+.. class:: BufferedWriter(raw, buffer_size=DEFAULT_BUFFER_SIZE)
 
    A buffer for a writeable sequential RawIO object.  It inherits
    :class:`BufferedIOBase`.
@@ -517,7 +529,7 @@ Buffered Streams
    *raw* stream.  If the *buffer_size* is not given, it defaults to
    :data:`DEFAULT_BUFFER_SIZE`.
 
-   *max_buffer_size* is unused and deprecated.
+   A third argument, *max_buffer_size*, is supported, but unused and deprecated.
 
    :class:`BufferedWriter` provides or overrides these methods in addition to
    those from :class:`BufferedIOBase` and :class:`IOBase`:
@@ -534,7 +546,7 @@ Buffered Streams
       raw stream blocks.
 
 
-.. class:: BufferedRWPair(reader, writer[, buffer_size[, max_buffer_size]])
+.. class:: BufferedRWPair(reader, writer, buffer_size, max_buffer_size=DEFAULT_BUFFER_SIZE)
 
    A combined buffered writer and reader object for a raw stream that can be
    written to and read from.  It has and supports both :meth:`read`, :meth:`write`,
@@ -545,12 +557,15 @@ Buffered Streams
    writeable respectively.  If the *buffer_size* is omitted it defaults to
    :data:`DEFAULT_BUFFER_SIZE`.
 
-   *max_buffer_size* is unused and deprecated.
+   A fourth argument, *max_buffer_size*, is supported, but unused and
+   deprecated.
 
-   :class:`BufferedRWPair` implements all of :class:`BufferedIOBase`\'s methods.
+   :class:`BufferedRWPair` implements all of :class:`BufferedIOBase`\'s methods
+   except for :meth:`~BufferedIOBase.detach`, which raises
+   :exc:`UnsupportedOperation`.
 
 
-.. class:: BufferedRandom(raw[, buffer_size[, max_buffer_size]])
+.. class:: BufferedRandom(raw, buffer_size=DEFAULT_BUFFER_SIZE)
 
    A buffered interface to random access streams.  It inherits
    :class:`BufferedReader` and :class:`BufferedWriter`.
@@ -559,7 +574,7 @@ Buffered Streams
    in the first argument.  If the *buffer_size* is omitted it defaults to
    :data:`DEFAULT_BUFFER_SIZE`.
 
-   *max_buffer_size* is unused and deprecated.
+   A third argument, *max_buffer_size*, is supported, but unused and deprecated.
 
    :class:`BufferedRandom` is capable of anything :class:`BufferedReader` or
    :class:`BufferedWriter` can do.
@@ -583,10 +598,27 @@ Text I/O
       The name of the encoding used to decode the stream's bytes into
       strings, and to encode strings into bytes.
 
+   .. attribute:: errors
+
+      The error setting of the decoder or encoder.
+
    .. attribute:: newlines
 
       A string, a tuple of strings, or ``None``, indicating the newlines
       translated so far.
+
+   .. method:: detach()
+
+      Separate the underlying buffer from the :class:`TextIOBase` and return it.
+
+      After the underlying buffer has been detached, the :class:`TextIOBase` is
+      in an unusable state.
+
+      Some :class:`TextIOBase` implementations, like :class:`StringIO`, may not
+      have the concept of an underlying buffer and calling this method will
+      raise :exc:`UnsupportedOperation`.
+
+      .. versionadded:: 3.1
 
    .. method:: read(n)
 
@@ -604,7 +636,7 @@ Text I/O
       written.
 
 
-.. class:: TextIOWrapper(buffer[, encoding[, errors[, newline[, line_buffering]]]])
+.. class:: TextIOWrapper(buffer, encoding=None, errors=None, newline=None, line_buffering=False)
 
    A buffered text stream over a :class:`BufferedIOBase` raw stream, *buffer*.
    It inherits :class:`TextIOBase`.
@@ -635,19 +667,15 @@ Text I/O
    If *line_buffering* is ``True``, :meth:`flush` is implied when a call to
    write contains a newline character.
 
-   :class:`TextIOWrapper` provides these data attributes in addition to those of
+   :class:`TextIOWrapper` provides one attribute in addition to those of
    :class:`TextIOBase` and its parents:
-
-   .. attribute:: errors
-
-      The encoding and decoding error setting.
 
    .. attribute:: line_buffering
 
       Whether line buffering is enabled.
 
 
-.. class:: StringIO([initial_value[, newline]])
+.. class:: StringIO(initial_value='', newline=None)
 
    An in-memory stream for text.  It inherits :class:`TextIOWrapper`.
 

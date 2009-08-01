@@ -34,7 +34,7 @@ typedef struct {
 typedef enum {
     ANS_INIT,
     ANS_AUTO,
-    ANS_MANUAL,
+    ANS_MANUAL
 } AutoNumberState;   /* Keep track if we're auto-numbering fields */
 
 /* Keeps track of our auto-numbering state, and which number field we're on */
@@ -375,8 +375,9 @@ FieldNameIterator_next(FieldNameIterator *self, int *is_attribute,
         *name_idx = get_integer(name);
         break;
     default:
-        /* interal error, can't get here */
-        assert(0);
+        /* Invalid character follows ']' */
+        PyErr_SetString(PyExc_ValueError, "Only '.' or '[' may "
+                        "follow ']' in format field specifier");
         return 0;
     }
 

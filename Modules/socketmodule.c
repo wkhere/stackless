@@ -4231,7 +4231,7 @@ PyInit__socket(void)
 
 	/* Export C API */
 	if (PyModule_AddObject(m, PySocket_CAPI_NAME,
-	       PyCObject_FromVoidPtr((void *)&PySocketModuleAPI, NULL)
+	       PyCapsule_New(&PySocketModuleAPI, PySocket_CAPSULE_NAME, NULL)
 				 ) != 0)
 		return NULL;
 

@@ -26,9 +26,12 @@ To use, simply 'import logging' and log away!
 import sys, os, time, io, traceback, warnings
 
 __all__ = ['BASIC_FORMAT', 'BufferingFormatter', 'CRITICAL', 'DEBUG', 'ERROR',
-           'FATAL', 'FileHandler', 'Filter', 'Filterer', 'Formatter', 'Handler',
-           'INFO', 'LogRecord', 'Logger', 'Manager', 'NOTSET', 'PlaceHolder',
-           'RootLogger', 'StreamHandler', 'WARN', 'WARNING']
+           'FATAL', 'FileHandler', 'Filter', 'Formatter', 'Handler', 'INFO',
+           'LogRecord', 'Logger', 'LoggerAdapter', 'NOTSET', 'NullHandler',
+           'StreamHandler', 'WARN', 'WARNING', 'addLevelName', 'basicConfig',
+           'captureWarnings', 'critical', 'debug', 'disable', 'error',
+           'exception', 'fatal', 'getLevelName', 'getLogger', 'getLoggerClass',
+           'info', 'log', 'makeLogRecord', 'setLoggerClass', 'warn', 'warning']
 
 try:
     import codecs
@@ -717,8 +720,12 @@ class Handler(Filterer):
         """
         if raiseExceptions:
             ei = sys.exc_info()
-            traceback.print_exception(ei[0], ei[1], ei[2], None, sys.stderr)
-            del ei
+            try:
+                traceback.print_exception(ei[0], ei[1], ei[2], None, sys.stderr)
+            except IOError:
+                pass    # see issue 5971
+            finally:
+                del ei
 
 class StreamHandler(Handler):
     """
@@ -753,7 +760,7 @@ class StreamHandler(Handler):
         The record is then written to the stream with a trailing newline.  If
         exception information is present, it is formatted using
         traceback.print_exception and appended to the stream.  If the stream
-        has an 'encoding' attribute, it is used to encode the message before
+        has an 'encoding' attribute, it is used to determine how to do the
         output to the stream.
         """
         try:
@@ -764,11 +771,21 @@ class StreamHandler(Handler):
                 stream.write(fs % msg)
             else:
                 try:
-                    if (isinstance(msg, unicode) or
-                        getattr(stream, 'encoding', None) is None):
-                        stream.write(fs % msg)
+                    if (isinstance(msg, unicode) and
+                        getattr(stream, 'encoding', None)):
+                        fs = fs.decode(stream.encoding)
+                        try:
+                            stream.write(fs % msg)
+                        except UnicodeEncodeError:
+                            #Printing to terminals sometimes fails. For example,
+                            #with an encoding of 'cp1251', the above write will
+                            #work if written to a stream opened or wrapped by
+                            #the codecs module, but fail when writing to a
+                            #terminal even when the codepage is set to cp1251.
+                            #An extra encoding step seems to be needed.
+                            stream.write((fs % msg).encode(stream.encoding))
                     else:
-                        stream.write(fs % msg.encode(stream.encoding))
+                        stream.write(fs % msg)
                 except UnicodeError:
                     stream.write(fs % msg.encode("UTF-8"))
             self.flush()
@@ -1379,6 +1396,10 @@ def basicConfig(**kwargs):
         root.addHandler(hdlr)
         level = kwargs.get("level")
         if level is not None:
+            if str(level) == level: # If a string was passed, do more checks
+                if level not in _levelNames:
+                    raise ValueError("Unknown level: %r" % level)
+                level = _levelNames[level]
             root.setLevel(level)
 
 #---------------------------------------------------------------------------

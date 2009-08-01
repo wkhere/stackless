@@ -5,12 +5,9 @@ modules in setup scripts."""
 
 __revision__ = "$Id$"
 
-import os, sys
-
-try:
-    import warnings
-except ImportError:
-    warnings = None
+import os
+import sys
+import warnings
 
 # This class is really only used by the "build_ext" command, so it might
 # make sense to put it in distutils.command.build_ext.  However, that
@@ -129,18 +126,17 @@ class Extension:
         self.optional = optional
 
         # If there are unknown keyword options, warn about them
-        if len(kw):
-            L = map(repr, sorted(kw))
-            msg = "Unknown Extension options: " + ', '.join(L)
-            if warnings is not None:
-                warnings.warn(msg)
-            else:
-                sys.stderr.write(msg + '\n')
-
+        if len(kw) > 0:
+            options = [repr(option) for option in kw]
+            options = ', '.join(sorted(options))
+            msg = "Unknown Extension options: %s" % options
+            warnings.warn(msg)
 
 def read_setup_file(filename):
-    from distutils.sysconfig import \
-         parse_makefile, expand_makefile_vars, _variable_rx
+    """Reads a Setup file and returns Extension instances."""
+    from distutils.sysconfig import (parse_makefile, expand_makefile_vars,
+                                     _variable_rx)
+
     from distutils.text_file import TextFile
     from distutils.util import split_quoted
 
@@ -165,10 +161,8 @@ def read_setup_file(filename):
             file.warn("'%s' lines not handled yet" % line)
             continue
 
-        #print "original line: " + line
         line = expand_makefile_vars(line, vars)
         words = split_quoted(line)
-        #print "expanded line: " + line
 
         # NB. this parses a slightly different syntax than the old
         # makesetup script: here, there must be exactly one extension per
@@ -233,14 +227,5 @@ def read_setup_file(filename):
                 file.warn("unrecognized argument '%s'" % word)
 
         extensions.append(ext)
-
-        #print "module:", module
-        #print "source files:", source_files
-        #print "cpp args:", cpp_args
-        #print "lib args:", library_args
-
-        #extensions[module] = { 'sources': source_files,
-        #                       'cpp_args': cpp_args,
-        #                       'lib_args': library_args }
 
     return extensions

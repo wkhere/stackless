@@ -1,18 +1,19 @@
+# -*- coding: utf8 -*-
 """Tests for distutils.dist."""
-
-import distutils.cmd
-import distutils.dist
 import os
 import io
 import sys
 import unittest
 import warnings
 
-from test.support import TESTFN
+from distutils.dist import Distribution, fix_help_options
+from distutils.cmd import Command
+
+from test.support import TESTFN, captured_stdout
 from distutils.tests import support
 
 
-class test_dist(distutils.cmd.Command):
+class test_dist(Command):
     """Sample distutils extension command."""
 
     user_options = [
@@ -23,7 +24,7 @@ class test_dist(distutils.cmd.Command):
         self.sample_option = None
 
 
-class TestDistribution(distutils.dist.Distribution):
+class TestDistribution(Distribution):
     """Distribution subclasses that avoids the default search for
     configuration files.
 
@@ -35,14 +36,17 @@ class TestDistribution(distutils.dist.Distribution):
         return self._config_files
 
 
-class DistributionTestCase(unittest.TestCase):
+class DistributionTestCase(support.LoggingSilencer,
+                           unittest.TestCase):
 
     def setUp(self):
+        super(DistributionTestCase, self).setUp()
         self.argv = sys.argv[:]
         del sys.argv[1:]
 
     def tearDown(self):
         sys.argv[:] = self.argv
+        super(DistributionTestCase, self).tearDown()
 
     def create_distribution(self, configfiles=()):
         d = TestDistribution()
@@ -97,11 +101,10 @@ class DistributionTestCase(unittest.TestCase):
         finally:
             os.unlink(TESTFN)
 
-
     def test_empty_options(self):
         # an empty options dictionary should not stay in the
         # list of attributes
-        klass = distutils.dist.Distribution
+        klass = Distribution
 
         # catching warnings
         warns = []
@@ -121,12 +124,56 @@ class DistributionTestCase(unittest.TestCase):
 
         self.assertEquals(len(warns), 0)
 
-class MetadataTestCase(support.TempdirManager, unittest.TestCase):
+    def test_finalize_options(self):
+
+        attrs = {'keywords': 'one,two',
+                 'platforms': 'one,two'}
+
+        dist = Distribution(attrs=attrs)
+        dist.finalize_options()
+
+        # finalize_option splits platforms and keywords
+        self.assertEquals(dist.metadata.platforms, ['one', 'two'])
+        self.assertEquals(dist.metadata.keywords, ['one', 'two'])
+
+    def test_show_help(self):
+        class FancyGetopt(object):
+            def __init__(self):
+                self.count = 0
+
+            def set_option_table(self, *args):
+                pass
+
+            def print_help(self, *args):
+                self.count += 1
+
+        parser = FancyGetopt()
+        dist = Distribution()
+        dist.commands = ['sdist']
+        dist.script_name = 'setup.py'
+        dist._show_help(parser)
+        self.assertEquals(parser.count, 3)
+
+    def test_get_command_packages(self):
+        dist = Distribution()
+        self.assertEquals(dist.command_packages, None)
+        cmds = dist.get_command_packages()
+        self.assertEquals(cmds, ['distutils.command'])
+        self.assertEquals(dist.command_packages,
+                          ['distutils.command'])
+
+        dist.command_packages = 'one,two'
+        cmds = dist.get_command_packages()
+        self.assertEquals(cmds, ['distutils.command', 'one', 'two'])
+
+
+class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
+                       unittest.TestCase):
 
     def test_simple_metadata(self):
         attrs = {"name": "package",
                  "version": "1.0"}
-        dist = distutils.dist.Distribution(attrs)
+        dist = Distribution(attrs)
         meta = self.format_metadata(dist)
         self.assert_("Metadata-Version: 1.0" in meta)
         self.assert_("provides:" not in meta.lower())
@@ -137,7 +184,7 @@ class MetadataTestCase(support.TempdirManager, unittest.TestCase):
         attrs = {"name": "package",
                  "version": "1.0",
                  "provides": ["package", "package.sub"]}
-        dist = distutils.dist.Distribution(attrs)
+        dist = Distribution(attrs)
         self.assertEqual(dist.metadata.get_provides(),
                          ["package", "package.sub"])
         self.assertEqual(dist.get_provides(),
@@ -148,8 +195,7 @@ class MetadataTestCase(support.TempdirManager, unittest.TestCase):
         self.assert_("obsoletes:" not in meta.lower())
 
     def test_provides_illegal(self):
-        self.assertRaises(ValueError,
-                          distutils.dist.Distribution,
+        self.assertRaises(ValueError, Distribution,
                           {"name": "package",
                            "version": "1.0",
                            "provides": ["my.pkg (splat)"]})
@@ -158,7 +204,7 @@ class MetadataTestCase(support.TempdirManager, unittest.TestCase):
         attrs = {"name": "package",
                  "version": "1.0",
                  "requires": ["other", "another (==1.0)"]}
-        dist = distutils.dist.Distribution(attrs)
+        dist = Distribution(attrs)
         self.assertEqual(dist.metadata.get_requires(),
                          ["other", "another (==1.0)"])
         self.assertEqual(dist.get_requires(),
@@ -171,8 +217,7 @@ class MetadataTestCase(support.TempdirManager, unittest.TestCase):
         self.assert_("obsoletes:" not in meta.lower())
 
     def test_requires_illegal(self):
-        self.assertRaises(ValueError,
-                          distutils.dist.Distribution,
+        self.assertRaises(ValueError, Distribution,
                           {"name": "package",
                            "version": "1.0",
                            "requires": ["my.pkg (splat)"]})
@@ -181,7 +226,7 @@ class MetadataTestCase(support.TempdirManager, unittest.TestCase):
         attrs = {"name": "package",
                  "version": "1.0",
                  "obsoletes": ["other", "another (<1.0)"]}
-        dist = distutils.dist.Distribution(attrs)
+        dist = Distribution(attrs)
         self.assertEqual(dist.metadata.get_obsoletes(),
                          ["other", "another (<1.0)"])
         self.assertEqual(dist.get_obsoletes(),
@@ -194,8 +239,7 @@ class MetadataTestCase(support.TempdirManager, unittest.TestCase):
         self.assert_("Obsoletes: another (<1.0)" in meta)
 
     def test_obsoletes_illegal(self):
-        self.assertRaises(ValueError,
-                          distutils.dist.Distribution,
+        self.assertRaises(ValueError, Distribution,
                           {"name": "package",
                            "version": "1.0",
                            "obsoletes": ["my.pkg (splat)"]})
@@ -208,13 +252,6 @@ class MetadataTestCase(support.TempdirManager, unittest.TestCase):
     def test_custom_pydistutils(self):
         # fixes #2166
         # make sure pydistutils.cfg is found
-        old = {}
-        for env in ('HOME', 'HOMEPATH', 'HOMEDRIVE'):
-            value = os.environ.get(env)
-            old[env] = value
-            if value is not None:
-                del os.environ[env]
-
         if os.name == 'posix':
             user_filename = ".pydistutils.cfg"
         else:
@@ -227,27 +264,46 @@ class MetadataTestCase(support.TempdirManager, unittest.TestCase):
         f.close()
 
         try:
-            dist = distutils.dist.Distribution()
+            dist = Distribution()
 
             # linux-style
             if sys.platform in ('linux', 'darwin'):
-                os.environ['HOME'] = temp_dir
+                self.environ['HOME'] = temp_dir
                 files = dist.find_config_files()
                 self.assert_(user_filename in files)
 
             # win32-style
             if sys.platform == 'win32':
                 # home drive should be found
-                os.environ['HOME'] = temp_dir
+                self.environ['HOME'] = temp_dir
                 files = dist.find_config_files()
                 self.assert_(user_filename in files,
                              '%r not found in %r' % (user_filename, files))
         finally:
-            for key, value in old.items():
-                if value is None:
-                    continue
-                os.environ[key] = value
             os.remove(user_filename)
+
+    def test_fix_help_options(self):
+        help_tuples = [('a', 'b', 'c', 'd'), (1, 2, 3, 4)]
+        fancy_options = fix_help_options(help_tuples)
+        self.assertEquals(fancy_options[0], ('a', 'b', 'c'))
+        self.assertEquals(fancy_options[1], (1, 2, 3))
+
+    def test_show_help(self):
+        # smoke test, just makes sure some help is displayed
+        dist = Distribution()
+        old_argv = sys.argv
+        sys.argv = []
+        try:
+            dist.help = 1
+            dist.script_name = 'setup.py'
+            with captured_stdout() as s:
+                dist.parse_command_line()
+        finally:
+            sys.argv = old_argv
+
+        output = [line for line in s.getvalue().split('\n')
+                  if line.strip() != '']
+        self.assert_(len(output) > 0)
 
 def test_suite():
     suite = unittest.TestSuite()

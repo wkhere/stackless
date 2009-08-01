@@ -63,7 +63,7 @@ def print_tb(tb, limit=None, file=None):
         filename = co.co_filename
         name = co.co_name
         _print(file,
-               '  File "%s", line %d, in %s' % (filename,lineno,name))
+               '  File "%s", line %d, in %s' % (filename, lineno, name))
         linecache.checkcache(filename)
         line = linecache.getline(filename, lineno, f.f_globals)
         if line: _print(file, '    ' + line.strip())
@@ -159,9 +159,8 @@ def print_exception(etype, value, tb, limit=None, file=None, chain=True):
             _print(file, 'Traceback (most recent call last):')
             print_tb(tb, limit, file)
         lines = format_exception_only(type(value), value)
-        for line in lines[:-1]:
-            _print(file, line, ' ')
-        _print(file, lines[-1], '')
+        for line in lines:
+            _print(file, line, '')
 
 def format_exception(etype, value, tb, limit=None, chain=True):
     """Format a stack trace and the exception information.
@@ -226,7 +225,7 @@ def format_exception_only(etype, value):
     if badline is not None:
         lines.append('    %s\n' % badline.strip())
         if offset is not None:
-            caretspace = badline[:offset].lstrip()
+            caretspace = badline.rstrip('\n')[:offset].lstrip()
             # non-space whitespace (likes tabs) must be kept for alignment
             caretspace = ((c.isspace() and c or ' ') for c in caretspace)
             # only three spaces to account for offset1 == pos 0

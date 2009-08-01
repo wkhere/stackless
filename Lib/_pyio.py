@@ -35,8 +35,9 @@ class BlockingIOError(IOError):
         self.characters_written = characters_written
 
 
-def open(file, mode="r", buffering=None, encoding=None, errors=None,
-         newline=None, closefd=True):
+def open(file: (str, bytes), mode: str = "r", buffering: int = None,
+         encoding: str = None, errors: str = None,
+         newline: str = None, closefd: bool = True) -> "IOBase":
 
     r"""Open file and return a stream.  Raise IOError upon failure.
 
@@ -459,6 +460,8 @@ class IOBase(metaclass=abc.ABCMeta):
                 return 1
         if limit is None:
             limit = -1
+        elif not isinstance(limit, int):
+            raise TypeError("limit must be an integer")
         res = bytearray()
         while limit < 0 or len(res) < limit:
             b = self.read(nreadahead())
@@ -639,6 +642,15 @@ class BufferedIOBase(IOBase):
         """
         self._unsupported("write")
 
+    def detach(self) -> None:
+        """
+        Separate the underlying raw stream from the buffer and return it.
+
+        After the raw stream has been detached, the buffer is in an unusable
+        state.
+        """
+        self._unsupported("detach")
+
 io.BufferedIOBase.register(BufferedIOBase)
 
 
@@ -686,12 +698,20 @@ class _BufferedIOMixin(BufferedIOBase):
         self.raw.flush()
 
     def close(self):
-        if not self.closed:
+        if not self.closed and self.raw is not None:
             try:
                 self.flush()
             except IOError:
                 pass  # If flush() fails, just give up
             self.raw.close()
+
+    def detach(self):
+        if self.raw is None:
+            raise ValueError("raw stream already detached")
+        self.flush()
+        raw = self.raw
+        self.raw = None
+        return raw
 
     ### Inquiries ###
 
@@ -715,6 +735,15 @@ class _BufferedIOMixin(BufferedIOBase):
     @property
     def mode(self):
         return self.raw.mode
+
+    def __repr__(self):
+        clsname = self.__class__.__name__
+        try:
+            name = self.name
+        except AttributeError:
+            return "<_pyio.{0}>".format(clsname)
+        else:
+            return "<_pyio.{0} name={1!r}>".format(clsname, name)
 
     ### Lower-level APIs ###
 
@@ -838,7 +867,9 @@ class BufferedReader(_BufferedIOMixin):
     def __init__(self, raw, buffer_size=DEFAULT_BUFFER_SIZE):
         """Create a new buffered reader using the given readable raw IO object.
         """
-        raw._checkReadable()
+        if not raw.readable():
+            raise IOError('"raw" argument must be readable.')
+
         _BufferedIOMixin.__init__(self, raw)
         if buffer_size <= 0:
             raise ValueError("invalid buffer size")
@@ -969,7 +1000,9 @@ class BufferedWriter(_BufferedIOMixin):
 
     def __init__(self, raw,
                  buffer_size=DEFAULT_BUFFER_SIZE, max_buffer_size=None):
-        raw._checkWritable()
+        if not raw.writable():
+            raise IOError('"raw" argument must be writable.')
+
         _BufferedIOMixin.__init__(self, raw)
         if buffer_size <= 0:
             raise ValueError("invalid buffer size")
@@ -1075,8 +1108,13 @@ class BufferedRWPair(BufferedIOBase):
         """
         if max_buffer_size is not None:
             warnings.warn("max_buffer_size is deprecated", DeprecationWarning, 2)
-        reader._checkReadable()
-        writer._checkWritable()
+
+        if not reader.readable():
+            raise IOError('"reader" argument must be readable.')
+
+        if not writer.writable():
+            raise IOError('"writer" argument must be writable.')
+
         self.reader = BufferedReader(reader, buffer_size)
         self.writer = BufferedWriter(writer, buffer_size)
 
@@ -1224,6 +1262,15 @@ class TextIOBase(IOBase):
         """
         self._unsupported("readline")
 
+    def detach(self) -> None:
+        """
+        Separate the underlying buffer from the TextIOBase and return it.
+
+        After the underlying buffer has been detached, the TextIO is in an
+        unusable state.
+        """
+        self._unsupported("detach")
+
     @property
     def encoding(self):
         """Subclasses should override."""
@@ -1237,6 +1284,13 @@ class TextIOBase(IOBase):
 
         Subclasses should override.
         """
+        return None
+
+    @property
+    def errors(self):
+        """Error setting of the decoder or encoder.
+
+        Subclasses should override."""
         return None
 
 io.TextIOBase.register(TextIOBase)
@@ -1398,6 +1452,15 @@ class TextIOWrapper(TextIOBase):
         self._snapshot = None  # info for reconstructing decoder state
         self._seekable = self._telling = self.buffer.seekable()
 
+        if self._seekable and self.writable():
+            position = self.buffer.tell()
+            if position != 0:
+                try:
+                    self._get_encoder().setstate(0)
+                except LookupError:
+                    # Sometimes the encoder doesn't exist
+                    pass
+
     # self._snapshot is either None, or a tuple (dec_flags, next_input)
     # where dec_flags is the second (integer) item of the decoder state
     # and next_input is the chunk of input bytes that comes next after the
@@ -1408,7 +1471,13 @@ class TextIOWrapper(TextIOBase):
     #   - "chars_..." for integer variables that count decoded characters
 
     def __repr__(self):
-        return "<TextIOWrapper encoding={0}>".format(self.encoding)
+        try:
+            name = self.name
+        except AttributeError:
+            return "<_pyio.TextIOWrapper encoding={0!r}>".format(self.encoding)
+        else:
+            return "<_pyio.TextIOWrapper name={0!r} encoding={1!r}>".format(
+                name, self.encoding)
 
     @property
     def encoding(self):
@@ -1436,11 +1505,12 @@ class TextIOWrapper(TextIOBase):
         self._telling = self._seekable
 
     def close(self):
-        try:
-            self.flush()
-        except:
-            pass  # If flush() fails, just give up
-        self.buffer.close()
+        if self.buffer is not None:
+            try:
+                self.flush()
+            except IOError:
+                pass  # If flush() fails, just give up
+            self.buffer.close()
 
     @property
     def closed(self):
@@ -1635,6 +1705,14 @@ class TextIOWrapper(TextIOBase):
         self.seek(pos)
         return self.buffer.truncate()
 
+    def detach(self):
+        if self.buffer is None:
+            raise ValueError("buffer is already detached")
+        self.flush()
+        buffer = self.buffer
+        self.buffer = None
+        return buffer
+
     def seek(self, cookie, whence=0):
         if self.closed:
             raise ValueError("tell on closed file")
@@ -1694,6 +1772,17 @@ class TextIOWrapper(TextIOBase):
                 raise IOError("can't restore logical file position")
             self._decoded_chars_used = chars_to_skip
 
+        # Finally, reset the encoder (merely useful for proper BOM handling)
+        try:
+            encoder = self._encoder or self._get_encoder()
+        except LookupError:
+            # Sometimes the encoder doesn't exist
+            pass
+        else:
+            if cookie != 0:
+                encoder.setstate(0)
+            else:
+                encoder.reset()
         return cookie
 
     def read(self, n=None):
@@ -1731,6 +1820,8 @@ class TextIOWrapper(TextIOBase):
             raise ValueError("read from closed file")
         if limit is None:
             limit = -1
+        elif not isinstance(limit, int):
+            raise TypeError("limit must be an integer")
 
         # Grab all the decoded text (we will rewind any extra bits later).
         line = self._get_decoded_chars()
@@ -1849,5 +1940,13 @@ class StringIO(TextIOWrapper):
         return object.__repr__(self)
 
     @property
+    def errors(self):
+        return None
+
+    @property
     def encoding(self):
         return None
+
+    def detach(self):
+        # This doesn't make sense on StringIO.
+        self._unsupported("detach")

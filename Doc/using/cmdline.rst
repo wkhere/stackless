@@ -286,7 +286,7 @@ Miscellaneous options
       warning is triggered repeatedly for the same source line, such as inside a
       loop).
    ``module``
-      Print each warning only only the first time it occurs in each module.
+      Print each warning only the first time it occurs in each module.
    ``once``
       Print each warning only the first time it occurs in the program.
    ``error``
@@ -318,7 +318,7 @@ Miscellaneous options
    Skip the first line of the source, allowing use of non-Unix forms of
    ``#!cmd``.  This is intended for a DOS specific hack only.
 
-   .. warning:: The line numbers in error messages will be off by one!
+   .. note:: The line numbers in error messages will be off by one.
 
 .. _using-on-envvars:
 

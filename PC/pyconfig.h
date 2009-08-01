@@ -558,10 +558,6 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* This is enough for unicodeobject.h to do the "right thing" on Windows. */
 #define Py_UNICODE_SIZE 2
 
-/* Define to indicate that the Python Unicode representation can be passed
-   as-is to Win32 Wide API.  */
-#define Py_WIN_WIDE_FILENAMES
-
 /* Use Python's own small-block memory-allocator. */
 #define WITH_PYMALLOC 1
 
@@ -640,6 +636,11 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 
 /* Define if you have waitpid.  */
 /* #undef HAVE_WAITPID */
+
+/* Define to 1 if you have the `wcsftime' function. */
+#if defined(_MSC_VER) && _MSC_VER >= 1310
+#define HAVE_WCSFTIME 1
+#endif
 
 /* Define to 1 if you have the `wcscoll' function. */
 #ifndef MS_WINCE
@@ -751,5 +752,9 @@ Py_NO_ENABLE_SHARED to find out.  Also support MS_NO_COREDLL for b/w compat */
 /* WinSock does not use a bitmask in select, and uses
    socket handles greater than FD_SETSIZE */
 #define Py_SOCKET_FD_CAN_BE_GE_FD_SETSIZE
+
+/* Define if C doubles are 64-bit IEEE 754 binary format, stored with the
+   least significant byte first */
+#define DOUBLE_IS_LITTLE_ENDIAN_IEEE754 1
 
 #endif /* !Py_CONFIG_H */

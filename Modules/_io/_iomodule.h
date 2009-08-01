@@ -23,10 +23,10 @@ extern PyTypeObject PyIncrementalNewlineDecoder_Type;
  * with args=NULL, and return a new reference.
  * BUT when args=Py_True is passed, they return a borrowed reference.
  */
-extern PyObject* _PyIOBase_checkReadable(PyObject *self, PyObject *args);
-extern PyObject* _PyIOBase_checkWritable(PyObject *self, PyObject *args);
-extern PyObject* _PyIOBase_checkSeekable(PyObject *self, PyObject *args);
-extern PyObject* _PyIOBase_checkClosed(PyObject *self, PyObject *args);
+extern PyObject* _PyIOBase_check_readable(PyObject *self, PyObject *args);
+extern PyObject* _PyIOBase_check_writable(PyObject *self, PyObject *args);
+extern PyObject* _PyIOBase_check_seekable(PyObject *self, PyObject *args);
+extern PyObject* _PyIOBase_check_closed(PyObject *self, PyObject *args);
 
 /* Helper for finalization.
    This function will revive an object ready to be deallocated and try to
@@ -141,6 +141,7 @@ extern PyObject *_PyIO_str_readline;
 extern PyObject *_PyIO_str_reset;
 extern PyObject *_PyIO_str_seek;
 extern PyObject *_PyIO_str_seekable;
+extern PyObject *_PyIO_str_setstate;
 extern PyObject *_PyIO_str_tell;
 extern PyObject *_PyIO_str_truncate;
 extern PyObject *_PyIO_str_writable;
@@ -148,3 +149,4 @@ extern PyObject *_PyIO_str_write;
 
 extern PyObject *_PyIO_empty_str;
 extern PyObject *_PyIO_empty_bytes;
+extern PyObject *_PyIO_zero;

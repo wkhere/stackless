@@ -5,17 +5,38 @@ import tempfile
 
 from distutils import log
 from distutils.core import Distribution
+from test.support import EnvironmentVarGuard
 
 class LoggingSilencer(object):
 
     def setUp(self):
         super().setUp()
         self.threshold = log.set_threshold(log.FATAL)
+        # catching warnings
+        # when log will be replaced by logging
+        # we won't need such monkey-patch anymore
+        self._old_log = log.Log._log
+        log.Log._log = self._log
+        self.logs = []
 
     def tearDown(self):
         log.set_threshold(self.threshold)
+        log.Log._log = self._old_log
         super().tearDown()
 
+    def _log(self, level, msg, args):
+        self.logs.append((level, msg, args))
+
+    def get_logs(self, *levels):
+        def _format(msg, args):
+            if len(args) == 0:
+                return msg
+            return msg % args
+        return [_format(msg, args) for level, msg, args
+                in self.logs if level in levels]
+
+    def clear_logs(self):
+        self.logs = []
 
 class TempdirManager(object):
     """Mix-in class that handles temporary directories for test cases.
@@ -82,3 +103,13 @@ class DummyCommand:
 
     def ensure_finalized(self):
         pass
+
+class EnvironGuard(object):
+
+    def setUp(self):
+        super(EnvironGuard, self).setUp()
+        self.environ = EnvironmentVarGuard()
+
+    def tearDown(self):
+        self.environ.__exit__()
+        super(EnvironGuard, self).tearDown()

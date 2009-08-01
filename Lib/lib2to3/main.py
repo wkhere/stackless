@@ -10,8 +10,7 @@ import optparse
 
 from . import refactor
 
-
-class StdoutRefactoringTool(refactor.RefactoringTool):
+class StdoutRefactoringTool(refactor.MultiprocessRefactoringTool):
     """
     Prints output to stdout.
     """
@@ -24,7 +23,7 @@ class StdoutRefactoringTool(refactor.RefactoringTool):
         self.errors.append((msg, args, kwargs))
         self.logger.error(msg, *args, **kwargs)
 
-    def write_file(self, new_text, filename, old_text):
+    def write_file(self, new_text, filename, old_text, encoding):
         if not self.nobackups:
             # Make backup
             backup = filename + ".bak"
@@ -38,8 +37,8 @@ class StdoutRefactoringTool(refactor.RefactoringTool):
             except os.error as err:
                 self.log_message("Can't rename %s to %s", filename, backup)
         # Actually write the new file
-        super(StdoutRefactoringTool, self).write_file(new_text,
-                                                      filename, old_text)
+        write = super(StdoutRefactoringTool, self).write_file
+        write(new_text, filename, old_text, encoding)
         if not self.nobackups:
             shutil.copymode(backup, filename)
 
@@ -64,6 +63,8 @@ def main(fixer_pkg, args=None):
                       help="Fix up doctests only")
     parser.add_option("-f", "--fix", action="append", default=[],
                       help="Each FIX specifies a transformation; default: all")
+    parser.add_option("-j", "--processes", action="store", default=1,
+                      type="int", help="Run 2to3 concurrently")
     parser.add_option("-x", "--nofix", action="append", default=[],
                       help="Prevent a fixer from being run.")
     parser.add_option("-l", "--list-fixes", action="store_true",
@@ -126,7 +127,14 @@ def main(fixer_pkg, args=None):
         if refactor_stdin:
             rt.refactor_stdin()
         else:
-            rt.refactor(args, options.write, options.doctests_only)
+            try:
+                rt.refactor(args, options.write, options.doctests_only,
+                            options.processes)
+            except refactor.MultiprocessingUnsupported:
+                assert options.processes > 1
+                print >> sys.stderr, "Sorry, -j isn't " \
+                    "supported on this platform."
+                return 1
         rt.summarize()
 
     # Return error status (0 if rt.errors is zero)

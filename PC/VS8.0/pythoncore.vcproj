@@ -707,6 +707,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Include\dtoa.h"
+				>
+			</File>			
+			<File
 				RelativePath="..\..\Include\enumobject.h"
 				>
 			</File>
@@ -844,6 +848,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Include\pyarena.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Include\pyctype.h"
 				>
 			</File>
 			<File
@@ -1363,6 +1371,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Objects\capsule.c"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Objects\cellobject.c"
 				>
 			</File>
@@ -1639,6 +1651,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\Python\dtoa.c"
+				>
+			</File>
+			<File
 				RelativePath="..\..\Python\dynload_win.c"
 				>
 			</File>
@@ -1720,6 +1736,10 @@
 			</File>
 			<File
 				RelativePath="..\..\Python\pyarena.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\Python\pyctype.c"
 				>
 			</File>
 			<File

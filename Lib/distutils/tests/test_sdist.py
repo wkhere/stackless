@@ -6,13 +6,20 @@ import zipfile
 from os.path import join
 import sys
 import tempfile
+import warnings
+
+from test.support import check_warnings
+from test.support import captured_stdout
 
 from distutils.command.sdist import sdist
+from distutils.command.sdist import show_formats
 from distutils.core import Distribution
 from distutils.tests.test_config import PyPIRCCommandTestCase
-from distutils.errors import DistutilsExecError
+from distutils.errors import DistutilsExecError, DistutilsOptionError
 from distutils.spawn import find_executable
 from distutils.tests import support
+from distutils.log import WARN
+from distutils.archive_util import ARCHIVE_FORMATS
 
 SETUP_PY = """
 from distutils.core import setup
@@ -34,12 +41,12 @@ somecode%(sep)sdoc.dat
 somecode%(sep)sdoc.txt
 """
 
-class sdistTestCase(PyPIRCCommandTestCase):
+class SDistTestCase(PyPIRCCommandTestCase):
 
     def setUp(self):
         # PyPIRCCommandTestCase creates a temp dir already
         # and put it in self.tmp_dir
-        super(sdistTestCase, self).setUp()
+        super(SDistTestCase, self).setUp()
         # setting up an environment
         self.old_path = os.getcwd()
         os.mkdir(join(self.tmp_dir, 'somecode'))
@@ -53,7 +60,7 @@ class sdistTestCase(PyPIRCCommandTestCase):
     def tearDown(self):
         # back to normal
         os.chdir(self.old_path)
-        super(sdistTestCase, self).tearDown()
+        super(SDistTestCase, self).tearDown()
 
     def get_cmd(self, metadata=None):
         """Returns a cmd"""
@@ -210,8 +217,68 @@ class sdistTestCase(PyPIRCCommandTestCase):
         manifest = open(join(self.tmp_dir, 'MANIFEST')).read()
         self.assertEquals(manifest, MANIFEST % {'sep': os.sep})
 
+    def test_metadata_check_option(self):
+        # testing the `medata-check` option
+        dist, cmd = self.get_cmd(metadata={})
+
+        # this should raise some warnings !
+        # with the `check` subcommand
+        cmd.ensure_finalized()
+        cmd.run()
+        warnings = self.get_logs(WARN)
+        self.assertEquals(len(warnings), 2)
+
+        # trying with a complete set of metadata
+        self.clear_logs()
+        dist, cmd = self.get_cmd()
+        cmd.ensure_finalized()
+        cmd.metadata_check = 0
+        cmd.run()
+        warnings = self.get_logs(WARN)
+        self.assertEquals(len(warnings), 0)
+
+    def test_check_metadata_deprecated(self):
+        # makes sure make_metadata is deprecated
+        dist, cmd = self.get_cmd()
+        with check_warnings() as w:
+            warnings.simplefilter("always")
+            cmd.check_metadata()
+            self.assertEquals(len(w.warnings), 1)
+
+    def test_show_formats(self):
+        with captured_stdout() as stdout:
+            show_formats()
+
+        # the output should be a header line + one line per format
+        num_formats = len(ARCHIVE_FORMATS.keys())
+        output = [line for line in stdout.getvalue().split('\n')
+                  if line.strip().startswith('--formats=')]
+        self.assertEquals(len(output), num_formats)
+
+    def test_finalize_options(self):
+
+        dist, cmd = self.get_cmd()
+        cmd.finalize_options()
+
+        # default options set by finalize
+        self.assertEquals(cmd.manifest, 'MANIFEST')
+        self.assertEquals(cmd.template, 'MANIFEST.in')
+        self.assertEquals(cmd.dist_dir, 'dist')
+
+        # formats has to be a string splitable on (' ', ',') or
+        # a stringlist
+        cmd.formats = 1
+        self.assertRaises(DistutilsOptionError, cmd.finalize_options)
+        cmd.formats = ['zip']
+        cmd.finalize_options()
+
+        # formats has to be known
+        cmd.formats = 'supazipa'
+        self.assertRaises(DistutilsOptionError, cmd.finalize_options)
+
+
 def test_suite():
-    return unittest.makeSuite(sdistTestCase)
+    return unittest.makeSuite(SDistTestCase)
 
 if __name__ == "__main__":
     unittest.main(defaultTest="test_suite")

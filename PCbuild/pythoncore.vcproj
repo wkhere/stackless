@@ -846,6 +846,11 @@
 				RelativePath="..\Include\pyarena.h"
 				>
 			</File>
+                        <File RelativePath="..\Include\pycapsule.h"></File>
+			<File
+				RelativePath="..\Include\pyctype.h"
+				>
+			</File>
 			<File
 				RelativePath="..\Include\pydebug.h"
 				>
@@ -892,6 +897,10 @@
 			</File>
 			<File
 				RelativePath="..\Include\pystrtod.h"
+				>
+			</File>
+			<File
+				RelativePath="..\Include\dtoa.h"
 				>
 			</File>
 			<File
@@ -1366,6 +1375,10 @@
 				RelativePath="..\Objects\bytesobject.c"
 				>
 			</File>
+                        <File
+                                RelativePath="..\Objects\capsule.c"
+                                >
+                        </File>
 			<File
 				RelativePath="..\Objects\cellobject.c"
 				>
@@ -1727,6 +1740,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Python\pyctype.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Python\pyfpe.c"
 				>
 			</File>
@@ -1744,6 +1761,10 @@
 			</File>
 			<File
 				RelativePath="..\Python\pystrtod.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Python\dtoa.c"
 				>
 			</File>
 			<File

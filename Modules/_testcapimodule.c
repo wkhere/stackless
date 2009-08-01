@@ -227,6 +227,13 @@ test_lazy_hash_inheritance(PyObject* self)
 	long hash;
 
 	type = &_HashInheritanceTester_Type;
+
+	if (type->tp_dict != NULL)
+		/* The type has already been initialized. This probably means
+		   -R is being used. */
+		Py_RETURN_NONE;
+
+
 	obj = PyObject_New(PyObject, type);
 	if (obj == NULL) {
 		PyErr_Clear();
@@ -269,6 +276,8 @@ test_lazy_hash_inheritance(PyObject* self)
 		Py_DECREF(obj);
 		return NULL;
 	}
+
+	Py_DECREF(obj);
 
 	Py_RETURN_NONE;
 }
@@ -1045,6 +1054,203 @@ test_with_docstring(PyObject *self)
 	Py_RETURN_NONE;
 }
 
+/* Test PyOS_string_to_double. */
+static PyObject *
+test_string_to_double(PyObject *self) {
+	double result;
+	char *msg;
+
+#define CHECK_STRING(STR, expected)				\
+	result = PyOS_string_to_double(STR, NULL, NULL);	\
+	if (result == -1.0 && PyErr_Occurred())			\
+		return NULL;					\
+	if (result != expected) {				\
+		msg = "conversion of " STR " to float failed";	\
+		goto fail;					\
+	}
+
+#define CHECK_INVALID(STR)						\
+	result = PyOS_string_to_double(STR, NULL, NULL);		\
+	if (result == -1.0 && PyErr_Occurred()) {			\
+		if (PyErr_ExceptionMatches(PyExc_ValueError))		\
+			PyErr_Clear();					\
+		else							\
+			return NULL;					\
+	}								\
+	else {								\
+		msg = "conversion of " STR " didn't raise ValueError";	\
+		goto fail;						\
+	}
+
+	CHECK_STRING("0.1", 0.1);
+	CHECK_STRING("1.234", 1.234);
+	CHECK_STRING("-1.35", -1.35);
+	CHECK_STRING(".1e01", 1.0);
+	CHECK_STRING("2.e-2", 0.02);
+
+	CHECK_INVALID(" 0.1");
+	CHECK_INVALID("\t\n-3");
+	CHECK_INVALID(".123 ");
+	CHECK_INVALID("3\n");
+	CHECK_INVALID("123abc");
+
+	Py_RETURN_NONE;
+  fail:
+	return raiseTestError("test_string_to_double", msg);
+#undef CHECK_STRING
+#undef CHECK_INVALID
+}
+
+
+/* Coverage testing of capsule objects. */
+
+static const char *capsule_name = "capsule name";
+static       char *capsule_pointer = "capsule pointer";
+static       char *capsule_context = "capsule context";
+static const char *capsule_error = NULL;
+static int
+capsule_destructor_call_count = 0;
+
+static void
+capsule_destructor(PyObject *o) {
+	capsule_destructor_call_count++;
+	if (PyCapsule_GetContext(o) != capsule_context) {
+		capsule_error = "context did not match in destructor!";
+	} else if (PyCapsule_GetDestructor(o) != capsule_destructor) {
+		capsule_error = "destructor did not match in destructor!  (woah!)";
+	} else if (PyCapsule_GetName(o) != capsule_name) {
+		capsule_error = "name did not match in destructor!";
+	} else if (PyCapsule_GetPointer(o, capsule_name) != capsule_pointer) {
+		capsule_error = "pointer did not match in destructor!";
+	}
+}
+
+typedef struct {
+	char *name;
+	char *module;
+	char *attribute;
+} known_capsule;
+
+static PyObject *
+test_capsule(PyObject *self, PyObject *args)
+{
+	PyObject *object;
+	const char *error = NULL;
+	void *pointer;
+	void *pointer2;
+	known_capsule known_capsules[] = {
+		#define KNOWN_CAPSULE(module, name)	{ module "." name, module, name }
+		KNOWN_CAPSULE("_socket", "CAPI"),
+		KNOWN_CAPSULE("_curses", "_C_API"),
+		KNOWN_CAPSULE("datetime", "datetime_CAPI"),
+		{ NULL, NULL },
+	};
+	known_capsule *known = &known_capsules[0];
+
+#define FAIL(x) { error = (x); goto exit; }
+
+#define CHECK_DESTRUCTOR \
+	if (capsule_error) { \
+		FAIL(capsule_error); \
+	} \
+	else if (!capsule_destructor_call_count) {	\
+		FAIL("destructor not called!"); \
+	} \
+	capsule_destructor_call_count = 0; \
+
+	object = PyCapsule_New(capsule_pointer, capsule_name, capsule_destructor);
+	PyCapsule_SetContext(object, capsule_context);
+	capsule_destructor(object);
+	CHECK_DESTRUCTOR;
+	Py_DECREF(object);
+	CHECK_DESTRUCTOR;
+
+	object = PyCapsule_New(known, "ignored", NULL);
+	PyCapsule_SetPointer(object, capsule_pointer);
+	PyCapsule_SetName(object, capsule_name);
+	PyCapsule_SetDestructor(object, capsule_destructor);
+	PyCapsule_SetContext(object, capsule_context);
+	capsule_destructor(object);
+	CHECK_DESTRUCTOR;
+	/* intentionally access using the wrong name */
+	pointer2 = PyCapsule_GetPointer(object, "the wrong name");
+	if (!PyErr_Occurred()) {
+		FAIL("PyCapsule_GetPointer should have failed but did not!");
+	}
+	PyErr_Clear();
+	if (pointer2) {
+		if (pointer2 == capsule_pointer) {
+			FAIL("PyCapsule_GetPointer should not have"
+				 " returned the internal pointer!");
+		} else {
+			FAIL("PyCapsule_GetPointer should have "
+				 "returned NULL pointer but did not!");
+		}
+	}
+	PyCapsule_SetDestructor(object, NULL);
+	Py_DECREF(object);
+	if (capsule_destructor_call_count) {
+		FAIL("destructor called when it should not have been!");
+	}
+
+	for (known = &known_capsules[0]; known->module != NULL; known++) {
+		/* yeah, ordinarily I wouldn't do this either,
+		   but it's fine for this test harness.
+		*/
+		static char buffer[256];
+#undef FAIL
+#define FAIL(x) \
+		{ \
+		sprintf(buffer, "%s module: \"%s\" attribute: \"%s\"", \
+			x, known->module, known->attribute); \
+		error = buffer; \
+		goto exit; \
+		} \
+
+		PyObject *module = PyImport_ImportModule(known->module);
+		if (module) {
+			pointer = PyCapsule_Import(known->name, 0);
+			if (!pointer) {
+				Py_DECREF(module);
+				FAIL("PyCapsule_GetPointer returned NULL unexpectedly!");
+			}
+			object = PyObject_GetAttrString(module, known->attribute);
+			if (!object) {
+				Py_DECREF(module);
+				return NULL;
+			}
+			pointer2 = PyCapsule_GetPointer(object,
+						"weebles wobble but they don't fall down");
+			if (!PyErr_Occurred()) {
+				Py_DECREF(object);
+				Py_DECREF(module);
+				FAIL("PyCapsule_GetPointer should have failed but did not!");
+			}
+			PyErr_Clear();
+			if (pointer2) {
+				Py_DECREF(module);
+				Py_DECREF(object);
+				if (pointer2 == pointer) {
+					FAIL("PyCapsule_GetPointer should not have" 
+						 " returned its internal pointer!");
+				} else {
+					FAIL("PyCapsule_GetPointer should have" 
+						 " returned NULL pointer but did not!");
+				}
+			}
+			Py_DECREF(object);
+			Py_DECREF(module);
+		}
+	}
+
+  exit:
+	if (error) {
+		return raiseTestError("test_capsule", error);
+	}
+	Py_RETURN_NONE;
+#undef FAIL
+}
+
 #ifdef HAVE_GETTIMEOFDAY
 /* Profiling of integer performance */
 static void print_delta(int test, struct timeval *s, struct timeval *e)
@@ -1209,6 +1415,36 @@ raise_memoryerror(PyObject *self)
 	return NULL;
 }
 
+/* Issue 6012 */
+static PyObject *str1, *str2;
+static int
+failing_converter(PyObject *obj, void *arg)
+{
+	/* Clone str1, then let the conversion fail. */
+	assert(str1);
+	str2 = str1;
+	Py_INCREF(str2);
+	return 0;
+}
+static PyObject*
+argparsing(PyObject *o, PyObject *args)
+{
+	PyObject *res;
+	str1 = str2 = NULL;
+	if (!PyArg_ParseTuple(args, "O&O&",
+			      PyUnicode_FSConverter, &str1,
+			      failing_converter, &str2)) {
+		if (!str2)
+			/* argument converter not called? */
+			return NULL;
+		/* Should be 1 */
+		res = PyLong_FromLong(Py_REFCNT(str2));
+		Py_DECREF(str2);
+		PyErr_Clear();
+		return res;
+	}
+	Py_RETURN_NONE;
+}
 
 static PyMethodDef TestMethods[] = {
 	{"raise_exception",	raise_exception,		 METH_VARARGS},
@@ -1225,7 +1461,8 @@ static PyMethodDef TestMethods[] = {
 	{"test_string_from_format", (PyCFunction)test_string_from_format, METH_NOARGS},
 	{"test_with_docstring", (PyCFunction)test_with_docstring, METH_NOARGS,
 	 PyDoc_STR("This is a pretty normal docstring.")},
-
+	{"test_string_to_double", (PyCFunction)test_string_to_double, METH_NOARGS},
+	{"test_capsule", (PyCFunction)test_capsule, METH_NOARGS},
 	{"getargs_tuple",	getargs_tuple,			 METH_VARARGS},
 	{"getargs_keywords", (PyCFunction)getargs_keywords, 
 	  METH_VARARGS|METH_KEYWORDS},
@@ -1260,6 +1497,7 @@ static PyMethodDef TestMethods[] = {
 #endif
 	{"traceback_print", traceback_print, 	         METH_VARARGS},
 	{"exception_print", exception_print, 	         METH_VARARGS},
+	{"argparsing",     argparsing, METH_VARARGS},
 	{NULL, NULL} /* sentinel */
 };
 

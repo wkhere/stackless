@@ -2,6 +2,7 @@
 # All tests are executed with environment variables ignored
 # See test_cmd_line_script.py for testing of script execution
 
+import os
 import test.support, unittest
 import os
 import sys
@@ -40,8 +41,9 @@ class CmdLineTest(unittest.TestCase):
     def exit_code(self, *args):
         cmd_line = [sys.executable, '-E']
         cmd_line.extend(args)
-        return subprocess.call(cmd_line, stdout=subprocess.PIPE,
-                                         stderr=subprocess.PIPE)
+        with open(os.devnull, 'w') as devnull:
+            return subprocess.call(cmd_line, stdout=devnull,
+                                   stderr=subprocess.STDOUT)
 
     def test_directories(self):
         self.assertNotEqual(self.exit_code('.'), 0)
@@ -168,6 +170,16 @@ class CmdLineTest(unittest.TestCase):
         data, rc = _kill_python_and_exit_code(p)
         self.assertEqual(rc, 0)
         self.assert_(data.startswith(b'x'), data)
+
+    def test_large_PYTHONPATH(self):
+        with test.support.EnvironmentVarGuard() as env:
+            path1 = "ABCDE" * 100
+            path2 = "FGHIJ" * 100
+            env['PYTHONPATH'] = path1 + os.pathsep + path2
+            p = _spawn_python('-S', '-c', 'import sys; print(sys.path)')
+            stdout, _ = p.communicate()
+            self.assert_(path1.encode('ascii') in stdout)
+            self.assert_(path2.encode('ascii') in stdout)
 
 
 def test_main():

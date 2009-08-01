@@ -753,7 +753,7 @@ introduction to these two functions, see sections :ref:`doctest-simple-testmod`
 and :ref:`doctest-simple-testfile`.
 
 
-.. function:: testfile(filename[, module_relative][, name][, package][, globs][, verbose][, report][, optionflags][, extraglobs][, raise_on_error][, parser][, encoding])
+.. function:: testfile(filename, module_relative=True, name=None, package=None, globs=None, verbose=None, report=True, optionflags=0, extraglobs=None, raise_on_error=False, parser=DocTestParser(), encoding=None)
 
    All arguments except *filename* are optional, and should be specified in keyword
    form.
@@ -822,7 +822,7 @@ and :ref:`doctest-simple-testfile`.
    convert the file to unicode.
 
 
-.. function:: testmod([m][, name][, globs][, verbose][, report][, optionflags][, extraglobs][, raise_on_error][, exclude_empty])
+.. function:: testmod(m=None, name=None, globs=None, verbose=None, report=True, optionflags=0, extraglobs=None, raise_on_error=False, exclude_empty=False)
 
    All arguments are optional, and all except for *m* should be specified in
    keyword form.
@@ -860,7 +860,7 @@ This function is provided for backward compatibility.  There are no plans to
 deprecate it, but it's rarely useful:
 
 
-.. function:: run_docstring_examples(f, globs[, verbose][, name][, compileflags][, optionflags])
+.. function:: run_docstring_examples(f, globs, verbose=False, name="NoName", compileflags=None, optionflags=0)
 
    Test examples associated with object *f*; for example, *f* may be a module,
    function, or class object.
@@ -905,7 +905,7 @@ There are two main functions for creating :class:`unittest.TestSuite` instances
 from text files and modules with doctests:
 
 
-.. function:: DocFileSuite([module_relative][, package][, setUp][, tearDown][, globs][, optionflags][, parser][, encoding])
+.. function:: DocFileSuite(*paths, module_relative=True, package=None, setUp=None, tearDown=None, globs=None, optionflags=0, parser=DocTestParser(), encoding=None)
 
    Convert doctest tests from one or more text files to a
    :class:`unittest.TestSuite`.
@@ -923,32 +923,34 @@ from text files and modules with doctests:
    Optional argument *module_relative* specifies how the filenames in *paths*
    should be interpreted:
 
-   * If *module_relative* is ``True`` (the default), then each filename specifies
-     an OS-independent module-relative path.  By default, this path is relative to
-     the calling module's directory; but if the *package* argument is specified, then
-     it is relative to that package.  To ensure OS-independence, each filename should
-     use ``/`` characters to separate path segments, and may not be an absolute path
-     (i.e., it may not begin with ``/``).
+   * If *module_relative* is ``True`` (the default), then each filename in
+     *paths* specifies an OS-independent module-relative path.  By default, this
+     path is relative to the calling module's directory; but if the *package*
+     argument is specified, then it is relative to that package.  To ensure
+     OS-independence, each filename should use ``/`` characters to separate path
+     segments, and may not be an absolute path (i.e., it may not begin with
+     ``/``).
 
-   * If *module_relative* is ``False``, then each filename specifies an OS-specific
-     path.  The path may be absolute or relative; relative paths are resolved with
-     respect to the current working directory.
+   * If *module_relative* is ``False``, then each filename in *paths* specifies
+     an OS-specific path.  The path may be absolute or relative; relative paths
+     are resolved with respect to the current working directory.
 
-   Optional argument *package* is a Python package or the name of a Python package
-   whose directory should be used as the base directory for module-relative
-   filenames.  If no package is specified, then the calling module's directory is
-   used as the base directory for module-relative filenames.  It is an error to
-   specify *package* if *module_relative* is ``False``.
+   Optional argument *package* is a Python package or the name of a Python
+   package whose directory should be used as the base directory for
+   module-relative filenames in *paths*.  If no package is specified, then the
+   calling module's directory is used as the base directory for module-relative
+   filenames.  It is an error to specify *package* if *module_relative* is
+   ``False``.
 
-   Optional argument *setUp* specifies a set-up function for the test suite.  This
-   is called before running the tests in each file.  The *setUp* function will be
-   passed a :class:`DocTest` object.  The setUp function can access the test
-   globals as the *globs* attribute of the test passed.
-
-   Optional argument *tearDown* specifies a tear-down function for the test suite.
-   This is called after running the tests in each file.  The *tearDown* function
+   Optional argument *setUp* specifies a set-up function for the test suite.
+   This is called before running the tests in each file.  The *setUp* function
    will be passed a :class:`DocTest` object.  The setUp function can access the
    test globals as the *globs* attribute of the test passed.
+
+   Optional argument *tearDown* specifies a tear-down function for the test
+   suite.  This is called after running the tests in each file.  The *tearDown*
+   function will be passed a :class:`DocTest` object.  The setUp function can
+   access the test globals as the *globs* attribute of the test passed.
 
    Optional argument *globs* is a dictionary containing the initial global
    variables for the tests.  A new copy of this dictionary is created for each
@@ -956,12 +958,12 @@ from text files and modules with doctests:
 
    Optional argument *optionflags* specifies the default doctest options for the
    tests, created by or-ing together individual option flags.  See section
-   :ref:`doctest-options`. See function :func:`set_unittest_reportflags` below for
-   a better way to set reporting options.
+   :ref:`doctest-options`. See function :func:`set_unittest_reportflags` below
+   for a better way to set reporting options.
 
-   Optional argument *parser* specifies a :class:`DocTestParser` (or subclass) that
-   should be used to extract tests from the files.  It defaults to a normal parser
-   (i.e., ``DocTestParser()``).
+   Optional argument *parser* specifies a :class:`DocTestParser` (or subclass)
+   that should be used to extract tests from the files.  It defaults to a normal
+   parser (i.e., ``DocTestParser()``).
 
    Optional argument *encoding* specifies an encoding that should be used to
    convert the file to unicode.
@@ -970,7 +972,7 @@ from text files and modules with doctests:
    from a text file using :func:`DocFileSuite`.
 
 
-.. function:: DocTestSuite([module][, globs][, extraglobs][, test_finder][, setUp][, tearDown][, checker])
+.. function:: DocTestSuite(module=None, globs=None, extraglobs=None, test_finder=None, setUp=None, tearDown=None, checker=None)
 
    Convert doctest tests for a module to a :class:`unittest.TestSuite`.
 
@@ -1156,7 +1158,7 @@ Example Objects
 ^^^^^^^^^^^^^^^
 
 
-.. class:: Example(source, want[, exc_msg][, lineno][, indent][, options])
+.. class:: Example(source, want, exc_msg=None, lineno=0, indent=0, options=None)
 
    A single interactive example, consisting of a Python statement and its expected
    output.  The constructor arguments are used to initialize the member variables
@@ -1218,7 +1220,7 @@ DocTestFinder objects
 ^^^^^^^^^^^^^^^^^^^^^
 
 
-.. class:: DocTestFinder([verbose][, parser][, recurse][, exclude_empty])
+.. class:: DocTestFinder(verbose=False, parser=DocTestParser(), recurse=True, exclude_empty=True)
 
    A processing class used to extract the :class:`DocTest`\ s that are relevant to
    a given object, from its docstring and the docstrings of its contained objects.
@@ -1304,14 +1306,14 @@ DocTestParser objects
       information.
 
 
-   .. method:: get_examples(string[, name])
+   .. method:: get_examples(string, name='<string>')
 
       Extract all doctest examples from the given string, and return them as a list
       of :class:`Example` objects.  Line numbers are 0-based.  The optional argument
       *name* is a name identifying this string, and is only used for error messages.
 
 
-   .. method:: parse(string[, name])
+   .. method:: parse(string, name='<string>')
 
       Divide the given string into examples and intervening text, and return them as
       a list of alternating :class:`Example`\ s and strings. Line numbers for the
@@ -1325,7 +1327,7 @@ DocTestRunner objects
 ^^^^^^^^^^^^^^^^^^^^^
 
 
-.. class:: DocTestRunner([checker][, verbose][, optionflags])
+.. class:: DocTestRunner(checker=None, verbose=None, optionflags=0)
 
    A processing class used to execute and verify the interactive examples in a
    :class:`DocTest`.
@@ -1407,7 +1409,7 @@ DocTestRunner objects
       output function that was passed to :meth:`DocTestRunner.run`.
 
 
-   .. method:: run(test[, compileflags][, out][, clear_globs])
+   .. method:: run(test, compileflags=None, out=None, clear_globs=True)
 
       Run the examples in *test* (a :class:`DocTest` object), and display the
       results using the writer function *out*.
@@ -1426,7 +1428,7 @@ DocTestRunner objects
       :meth:`DocTestRunner.report_\*` methods.
 
 
-   .. method:: summarize([verbose])
+   .. method:: summarize(verbose=None)
 
       Print a summary of all the test cases that have been run by this DocTestRunner,
       and return a :term:`named tuple` ``TestResults(failed, attempted)``.
@@ -1590,7 +1592,7 @@ code under the debugger:
    converted to code, and the rest placed in comments.
 
 
-.. function:: debug(module, name[, pm])
+.. function:: debug(module, name, pm=False)
 
    Debug the doctests for an object.
 
@@ -1611,7 +1613,7 @@ code under the debugger:
    passing an appropriate :func:`exec` call to :func:`pdb.run`.
 
 
-.. function:: debug_src(src[, pm][, globs])
+.. function:: debug_src(src, pm=False, globs=None)
 
    Debug the doctests in a string.
 
@@ -1631,7 +1633,7 @@ the source code, and especially :class:`DebugRunner`'s docstring (which is a
 doctest!) for more details:
 
 
-.. class:: DebugRunner([checker][, verbose][, optionflags])
+.. class:: DebugRunner(checker=None, verbose=None, optionflags=0)
 
    A subclass of :class:`DocTestRunner` that raises an exception as soon as a
    failure is encountered.  If an unexpected exception occurs, an

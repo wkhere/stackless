@@ -250,6 +250,14 @@ variable(s) whose address should be passed.
    the conversion has failed.  When the conversion fails, the *converter* function
    should raise an exception and leave the content of *address* unmodified.
 
+   If the *converter* returns Py_CLEANUP_SUPPORTED, it may get called a second time
+   if the argument parsing eventually fails, giving the converter a chance to release
+   any memory that it had already allocated. In this second call, the *object* parameter
+   will be NULL; *address* will have the same value as in the original call.
+
+   .. versionchanged:: 3.1
+      Py_CLEANUP_SUPPORTED was added.
+
 ``S`` (string) [PyStringObject \*]
    Like ``O`` but requires that the Python object is a string object.  Raises
    :exc:`TypeError` if the object is not a string object.  The C variable may also
@@ -278,10 +286,10 @@ variable(s) whose address should be passed.
 
 ``w#`` (read-write character buffer) [char \*, int]
    Like ``s#``, but accepts any object which implements the read-write buffer
-   interface.  The :ctype:`char \*` variable is set to point to the first byte of
-   the buffer, and the :ctype:`int` is set to the length of the buffer.  Only
-   single-segment buffer objects are accepted; :exc:`TypeError` is raised for all
-   others.
+   interface.  The :ctype:`char \*` variable is set to point to the first byte
+   of the buffer, and the :ctype:`int` is set to the length of the buffer.
+   Only single-segment buffer objects are accepted; :exc:`TypeError` is raised
+   for all others.
 
 ``(items)`` (tuple) [*matching-items*]
    The object must be a Python sequence whose length is the number of format units

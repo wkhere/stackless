@@ -869,9 +869,7 @@ tarballs or zipfiles.
    prefix of all files and directories in the archive.  *root_dir* and *base_dir*
    both default to the current directory.  Returns the name of the archive file.
 
-   .. warning::
-
-      This should be changed to support bz2 files
+   .. XXX This should be changed to support bz2 files.
 
 
 .. function:: make_tarball(base_name, base_dir[, compress='gzip', verbose=0, dry_run=0])
@@ -884,9 +882,7 @@ tarballs or zipfiles.
    possibly plus the appropriate compression extension (:file:`.gz`, :file:`.bz2`
    or :file:`.Z`).  Return the output filename.
 
-   .. warning::
-
-      This should be replaced with calls to the :mod:`tarfile` module.
+   .. XXX This should be replaced with calls to the :mod:`tarfile` module.
 
 
 .. function:: make_zipfile(base_name, base_dir[, verbose=0, dry_run=0])
@@ -1050,8 +1046,8 @@ This module contains some utility functions for operating on individual files.
 
    .. warning::
 
-      Handles cross-device moves on Unix using :func:`copy_file`.   What about other
-      systems???
+      Handles cross-device moves on Unix using :func:`copy_file`.  What about
+      other systems?
 
 
 .. function:: write_file(filename, contents)
@@ -1091,17 +1087,17 @@ other utility module.
 
    For non-POSIX platforms, currently just returns ``sys.platform``.
 
-   For MacOS X systems the OS version reflects the minimal version on which
+   For Mac OS X systems the OS version reflects the minimal version on which
    binaries will run (that is, the value of ``MACOSX_DEPLOYMENT_TARGET``
    during the build of Python), not the OS version of the current system.
 
-   For universal binary builds on MacOS X the architecture value reflects
+   For universal binary builds on Mac OS X the architecture value reflects
    the univeral binary status instead of the architecture of the current
    processor. For 32-bit universal binaries the architecture is ``fat``,
    for 64-bit universal binaries the architecture is ``fat64``, and
    for 4-way universal binaries the architecture is ``universal``.
 
-   Examples of returned values on MacOS X:
+   Examples of returned values on Mac OS X:
 
    * ``macosx-10.3-ppc``
 
@@ -1329,10 +1325,8 @@ provides the following additional features:
 
    Wraps *text* to less than *width* wide.
 
-   .. warning::
-
-      Should be replaced with :mod:`textwrap` (which is available  in Python 2.3 and
-      later).
+   .. XXX Should be replaced with :mod:`textwrap` (which is available in Python
+      2.3 and later).
 
 
 .. class:: FancyGetopt([option_table=None])
@@ -1381,8 +1375,8 @@ The :class:`FancyGetopt` class provides the following methods:
 ================================================
 
 .. module:: distutils.filelist
-   :synopsis: The FileList class, used for poking about the file system and building lists of
-              files.
+   :synopsis: The FileList class, used for poking about the file system and
+              building lists of files.
 
 
 This module provides the :class:`FileList` class, used for poking about the
@@ -1396,13 +1390,8 @@ filesystem and building lists of files.
    :synopsis: A simple logging mechanism, 282-style
 
 
-.. warning::
+.. XXX Should be replaced with standard :mod:`logging` module.
 
-   Should be replaced with standard :mod:`logging` module.
-
-.. % \subsubsection{\module{} --- }
-.. % \declaremodule{standard}{distutils.magic}
-.. % \modulesynopsis{ }
 
 
 :mod:`distutils.spawn` --- Spawn a sub-process
@@ -1758,8 +1747,16 @@ This module supplies the abstract base class :class:`Command`.
 .. module:: distutils.command.bdist_msi
    :synopsis: Build a binary distribution as a Windows MSI file
 
+.. class:: bdist_msi(Command)
 
-.. % todo
+   Builds a `Windows Installer`_ (.msi) binary package.
+
+   .. _Windows Installer: http://msdn.microsoft.com/en-us/library/cc185688(VS.85).aspx
+
+   In most cases, the ``bdist_msi`` installer is a better choice than the
+   ``bdist_wininst`` installer, because it provides better support for
+   Win64 platforms, allows administrators to perform non-interactive
+   installations, and allows installation through group policies.
 
 
 :mod:`distutils.command.bdist_rpm` --- Build a binary distribution as a Redhat RPM and SRPM
@@ -1939,6 +1936,19 @@ This module supplies the abstract base class :class:`Command`.
 
 The ``register`` command registers the package with the Python Package  Index.
 This is described in more detail in :pep:`301`.
+
+.. % todo
+
+:mod:`distutils.command.check` --- Check the meta-data of a package
+===================================================================
+
+.. module:: distutils.command.check
+   :synopsis: Check the metadata of a package
+
+
+The ``check`` command performs some tests on the meta-data of a package.
+It makes sure for example that all required meta-data are provided through
+the arguments passed to the :func:`setup` function.
 
 .. % todo
 

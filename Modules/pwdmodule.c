@@ -49,8 +49,9 @@ static void
 sets(PyObject *v, int i, const char* val)
 {
   if (val) {
-	  PyObject *o =
-		PyUnicode_DecodeUnicodeEscape(val, strlen(val), "strict");
+	  PyObject *o = PyUnicode_Decode(val, strlen(val),
+					 Py_FileSystemDefaultEncoding,
+					 "surrogateescape");
 	  PyStructSequence_SET_ITEM(v, i, o);
   }
   else {
@@ -129,14 +130,25 @@ pwd_getpwnam(PyObject *self, PyObject *args)
 {
 	char *name;
 	struct passwd *p;
-	if (!PyArg_ParseTuple(args, "s:getpwnam", &name))
+	PyObject *arg, *bytes, *retval = NULL;
+
+	if (!PyArg_ParseTuple(args, "U:getpwnam", &arg))
 		return NULL;
+	if ((bytes = PyUnicode_AsEncodedString(arg,
+					       Py_FileSystemDefaultEncoding,
+					       "surrogateescape")) == NULL)
+		return NULL;
+	if (PyBytes_AsStringAndSize(bytes, &name, NULL) == -1)
+		goto out;
 	if ((p = getpwnam(name)) == NULL) {
 		PyErr_Format(PyExc_KeyError,
 			     "getpwnam(): name not found: %s", name);
-		return NULL;
+		goto out;
 	}
-	return mkpwent(p);
+	retval = mkpwent(p);
+out:
+	Py_DECREF(bytes);
+	return retval;
 }
 
 #ifdef HAVE_GETPWENT
@@ -163,6 +175,7 @@ pwd_getpwall(PyObject *self)
 		if (v == NULL || PyList_Append(d, v) != 0) {
 			Py_XDECREF(v);
 			Py_DECREF(d);
+			endpwent();
 			return NULL;
 		}
 		Py_DECREF(v);
@@ -203,13 +216,12 @@ PyInit_pwd(void)
 	if (m == NULL)
     		return NULL;
 
-	if (!initialized)
+	if (!initialized) {
 		PyStructSequence_InitType(&StructPwdType, 
 					  &struct_pwd_type_desc);
+		initialized = 1;
+	}
 	Py_INCREF((PyObject *) &StructPwdType);
 	PyModule_AddObject(m, "struct_passwd", (PyObject *) &StructPwdType);
-	/* And for b/w compatibility (this was defined by mistake): */
-	PyModule_AddObject(m, "struct_pwent", (PyObject *) &StructPwdType);
-	initialized = 1;
 	return m;
 }

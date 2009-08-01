@@ -1,3 +1,5 @@
+import builtins
+import sys
 import types
 import unittest
 import warnings
@@ -1537,6 +1539,106 @@ order (MRO) for bases """
         self.assertEqual(E().foo.__func__, C.foo) # i.e., unbound
         self.assert_(repr(C.foo.__get__(C(1))).startswith("<bound method "))
 
+    def test_special_method_lookup(self):
+        # The lookup of special methods bypasses __getattr__ and
+        # __getattribute__, but they still can be descriptors.
+
+        def run_context(manager):
+            with manager:
+                pass
+        def iden(self):
+            return self
+        def hello(self):
+            return b"hello"
+        def empty_seq(self):
+            return []
+        def zero(self):
+            return 0
+        def stop(self):
+            raise StopIteration
+        def return_true(self, thing=None):
+            return True
+        def do_isinstance(obj):
+            return isinstance(int, obj)
+        def do_issubclass(obj):
+            return issubclass(int, obj)
+        def do_dict_missing(checker):
+            class DictSub(checker.__class__, dict):
+                pass
+            self.assertEqual(DictSub()["hi"], 4)
+        def some_number(self_, key):
+            self.assertEqual(key, "hi")
+            return 4
+
+        # It would be nice to have every special method tested here, but I'm
+        # only listing the ones I can remember outside of typeobject.c, since it
+        # does it right.
+        specials = [
+            ("__bytes__", bytes, hello, set(), {}),
+            ("__reversed__", reversed, empty_seq, set(), {}),
+            ("__length_hint__", list, zero, set(),
+             {"__iter__" : iden, "__next__" : stop}),
+            ("__sizeof__", sys.getsizeof, zero, set(), {}),
+            ("__instancecheck__", do_isinstance, return_true, set(), {}),
+            ("__missing__", do_dict_missing, some_number,
+             set(("__class__",)), {}),
+            ("__subclasscheck__", do_issubclass, return_true,
+             set(("__bases__",)), {}),
+            # These two fail because the compiler generates LOAD_ATTR to look
+            # them up.  We'd have to add a new opcode to fix this, and it's
+            # probably not worth it.
+            # ("__enter__", run_context, iden),
+            # ("__exit__", run_context, iden),
+            ]
+
+        class Checker(object):
+            def __getattr__(self, attr, test=self):
+                test.fail("__getattr__ called with {0}".format(attr))
+            def __getattribute__(self, attr, test=self):
+                if attr not in ok:
+                    test.fail("__getattribute__ called with {0}".format(attr))
+                return object.__getattribute__(self, attr)
+        class SpecialDescr(object):
+            def __init__(self, impl):
+                self.impl = impl
+            def __get__(self, obj, owner):
+                record.append(1)
+                return self.impl.__get__(obj, owner)
+        class MyException(Exception):
+            pass
+        class ErrDescr(object):
+            def __get__(self, obj, owner):
+                raise MyException
+
+        for name, runner, meth_impl, ok, env in specials:
+            class X(Checker):
+                pass
+            for attr, obj in env.items():
+                setattr(X, attr, obj)
+            setattr(X, name, meth_impl)
+            runner(X())
+
+            record = []
+            class X(Checker):
+                pass
+            for attr, obj in env.items():
+                setattr(X, attr, obj)
+            setattr(X, name, SpecialDescr(meth_impl))
+            runner(X())
+            self.assertEqual(record, [1], name)
+
+            class X(Checker):
+                pass
+            for attr, obj in env.items():
+                setattr(X, attr, obj)
+            setattr(X, name, ErrDescr())
+            try:
+                runner(X())
+            except MyException:
+                pass
+            else:
+                self.fail("{0!r} didn't raise".format(name))
+
     def test_specials(self):
         # Testing special operators...
         # Test operators like __hash__ for which a built-in default exists
@@ -2746,6 +2848,16 @@ order (MRO) for bases """
                     continue
                 cant(cls(), cls2)
 
+        # Issue5283: when __class__ changes in __del__, the wrong
+        # type gets DECREF'd.
+        class O(object):
+            pass
+        class A(object):
+            def __del__(self):
+                self.__class__ = O
+        l = [A() for x in range(100)]
+        del l
+
     def test_set_dict(self):
         # Testing __dict__ assignment...
         class C(object): pass
@@ -3524,31 +3636,6 @@ order (MRO) for bases """
         self.assertEqual(e.a, 2)
         self.assertEqual(C2.__subclasses__(), [D])
 
-        # stuff that shouldn't:
-        class L(list):
-            pass
-
-        try:
-            L.__bases__ = (dict,)
-        except TypeError:
-            pass
-        else:
-            self.fail("shouldn't turn list subclass into dict subclass")
-
-        try:
-            list.__bases__ = (dict,)
-        except TypeError:
-            pass
-        else:
-            self.fail("shouldn't be able to assign to list.__bases__")
-
-        try:
-            D.__bases__ = (C2, list)
-        except TypeError:
-            pass
-        else:
-            assert 0, "best_base calculation found wanting"
-
         try:
             del D.__bases__
         except (TypeError, AttributeError):
@@ -3585,6 +3672,47 @@ order (MRO) for bases """
             pass
         else:
             self.fail("shouldn't be able to create inheritance cycles")
+
+    def test_builtin_bases(self):
+        # Make sure all the builtin types can have their base queried without
+        # segfaulting. See issue #5787.
+        builtin_types = [tp for tp in builtins.__dict__.values()
+                         if isinstance(tp, type)]
+        for tp in builtin_types:
+            object.__getattribute__(tp, "__bases__")
+            if tp is not object:
+                self.assertEqual(len(tp.__bases__), 1, tp)
+
+        class L(list):
+            pass
+
+        class C(object):
+            pass
+
+        class D(C):
+            pass
+
+        try:
+            L.__bases__ = (dict,)
+        except TypeError:
+            pass
+        else:
+            self.fail("shouldn't turn list subclass into dict subclass")
+
+        try:
+            list.__bases__ = (dict,)
+        except TypeError:
+            pass
+        else:
+            self.fail("shouldn't be able to assign to list.__bases__")
+
+        try:
+            D.__bases__ = (C, list)
+        except TypeError:
+            pass
+        else:
+            assert 0, "best_base calculation found wanting"
+
 
     def test_mutable_bases_with_failing_mro(self):
         # Testing mutable bases with failing mro...

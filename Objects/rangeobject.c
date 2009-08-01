@@ -59,26 +59,42 @@ range_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 
     if (PyTuple_Size(args) <= 1) {
         if (!PyArg_UnpackTuple(args, "range", 1, 1, &stop))
-            goto Fail;
+            return NULL;
         stop = PyNumber_Index(stop);
         if (!stop)
-            goto Fail;
+            return NULL;
         start = PyLong_FromLong(0);
+        if (!start) {
+            Py_DECREF(stop);
+            return NULL;
+        }
         step = PyLong_FromLong(1);
-        if (!start || !step)
-            goto Fail;
+        if (!step) {
+            Py_DECREF(stop);
+            Py_DECREF(start);
+            return NULL;
+        }
     }
     else {
         if (!PyArg_UnpackTuple(args, "range", 2, 3,
                                &start, &stop, &step))
-            goto Fail;
+            return NULL;
 
         /* Convert borrowed refs to owned refs */
         start = PyNumber_Index(start);
+        if (!start)
+            return NULL;
         stop = PyNumber_Index(stop);
-        step = validate_step(step);
-        if (!start || !stop || !step)
-            goto Fail;
+        if (!stop) {
+            Py_DECREF(start);
+            return NULL;
+        }
+        step = validate_step(step);    /* Caution, this can clear exceptions */
+        if (!step) {
+            Py_DECREF(start);
+            Py_DECREF(stop);
+            return NULL;
+        }
     }
 
     obj = PyObject_New(rangeobject, &PyRange_Type);
@@ -110,18 +126,17 @@ range_dealloc(rangeobject *r)
     PyObject_Del(r);
 }
 
-/* Return number of items in range (lo, hi, step), when arguments are
- * PyInt or PyLong objects.  step > 0 required.  Return a value < 0 if
- * & only if the true value is too large to fit in a signed long.
- * Arguments MUST return 1 with either PyLong_Check() or
- * PyLong_Check().  Return -1 when there is an error.
+/* Return number of items in range (lo, hi, step), when arguments are PyLong
+ * objects.  Return a value < 0 if & only if the true value is too large to
+ * fit in a signed long.  Arguments MUST return 1 with PyLong_Check().  Return
+ * -1 when there is an error.
  */
 static PyObject*
 range_length_obj(rangeobject *r)
 {
     /* -------------------------------------------------------------
     Algorithm is equal to that of get_len_of_range(), but it operates
-    on PyObjects (which are assumed to be PyLong or PyInt objects).
+    on PyObjects (which are assumed to be PyLong objects).
     ---------------------------------------------------------------*/
     int cmp_result;
     PyObject *lo, *hi;
@@ -572,7 +587,6 @@ range_iter(PyObject *seq)
 {
     rangeobject *r = (rangeobject *)seq;
     longrangeiterobject *it;
-    PyObject *tmp, *len;
     long lstart, lstop, lstep;
 
     assert(PyRange_Check(seq));
@@ -603,15 +617,9 @@ range_iter(PyObject *seq)
 
     it->len = it->index = NULL;
 
-    /* Calculate length: (r->stop - r->start) / r->step */
-    tmp = PyNumber_Subtract(r->stop, r->start);
-    if (!tmp)
+    it->len = range_length_obj(r);
+    if (!it->len)
         goto create_failure;
-    len = PyNumber_FloorDivide(tmp, r->step);
-    Py_DECREF(tmp);
-    if (!len)
-        goto create_failure;
-    it->len = len;
     it->index = PyLong_FromLong(0);
     if (!it->index)
         goto create_failure;

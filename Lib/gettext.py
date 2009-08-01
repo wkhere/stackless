@@ -366,7 +366,7 @@ class GNUTranslations(NullTranslations):
 
 
 # Locate a .mo file using the gettext strategy
-def find(domain, localedir=None, languages=None, all=0):
+def find(domain, localedir=None, languages=None, all=False):
     # Get some reasonable defaults for arguments that were not supplied
     if localedir is None:
         localedir = _default_localedir
@@ -410,12 +410,11 @@ def translation(domain, localedir=None, languages=None,
                 class_=None, fallback=False, codeset=None):
     if class_ is None:
         class_ = GNUTranslations
-    mofiles = find(domain, localedir, languages, all=1)
+    mofiles = find(domain, localedir, languages, all=True)
     if not mofiles:
         if fallback:
             return NullTranslations()
         raise IOError(ENOENT, 'No translation file found for domain', domain)
-    # TBD: do we need to worry about the file pointer getting collected?
     # Avoid opening, reading, and parsing the .mo file after it's been done
     # once.
     result = None
@@ -423,7 +422,8 @@ def translation(domain, localedir=None, languages=None,
         key = os.path.abspath(mofile)
         t = _translations.get(key)
         if t is None:
-            t = _translations.setdefault(key, class_(open(mofile, 'rb')))
+            with open(mofile, 'rb') as fp:
+                t = _translations.setdefault(key, class_(fp))
         # Copy the translation object to allow setting fallbacks and
         # output charset. All other instance data is shared with the
         # cached object.

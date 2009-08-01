@@ -11,6 +11,7 @@ PS: In the standard Python distribution, this file is encoded in Latin-1.
 
 David Abrahams
 Jim Ahlstrom
+Farhan Ahmad
 Jyrki Alakuijala
 Billy G. Allie
 Kevin Altis
@@ -28,6 +29,7 @@ Jan-Hein B"uhrman
 Donovan Baarda
 Attila Babo
 Alfonso Baciero
+Marcin Bachry
 Dwayne Bailey
 Stig Bakken
 Greg Ball
@@ -35,6 +37,7 @@ Luigi Ballabio
 Jeff Balogh
 Michael J. Barber
 Chris Barker
+Nick Barnes
 Quentin Barnes
 Richard Barran
 Cesar Eduardo Barros
@@ -143,6 +146,7 @@ Aldo Cortesi
 David Costanzo
 Scott Cotton
 Greg Couch
+David Cournapeau
 Steve Cousins
 Alex Coventry
 Matthew Dixon Cowles
@@ -160,6 +164,7 @@ Scott David Daniels
 Ben Darnell
 Jonathan Dasteel
 John DeGood
+Ned Deily
 Vincent Delft
 Arnaud Delobelle
 Erik Demaine
@@ -168,6 +173,7 @@ Raghuram Devarakonda
 Toby Dickenson
 Mark Dickinson
 Jack Diederich
+Daniel Diniz
 Humberto Diogenes
 Yves Dionne
 Daniel Dittmar
@@ -371,6 +377,7 @@ Tamito Kajiyama
 Peter van Kampen
 Jacob Kaplan-Moss
 Lou Kates
+Hiroaki Kawai
 Sebastien Keim
 Robert Kern
 Randall Kern
@@ -392,6 +399,7 @@ Pat Knight
 Greg Kochanski
 Damon Kohler
 Joseph Koshy
+Maksim Kozyarchuk
 Bob Kras
 Holger Krekel
 Michael Kremer
@@ -490,6 +498,7 @@ Doug Moen
 The Dragon De Monsyne
 Skip Montanaro
 Paul Moore
+Derek Morr
 James A Morrison
 Sjoerd Mullender
 Sape Mullender
@@ -543,6 +552,7 @@ Randy Pausch
 Samuele Pedroni
 Marcel van der Peijl
 Steven Pemberton
+Santiago Peresón
 Mark Perrego
 Trevor Perrin
 Tim Peters
@@ -575,6 +585,7 @@ Eduardo Pérez
 Brian Quinlan
 Anders Qvist
 Burton Radons
+Brodie Rao
 Antti Rasinen
 Eric Raymond
 Edward K. Ream
@@ -611,9 +622,11 @@ Saskia van Rossum
 Donald Wallace Rouse II
 Liam Routt
 Craig Rowland
+Clinton Roy
 Paul Rubin
 Sam Ruby
 Audun S. Runde
+Rauli Ruohonen
 Jeff Rush
 Sam Rushing
 Mark Russell
@@ -645,6 +658,7 @@ Nick Seidenman
 Å½iga Seilnach
 Fred Sells
 Jiwon Seo
+Roger D. Serwy
 Jerry Seutter
 Denis Severson
 Ian Seyer
@@ -697,7 +711,9 @@ Kalle Svensson
 Andrew Svetlov
 Paul Swartz
 Thenault Sylvain
+Arfrever Frehtes Taifersar Arahesis
 Geoff Talvola
+Musashi Tamura
 William Tanksley
 Christian Tanzer
 Steven Taschuk
@@ -750,6 +766,7 @@ Greg Ward
 Barry Warsaw
 Steve Waterbury
 Bob Watson
+David Watson
 Aaron Watters
 Henrik Weber
 Corran Webster

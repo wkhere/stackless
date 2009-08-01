@@ -11,6 +11,9 @@ from test.support import TESTFN, run_unittest
 from test import inspect_fodder as mod
 from test import inspect_fodder2 as mod2
 
+# C module for test_findsource_binary
+import unicodedata
+
 # Functions tested in this suite:
 # ismodule, isclass, ismethod, isfunction, istraceback, isframe, iscode,
 # isbuiltin, isroutine, isgenerator, isgeneratorfunction, getmembers,
@@ -172,7 +175,8 @@ class GetSourceBase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         unittest.TestCase.__init__(self, *args, **kwargs)
 
-        self.source = open(inspect.getsourcefile(self.fodderFile)).read()
+        with open(inspect.getsourcefile(self.fodderFile)) as fp:
+            self.source = fp.read()
 
     def sourcerange(self, top, bottom):
         lines = self.source.split("\n")
@@ -335,6 +339,14 @@ class TestBuggyCases(GetSourceBase):
 
     def test_method_in_dynamic_class(self):
         self.assertSourceEqual(mod2.method_in_dynamic_class, 95, 97)
+
+    @unittest.skipIf(
+        not hasattr(unicodedata, '__file__') or
+            unicodedata.__file__[-4:] in (".pyc", ".pyo"),
+        "unicodedata is not an external binary module")
+    def test_findsource_binary(self):
+        self.assertRaises(IOError, inspect.getsource, unicodedata)
+        self.assertRaises(IOError, inspect.findsource, unicodedata)
 
 # Helper for testing classify_class_attrs.
 def attrs_wo_objs(cls):

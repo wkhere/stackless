@@ -76,7 +76,7 @@ Py_ssize_t
 _PyObject_LengthHint(PyObject *o, Py_ssize_t defaultvalue)
 {
 	static PyObject *hintstrobj = NULL;
-	PyObject *ro;
+	PyObject *ro, *hintmeth;
 	Py_ssize_t rv;
 
 	/* try o.__len__() */
@@ -84,25 +84,24 @@ _PyObject_LengthHint(PyObject *o, Py_ssize_t defaultvalue)
 	if (rv >= 0)
 		return rv;
 	if (PyErr_Occurred()) {
-		if (!PyErr_ExceptionMatches(PyExc_TypeError) &&
-			!PyErr_ExceptionMatches(PyExc_AttributeError))
-				return -1;
+		if (!PyErr_ExceptionMatches(PyExc_TypeError))
+			return -1;
 		PyErr_Clear();
 	}
 
-	/* cache a hashed version of the attribute string */
-	if (hintstrobj == NULL) {
-		hintstrobj = PyUnicode_InternFromString("__length_hint__");
-		if (hintstrobj == NULL)
-			return -1;
-	}
-
 	/* try o.__length_hint__() */
-	ro = PyObject_CallMethodObjArgs(o, hintstrobj, NULL);
+        hintmeth = _PyObject_LookupSpecial(o, "__length_hint__", &hintstrobj);
+	if (hintmeth == NULL) {
+		if (PyErr_Occurred())
+			return -1;
+		else
+			return defaultvalue;
+	}
+	ro = PyObject_CallFunctionObjArgs(hintmeth, NULL);
+	Py_DECREF(hintmeth);
 	if (ro == NULL) {
-		if (!PyErr_ExceptionMatches(PyExc_TypeError) &&
-			!PyErr_ExceptionMatches(PyExc_AttributeError))
-				return -1;
+		if (!PyErr_ExceptionMatches(PyExc_TypeError))
+			return -1;
 		PyErr_Clear();
 		return defaultvalue;
 	}
@@ -136,7 +135,7 @@ PyObject_GetItem(PyObject *o, PyObject *key)
 					  "be integer, not '%.200s'", key);
 	}
 
-	return type_error("'%.200s' object is unsubscriptable", o);
+	return type_error("'%.200s' object is not subscriptable", o);
 }
 
 int
@@ -2595,14 +2594,8 @@ PyObject_IsInstance(PyObject *inst, PyObject *cls)
 		Py_LeaveRecursiveCall();
 		return r;
 	}
-	if (name == NULL) {
-		name = PyUnicode_InternFromString("__instancecheck__");
-		if (name == NULL)
-			return -1;
-	}
-	checker = PyObject_GetAttr(cls, name);
-	if (checker == NULL && PyErr_Occurred())
-		PyErr_Clear();
+
+	checker = _PyObject_LookupSpecial(cls, "__instancecheck__", &name);
 	if (checker != NULL) {
 		PyObject *res;
 		int ok = -1;
@@ -2619,6 +2612,8 @@ PyObject_IsInstance(PyObject *inst, PyObject *cls)
 		}
 		return ok;
 	}
+	else if (PyErr_Occurred())
+		return -1;
 	return recursive_isinstance(inst, cls);
 }
 
@@ -2644,9 +2639,8 @@ int
 PyObject_IsSubclass(PyObject *derived, PyObject *cls)
 {
 	static PyObject *name = NULL;
-	PyObject *t, *v, *tb;
 	PyObject *checker;
-	
+
 	if (PyTuple_Check(cls)) {
 		Py_ssize_t i;
 		Py_ssize_t n;
@@ -2665,14 +2659,8 @@ PyObject_IsSubclass(PyObject *derived, PyObject *cls)
 		Py_LeaveRecursiveCall();
 		return r;
 	}
-	if (name == NULL) {
-		name = PyUnicode_InternFromString("__subclasscheck__");
-		if (name == NULL)
-			return -1;
-	}
-	PyErr_Fetch(&t, &v, &tb);
-	checker = PyObject_GetAttr(cls, name);
-	PyErr_Restore(t, v, tb);
+
+	checker = _PyObject_LookupSpecial(cls, "__subclasscheck__", &name);
 	if (checker != NULL) {
 		PyObject *res;
 		int ok = -1;
@@ -2689,6 +2677,8 @@ PyObject_IsSubclass(PyObject *derived, PyObject *cls)
 		}
 		return ok;
 	}
+	else if (PyErr_Occurred())
+		return -1;
 	return recursive_issubclass(derived, cls);
 }
 
