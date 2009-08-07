@@ -1084,7 +1084,11 @@ PyErr_PrintEx(int set_sys_last_vars)
 {
 	PyObject *exception, *v, *tb, *hook;
 
+#ifdef STACKLESS
+	if (PyErr_ExceptionMatches(PyExc_SystemExit) && !PyErr_ExceptionMatches(PyExc_TaskletExit)) {
+#else
 	if (PyErr_ExceptionMatches(PyExc_SystemExit)) {
+#endif
 		handle_system_exit();
 	}
 	PyErr_Fetch(&exception, &v, &tb);
@@ -1106,7 +1110,11 @@ PyErr_PrintEx(int set_sys_last_vars)
 		PyObject *result = PyEval_CallObject(hook, args);
 		if (result == NULL) {
 			PyObject *exception2, *v2, *tb2;
+#ifdef STACKLESS
+			if (PyErr_ExceptionMatches(PyExc_SystemExit) && !PyErr_ExceptionMatches(PyExc_TaskletExit)) {
+#else
 			if (PyErr_ExceptionMatches(PyExc_SystemExit)) {
+#endif
 				handle_system_exit();
 			}
 			PyErr_Fetch(&exception2, &v2, &tb2);
