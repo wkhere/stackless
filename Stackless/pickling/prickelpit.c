@@ -1778,7 +1778,7 @@ rangeiter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	it = PyObject_New(rangeiterobject, type);
 	if (it == NULL)
 		return NULL;
-	if (!PyArg_ParseTuple(args, "iiii:rangeiterator",
+	if (!PyArg_ParseTuple(args, "llll:rangeiterator",
 				    &it->index,
 				    &it->start,
 				    &it->step,
