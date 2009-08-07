@@ -4,6 +4,20 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.5.4?
+===========================
+
+*Release date: 23-Dec-2008*
+
+Core and builtins
+-----------------
+
+- Revert patch for #1706039, as it can crash the interpreter.
+
+- Added test case to ensure attempts to read from a file opened for writing
+  fail.
+
+
 What's New in Python 2.5.3?
 ===========================
 
