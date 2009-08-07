@@ -481,7 +481,7 @@ class Directory:
                 file = prefix+"."+suffix
             else:
                 file = prefix
-            assert file not in self.short_names
+            # assert file not in self.short_names
         else:
             prefix = prefix[:6]
             if suffix:

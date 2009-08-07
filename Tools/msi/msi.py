@@ -12,7 +12,7 @@ from uuids import product_codes
 # 0 for official python.org releases
 # 1 for intermediate releases by anybody, with
 # a new product code for every package.
-snapshot = 1
+snapshot = 0
 # 1 means that file extension is px, not py,
 # and binaries start with x
 testpackage = 0
@@ -21,7 +21,7 @@ srcdir = os.path.abspath("../..")
 # Text to be displayed as the version in dialogs etc.
 # goes into file name and ProductCode. Defaults to
 # current_version.day for Snapshot, current_version otherwise
-full_current_version = None
+full_current_version = "2.5.3"
 # Is Tcl available at all?
 have_tcl = True
 # Where is sqlite3.dll located, relative to srcdir?

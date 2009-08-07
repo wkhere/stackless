@@ -5,12 +5,39 @@ Python News
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
 What's New in Python 2.5.3?
+===========================
+
+*Release date: 19-Dec-2008*
+
+
+Build
+-----
+
+- In the OSX installer, update SQLite to 3.6.7, and change bsddb URL.
+  Build against system Tcl framework.
+
+What's New in Python 2.5.3c1?
 =============================
 
-*Release date: XX-XXX-20XX*
+*Release date: 13-Dec-2008*
 
 Core and builtins
 -----------------
+
+- Issue #1706039: Support continued reading from a file even after 
+  EOF was hit.
+
+- Issue #1683: prevent forking from interfering in threading storage.
+
+- Issue #4597: Fixed several opcodes that weren't always propagating
+  exceptions.
+
+- Issue #4589: Propagated an exception thrown by a context manager's
+  __exit__ method's result while it's being converted to bool.
+
+- Issue #4317: Fixed a crash in the imageop.rgb2rgb8() function.
+
+- Issue #4230: If ``__getattr__`` is a descriptor, it now functions correctly.
 
 - Issue #4048: The parser module now correctly validates relative imports.
 
@@ -96,6 +123,18 @@ Core and builtins
 
 Library
 -------
+
+- Issue #3767: Convert Tk object to string in tkColorChooser.
+
+- Issue #4342: Always convert Text.index result to string.
+
+- Issue 3248: Allow placing ScrolledText in a PanedWindow.
+
+- Issue #4084: Fix max, min, max_mag and min_mag Decimal methods to
+  give correct results in the case where one argument is a quiet NaN
+  and the other is a finite number that requires rounding.
+
+- Issue #1776581 and #4302. Minor corrections to smtplib.
 
 - Issue #3774: Fixed an error when create a Tkinter menu item without command
   and then remove it.
@@ -201,6 +240,10 @@ Library
 Extension Modules
 -----------------
 
+- Issue #1040026: Fix os.times result on systems where HZ is incorrect.
+
+- Issue #4228: Pack negative values the same way as 2.4 in struct's L format.
+
 - Security Issue #2: imageop did not validate arguments correctly and could
   segfault as a result.
 
@@ -232,6 +275,9 @@ Extension Modules
 Tests
 -----
 
+- Issue #3863: Disabled a unit test of fork being called from a thread
+  when running on platforms known to exhibit OS bugs when attempting that.
+
 - Issue #3261: test_cookielib had an improper file encoding specified.
 
 - Patch #2232: os.tmpfile might fail on Windows if the user has no
@@ -243,6 +289,8 @@ Documentation
 
 Build
 -----
+
+- Issue #4368: Don't define _XOPEN_SOURCE on FreeBSD 4.*.
 
 Windows
 -------
