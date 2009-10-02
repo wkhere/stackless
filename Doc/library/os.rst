@@ -354,7 +354,7 @@ These functions create new file objects. (See also :func:`open`.)
    is ``'r'`` (default) or ``'w'``. The *bufsize* argument has the same meaning as
    the corresponding argument to the built-in :func:`open` function.  The exit
    status of the command (encoded in the format specified for :func:`wait`) is
-   available as the return value of the :meth:`close` method of the file object,
+   available as the return value of the :meth:`~file.close` method of the file object,
    except that when the exit status is zero (termination without errors), ``None``
    is returned. Availability: Unix, Windows.
 
@@ -475,9 +475,9 @@ by file descriptors.
    .. note::
 
       This function is intended for low-level I/O and must be applied to a file
-      descriptor as returned by :func:`open` or :func:`pipe`.  To close a "file
+      descriptor as returned by :func:`os.open` or :func:`pipe`.  To close a "file
       object" returned by the built-in function :func:`open` or by :func:`popen` or
-      :func:`fdopen`, use its :meth:`close` method.
+      :func:`fdopen`, use its :meth:`~file.close` method.
 
 
 .. function:: closerange(fd_low, fd_high)
@@ -604,8 +604,8 @@ by file descriptors.
    .. note::
 
       This function is intended for low-level I/O.  For normal usage, use the built-in
-      function :func:`open`, which returns a "file object" with :meth:`read` and
-      :meth:`write` methods (and many more).  To wrap a file descriptor in a "file
+      function :func:`open`, which returns a "file object" with :meth:`~file.read` and
+      :meth:`~file.write` methods (and many more).  To wrap a file descriptor in a "file
       object", use :func:`fdopen`.
 
 
@@ -634,22 +634,22 @@ by file descriptors.
    .. note::
 
       This function is intended for low-level I/O and must be applied to a file
-      descriptor as returned by :func:`open` or :func:`pipe`.  To read a "file object"
+      descriptor as returned by :func:`os.open` or :func:`pipe`.  To read a "file object"
       returned by the built-in function :func:`open` or by :func:`popen` or
-      :func:`fdopen`, or :data:`sys.stdin`, use its :meth:`read` or :meth:`readline`
-      methods.
+      :func:`fdopen`, or :data:`sys.stdin`, use its :meth:`~file.read` or
+      :meth:`~file.readline` methods.
 
 
 .. function:: tcgetpgrp(fd)
 
    Return the process group associated with the terminal given by *fd* (an open
-   file descriptor as returned by :func:`open`). Availability: Unix.
+   file descriptor as returned by :func:`os.open`). Availability: Unix.
 
 
 .. function:: tcsetpgrp(fd, pg)
 
    Set the process group associated with the terminal given by *fd* (an open file
-   descriptor as returned by :func:`open`) to *pg*. Availability: Unix.
+   descriptor as returned by :func:`os.open`) to *pg*. Availability: Unix.
 
 
 .. function:: ttyname(fd)
@@ -667,16 +667,16 @@ by file descriptors.
    .. note::
 
       This function is intended for low-level I/O and must be applied to a file
-      descriptor as returned by :func:`open` or :func:`pipe`.  To write a "file
+      descriptor as returned by :func:`os.open` or :func:`pipe`.  To write a "file
       object" returned by the built-in function :func:`open` or by :func:`popen` or
-      :func:`fdopen`, or :data:`sys.stdout` or :data:`sys.stderr`, use its :meth:`write`
-      method.
+      :func:`fdopen`, or :data:`sys.stdout` or :data:`sys.stderr`, use its
+      :meth:`~file.write` method.
 
 The following constants are options for the *flags* parameter to the
-:func:`open` function.  They can be combined using the bitwise OR operator
+:func:`~os.open` function.  They can be combined using the bitwise OR operator
 ``|``.  Some of them are not available on all platforms.  For descriptions of
 their availability and use, consult the :manpage:`open(2)` manual page on Unix
-or `the MSDN <http://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>` on Windows.
+or `the MSDN <http://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>`_ on Windows.
 
 
 .. data:: O_RDONLY
@@ -752,7 +752,7 @@ Files and Directories
    .. note::
 
       Using :func:`access` to check if a user is authorized to e.g. open a file before
-      actually doing so using :func:`open` creates a  security hole, because the user
+      actually doing so using :func:`open` creates a security hole, because the user
       might exploit the short time interval  between checking and opening the file to
       manipulate it.
 
@@ -854,25 +854,25 @@ Files and Directories
    combinations of them:
 
 
-   * ``stat.S_ISUID``
-   * ``stat.S_ISGID``
-   * ``stat.S_ENFMT``
-   * ``stat.S_ISVTX``
-   * ``stat.S_IREAD``
-   * ``stat.S_IWRITE``
-   * ``stat.S_IEXEC``
-   * ``stat.S_IRWXU``
-   * ``stat.S_IRUSR``
-   * ``stat.S_IWUSR``
-   * ``stat.S_IXUSR``
-   * ``stat.S_IRWXG``
-   * ``stat.S_IRGRP``
-   * ``stat.S_IWGRP``
-   * ``stat.S_IXGRP``
-   * ``stat.S_IRWXO``
-   * ``stat.S_IROTH``
-   * ``stat.S_IWOTH``
-   * ``stat.S_IXOTH``
+   * :data:`stat.S_ISUID`
+   * :data:`stat.S_ISGID`
+   * :data:`stat.S_ENFMT`
+   * :data:`stat.S_ISVTX`
+   * :data:`stat.S_IREAD`
+   * :data:`stat.S_IWRITE`
+   * :data:`stat.S_IEXEC`
+   * :data:`stat.S_IRWXU`
+   * :data:`stat.S_IRUSR`
+   * :data:`stat.S_IWUSR`
+   * :data:`stat.S_IXUSR`
+   * :data:`stat.S_IRWXG`
+   * :data:`stat.S_IRGRP`
+   * :data:`stat.S_IWGRP`
+   * :data:`stat.S_IXGRP`
+   * :data:`stat.S_IRWXO`
+   * :data:`stat.S_IROTH`
+   * :data:`stat.S_IWOTH`
+   * :data:`stat.S_IXOTH`
 
    Availability: Unix, Windows.
 
@@ -929,7 +929,8 @@ Files and Directories
 
    .. versionchanged:: 2.3
       On Windows NT/2k/XP and Unix, if *path* is a Unicode object, the result will be
-      a list of Unicode objects.
+      a list of Unicode objects. Undecodable filenames will still be returned as
+      string objects.
 
 
 .. function:: lstat(path)
@@ -1709,8 +1710,8 @@ written in Python, such as a mail server's external command delivery program.
 
    (Note that the :mod:`subprocess` module provides more powerful facilities for
    spawning new processes and retrieving their results; using that module is
-   preferable to using these functions.  Check specially the *Replacing Older
-   Functions with the subprocess Module* section in that documentation page.)
+   preferable to using these functions.  Check especially the
+   :ref:`subprocess-replacements` section.)
 
    If *mode* is :const:`P_NOWAIT`, this function returns the process id of the new
    process; if *mode* is :const:`P_WAIT`, returns the process's exit code if it

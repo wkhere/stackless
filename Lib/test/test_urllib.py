@@ -98,20 +98,20 @@ class urlopen_FileTests(unittest.TestCase):
 class ProxyTests(unittest.TestCase):
 
     def setUp(self):
-        # Save all proxy related env vars
-        self._saved_environ = dict([(k, v) for k, v in os.environ.iteritems()
-                                    if k.lower().find('proxy') >= 0])
+        # Records changes to env vars
+        self.env = test_support.EnvironmentVarGuard()
         # Delete all proxy related env vars
-        for k in self._saved_environ:
-            del os.environ[k]
+        for k, v in os.environ.iteritems():
+            if 'proxy' in k.lower():
+                env.unset(k)
 
     def tearDown(self):
         # Restore all proxy related env vars
-        for k, v in self._saved_environ.iteritems():
-            os.environ[k] = v
+        self.env.__exit__()
+        del self.env
 
     def test_getproxies_environment_keep_no_proxies(self):
-        os.environ['NO_PROXY'] = 'localhost'
+        self.env.set('NO_PROXY', 'localhost')
         proxies = urllib.getproxies_environment()
         # getproxies_environment use lowered case truncated (no '_proxy') keys
         self.assertEquals('localhost', proxies['no'])
@@ -582,6 +582,17 @@ class Pathname_Tests(unittest.TestCase):
                          "url2pathname() failed; %s != %s" %
                          (expect, result))
 
+class URLopener_Tests(unittest.TestCase):
+    """Testcase to test the open method of URLopener class."""
+    def test_quoted_open(self):
+        class DummyURLopener(urllib.URLopener):
+            def open_spam(self, url):
+                return url
+
+        self.assertEqual(DummyURLopener().open(
+            'spam://example/ /'),'//example/%20/')
+
+
 # Just commented them out.
 # Can't really tell why keep failing in windows and sparc.
 # Everywhere else they work ok, but on those machines, someteimes
@@ -676,6 +687,7 @@ def test_main():
             UnquotingTests,
             urlencode_Tests,
             Pathname_Tests,
+            URLopener_Tests,
             #FTPWrapperTests,
         )
 

@@ -182,6 +182,8 @@ get_long(PyObject *v, long *p)
 
 /* Same, but handling unsigned long */
 
+#ifndef PY_STRUCT_OVERFLOW_MASKING
+
 static int
 get_ulong(PyObject *v, unsigned long *p)
 {
@@ -201,6 +203,8 @@ get_ulong(PyObject *v, unsigned long *p)
 	}
 	return 0;
 }
+
+#endif /* PY_STRUCT_OVERFLOW_MASKING */
 
 #ifdef HAVE_LONG_LONG
 
@@ -646,7 +650,7 @@ np_ushort(char *p, PyObject *v, const formatdef *f)
 		return -1;
 	if (x < 0 || x > USHRT_MAX){
 		PyErr_SetString(StructError,
-				"short format requires 0 <= number <= " STRINGIFY(USHRT_MAX));
+				"ushort format requires 0 <= number <= " STRINGIFY(USHRT_MAX));
 		return -1;
 	}
 	y = (unsigned short)x;

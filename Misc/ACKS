@@ -12,6 +12,7 @@ PS: In the standard Python distribution, this file is encoded in Latin-1.
 
 David Abrahams
 Jim Ahlstrom
+Farhan Ahmad
 Jyrki Alakuijala
 Billy G. Allie
 Kevin Altis
@@ -29,6 +30,7 @@ Jan-Hein B"uhrman
 Donovan Baarda
 Attila Babo
 Alfonso Baciero
+Marcin Bachry
 Dwayne Bailey
 Stig Bakken
 Greg Ball
@@ -43,6 +45,7 @@ Des Barry
 Ulf Bartelt
 Nick Bastin
 Jeff Bauer
+Mike Bayer
 Michael R Bax
 Anthony Baxter
 Samuel L. Bayer
@@ -166,6 +169,7 @@ Roger Dev
 Raghuram Devarakonda
 Toby Dickenson
 Mark Dickinson
+Daniel Diniz
 Yves Dionne
 Daniel Dittmar
 Jaromir Dolecek
@@ -173,8 +177,10 @@ Ismail Donmez
 Dima Dorfman
 Cesar Douady
 Dean Draayer
+Fred L. Drake, Jr.
 John DuBois
 Paul Dubois
+Graham Dumpleton
 Quinn Dunkan
 Robin Dunn
 Luke Dunstan
@@ -353,7 +359,6 @@ Irmen de Jong
 Lucas de Jonge
 John Jorgensen
 Jens B. Jorgensen
-Fred L. Drake, Jr.
 Andreas Jung
 Tattoo Mabonzo K.
 Bob Kahn
@@ -362,6 +367,7 @@ Tamito Kajiyama
 Peter van Kampen
 Jacob Kaplan-Moss
 Lou Kates
+Hiroaki Kawai
 Sebastien Keim
 Robert Kern
 Randall Kern
@@ -387,6 +393,7 @@ Holger Krekel
 Michael Kremer
 Fabian Kreutz
 Hannu Krosing
+Ivan KrstiÄ‡
 Andrew Kuchling
 Vladimir Kushnir
 Cameron Laird
@@ -404,6 +411,7 @@ Inyeol Lee
 Thomas Lee
 Christopher Lee
 Luc Lefebvre
+Vincent Legoll
 Kip Lehman
 Joerg Lehmann
 Luke Kenneth Casson Leighton
@@ -450,6 +458,7 @@ Nick Mathewson
 Graham Matthews
 Dieter Maurer
 Arnaud Mazin
+Kirk McDonald
 Chris McDonough
 Greg McFarlane
 Alan McIntyre
@@ -460,6 +469,8 @@ Andrew McNamara
 Craig McPheeters
 Lambert Meertens
 Bill van Melle
+Lucas Prado Melo
+Brian Merrell
 Luke Mewburn
 Mike Meyer
 Steven Miale
@@ -475,6 +486,7 @@ Doug Moen
 The Dragon De Monsyne
 Skip Montanaro
 Paul Moore
+Derek Morr
 James A Morrison
 Sjoerd Mullender
 Sape Mullender
@@ -527,8 +539,10 @@ Randy Pausch
 Samuele Pedroni
 Marcel van der Peijl
 Steven Pemberton
+Santiago Peresón
 Mark Perrego
 Trevor Perrin
+Gabriel de Perthuis
 Tim Peters
 Benjamin Peterson
 Chris Petrilli
@@ -678,6 +692,7 @@ Andrew Svetlov
 Kalle Svensson
 Paul Swartz
 Thenault Sylvain
+Arfrever Frehtes Taifersar Arahesis
 Geoff Talvola
 William Tanksley
 Christian Tanzer

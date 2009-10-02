@@ -798,7 +798,7 @@ Examples:
                                                in MyTestCase
 """
     def __init__(self, module='__main__', defaultTest=None,
-                 argv=None, testRunner=TextTestRunner,
+                 argv=None, testRunner=None,
                  testLoader=defaultTestLoader):
         if type(module) == type(''):
             self.module = __import__(module)
@@ -849,6 +849,9 @@ Examples:
                                                        self.module)
 
     def runTests(self):
+        if self.testRunner is None:
+            self.testRunner = TextTestRunner
+
         if isinstance(self.testRunner, (type, types.ClassType)):
             try:
                 testRunner = self.testRunner(verbosity=self.verbosity)

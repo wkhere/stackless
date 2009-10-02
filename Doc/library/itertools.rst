@@ -366,7 +366,7 @@ loops that truncate the stream.
           # izip('ABCD', 'xy') --> Ax By
           iterables = map(iter, iterables)
           while iterables:
-              yield yield tuple(map(next, iterables))
+              yield tuple(map(next, iterables))
 
    .. versionchanged:: 2.4
       When no iterables are specified, returns a zero length iterator instead of
@@ -701,11 +701,6 @@ which incur interpreter overhead.
            except StopIteration:
                pending -= 1
                nexts = cycle(islice(nexts, pending))
-
-   def powerset(iterable):
-       "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
-       s = list(iterable)
-       return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
 
    def compress(data, selectors):
        "compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F"

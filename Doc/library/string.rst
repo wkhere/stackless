@@ -388,7 +388,7 @@ displayed after the decimal point for a floating point value formatted with
 ``'f'`` and ``'F'``, or before and after the decimal point for a floating point
 value formatted with ``'g'`` or ``'G'``.  For non-number types the field
 indicates the maximum field size - in other words, how many characters will be
-used from the field content. The *precision* is ignored for integer values.
+used from the field content. The *precision* is not allowed for integer values.
 
 Finally, the *type* determines how the data should be presented.
 
@@ -578,12 +578,14 @@ The following functions are available to operate on string and Unicode objects.
 They are not available as string methods.
 
 
-.. function:: capwords(s)
+.. function:: capwords(s[, sep])
 
-   Split the argument into words using :func:`split`, capitalize each word using
-   :func:`capitalize`, and join the capitalized words using :func:`join`.  Note
-   that this replaces runs of whitespace characters by a single space, and removes
-   leading and trailing whitespace.
+   Split the argument into words using :meth:`str.split`, capitalize each word
+   using :meth:`str.capitalize`, and join the capitalized words using
+   :meth:`str.join`.  If the optional second argument *sep* is absent
+   or ``None``, runs of whitespace characters are replaced by a single space
+   and leading and trailing whitespace are removed, otherwise *sep* is used to
+   split and join the words.
 
 
 .. function:: maketrans(from, to)
@@ -592,7 +594,7 @@ They are not available as string methods.
    map each character in *from* into the character at the same position in *to*;
    *from* and *to* must have the same length.
 
-   .. warning::
+   .. note::
 
       Don't use strings derived from :const:`lowercase` and :const:`uppercase` as
       arguments; in some locales, these don't have the same length.  For case

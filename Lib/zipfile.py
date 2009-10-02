@@ -940,7 +940,9 @@ class ZipFile:
         """
         # build the destination pathname, replacing
         # forward slashes to platform specific separators.
-        if targetpath[-1:] in (os.path.sep, os.path.altsep):
+        # Strip trailing path separator, unless it represents the root.
+        if (targetpath[-1:] in (os.path.sep, os.path.altsep)
+            and len(os.path.splitdrive(targetpath)[1]) > 1):
             targetpath = targetpath[:-1]
 
         # don't include leading "/" from file name if present
@@ -957,7 +959,8 @@ class ZipFile:
             os.makedirs(upperdirs)
 
         if member.filename[-1] == '/':
-            os.mkdir(targetpath)
+            if not os.path.isdir(targetpath):
+                os.mkdir(targetpath)
             return targetpath
 
         source = self.open(member, pwd=pwd)
@@ -1107,7 +1110,7 @@ class ZipFile:
         self.fp.flush()
         if zinfo.flag_bits & 0x08:
             # Write CRC and file sizes after the file data
-            self.fp.write(struct.pack("<lLL", zinfo.CRC, zinfo.compress_size,
+            self.fp.write(struct.pack("<LLL", zinfo.CRC, zinfo.compress_size,
                   zinfo.file_size))
         self.filelist.append(zinfo)
         self.NameToInfo[zinfo.filename] = zinfo

@@ -616,15 +616,25 @@ PyUnicode_FromFormatV(const char *format, va_list vargs)
     count = vargs;
 #endif
 #endif
-    /* step 1: count the number of %S/%R format specifications
-     * (we call PyObject_Str()/PyObject_Repr() for these objects
-     * once during step 3 and put the result in an array) */
+     /* step 1: count the number of %S/%R/%s format specifications
+      * (we call PyObject_Str()/PyObject_Repr()/PyUnicode_DecodeUTF8() for these
+      * objects once during step 3 and put the result in an array) */
     for (f = format; *f; f++) {
-        if (*f == '%' && (*(f+1)=='S' || *(f+1)=='R'))
-            ++callcount;
+         if (*f == '%') {
+             if (*(f+1)=='%')
+                 continue;
+             if (*(f+1)=='S' || *(f+1)=='R')
+                 ++callcount;
+             while (isdigit((unsigned)*f))
+                 width = (width*10) + *f++ - '0';
+             while (*++f && *f != '%' && !isalpha((unsigned)*f))
+                 ;
+             if (*f == 's')
+                 ++callcount;
+         }
     }
     /* step 2: allocate memory for the results of
-     * PyObject_Str()/PyObject_Repr() calls */
+     * PyObject_Str()/PyObject_Repr()/PyUnicode_DecodeUTF8() calls */
     if (callcount) {
         callresults = PyObject_Malloc(sizeof(PyObject *)*callcount);
         if (!callresults) {
@@ -673,35 +683,13 @@ PyUnicode_FromFormatV(const char *format, va_list vargs)
             case 's':
             {
                 /* UTF-8 */
-                unsigned char*s;
-                s = va_arg(count, unsigned char*);
-                while (*s) {
-                    if (*s < 128) {
-                        n++; s++;
-                    } else if (*s < 0xc0) {
-                        /* invalid UTF-8 */
-                        n++; s++;
-                    } else if (*s < 0xc0) {
-                        n++;
-                        s++; if(!*s)break;
-                        s++;
-                    } else if (*s < 0xe0) {
-                        n++;
-                        s++; if(!*s)break;
-                        s++; if(!*s)break;
-                        s++;
-                    } else {
-#ifdef Py_UNICODE_WIDE
-                        n++;
-#else
-                        n+=2;
-#endif
-                        s++; if(!*s)break;
-                        s++; if(!*s)break;
-                        s++; if(!*s)break;
-                        s++;
-                    }
-                }
+                unsigned char *s = va_arg(count, unsigned char*);
+                PyObject *str = PyUnicode_DecodeUTF8(s, strlen(s), "replace");
+                if (!str)
+                    goto fail;
+                n += PyUnicode_GET_SIZE(str);
+                /* Remember the str and switch to the next slot */
+                *callresult++ = str;
                 break;
             }
             case 'U':
@@ -857,19 +845,15 @@ PyUnicode_FromFormatV(const char *format, va_list vargs)
                 break;
             case 's':
             {
-                /* Parameter must be UTF-8 encoded.
-                   In case of encoding errors, use
-                   the replacement character. */
-                PyObject *u;
-                p = va_arg(vargs, char*);
-                u = PyUnicode_DecodeUTF8(p, strlen(p),
-                                         "replace");
-                if (!u)
-                    goto fail;
-                Py_UNICODE_COPY(s, PyUnicode_AS_UNICODE(u),
-                                PyUnicode_GET_SIZE(u));
-                s += PyUnicode_GET_SIZE(u);
-                Py_DECREF(u);
+                /* unused, since we already have the result */
+                (void) va_arg(vargs, char *);
+                Py_UNICODE_COPY(s, PyUnicode_AS_UNICODE(*callresult),
+                                PyUnicode_GET_SIZE(*callresult));
+                s += PyUnicode_GET_SIZE(*callresult);
+                /* We're done with the unicode()/repr() => forget it */
+                Py_DECREF(*callresult);
+                /* switch to next unicode()/repr() result */
+                ++callresult;
                 break;
             }
             case 'U':
@@ -1704,7 +1688,7 @@ PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
                 charsleft = (charsleft << 16) | ch;
                 /* out, charsleft, bitsleft = */ ENCODE(out, charsleft, bitsleft);
 
-                /* If the next character is special then we dont' need to terminate
+                /* If the next character is special then we don't need to terminate
                    the shift sequence. If the next character is not a BASE64 character
                    or '-' then the shift sequence will be terminated implicitly and we
                    don't have to insert a '-'. */
@@ -2223,7 +2207,7 @@ PyUnicode_DecodeUTF32Stateful(const char *s,
         if (unicode_decode_call_errorhandler(
                 errors, &errorHandler,
                 "utf32", errmsg,
-                starts, size, &startinpos, &endinpos, &exc, &s,
+                starts, size, &startinpos, &endinpos, &exc, (const char **)&q,
                 &unicode, &outpos, &p))
             goto onError;
     }
@@ -8228,14 +8212,16 @@ formatfloat(Py_UNICODE *buf,
         return -1;
     if (prec < 0)
         prec = 6;
+#if SIZEOF_INT > 4
     /* make sure that the decimal representation of precision really does
        need at most 10 digits: platforms with sizeof(int) == 8 exist! */
-    if (prec > 0x7fffffffL) {
+    if (prec > 0x7fffffff) {
         PyErr_SetString(PyExc_OverflowError,
                         "outrageously large precision "
                         "for formatted float");
         return -1;
     }
+#endif
 
     if (type == 'f' && fabs(x) >= 1e50)
         type = 'g';

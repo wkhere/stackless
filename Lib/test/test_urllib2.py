@@ -224,8 +224,8 @@ def test_password_manager_default_port(self):
 
 class MockOpener:
     addheaders = []
-    def open(self, req, data=None):
-        self.req, self.data = req, data
+    def open(self, req, data=None,timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+        self.req, self.data, self.timeout  = req, data, timeout
     def error(self, proto, *args):
         self.proto, self.args = proto, args
 
@@ -850,6 +850,7 @@ class HandlerTests(unittest.TestCase):
                 method = getattr(h, "http_error_%s" % code)
                 req = Request(from_url, data)
                 req.add_header("Nonsense", "viking=withhold")
+                req.timeout = socket._GLOBAL_DEFAULT_TIMEOUT
                 if data is not None:
                     req.add_header("Content-Length", str(len(data)))
                 req.add_unredirected_header("Spam", "spam")
@@ -878,6 +879,7 @@ class HandlerTests(unittest.TestCase):
 
         # loop detection
         req = Request(from_url)
+        req.timeout = socket._GLOBAL_DEFAULT_TIMEOUT
         def redirect(h, req, url=to_url):
             h.http_error_302(req, MockFile(), 302, "Blah",
                              MockHeaders({"location": url}))
@@ -887,6 +889,7 @@ class HandlerTests(unittest.TestCase):
         # detect infinite loop redirect of a URL to itself
         req = Request(from_url, origin_req_host="example.com")
         count = 0
+        req.timeout = socket._GLOBAL_DEFAULT_TIMEOUT
         try:
             while 1:
                 redirect(h, req, "http://example.com/")
@@ -898,6 +901,7 @@ class HandlerTests(unittest.TestCase):
         # detect endless non-repeating chain of redirects
         req = Request(from_url, origin_req_host="example.com")
         count = 0
+        req.timeout = socket._GLOBAL_DEFAULT_TIMEOUT
         try:
             while 1:
                 redirect(h, req, "http://example.com/%d" % count)
@@ -937,6 +941,21 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(req.get_host(), "proxy.example.com:3128")
 
         self.assertEqual([(handlers[0], "http_open")],
+                         [tup[0:2] for tup in o.calls])
+
+    def test_proxy_https(self):
+        o = OpenerDirector()
+        ph = urllib2.ProxyHandler(dict(https='proxy.example.com:3128'))
+        o.add_handler(ph)
+        meth_spec = [
+            [("https_open","return response")]
+        ]
+        handlers = add_ordered_mock_handlers(o, meth_spec)
+        req = Request("https://www.example.com/")
+        self.assertEqual(req.get_host(), "www.example.com")
+        r = o.open(req)
+        self.assertEqual(req.get_host(), "proxy.example.com:3128")
+        self.assertEqual([(handlers[0], "https_open")],
                          [tup[0:2] for tup in o.calls])
 
     def test_basic_auth(self, quote_char='"'):

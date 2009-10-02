@@ -316,6 +316,28 @@ Example:
 
 This section shows various approaches to working with deques.
 
+Bounded length deques provide functionality similar to the ``tail`` filter
+in Unix::
+
+   def tail(filename, n=10):
+       'Return the last n lines of a file'
+       return deque(open(filename), n)
+
+Another approach to using deques is to maintain a sequence of recently
+added elements by appending to the right and popping to the left::
+
+    def moving_average(iterable, n=3):
+        # moving_average([40, 30, 50, 46, 39, 44]) --> 40.0 42.0 45.0 43.0
+        # http://en.wikipedia.org/wiki/Moving_average
+        it = iter(iterable)
+        d = deque(itertools.islice(it, n-1))
+        d.appendleft(0)
+        s = sum(d)
+        for elem in it:
+            s += elem - d.popleft()
+            d.append(elem)
+            yield s / float(n)
+
 The :meth:`rotate` method provides a way to implement :class:`deque` slicing and
 deletion.  For example, a pure python implementation of ``del d[n]`` relies on
 the :meth:`rotate` method to position elements to be popped::
@@ -332,31 +354,6 @@ reverse the rotation.
 With minor variations on that approach, it is easy to implement Forth style
 stack manipulations such as ``dup``, ``drop``, ``swap``, ``over``, ``pick``,
 ``rot``, and ``roll``.
-
-Multi-pass data reduction algorithms can be succinctly expressed and efficiently
-coded by extracting elements with multiple calls to :meth:`popleft`, applying
-a reduction function, and calling :meth:`append` to add the result back to the
-deque.
-
-For example, building a balanced binary tree of nested lists entails reducing
-two adjacent nodes into one by grouping them in a list:
-
-   >>> def maketree(iterable):
-   ...     d = deque(iterable)
-   ...     while len(d) > 1:
-   ...         pair = [d.popleft(), d.popleft()]
-   ...         d.append(pair)
-   ...     return list(d)
-   ...
-   >>> print maketree('abcdefgh')
-   [[[['a', 'b'], ['c', 'd']], [['e', 'f'], ['g', 'h']]]]
-
-Bounded length deques provide functionality similar to the ``tail`` filter
-in Unix::
-
-   def tail(filename, n=10):
-       'Return the last n lines of a file'
-       return deque(open(filename), n)
 
 .. _defaultdict-objects:
 
@@ -527,8 +524,8 @@ Example:
    <BLANKLINE>
            _fields = ('x', 'y')
    <BLANKLINE>
-           def __new__(cls, x, y):
-               return tuple.__new__(cls, (x, y))
+           def __new__(_cls, x, y):
+               return _tuple.__new__(_cls, (x, y))
    <BLANKLINE>
            @classmethod
            def _make(cls, iterable, new=tuple.__new__, len=len):
@@ -545,9 +542,9 @@ Example:
                'Return a new dict which maps field names to their values'
                return {'x': t[0], 'y': t[1]}
    <BLANKLINE>
-           def _replace(self, **kwds):
+           def _replace(_self, **kwds):
                'Return a new Point object replacing specified fields with new values'
-               result = self._make(map(kwds.pop, ('x', 'y'), self))
+               result = _self._make(map(kwds.pop, ('x', 'y'), _self))
                if kwds:
                    raise ValueError('Got unexpected field names: %r' % kwds.keys())
                return result
@@ -555,8 +552,8 @@ Example:
            def __getnewargs__(self):
                return tuple(self)
    <BLANKLINE>
-           x = property(itemgetter(0))
-           y = property(itemgetter(1))
+           x = _property(_itemgetter(0))
+           y = _property(_itemgetter(1))
 
    >>> p = Point(11, y=22)     # instantiate with positional or keyword arguments
    >>> p[0] + p[1]             # indexable like the plain tuple (11, 22)

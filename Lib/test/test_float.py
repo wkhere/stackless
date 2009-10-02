@@ -82,11 +82,23 @@ class GeneralFloatCases(unittest.TestCase):
             def __float__(self):
                 return 42
 
+        # Issue 5759: __float__ not called on str subclasses (though it is on
+        # unicode subclasses).
+        class FooStr(str):
+            def __float__(self):
+                return float(str(self)) + 1
+
+        class FooUnicode(unicode):
+            def __float__(self):
+                return float(unicode(self)) + 1
+
         self.assertAlmostEqual(float(Foo0()), 42.)
         self.assertAlmostEqual(float(Foo1()), 42.)
         self.assertAlmostEqual(float(Foo2()), 42.)
         self.assertAlmostEqual(float(Foo3(21)), 42.)
         self.assertRaises(TypeError, float, Foo4(42))
+        self.assertAlmostEqual(float(FooUnicode('8')), 9.)
+        self.assertAlmostEqual(float(FooStr('8')), 9.)
 
     def test_floatasratio(self):
         for f, ratio in [
@@ -379,6 +391,11 @@ class HexFloatTestCase(unittest.TestCase):
             'snan',
             'NaNs',
             'nna',
+            'an',
+            'nf',
+            'nfinity',
+            'inity',
+            'iinity',
             '0xnan',
             '',
             ' ',
@@ -425,6 +442,32 @@ class HexFloatTestCase(unittest.TestCase):
             else:
                 self.fail('Expected float.fromhex(%r) to raise ValueError; '
                           'got %r instead' % (x, result))
+
+
+    def test_whitespace(self):
+        value_pairs = [
+            ('inf', INF),
+            ('-Infinity', -INF),
+            ('nan', NAN),
+            ('1.0', 1.0),
+            ('-0x.2', -0.125),
+            ('-0.0', -0.0)
+            ]
+        whitespace = [
+            '',
+            ' ',
+            '\t',
+            '\n',
+            '\n \t',
+            '\f',
+            '\v',
+            '\r'
+            ]
+        for inp, expected in value_pairs:
+            for lead in whitespace:
+                for trail in whitespace:
+                    got = fromHex(lead + inp + trail)
+                    self.identical(got, expected)
 
 
     def test_from_hex(self):

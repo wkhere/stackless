@@ -1,5 +1,18 @@
 #include "Python.h"
 
+#ifdef X87_DOUBLE_ROUNDING
+/* On x86 platforms using an x87 FPU, this function is called from the
+   Py_FORCE_DOUBLE macro (defined in pymath.h) to force a floating-point
+   number out of an 80-bit x87 FPU register and into a 64-bit memory location,
+   thus rounding from extended precision to double precision. */
+double _Py_force_double(double x)
+{
+	volatile double y;
+	y = x;
+	return y;
+}
+#endif
+
 #ifndef HAVE_HYPOT
 double hypot(double x, double y)
 {
@@ -22,7 +35,7 @@ double hypot(double x, double y)
 #endif /* HAVE_HYPOT */
 
 #ifndef HAVE_COPYSIGN
-static double
+double
 copysign(double x, double y)
 {
 	/* use atan2 to distinguish -0. from 0. */

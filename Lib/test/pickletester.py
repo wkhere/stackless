@@ -1,6 +1,7 @@
 import unittest
 import pickle
 import cPickle
+import StringIO
 import pickletools
 import copy_reg
 
@@ -427,6 +428,16 @@ class AbstractPickleTests(unittest.TestCase):
             x = self.loads(s)
             self.assertEqual(len(x), 1)
             self.assert_(x is x[0])
+
+    def test_recursive_tuple(self):
+        t = ([],)
+        t[0].append(t)
+        for proto in protocols:
+            s = self.dumps(t, proto)
+            x = self.loads(s)
+            self.assertEqual(len(x), 1)
+            self.assertEqual(len(x[0]), 1)
+            self.assert_(x is x[0][0])
 
     def test_recursive_dict(self):
         d = {}
@@ -1004,6 +1015,10 @@ class AbstractPickleModuleTests(unittest.TestCase):
         self.module.dumps(123, protocol=-1)
         self.module.Pickler(f, -1)
         self.module.Pickler(f, protocol=-1)
+
+    def test_incomplete_input(self):
+        s = StringIO.StringIO("X''.")
+        self.assertRaises(EOFError, self.module.load, s)
 
 class AbstractPersistentPicklerTests(unittest.TestCase):
 

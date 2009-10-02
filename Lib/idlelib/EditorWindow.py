@@ -22,6 +22,16 @@ import macosxSupport
 # The default tab setting for a Text widget, in average-width characters.
 TK_TABWIDTH_DEFAULT = 8
 
+def _sphinx_version():
+    "Format sys.version_info to produce the Sphinx version string used to install the chm docs"
+    major, minor, micro, level, serial = sys.version_info
+    release = '%s%s' % (major, minor)
+    if micro:
+        release += '%s' % micro
+    if level != 'final':
+        release += '%s%s' % (level[0], serial)
+    return release
+
 def _find_module(fullname, path=None):
     """Version of imp.find_module() that handles hierarchical module names"""
 
@@ -64,15 +74,13 @@ class EditorWindow(object):
                                            'Doc', 'index.html')
             elif sys.platform[:3] == 'win':
                 chmfile = os.path.join(sys.prefix, 'Doc',
-                                       'Python%d%d.chm' % sys.version_info[:2])
+                                       'Python%s.chm' % _sphinx_version())
                 if os.path.isfile(chmfile):
                     dochome = chmfile
-
             elif macosxSupport.runningAsOSXApp():
                 # documentation is stored inside the python framework
                 dochome = os.path.join(sys.prefix,
                         'Resources/English.lproj/Documentation/index.html')
-
             dochome = os.path.normpath(dochome)
             if os.path.isfile(dochome):
                 EditorWindow.help_url = dochome
@@ -80,7 +88,7 @@ class EditorWindow(object):
                     # Safari requires real file:-URLs
                     EditorWindow.help_url = 'file://' + EditorWindow.help_url
             else:
-                EditorWindow.help_url = "http://www.python.org/doc/current"
+                EditorWindow.help_url = "http://docs.python.org/%d.%d" % sys.version_info[:2]
         currentTheme=idleConf.CurrentTheme()
         self.flist = flist
         root = root or flist.root
@@ -105,10 +113,18 @@ class EditorWindow(object):
         self.text_frame = text_frame = Frame(top)
         self.vbar = vbar = Scrollbar(text_frame, name='vbar')
         self.width = idleConf.GetOption('main','EditorWindow','width')
-        self.text = text = MultiCallCreator(Text)(
-                text_frame, name='text', padx=5, wrap='none',
-                width=self.width,
-                height=idleConf.GetOption('main','EditorWindow','height') )
+        text_options = {
+                'name': 'text',
+                'padx': 5,
+                'wrap': 'none',
+                'width': self.width,
+                'height': idleConf.GetOption('main', 'EditorWindow', 'height')}
+        if TkVersion >= 8.5:
+            # Starting with tk 8.5 we have to set the new tabstyle option
+            # to 'wordprocessor' to achieve the same display of tabs as in
+            # older tk versions.
+            text_options['tabstyle'] = 'wordprocessor'
+        self.text = text = MultiCallCreator(Text)(text_frame, **text_options)
         self.top.focused_widget = self.text
 
         self.createmenubar()

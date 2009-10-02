@@ -24,9 +24,12 @@ To use, simply 'import logging' and log away!
 """
 
 __all__ = ['BASIC_FORMAT', 'BufferingFormatter', 'CRITICAL', 'DEBUG', 'ERROR',
-           'FATAL', 'FileHandler', 'Filter', 'Filterer', 'Formatter', 'Handler',
-           'INFO', 'LogRecord', 'Logger', 'Manager', 'NOTSET', 'PlaceHolder',
-           'RootLogger', 'StreamHandler', 'WARN', 'WARNING']
+           'FATAL', 'FileHandler', 'Filter', 'Formatter', 'Handler', 'INFO',
+           'LogRecord', 'Logger', 'LoggerAdapter', 'NOTSET', 'NullHandler',
+           'StreamHandler', 'WARN', 'WARNING', 'addLevelName', 'basicConfig',
+           'captureWarnings', 'critical', 'debug', 'disable', 'error',
+           'exception', 'fatal', 'getLevelName', 'getLogger', 'getLoggerClass',
+           'info', 'log', 'makeLogRecord', 'setLoggerClass', 'warn', 'warning']
 
 import sys, os, types, time, string, cStringIO, traceback
 
@@ -268,11 +271,14 @@ class LogRecord:
         else:
             self.thread = None
             self.threadName = None
-        if logMultiprocessing:
-            from multiprocessing import current_process
-            self.processName = current_process().name
-        else:
+        if not logMultiprocessing:
             self.processName = None
+        else:
+            try:
+                from multiprocessing import current_process
+                self.processName = current_process().name
+            except ImportError:
+                self.processName = None
         if logProcesses and hasattr(os, 'getpid'):
             self.process = os.getpid()
         else:
@@ -717,8 +723,12 @@ class Handler(Filterer):
         """
         if raiseExceptions:
             ei = sys.exc_info()
-            traceback.print_exception(ei[0], ei[1], ei[2], None, sys.stderr)
-            del ei
+            try:
+                traceback.print_exception(ei[0], ei[1], ei[2], None, sys.stderr)
+            except IOError:
+                pass    # see issue 5971
+            finally:
+                del ei
 
 class StreamHandler(Handler):
     """
@@ -764,11 +774,21 @@ class StreamHandler(Handler):
                 stream.write(fs % msg)
             else:
                 try:
-                    if (isinstance(msg, unicode) or
-                        getattr(stream, 'encoding', None) is None):
-                        stream.write(fs % msg)
+                    if (isinstance(msg, unicode) and
+                        getattr(stream, 'encoding', None)):
+                        fs = fs.decode(stream.encoding)
+                        try:
+                            stream.write(fs % msg)
+                        except UnicodeEncodeError:
+                            #Printing to terminals sometimes fails. For example,
+                            #with an encoding of 'cp1251', the above write will
+                            #work if written to a stream opened or wrapped by
+                            #the codecs module, but fail when writing to a
+                            #terminal even when the codepage is set to cp1251.
+                            #An extra encoding step seems to be needed.
+                            stream.write((fs % msg).encode(stream.encoding))
                     else:
-                        stream.write(fs % msg.encode(stream.encoding))
+                        stream.write(fs % msg)
                 except UnicodeError:
                     stream.write(fs % msg.encode("UTF-8"))
             self.flush()
@@ -1097,7 +1117,11 @@ class Logger(Filterer):
         Find the stack frame of the caller so that we can note the source
         file name, line number and function name.
         """
-        f = currentframe().f_back
+        f = currentframe()
+        #On some versions of IronPython, currentframe() returns None if
+        #IronPython isn't run with -X:Frames.
+        if f is not None:
+            f = f.f_back
         rv = "(unknown file)", 0, "(unknown function)"
         while hasattr(f, "f_code"):
             co = f.f_code

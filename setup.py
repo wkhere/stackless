@@ -1402,6 +1402,17 @@ class PyBuildExt(build_ext):
             addMacExtension('_CF', core_kwds, ['cf/pycfbridge.c'])
             addMacExtension('autoGIL', core_kwds)
 
+            # _scproxy
+            sc_kwds = {
+                'extra_compile_args': carbon_extra_compile_args,
+                'extra_link_args': [
+                    '-framework', 'SystemConfiguration',
+                    '-framework', 'CoreFoundation'
+                ],
+            }
+            addMacExtension("_scproxy", sc_kwds)
+
+
             # Carbon
             carbon_kwds = {'extra_compile_args': carbon_extra_compile_args,
                            'extra_link_args': ['-framework', 'Carbon'],
@@ -1501,19 +1512,17 @@ class PyBuildExt(build_ext):
         # architectures.
         cflags = sysconfig.get_config_vars('CFLAGS')[0]
         archs = re.findall('-arch\s+(\w+)', cflags)
-        if 'x86_64' in archs or 'ppc64' in archs:
-            try:
-                archs.remove('x86_64')
-            except ValueError:
-                pass
-            try:
-                archs.remove('ppc64')
-            except ValueError:
-                pass
+        fp = os.popen("file %s/Tk.framework/Tk | grep 'for architecture'"%(F,))
+        detected_archs = []
+        for ln in fp:
+            a = ln.split()[-1]
+            if a in archs:
+                detected_archs.append(ln.split()[-1])
+        fp.close()
 
-            for a in archs:
-                frameworks.append('-arch')
-                frameworks.append(a)
+        for a in detected_archs:
+            frameworks.append('-arch')
+            frameworks.append(a)
 
         ext = Extension('_tkinter', ['_tkinter.c', 'tkappinit.c'],
                         define_macros=[('WITH_APPINIT', 1)],

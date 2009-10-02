@@ -20,7 +20,7 @@ encoding = 'utf-8'
 class UnicodeMethodsTest(unittest.TestCase):
 
     # update this, if the database changes
-    expectedchecksum = 'aef99984a58c8e1e5363a3175f2ff9608599a93e'
+    expectedchecksum = '6ec65b65835614ec00634c674bba0e50cd32c189'
 
     def test_method_checksum(self):
         h = hashlib.sha1()
@@ -257,6 +257,24 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         # the upper-case mapping: as delta, or as absolute value
         self.assert_(u"a".upper()==u'A')
         self.assert_(u"\u1d79".upper()==u'\ua77d')
+        self.assert_(u".".upper()==u".")
+
+    def test_bug_5828(self):
+        self.assertEqual(u"\u1d79".lower(), u"\u1d79")
+        # Only U+0000 should have U+0000 as its upper/lower/titlecase variant
+        self.assertEqual(
+            [
+                c for c in range(sys.maxunicode+1)
+                if u"\x00" in unichr(c).lower()+unichr(c).upper()+unichr(c).title()
+            ],
+            [0]
+        )
+
+    def test_bug_4971(self):
+        # LETTER DZ WITH CARON: DZ, Dz, dz
+        self.assertEqual(u"\u01c4".title(), u"\u01c5")
+        self.assertEqual(u"\u01c5".title(), u"\u01c5")
+        self.assertEqual(u"\u01c6".title(), u"\u01c5")
 
 def test_main():
     test.test_support.run_unittest(

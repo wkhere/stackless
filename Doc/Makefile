@@ -28,10 +28,11 @@ help:
 	@echo "  coverage  to check documentation coverage for library and C API"
 	@echo "  dist      to create a \"dist\" directory with archived docs for download"
 
+# Note: if you update versions here, do the same in make.bat and README.txt
 checkout:
 	@if [ ! -d tools/sphinx ]; then \
 	  echo "Checking out Sphinx..."; \
-	  svn checkout $(SVNROOT)/external/Sphinx-0.6.1/sphinx tools/sphinx; \
+	  svn checkout $(SVNROOT)/external/Sphinx-0.6.2/sphinx tools/sphinx; \
 	fi
 	@if [ ! -d tools/docutils ]; then \
 	  echo "Checking out Docutils..."; \

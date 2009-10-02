@@ -4241,11 +4241,18 @@ do_call(PyObject *func, PyObject ***pp_stack, int na, int nk)
 		PCALL(PCALL_METHOD);
 	else if (PyType_Check(func))
 		PCALL(PCALL_TYPE);
+	else if (PyCFunction_Check(func))
+		PCALL(PCALL_CFUNCTION);
 	else
 		PCALL(PCALL_OTHER);
 #endif
 	STACKLESS_PROPOSE(func);
-	result = PyObject_Call(func, callargs, kwdict);
+	if (PyCFunction_Check(func)) {
+		PyThreadState *tstate = PyThreadState_GET();
+		C_TRACE(result, PyCFunction_Call(func, callargs, kwdict));
+	}
+	else
+		result = PyObject_Call(func, callargs, kwdict);
 	STACKLESS_ASSERT();
 
 call_fail:
@@ -4332,11 +4339,18 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 		PCALL(PCALL_METHOD);
 	else if (PyType_Check(func))
 		PCALL(PCALL_TYPE);
+	else if (PyCFunction_Check(func))
+		PCALL(PCALL_CFUNCTION);
 	else
 		PCALL(PCALL_OTHER);
 #endif
 	STACKLESS_PROPOSE(func);
-	result = PyObject_Call(func, callargs, kwdict);
+	if (PyCFunction_Check(func)) {
+		PyThreadState *tstate = PyThreadState_GET();
+		C_TRACE(result, PyCFunction_Call(func, callargs, kwdict));
+	}
+	else
+		result = PyObject_Call(func, callargs, kwdict);
 	STACKLESS_ASSERT();
 
 ext_call_fail:

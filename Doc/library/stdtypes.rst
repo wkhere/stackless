@@ -1131,8 +1131,28 @@ string functions based on regular expressions.
 
 .. method:: str.title()
 
-   Return a titlecased version of the string: words start with uppercase
-   characters, all remaining cased characters are lowercase.
+   Return a titlecased version of the string where words start with an uppercase
+   character and the remaining characters are lowercase.
+
+   The algorithm uses a simple language-independent definition of a word as
+   groups of consecutive letters.  The definition works in many contexts but
+   it means that apostrophes in contractions and possessives form word
+   boundaries, which may not be the desired result::
+
+        >>> "they're bill's friends from the UK".title()
+        "They'Re Bill'S Friends From The Uk"
+
+   A workaround for apostrophes can be constructed using regular expressions::
+
+        >>> import re
+        >>> def titlecase(s):
+                return re.sub(r"[A-Za-z]+('[A-Za-z]+)?",
+                              lambda mo: mo.group(0)[0].upper() +
+                                         mo.group(0)[1:].lower(),
+                              s)
+
+        >>> titlecase("they're bill's friends.")
+        "They're Bill's Friends."
 
    For 8-bit strings, this method is locale-dependent.
 
@@ -1955,7 +1975,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       note for :meth:`dict.items`.
 
       Using :meth:`iteritems` while adding or deleting entries in the dictionary
-      will raise a :exc:`RuntimeError`.
+      may raise a :exc:`RuntimeError` or fail to iterate over all entries.
 
       .. versionadded:: 2.2
 
@@ -1965,7 +1985,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       :meth:`dict.items`.
 
       Using :meth:`iterkeys` while adding or deleting entries in the dictionary
-      will raise a :exc:`RuntimeError`.
+      may raise a :exc:`RuntimeError` or fail to iterate over all entries.
 
       .. versionadded:: 2.2
 
@@ -1975,7 +1995,8 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
       :meth:`dict.items`.
 
       Using :meth:`itervalues` while adding or deleting entries in the
-      dictionary will raise a :exc:`RuntimeError`.
+      dictionary may raise a :exc:`RuntimeError` or fail to iterate over all
+      entries.
 
       .. versionadded:: 2.2
 

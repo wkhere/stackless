@@ -386,9 +386,10 @@ first converted to a string using the rules for string conversions.  The
 object is (converted and) written, unless the output system believes it is
 positioned at the beginning of a line.  This is the case (1) when no characters
 have yet been written to standard output, (2) when the last character written to
-standard output is ``'\n'``, or (3) when the last write operation on standard
-output was not a :keyword:`print` statement.  (In some cases it may be
-functional to write an empty string to standard output for this reason.)
+standard output is a whitespace character except ``' '``, or (3) when the last
+write operation on standard output was not a :keyword:`print` statement.
+(In some cases it may be functional to write an empty string to standard output
+for this reason.)
 
 .. note::
 
@@ -906,6 +907,11 @@ for the rest of the interpreter session.  If an interpreter is started with the
 :option:`-i` option, is passed a script name to execute, and the script includes
 a future statement, it will be in effect in the interactive session started
 after the script is executed.
+
+.. seealso::
+
+   :pep:`236` - Back to the __future__
+      The original proposal for the __future__ mechanism.
 
 
 .. _global:

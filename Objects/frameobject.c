@@ -72,7 +72,7 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 	int new_iblock = 0;		/* The new value of f_iblock */
 	unsigned char *code = NULL;	/* The bytecode for the frame... */
 	Py_ssize_t code_len = 0;	/* ...and its length */
-	char *lnotab = NULL;		/* Iterating over co_lnotab */
+	unsigned char *lnotab = NULL;	/* Iterating over co_lnotab */
 	Py_ssize_t lnotab_len = 0;	/* (ditto) */
 	int offset = 0;			/* (ditto) */
 	int line = 0;			/* (ditto) */
@@ -88,6 +88,7 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 	int in_finally[CO_MAXBLOCKS];	/* (ditto) */
 	int blockstack_top = 0;		/* (ditto) */
 	unsigned char setup_op = 0;	/* (ditto) */
+	char *tmp;
 
 	/* f_lineno must be an integer. */
 	if (!PyInt_Check(p_new_lineno)) {
@@ -116,7 +117,9 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 
 	/* Find the bytecode offset for the start of the given line, or the
 	 * first code-owning line after it. */
-	PyString_AsStringAndSize(f->f_code->co_lnotab, &lnotab, &lnotab_len);
+	PyString_AsStringAndSize(f->f_code->co_lnotab,
+	                         &tmp, &lnotab_len);
+	lnotab = (unsigned char *) tmp;
 	addr = 0;
 	line = f->f_code->co_firstlineno;
 	new_lasti = -1;
@@ -598,14 +601,6 @@ int _PyFrame_Init()
 	builtin_object = PyString_InternFromString("__builtins__");
 	if (builtin_object == NULL)
 		return 0;
-	/* 
-	   Traceback objects are not created the normal way (through calling the
-	   type), so PyType_Ready has to be called here.
-	*/
-	if (PyType_Ready(&PyTraceBack_Type)) {
-		Py_DECREF(builtin_object);
-		return 0;
-	}
 	return 1;
 }
 

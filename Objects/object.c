@@ -2,6 +2,7 @@
 /* Generic object operations; and implementation of None (NoObject) */
 
 #include "Python.h"
+#include "frameobject.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -1805,9 +1806,11 @@ _specialized_dir_module(PyObject *obj)
 		if (PyDict_Check(dict))
 			result = PyDict_Keys(dict);
 		else {
-			PyErr_Format(PyExc_TypeError,
-				     "%.200s.__dict__ is not a dictionary",
-				     PyModule_GetName(obj));
+			char *name = PyModule_GetName(obj);
+			if (name)
+				PyErr_Format(PyExc_TypeError,
+					     "%.200s.__dict__ is not a dictionary",
+					     name);
 		}
 	}
 
@@ -1959,7 +1962,7 @@ static void
 none_dealloc(PyObject* ignore)
 {
 	/* This should never get called, but we also don't want to SEGV if
-	 * we accidently decref None out of existance.
+	 * we accidentally decref None out of existence.
 	 */
 	Py_FatalError("deallocating None");
 }
@@ -2022,28 +2025,132 @@ void
 _Py_ReadyTypes(void)
 {
 	if (PyType_Ready(&PyType_Type) < 0)
-		Py_FatalError("Can't initialize 'type'");
+		Py_FatalError("Can't initialize type type");
 
 	if (PyType_Ready(&_PyWeakref_RefType) < 0)
-		Py_FatalError("Can't initialize 'weakref'");
+		Py_FatalError("Can't initialize weakref type");
+
+	if (PyType_Ready(&_PyWeakref_CallableProxyType) < 0)
+		Py_FatalError("Can't initialize callable weakref proxy type");
+
+	if (PyType_Ready(&_PyWeakref_ProxyType) < 0)
+		Py_FatalError("Can't initialize weakref proxy type");
 
 	if (PyType_Ready(&PyBool_Type) < 0)
-		Py_FatalError("Can't initialize 'bool'");
+		Py_FatalError("Can't initialize bool type");
 
 	if (PyType_Ready(&PyString_Type) < 0)
-		Py_FatalError("Can't initialize 'str'");
+		Py_FatalError("Can't initialize str type");
 
 	if (PyType_Ready(&PyByteArray_Type) < 0)
-		Py_FatalError("Can't initialize 'bytes'");
+		Py_FatalError("Can't initialize bytearray type");
 
 	if (PyType_Ready(&PyList_Type) < 0)
-		Py_FatalError("Can't initialize 'list'");
+		Py_FatalError("Can't initialize list type");
 
 	if (PyType_Ready(&PyNone_Type) < 0)
-		Py_FatalError("Can't initialize type(None)");
+		Py_FatalError("Can't initialize None type");
 
 	if (PyType_Ready(&PyNotImplemented_Type) < 0)
-		Py_FatalError("Can't initialize type(NotImplemented)");
+		Py_FatalError("Can't initialize NotImplemented type");
+
+	if (PyType_Ready(&PyTraceBack_Type) < 0)
+		Py_FatalError("Can't initialize traceback type");
+
+	if (PyType_Ready(&PySuper_Type) < 0)
+		Py_FatalError("Can't initialize super type");
+
+	if (PyType_Ready(&PyBaseObject_Type) < 0)
+		Py_FatalError("Can't initialize object type");
+
+	if (PyType_Ready(&PyRange_Type) < 0)
+		Py_FatalError("Can't initialize xrange type");
+
+	if (PyType_Ready(&PyDict_Type) < 0)
+		Py_FatalError("Can't initialize dict type");
+
+	if (PyType_Ready(&PySet_Type) < 0)
+		Py_FatalError("Can't initialize set type");
+
+	if (PyType_Ready(&PyUnicode_Type) < 0)
+		Py_FatalError("Can't initialize unicode type");
+
+	if (PyType_Ready(&PySlice_Type) < 0)
+		Py_FatalError("Can't initialize slice type");
+
+	if (PyType_Ready(&PyStaticMethod_Type) < 0)
+		Py_FatalError("Can't initialize static method type");
+
+#ifndef WITHOUT_COMPLEX
+	if (PyType_Ready(&PyComplex_Type) < 0)
+		Py_FatalError("Can't initialize complex type");
+#endif
+
+	if (PyType_Ready(&PyFloat_Type) < 0)
+		Py_FatalError("Can't initialize float type");
+
+	if (PyType_Ready(&PyBuffer_Type) < 0)
+		Py_FatalError("Can't initialize buffer type");
+
+	if (PyType_Ready(&PyLong_Type) < 0)
+		Py_FatalError("Can't initialize long type");
+
+	if (PyType_Ready(&PyInt_Type) < 0)
+		Py_FatalError("Can't initialize int type");
+
+	if (PyType_Ready(&PyFrozenSet_Type) < 0)
+		Py_FatalError("Can't initialize frozenset type");
+
+	if (PyType_Ready(&PyProperty_Type) < 0)
+		Py_FatalError("Can't initialize property type");
+
+	if (PyType_Ready(&PyTuple_Type) < 0)
+		Py_FatalError("Can't initialize tuple type");
+
+	if (PyType_Ready(&PyEnum_Type) < 0)
+		Py_FatalError("Can't initialize enumerate type");
+
+	if (PyType_Ready(&PyReversed_Type) < 0)
+		Py_FatalError("Can't initialize reversed type");
+
+	if (PyType_Ready(&PyCode_Type) < 0)
+		Py_FatalError("Can't initialize code type");
+
+	if (PyType_Ready(&PyFrame_Type) < 0)
+		Py_FatalError("Can't initialize frame type");
+
+	if (PyType_Ready(&PyCFunction_Type) < 0)
+		Py_FatalError("Can't initialize builtin function type");
+
+	if (PyType_Ready(&PyMethod_Type) < 0)
+		Py_FatalError("Can't initialize method type");
+
+	if (PyType_Ready(&PyFunction_Type) < 0)
+		Py_FatalError("Can't initialize function type");
+
+	if (PyType_Ready(&PyClass_Type) < 0)
+		Py_FatalError("Can't initialize class type");
+
+	if (PyType_Ready(&PyDictProxy_Type) < 0)
+		Py_FatalError("Can't initialize dict proxy type");
+
+	if (PyType_Ready(&PyGen_Type) < 0)
+		Py_FatalError("Can't initialize generator type");
+
+	if (PyType_Ready(&PyGetSetDescr_Type) < 0)
+		Py_FatalError("Can't initialize get-set descriptor type");
+
+	if (PyType_Ready(&PyWrapperDescr_Type) < 0)
+		Py_FatalError("Can't initialize wrapper type");
+
+	if (PyType_Ready(&PyInstance_Type) < 0)
+		Py_FatalError("Can't initialize instance type");
+
+	if (PyType_Ready(&PyEllipsis_Type) < 0)
+		Py_FatalError("Can't initialize ellipsis type");
+
+	if (PyType_Ready(&PyMemberDescr_Type) < 0)
+		Py_FatalError("Can't initialize member descriptor type");
 }
 
 

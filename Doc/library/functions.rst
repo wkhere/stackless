@@ -17,7 +17,8 @@ available.  They are listed here in alphabetical order.
 
 .. function:: all(iterable)
 
-   Return True if all elements of the *iterable* are true. Equivalent to::
+   Return True if all elements of the *iterable* are true (or if the iterable
+   is empty).  Equivalent to::
 
       def all(iterable):
           for element in iterable:
@@ -30,7 +31,8 @@ available.  They are listed here in alphabetical order.
 
 .. function:: any(iterable)
 
-   Return True if any element of the *iterable* is true. Equivalent to::
+   Return True if any element of the *iterable* is true.  If the iterable
+   is empty, return False.  Equivalent to::
 
       def any(iterable):
           for element in iterable:
@@ -149,7 +151,7 @@ available.  They are listed here in alphabetical order.
    ``'exec'`` if *source* consists of a sequence of statements, ``'eval'`` if it
    consists of a single expression, or ``'single'`` if it consists of a single
    interactive statement (in the latter case, expression statements that
-   evaluate to something else than ``None`` will be printed).
+   evaluate to something other than ``None`` will be printed).
 
    The optional arguments *flags* and *dont_inherit* control which future
    statements (see :pep:`236`) affect the compilation of *source*.  If neither
@@ -362,7 +364,7 @@ available.  They are listed here in alphabetical order.
    If both dictionaries are omitted, the expression is executed in the environment
    where :func:`execfile` is called.  The return value is ``None``.
 
-   .. warning::
+   .. note::
 
       The default *locals* act as described for function :func:`locals` below:
       modifications to the default *locals* dictionary should not be attempted.  Pass
@@ -538,15 +540,15 @@ available.  They are listed here in alphabetical order.
    Consider using the :func:`raw_input` function for general input from users.
 
 
-.. function:: int([x[, radix]])
+.. function:: int([x[, base]])
 
    Convert a string or number to a plain integer.  If the argument is a string,
    it must contain a possibly signed decimal number representable as a Python
-   integer, possibly embedded in whitespace.  The *radix* parameter gives the
+   integer, possibly embedded in whitespace.  The *base* parameter gives the
    base for the conversion (which is 10 by default) and may be any integer in
-   the range [2, 36], or zero.  If *radix* is zero, the proper radix is
+   the range [2, 36], or zero.  If *base* is zero, the proper radix is
    determined based on the contents of string; the interpretation is the same as
-   for integer literals.  (See :ref:`numbers`.)  If *radix* is specified and *x*
+   for integer literals.  (See :ref:`numbers`.)  If *base* is specified and *x*
    is not a string, :exc:`TypeError` is raised. Otherwise, the argument may be a
    plain or long integer or a floating point number.  Conversion of floating
    point numbers to integers truncates (towards zero).  If the argument is
@@ -623,7 +625,7 @@ available.  They are listed here in alphabetical order.
 
    Update and return a dictionary representing the current local symbol table.
 
-   .. warning::
+   .. note::
 
       The contents of this dictionary should not be modified; changes may not affect
       the values of local variables used by the interpreter.
@@ -633,17 +635,18 @@ available.  They are listed here in alphabetical order.
    interpreter.  Free variables are not returned in class blocks.
 
 
-.. function:: long([x[, radix]])
+.. function:: long([x[, base]])
 
    Convert a string or number to a long integer.  If the argument is a string, it
    must contain a possibly signed number of arbitrary size, possibly embedded in
-   whitespace. The *radix* argument is interpreted in the same way as for
+   whitespace. The *base* argument is interpreted in the same way as for
    :func:`int`, and may only be given when *x* is a string. Otherwise, the argument
    may be a plain or long integer or a floating point number, and a long integer
    with the same value is returned.    Conversion of floating point numbers to
    integers truncates (towards zero).  If no arguments are given, returns ``0L``.
 
    The long type is described in :ref:`typesnumeric`.
+
 
 .. function:: map(function, iterable, ...)
 
@@ -813,7 +816,7 @@ available.  They are listed here in alphabetical order.
    accidents.)
 
 
-.. function:: print([object, ...][, sep=' '][, end='\n'][, file=sys.stdout])
+.. function:: print([object, ...][, sep=' '][, end='\\n'][, file=sys.stdout])
 
    Print *object*\(s) to the stream *file*, separated by *sep* and followed by
    *end*.  *sep*, *end* and *file*, if present, must be given as keyword
@@ -1346,7 +1349,7 @@ available.  They are listed here in alphabetical order.
    else that has a :attr:`__dict__` attribute), returns a dictionary corresponding
    to the object's symbol table.
 
-   .. warning::
+   .. note::
 
       The returned dictionary should not be modified:
       the effects on the corresponding symbol table are undefined. [#]_
@@ -1396,7 +1399,7 @@ available.  They are listed here in alphabetical order.
       >>> zipped
       [(1, 4), (2, 5), (3, 6)]
       >>> x2, y2 = zip(*zipped)
-      >>> x == x2, y == y2
+      >>> x == list(x2) and y == list(y2)
       True
 
    .. versionadded:: 2.0
@@ -1466,7 +1469,7 @@ available.  They are listed here in alphabetical order.
    names.
 
    If you simply want to import a module (potentially within a package) by name,
-   you can get it from :data:`sys.modules`::
+   you can call :func:`__import__` and then look it up in :data:`sys.modules`::
 
       >>> import sys
       >>> name = 'foo.bar.baz'

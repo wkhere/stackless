@@ -374,6 +374,10 @@ Initialization, Finalization, and Threads
    Set the default "home" directory, that is, the location of the standard
    Python libraries.  The libraries are searched in
    :file:`{home}/lib/python{version}` and :file:`{home}/lib/python{version}`.
+   The argument should point to a zero-terminated character string in static
+   storage whose contents will not change for the duration of the program's
+   execution.  No code in the Python interpreter will change the contents of
+   this storage.
 
 
 .. cfunction:: char* Py_GetPythonHome()
@@ -419,10 +423,9 @@ the I/O is waiting for the I/O operation to complete.
 The Python interpreter needs to keep some bookkeeping information separate per
 thread --- for this it uses a data structure called :ctype:`PyThreadState`.
 There's one global variable, however: the pointer to the current
-:ctype:`PyThreadState` structure.  While most thread packages have a way to
-store "per-thread global data," Python's internal platform independent thread
-abstraction doesn't support this yet.  Therefore, the current thread state must
-be manipulated explicitly.
+:ctype:`PyThreadState` structure.  Before the addition of :dfn:`thread-local
+storage` (:dfn:`TLS`) the current thread state had to be manipulated
+explicitly.
 
 This is easy enough in most cases.  Most code manipulating the global
 interpreter lock has the following simple structure::
@@ -492,13 +495,13 @@ thread could immediately acquire the lock and store its own thread state in the
 global variable). Conversely, when acquiring the lock and restoring the thread
 state, the lock must be acquired before storing the thread state pointer.
 
-Why am I going on with so much detail about this?  Because when threads are
-created from C, they don't have the global interpreter lock, nor is there a
-thread state data structure for them.  Such threads must bootstrap themselves
-into existence, by first creating a thread state data structure, then acquiring
-the lock, and finally storing their thread state pointer, before they can start
-using the Python/C API.  When they are done, they should reset the thread state
-pointer, release the lock, and finally free their thread state data structure.
+It is important to note that when threads are created from C, they don't have
+the global interpreter lock, nor is there a thread state data structure for
+them.  Such threads must bootstrap themselves into existence, by first
+creating a thread state data structure, then acquiring the lock, and finally
+storing their thread state pointer, before they can start using the Python/C
+API.  When they are done, they should reset the thread state pointer, release
+the lock, and finally free their thread state data structure.
 
 Beginning with version 2.3, threads can now take advantage of the
 :cfunc:`PyGILState_\*` functions to do all of the above automatically.  The
@@ -520,6 +523,22 @@ supports the creation of additional interpreters (using
 :cfunc:`Py_NewInterpreter`), but mixing multiple interpreters and the
 :cfunc:`PyGILState_\*` API is unsupported.
 
+Another important thing to note about threads is their behaviour in the face
+of the C :cfunc:`fork` call. On most systems with :cfunc:`fork`, after a
+process forks only the thread that issued the fork will exist. That also
+means any locks held by other threads will never be released. Python solves
+this for :func:`os.fork` by acquiring the locks it uses internally before
+the fork, and releasing them afterwards. In addition, it resets any
+:ref:`lock-objects` in the child. When extending or embedding Python, there
+is no way to inform Python of additional (non-Python) locks that need to be
+acquired before or reset after a fork. OS facilities such as
+:cfunc:`posix_atfork` would need to be used to accomplish the same thing.
+Additionally, when extending or embedding Python, calling :cfunc:`fork`
+directly rather than through :func:`os.fork` (and returning to or calling
+into Python) may result in a deadlock by one of Python's internal locks
+being held by a thread that is defunct after the fork.
+:cfunc:`PyOS_AfterFork` tries to reset the necessary locks, but is not
+always able to.
 
 .. ctype:: PyInterpreterState
 

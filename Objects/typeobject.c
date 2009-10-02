@@ -929,6 +929,9 @@ subtype_dealloc(PyObject *self)
 			assert(base);
 		}
 
+		/* Extract the type again; tp_del may have changed it */
+		type = Py_TYPE(self);
+
 		/* Call the base tp_dealloc() */
 		assert(basedealloc);
 		basedealloc(self);
@@ -1009,6 +1012,9 @@ subtype_dealloc(PyObject *self)
 			}
 		}
 	}
+
+	/* Extract the type again; tp_del may have changed it */
+	type = Py_TYPE(self);
 
 	/* Call the base tp_dealloc(); first retrack self if
 	 * basedealloc knows about gc.

@@ -6,6 +6,7 @@ Still need testing:
     TestCase.{assert,fail}* methods (some are tested implicitly)
 """
 
+import sys
 from test import test_support
 import unittest
 from unittest import TestCase
@@ -2283,6 +2284,8 @@ class Test_Assertions(TestCase):
                           self.failUnlessAlmostEqual, 0, .1+.1j, places=1)
         self.assertRaises(AssertionError,
                           self.failIfAlmostEqual, 0, .1+.1j, places=0)
+
+
 
 ######################################################################
 ## Main

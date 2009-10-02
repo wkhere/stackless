@@ -432,9 +432,6 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
         self.assertEqual(str(Decimal(u'-Inf')), '-Infinity')
         self.assertEqual(str(Decimal(u'NaN123')), 'NaN123')
 
-        #but alternate unicode digits should not
-        self.assertEqual(str(Decimal(u'\uff11')), 'NaN')
-
     def test_explicit_from_tuples(self):
 
         #zero
@@ -540,6 +537,15 @@ class DecimalExplicitConstructionTest(unittest.TestCase):
         self.assertEqual(str(d), '500000123')
         d = nc.create_decimal(prevdec)
         self.assertEqual(str(d), '5.00E+8')
+
+    def test_unicode_digits(self):
+        test_values = {
+            u'\uff11': '1',
+            u'\u0660.\u0660\u0663\u0667\u0662e-\u0663' : '0.0000372',
+            u'-nan\u0c68\u0c6a\u0c66\u0c66' : '-NaN2400',
+            }
+        for input, expected in test_values.items():
+            self.assertEqual(str(Decimal(input)), expected)
 
 
 class DecimalImplicitConstructionTest(unittest.TestCase):
@@ -710,6 +716,9 @@ class DecimalFormatTest(unittest.TestCase):
             ('>6', '123', '   123'),
             ('^6', '123', ' 123  '),
             ('=+6', '123', '+  123'),
+
+            # issue 6850
+            ('a=-7.0', '0.12345', 'aaaa0.1'),
             ]
         for fmt, d, result in test_values:
             self.assertEqual(format(Decimal(d), fmt), result)
@@ -1362,6 +1371,16 @@ class DecimalPythonAPItests(unittest.TestCase):
             d = Decimal(s)
             r = d.to_integral(ROUND_DOWN)
             self.assertEqual(Decimal(int(d)), r)
+
+        self.assertRaises(ValueError, int, Decimal('-nan'))
+        self.assertRaises(ValueError, int, Decimal('snan'))
+        self.assertRaises(OverflowError, int, Decimal('inf'))
+        self.assertRaises(OverflowError, int, Decimal('-inf'))
+
+        self.assertRaises(ValueError, long, Decimal('-nan'))
+        self.assertRaises(ValueError, long, Decimal('snan'))
+        self.assertRaises(OverflowError, long, Decimal('inf'))
+        self.assertRaises(OverflowError, long, Decimal('-inf'))
 
     def test_trunc(self):
         for x in range(-250, 250):

@@ -66,6 +66,7 @@ Req-started-unread-response    _CS_REQ_STARTED    <response_class>
 Req-sent-unread-response       _CS_REQ_SENT       <response_class>
 """
 
+from array import array
 import socket
 from sys import py3kwarning
 from urlparse import urlsplit
@@ -544,10 +545,7 @@ class HTTPResponse:
     def _read_chunked(self, amt):
         assert self.chunked != _UNKNOWN
         chunk_left = self.chunk_left
-        value = ''
-
-        # XXX This accumulates chunks by repeated string concatenation,
-        # which is not efficient as the number or size of chunks gets big.
+        value = []
         while True:
             if chunk_left is None:
                 line = self.fp.readline()
@@ -560,22 +558,22 @@ class HTTPResponse:
                     # close the connection as protocol synchronisation is
                     # probably lost
                     self.close()
-                    raise IncompleteRead(value)
+                    raise IncompleteRead(''.join(value))
                 if chunk_left == 0:
                     break
             if amt is None:
-                value += self._safe_read(chunk_left)
+                value.append(self._safe_read(chunk_left))
             elif amt < chunk_left:
-                value += self._safe_read(amt)
+                value.append(self._safe_read(amt))
                 self.chunk_left = chunk_left - amt
-                return value
+                return ''.join(value)
             elif amt == chunk_left:
-                value += self._safe_read(amt)
+                value.append(self._safe_read(amt))
                 self._safe_read(2)  # toss the CRLF at the end of the chunk
                 self.chunk_left = None
-                return value
+                return ''.join(value)
             else:
-                value += self._safe_read(chunk_left)
+                value.append(self._safe_read(chunk_left))
                 amt -= chunk_left
 
             # we read the whole chunk, get another
@@ -596,7 +594,7 @@ class HTTPResponse:
         # we read everything; close the "file"
         self.close()
 
-        return value
+        return ''.join(value)
 
     def _safe_read(self, amt):
         """Read the number of bytes requested, compensating for partial reads.
@@ -652,10 +650,17 @@ class HTTPConnection:
         self.__response = None
         self.__state = _CS_IDLE
         self._method = None
+        self._tunnel_host = None
+        self._tunnel_port = None
 
         self._set_hostport(host, port)
         if strict is not None:
             self.strict = strict
+
+    def _set_tunnel(self, host, port=None):
+        """ Sets up the host and the port for the HTTP CONNECT Tunnelling."""
+        self._tunnel_host = host
+        self._tunnel_port = port
 
     def _set_hostport(self, host, port):
         if port is None:
@@ -677,10 +682,29 @@ class HTTPConnection:
     def set_debuglevel(self, level):
         self.debuglevel = level
 
+    def _tunnel(self):
+        self._set_hostport(self._tunnel_host, self._tunnel_port)
+        self.send("CONNECT %s:%d HTTP/1.0\r\n\r\n" % (self.host, self.port))
+        response = self.response_class(self.sock, strict = self.strict,
+                                       method = self._method)
+        (version, code, message) = response._read_status()
+
+        if code != 200:
+            self.close()
+            raise socket.error, "Tunnel connection failed: %d %s" % (code,
+                                                                     message.strip())
+        while True:
+            line = response.fp.readline()
+            if line == '\r\n': break
+
+
     def connect(self):
         """Connect to the host and port specified in __init__."""
         self.sock = socket.create_connection((self.host,self.port),
                                              self.timeout)
+
+        if self._tunnel_host:
+            self._tunnel()
 
     def close(self):
         """Close the connection to the HTTP server."""
@@ -709,7 +733,7 @@ class HTTPConnection:
             print "send:", repr(str)
         try:
             blocksize=8192
-            if hasattr(str,'read') :
+            if hasattr(str,'read') and not isinstance(str, array):
                 if self.debuglevel > 0: print "sendIng a read()able"
                 data=str.read(blocksize)
                 while data:
@@ -1070,6 +1094,9 @@ else:
             "Connect to a host on a given (SSL) port."
 
             sock = socket.create_connection((self.host, self.port), self.timeout)
+            if self._tunnel_host:
+                self.sock = sock
+                self._tunnel()
             self.sock = ssl.wrap_socket(sock, self.key_file, self.cert_file)
 
     __all__.append("HTTPSConnection")

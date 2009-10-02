@@ -1,3 +1,4 @@
+import __builtin__
 import types
 import unittest
 import warnings
@@ -2958,6 +2959,16 @@ order (MRO) for bases """
                     continue
                 cant(cls(), cls2)
 
+        # Issue5283: when __class__ changes in __del__, the wrong
+        # type gets DECREF'd.
+        class O(object):
+            pass
+        class A(object):
+            def __del__(self):
+                self.__class__ = O
+        l = [A() for x in range(100)]
+        del l
+
     def test_set_dict(self):
         # Testing __dict__ assignment...
         class C(object): pass
@@ -3837,6 +3848,17 @@ order (MRO) for bases """
             pass
         else:
             self.fail("new-style class must have a new-style base")
+
+    def test_builtin_bases(self):
+        # Make sure all the builtin types can have their base queried without
+        # segfaulting. See issue #5787.
+        builtin_types = [tp for tp in __builtin__.__dict__.itervalues()
+                         if isinstance(tp, type)]
+        for tp in builtin_types:
+            object.__getattribute__(tp, "__bases__")
+            if tp is not object:
+                self.assertEqual(len(tp.__bases__), 1, tp)
+
 
     def test_mutable_bases_with_failing_mro(self):
         # Testing mutable bases with failing mro...

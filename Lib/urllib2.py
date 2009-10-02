@@ -192,6 +192,7 @@ class Request:
         # self.__r_type is what's left after doing the splittype
         self.host = None
         self.port = None
+        self._tunnel_host = None
         self.data = data
         self.headers = {}
         for key, value in headers.items():
@@ -252,8 +253,13 @@ class Request:
         return self.__r_host
 
     def set_proxy(self, host, type):
-        self.host, self.type = host, type
-        self.__r_host = self.__original
+        if self.type == 'https' and not self._tunnel_host:
+            self._tunnel_host = self.host
+        else:
+            self.type = type
+            self.__r_host = self.__original
+
+        self.host = host
 
     def has_proxy(self):
         return self.__r_host == self.__original
@@ -594,7 +600,7 @@ class HTTPRedirectHandler(BaseHandler):
         fp.read()
         fp.close()
 
-        return self.parent.open(new)
+        return self.parent.open(new, timeout=req.timeout)
 
     http_error_301 = http_error_303 = http_error_307 = http_error_302
 
@@ -700,7 +706,7 @@ class ProxyHandler(BaseHandler):
             req.add_header('Proxy-authorization', 'Basic ' + creds)
         hostport = unquote(hostport)
         req.set_proxy(hostport, proxy_type)
-        if orig_type == proxy_type:
+        if orig_type == proxy_type or orig_type == 'https':
             # let other handlers take care of it
             return None
         else:
@@ -710,7 +716,7 @@ class ProxyHandler(BaseHandler):
             # {'http': 'ftp://proxy.example.com'}, we may end up turning
             # a request for http://acme.example.com/a into one for
             # ftp://proxy.example.com/a
-            return self.parent.open(req)
+            return self.parent.open(req, timeout=req.timeout)
 
 class HTTPPasswordMgr:
 
@@ -826,7 +832,7 @@ class AbstractBasicAuthHandler:
             if req.headers.get(self.auth_header, None) == auth:
                 return None
             req.add_header(self.auth_header, auth)
-            return self.parent.open(req)
+            return self.parent.open(req, timeout=req.timeout)
         else:
             return None
 
@@ -917,7 +923,7 @@ class AbstractDigestAuthHandler:
             if req.headers.get(self.auth_header, None) == auth_val:
                 return None
             req.add_unredirected_header(self.auth_header, auth_val)
-            resp = self.parent.open(req)
+            resp = self.parent.open(req, timeout=req.timeout)
             return resp
 
     def get_cnonce(self, nonce):
@@ -1098,6 +1104,10 @@ class AbstractHTTPHandler(BaseHandler):
         headers["Connection"] = "close"
         headers = dict(
             (name.title(), val) for name, val in headers.items())
+
+        if req._tunnel_host:
+            h._set_tunnel(req._tunnel_host)
+
         try:
             h.request(req.get_method(), req.get_selector(), req.data, headers)
             r = h.getresponse()

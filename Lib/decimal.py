@@ -551,20 +551,16 @@ class Decimal(object):
             intpart = m.group('int')
             if intpart is not None:
                 # finite number
-                fracpart = m.group('frac')
+                fracpart = m.group('frac') or ''
                 exp = int(m.group('exp') or '0')
-                if fracpart is not None:
-                    self._int = str((intpart+fracpart).lstrip('0') or '0')
-                    self._exp = exp - len(fracpart)
-                else:
-                    self._int = str(intpart.lstrip('0') or '0')
-                    self._exp = exp
+                self._int = str(int(intpart+fracpart))
+                self._exp = exp - len(fracpart)
                 self._is_special = False
             else:
                 diag = m.group('diag')
                 if diag is not None:
                     # NaN
-                    self._int = str(diag.lstrip('0'))
+                    self._int = str(int(diag or '0')).lstrip('0')
                     if m.group('signal'):
                         self._exp = 'N'
                     else:
@@ -1516,10 +1512,9 @@ class Decimal(object):
         """Converts self to an int, truncating if necessary."""
         if self._is_special:
             if self._isnan():
-                context = getcontext()
-                return context._raise_error(InvalidContext)
+                raise ValueError("Cannot convert NaN to integer")
             elif self._isinfinity():
-                raise OverflowError("Cannot convert infinity to int")
+                raise OverflowError("Cannot convert infinity to integer")
         s = (-1)**self._sign
         if self._exp >= 0:
             return s*int(self._int)*10**self._exp
@@ -2697,12 +2692,15 @@ class Decimal(object):
         other_nan = other._isnan()
         if self_nan or other_nan:
             if self_nan == other_nan:
-                if self._int < other._int:
+                # compare payloads as though they're integers
+                self_key = len(self._int), self._int
+                other_key = len(other._int), other._int
+                if self_key < other_key:
                     if sign:
                         return _One
                     else:
                         return _NegativeOne
-                if self._int > other._int:
+                if self_key > other_key:
                     if sign:
                         return _NegativeOne
                     else:
@@ -5349,29 +5347,26 @@ ExtendedContext = Context(
 # number between the optional sign and the optional exponent must have
 # at least one decimal digit, possibly after the decimal point.  The
 # lookahead expression '(?=\d|\.\d)' checks this.
-#
-# As the flag UNICODE is not enabled here, we're explicitly avoiding any
-# other meaning for \d than the numbers [0-9].
 
 import re
 _parser = re.compile(r"""        # A numeric string consists of:
 #    \s*
     (?P<sign>[-+])?              # an optional sign, followed by either...
     (
-        (?=[0-9]|\.[0-9])        # ...a number (with at least one digit)
-        (?P<int>[0-9]*)          # having a (possibly empty) integer part
-        (\.(?P<frac>[0-9]*))?    # followed by an optional fractional part
-        (E(?P<exp>[-+]?[0-9]+))? # followed by an optional exponent, or...
+        (?=\d|\.\d)              # ...a number (with at least one digit)
+        (?P<int>\d*)             # having a (possibly empty) integer part
+        (\.(?P<frac>\d*))?       # followed by an optional fractional part
+        (E(?P<exp>[-+]?\d+))?    # followed by an optional exponent, or...
     |
         Inf(inity)?              # ...an infinity, or...
     |
         (?P<signal>s)?           # ...an (optionally signaling)
         NaN                      # NaN
-        (?P<diag>[0-9]*)         # with (possibly empty) diagnostic info.
+        (?P<diag>\d*)            # with (possibly empty) diagnostic info.
     )
 #    \s*
     \Z
-""", re.VERBOSE | re.IGNORECASE).match
+""", re.VERBOSE | re.IGNORECASE | re.UNICODE).match
 
 _all_zeros = re.compile('0*$').match
 _exact_half = re.compile('50*$').match
@@ -5451,7 +5446,7 @@ def _parse_format_specifier(format_spec):
     # if format type is 'g' or 'G' then a precision of 0 makes little
     # sense; convert it to 1.  Same if format type is unspecified.
     if format_dict['precision'] == 0:
-        if format_dict['type'] in 'gG' or format_dict['type'] is None:
+        if format_dict['type'] is None or format_dict['type'] in 'gG':
             format_dict['precision'] = 1
 
     # record whether return type should be str or unicode
