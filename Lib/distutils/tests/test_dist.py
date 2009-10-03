@@ -72,7 +72,7 @@ class DistributionTestCase(support.LoggingSilencer,
         self.assertEqual(d.get_command_packages(),
                          ["distutils.command", "foo.bar", "distutils.tests"])
         cmd = d.get_command_obj("test_dist")
-        self.assert_(isinstance(cmd, test_dist))
+        self.assertTrue(isinstance(cmd, test_dist))
         self.assertEqual(cmd.sample_option, "sometext")
 
     def test_command_packages_configfile(self):
@@ -136,24 +136,6 @@ class DistributionTestCase(support.LoggingSilencer,
         self.assertEquals(dist.metadata.platforms, ['one', 'two'])
         self.assertEquals(dist.metadata.keywords, ['one', 'two'])
 
-    def test_show_help(self):
-        class FancyGetopt(object):
-            def __init__(self):
-                self.count = 0
-
-            def set_option_table(self, *args):
-                pass
-
-            def print_help(self, *args):
-                self.count += 1
-
-        parser = FancyGetopt()
-        dist = Distribution()
-        dist.commands = ['sdist']
-        dist.script_name = 'setup.py'
-        dist._show_help(parser)
-        self.assertEquals(parser.count, 3)
-
     def test_get_command_packages(self):
         dist = Distribution()
         self.assertEquals(dist.command_packages, None)
@@ -175,10 +157,10 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
                  "version": "1.0"}
         dist = Distribution(attrs)
         meta = self.format_metadata(dist)
-        self.assert_("Metadata-Version: 1.0" in meta)
-        self.assert_("provides:" not in meta.lower())
-        self.assert_("requires:" not in meta.lower())
-        self.assert_("obsoletes:" not in meta.lower())
+        self.assertTrue("Metadata-Version: 1.0" in meta)
+        self.assertTrue("provides:" not in meta.lower())
+        self.assertTrue("requires:" not in meta.lower())
+        self.assertTrue("obsoletes:" not in meta.lower())
 
     def test_provides(self):
         attrs = {"name": "package",
@@ -190,9 +172,9 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
         self.assertEqual(dist.get_provides(),
                          ["package", "package.sub"])
         meta = self.format_metadata(dist)
-        self.assert_("Metadata-Version: 1.1" in meta)
-        self.assert_("requires:" not in meta.lower())
-        self.assert_("obsoletes:" not in meta.lower())
+        self.assertTrue("Metadata-Version: 1.1" in meta)
+        self.assertTrue("requires:" not in meta.lower())
+        self.assertTrue("obsoletes:" not in meta.lower())
 
     def test_provides_illegal(self):
         self.assertRaises(ValueError, Distribution,
@@ -210,11 +192,11 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
         self.assertEqual(dist.get_requires(),
                          ["other", "another (==1.0)"])
         meta = self.format_metadata(dist)
-        self.assert_("Metadata-Version: 1.1" in meta)
-        self.assert_("provides:" not in meta.lower())
-        self.assert_("Requires: other" in meta)
-        self.assert_("Requires: another (==1.0)" in meta)
-        self.assert_("obsoletes:" not in meta.lower())
+        self.assertTrue("Metadata-Version: 1.1" in meta)
+        self.assertTrue("provides:" not in meta.lower())
+        self.assertTrue("Requires: other" in meta)
+        self.assertTrue("Requires: another (==1.0)" in meta)
+        self.assertTrue("obsoletes:" not in meta.lower())
 
     def test_requires_illegal(self):
         self.assertRaises(ValueError, Distribution,
@@ -232,11 +214,11 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
         self.assertEqual(dist.get_obsoletes(),
                          ["other", "another (<1.0)"])
         meta = self.format_metadata(dist)
-        self.assert_("Metadata-Version: 1.1" in meta)
-        self.assert_("provides:" not in meta.lower())
-        self.assert_("requires:" not in meta.lower())
-        self.assert_("Obsoletes: other" in meta)
-        self.assert_("Obsoletes: another (<1.0)" in meta)
+        self.assertTrue("Metadata-Version: 1.1" in meta)
+        self.assertTrue("provides:" not in meta.lower())
+        self.assertTrue("requires:" not in meta.lower())
+        self.assertTrue("Obsoletes: other" in meta)
+        self.assertTrue("Obsoletes: another (<1.0)" in meta)
 
     def test_obsoletes_illegal(self):
         self.assertRaises(ValueError, Distribution,
@@ -270,14 +252,14 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
             if sys.platform in ('linux', 'darwin'):
                 self.environ['HOME'] = temp_dir
                 files = dist.find_config_files()
-                self.assert_(user_filename in files)
+                self.assertTrue(user_filename in files)
 
             # win32-style
             if sys.platform == 'win32':
                 # home drive should be found
                 self.environ['HOME'] = temp_dir
                 files = dist.find_config_files()
-                self.assert_(user_filename in files,
+                self.assertTrue(user_filename in files,
                              '%r not found in %r' % (user_filename, files))
         finally:
             os.remove(user_filename)
@@ -303,7 +285,7 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
 
         output = [line for line in s.getvalue().split('\n')
                   if line.strip() != '']
-        self.assert_(len(output) > 0)
+        self.assertTrue(len(output) > 0)
 
 def test_suite():
     suite = unittest.TestSuite()

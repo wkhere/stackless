@@ -105,13 +105,13 @@ Here is a short script to test three functions from the :mod:`random` module::
    class TestSequenceFunctions(unittest.TestCase):
 
        def setUp(self):
-           self.seq = range(10)
+           self.seq = list(range(10))
 
        def test_shuffle(self):
            # make sure the shuffled sequence does not lose any elements
            random.shuffle(self.seq)
            self.seq.sort()
-           self.assertEqual(self.seq, range(10))
+           self.assertEqual(self.seq, list(range(10)))
 
        def test_choice(self):
            element = random.choice(self.seq)
@@ -580,8 +580,8 @@ Test cases
 
       Run the test, collecting the result into the test result object passed as
       *result*.  If *result* is omitted or :const:`None`, a temporary result
-      object is created (by calling the :meth:`defaultTestCase` method) and
-      used; this result object is not returned to :meth:`run`'s caller.
+      object is created (by calling the :meth:`defaultTestResult` method) and
+      used. The result object is not returned to :meth:`run`'s caller.
 
       The same effect may be had by simply calling the :class:`TestCase`
       instance.

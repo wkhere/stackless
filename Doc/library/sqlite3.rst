@@ -81,7 +81,7 @@ This example uses the iterator form::
    >>> for row in c:
    ...    print(row)
    ...
-   (u'2006-01-05', u'BUY', u'RHAT', 100, 35.140000000000001)
+   (u'2006-01-05', u'BUY', u'RHAT', 100, 35.14)
    (u'2006-03-28', u'BUY', u'IBM', 1000, 45.0)
    (u'2006-04-06', u'SELL', u'IBM', 500, 53.0)
    (u'2006-04-05', u'BUY', u'MSOFT', 1000, 72.0)
@@ -591,7 +591,7 @@ Now we plug :class:`Row` in::
     >>> type(r)
     <type 'sqlite3.Row'>
     >>> r
-    (u'2006-01-05', u'BUY', u'RHAT', 100.0, 35.140000000000001)
+    (u'2006-01-05', u'BUY', u'RHAT', 100.0, 35.14)
     >>> len(r)
     5
     >>> r[2]
@@ -822,7 +822,7 @@ directly using only a single call on the :class:`Connection` object.
 Accessing columns by name instead of by index
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-One useful feature of the :mod:`sqlite3` module is the builtin
+One useful feature of the :mod:`sqlite3` module is the built-in
 :class:`sqlite3.Row` class designed to be used as a row factory.
 
 Rows wrapped with this class can be accessed both by index (like tuples) and

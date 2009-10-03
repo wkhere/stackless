@@ -52,10 +52,10 @@ Some examples::
    'Hello, world.'
    >>> repr(s)
    "'Hello, world.'"
-   >>> str(0.1)
-   '0.1'
-   >>> repr(0.1)
-   '0.10000000000000001'
+   >>> str(1.0/7.0)
+   '0.142857142857'
+   >>> repr(1.0/7.0)
+   '0.14285714285714285'
    >>> x = 10 * 3.25
    >>> y = 200 * 200
    >>> s = 'The value of x is ' + repr(x) + ', and y is ' + repr(y) + '...'
@@ -130,16 +130,17 @@ Basic usage of the :meth:`str.format` method looks like this::
    We are the knights who say "Ni!"
 
 The brackets and characters within them (called format fields) are replaced with
-the objects passed into the format method.  The number in the brackets refers to
-the position of the object passed into the format method. ::
+the objects passed into the :meth:`~str.format` method.  The number in the
+brackets refers to the position of the object passed into the
+:meth:`~str.format` method. ::
 
    >>> print('{0} and {1}'.format('spam', 'eggs'))
    spam and eggs
    >>> print('{1} and {0}'.format('spam', 'eggs'))
    eggs and spam
 
-If keyword arguments are used in the format method, their values are referred to
-by using the name of the argument. ::
+If keyword arguments are used in the :meth:`~str.format` method, their values
+are referred to by using the name of the argument. ::
 
    >>> print('This {food} is {adjective}.'.format(
    ...       food='spam', adjective='absolutely horrible'))
@@ -151,16 +152,16 @@ Positional and keyword arguments can be arbitrarily combined::
                                                           other='Georg'))
    The story of Bill, Manfred, and Georg.
 
-An optional ``':'`` and format specifier can follow the field name. This also
+An optional ``':'`` and format specifier can follow the field name. This allows
 greater control over how the value is formatted.  The following example
-truncates the Pi to three places after the decimal.
+truncates Pi to three places after the decimal.
 
    >>> import math
    >>> print('The value of PI is approximately {0:.3f}.'.format(math.pi))
    The value of PI is approximately 3.142.
 
 Passing an integer after the ``':'`` will cause that field to be a minimum
-number of characters wide.  This is useful for making tables pretty.::
+number of characters wide.  This is useful for making tables pretty. ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 7678}
    >>> for name, phone in table.items():
@@ -181,7 +182,7 @@ square brackets ``'[]'`` to access the keys ::
    Jack: 4098; Sjoerd: 4127; Dcab: 8637678
 
 This could also be done by passing the table as keyword arguments with the '**'
-notation.::
+notation. ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 8637678}
    >>> print('Jack: {Jack:d}; Sjoerd: {Sjoerd:d}; Dcab: {Dcab:d}'.format(**table))
@@ -207,8 +208,8 @@ operation. For example::
    The value of PI is approximately 3.142.
 
 Since :meth:`str.format` is quite new, a lot of Python code still uses the ``%``
-operator. However, because this old style of formatting will eventually removed
-from the language :meth:`str.format` should generally be used.
+operator. However, because this old style of formatting will eventually be
+removed from the language, :meth:`str.format` should generally be used.
 
 More information can be found in the :ref:`old-string-formatting` section.
 
@@ -374,9 +375,9 @@ shorter than writing equivalent :keyword:`try`\ -\ :keyword:`finally` blocks::
     >>> f.closed
     True
 
-File objects have some additional methods, such as :meth:`isatty` and
-:meth:`truncate` which are less frequently used; consult the Library Reference
-for a complete guide to file objects.
+File objects have some additional methods, such as :meth:`~file.isatty` and
+:meth:`~file.truncate` which are less frequently used; consult the Library
+Reference for a complete guide to file objects.
 
 
 .. _tut-pickle:

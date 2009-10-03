@@ -930,7 +930,11 @@ write_compiled_module(PyCodeObject *co, char *cpathname, struct stat *srcstat)
 {
 	FILE *fp;
 	time_t mtime = srcstat->st_mtime;
-	mode_t mode = srcstat->st_mode;
+#ifdef MS_WINDOWS   /* since Windows uses different permissions  */
+	mode_t mode = srcstat->st_mode & ~S_IEXEC;
+#else
+	mode_t mode = srcstat->st_mode & ~S_IXUSR & ~S_IXGRP & ~S_IXOTH;
+#endif 
 
 	fp = open_exclusive(cpathname, mode);
 	if (fp == NULL) {
@@ -1778,7 +1782,7 @@ static int init_builtin(char *); /* Forward */
    its module object WITH INCREMENTED REFERENCE COUNT */
 
 static PyObject *
-load_module(char *name, FILE *fp, char *buf, int type, PyObject *loader)
+load_module(char *name, FILE *fp, char *pathname, int type, PyObject *loader)
 {
 	PyObject *modules;
 	PyObject *m;
@@ -1799,27 +1803,27 @@ load_module(char *name, FILE *fp, char *buf, int type, PyObject *loader)
 	switch (type) {
 
 	case PY_SOURCE:
-		m = load_source_module(name, buf, fp);
+		m = load_source_module(name, pathname, fp);
 		break;
 
 	case PY_COMPILED:
-		m = load_compiled_module(name, buf, fp);
+		m = load_compiled_module(name, pathname, fp);
 		break;
 
 #ifdef HAVE_DYNAMIC_LOADING
 	case C_EXTENSION:
-		m = _PyImport_LoadDynamicModule(name, buf, fp);
+		m = _PyImport_LoadDynamicModule(name, pathname, fp);
 		break;
 #endif
 
 	case PKG_DIRECTORY:
-		m = load_package(name, buf);
+		m = load_package(name, pathname);
 		break;
 
 	case C_BUILTIN:
 	case PY_FROZEN:
-		if (buf != NULL && buf[0] != '\0')
-			name = buf;
+		if (pathname != NULL && pathname[0] != '\0')
+			name = pathname;
 		if (type == C_BUILTIN)
 			err = init_builtin(name);
 		else

@@ -372,7 +372,9 @@ The :mod:`multiprocessing` package mostly replicates the API of the
 
       Note that a daemonic process is not allowed to create child processes.
       Otherwise a daemonic process would leave its children orphaned if it gets
-      terminated when its parent process exits.
+      terminated when its parent process exits. Additionally, these are **not**
+      Unix daemons or services, they are normal processes that will be
+      terminated (and not joined) if non-dameonic processes have exited.
 
    In addition to the  :class:`Threading.Thread` API, :class:`Process` objects
    also support the following attributes and methods:
@@ -1552,9 +1554,9 @@ with the :class:`Pool` class.
    .. method:: apply(func[, args[, kwds]])
 
       Call *func* with arguments *args* and keyword arguments *kwds*.  It blocks
-      till the result is ready. Given this blocks - :meth:`apply_async` is better suited
-      for performing work in parallel. Additionally, the passed
-      in function is only executed in one of the workers of the pool.
+      till the result is ready. Given this blocks, :meth:`apply_async` is better
+      suited for performing work in parallel. Additionally, the passed in
+      function is only executed in one of the workers of the pool.
 
    .. method:: apply_async(func[, args[, kwds[, callback]]])
 
@@ -1567,7 +1569,7 @@ with the :class:`Pool` class.
 
    .. method:: map(func, iterable[, chunksize])
 
-      A parallel equivalent of the :func:`map` builtin function (it supports only
+      A parallel equivalent of the :func:`map` built-in function (it supports only
       one *iterable* argument though).  It blocks till the result is ready.
 
       This method chops the iterable into a number of chunks which it submits to
@@ -1576,7 +1578,7 @@ with the :class:`Pool` class.
 
    .. method:: map_async(func, iterable[, chunksize[, callback]])
 
-      A variant of the :meth:`map` method which returns a result object.
+      A variant of the :meth:`.map` method which returns a result object.
 
       If *callback* is specified then it should be a callable which accepts a
       single argument.  When the result becomes ready *callback* is applied to
@@ -1592,7 +1594,7 @@ with the :class:`Pool` class.
       make make the job complete **much** faster than using the default value of
       ``1``.
 
-      Also if *chunksize* is ``1`` then the :meth:`next` method of the iterator
+      Also if *chunksize* is ``1`` then the :meth:`!next` method of the iterator
       returned by the :meth:`imap` method has an optional *timeout* parameter:
       ``next(timeout)`` will raise :exc:`multiprocessing.TimeoutError` if the
       result cannot be returned within *timeout* seconds.
@@ -1713,7 +1715,7 @@ authentication* using the :mod:`hmac` module.
    generally be omitted since it can usually be inferred from the format of
    *address*. (See :ref:`multiprocessing-address-formats`)
 
-   If *authentication* is ``True`` or *authkey* is a string then digest
+   If *authenticate* is ``True`` or *authkey* is a string then digest
    authentication is used.  The key used for authentication will be either
    *authkey* or ``current_process().authkey)`` if *authkey* is ``None``.
    If authentication fails then :exc:`AuthenticationError` is raised.  See
@@ -1755,7 +1757,7 @@ authentication* using the :mod:`hmac` module.
 
    If *authkey* is ``None`` and *authenticate* is ``True`` then
    ``current_process().authkey`` is used as the authentication key.  If
-   *authkey* is ``None`` and *authentication* is ``False`` then no
+   *authkey* is ``None`` and *authenticate* is ``False`` then no
    authentication is done.  If authentication fails then
    :exc:`AuthenticationError` is raised.  See :ref:`multiprocessing-auth-keys`.
 
@@ -2097,6 +2099,38 @@ Explicitly pass resources to child processes
            for i in range(10):
                 Process(target=f, args=(lock,)).start()
 
+Beware replacing sys.stdin with a "file like object"
+
+    :mod:`multiprocessing` originally unconditionally called::
+
+        os.close(sys.stdin.fileno())
+
+    in the :meth:`multiprocessing.Process._bootstrap` method --- this resulted
+    in issues with processes-in-processes. This has been changed to::
+
+        sys.stdin.close()
+        sys.stdin = open(os.devnull)
+
+    Which solves the fundamental issue of processes colliding with each other
+    resulting in a bad file descriptor error, but introduces a potential danger
+    to applications which replace :func:`sys.stdin` with a "file-like object"
+    with output buffering.  This danger is that if multiple processes call
+    :func:`close()` on this file-like object, it could result in the same
+    data being flushed to the object multiple times, resulting in corruption.
+
+    If you write a file-like object and implement your own caching, you can
+    make it fork-safe by storing the pid whenever you append to the cache,
+    and discarding the cache when the pid changes. For example::
+
+       @property
+       def cache(self):
+           pid = os.getpid()
+           if pid != self._pid:
+               self._pid = pid
+               self._cache = []
+           return self._cache
+
+    For more information, see :issue:`5155`, :issue:`5313` and :issue:`5331`
 
 Windows
 ~~~~~~~

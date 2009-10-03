@@ -725,17 +725,17 @@ class PyBuildExt(build_ext):
                 f = os.path.join(d, "db.h")
                 if db_setup_debug: print("db: looking for db.h in", f)
                 if os.path.exists(f):
-                    f = open(f).read()
-                    m = re.search(r"#define\WDB_VERSION_MAJOR\W(\d+)", f)
+                    f = open(f, "rb").read()
+                    m = re.search(br"#define\WDB_VERSION_MAJOR\W(\d+)", f)
                     if m:
                         db_major = int(m.group(1))
-                        m = re.search(r"#define\WDB_VERSION_MINOR\W(\d+)", f)
+                        m = re.search(br"#define\WDB_VERSION_MINOR\W(\d+)", f)
                         db_minor = int(m.group(1))
                         db_ver = (db_major, db_minor)
 
                         # Avoid 4.6 prior to 4.6.21 due to a BerkeleyDB bug
                         if db_ver == (4, 6):
-                            m = re.search(r"#define\WDB_VERSION_PATCH\W(\d+)", f)
+                            m = re.search(br"#define\WDB_VERSION_PATCH\W(\d+)", f)
                             db_patch = int(m.group(1))
                             if db_patch < 21:
                                 print("db.h:", db_ver, "patch", db_patch,
@@ -1605,12 +1605,11 @@ class PyBuildInstallLib(install_lib):
 
     def set_dir_modes(self, dirname, mode):
         if not self.is_chmod_supported(): return
-        os.walk(dirname, self.set_dir_modes_visitor, mode)
-
-    def set_dir_modes_visitor(self, mode, dirname, names):
-        if os.path.islink(dirname): return
-        log.info("changing mode of %s to %o", dirname, mode)
-        if not self.dry_run: os.chmod(dirname, mode)
+        for dirpath, dirnames, fnames in os.walk(dirname):
+            if os.path.islink(dirpath):
+                continue
+            log.info("changing mode of %s to %o", dirpath, mode)
+            if not self.dry_run: os.chmod(dirpath, mode)
 
     def is_chmod_supported(self):
         return hasattr(os, 'chmod')

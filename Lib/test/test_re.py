@@ -1,6 +1,3 @@
-import sys
-sys.path = ['.'] + sys.path
-
 from test.support import verbose, run_unittest
 import re
 from re import Scanner
@@ -585,7 +582,7 @@ class ReTests(unittest.TestCase):
                          [":", "::", ":::"])
 
     def test_bug_926075(self):
-        self.assert_(re.compile('bug_926075') is not
+        self.assertTrue(re.compile('bug_926075') is not
                      re.compile(b'bug_926075'))
 
     def test_bug_931848(self):

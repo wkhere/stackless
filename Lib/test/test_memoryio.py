@@ -140,6 +140,7 @@ class MemoryTestMixin:
         self.assertEqual(memio.getvalue(), buf * 2)
         memio.__init__(buf)
         self.assertEqual(memio.getvalue(), buf)
+        self.assertRaises(TypeError, memio.__init__, [])
 
     def test_read(self):
         buf = self.buftype("1234567890")
@@ -222,8 +223,8 @@ class MemoryTestMixin:
         memio = self.ioclass(buf * 10)
 
         self.assertEqual(iter(memio), memio)
-        self.failUnless(hasattr(memio, '__iter__'))
-        self.failUnless(hasattr(memio, '__next__'))
+        self.assertTrue(hasattr(memio, '__iter__'))
+        self.assertTrue(hasattr(memio, '__next__'))
         i = 0
         for line in memio:
             self.assertEqual(line, buf)
@@ -338,6 +339,13 @@ class MemoryTestMixin:
         self.assertEqual(test1(), buf)
         self.assertEqual(test2(), buf)
 
+    def test_instance_dict_leak(self):
+        # Test case for issue #6242.
+        # This will be caught by regrtest.py -R if this leak.
+        for _ in range(100):
+            memio = self.ioclass()
+            memio.foo = 1
+
 
 class PyBytesIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
 
@@ -416,6 +424,10 @@ class PyBytesIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
         self.assertEqual(memio.write(a), 10)
         self.assertEqual(memio.getvalue(), buf)
 
+    def test_issue5449(self):
+        buf = self.buftype("1234567890")
+        self.ioclass(initial_bytes=buf)
+        self.assertRaises(TypeError, self.ioclass, buf, foo=None)
 
 class PyStringIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
     buftype = str
@@ -522,6 +534,13 @@ class PyStringIOTest(MemoryTestMixin, MemorySeekTestMixin, unittest.TestCase):
         # StringIO can duplicate newlines in universal newlines mode
         memio = self.ioclass("a\r\nb\r\n", newline=None)
         self.assertEqual(memio.read(5), "a\nb\n")
+
+    def test_newline_argument(self):
+        self.assertRaises(TypeError, self.ioclass, newline=b"\n")
+        self.assertRaises(ValueError, self.ioclass, newline="error")
+        # These should not raise an error
+        for newline in (None, "", "\n", "\r", "\r\n"):
+            self.ioclass(newline=newline)
 
 
 class CBytesIOTest(PyBytesIOTest):

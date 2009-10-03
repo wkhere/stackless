@@ -50,7 +50,7 @@ decimal value 0.1 cannot be represented exactly as a base 2 fraction.  In base
 
 Stop at any finite number of bits, and you get an approximation.  On most
 machines today, floats are approximated using a binary fraction with
-the numerator using the first 53 bits following the most significant bit and
+the numerator using the first 53 bits starting with the most significant bit and
 with the denominator as a power of two.  In the case of 1/10, the binary fraction
 is ``3602879701896397 / 2 ** 55`` which is close to but not exactly
 equal to the true value of 1/10.
@@ -82,7 +82,7 @@ values share the same approximation, any one of them could be displayed
 while still preserving the invariant ``eval(repr(x)) == x``.
 
 Historically, the Python prompt and built-in :func:`repr` function would chose
-the one with 17 significant digits, ``0.10000000000000001``, Starting with
+the one with 17 significant digits, ``0.10000000000000001``.   Starting with
 Python 3.1, Python (on most systems) is now able to choose the shortest of
 these and simply display ``0.1``.
 
@@ -123,9 +123,9 @@ Also, since the 0.1 cannot get any closer to the exact value of 1/10 and
 
 Though the numbers cannot be made closer to their intended exact values,
 the :func:`round` function can be useful for post-rounding so that results
-have inexact values that are comparable to one another::
+with inexact values become comparable to one another::
 
-    >>> round(.1 + .1 + .1, 1) == round(.3, 1)
+    >>> round(.1 + .1 + .1, 10) == round(.3, 10)
     True
 
 Binary floating-point arithmetic holds many surprises like this.  The problem
@@ -137,7 +137,7 @@ As that says near the end, "there are no easy answers."  Still, don't be unduly
 wary of floating-point!  The errors in Python float operations are inherited
 from the floating-point hardware, and on most machines are on the order of no
 more than 1 part in 2\*\*53 per operation.  That's more than adequate for most
-tasks, but you do need to keep in mind that it's not decimal arithmetic, and
+tasks, but you do need to keep in mind that it's not decimal arithmetic and
 that every float operation can suffer a new rounding error.
 
 While pathological cases do exist, for most casual use of floating-point
@@ -165,7 +165,7 @@ fraction::
 
    >>> x = 3.14159
    >>> x.as_integer_ratio()
-   (3537115888337719L, 1125899906842624L)
+   (3537115888337719, 1125899906842624)
 
 Since the ratio is exact, it can be used to losslessly recreate the
 original value::
@@ -230,12 +230,8 @@ as ::
 and recalling that *J* has exactly 53 bits (is ``>= 2**52`` but ``< 2**53``),
 the best value for *N* is 56::
 
-   >>> 2**52
-   4503599627370496
-   >>> 2**53
-   9007199254740992
-   >>> 2**56/10
-   7205759403792794.0
+    >>> 2**52 <=  2**56 // 10  < 2**53
+    True
 
 That is, 56 is the only value for *N* that leaves *J* with exactly 53 bits.  The
 best possible value for *J* is then that quotient rounded::
@@ -250,14 +246,13 @@ by rounding up::
    >>> q+1
    7205759403792794
 
-Therefore the best possible approximation to 1/10 in 754 double precision is
-that over 2\*\*56, or ::
+Therefore the best possible approximation to 1/10 in 754 double precision is::
 
-   7205759403792794 / 72057594037927936
+   7205759403792794 / 2 ** 56
 
 Dividing both the numerator and denominator by two reduces the fraction to::
 
-   3602879701896397 / 36028797018963968
+   3602879701896397 / 2 ** 55
 
 Note that since we rounded up, this is actually a little bit larger than 1/10;
 if we had not rounded up, the quotient would have been a little bit smaller than
@@ -269,24 +264,34 @@ above, the best 754 double approximation it can get::
    >>> 0.1 * 2 ** 55
    3602879701896397.0
 
-If we multiply that fraction by 10\*\*60, we can see the value of out to
-60 decimal digits::
+If we multiply that fraction by 10\*\*55, we can see the value out to
+55 decimal digits::
 
-   >>> 3602879701896397 * 10 ** 60 // 2 ** 55
+   >>> 3602879701896397 * 10 ** 55 // 2 ** 55
    1000000000000000055511151231257827021181583404541015625
 
-meaning that the exact number stored in the computer is approximately equal to
-the decimal value 0.100000000000000005551115123125.  Rounding that to 17
-significant digits gives the 0.10000000000000001 that Python displays (well,
-will display on any 754-conforming platform that does best-possible input and
-output conversions in its C library --- yours may not!).
+meaning that the exact number stored in the computer is equal to
+the decimal value 0.1000000000000000055511151231257827021181583404541015625.
+Instead of displaying the full decimal value, many languages (including
+older versions of Python), round the result to 17 significant digits::
+
+   >>> format(0.1, '.17f')
+   '0.10000000000000001'
 
 The :mod:`fractions` and :mod:`decimal` modules make these calculations
 easy::
 
    >>> from decimal import Decimal
    >>> from fractions import Fraction
-   >>> print(Fraction.from_float(0.1))
-   3602879701896397/36028797018963968
-   >>> print(Decimal.from_float(0.1))
-   0.1000000000000000055511151231257827021181583404541015625
+
+   >>> Fraction.from_float(0.1)
+   Fraction(3602879701896397, 36028797018963968)
+
+   >>> (0.1).as_integer_ratio()
+   (3602879701896397, 36028797018963968)
+
+   >>> Decimal.from_float(0.1)
+   Decimal('0.1000000000000000055511151231257827021181583404541015625')
+
+   >>> format(Decimal.from_float(0.1), '.17')
+   '0.10000000000000001'

@@ -187,9 +187,9 @@ floating point flying circus:
    >>> str(a)
    '1.34'
    >>> float(a)
-   1.3400000000000001
-   >>> round(a, 1)     # round() first converts to binary floating point
-   1.3
+   1.34
+   >>> round(a, 1)
+   Decimal('1.3')
    >>> int(a)
    1
    >>> a * 5
@@ -323,6 +323,11 @@ Decimal objects
       nan            ::=  'NaN' [digits] | 'sNaN' [digits]
       numeric-value  ::=  decimal-part [exponent-part] | infinity
       numeric-string ::=  [sign] numeric-value | [sign] nan
+
+   Other Unicode decimal digits are also permitted where ``digit``
+   appears above.  These include decimal digits from various other
+   alphabets (for example, Arabic-Indic and Devanāgarī digits) along
+   with the fullwidth digits ``'\uff10'`` through ``'\uff19'``.
 
    If *value* is a :class:`tuple`, it should have three components, a sign
    (:const:`0` for positive or :const:`1` for negative), a :class:`tuple` of
@@ -558,10 +563,9 @@ Decimal objects
       operands* (see :ref:`logical_operands_label`).  The result is the
       digit-wise ``and`` of the two operands.
 
-   .. method:: logical_invert(other[, context])
+   .. method:: logical_invert([context])
 
-      :meth:`logical_invert` is a logical operation.  The argument must
-      be a *logical operand* (see :ref:`logical_operands_label`).  The
+      :meth:`logical_invert` is a logical operation.  The
       result is the digit-wise inversion of the operand.
 
    .. method:: logical_or(other[, context])
@@ -585,7 +589,7 @@ Decimal objects
 
    .. method:: max_mag(other[, context])
 
-      Similar to the :meth:`max` method, but the comparison is done using the
+      Similar to the :meth:`.max` method, but the comparison is done using the
       absolute values of the operands.
 
    .. method:: min(other[, context])
@@ -597,7 +601,7 @@ Decimal objects
 
    .. method:: min_mag(other[, context])
 
-      Similar to the :meth:`min` method, but the comparison is done using the
+      Similar to the :meth:`.min` method, but the comparison is done using the
       absolute values of the operands.
 
    .. method:: next_minus([context])

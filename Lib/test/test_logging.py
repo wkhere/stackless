@@ -826,7 +826,7 @@ class MemoryTest(BaseTest):
             key = id(obj), repr(obj)
             self._survivors[key] = weakref.ref(obj)
 
-    def _assert_survival(self):
+    def _assertTruesurvival(self):
         """Assert that all objects watched for survival have survived."""
         # Trigger cycle breaking.
         gc.collect()
@@ -852,7 +852,7 @@ class MemoryTest(BaseTest):
         ])
         del foo
         # foo has survived.
-        self._assert_survival()
+        self._assertTruesurvival()
         # foo has retained its settings.
         bar = logging.getLogger("foo")
         bar.debug(self.next_message())
@@ -881,7 +881,7 @@ class EncodingTest(BaseTest):
             # check we wrote exactly those bytes, ignoring trailing \n etc
             f = open(fn, encoding="utf8")
             try:
-                self.failUnlessEqual(f.read().rstrip(), data)
+                self.assertEqual(f.read().rstrip(), data)
             finally:
                 f.close()
         finally:

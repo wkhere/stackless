@@ -49,7 +49,7 @@ class BaseTest(unittest.TestCase):
     def test_constructor(self):
         a = array.array(self.typecode)
         self.assertEqual(a.typecode, self.typecode)
-        self.assert_(a.itemsize>=self.minitemsize)
+        self.assertTrue(a.itemsize>=self.minitemsize)
         self.assertRaises(TypeError, array.array, self.typecode, None)
 
     def test_len(self):
@@ -64,10 +64,10 @@ class BaseTest(unittest.TestCase):
         a = array.array(self.typecode, self.example)
         self.assertRaises(TypeError, a.buffer_info, 42)
         bi = a.buffer_info()
-        self.assert_(isinstance(bi, tuple))
+        self.assertTrue(isinstance(bi, tuple))
         self.assertEqual(len(bi), 2)
-        self.assert_(isinstance(bi[0], int))
-        self.assert_(isinstance(bi[1], int))
+        self.assertTrue(isinstance(bi[0], int))
+        self.assertTrue(isinstance(bi[1], int))
         self.assertEqual(bi[1], len(a))
 
     def test_byteswap(self):
@@ -216,39 +216,39 @@ class BaseTest(unittest.TestCase):
 
     def test_cmp(self):
         a = array.array(self.typecode, self.example)
-        self.assert_((a == 42) is False)
-        self.assert_((a != 42) is True)
+        self.assertTrue((a == 42) is False)
+        self.assertTrue((a != 42) is True)
 
-        self.assert_((a == a) is True)
-        self.assert_((a != a) is False)
-        self.assert_((a < a) is False)
-        self.assert_((a <= a) is True)
-        self.assert_((a > a) is False)
-        self.assert_((a >= a) is True)
+        self.assertTrue((a == a) is True)
+        self.assertTrue((a != a) is False)
+        self.assertTrue((a < a) is False)
+        self.assertTrue((a <= a) is True)
+        self.assertTrue((a > a) is False)
+        self.assertTrue((a >= a) is True)
 
         al = array.array(self.typecode, self.smallerexample)
         ab = array.array(self.typecode, self.biggerexample)
 
-        self.assert_((a == 2*a) is False)
-        self.assert_((a != 2*a) is True)
-        self.assert_((a < 2*a) is True)
-        self.assert_((a <= 2*a) is True)
-        self.assert_((a > 2*a) is False)
-        self.assert_((a >= 2*a) is False)
+        self.assertTrue((a == 2*a) is False)
+        self.assertTrue((a != 2*a) is True)
+        self.assertTrue((a < 2*a) is True)
+        self.assertTrue((a <= 2*a) is True)
+        self.assertTrue((a > 2*a) is False)
+        self.assertTrue((a >= 2*a) is False)
 
-        self.assert_((a == al) is False)
-        self.assert_((a != al) is True)
-        self.assert_((a < al) is False)
-        self.assert_((a <= al) is False)
-        self.assert_((a > al) is True)
-        self.assert_((a >= al) is True)
+        self.assertTrue((a == al) is False)
+        self.assertTrue((a != al) is True)
+        self.assertTrue((a < al) is False)
+        self.assertTrue((a <= al) is False)
+        self.assertTrue((a > al) is True)
+        self.assertTrue((a >= al) is True)
 
-        self.assert_((a == ab) is False)
-        self.assert_((a != ab) is True)
-        self.assert_((a < ab) is True)
-        self.assert_((a <= ab) is True)
-        self.assert_((a > ab) is False)
-        self.assert_((a >= ab) is False)
+        self.assertTrue((a == ab) is False)
+        self.assertTrue((a != ab) is True)
+        self.assertTrue((a < ab) is True)
+        self.assertTrue((a <= ab) is True)
+        self.assertTrue((a > ab) is False)
+        self.assertTrue((a >= ab) is False)
 
     def test_add(self):
         a = array.array(self.typecode, self.example) \
@@ -267,10 +267,16 @@ class BaseTest(unittest.TestCase):
         a = array.array(self.typecode, self.example[::-1])
         b = a
         a += array.array(self.typecode, 2*self.example)
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(
             a,
             array.array(self.typecode, self.example[::-1]+2*self.example)
+        )
+        a = array.array(self.typecode, self.example)
+        a += a
+        self.assertEqual(
+            a,
+            array.array(self.typecode, self.example + self.example)
         )
 
         b = array.array(self.badtypecode())
@@ -310,22 +316,22 @@ class BaseTest(unittest.TestCase):
         b = a
 
         a *= 5
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(
             a,
             array.array(self.typecode, 5*self.example)
         )
 
         a *= 0
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(a, array.array(self.typecode))
 
         a *= 1000
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(a, array.array(self.typecode))
 
         a *= -1
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(a, array.array(self.typecode))
 
         a = array.array(self.typecode, self.example)
@@ -667,6 +673,13 @@ class BaseTest(unittest.TestCase):
             array.array(self.typecode, self.example+self.example[::-1])
         )
 
+        a = array.array(self.typecode, self.example)
+        a.extend(a)
+        self.assertEqual(
+            a,
+            array.array(self.typecode, self.example+self.example)
+        )
+
         b = array.array(self.badtypecode())
         self.assertRaises(TypeError, a.extend, b)
 
@@ -710,22 +723,37 @@ class BaseTest(unittest.TestCase):
     def test_buffer(self):
         a = array.array(self.typecode, self.example)
         m = memoryview(a)
-        b = bytes(m)
-        self.assertEqual(b, a.tostring())
-        self.assertEqual(b[0], a.tostring()[0])
-        # Resizing is forbidden when there are buffer exports
+        expected = m.tobytes()
+        self.assertEqual(a.tostring(), expected)
+        self.assertEqual(a.tostring()[0], expected[0])
+        # Resizing is forbidden when there are buffer exports.
+        # For issue 4509, we also check after each error that
+        # the array was not modified.
         self.assertRaises(BufferError, a.append, a[0])
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, a.extend, a[0:1])
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, a.remove, a[0])
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, a.pop, 0)
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, a.fromlist, a.tolist())
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, a.fromstring, a.tostring())
+        self.assertEqual(m.tobytes(), expected)
         if self.typecode == 'u':
             self.assertRaises(BufferError, a.fromunicode, a.tounicode())
-        self.assertRaises(BufferError, operator.setitem, a, slice(0, 0), a)
-        self.assertRaises(BufferError, operator.delitem, a, 0)
-        self.assertRaises(BufferError, operator.delitem, a, slice(0, 1))
+            self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, operator.imul, a, 2)
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, operator.imul, a, 0)
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, operator.setitem, a, slice(0, 0), a)
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, operator.delitem, a, 0)
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, operator.delitem, a, slice(0, 1))
+        self.assertEqual(m.tobytes(), expected)
 
     def test_weakref(self):
         s = array.array(self.typecode, self.example)
@@ -749,6 +777,8 @@ class BaseTest(unittest.TestCase):
         ArraySubclassWithKwargs('b', newarg=1)
 
     def test_create_from_bytes(self):
+        # XXX This test probably needs to be moved in a subclass or
+        # generalized to use self.typecode.
         a = array.array('H', b"1234")
         self.assertEqual(len(a) * a.itemsize, 4)
 

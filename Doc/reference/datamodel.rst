@@ -1254,11 +1254,11 @@ Basic customization
    .. index:: single: __len__() (mapping object method)
 
    Called to implement truth value testing and the built-in operation
-   ``bool()``; should return ``False`` or ``True``, or their integer equivalents
-   ``0`` or ``1``.  When this method is not defined, :meth:`__len__` is called,
-   if it is defined, and the object is considered true if its result is nonzero.
-   If a class defines neither :meth:`__len__` nor :meth:`__bool__`, all its
-   instances are considered true.
+   ``bool()``; should return ``False`` or ``True``.  When this method is not
+   defined, :meth:`__len__` is called, if it is defined, and the object is
+   considered true if its result is nonzero.  If a class defines neither
+   :meth:`__len__` nor :meth:`__bool__`, all its instances are considered
+   true.
 
 
 .. _attribute-access:
@@ -1304,7 +1304,7 @@ access (use of, assignment to, or deletion of ``x.name``) for class instances.
    .. note::
 
       This method may still be bypassed when looking up special methods as the
-      result of implicit invocation via language syntax or builtin functions.
+      result of implicit invocation via language syntax or built-in functions.
       See :ref:`special-lookup`.
 
 
@@ -1696,12 +1696,12 @@ through the container; for mappings, :meth:`__iter__` should be the same as
 
 .. method:: object.__reversed__(self)
 
-   Called (if present) by the :func:`reversed` builtin to implement
+   Called (if present) by the :func:`reversed` built-in to implement
    reverse iteration.  It should return a new iterator object that iterates
    over all the objects in the container in reverse order.
 
    If the :meth:`__reversed__` method is not provided, the :func:`reversed`
-   builtin will fall back to using the sequence protocol (:meth:`__len__` and
+   built-in will fall back to using the sequence protocol (:meth:`__len__` and
    :meth:`__getitem__`).  Objects that support the sequence protocol should
    only provide :meth:`__reversed__` if they can provide an implementation
    that is more efficient than the one provided by :func:`reversed`.

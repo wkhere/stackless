@@ -4,6 +4,131 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 3.1.1?
+===========================
+
+*Release date: 2009-08-13*
+
+Core and Builtins
+-----------------
+
+- Issue #6707: dir() on an uninitialized module caused a crash.
+
+- Issue #6540: Fixed crash for bytearray.translate() with invalid parameters.
+
+- Issue #6573: set.union() stopped processing inputs if an instance of self
+  occurred in the argument chain.
+
+- Issue #6070: On posix platforms import no longer copies the execute bit
+  from the .py file to the .pyc file if it is set.
+
+- Issue #6428: Since Python 3.0, the __bool__ method must return a bool
+  object, and not an int.  Fix the corresponding error message, and the
+  documentation.
+
+- Issue #6347: Include inttypes.h as well as stdint.h in pyport.h.
+  This fixes a build failure on HP-UX: int32_t and uint32_t are
+  defined in inttypes.h instead of stdint.h on that platform.
+
+- Issue #6373: Fixed a SystemError when encoding with the latin-1 codec and
+  the 'surrogateescape' error handler, a string which contains unpaired
+  surrogates.
+
+C-API
+-----
+
+- Issue #6624: yArg_ParseTuple with "s" format when parsing argument with
+  NUL: Bogus TypeError detail string.
+
+- Issue #6405: Remove duplicate type declarations in descrobject.h.
+
+- The code flags for old __future__ features are now available again.
+
+Library
+-------
+
+- Issue #6106: telnetlib.Telnet.process_rawq doesn't handle default WILL/WONT
+  DO/DONT correctly.
+
+- Issue #6126: Fixed pdb command-line usage.
+
+- Issue #6629: Fix a data corruption issue in the new I/O library, which could
+  occur when writing to a BufferedRandom object (e.g. a file opened in "rb+" or
+  "wb+" mode) after having buffered a certain amount of data for reading. This
+  bug was not present in the pure Python implementation.
+
+- Issue #6622: Fix "local variable 'secret' referenced before
+  assignment" bug in POP3.apop.
+
+- Issue #6637: defaultdict.copy() did not work when the default factory
+  was left unspecified.  Also, the eval/repr round-trip would fail when
+  the default_factory was None.
+
+- Issue #2715: Remove remnants of Carbon.File from binhex module.
+
+- Issue #6595: The Decimal constructor now allows arbitrary Unicode
+decimal digits in input, as recommended by the standard.  Previously
+it was restricted to accepting [0-9].
+
+- Issues #5155, #5313, #5331: multiprocessing.Process._bootstrap was
+unconditionally calling "os.close(sys.stdin.fileno())" resulting in file
+descriptor errors
+
+- Issue #1424152: Fix for http.client, urllib.request to support SSL while
+working through proxy. Original patch by Christopher Li, changes made by
+Senthil Kumaran
+
+- importlib.abc.PyLoader did not inherit from importlib.abc.ResourceLoader like
+the documentation said it did even though the code in PyLoader relied on the
+abstract method required by ResourceLoader.
+
+- Issue #6431: Make Fraction type return NotImplemented when it doesn't
+know how to handle a comparison without loss of precision.  Also add
+correct handling of infinities and nans for comparisons with float.
+
+- Issue #6415: Fixed warnings.warn segfault on bad formatted string.
+
+- Issue #6358: The exit status of a command started with os.popen() was
+reported differently than it did with python 2.x.
+
+- Issue #6323: The pdb debugger did not exit when running a script with a
+syntax error.
+
+- Issue #3392: The subprocess communicate() method no longer fails in select()
+  when file descriptors are large; communicate() now uses poll() when possible.
+
+- Issue #6369: Fix an RLE decompression bug in the binhex module.
+
+- Issue #6344: Fixed a crash of mmap.read() when passed a negative argument.
+
+- Issue #4005: Fixed a crash of pydoc when there was a zip file present in
+  sys.path.
+
+Extension Modules
+-----------------
+
+- Fix a segfault in expat.
+
+- Issue #4509: array.array objects are no longer modified after an operation
+  failing due to the resize restriction in-place when the object has exported
+  buffers.
+
+Build
+-----
+
+- Issue 4601: 'make install' did not set the appropriate permissions on
+directories.
+
+- Issue 5390: Add uninstall icon independent of whether file
+extensions are installed.
+
+Test
+----
+
+- Fix a test in importlib.test.source.test_abc_loader that was incorrectly
+testing when a .pyc file lacked an code object bytecode.
+
+
 What's New in Python 3.1?
 =========================
 
@@ -13,27 +138,27 @@ Core and Builtins
 -----------------
 
 - Issue #6334: Fix bug in range length calculation for ranges with
-  large arguments.
+large arguments.
 
 - Issue #6329: Fixed iteration for memoryview objects (it was being blocked
-  because it wasn't recognized as a sequence).
+because it wasn't recognized as a sequence).
 
 Library
 -------
 
 - Issue #6314: logging.basicConfig() performs extra checks on the "level"
-  argument.
+argument.
 
 - Issue #6274: Fixed possible file descriptors leak in subprocess.py
 
 - Accessing io.StringIO.buffer now raises an AttributeError instead of
-  io.UnsupportedOperation.
+io.UnsupportedOperation.
 
 - Issue #6271: mmap tried to close invalid file handle (-1) when anonymous.
-  (On Unix)
+(On Unix)
 
 - Issue #1202: zipfile module would cause a struct.error when attempting to
-  store files with a CRC32 > 2**31-1.
+store files with a CRC32 > 2**31-1.
 
 Extension Modules
 -----------------
@@ -52,46 +177,50 @@ Core and Builtins
 - Fixed SystemError triggered by "range([], 1, -1)".
 
 - Issue #5924: On Windows, a large PYTHONPATH environment variable
-  (more than 255 characters) would be completely ignored.
+(more than 255 characters) would be completely ignored.
 
 - Issue #4547: When debugging a very large function, it was not always
-  possible to update the lineno attribute of the current frame.
+possible to update the lineno attribute of the current frame.
 
 - Issue #5330: C functions called with keyword arguments were not reported by
-  the various profiling modules (profile, cProfile). Patch by Hagen Fürstenau.
+  the various profiling modules (profile, cProfile). Patch by Hagen FÃ¼rstenau.
 
 Library
 -------
 
+- Issue #6438: Fixed distutils.cygwinccompiler.get_versions : the regular
+expression string pattern was trying to match against a bytes returned by 
+Popen. Tested under win32 to build the py-postgresql project.
+
 - Issue #6258: Support AMD64 in bdist_msi.
 
 - Issue #6195: fixed doctest to no longer try to read 'source' data from
-  binary files.
+binary files.
 
 - Issue #5262: Fixed bug in next rollover time computation in
-  TimedRotatingFileHandler.
+TimedRotatingFileHandler.
 
 - Issue #6217: The C implementation of io.TextIOWrapper didn't include the
-  errors property.  Additionally, the errors and encoding properties of StringIO
-  are always None now.
+errors property.  Additionally, the errors and encoding properties of StringIO
+are always None now.
 
 - Issue #6137: The pickle module now translates module names when loading
-  or dumping pickles with a 2.x-compatible protocol, in order to make data
-  sharing and migration easier. This behaviour can be disabled using the
-  new `fix_imports` optional argument.
+or dumping pickles with a 2.x-compatible protocol, in order to make data
+sharing and migration easier. This behaviour can be disabled using the
+new `fix_imports` optional argument.
 
 - Removed the ipaddr module.
 
 - Issue #3613: base64.{encode,decode}string are now called
-  base64.{encode,decode}bytes which reflects what type they accept and return.
-  The old names are still there as deprecated aliases.
+base64.{encode,decode}bytes which reflects what type they accept and return.
+The old names are still there as deprecated aliases.
 
 - Issue #5767: Remove sgmlop support from xmlrpc.client.
 
 - Issue #6150: Fix test_unicode on wide-unicode builds.
 
 - Issue #6149: Fix initialization of WeakValueDictionary objects from non-empty
-  parameters.
+parameters.
 
 Windows
 -------
@@ -818,6 +947,23 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #6545: Removed assert statements in distutils.Extension, so the 
+  behavior is similar when used with -O.
+
+- Issue #6459: distutils.command.build_ext.get_export_symbols now uses the 
+  "PyInit" prefix, rather than "init". 
+
+- Issue #6433: fixed issues with multiprocessing.pool.map hanging on empty list
+
+- Issue #6455: Fixed test_build_ext under win32. 
+
+- Issue #6413: Fixed the log level in distutils.dist for announce.
+
+- Issue #6403: Fixed package path usage in build_ext.
+
+- Issue #6365: Distutils build_ext inplace mode was copying the compiled 
+  extension in a subdirectory if the extension name had dots.
 
 - Issue #6287: Added the license field in Distutils documentation.
 

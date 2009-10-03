@@ -236,10 +236,6 @@ def isroutine(object):
             or ismethod(object)
             or ismethoddescriptor(object))
 
-def isgenerator(object):
-    """Return true if the object is a generator object."""
-    return isinstance(object, types.GeneratorType)
-
 def isabstract(object):
     """Return true if the object is an abstract base class (ABC)."""
     return isinstance(object, type) and object.__flags__ & TPFLAGS_IS_ABSTRACT
@@ -994,7 +990,10 @@ def getinnerframes(tb, context=1):
         tb = tb.tb_next
     return framelist
 
-currentframe = sys._getframe
+if hasattr(sys, '_getframe'):
+    currentframe = sys._getframe
+else:
+    currentframe = lambda _=None: None
 
 def stack(context=1):
     """Return a list of records for the stack above the caller's frame."""

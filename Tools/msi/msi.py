@@ -117,13 +117,13 @@ pythondll_uuid = {
 
 # Compute the name that Sphinx gives to the docfile
 docfile = ""
-if micro:
-    docfile = str(micro)
+if int(micro):
+    docfile = micro
 if level < 0xf:
     if level == 0xC:
-        docfile = "rc%s" % (serial,)
+        docfile += "rc%s" % (serial,)
     else:
-        docfile = '%x%s' % (level, serial)
+        docfile += '%x%s' % (level, serial)
 docfile = 'python%s%s%s.chm' % (major, minor, docfile)
 
 # Build the mingw import library, libpythonXY.a
@@ -1276,7 +1276,7 @@ def add_registry(db):
                "", r"[TARGETDIR]Python.exe", "REGISTRY.def"),
               ("DisplayIcon", -1,
                r"Software\Microsoft\Windows\CurrentVersion\Uninstall\%s" % product_code,
-               "DisplayIcon", "[TARGETDIR]python.exe", "REGISTRY.def")
+               "DisplayIcon", "[TARGETDIR]python.exe", "REGISTRY")
               ])
     # Shortcuts, see "Shortcut Table"
     add_data(db, "Directory",

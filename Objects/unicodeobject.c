@@ -2044,7 +2044,7 @@ PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
 {
     PyObject *v;
     /* It might be possible to tighten this worst case */
-    Py_ssize_t allocated = 5 * size;
+    Py_ssize_t allocated = 8 * size;
     int inShift = 0;
     Py_ssize_t i = 0;
     unsigned int base64bits = 0;
@@ -2055,7 +2055,7 @@ PyObject *PyUnicode_EncodeUTF7(const Py_UNICODE *s,
     if (size == 0)
         return PyBytes_FromStringAndSize(NULL, 0);
 
-    if (allocated / 5 != size)
+    if (allocated / 8 != size)
         return PyErr_NoMemory();
 
     v = PyBytes_FromStringAndSize(NULL, allocated);
@@ -4201,10 +4201,12 @@ static PyObject *unicode_encode_ucs1(const Py_UNICODE *p,
                     repsize = PyBytes_Size(repunicode);
                     if (repsize > 1) {
                         /* Make room for all additional bytes. */
+                        respos = str - PyBytes_AS_STRING(res);
                         if (_PyBytes_Resize(&res, ressize+repsize-1)) {
                             Py_DECREF(repunicode);
                             goto onError;
                         }
+                        str = PyBytes_AS_STRING(res) + respos;
                         ressize += repsize-1;
                     }
                     memcpy(str, PyBytes_AsString(repunicode), repsize);

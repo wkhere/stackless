@@ -72,9 +72,10 @@ It defines the following functions:
    encoding error), ``'replace'`` (replace malformed data with a suitable
    replacement marker, such as ``'?'``), ``'ignore'`` (ignore malformed data and
    continue without further notice), ``'xmlcharrefreplace'`` (replace with the
-   appropriate XML character reference (for encoding only)) and
-   ``'backslashreplace'`` (replace with backslashed escape sequences (for encoding
-   only)) as well as any other error handling name defined via
+   appropriate XML character reference (for encoding only)),
+   ``'backslashreplace'`` (replace with backslashed escape sequences (for
+   encoding only)), ``'surrogateescape'`` (replace with surrogate U+DCxx, see
+   :pep:`383`) as well as any other error handling name defined via
    :func:`register_error`.
 
    In case a search function cannot find a given encoding, it should return
@@ -322,7 +323,8 @@ and implemented by all standard Python codecs:
 | ``'backslashreplace'``  | Replace with backslashed escape sequences     |
 |                         | (only for encoding).                          |
 +-------------------------+-----------------------------------------------+
-| ``'surrogateescape'``   | Replace byte with surrogate U+DCxx.           |
+| ``'surrogateescape'``   | Replace byte with surrogate U+DCxx, as defined|
+|                         | in :pep:`383`.                                |
 +-------------------------+-----------------------------------------------+
 
 In addition, the following error handlers are specific to a single codec:

@@ -648,18 +648,24 @@ class build_ext(Command):
         (inplace option).
         """
         fullname = self.get_ext_fullname(ext_name)
-        filename = self.get_ext_filename(fullname)
+        modpath = fullname.split('.')
+        filename = self.get_ext_filename(modpath[-1])
+
         if not self.inplace:
             # no further work needed
+            # returning :
+            #   build_dir/package/path/filename
+            filename = os.path.join(*modpath[:-1]+[filename])
             return os.path.join(self.build_lib, filename)
 
         # the inplace option requires to find the package directory
-        # using the build_py command
-        modpath = fullname.split('.')
+        # using the build_py command for that
         package = '.'.join(modpath[0:-1])
-        base = modpath[-1]
         build_py = self.get_finalized_command('build_py')
         package_dir = os.path.abspath(build_py.get_package_dir(package))
+
+        # returning
+        #   package_dir/filename
         return os.path.join(package_dir, filename)
 
     def get_ext_fullname(self, ext_name):
@@ -691,7 +697,7 @@ class build_ext(Command):
         """Return the list of symbols that a shared extension has to
         export.  This either uses 'ext.export_symbols' or, if it's not
         provided, "PyInit_" + module_name.  Only relevant on Windows, where
-        the .pyd file (DLL) must export the module "init" function.
+        the .pyd file (DLL) must export the module "PyInit_" function.
         """
         initfunc_name = "PyInit_" + ext.name.split('.')[-1]
         if initfunc_name not in ext.export_symbols:
