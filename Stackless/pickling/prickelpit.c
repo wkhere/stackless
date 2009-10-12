@@ -20,6 +20,9 @@
 
 static int is_wrong_type(PyTypeObject *type)
 {
+	/* this works because the tp_base's name was modified to
+	 * point into the wrapper's name
+	 */
 	if (type->tp_base == NULL ||
 	    strrchr(type->tp_name, '.')+1 != type->tp_base->tp_name) {
 		PyErr_SetString(PyExc_TypeError, "incorrect wrapper type");
@@ -565,9 +568,14 @@ static int init_codetype(void)
  * cells create cycles via function closures.
  * We therefore need to use the 3-element protocol
  * of __reduce__
+ * We must also export this type to funcobject where
+ * a typecheck of the function_closure member is done,
+ * since a function may get a __setstate__ call with
+ * a partially initialized cell object.
  */
 
 static PyTypeObject wrap_PyCell_Type;
+extern PyTypeObject *_Pywrap_PyCell_Type = &wrap_PyCell_Type;
 
 static PyObject *
 cell_reduce(PyCellObject *cell)
@@ -677,11 +685,16 @@ static PyObject *
 func_setstate(PyObject *self, PyObject *args)
 {
 	PyFunctionObject *fu;
+	PyObject *args2;
 
 	if (is_wrong_type(self->ob_type)) return NULL;
 	self->ob_type = self->ob_type->tp_base;
+	args2 = PyTuple_GetSlice(args, 0, 5);
+	if (args2 == NULL)
+		return NULL;
 	fu = (PyFunctionObject *)
-	     self->ob_type->tp_new(self->ob_type, PyTuple_GetSlice(args, 0, 5), NULL);
+	     self->ob_type->tp_new(self->ob_type, args2, NULL);
+	Py_DECREF(args2);
 	if (fu != NULL) {
 		PyFunctionObject *target = (PyFunctionObject *) self;
 		COPY(fu, target, func_code);
