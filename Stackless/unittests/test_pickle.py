@@ -114,6 +114,18 @@ def genoutertest(n, when):
             schedule()
     return i
 
+def cellpickling():
+    """defect:  Initializing a function object with a partially constructed
+       cell object
+    """
+    def closure():
+        localvar = the_closure
+        return 
+    the_closure = closure
+    del closure
+    schedule()
+    return the_closure()
+
 def is_soft():
     softswitch = stackless.enable_softswitch(0)
     stackless.enable_softswitch(softswitch)
@@ -253,6 +265,9 @@ class TestConcretePickledTasklets(TestPickledTasklets):
             else:
                 schedule()
         self.run_pickled(rectest, 13)
+
+    def testCell(self):
+        self.run_pickled(cellpickling)
 
     def testFakeModules(self):
         types.ModuleType('fakemodule!')
