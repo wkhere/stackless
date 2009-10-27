@@ -321,7 +321,7 @@ class build_ext (Command):
 
         # Setup the CCompiler object that we'll use to do all the
         # compiling and linking
-        self.compiler = new_compiler(compiler=None,
+        self.compiler = new_compiler(compiler=self.compiler,
                                      verbose=self.verbose,
                                      dry_run=self.dry_run,
                                      force=self.force)
@@ -646,9 +646,14 @@ class build_ext (Command):
         The file is located in `build_lib` or directly in the package
         (inplace option).
         """
+        # makes sure the extension name is only using dots
+        all_dots = string.maketrans('/'+os.sep, '..')
+        ext_name = ext_name.translate(all_dots)
+
         fullname = self.get_ext_fullname(ext_name)
         modpath = fullname.split('.')
-        filename = self.get_ext_filename(modpath[-1])
+        filename = self.get_ext_filename(ext_name)
+        filename = os.path.split(filename)[-1]
 
         if not self.inplace:
             # no further work needed

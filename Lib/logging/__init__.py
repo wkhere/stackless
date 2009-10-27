@@ -25,9 +25,9 @@ To use, simply 'import logging' and log away!
 
 __all__ = ['BASIC_FORMAT', 'BufferingFormatter', 'CRITICAL', 'DEBUG', 'ERROR',
            'FATAL', 'FileHandler', 'Filter', 'Formatter', 'Handler', 'INFO',
-           'LogRecord', 'Logger', 'LoggerAdapter', 'NOTSET', 'NullHandler',
+           'LogRecord', 'Logger', 'LoggerAdapter', 'NOTSET',
            'StreamHandler', 'WARN', 'WARNING', 'addLevelName', 'basicConfig',
-           'captureWarnings', 'critical', 'debug', 'disable', 'error',
+           'critical', 'debug', 'disable', 'error',
            'exception', 'fatal', 'getLevelName', 'getLogger', 'getLoggerClass',
            'info', 'log', 'makeLogRecord', 'setLoggerClass', 'warn', 'warning']
 
@@ -273,12 +273,10 @@ class LogRecord:
             self.threadName = None
         if not logMultiprocessing:
             self.processName = None
+        elif 'multiprocessing' not in sys.modules:
+            self.processName = 'MainProcess'
         else:
-            try:
-                from multiprocessing import current_process
-                self.processName = current_process().name
-            except ImportError:
-                self.processName = None
+            self.processName = sys.modules['multiprocessing'].current_process().name
         if logProcesses and hasattr(os, 'getpid'):
             self.process = os.getpid()
         else:

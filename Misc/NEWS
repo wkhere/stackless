@@ -4,6 +4,68 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.6.4 final?
+=================================
+
+*Release date: 25-Oct-2009*
+
+Core and Builtins
+-----------------
+
+Library
+-------
+
+
+What's New in Python 2.6.4rc2?
+==============================
+
+*Release date: 18-Oct-2009*
+
+Core and Builtins
+-----------------
+
+Library
+-------
+
+- Issue #7115: Fixed the extension module builds that is failing when using
+  paths in the extension name instead of dotted names.
+
+- Issue #7120: logging: Removed import of multiprocessing which is causing
+  crash in GAE.
+
+- Issue #7149: fix exception in urllib when detecting proxy settings on OSX.
+
+
+What's New in Python 2.6.4rc1?
+==============================
+
+*Release date: 07-Oct-2009*
+
+Core and Builtins
+-----------------
+
+- Issue #7019: Raise ValueError when unmarshalling bad long data, instead
+  of producing internally inconsistent Python longs.
+
+Library
+-------
+
+- Issue #7068: Fixed the partial renaming that occured in r72594.
+
+- Issue #7064: Fixed the incompatibility with Setuptools in distutils
+  when running the build_ext command.
+
+- Issue #7052: Removed nonexisting NullHandler from logging.__all__.
+
+- Issue #7039: Fixed distutils.tests.test_sysconfig when running on
+  installation with no build.
+
+Tests
+-----
+
+- Issue #7042: Fix test_signal (test_itimer_virtual) failure on OS X 10.6.
+
+
 What's New in Python 2.6.3
 ==========================
 
@@ -94,6 +156,8 @@ Core and Builtins
 Library
 -------
 
+- Issue #6894: Fixed the issue urllib2 doesn't respect "no_proxy" environment
+
 - Issue #6790: Make it possible again to pass an `array.array` to
   `httplib.HTTPConnection.send`. Patch by Kirk McDonald.
 
@@ -142,7 +206,7 @@ Library
 - Issue #1424152: Fix for httplib, urllib2 to support SSL while working through
   proxy. Original patch by Christopher Li, changes made by Senthil Kumaran.
 
-- Issues #5155, 5313, 5331: multiprocessing.Process._bootstrap was 
+- Issues #5155, 5313, 5331: multiprocessing.Process._bootstrap was
   unconditionally calling "os.close(sys.stdin.fileno())" resulting in file
   descriptor errors
 
@@ -242,7 +306,7 @@ Library
 - Issue #2622: Fixed an ImportError when importing email.messsage from a
   standalone application built with py2exe or py2app.
 
-- Issue #6455: Fixed test_build_ext under win32. 
+- Issue #6455: Fixed test_build_ext under win32.
 
 - Issue #6403: Fixed package path usage in build_ext.
 

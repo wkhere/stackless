@@ -13,6 +13,7 @@ from distutils.errors import DistutilsSetupError
 import unittest
 from test import test_support
 
+
 # http://bugs.python.org/issue4373
 # Don't load the xx module more than once.
 ALREADY_TESTED = False
@@ -263,7 +264,7 @@ class BuildExtTestCase(support.TempdirManager,
                           sysconfig.get_config_var('SO'))
         so_dir = os.path.dirname(so_file)
         self.assertEquals(so_dir, other_tmp_dir)
-
+        cmd.compiler = None
         cmd.inplace = 0
         cmd.run()
         so_file = cmd.get_outputs()[0]
@@ -334,6 +335,7 @@ class BuildExtTestCase(support.TempdirManager,
         etree_ext = Extension('lxml.etree', [etree_c])
         dist = Distribution({'name': 'lxml', 'ext_modules': [etree_ext]})
         cmd = build_ext(dist)
+        cmd.ensure_finalized()
         cmd.inplace = 1
         cmd.distribution.package_dir = {'': 'src'}
         cmd.distribution.packages = ['lxml', 'lxml.html']
@@ -342,6 +344,47 @@ class BuildExtTestCase(support.TempdirManager,
         wanted = os.path.join(curdir, 'src', 'lxml', 'etree' + ext)
         path = cmd.get_ext_fullpath('lxml.etree')
         self.assertEquals(wanted, path)
+
+    def test_setuptools_compat(self):
+        from setuptools_build_ext import build_ext as setuptools_build_ext
+        from setuptools_extension import Extension
+
+        etree_c = os.path.join(self.tmp_dir, 'lxml.etree.c')
+        etree_ext = Extension('lxml.etree', [etree_c])
+        dist = Distribution({'name': 'lxml', 'ext_modules': [etree_ext]})
+        cmd = setuptools_build_ext(dist)
+        cmd.ensure_finalized()
+        cmd.inplace = 1
+        cmd.distribution.package_dir = {'': 'src'}
+        cmd.distribution.packages = ['lxml', 'lxml.html']
+        curdir = os.getcwd()
+        ext = sysconfig.get_config_var("SO")
+        wanted = os.path.join(curdir, 'src', 'lxml', 'etree' + ext)
+        path = cmd.get_ext_fullpath('lxml.etree')
+        self.assertEquals(wanted, path)
+
+    def test_build_ext_path_with_os_sep(self):
+        dist = Distribution({'name': 'UpdateManager'})
+        cmd = build_ext(dist)
+        cmd.ensure_finalized()
+        ext = sysconfig.get_config_var("SO")
+        ext_name = os.path.join('UpdateManager', 'fdsend')
+        ext_path = cmd.get_ext_fullpath(ext_name)
+        wanted = os.path.join(cmd.build_lib, 'UpdateManager', 'fdsend' + ext)
+        self.assertEquals(ext_path, wanted)
+
+    def test_build_ext_path_cross_platform(self):
+        if sys.platform != 'win32':
+            return
+        dist = Distribution({'name': 'UpdateManager'})
+        cmd = build_ext(dist)
+        cmd.ensure_finalized()
+        ext = sysconfig.get_config_var("SO")
+        # this needs to work even under win32
+        ext_name = 'UpdateManager/fdsend'
+        ext_path = cmd.get_ext_fullpath(ext_name)
+        wanted = os.path.join(cmd.build_lib, 'UpdateManager', 'fdsend' + ext)
+        self.assertEquals(ext_path, wanted)
 
 def test_suite():
     if not sysconfig.python_build:
