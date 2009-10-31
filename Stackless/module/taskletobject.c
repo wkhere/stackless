@@ -1355,7 +1355,7 @@ static PyMethodDef tasklet_methods[] = {
 	 tasklet_become__doc__},
 	{"capture",		(PCF)tasklet_capture,	    METH_VARARGS | METH_KEYWORDS,
 	 tasklet_capture__doc__},
-	{"raise_exception",	(PCF)tasklet_raise_exception, METH_KS,
+	{"raise_exception",	(PCF)tasklet_raise_exception, METH_VARARGS | METH_STACKLESS,
 	tasklet_raise_exception__doc__},
 	{"kill",		(PCF)tasklet_kill,	    METH_NS,
 	 tasklet_kill__doc__},
