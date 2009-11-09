@@ -157,7 +157,10 @@ class TestPickledTasklets(unittest.TestCase):
         pi = pickle.dumps(t)
 
         # if self.verbose: print repr(pi)
-        # why do we want to remove it?
+
+        # You may want to remove t so that it doesn't get run when
+        # pi is run.  Scheduling behaviour for tasklet.run() is undefined
+        # and no guarantee that we return directly to the previous tasklet.
         # t.remove()
 
         if self.verbose: print "unpickling"
