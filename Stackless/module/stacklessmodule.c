@@ -408,7 +408,7 @@ static char test_outside__doc__[] =
 "test_outside() -- a builtin testing function.\n\
 This function simulates an application that does not run \"inside\"\n\
 Stackless, with active, running frames, but always needs to initialize\n\
-the main tasklet to get \"ínside\".\n\
+the main tasklet to get \"inside\".\n\
 The function will terminate when no other tasklets are runnable.\n\
 \n\
 Typical usage: Create a tasklet for test_cframe and run by test_outside().\n\
