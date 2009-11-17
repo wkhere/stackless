@@ -3,7 +3,12 @@
 typedef struct _sts {
 	/* the blueprint for new stacks */
 	struct _cstack *initial_stub;
-	/* the counter that ensures that we always switch to the most recent stub */
+	/* "serial" is incremented each time we create a new stub.
+	 * (enter "stackless" from the outside)
+	 * and "serial_last_jump" indicates to which stub the current
+	 * stack belongs.  This is used to find out if a stack switch
+	 * is required when the main tasklet exits
+	 */
 #ifdef have_long_long
 	long_long serial;
 	long_long serial_last_jump;

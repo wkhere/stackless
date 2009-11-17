@@ -1096,8 +1096,9 @@ tasklet_end(PyObject *retval)
 
 	if (ismain) {
 		/*
-		 * See whether we need to adjust main's context before
-		 * returning
+		 * Because of soft switching, we may find ourself in the top level of a stack that was created
+		 * using another stub (another entry point into stackless).  If so, we need a final return to
+		 * the original stub if necessary.
 		 */
 		if (ts->st.serial_last_jump != ts->st.serial) {
 			slp_transfer_return(task->cstate);
