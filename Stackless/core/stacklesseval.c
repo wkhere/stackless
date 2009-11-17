@@ -107,7 +107,7 @@ slp_cstack_new(PyCStackObject **cst, intptr_t *stackref, PyTaskletObject *task)
 	(*cst)->startaddr = stackbase;
 	(*cst)->next = (*cst)->prev = NULL;
 	SLP_CHAIN_INSERT(PyCStackObject, &slp_cstack_chain, *cst, next, prev);
-	(*cst)->serial = ts->st.serial;
+	(*cst)->serial = ts->st.serial_last_jump;
 	(*cst)->task = task;
 	(*cst)->tstate = ts;
 	(*cst)->nesting_level = ts->st.nesting_level;
