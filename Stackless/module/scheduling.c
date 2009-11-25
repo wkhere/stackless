@@ -51,18 +51,9 @@ bomb_traverse(PyBombObject *bomb, visitproc visit, void *arg)
 static void
 bomb_clear(PyBombObject *bomb)
 {
-#define ZAP(x) \
-	if (x != NULL) { \
-		PyObject *_hold = (PyObject *) x; \
-		x = NULL; \
-		Py_XDECREF(_hold); \
-	}
-
-	ZAP(bomb->curexc_type);
-	ZAP(bomb->curexc_value);
-	ZAP(bomb->curexc_traceback);
-
-#undef ZAP
+	Py_CLEAR(bomb->curexc_type);
+	Py_CLEAR(bomb->curexc_value);
+	Py_CLEAR(bomb->curexc_traceback);
 }
 
 static PyBombObject *
