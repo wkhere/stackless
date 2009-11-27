@@ -1104,10 +1104,11 @@ tasklet_end(PyObject *retval)
 		/*
 		 * Because of soft switching, we may find ourself in the top level of a stack that was created
 		 * using another stub (another entry point into stackless).  If so, we need a final return to
-		 * the original stub if necessary.
+		 * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
+		 * the original stub, so we take the stub from the cstate)
 		 */
 		if (ts->st.serial_last_jump != ts->st.serial) {
-			slp_transfer_return(task->cstate);
+			slp_transfer_return(ts->st.initial_stub);
 		}
 	}
 

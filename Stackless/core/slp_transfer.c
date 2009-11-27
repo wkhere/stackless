@@ -108,6 +108,7 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
 	     PyTaskletObject *prev)
 {
 	PyThreadState *ts = PyThreadState_GET();
+	int error;
 
 	/* since we change the stack we must assure that the protocol was met */
 	STACKLESS_ASSERT();
@@ -127,8 +128,6 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
 				"bad stack reference in transfer");
 			return -1;
 		}
-		/* record the context of the target stack */
-		ts->st.serial_last_jump = cst->serial;
 		/*
 		 * if stacks are same and refcount==1, it must be the same
 		 * task. In this case, we would destroy the target before
@@ -140,7 +139,14 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
 	_cstprev = cstprev;
 	_cst = cst;
 	_prev = prev;
-	return slp_switch();
+	error = slp_switch();
+	if (_cst && !error) {
+		/* record the context of the target stack.  Can't do it before the switch because
+		 * when saving the stack, the serial number is taken from serial_last_jump
+		 */
+		ts->st.serial_last_jump = _cst->serial;
+	}
+	return error;
 }
 
 #ifdef Py_DEBUG
