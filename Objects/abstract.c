@@ -1860,9 +1860,23 @@ PyObject_Call(PyObject *func, PyObject *arg, PyObject *kw)
         ternaryfunc call;
 
 	if ((call = func->ob_type->tp_call) != NULL) {
-		PyObject *result = NULL;
+		PyObject *result;
+#ifdef STACKLESS
+		/* only do recursion adjustment if there is no danger
+		 * of softswitching, i.e. if we are not being called by
+		 * run_cframe.  Were a softswitch to occur, the readjustment
+		 * of the recursion depth would happen for the wrong frame.
+		 */
+		if (!stackless)
+#endif
+		if (Py_EnterRecursiveCall(" while calling a Python object"))
+		    return NULL;
 		result = (STACKLESS_PROMOTE(func), (*call)(func, arg, kw));
 		STACKLESS_ASSERT();
+#ifdef STACKLESS
+		if (!stackless)
+#endif
+		Py_LeaveRecursiveCall();
 		if (result == NULL && !PyErr_Occurred())
 			PyErr_SetString(
 				PyExc_SystemError,
