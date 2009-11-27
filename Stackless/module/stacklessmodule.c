@@ -509,6 +509,19 @@ test_cframe_nr(PyObject *self, PyObject *args, PyObject *kwds)
 }
 
 
+static char test_cstate__doc__[] =
+"test_cstate(callable) -- a builtin testing function that simply returns the\n\
+result of calling its single argument.  Used for testing to force stackless\n\
+into using hard switching.";
+
+static
+PyObject *
+test_cstate(PyObject *f, PyObject *callable)
+{
+	return PyObject_CallObject(callable, NULL);
+}
+
+
 /******************************************************
 
   The Stackless External Interface
@@ -818,6 +831,8 @@ static PyMethodDef stackless_methods[] = {
 	test_cframe_nr__doc__},
 	{"test_outside",	    (PCF)test_outside,		METH_NOARGS,
 	test_outside__doc__},
+	{"test_cstate",		    (PCF)test_cstate,		METH_O,
+	test_cstate__doc__},
 	{"set_channel_callback",    (PCF)set_channel_callback,	METH_O,
 	 set_channel_callback__doc__},
 	{"set_schedule_callback",   (PCF)set_schedule_callback, METH_O,
