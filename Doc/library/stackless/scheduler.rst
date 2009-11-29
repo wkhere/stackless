@@ -1,4 +1,4 @@
-.. _scheduler:
+.. _stackless-scheduler:
 
 *********
 Scheduler
