@@ -53,27 +53,39 @@ Tasklets
 
 .. method:: tasklet.insert()
 
-   descriptive text
+   Insert the tasklet into the scheduler.
 
 .. method:: tasklet.remove()
 
-   descriptive text
+   Remove the tasklet from the scheduler.
 
 .. method:: tasklet.run()
 
-   descriptive text
+   Run the tasklet.  The tasklet cannot be run if it is blocked on a channel.
 
-.. method:: tasklet.raise_exception(exc, value)
+.. method:: tasklet.raise_exception(exc_class, *args)
 
-   descriptive text
+   Raise an exception on the given tasklet.  *exc_class* is required to be a
+   sub-class of :exc:`Exception`.  It is instantiated with the given arguments
+   *args* and raised within the given tasklet.
 
 .. method:: tasklet.set_atomic(flag)
 
-   descriptive text
+   This method is used to construct a block of code within which the tasklet
+   will not be auto-scheduled when pre-emptive scheduling.  It is useful for 
+   wrapping critical sections that should not be interrupted::
+
+     old_value = t.set_atomic(1)
+     # Implement unsafe logic here.
+     t.set_atomic(old_value)
 
 .. method:: tasklet.set_ignore_nesting(flag)
 
-   descriptive text
+   It is probably best not to use this until you understand nesting levels::
+
+     old_value = t.set_ignore_nesting(1)
+     # Implement unsafe logic here.
+     t.set_ignore_nesting(old_value)
 
 The following (read-only) attributes allow tasklet state to be checked:
 
