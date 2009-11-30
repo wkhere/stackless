@@ -1,8 +1,8 @@
 .. _channels:
 
-********
-Channels
-********
+*******************************************
+Channels --- Communication between tasklets
+*******************************************
 
 A channel object is used for communication between tasklets.
 

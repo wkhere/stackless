@@ -1,8 +1,8 @@
 .. _tasklets:
 
-********
-Tasklets
-********
+********************************
+Tasklets --- Lightweight threads
+********************************
 
 .. class:: tasklet(callable=None)
 

@@ -1,5 +1,7 @@
 .. _stackless-pickling:
 
-############
-  Pickling
-############
+**********************************************
+Pickling --- Serialisation of running tasklets
+**********************************************
+
+TBD

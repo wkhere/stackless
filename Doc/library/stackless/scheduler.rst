@@ -1,5 +1,7 @@
 .. _stackless-scheduler:
 
-*********
-Scheduler
-*********
+**********************************
+Scheduler --- How tasklets are run
+**********************************
+
+TBD

@@ -24,15 +24,11 @@ Overview
 Unless actual use is made of the enhanced functionality that Stackless adds
 to Python, Stackless will behave exactly the same as Python would and is used
 in exactly the same way.  This functionality is exposed as a framework
-through the :mod:`stackless` module.  The three main elements it provides are:
+through the :mod:`stackless` module.
 
- * :ref:`Tasklets <tasklets>` - the form of lightweight threading.
- * :ref:`Channels <channels>` - a method of communicating between tasklets.
- * A :ref:`scheduler <stackless-scheduler>` - how tasklets are run.
-
-In addition, the following is also provided:
-
- * :ref:`Pickling <stackless-pickling>` - serialisation of running tasklets.
+.. toctree::
+   
+   library/stackless/stackless.rst
 
 What You Need To Know
 =====================
