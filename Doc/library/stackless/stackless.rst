@@ -183,8 +183,22 @@ Debugging related functions:
 .. attribute:: runcount
 
    The number of currently runnable tasklets.
+
+   Example - usage::
+
+       >>> stackless.runcount
+       1   
+
+   .. note::
+   
+       The minimum value of :attr:`runcount` will be ``1``, as the calling
+       tasklet will be included.
    
 .. attribute:: threads
 
    A list of all thread ids, starting with the id of the main thread.
 
+   Example - usage::
+   
+       >>> stackless.threads
+       [5148]
