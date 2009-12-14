@@ -14,6 +14,18 @@ By receiving on a channel within a tasklet, another tasklet that is waiting
 on the channel to send is resumed.  If there is no waiting sender, then the
 receiver is suspended.
 
+--------------------
+Channels and threads
+--------------------
+
+Channels are thread-safe.  This means that tasklets running in one thread can
+use them to communicate with tasklets running in another.  This is covered
+in the :doc:`Threads and Stackless <threads>` section.
+
+---------------------
+The ``channel`` class
+---------------------
+
 .. class:: channel()
 
 .. method:: channel.send(value)
@@ -163,15 +175,70 @@ tasklets.
 
 .. attribute:: channel.preference
 
-   -1 prefer receiver (default).
-   1 prefer sender.
-   0 don't prefer anything.
+   The :attr:`preference` attribute allows you to customise how the channel
+   actions :attr:`send` or :attr:`receive` work with the scheduler.
+
+   There are three valid values you can assign it:
+
+     +----+------------------------------------+
+     | -1 | Prefer the receiver (the default). |
+     +----+------------------------------------+
+     |  1 | Prefer the sender.                 |
+     +----+------------------------------------+
+     |  0 | Do not prefer anything.            |
+     +----+------------------------------------+
+
+   It can be very important to your code behaving predictably, that it does
+   one particular side of the channel action during the call.  This might
+   be that in a :attr:`send` action, the sending tasklet is blocked and
+   rescheduled, while the waiting receiving tasklet is given the sent
+   value and continues executing immediately.  It might be that in a
+   :attr:`send` action, the sending tasklet returns immediately to continue
+   execution while the receiving tasklet is rescheduled.  It might even
+   be that both tasklets are scheduled.
+   
+   The key to getting channel actions to work the way you want is to
+   understand what "prefer" means.  The tasklet that is preferred is simply
+   the one whose execution resumes immediately, while the other tasklet
+   is resumes execution when it next gets scheduled.
+
+   So if you do not want your send operations to block, you might set your
+   :attr:`preference` attribute to ``1``.  In this way, you could then
+   send to all waiting receivers without blocking, as shown in the
+   :ref:`pumping the scheduler <slp-chan-pref-ex1>` idiom described
+   elsewhere in this documentation.
+   
+   On the other hand, if you have a channel you are receiving a lot of data
+   through, you might want to collect all the waiting data in the most
+   efficient way - without blocking.
+   
+   Example - receiving it all, without blocking::
+   
+       channel.preference = -1
+       
+       while channel.balance > 0:
+           total += channel.receive()
+
+   In fact, by using the handy :attr:`tasklet.block_trap` attribute, that
+   this does not block can be easy verified.
+   
+   Example - verified receiving without blocking::
+   
+       channel.preference = -1
+       
+       old_value = stackless.current.block_trap
+       try:
+           while channel.balance > 0:
+               total += channel.receive()           
+       finally:
+           stackless.current.block_trap = old_value
 
 .. attribute:: channel.schedule_all
 
-   Setting this attribute to ``True`` overrides the value assigned to the
-   :attr:`preference` attribute.  If set to ``True``, then any channel
-   action will schedule to the next runnable.
+   Setting this attribute to ``1`` overrides the value assigned to the
+   :attr:`preference` attribute.  If set to ``1``, then any channel
+   action will result in involved tasklets being scheduled to continue
+   execution later.
 
 Read-only attributes are provided for checking channel state and contents.
 

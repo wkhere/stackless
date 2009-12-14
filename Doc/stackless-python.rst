@@ -2,7 +2,7 @@
 Stackless Python
 ****************
 
-:Author: Richard Tew (richard.m.tew at gmail.com)
+:Author: Richard Tew (richard.m.tew@gmail.com)
 :Release: |release|
 :Date: |today|
 
@@ -18,6 +18,15 @@ facilitate more readable code.
 If you are reading this text as part of a version of Python you have installed,
 then you have installed Stackless rather than standard Python.
 
+.. image:: http://www.paypal.com/en_US/i/btn/btn_donate_LG.gif
+   :alt: Donate
+   :align: right
+   :target: http://www.disinterest.org/donate.html
+
+If this documentation is of use to you, *please consider donating* via:
+
+    `http://disinterest.org/donate.html <http://disinterest.org/donate.html>`_.
+
 Overview
 ========
 
@@ -27,15 +36,24 @@ in exactly the same way.  This functionality is exposed as a framework
 through the :mod:`stackless` module.
 
 .. toctree::
-   
+   :maxdepth: 3
+
    library/stackless/stackless.rst
 
-What You Need To Know
+.. I'd really like the "What you need to know", "External resources" and
+.. "History" sections to appear in the table of contents.. but this does
+.. not seem possible to do.  Let's hope people read down far enough to
+.. see them.
+
+What you need to know
 =====================
 
 Stackless Python provides a minimal framework and it is not accompanied by any
-support functionality, to address the common needs that may arise when building
-a more targeted framework around it.
+support functionality, that would otherwise address the common needs that may
+arise when building a more targeted framework around it.
+
+Blocking operations
+-------------------
 
 When operations are invoked that block the Python interpreter, the user needs
 to be aware that this inherently blocks all running tasklets.  Until the tasklet
@@ -43,10 +61,44 @@ that engaged that operation is complete, the Python interpreter and therefore
 scheduler is blocked on that operation and in that tasklet.  Operations that
 block the interpreter are often related to synchronous IO (file reading
 and writing, socket operations, interprocess communication and more), although
-:func:`time.sleep` should also be kept in mind.  The user is advised to use
+:func:`time.sleep` should also be kept in mind.  The user is advised to choose
 asynchronous versions of IO functionality.
 
-External Resources
+Some third-party modules are available that replace standard library
+functionality with Stackless-compatible versions.  The advantage of this 
+approach is that other modules which use that standard functionality,
+also work with Stackless when the replacement is installed.  The
+`Stackless socket
+<http://code.google.com/p/stacklessexamples/wiki/StacklessNetworking>`_
+module is the most commonly used replacement module.
+
+Exceptions
+----------
+
+Certain exceptions that may occur within tasklets, are expected to reach all
+the way up the call stack to the scheduler.  This means that naively using
+the ``except`` statement may result in hard to track down problems.
+
+.. In an ideal world, rather than linking to TaskletExit via ref, I
+.. would link to it properly with exc.  However, this does not seem
+.. to work.  So, until this can be resolved, ref is it. -- richard.
+
+A description of the problem with bare ``except`` statements can be read in
+the documentation for the :ref:`TaskletExit <slp-exc>` exception.
+
+Debugging
+---------
+
+The Stackless scheduling mechanism changes the way the Python debugging hooks
+work so that debugging hooks are set per-tasklet rather than per-thread.
+However, very few debuggers, certainly none of those in the standard library
+take this into account.  As a result of this, debugging is unlikely to work
+with special handling being worked into your use of Stackless.
+
+A description of this problem can be read in the Stackless :doc:`debugging
+documentation <library/stackless/debugging>`.
+
+External resources
 ==================
 
 There are a range of resources available outside of this document:
@@ -57,6 +109,9 @@ There are a range of resources available outside of this document:
 
 History
 =======
+
+.. I emailed Christian with this text, and asked him to read it over.
+.. Still to receive a reply, so it will do for now. -- richard.
 
 Continuations are a feature that require the programming language they are
 part of, to be implemented in a way conducive to their presence.  In order to

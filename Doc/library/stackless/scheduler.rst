@@ -1,8 +1,8 @@
 .. _stackless-scheduler:
 
-**********************************
-Scheduler --- How tasklets are run
-**********************************
+**************************************
+The scheduler --- How tasklets are run
+**************************************
 
 The two main ways in which Stackless schedules its tasklets are
 pre-emptive scheduling and cooperative scheduling.  However, there
@@ -78,6 +78,8 @@ can be driven by a call to :func:`stackless.run`.  However, it is not always
 that simple and there are many reasons why the scheduler may be empty, and
 repeated calls to :func:`stackless.run` need to be made after creation of
 new tasklets or reinsertion of old ones which were blocked outside of it.
+
+.. _uncooperative-tasklets:
 
 --------------------------------
 Detecting uncooperative tasklets 
@@ -197,6 +199,8 @@ Rescheduling blocked tasklets::
     def RescheduleBlockedTasklets():
         while customYieldChannel.balance < 0:
             customYieldChannel.send(None)
+
+.. _slp-chan-pref-ex1:
 
 When we want to reinsert all the blocked tasklets back into the
 scheduler, we simply do sends on the channel as long as there are
@@ -328,3 +332,90 @@ Idiom - pre-emptive scheduler pumping::
 
         t.insert()
 
+.. _slp-exc-section:
+
+==========
+Exceptions
+==========
+
+Exceptions that occur within tasklets and are uncaught are raised out of the
+:func:`stackless.run` call, to be handled by its caller.
+
+Example - an exception raised out of the scheduler::
+
+    >>> def func_loop():
+    ...     while 1:
+    ...         stackless.schedule()
+    ...
+    >>> def func_exception():
+    ...     raise Exception("catch this")
+    ...
+    >>> stackless.tasklet(func_loop)()
+    <stackless.tasklet object at 0x01C58EB0>
+    >>> stackless.tasklet(func_exception)()
+    <stackless.tasklet object at 0x01C58F70>
+    >>> stackless.run()
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+      File "<stdin>", line 2, in func_exception
+    Exception: catch this
+
+This may not be the desired behaviour, and a more acceptable one might be that
+the exception is caught and dealt with in the tasklet it occurred in before
+that tasklet exits.
+
+---------------------------
+Catching tasklet exceptions
+---------------------------
+
+We want to change the new behaviour to be:
+
+#. The tasklet with the uncaught exception exits normally.
+#. The uncaught exception is examined and handled before the tasklet exits.
+#. The scheduler continues running.
+
+There are two ways to accomplish these things.  You can either monkey-patch
+the tasklet creation process, or you can use a custom function for all your
+tasklet creation.
+
+Example - a custom tasklet creation function::
+
+    def new_tasklet(f, *args, **kwargs):
+        def safe_tasklet():
+            try:
+                f(*args, **kwargs)
+            except Exception:
+                traceback.print_exc()
+
+        return stackless.tasklet(safe_tasklet)()
+
+    new_tasklet(some_function, 1, 2, 3, key="value")
+
+Example - monkey-patching the tasklet creation process::
+
+    def __call__(self, *args, **kwargs):
+         f = self.tempval
+
+         def new_f(old_f, args, kwargs):
+             try:
+                 old_f(*args, **kwargs)
+             except Exception:
+                 traceback.print_exc()
+
+         self.tempval = new_f
+         stackless.tasklet.setup(self, f, args, kwargs)
+        
+    stackless.tasklet.__call__ = __call__
+
+    stackless.tasklet(some_function)(1, 2, 3, key=value)
+
+Printing the call stack in the case of an exception is good enough for these
+examples, but in practice the call stack might instead be recorded in a
+database.
+
+.. note::
+
+  We catch :exc:`Exception` explicitly, rather than catching any exception
+  which might occur.  The reason for this is to avoid catching exceptions we
+  should not be catching like :exc:`SystemExit` or :ref:`TaskletExit
+  <slp-exc>`, which derive from the lower level :exc:`BaseException`.

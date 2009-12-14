@@ -4,6 +4,7 @@
 .. module:: stackless
    :synopsis: Access the enhanced functionality provided by Stackless
 
+.. moduleauthor:: Christian Tismer <tismer@stackless.com>
 .. sectionauthor:: Richard Tew <richard.m.tew@gmail.com>
 
 .. versionadded:: 1.5.2
@@ -16,7 +17,13 @@ the enhanced functionality provided by Stackless Python.
    tasklets.rst
    channels.rst
    scheduler.rst
+   debugging.rst
+   threads.rst
    pickling.rst
+
+---------
+Functions
+---------
 
 The main scheduling related functions:
 
@@ -36,7 +43,7 @@ The main scheduling related functions:
    in a different manner, providing pre-emptive scheduling.  A non-zero
    value indicates that as each tasklet is given a chance to run, it
    should only be allowed to run as long as the number of 
-   :mod:`interpreter instructions <dis>` are below this value. If a
+   :mod:`Python virtual instructions <dis>` are below this value. If a
    tasklet hits this limit, then it is interrupted and the scheduler
    exits returning the now no longer scheduled tasklet to the caller.
    
@@ -72,7 +79,7 @@ The main scheduling related functions:
       The most common use of this function is to call it either without
       arguments, or with a value for *timeout*.
 
-.. function:: schedule()
+.. function:: schedule(retval=stackless.current)
 
    Yield execution of the currently running tasklet.  When called, the tasklet
    is blocked and moved to the end of the chain of runnable tasklets.  The
@@ -81,10 +88,54 @@ The main scheduling related functions:
    If your application employs cooperative scheduling and you do not use
    custom yielding mechanisms built around channels, you will most likely
    call this in your tasklets.
-   
-.. function:: schedule_remove()
 
-   The purpose of this function is indeterminate at this time.   
+   Example - typical usage of :func:`schedule`::
+   
+       stackless.schedule()
+   
+   As illustrated in the example, the typical use of this function ignores
+   both the optional argument *retval* and the return value.  Note that as
+   the variable name *retval* hints, the return value is the value of the
+   optional argument.
+   
+.. function:: schedule_remove(retval=stackless.current)
+
+   Yield execution of the currently running tasklet.  When called, the
+   tasklet is blocked and removed from the chain of runnable tasklets.  The
+   tasklet following calling tasklet in the chain is executed next.
+
+   The most likely reason to use this, rather than :func:`schedule`, is to
+   build your own yielding primitive without using channels.  This is where
+   the otherwise ignored optional argument *retval* and the return value
+   are useful.
+   
+   :attr:`tasklet.tempval` is used to store the value to be returned, and
+   as expected, when this function is called it is set to *retval*.  Custom
+   utility functions can take advantage of this and set a new value for
+   :attr:`tasklet.tempval` before reinserting the tasklet back into the
+   scheduler.
+   
+   Example - a utility function::
+   
+       def wait_for_result():
+           waiting_tasklets.append(stackless.current)
+           return stackless.schedule_remove()
+
+       def event_callback(result):
+           for tasklet in waiting_tasklets:
+               tasklet.tempval = result
+               tasklet.insert()
+
+           waiting_tasklets = []
+
+       def tasklet_function():
+           result = wait_for_result()
+           print "received result", result
+
+   One drawback of this approach over channels, is that it bypasses the
+   useful :attr:`tasklet.block_trap` attribute.  The ability to guard against
+   a tasklet being blocked on a channel, is in practice a useful ability to
+   have.
 
 Callback related functions:
 
@@ -172,6 +223,10 @@ Debugging related functions:
        Disabling soft switching in this manner is exposed for timing and
        debugging purposes.
 
+----------
+Attributes
+----------
+
 .. attribute:: current
 
    The currently executing tasklet of this thread.
@@ -202,3 +257,38 @@ Debugging related functions:
    
        >>> stackless.threads
        [5148]
+
+.. _slp-exc:
+
+----------
+Exceptions
+----------
+
+.. exception:: TaskletExit
+
+   This exception is used to silently kill a tasklet.  It should not be
+   caught by your code, and along with other important exceptions like
+   :exc:`SystemExit`, be propagated up to the scheduler.
+   
+   The following use of the ``except`` clause should be avoided::
+   
+       try:
+           some_function()
+       except:
+           pass
+
+   This will catch every exception raised within it, including
+   :exc:`TaskletExit`.  Unless you guarantee you actually raise the exceptions
+   that should reach the scheduler, you are better to use ``except`` in the
+   following manner::
+   
+       try:
+           some_function()
+       except Exception:
+           pass
+
+   Here only the more common exceptions are caught, as the ones that should
+   not be caught and discarded inherit from :exc:`BaseException`, rather than
+   :exc:`Exception`.
+
+   This class is derived from :exc:`EnvironmentError`. 

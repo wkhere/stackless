@@ -49,7 +49,6 @@ the `Python Package Index <http://pypi.python.org/pypi>`_.
 
    strings.rst
    datatypes.rst
-   stackless/stackless.rst
    numeric.rst
    filesys.rst
    persistence.rst
