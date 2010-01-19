@@ -19,7 +19,7 @@ class TestTaskletTempvalDel(unittest.TestCase):
         def called_func(self):
             pass #destructor must call a function
     
-    def _test(self):
+    def test(self):
         def TaskletFunc(self):
             return self.ObjWithDel()
             

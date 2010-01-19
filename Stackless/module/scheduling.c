@@ -1040,7 +1040,19 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 			retval = slp_bomb_explode(retval);
 	}
 
-	prev->ob_type->tp_clear((PyObject *)prev);
+	{
+		/* clear the tasklet's tempval.  This may cause
+		 * __del__ methods, so be careful with the unwind state!
+		 */
+		PyObject *tmp = NULL;
+		if (STACKLESS_UNWINDING(retval))
+			tmp = STACKLESS_UNPACK(retval);
+		/* TODO: make sure that no stackless action happens here */
+		prev->ob_type->tp_clear((PyObject *)prev);
+		if (STACKLESS_UNWINDING(retval))
+			STACKLESS_PACK(tmp);
+	}
+
 	/* now it is safe to derefence prev */
 	Py_DECREF(prev);
 	return retval;
