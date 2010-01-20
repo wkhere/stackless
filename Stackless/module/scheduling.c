@@ -1010,6 +1010,7 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 	 */
 	PyThreadState *ts = PyThreadState_GET();
 	PyObject *retval;
+	int unwinding = 0;
 
 	/* we should have no nesting level */
 	assert(ts->st.nesting_level == 0);
@@ -1040,21 +1041,22 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 			retval = slp_bomb_explode(retval);
 	}
 
-	{
-		/* clear the tasklet's tempval.  This may cause
-		 * __del__ methods, so be careful with the unwind state!
-		 */
-		PyObject *tmp = NULL;
-		if (STACKLESS_UNWINDING(retval))
-			tmp = STACKLESS_UNPACK(retval);
-		/* TODO: make sure that no stackless action happens here */
-		prev->ob_type->tp_clear((PyObject *)prev);
-		if (STACKLESS_UNWINDING(retval))
-			STACKLESS_PACK(tmp);
+	/* when destroying the tasklet, __del__ can be called, so we
+	 * must temporarily suspend our unwinding state
+	 */
+	/* TODO: make sure that no stackless action happens here */
+	if (STACKLESS_UNWINDING(retval)) {
+		retval = STACKLESS_UNPACK(retval);
+		unwinding = 1;
 	}
 
+	/* clear the tasklet's tempval */
+	prev->ob_type->tp_clear((PyObject *)prev);
 	/* now it is safe to derefence prev */
 	Py_DECREF(prev);
+	
+	if (unwinding)
+		retval = STACKLESS_PACK(retval);
 	return retval;
 }
 
