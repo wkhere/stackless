@@ -6,7 +6,7 @@ Various regression tests for stackless defects.
 Typically, one can start by adding a test here, then fix it.
 Don't check in tests for un-fixed defects unless they are disabled (by adding a leading _)
 """
-        
+
 class TestTaskletDel(unittest.TestCase):
     #Defect:  If a tasklet's tempval contains any non-trivial __del__ function, it will cause
     #an assertion in debug mode due to violation of the stackless protocol.
@@ -19,13 +19,13 @@ class TestTaskletDel(unittest.TestCase):
             self.called_func()
         def called_func(self):
             pass #destructor must call a function
-    
+
     class TaskletWithDel(stackless.tasklet):
         def __del__(self):
             self.func()
         def func(self):
             pass
-    
+
     class TaskletWithDelAndImport(stackless.tasklet):
         def __del__(self):
             import ctypes
@@ -55,6 +55,14 @@ class TestTaskletDel(unittest.TestCase):
         self.TaskletWithDelAndImport(TaskletFunc)(self)
         stackless.run()
 
+class Schedule(unittest.TestCase):
+    def _testScheduleRemove(self):
+        #schedule remove doesn't work if it is the only tasklet running under watchdog
+        def func(self):
+            stackless.schedule_remove()
+            self.fail("We shouldn't be here")
+        stackless.tasklet(func)(self)
+        stackless.run()
 
 if __name__ == '__main__':
     import sys
