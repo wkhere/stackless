@@ -56,13 +56,24 @@ class TestTaskletDel(unittest.TestCase):
         stackless.run()
 
 class Schedule(unittest.TestCase):
-    def _testScheduleRemove(self):
+    def testScheduleRemove(self):
         #schedule remove doesn't work if it is the only tasklet running under watchdog
         def func(self):
             stackless.schedule_remove()
             self.fail("We shouldn't be here")
+        stackless.run() #flush all runnables
         stackless.tasklet(func)(self)
         stackless.run()
+
+    def testScheduleRemove2(self):
+        #schedule remove doesn't work if it is the only tasklet with main blocked
+            #main tasklet is blocked, this should raise an error
+            self.assertRaises(RuntimeError, stackless.schedule_remove)
+            chan.send(None)
+        stackless.run() #flush all runnables
+        chan = stackless.channel()
+        stackless.tasklet(func)(self, chan)
+        chan.receive()
 
 if __name__ == '__main__':
     import sys
