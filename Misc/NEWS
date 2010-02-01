@@ -4,6 +4,48 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.5.5?
+===========================
+
+*Release date: 31-Jan-2010*
+
+
+What's New in Python 2.5.5c2?
+=============================
+
+*Release date: 24-Jan-2010*
+
+Extension Modules
+-----------------
+
+- expat: Fix DoS via XML document with malformed UTF-8 sequences
+  (CVE_2009_3560).
+
+- expat: Fix DoS via malformed XML (CVE-2009-3720).
+
+
+What's New in Python 2.5.5c1?
+=============================
+
+*Release date: 14-Jan-2010*
+
+Core and builtins
+-----------------
+
+- Issue #6990: Fix threading.local subclasses leaving old state around
+  after a reference cycle GC which could be recycled by new locals.
+
+Library
+-------
+
+- Issue #7403: logging: Fixed possible race condition in lock creation.
+
+- Issue #5068: Fixed the tarfile._BZ2Proxy.read() method that would loop
+  forever on incomplete input. That caused tarfile.open() to hang when used
+  with mode 'r' or 'r:bz2' and a fileobj argument that contained no data or
+  partial bzip2 compressed data.
+
+
 What's New in Python 2.5.4?
 ===========================
 
@@ -11,6 +53,9 @@ What's New in Python 2.5.4?
 
 Core and builtins
 -----------------
+
+- Issue #5389: Avoid potential for undefined variable 'startinpos' in
+  PyUnicode_DecodeUTF7().
 
 - Revert patch for #1706039, as it can crash the interpreter.
 
