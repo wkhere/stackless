@@ -388,6 +388,7 @@ eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
 	PyTaskletObject *cur = ts->st.current;
 	PyCStackObject *cst = cur->cstate;
 	PyCFrameObject *cf = (PyCFrameObject *) f;
+	PyObject *tmpval;
 
 	ts->st.nesting_level = cf->n;
 	ts->frame = f->f_back;
@@ -399,6 +400,9 @@ eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
 		retval = slp_curexc_to_bomb();
 	if (retval == NULL)
 		return NULL;
+	/* Pack the retval and current tempval into the tempval */
+	TASKLET_CLAIMVAL(cur, &tmpval);
+	retval = Py_BuildValue("NN", retval, tmpval);
 	TASKLET_SETVAL_OWN(cur, retval);
 	/* jump back */
 	Py_DECREF(cur->cstate);
@@ -415,9 +419,18 @@ slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
 	PyTaskletObject *cur = ts->st.current;
 	PyCFrameObject *cf = NULL;
 	PyCStackObject *cst;
+	PyObject *packed, *tmpval;
 
+	if (cur == NULL) {
+		/* this is during early initialization.  Just bypass this mechanism */
+		intptr_t *old = ts->st.cstack_root;
+		ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &f;
+		retval = PyEval_EvalFrameEx_slp(f,exc, retval);
+		ts->st.cstack_root = old;
+		return retval;
+	}
 	if (ts->st.cstack_root == NULL) {
-		/* this is a toplevel call */
+		/* this is a toplevel call.  Store the root of stack spilling */
 		ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &f;
 		retval = PyEval_EvalFrameEx_slp(f, exc, retval);
 		return retval;
@@ -435,7 +448,15 @@ slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
 	if (slp_transfer(&cur->cstate, NULL, cur))
 		goto finally; /* fatal */
 	Py_XDECREF(cur->cstate);
-	TASKLET_CLAIMVAL(cur, &retval);
+	
+	/* unpack the retval and tempval from the tempval */
+	TASKLET_CLAIMVAL(cur, &packed);
+	retval = PyTuple_GET_ITEM(packed, 0);
+	Py_INCREF(retval);
+	tmpval = PyTuple_GET_ITEM(packed, 1);
+	TASKLET_SETVAL(cur, tmpval); /* takes a reference */
+	Py_DECREF(packed);
+
 	if (PyBomb_Check(retval))
 		retval = slp_bomb_explode(retval);
 finally:
