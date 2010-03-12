@@ -66,7 +66,7 @@ typedef struct _sts {
 
 /* note that the scheduler knows how to zap. It checks if it is in charge
    for this tstate and then clears everything. This will not work if
-   we use ZAP, since it clears the pointer before deallocating.
+   we use Py_CLEAR, since it clears the pointer before deallocating.
  */
 
 struct _ts; /* Forward */

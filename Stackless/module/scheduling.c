@@ -51,18 +51,9 @@ bomb_traverse(PyBombObject *bomb, visitproc visit, void *arg)
 static void
 bomb_clear(PyBombObject *bomb)
 {
-#define ZAP(x) \
-	if (x != NULL) { \
-		PyObject *_hold = (PyObject *) x; \
-		x = NULL; \
-		Py_XDECREF(_hold); \
-	}
-
-	ZAP(bomb->curexc_type);
-	ZAP(bomb->curexc_value);
-	ZAP(bomb->curexc_traceback);
-
-#undef ZAP
+	Py_CLEAR(bomb->curexc_type);
+	Py_CLEAR(bomb->curexc_value);
+	Py_CLEAR(bomb->curexc_traceback);
 }
 
 static PyBombObject *
@@ -1016,6 +1007,7 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 	 */
 	PyThreadState *ts = PyThreadState_GET();
 	PyObject *retval;
+	int unwinding = 0;
 
 	/* we should have no nesting level */
 	assert(ts->st.nesting_level == 0);
@@ -1052,9 +1044,22 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 			retval = slp_bomb_explode(retval);
 	}
 
+	/* when destroying the tasklet, __del__ can be called, so we
+	 * must temporarily suspend our unwinding state
+	 */
+	/* TODO: make sure that no stackless action happens here */
+	if (STACKLESS_UNWINDING(retval)) {
+		retval = STACKLESS_UNPACK(retval);
+		unwinding = 1;
+	}
+
+	/* clear the tasklet's tempval */
 	prev->ob_type->tp_clear((PyObject *)prev);
 	/* now it is safe to derefence prev */
 	Py_DECREF(prev);
+	
+	if (unwinding)
+		retval = STACKLESS_PACK(retval);
 	return retval;
 }
 

@@ -71,17 +71,10 @@ cframe_traverse(PyCFrameObject *cf, visitproc visit, void *arg)
 static void
 cframe_clear(PyCFrameObject *cf)
 {
-#define ZAP(x) \
-	if (x != NULL) { \
-		PyObject *_hold = (PyObject *) x; \
-		x = NULL; \
-		Py_XDECREF(_hold); \
-	}
-	ZAP(cf->f_back);
-	ZAP(cf->ob1);
-	ZAP(cf->ob2);
-	ZAP(cf->ob3);
-#undef ZAP
+	Py_CLEAR(cf->f_back);
+	Py_CLEAR(cf->ob1);
+	Py_CLEAR(cf->ob2);
+	Py_CLEAR(cf->ob3);
 }
 
 
