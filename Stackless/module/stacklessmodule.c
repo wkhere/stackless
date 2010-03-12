@@ -52,6 +52,8 @@ PyStackless_Schedule(PyObject *retval, int remove)
 	if (remove) {
 		slp_current_remove();
 		Py_DECREF(prev);
+		if (next == prev)
+			next = 0; /* we were the last runnable tasklet */
 	}
 	ret = slp_schedule_task(prev, next, stackless);
 	Py_DECREF(prev);
