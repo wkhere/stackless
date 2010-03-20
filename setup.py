@@ -556,16 +556,19 @@ class PyBuildExt(build_ext):
 
         # readline
         do_readline = self.compiler.find_library_file(lib_dirs, 'readline')
-        if platform == 'darwin': # and os.uname()[2] < '9.':
-            # MacOSX 10.4 has a broken readline. Don't try to build
-            # the readline module unless the user has installed a fixed
-            # readline package
-            # FIXME: The readline emulation on 10.5 is better, but the
-            # readline module doesn't compile out of the box.
-            if find_file('readline/rlconf.h', inc_dirs, []) is None:
-                do_readline = False
+        if platform == 'darwin':
+            os_release = int(os.uname()[2].split('.')[0])
+            dep_target = sysconfig.get_config_var('MACOSX_DEPLOYMENT_TARGET')
+            if dep_target and dep_target.split('.') < ['10', '5']:
+                os_release = 8
+            if os_release < 9:
+                # MacOSX 10.4 has a broken readline. Don't try to build
+                # the readline module unless the user has installed a fixed
+                # readline package
+                if find_file('readline/rlconf.h', inc_dirs, []) is None:
+                    do_readline = False
         if do_readline:
-            if sys.platform == 'darwin':
+            if platform == 'darwin' and os_release < 9:
                 # In every directory on the search path search for a dynamic
                 # library and then a static library, instead of first looking
                 # for dynamic libraries on the entiry path.
@@ -814,7 +817,7 @@ class PyBuildExt(build_ext):
                                 print "being ignored (4.6.x must be >= 4.6.21)"
                                 continue
 
-                        if ( (not db_ver_inc_map.has_key(db_ver)) and
+                        if ( (db_ver not in db_ver_inc_map) and
                             allow_db_ver(db_ver) ):
                             # save the include directory with the db.h version
                             # (first occurrence only)
@@ -1065,7 +1068,8 @@ class PyBuildExt(build_ext):
                 missing.append('resource')
 
             # Sun yellow pages. Some systems have the functions in libc.
-            if platform not in ['cygwin', 'atheos', 'qnx6']:
+            if (platform not in ['cygwin', 'atheos', 'qnx6'] and
+                find_file('rpcsvc/yp_prot.h', inc_dirs, []) is not None):
                 if (self.compiler.find_library_file(lib_dirs, 'nsl')):
                     libs = ['nsl']
                 else:
@@ -1324,9 +1328,13 @@ class PyBuildExt(build_ext):
             if macros.get('HAVE_SEM_OPEN', False):
                 multiprocessing_srcs.append('_multiprocessing/semaphore.c')
 
-        exts.append ( Extension('_multiprocessing', multiprocessing_srcs,
-                                 define_macros=macros.items(),
-                                 include_dirs=["Modules/_multiprocessing"]))
+        if sysconfig.get_config_var('WITH_THREAD'):
+            exts.append ( Extension('_multiprocessing', multiprocessing_srcs,
+                                    define_macros=macros.items(),
+                                    include_dirs=["Modules/_multiprocessing"]))
+        else:
+            missing.append('_multiprocessing')
+
         # End multiprocessing
 
 
@@ -1361,7 +1369,7 @@ class PyBuildExt(build_ext):
         if platform == 'darwin' and ("--disable-toolbox-glue" not in
                 sysconfig.get_config_var("CONFIG_ARGS")):
 
-            if os.uname()[2] > '8.':
+            if int(os.uname()[2].split('.')[0]) >= 8:
                 # We're on Mac OS X 10.4 or later, the compiler should
                 # support '-Wno-deprecated-declarations'. This will
                 # surpress deprecation warnings for the Carbon extensions,
@@ -1711,17 +1719,18 @@ class PyBuildExt(build_ext):
                     return False
 
             fficonfig = {}
-            execfile(ffi_configfile, globals(), fficonfig)
-            ffi_srcdir = os.path.join(fficonfig['ffi_srcdir'], 'src')
+            exec open(ffi_configfile) in fficonfig
 
             # Add .S (preprocessed assembly) to C compiler source extensions.
             self.compiler.src_extensions.append('.S')
 
             include_dirs = [os.path.join(ffi_builddir, 'include'),
-                            ffi_builddir, ffi_srcdir]
+                            ffi_builddir,
+                            os.path.join(ffi_srcdir, 'src')]
             extra_compile_args = fficonfig['ffi_cflags'].split()
 
-            ext.sources.extend(fficonfig['ffi_sources'])
+            ext.sources.extend(os.path.join(ffi_srcdir, f) for f in
+                               fficonfig['ffi_sources'])
             ext.include_dirs.extend(include_dirs)
             ext.extra_compile_args.extend(extra_compile_args)
         return True

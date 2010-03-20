@@ -465,7 +465,8 @@ int_add(PyIntObject *v, PyIntObject *w)
 	register long a, b, x;
 	CONVERT_TO_LONG(v, a);
 	CONVERT_TO_LONG(w, b);
-	x = a + b;
+	/* casts in the line below avoid undefined behaviour on overflow */
+	x = (long)((unsigned long)a + b);
 	if ((x^a) >= 0 || (x^b) >= 0)
 		return PyInt_FromLong(x);
 	return PyLong_Type.tp_as_number->nb_add((PyObject *)v, (PyObject *)w);
@@ -477,7 +478,8 @@ int_sub(PyIntObject *v, PyIntObject *w)
 	register long a, b, x;
 	CONVERT_TO_LONG(v, a);
 	CONVERT_TO_LONG(w, b);
-	x = a - b;
+	/* casts in the line below avoid undefined behaviour on overflow */
+	x = (long)((unsigned long)a - b);
 	if ((x^a) >= 0 || (x^~b) >= 0)
 		return PyInt_FromLong(x);
 	return PyLong_Type.tp_as_number->nb_subtract((PyObject *)v,
@@ -520,7 +522,8 @@ int_mul(PyObject *v, PyObject *w)
 
 	CONVERT_TO_LONG(v, a);
 	CONVERT_TO_LONG(w, b);
-	longprod = a * b;
+	/* casts in the next line avoid undefined behaviour on overflow */
+	longprod = (long)((unsigned long)a * b);
 	doubleprod = (double)a * (double)b;
 	doubled_longprod = (double)longprod;
 
@@ -581,7 +584,16 @@ i_divmod(register long x, register long y,
 	if (y == -1 && UNARY_NEG_WOULD_OVERFLOW(x))
 		return DIVMOD_OVERFLOW;
 	xdivy = x / y;
-	xmody = x - xdivy * y;
+	/* xdiv*y can overflow on platforms where x/y gives floor(x/y)
+	 * for x and y with differing signs. (This is unusual
+	 * behaviour, and C99 prohibits it, but it's allowed by C89;
+	 * for an example of overflow, take x = LONG_MIN, y = 5 or x =
+	 * LONG_MAX, y = -5.)  However, x - xdivy*y is always
+	 * representable as a long, since it lies strictly between
+	 * -abs(y) and abs(y).  We add casts to avoid intermediate
+	 * overflow.
+	 */
+	xmody = (long)(x - (unsigned long)xdivy * y);
 	/* If the signs of x and y differ, and the remainder is non-0,
 	 * C89 doesn't define whether xdivy is now the floor or the
 	 * ceiling of the infinitely precise quotient.  We want the floor,

@@ -628,15 +628,6 @@ static PyGetSetDef type_getsets[] = {
 	{0}
 };
 
-static int
-type_compare(PyObject *v, PyObject *w)
-{
-	/* This is called with type objects only. So we
-	   can just compare the addresses. */
-	Py_uintptr_t vv = (Py_uintptr_t)v;
-	Py_uintptr_t ww = (Py_uintptr_t)w;
-	return (vv < ww) ? -1 : (vv > ww) ? 1 : 0;
-}
 
 static PyObject*
 type_richcompare(PyObject *v, PyObject *w, int op)
@@ -646,7 +637,11 @@ type_richcompare(PyObject *v, PyObject *w, int op)
 	int c;
 
 	/* Make sure both arguments are types. */
-	if (!PyType_Check(v) || !PyType_Check(w)) {
+	if (!PyType_Check(v) || !PyType_Check(w) ||
+	    /* If there is a __cmp__ method defined, let it be called instead
+	       of our dumb function designed merely to warn.  See bug
+	       #7491. */
+	    Py_TYPE(v)->tp_compare || Py_TYPE(w)->tp_compare) {
 		result = Py_NotImplemented;
 		goto out;
 	}
@@ -2772,7 +2767,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	type_compare,				/* tp_compare */
+	0,				/* tp_compare */
 	(reprfunc)type_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */

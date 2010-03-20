@@ -10,7 +10,7 @@
 .. versionadded:: 2.6
 
 The :mod:`io` module provides the Python interfaces to stream handling.  The
-builtin :func:`open` function is defined in this module.
+built-in :func:`open` function is defined in this module.
 
 At the top of the I/O hierarchy is the abstract base class :class:`IOBase`.  It
 defines the basic interface to a stream.  Note, however, that there is no
@@ -37,7 +37,7 @@ buffered text interface to a buffered raw stream
 stream for text.
 
 Argument names are not part of the specification, and only the arguments of
-:func:`open` are intended to be used as keyword arguments.
+:func:`.open` are intended to be used as keyword arguments.
 
 
 Module Interface
@@ -46,7 +46,7 @@ Module Interface
 .. data:: DEFAULT_BUFFER_SIZE
 
    An int containing the default buffer size used by the module's buffered I/O
-   classes.  :func:`open` uses the file's blksize (as obtained by
+   classes.  :func:`.open` uses the file's blksize (as obtained by
    :func:`os.stat`) if possible.
 
 .. function:: open(file[, mode[, buffering[, encoding[, errors[, newline[, closefd=True]]]]]])
@@ -94,10 +94,20 @@ Module Interface
    strings, the bytes having been first decoded using a platform-dependent
    encoding or using the specified *encoding* if given.
 
-   *buffering* is an optional integer used to set the buffering policy.  By
-   default full buffering is on.  Pass 0 to switch buffering off (only allowed
-   in binary mode), 1 to set line buffering, and an integer > 1 for full
-   buffering.
+   *buffering* is an optional integer used to set the buffering policy.
+   Pass 0 to switch buffering off (only allowed in binary mode), 1 to select
+   line buffering (only usable in text mode), and an integer > 1 to indicate
+   the size of a fixed-size chunk buffer.  When no *buffering* argument is
+   given, the default buffering policy works as follows:
+
+   * Binary files are buffered in fixed-size chunks; the size of the buffer
+     is chosen using a heuristic trying to determine the underlying device's
+     "block size" and falling back on :attr:`DEFAULT_BUFFER_SIZE`.
+     On many systems, the buffer will typically be 4096 or 8192 bytes long.
+
+   * "Interactive" text files (files for which :meth:`isatty` returns True)
+     use line buffering.  Other text files use the policy described above
+     for binary files.
 
    *encoding* is the name of the encoding used to decode or encode the file.
    This should only be used in text mode.  The default encoding is platform
@@ -138,8 +148,8 @@ Module Interface
    when the file is closed.  If a filename is given *closefd* has no
    effect but must be ``True`` (the default).
 
-   The type of file object returned by the :func:`open` function depends
-   on the mode.  When :func:`open` is used to open a file in a text mode
+   The type of file object returned by the :func:`.open` function depends
+   on the mode.  When :func:`.open` is used to open a file in a text mode
    (``'w'``, ``'r'``, ``'wt'``, ``'rt'``, etc.), it returns a
    :class:`TextIOWrapper`. When used to open a file in a binary mode,
    the returned class varies: in read binary mode, it returns a
@@ -250,7 +260,7 @@ I/O Base Classes
       most *limit* bytes will be read.
 
       The line terminator is always ``b'\n'`` for binary files; for text files,
-      the *newlines* argument to :func:`open` can be used to select the line
+      the *newlines* argument to :func:`.open` can be used to select the line
       terminator(s) recognized.
 
    .. method:: readlines([hint])
@@ -329,59 +339,6 @@ I/O Base Classes
       ``len(b)``, since if the write fails, an :exc:`IOError` will be raised).
 
 
-Raw File I/O
-------------
-
-.. class:: FileIO(name[, mode])
-
-   :class:`FileIO` represents a file containing bytes data.  It implements
-   the :class:`RawIOBase` interface (and therefore the :class:`IOBase`
-   interface, too).
-
-   The *mode* can be ``'r'``, ``'w'`` or ``'a'`` for reading (default), writing,
-   or appending.  The file will be created if it doesn't exist when opened for
-   writing or appending; it will be truncated when opened for writing.  Add a
-   ``'+'`` to the mode to allow simultaneous reading and writing.
-
-   In addition to the attributes and methods from :class:`IOBase` and
-   :class:`RawIOBase`, :class:`FileIO` provides the following data
-   attributes and methods:
-
-   .. attribute:: mode
-
-      The mode as given in the constructor.
-
-   .. attribute:: name
-
-      The file name.  This is the file descriptor of the file when no name is
-      given in the constructor.
-
-   .. method:: read([n])
-
-      Read and return at most *n* bytes.  Only one system call is made, so it is
-      possible that less data than was requested is returned.  Use :func:`len`
-      on the returned bytes object to see how many bytes were actually returned.
-      (In non-blocking mode, ``None`` is returned when no data is available.)
-
-   .. method:: readall()
-
-      Read and return the entire file's contents in a single bytes object.  As
-      much as immediately available is returned in non-blocking mode.  If the
-      EOF has been reached, ``b''`` is returned.
-
-   .. method:: write(b)
-
-      Write the bytes or bytearray object, *b*, to the file, and return
-      the number actually written. Only one system call is made, so it
-      is possible that only some of the data is written.
-
-   Note that the inherited ``readinto()`` method should not be used on
-   :class:`FileIO` objects.
-
-
-Buffered Streams
-----------------
-
 .. class:: BufferedIOBase
 
    Base class for streams that support buffering.  It inherits :class:`IOBase`.
@@ -438,6 +395,59 @@ Buffered Streams
       A :exc:`BlockingIOError` is raised if the buffer is full, and the
       underlying raw stream cannot accept more data at the moment.
 
+
+Raw File I/O
+------------
+
+.. class:: FileIO(name[, mode])
+
+   :class:`FileIO` represents a file containing bytes data.  It implements
+   the :class:`RawIOBase` interface (and therefore the :class:`IOBase`
+   interface, too).
+
+   The *mode* can be ``'r'``, ``'w'`` or ``'a'`` for reading (default), writing,
+   or appending.  The file will be created if it doesn't exist when opened for
+   writing or appending; it will be truncated when opened for writing.  Add a
+   ``'+'`` to the mode to allow simultaneous reading and writing.
+
+   In addition to the attributes and methods from :class:`IOBase` and
+   :class:`RawIOBase`, :class:`FileIO` provides the following data
+   attributes and methods:
+
+   .. attribute:: mode
+
+      The mode as given in the constructor.
+
+   .. attribute:: name
+
+      The file name.  This is the file descriptor of the file when no name is
+      given in the constructor.
+
+   .. method:: read([n])
+
+      Read and return at most *n* bytes.  Only one system call is made, so it is
+      possible that less data than was requested is returned.  Use :func:`len`
+      on the returned bytes object to see how many bytes were actually returned.
+      (In non-blocking mode, ``None`` is returned when no data is available.)
+
+   .. method:: readall()
+
+      Read and return the entire file's contents in a single bytes object.  As
+      much as immediately available is returned in non-blocking mode.  If the
+      EOF has been reached, ``b''`` is returned.
+
+   .. method:: write(b)
+
+      Write the bytes or bytearray object, *b*, to the file, and return
+      the number actually written. Only one system call is made, so it
+      is possible that only some of the data is written.
+
+   Note that the inherited ``readinto()`` method should not be used on
+   :class:`FileIO` objects.
+
+
+Buffered Streams
+----------------
 
 .. class:: BytesIO([initial_bytes])
 
@@ -633,7 +643,7 @@ Text I/O
 
 .. class:: StringIO([initial_value[, encoding[, errors[, newline]]]])
 
-   An in-memory stream for text.  It in inherits :class:`TextIOWrapper`.
+   An in-memory stream for text.  It inherits :class:`TextIOWrapper`.
 
    Create a new StringIO stream with an inital value, encoding, error handling,
    and newline setting.  See :class:`TextIOWrapper`\'s constructor for more

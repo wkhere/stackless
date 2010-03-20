@@ -32,7 +32,7 @@ class MemoryTestMixin:
         self.assertEqual(f.seek(0), 0)
         self.assertEqual(f.write(t("h")), 1)
         self.assertEqual(f.truncate(12), 12)
-        self.assertEqual(f.tell(), 12)
+        self.assertEqual(f.tell(), 1)
 
     def test_write(self):
         buf = self.buftype("hello world\n")
@@ -80,7 +80,11 @@ class MemoryTestMixin:
         self.assertEqual(memio.getvalue(), buf[:6])
         self.assertEqual(memio.truncate(4), 4)
         self.assertEqual(memio.getvalue(), buf[:4])
-        self.assertEqual(memio.tell(), 4)
+        # truncate() accepts long objects
+        self.assertEqual(memio.truncate(4L), 4)
+        self.assertEqual(memio.getvalue(), buf[:4])
+        self.assertEqual(memio.tell(), 6)
+        memio.seek(0, 2)
         memio.write(buf)
         self.assertEqual(memio.getvalue(), buf[:4] + buf)
         pos = memio.tell()
@@ -107,7 +111,8 @@ class MemoryTestMixin:
 
         self.assertEqual(memio.read(0), self.EOF)
         self.assertEqual(memio.read(1), buf[:1])
-        self.assertEqual(memio.read(4), buf[1:5])
+        # read() accepts long objects
+        self.assertEqual(memio.read(4L), buf[1:5])
         self.assertEqual(memio.read(900), buf[5:])
         self.assertEqual(memio.read(), self.EOF)
         memio.seek(0)
@@ -136,7 +141,8 @@ class MemoryTestMixin:
         self.assertEqual(memio.readline(), self.EOF)
         memio.seek(0)
         self.assertEqual(memio.readline(5), buf[:5])
-        self.assertEqual(memio.readline(5), buf[5:10])
+        # readline() accepts long objects
+        self.assertEqual(memio.readline(5L), buf[5:10])
         self.assertEqual(memio.readline(5), buf[10:15])
         memio.seek(0)
         self.assertEqual(memio.readline(-1), buf)
@@ -164,7 +170,8 @@ class MemoryTestMixin:
         memio.seek(5)
         self.assertEqual(memio.readlines(), [buf[5:]] + [buf] * 9)
         memio.seek(0)
-        self.assertEqual(memio.readlines(15), [buf] * 2)
+        # readlines() accepts long objects
+        self.assertEqual(memio.readlines(15L), [buf] * 2)
         memio.seek(0)
         self.assertEqual(memio.readlines(-1), [buf] * 10)
         memio.seek(0)
@@ -225,6 +232,8 @@ class MemoryTestMixin:
         self.assertEqual(memio.seek(0, 0), 0)
         self.assertEqual(memio.read(), buf)
         self.assertEqual(memio.seek(3), 3)
+        # seek() accepts long objects
+        self.assertEqual(memio.seek(3L), 3)
         self.assertEqual(memio.seek(0, 1), 3)
         self.assertEqual(memio.read(), buf[3:])
         self.assertEqual(memio.seek(len(buf)), len(buf))

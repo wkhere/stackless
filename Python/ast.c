@@ -682,7 +682,8 @@ ast_for_arguments(struct compiling *c, const node *n)
     while (i < NCH(n)) {
         ch = CHILD(n, i);
         switch (TYPE(ch)) {
-            case fpdef:
+            case fpdef: {
+                int complex_args = 0, parenthesized = 0;
             handle_fpdef:
                 /* XXX Need to worry about checking if TYPE(CHILD(n, i+1)) is
                    anything other than EQUAL or a comma? */
@@ -697,6 +698,12 @@ ast_for_arguments(struct compiling *c, const node *n)
                     found_default = 1;
                 }
                 else if (found_default) {
+                    /* def f((x)=4): pass should raise an error.
+                       def f((x, (y))): pass will just incur the tuple unpacking warning. */
+                    if (parenthesized && !complex_args) {
+                        ast_error(n, "parenthesized arg with default");
+                        goto error;
+                    }
                     ast_error(n, 
                              "non-default argument follows default argument");
                     goto error;
@@ -709,6 +716,7 @@ ast_for_arguments(struct compiling *c, const node *n)
                         if (Py_Py3kWarningFlag && !ast_warn(c, ch,
                             "tuple parameter unpacking has been removed in 3.x"))
                             goto error;
+                        complex_args = 1;
                         asdl_seq_SET(args, k++, compiler_complex_args(c, ch));
                         if (!asdl_seq_GET(args, k-1))
                                 goto error;
@@ -716,6 +724,7 @@ ast_for_arguments(struct compiling *c, const node *n)
                         /* def foo((x)): setup for checking NAME below. */
                         /* Loop because there can be many parens and tuple
                            unpacking mixed in. */
+                        parenthesized = 1;
                         ch = CHILD(ch, 0);
                         assert(TYPE(ch) == fpdef);
                         goto handle_fpdef;
@@ -737,7 +746,13 @@ ast_for_arguments(struct compiling *c, const node *n)
                                          
                 }
                 i += 2; /* the name and the comma */
+                if (parenthesized && Py_Py3kWarningFlag &&
+                    !ast_warn(c, ch, "parenthesized argument names "
+                              "are invalid in 3.x"))
+                    goto error;
+
                 break;
+            }
             case STAR:
                 if (!forbidden_check(c, CHILD(n, i+1), STR(CHILD(n, i+1))))
                     goto error;
@@ -3248,10 +3263,11 @@ decode_unicode(struct compiling *c, const char *s, size_t len, int rawmode, cons
                 u = NULL;
         } else {
                 /* check for integer overflow */
-                if (len > PY_SIZE_MAX / 4)
+                if (len > PY_SIZE_MAX / 6)
                         return NULL;
-                /* "\XX" may become "\u005c\uHHLL" (12 bytes) */
-                u = PyString_FromStringAndSize((char *)NULL, len * 4);
+		/* "<C3><A4>" (2 bytes) may become "\U000000E4" (10 bytes), or 1:5
+		   "\ä" (3 bytes) may become "\u005c\U000000E4" (16 bytes), or ~1:6 */
+                u = PyString_FromStringAndSize((char *)NULL, len * 6);
                 if (u == NULL)
                         return NULL;
                 p = buf = PyString_AsString(u);
@@ -3268,19 +3284,21 @@ decode_unicode(struct compiling *c, const char *s, size_t len, int rawmode, cons
                                 PyObject *w;
                                 char *r;
                                 Py_ssize_t rn, i;
-                                w = decode_utf8(c, &s, end, "utf-16-be");
+                                w = decode_utf8(c, &s, end, "utf-32-be");
                                 if (w == NULL) {
                                         Py_DECREF(u);
                                         return NULL;
                                 }
                                 r = PyString_AsString(w);
                                 rn = PyString_Size(w);
-                                assert(rn % 2 == 0);
-                                for (i = 0; i < rn; i += 2) {
-                                        sprintf(p, "\\u%02x%02x",
+                                assert(rn % 4 == 0);
+                                for (i = 0; i < rn; i += 4) {
+                                        sprintf(p, "\\U%02x%02x%02x%02x",
                                                 r[i + 0] & 0xFF,
-                                                r[i + 1] & 0xFF);
-                                        p += 6;
+                                                r[i + 1] & 0xFF,
+						r[i + 2] & 0xFF,
+						r[i + 3] & 0xFF);
+                                        p += 10;
                                 }
                                 Py_DECREF(w);
                         } else {

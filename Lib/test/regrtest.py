@@ -205,7 +205,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
 
     test_support.record_original_stdout(sys.stdout)
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hvgqxsSrf:lu:t:TD:NLR:wM:',
+        opts, args = getopt.getopt(sys.argv[1:], 'hvqxsSrf:lu:t:TD:NLR:wM:',
                                    ['help', 'verbose', 'quiet', 'exclude',
                                     'single', 'slow', 'random', 'fromfile',
                                     'findleaks', 'use=', 'threshold=', 'trace',
@@ -285,6 +285,10 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
                         use_resources.remove(r)
                 elif r not in use_resources:
                     use_resources.append(r)
+        else:
+            print >>sys.stderr, ("No handler for option {0}.  Please "
+                "report this as a bug at http://bugs.python.org.").format(o)
+            sys.exit(1)
     if single and fromfile:
         usage(2, "-s and -f don't go together!")
 
@@ -1187,11 +1191,9 @@ if __name__ == '__main__':
     # much of the testing framework relies on the globals in the
     # test.test_support module.
     mydir = os.path.abspath(os.path.normpath(os.path.dirname(sys.argv[0])))
-    i = pathlen = len(sys.path)
+    i = len(sys.path)
     while i >= 0:
         i -= 1
         if os.path.abspath(os.path.normpath(sys.path[i])) == mydir:
             del sys.path[i]
-    if len(sys.path) == pathlen:
-        print 'Could not find %r in sys.path to remove it' % mydir
     main()

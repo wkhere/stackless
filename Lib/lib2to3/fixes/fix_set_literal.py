@@ -34,19 +34,19 @@ class FixSetLiteral(fixer_base.BaseFix):
             items = results["items"]
 
         # Build the contents of the literal
-        literal = [pytree.Leaf(token.LBRACE, "{")]
+        literal = [pytree.Leaf(token.LBRACE, u"{")]
         literal.extend(n.clone() for n in items.children)
-        literal.append(pytree.Leaf(token.RBRACE, "}"))
+        literal.append(pytree.Leaf(token.RBRACE, u"}"))
         # Set the prefix of the right brace to that of the ')' or ']'
-        literal[-1].set_prefix(items.get_next_sibling().get_prefix())
+        literal[-1].prefix = items.next_sibling.prefix
         maker = pytree.Node(syms.dictsetmaker, literal)
-        maker.set_prefix(node.get_prefix())
+        maker.prefix = node.prefix
 
         # If the original was a one tuple, we need to remove the extra comma.
         if len(maker.children) == 4:
             n = maker.children[2]
             n.remove()
-            maker.children[-1].set_prefix(n.get_prefix())
+            maker.children[-1].prefix = n.prefix
 
         # Finally, replace the set call with our shiny new literal.
         return maker

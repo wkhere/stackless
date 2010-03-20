@@ -52,7 +52,7 @@ ABC                        Inherits               Abstract Methods        Mixin 
 :class:`Container`                                ``__contains__``
 :class:`Hashable`                                 ``__hash__``
 :class:`Iterable`                                 ``__iter__``
-:class:`Iterator`          :class:`Iterable`      ``__next__``            ``__iter__``
+:class:`Iterator`          :class:`Iterable`      ``next``                ``__iter__``
 :class:`Sized`                                    ``__len__``
 :class:`Callable`                                 ``__call__``
 
@@ -155,11 +155,8 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
    * For more about ABCs, see the :mod:`abc` module and :pep:`3119`.
 
 
-.. _deque-objects:
-
 :class:`deque` objects
 ----------------------
-
 
 .. class:: deque([iterable[, maxlen]])
 
@@ -309,8 +306,6 @@ Example:
    deque(['c', 'b', 'a'])
 
 
-.. _deque-recipes:
-
 :class:`deque` Recipes
 ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -339,7 +334,7 @@ added elements by appending to the right and popping to the left::
             yield s / float(n)
 
 The :meth:`rotate` method provides a way to implement :class:`deque` slicing and
-deletion.  For example, a pure python implementation of ``del d[n]`` relies on
+deletion.  For example, a pure Python implementation of ``del d[n]`` relies on
 the :meth:`rotate` method to position elements to be popped::
 
    def delete_nth(d, n):
@@ -355,16 +350,14 @@ With minor variations on that approach, it is easy to implement Forth style
 stack manipulations such as ``dup``, ``drop``, ``swap``, ``over``, ``pick``,
 ``rot``, and ``roll``.
 
-.. _defaultdict-objects:
 
 :class:`defaultdict` objects
 ----------------------------
 
-
 .. class:: defaultdict([default_factory[, ...]])
 
    Returns a new dictionary-like object.  :class:`defaultdict` is a subclass of the
-   builtin :class:`dict` class.  It overrides one method and adds one writable
+   built-in :class:`dict` class.  It overrides one method and adds one writable
    instance variable.  The remaining functionality is the same as for the
    :class:`dict` class and is not documented here.
 
@@ -405,8 +398,6 @@ stack manipulations such as ``dup``, ``drop``, ``swap``, ``over``, ``pick``,
       initialized from the first argument to the constructor, if present, or to
       ``None``, if absent.
 
-
-.. _defaultdict-examples:
 
 :class:`defaultdict` Examples
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -477,8 +468,6 @@ Setting the :attr:`default_factory` to :class:`set` makes the
    [('blue', set([2, 4])), ('red', set([1, 3]))]
 
 
-.. _named-tuple-factory:
-
 :func:`namedtuple` Factory Function for Tuples with Named Fields
 ----------------------------------------------------------------
 
@@ -516,7 +505,19 @@ Example:
 .. doctest::
    :options: +NORMALIZE_WHITESPACE
 
-   >>> Point = namedtuple('Point', 'x y', verbose=True)
+   >>> Point = namedtuple('Point', 'x y')
+   >>> p = Point(11, y=22)     # instantiate with positional or keyword arguments
+   >>> p[0] + p[1]             # indexable like the plain tuple (11, 22)
+   33
+   >>> x, y = p                # unpack like a regular tuple
+   >>> x, y
+   (11, 22)
+   >>> p.x + p.y               # fields also accessible by name
+   33
+   >>> p                       # readable __repr__ with a name=value style
+   Point(x=11, y=22)
+
+   >>> Point = namedtuple('Point', 'x y', verbose=True) # show the class definition
    class Point(tuple):
            'Point(x, y)'
    <BLANKLINE>
@@ -555,17 +556,6 @@ Example:
            x = _property(_itemgetter(0))
            y = _property(_itemgetter(1))
 
-   >>> p = Point(11, y=22)     # instantiate with positional or keyword arguments
-   >>> p[0] + p[1]             # indexable like the plain tuple (11, 22)
-   33
-   >>> x, y = p                # unpack like a regular tuple
-   >>> x, y
-   (11, 22)
-   >>> p.x + p.y               # fields also accessible by name
-   33
-   >>> p                       # readable __repr__ with a name=value style
-   Point(x=11, y=22)
-
 Named tuples are especially useful for assigning field names to result tuples returned
 by the :mod:`csv` or :mod:`sqlite3` modules::
 
@@ -590,7 +580,7 @@ field names, the method and attribute names start with an underscore.
 
    Class method that makes a new instance from an existing sequence or iterable.
 
-.. doctest::
+   .. doctest::
 
       >>> t = [11, 22]
       >>> Point._make(t)
@@ -606,9 +596,7 @@ field names, the method and attribute names start with an underscore.
 .. method:: somenamedtuple._replace(kwargs)
 
    Return a new instance of the named tuple replacing specified fields with new
-   values:
-
-::
+   values::
 
       >>> p = Point(x=11, y=22)
       >>> p._replace(x=33)
@@ -622,7 +610,7 @@ field names, the method and attribute names start with an underscore.
    Tuple of strings listing the field names.  Useful for introspection
    and for creating new named tuple types from existing named tuples.
 
-.. doctest::
+   .. doctest::
 
       >>> p._fields            # view the field names
       ('x', 'y')

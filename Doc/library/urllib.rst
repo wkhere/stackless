@@ -205,9 +205,10 @@ Utility functions
 .. function:: quote(string[, safe])
 
    Replace special characters in *string* using the ``%xx`` escape. Letters,
-   digits, and the characters ``'_.-'`` are never quoted. The optional *safe*
-   parameter specifies additional characters that should not be quoted --- its
-   default value is ``'/'``.
+   digits, and the characters ``'_.-'`` are never quoted. By default, this
+   function is intended for quoting the path section of the URL.The optional
+   *safe* parameter specifies additional characters that should not be quoted
+   --- its default value is ``'/'``.
 
    Example: ``quote('/~connolly/')`` yields ``'/%7econnolly/'``.
 
@@ -215,8 +216,9 @@ Utility functions
 .. function:: quote_plus(string[, safe])
 
    Like :func:`quote`, but also replaces spaces by plus signs, as required for
-   quoting HTML form values.  Plus signs in the original string are escaped unless
-   they are included in *safe*.  It also does not have *safe* default to ``'/'``.
+   quoting HTML form values when building up a query string to go into a URL.
+   Plus signs in the original string are escaped unless they are included in
+   *safe*.  It also does not have *safe* default to ``'/'``.
 
 
 .. function:: unquote(string)
@@ -261,6 +263,15 @@ Utility functions
    Convert the path component *path* from an encoded URL to the local syntax for a
    path.  This does not accept a complete URL.  This function uses :func:`unquote`
    to decode *path*.
+
+
+.. function:: getproxies()
+
+   This helper function returns a dictionary of scheme to proxy server URL
+   mappings. It scans the environment for variables named ``<scheme>_proxy``
+   for all operating systems first, and when it cannot find it, looks for proxy
+   information from Mac OSX System Configuration for Mac OS X and Windows
+   Systems Registry for Windows.
 
 
 URL Opener objects

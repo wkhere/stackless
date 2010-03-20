@@ -65,6 +65,7 @@ Available Types
 
 
 .. class:: date
+   :noindex:
 
    An idealized naive date, assuming the current Gregorian calendar always was, and
    always will be, in effect. Attributes: :attr:`year`, :attr:`month`, and
@@ -72,6 +73,7 @@ Available Types
 
 
 .. class:: time
+   :noindex:
 
    An idealized time, independent of any particular day, assuming that every day
    has exactly 24\*60\*60 seconds (there is no notion of "leap seconds" here).
@@ -80,6 +82,7 @@ Available Types
 
 
 .. class:: datetime
+   :noindex:
 
    A combination of a date and a time. Attributes: :attr:`year`, :attr:`month`,
    :attr:`day`, :attr:`hour`, :attr:`minute`, :attr:`second`, :attr:`microsecond`,
@@ -87,6 +90,7 @@ Available Types
 
 
 .. class:: timedelta
+   :noindex:
 
    A duration expressing the difference between two :class:`date`, :class:`time`,
    or :class:`datetime` instances to microsecond resolution.
@@ -231,7 +235,7 @@ Supported operations:
 |                                | (-*t1.days*, -*t1.seconds*,                   |
 |                                | -*t1.microseconds*), and to *t1*\* -1. (1)(4) |
 +--------------------------------+-----------------------------------------------+
-| ``abs(t)``                     | equivalent to +*t* when ``t.days >= 0``, and  |
+| ``abs(t)``                     | equivalent to +\ *t* when ``t.days >= 0``, and|
 |                                | to -*t* when ``t.days < 0``. (2)              |
 +--------------------------------+-----------------------------------------------+
 
@@ -467,7 +471,8 @@ Instance methods:
    Return a 3-tuple, (ISO year, ISO week number, ISO weekday).
 
    The ISO calendar is a widely used variant of the Gregorian calendar. See
-   http://www.phys.uu.nl/ vgent/calendar/isocalendar.htm for a good explanation.
+   http://www.phys.uu.nl/~vgent/calendar/isocalendar.htm for a good
+   explanation.
 
    The ISO year consists of 52 or 53 full weeks, and where a week starts on a
    Monday and ends on a Sunday.  The first week of an ISO year is the first

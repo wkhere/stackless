@@ -4,7 +4,9 @@ import random
 from test import test_support
 import thread
 import time
+import sys
 
+from test import lock_tests
 
 NUMTASKS = 10
 NUMTRIPS = 3
@@ -26,6 +28,7 @@ class BasicThreadTest(unittest.TestCase):
         self.done_mutex.acquire()
         self.running_mutex = thread.allocate_lock()
         self.random_mutex = thread.allocate_lock()
+        self.created = 0
         self.running = 0
         self.next_ident = 0
 
@@ -37,6 +40,7 @@ class ThreadRunningTests(BasicThreadTest):
             self.next_ident += 1
             verbose_print("creating task %s" % self.next_ident)
             thread.start_new_thread(self.task, (self.next_ident,))
+            self.created += 1
             self.running += 1
 
     def task(self, ident):
@@ -47,7 +51,7 @@ class ThreadRunningTests(BasicThreadTest):
         verbose_print("task %s done" % ident)
         with self.running_mutex:
             self.running -= 1
-            if self.running == 0:
+            if self.created == NUMTASKS and self.running == 0:
                 self.done_mutex.release()
 
     def test_starting_threads(self):
@@ -89,6 +93,7 @@ class ThreadRunningTests(BasicThreadTest):
             for tss in (262144, 0x100000):
                 verbose_print("trying stack_size = (%d)" % tss)
                 self.next_ident = 0
+                self.created = 0
                 for i in range(NUMTASKS):
                     self.newtask()
 
@@ -161,8 +166,50 @@ class BarrierTest(BasicThreadTest):
             self.done_mutex.release()
 
 
+class LockTests(lock_tests.LockTests):
+    locktype = thread.allocate_lock
+
+
+class TestForkInThread(unittest.TestCase):
+    def setUp(self):
+        self.read_fd, self.write_fd = os.pipe()
+
+    def _test_forkinthread(self):
+        def thread1():
+            try:
+                pid = os.fork() # fork in a thread
+            except RuntimeError:
+                sys.exit(0) # exit the child
+
+            if pid == 0: # child
+                os.close(self.read_fd)
+                os.write(self.write_fd, "OK")
+                sys.exit(0)
+            else: # parent
+                os.close(self.write_fd)
+
+        thread.start_new_thread(thread1, ())
+        self.assertEqual(os.read(self.read_fd, 2), "OK",
+                         "Unable to fork() in thread")
+
+    if not sys.platform.startswith('win'):
+        test_forkinthread = _test_forkinthread
+
+    def tearDown(self):
+        try:
+            os.close(self.read_fd)
+        except OSError:
+            pass
+
+        try:
+            os.close(self.write_fd)
+        except OSError:
+            pass
+
+
 def test_main():
-    test_support.run_unittest(ThreadRunningTests, BarrierTest)
+    test_support.run_unittest(ThreadRunningTests, BarrierTest, LockTests,
+                              TestForkInThread)
 
 if __name__ == "__main__":
     test_main()

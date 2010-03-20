@@ -94,7 +94,7 @@ between conformable Python objects and XML on the wire.
    :exc:`ProtocolError` used to signal an error in the HTTP/HTTPS transport layer.
    Both :exc:`Fault` and :exc:`ProtocolError` derive from a base class called
    :exc:`Error`.  Note that even though starting with Python 2.2 you can subclass
-   builtin types, the xmlrpclib module currently does not marshal instances of such
+   built-in types, the xmlrpclib module currently does not marshal instances of such
    subclasses.
 
    When passing strings, characters special to XML such as ``<``, ``>``, and ``&``
@@ -318,7 +318,7 @@ XMLRPC::
    import xmlrpclib
 
    def python_logo():
-        with open("python_logo.jpg") as handle:
+        with open("python_logo.jpg", "rb") as handle:
             return xmlrpclib.Binary(handle.read())
 
    server = SimpleXMLRPCServer(("localhost", 8000))
@@ -332,7 +332,7 @@ The client gets the image and saves it to a file::
    import xmlrpclib
 
    proxy = xmlrpclib.ServerProxy("http://localhost:8000/")
-   with open("fetched_python_logo.jpg", "w") as handle:
+   with open("fetched_python_logo.jpg", "wb") as handle:
        handle.write(proxy.python_logo().data)
 
 .. _fault-objects:

@@ -1,8 +1,8 @@
 import unittest
 from test import test_support
 
-import posixpath, os
-from posixpath import realpath, abspath, join, dirname, basename, relpath
+import posixpath, os, sys
+from posixpath import realpath, abspath, dirname, basename
 
 # An absolute path to a temporary filename for testing. We can't rely on TESTFN
 # being an absolute path, so we need this.
@@ -88,11 +88,6 @@ class PosixPathTest(unittest.TestCase):
         self.assertIs(posixpath.isabs("foo/bar"), False)
 
         self.assertRaises(TypeError, posixpath.isabs)
-
-    def test_splitdrive(self):
-        self.assertEqual(posixpath.splitdrive("/foo/bar"), ("", "/foo/bar"))
-
-        self.assertRaises(TypeError, posixpath.splitdrive)
 
     def test_basename(self):
         self.assertEqual(posixpath.basename("/foo/bar"), "bar")
@@ -385,10 +380,36 @@ class PosixPathTest(unittest.TestCase):
         self.assertEqual(posixpath.normpath("///foo/.//bar//.//..//.//baz"), "/foo/baz")
         self.assertEqual(posixpath.normpath("///..//./foo/.//bar"), "/foo/bar")
 
+        # Issue 5827: Make sure normpath preserves unicode
+        for path in (u'', u'.', u'/', u'\\', u'///foo/.//bar//'):
+            self.assertTrue(isinstance(posixpath.normpath(path), unicode),
+                            'normpath() returned str instead of unicode')
+
         self.assertRaises(TypeError, posixpath.normpath)
 
     def test_abspath(self):
         self.assert_("foo" in posixpath.abspath("foo"))
+
+        # Issue 3426: check that abspath retuns unicode when the arg is unicode
+        # and str when it's str, with both ASCII and non-ASCII cwds
+        saved_cwd = os.getcwd()
+        cwds = ['cwd']
+        try:
+            cwds.append(u'\xe7w\xf0'.encode(sys.getfilesystemencoding()
+                                            or 'ascii'))
+        except UnicodeEncodeError:
+            pass # the cwd can't be encoded -- test with ascii cwd only
+        for cwd in cwds:
+            try:
+                os.mkdir(cwd)
+                os.chdir(cwd)
+                for path in ('', 'foo', 'f\xf2\xf2', '/foo', 'C:\\'):
+                    self.assertTrue(isinstance(posixpath.abspath(path), str))
+                for upath in (u'', u'fuu', u'f\xf9\xf9', u'/fuu', u'U:\\'):
+                    self.assertTrue(isinstance(posixpath.abspath(upath), unicode))
+            finally:
+                os.chdir(saved_cwd)
+                os.rmdir(cwd)
 
         self.assertRaises(TypeError, posixpath.abspath)
 

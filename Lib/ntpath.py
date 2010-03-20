@@ -397,6 +397,8 @@ def expandvars(path):
 
 def normpath(path):
     """Normalize path, eliminating double slashes, etc."""
+    # Preserve unicode (if path is unicode)
+    backslash, dot = (u'\\', u'.') if isinstance(path, unicode) else ('\\', '.')
     path = path.replace("/", "\\")
     prefix, path = splitdrive(path)
     # We need to be careful here. If the prefix is empty, and the path starts
@@ -411,12 +413,12 @@ def normpath(path):
     if prefix == '':
         # No drive letter - preserve initial backslashes
         while path[:1] == "\\":
-            prefix = prefix + "\\"
+            prefix = prefix + backslash
             path = path[1:]
     else:
         # We have a drive letter - collapse initial backslashes
         if path.startswith("\\"):
-            prefix = prefix + "\\"
+            prefix = prefix + backslash
             path = path.lstrip("\\")
     comps = path.split("\\")
     i = 0
@@ -435,8 +437,8 @@ def normpath(path):
             i += 1
     # If the path is now empty, substitute '.'
     if not prefix and not comps:
-        comps.append('.')
-    return prefix + "\\".join(comps)
+        comps.append(dot)
+    return prefix + backslash.join(comps)
 
 
 # Return an absolute path.
@@ -447,7 +449,11 @@ except ImportError: # not running on Windows - mock up something sensible
     def abspath(path):
         """Return the absolute version of a path."""
         if not isabs(path):
-            path = join(os.getcwd(), path)
+            if isinstance(path, unicode):
+                cwd = os.getcwdu()
+            else:
+                cwd = os.getcwd()
+            path = join(cwd, path)
         return normpath(path)
 
 else:  # use native Windows method on Windows
@@ -459,6 +465,8 @@ else:  # use native Windows method on Windows
                 path = _getfullpathname(path)
             except WindowsError:
                 pass # Bad path - return unchanged.
+        elif isinstance(path, unicode):
+            path = os.getcwdu()
         else:
             path = os.getcwd()
         return normpath(path)

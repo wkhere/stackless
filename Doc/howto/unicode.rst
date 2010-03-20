@@ -210,11 +210,12 @@ To help understand the standard, Jukka Korpela has written an introductory guide
 to reading the Unicode character tables, available at
 <http://www.cs.tut.fi/~jkorpela/unicode/guide.html>.
 
-Two other good introductory articles were written by Joel Spolsky
-<http://www.joelonsoftware.com/articles/Unicode.html> and Jason Orendorff
-<http://www.jorendorff.com/articles/unicode/>.  If this introduction didn't make
-things clear to you, you should try reading one of these alternate articles
-before continuing.
+Another good introductory article was written by Joel Spolsky
+<http://www.joelonsoftware.com/articles/Unicode.html>.
+If this introduction didn't make things clear to you, you should try reading this
+alternate article before continuing.
+
+.. Jason Orendorff XXX http://www.jorendorff.com/articles/unicode/ is broken
 
 Wikipedia entries are often helpful; see the entries for "character encoding"
 <http://en.wikipedia.org/wiki/Character_encoding> and UTF-8
@@ -471,7 +472,7 @@ These are grouped into categories such as "Letter", "Number", "Punctuation", or
 from the above output, ``'Ll'`` means 'Letter, lowercase', ``'No'`` means
 "Number, other", ``'Mn'`` is "Mark, nonspacing", and ``'So'`` is "Symbol,
 other".  See
-<http://www.unicode.org/Public/UNIDATA/UCD.html#General_Category_Values> for a
+<http://unicode.org/Public/5.1.0/ucd/UCD.html#General_Category_Values> for a
 list of category codes.
 
 References

@@ -69,12 +69,17 @@ define_xopen_source=yes
 AC_SUBST(CONFIG_ARGS)
 CONFIG_ARGS="$ac_configure_args"
 
+AC_MSG_CHECKING([for --enable-universalsdk])
 AC_ARG_ENABLE(universalsdk,
 	AC_HELP_STRING(--enable-universalsdk@<:@=SDKDIR@:>@, Build against Mac OS X 10.4u SDK (ppc/i386)),
 [
 	case $enableval in
 	yes)
 		enableval=/Developer/SDKs/MacOSX10.4u.sdk
+		if test ! -d "${enableval}"
+		then
+			enableval=/
+		fi
 		;;
 	esac
 	case $enableval in
@@ -84,17 +89,32 @@ AC_ARG_ENABLE(universalsdk,
 		;;
 	*)
 		UNIVERSALSDK=$enableval
+		if test ! -d "${UNIVERSALSDK}"
+		then
+			AC_MSG_ERROR([--enable-universalsdk specifies non-existing SDK: ${UNIVERSALSDK}])
+		fi
 		;;
 	esac
+	
 ],[
    	UNIVERSALSDK=
 	enable_universalsdk=
 ])
+if test -n "${UNIVERSALSDK}"
+then
+	AC_MSG_RESULT(${UNIVERSALSDK})
+else
+	AC_MSG_RESULT(no)
+fi
 AC_SUBST(UNIVERSALSDK)
 
 AC_SUBST(ARCH_RUN_32BIT)
 
 UNIVERSAL_ARCHS="32-bit"
+AC_SUBST(LIPO_32BIT_FLAGS)
+AC_SUBST(LIPO_64BIT_FLAGS)
+AC_SUBST(UNIVERSAL_ARCH32_FLAGS)
+AC_SUBST(UNIVERSAL_ARCH64_FLAGS)
 AC_MSG_CHECKING(for --with-universal-archs)
 AC_ARG_WITH(universal-archs,
     AC_HELP_STRING(--with-universal-archs=ARCH, select architectures for universal build ("32-bit", "64-bit", "3-way", "intel" or "all")),
@@ -166,14 +186,16 @@ AC_ARG_ENABLE(framework,
 		PYTHONFRAMEWORKINSTALLDIR=$PYTHONFRAMEWORKPREFIX/$PYTHONFRAMEWORKDIR
 		FRAMEWORKINSTALLFIRST="frameworkinstallstructure"
 		FRAMEWORKALTINSTALLFIRST="frameworkinstallstructure bininstall maninstall"
-		if test "$UNIVERSAL_ARCHS" = "all"
-		then
+		case "${UNIVERSAL_ARCHS}" in
+		all|3-way|intel)
 			FRAMEWORKINSTALLLAST="frameworkinstallmaclib frameworkinstallapps4way frameworkinstallunixtools4way"
 			FRAMEWORKALTINSTALLLAST="frameworkinstallmaclib frameworkinstallapps4way frameworkaltinstallunixtools4way"
-		else
+			;;
+		*)
 			FRAMEWORKINSTALLLAST="frameworkinstallmaclib frameworkinstallapps frameworkinstallunixtools"
 			FRAMEWORKALTINSTALLLAST="frameworkinstallmaclib frameworkinstallapps frameworkaltinstallunixtools"
-		fi
+			;;
+		esac
 
 		if test "x${prefix}" = "xNONE" ; then
 			FRAMEWORKUNIXTOOLSPREFIX="${ac_default_prefix}"
@@ -279,8 +301,16 @@ case $ac_sys_system/$ac_sys_release in
   # On OpenBSD, select(2) is not available if _XOPEN_SOURCE is defined,
   # even though select is a POSIX function. Reported by J. Ribbens.
   # Reconfirmed for OpenBSD 3.3 by Zachary Hamm, for 3.4 by Jason Ish.
-  OpenBSD/2.* | OpenBSD/3.@<:@0123456789@:>@ | OpenBSD/4.@<:@0123@:>@) 
+  # In addition, Stefan Krah confirms that issue #1244610 exists through
+  # OpenBSD 4.6, but is fixed in 4.7.
+  OpenBSD/2.* | OpenBSD/3.@<:@0123456789@:>@ | OpenBSD/4.@<:@0123456@:>@) 
     define_xopen_source=no
+    # OpenBSD undoes our definition of __BSD_VISIBLE if _XOPEN_SOURCE is
+    # also defined. This can be overridden by defining _BSD_SOURCE
+    # As this has a different meaning on Linux, only define it on OpenBSD
+    AC_DEFINE(_BSD_SOURCE, 1, [Define on OpenBSD to activate all library features])
+    ;;
+  OpenBSD/4.@<:@789@:>@)
     # OpenBSD undoes our definition of __BSD_VISIBLE if _XOPEN_SOURCE is
     # also defined. This can be overridden by defining _BSD_SOURCE
     # As this has a different meaning on Linux, only define it on OpenBSD
@@ -316,6 +346,8 @@ case $ac_sys_system/$ac_sys_release in
   # On Mac OS X 10.3, defining _POSIX_C_SOURCE or _XOPEN_SOURCE 
   # has no effect, don't bother defining them
   Darwin/@<:@6789@:>@.*)
+    define_xopen_source=no;;
+  Darwin/1@<:@0-9@:>@.*)
     define_xopen_source=no;;
   # On AIX 4 and 5.1, mbstate_t is defined only when _XOPEN_SOURCE == 500 but
   # used in wcsnrtombs() and mbsnrtowcs() even if _XOPEN_SOURCE is not defined
@@ -848,7 +880,7 @@ fi],
 # tweak OPT based on compiler and platform, only if the user didn't set
 # it on the command line
 AC_SUBST(OPT)
-if test -z "$OPT"
+if test "${OPT-unset}" == "unset"
 then
     case $GCC in
     yes)
@@ -939,28 +971,39 @@ yes)
 	    # -Wno-long-double, -no-cpp-precomp, and -mno-fused-madd
 	    # used to be here, but non-Apple gcc doesn't accept them.
 
-
 	    if test "${enable_universalsdk}"; then
 		UNIVERSAL_ARCH_FLAGS=""
 	        if test "$UNIVERSAL_ARCHS" = "32-bit" ; then
-		   UNIVERSAL_ARCH_FLAGS="-arch ppc -arch i386"
 		   ARCH_RUN_32BIT=""
+		   UNIVERSAL_ARCH_FLAGS="-arch ppc -arch i386"
 
 	         elif test "$UNIVERSAL_ARCHS" = "64-bit" ; then
-		   UNIVERSAL_ARCH_FLAGS="-arch ppc64 -arch x86_64"
 		   ARCH_RUN_32BIT="true"
+		   UNIVERSAL_ARCH_FLAGS="-arch ppc64 -arch x86_64"
 
 	         elif test "$UNIVERSAL_ARCHS" = "all" ; then
+		   ARCH_RUN_32BIT="/usr/bin/arch -i386 -ppc"
 		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch ppc -arch ppc64 -arch x86_64"
-		   ARCH_RUN_32BIT="arch -i386 -ppc"
+		   UNIVERSAL_ARCH32_FLAGS="-arch i386 -arch ppc"
+		   UNIVERSAL_ARCH64_FLAGS="-arch x86_64 -arch ppc64"
+		   LIPO_32BIT_FLAGS="-extract i386 -extract ppc7400"
+		   LIPO_64BIT_FLAGS="-extract x86_64 -extract ppc64"
 
 	         elif test "$UNIVERSAL_ARCHS" = "intel" ; then
+		   ARCH_RUN_32BIT="/usr/bin/arch -i386"
 		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch x86_64"
-		   ARCH_RUN_32BIT="arch -i386"
+		   UNIVERSAL_ARCH32_FLAGS="-arch i386"
+		   UNIVERSAL_ARCH64_FLAGS="-arch x86_64"
+		   LIPO_32BIT_FLAGS="-extract i386"
+		   LIPO_64BIT_FLAGS="-extract x86_64"
 
 	         elif test "$UNIVERSAL_ARCHS" = "3-way" ; then
+		   ARCH_RUN_32BIT="/usr/bin/arch -i386 -ppc"
 		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch ppc -arch x86_64"
-		   ARCH_RUN_32BIT="arch -i386 -ppc"
+		   UNIVERSAL_ARCH32_FLAGS="-arch i386 -arch ppc"
+		   UNIVERSAL_ARCH64_FLAGS="-arch x86_64"
+		   LIPO_32BIT_FLAGS="-extract i386 -extract ppc7400"
+		   LIPO_64BIT_FLAGS="-extract x86_64"
 
 		 else
 	           AC_MSG_ERROR([proper usage is --with-universal-arch=32-bit|64-bit|all|intel|3-way])
@@ -998,7 +1041,7 @@ yes)
 				    cur_target='10.5'
 			    fi
 		    else
-			    if test `arch` = "i386"; then
+			    if test `/usr/bin/arch` = "i386"; then
 				    # On Intel macs default to a deployment
 				    # target of 10.4, that's the first OSX
 				    # release with Intel support.
@@ -1466,8 +1509,9 @@ AC_DEFINE_UNQUOTED(SIZEOF_OFF_T, $ac_cv_sizeof_off_t,
 [The number of bytes in an off_t.])
 
 AC_MSG_CHECKING(whether to enable large file support)
-if test "$have_long_long" = yes -a \
-	"$ac_cv_sizeof_off_t" -gt "$ac_cv_sizeof_long" -a \
+if test "$have_long_long" = yes
+then
+if test "$ac_cv_sizeof_off_t" -gt "$ac_cv_sizeof_long" -a \
 	"$ac_cv_sizeof_long_long" -ge "$ac_cv_sizeof_off_t"; then
   AC_DEFINE(HAVE_LARGEFILE_SUPPORT, 1, 
   [Defined to enable large file support when an off_t is bigger than a long
@@ -1475,6 +1519,9 @@ if test "$have_long_long" = yes -a \
    to add some flags for configuration and compilation to enable this mode.
    (For Solaris and Linux, the necessary defines are already defined.)])
   AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi
 else
   AC_MSG_RESULT(no)
 fi
@@ -1583,12 +1630,12 @@ case $ac_sys_system/$ac_sys_release in
     if test "${enable_universalsdk}"; then
 	    :
     else
-        LIBTOOL_CRUFT="${LIBTOOL_CRUFT} -arch_only `arch`"
+        LIBTOOL_CRUFT="${LIBTOOL_CRUFT} -arch_only `/usr/bin/arch`"
     fi
     LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -install_name $(PYTHONFRAMEWORKINSTALLDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
     LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -compatibility_version $(VERSION) -current_version $(VERSION)';;
   Darwin/*)
-    gcc_version=`gcc -v 2>&1 |  grep version | cut -d\  -f3`
+    gcc_version=`gcc -dumpversion`
     if test ${gcc_version} '<' 4.0
         then
             LIBTOOL_CRUFT="-lcc_dynamic"
@@ -1610,7 +1657,7 @@ case $ac_sys_system/$ac_sys_release in
        ac_osx_32bit=yes)
     
     if test "${ac_osx_32bit}" = "yes"; then
-    	case `arch` in
+    	case `/usr/bin/arch` in
     	i386) 
     		MACOSX_DEFAULT_ARCH="i386" 
     		;;
@@ -1622,7 +1669,7 @@ case $ac_sys_system/$ac_sys_release in
     		;;
     	esac
     else
-    	case `arch` in
+    	case `/usr/bin/arch` in
     	i386) 
     		MACOSX_DEFAULT_ARCH="x86_64" 
     		;;
@@ -2670,8 +2717,8 @@ AC_CHECK_LIB(c, inet_aton, [$ac_cv_prog_TRUE],
 
 # On Tru64, chflags seems to be present, but calling it will
 # exit Python
-AC_MSG_CHECKING(for chflags)
-AC_TRY_RUN([
+AC_CACHE_CHECK([for chflags], [ac_cv_have_chflags], [dnl
+AC_TRY_RUN([[
 #include <sys/stat.h>
 #include <unistd.h>
 int main(int argc, char*argv[])
@@ -2680,13 +2727,19 @@ int main(int argc, char*argv[])
     return 1;
   return 0;
 }
-],AC_DEFINE(HAVE_CHFLAGS, 1, Define to 1 if you have the `chflags' function.)
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-)
+]], ac_cv_have_chflags=yes,
+   ac_cv_have_chflags=no,
+   ac_cv_have_chflags=cross)
+])
+if test "$ac_cv_have_chflags" = cross ; then
+  AC_CHECK_FUNC([chflags], [ac_cv_have_chflags="yes"], [ac_cv_have_chflags="no"])
+fi
+if test "$ac_cv_have_chflags" = yes ; then
+  AC_DEFINE(HAVE_CHFLAGS, 1, Define to 1 if you have the `chflags' function.)
+fi
 
-AC_MSG_CHECKING(for lchflags)
-AC_TRY_RUN([
+AC_CACHE_CHECK([for lchflags], [ac_cv_have_lchflags], [dnl
+AC_TRY_RUN([[
 #include <sys/stat.h>
 #include <unistd.h>
 int main(int argc, char*argv[])
@@ -2695,10 +2748,16 @@ int main(int argc, char*argv[])
     return 1;
   return 0;
 }
-],AC_DEFINE(HAVE_LCHFLAGS, 1, Define to 1 if you have the `lchflags' function.)
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-)
+]], ac_cv_have_lchflags=yes,
+   ac_cv_have_lchflags=no,
+   ac_cv_have_lchflags=cross)
+])
+if test "$ac_cv_have_lchflags" = cross ; then
+  AC_CHECK_FUNC([lchflags], [ac_cv_have_lchflags="yes"], [ac_cv_have_lchflags="no"])
+fi
+if test "$ac_cv_have_lchflags" = yes ; then
+  AC_DEFINE(HAVE_LCHFLAGS, 1, Define to 1 if you have the `lchflags' function.)
+fi
 
 dnl Check if system zlib has *Copy() functions
 dnl
@@ -3391,6 +3450,7 @@ ucs2) unicode_size="2"
 ucs4) unicode_size="4"
       AC_DEFINE(Py_UNICODE_SIZE,4)
       ;;
+*) AC_MSG_ERROR([invalid value for --enable-unicode. Use either ucs2 or ucs4 (lowercase).]) ;;
 esac
 
 AH_TEMPLATE(PY_UNICODE_TYPE,
@@ -3517,6 +3577,10 @@ then
   [readline/readline.h],
   AC_DEFINE(HAVE_RL_COMPLETION_APPEND_CHARACTER, 1,
   [Define if you have readline 2.2]), )
+  AC_EGREP_HEADER([extern int rl_completion_suppress_append;],
+  [readline/readline.h],
+  AC_DEFINE(HAVE_RL_COMPLETION_SUPPRESS_APPEND, 1,
+  [Define if you have rl_completion_suppress_append]), )
 fi
 
 # check for readline 4.0
@@ -3854,6 +3918,13 @@ for h in `(cd $srcdir;echo Python/thread_*.h)`
 do
   THREADHEADERS="$THREADHEADERS \$(srcdir)/$h"
 done
+
+if test $ac_sys_system = Darwin
+then
+	LIBS="$LIBS -framework CoreFoundation"
+fi
+
+
 
 AC_SUBST(SRCDIRS)
 SRCDIRS="Parser Grammar Objects Python Modules Mac Stackless Stackless/core Stackless/module Stackless/pickling"

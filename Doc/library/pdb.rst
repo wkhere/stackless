@@ -53,7 +53,16 @@ useful than quitting the debugger upon program's exit.
 .. versionadded:: 2.4
    Restarting post-mortem behavior added.
 
-Typical usage to inspect a crashed program is::
+The typical usage to break into the debugger from a running program is to
+insert ::
+
+   import pdb; pdb.set_trace()
+
+at the location you want to break into the debugger.  You can then step through
+the code following this statement, and continue running without the debugger using
+the ``c`` command.
+
+The typical usage to inspect a crashed program is::
 
    >>> import pdb
    >>> import mymodule
@@ -343,7 +352,7 @@ unalias *name*
       (Pdb)
 
 run [*args* ...]
-   Restart the debugged python program. If an argument is supplied, it is split
+   Restart the debugged Python program. If an argument is supplied, it is split
    with "shlex" and the result is used as the new sys.argv. History, breakpoints,
    actions and debugger options are preserved. "restart" is an alias for "run".
 

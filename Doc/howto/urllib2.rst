@@ -182,10 +182,9 @@ which comes after we have a look at what happens when things go wrong.
 Handling Exceptions
 ===================
 
-*urlopen* raises :exc:`URLError` when it cannot handle a response (though as usual
-with Python APIs, builtin exceptions such as
-:exc:`ValueError`, :exc:`TypeError` etc. may also
-be raised).
+*urlopen* raises :exc:`URLError` when it cannot handle a response (though as
+usual with Python APIs, built-in exceptions such as :exc:`ValueError`,
+:exc:`TypeError` etc. may also be raised).
 
 :exc:`HTTPError` is the subclass of :exc:`URLError` raised in the specific case of
 HTTP URLs.
@@ -488,7 +487,7 @@ than the URL you pass to .add_password() will also match. ::
 
 .. note::
 
-    In the above example we only supplied our ``HHTPBasicAuthHandler`` to
+    In the above example we only supplied our ``HTTPBasicAuthHandler`` to
     ``build_opener``. By default openers have the handlers for normal situations
     -- ``ProxyHandler``, ``UnknownHandler``, ``HTTPHandler``,
     ``HTTPDefaultErrorHandler``, ``HTTPRedirectHandler``, ``FTPHandler``,

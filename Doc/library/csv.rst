@@ -61,7 +61,7 @@ The :mod:`csv` module defines the following functions:
 
    Return a reader object which will iterate over lines in the given *csvfile*.
    *csvfile* can be any object which supports the :term:`iterator` protocol and returns a
-   string each time its :meth:`next` method is called --- file objects and list
+   string each time its :meth:`!next` method is called --- file objects and list
    objects are both suitable.   If *csvfile* is a file object, it must be opened
    with the 'b' flag on platforms where that makes a difference.  An optional
    *dialect* parameter can be given which is used to define a set of parameters
@@ -72,8 +72,8 @@ The :mod:`csv` module defines the following functions:
    dialect.  For full details about the dialect and formatting parameters, see
    section :ref:`csv-fmt-params`.
 
-   All data read are returned as strings.  No automatic data type conversion is
-   performed.
+   Each row read from the csv file is returned as a list of strings.  No
+   automatic data type conversion is performed.
 
    A short usage example::
 
@@ -167,13 +167,12 @@ The :mod:`csv` module defines the following classes:
    Create an object which operates like a regular reader but maps the information
    read into a dict whose keys are given by the optional  *fieldnames* parameter.
    If the *fieldnames* parameter is omitted, the values in the first row of the
-   *csvfile* will be used as the fieldnames. If the row read has fewer fields than
-   the fieldnames sequence, the value of *restval* will be used as the default
-   value.  If the row read has more fields than the fieldnames sequence, the
-   remaining data is added as a sequence keyed by the value of *restkey*.  If the
-   row read has fewer fields than the fieldnames sequence, the remaining keys take
-   the value of the optional *restval* parameter.  Any other optional or keyword
-   arguments are passed to the underlying :class:`reader` instance.
+   *csvfile* will be used as the fieldnames.  If the row read has more fields
+   than the fieldnames sequence, the remaining data is added as a sequence
+   keyed by the value of *restkey*.  If the row read has fewer fields than the
+   fieldnames sequence, the remaining keys take the value of the optional
+   *restval* parameter.  Any other optional or keyword arguments are passed to
+   the underlying :class:`reader` instance.
 
 
 .. class:: DictWriter(csvfile, fieldnames[, restval=''[, extrasaction='raise'[, dialect='excel'[, *args, **kwds]]]])

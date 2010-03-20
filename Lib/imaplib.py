@@ -22,7 +22,7 @@ Public functions:       Internaldate2tuple
 
 __version__ = "2.58"
 
-import binascii, os, random, re, socket, sys, time
+import binascii, random, re, socket, subprocess, sys, time
 
 __all__ = ["IMAP4", "IMAP4_stream", "Internaldate2tuple",
            "Int2AP", "ParseFlags", "Time2Internaldate"]
@@ -726,7 +726,7 @@ class IMAP4:
     def thread(self, threading_algorithm, charset, *search_criteria):
         """IMAPrev1 extension THREAD command.
 
-        (type, [data]) = <instance>.thread(threading_alogrithm, charset, search_criteria, ...)
+        (type, [data]) = <instance>.thread(threading_algorithm, charset, search_criteria, ...)
         """
         name = 'THREAD'
         typ, dat = self._simple_command(name, threading_algorithm, charset, *search_criteria)
@@ -1001,6 +1001,8 @@ class IMAP4:
             raise self.abort('socket error: EOF')
 
         # Protocol mandates all lines terminated by CRLF
+        if not line.endswith('\r\n'):
+            raise self.abort('socket error: unterminated line')
 
         line = line[:-2]
         if __debug__:
@@ -1167,7 +1169,7 @@ else:
             while 1:
                 char = self.sslobj.read(1)
                 line.append(char)
-                if char == "\n": return ''.join(line)
+                if char in ("\n", ""): return ''.join(line)
 
 
         def send(self, data):
@@ -1210,7 +1212,7 @@ class IMAP4_stream(IMAP4):
 
     Instantiate with: IMAP4_stream(command)
 
-            where "command" is a string that can be passed to os.popen2()
+            where "command" is a string that can be passed to Subprocess.Popen()
 
     for more documentation see the docstring of the parent class IMAP4.
     """
@@ -1230,7 +1232,11 @@ class IMAP4_stream(IMAP4):
         self.port = None
         self.sock = None
         self.file = None
-        self.writefile, self.readfile = os.popen2(self.command)
+        self.process = subprocess.Popen(self.command,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            shell=True, close_fds=True)
+        self.writefile = self.process.stdin
+        self.readfile = self.process.stdout
 
 
     def read(self, size):
@@ -1253,6 +1259,7 @@ class IMAP4_stream(IMAP4):
         """Close I/O established in "open"."""
         self.readfile.close()
         self.writefile.close()
+        self.process.wait()
 
 
 

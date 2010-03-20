@@ -258,21 +258,22 @@ Connection Objects
 .. method:: Connection.execute(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`execute` method with
-   the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`execute<Cursor.execute>` method with the parameters given.
 
 
 .. method:: Connection.executemany(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`executemany` method
-   with the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`executemany<Cursor.executemany>` method with the parameters given.
 
 .. method:: Connection.executescript(sql_script)
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`executescript` method
-   with the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`executescript<Cursor.executescript>` method with the parameters
+   given.
 
 
 .. method:: Connection.create_function(name, num_params, func)
@@ -840,7 +841,7 @@ directly using only a single call on the :class:`Connection` object.
 Accessing columns by name instead of by index
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-One useful feature of the :mod:`sqlite3` module is the builtin
+One useful feature of the :mod:`sqlite3` module is the built-in
 :class:`sqlite3.Row` class designed to be used as a row factory.
 
 Rows wrapped with this class can be accessed both by index (like tuples) and

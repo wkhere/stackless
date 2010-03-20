@@ -56,7 +56,7 @@ Default values can be specified by passing them into the :class:`ConfigParser`
 constructor as a dictionary.  Additional defaults  may be passed into the
 :meth:`get` method which will override all others.
 
-Sections are normally stored in a builtin dictionary. An alternative dictionary
+Sections are normally stored in a built-in dictionary. An alternative dictionary
 type can be passed to the :class:`ConfigParser` constructor. For example, if a
 dictionary type is passed that sorts its keys, the sections will be sorted on
 write-back, as will be the keys within each section.
@@ -317,12 +317,23 @@ RawConfigParser Objects
 
 .. method:: RawConfigParser.optionxform(option)
 
-   Transforms the option name *option* as found in an input file or as passed in by
-   client code to the form that should be used in the internal structures.  The
-   default implementation returns a lower-case version of *option*; subclasses may
-   override this or client code can set an attribute of this name on instances to
-   affect this behavior.  Setting this to :func:`str`, for example, would make
-   option names case sensitive.
+   Transforms the option name *option* as found in an input file or as passed in
+   by client code to the form that should be used in the internal structures.
+   The default implementation returns a lower-case version of *option*;
+   subclasses may override this or client code can set an attribute of this name
+   on instances to affect this behavior.
+
+   You don't necessarily need to subclass a ConfigParser to use this method, you
+   can also re-set it on an instance, to a function that takes a string
+   argument.  Setting it to ``str``, for example, would make option names case
+   sensitive::
+
+      cfgparser = ConfigParser()
+      ...
+      cfgparser.optionxform = str
+
+   Note that when reading configuration files, whitespace around the
+   option names are stripped before :meth:`optionxform` is called.
 
 
 .. _configparser-objects:

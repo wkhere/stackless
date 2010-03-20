@@ -376,7 +376,7 @@ This module offers the following functions:
    key.  The key identified by the key parameter must have been opened with
    :const:`KEY_SET_VALUE` access.
 
-   To open the key, use the :func:`CreateKeyEx` or  :func:`OpenKey` methods.
+   To open the key, use the :func:`CreateKey` or  :func:`OpenKey` methods.
 
    Value lengths are limited by available memory. Long values (more than 2048
    bytes) should be stored as files with the filenames stored in the configuration
@@ -408,7 +408,7 @@ detached).
 The object also support comparison semantics, so handle objects will compare
 true if they both reference the same underlying Windows handle value.
 
-Handle objects can be converted to an integer (e.g., using the builtin
+Handle objects can be converted to an integer (e.g., using the built-in
 :func:`int` function), in which case the underlying Windows handle value is
 returned.  You can also use the  :meth:`Detach` method to return the integer
 handle, and also disconnect the Windows handle from the handle object.

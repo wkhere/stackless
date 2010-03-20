@@ -157,8 +157,8 @@ The :mod:`signal` module defines the following functions:
 
    The old values are returned as a tuple: (delay, interval).
 
-   Attempting to pass an invalid interval timer will cause a
-   :exc:`ItimerError`.
+   Attempting to pass an invalid interval timer will cause an
+   :exc:`ItimerError`.  Availability: Unix.
 
    .. versionadded:: 2.6
 
@@ -166,6 +166,7 @@ The :mod:`signal` module defines the following functions:
 .. function:: getitimer(which)
 
    Returns current value of a given interval timer specified by *which*.
+   Availability: Unix.
 
    .. versionadded:: 2.6
 
@@ -186,14 +187,14 @@ The :mod:`signal` module defines the following functions:
 
 .. function:: siginterrupt(signalnum, flag)
 
-   Change system call restart behaviour: if *flag* is :const:`False`, system calls
-   will be restarted when interrupted by signal *signalnum*, otherwise system calls will
-   be interrupted. Returns nothing. Availability: Unix (see the man page
-   :manpage:`siginterrupt(3)` for further information).
+   Change system call restart behaviour: if *flag* is :const:`False`, system
+   calls will be restarted when interrupted by signal *signalnum*, otherwise
+   system calls will be interrupted.  Returns nothing.  Availability: Unix (see
+   the man page :manpage:`siginterrupt(3)` for further information).
 
-   Note that installing a signal handler with :func:`signal` will reset the restart
-   behaviour to interruptible by implicitly calling :cfunc:`siginterrupt` with a true *flag*
-   value for the given signal.
+   Note that installing a signal handler with :func:`signal` will reset the
+   restart behaviour to interruptible by implicitly calling
+   :cfunc:`siginterrupt` with a true *flag* value for the given signal.
 
    .. versionadded:: 2.6
 
@@ -211,9 +212,9 @@ The :mod:`signal` module defines the following functions:
    exception to be raised.
 
    The *handler* is called with two arguments: the signal number and the current
-   stack frame (``None`` or a frame object; for a description of frame objects, see
-   the reference manual section on the standard type hierarchy or see the attribute
-   descriptions in the :mod:`inspect` module).
+   stack frame (``None`` or a frame object; for a description of frame objects,
+   see the :ref:`description in the type hierarchy <frame-objects>` or see the
+   attribute descriptions in the :mod:`inspect` module).
 
 
 .. _signal-example:
@@ -232,7 +233,7 @@ be sent, and the handler raises an exception. ::
 
    def handler(signum, frame):
        print 'Signal handler called with signal', signum
-       raise IOError, "Couldn't open device!"
+       raise IOError("Couldn't open device!")
 
    # Set the signal handler and a 5-second alarm
    signal.signal(signal.SIGALRM, handler)

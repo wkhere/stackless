@@ -19,28 +19,27 @@ class FixXrange(fixer_base.BaseFix):
 
     def transform(self, node, results):
         name = results["name"]
-        if name.value == "xrange":
+        if name.value == u"xrange":
             return self.transform_xrange(node, results)
-        elif name.value == "range":
+        elif name.value == u"range":
             return self.transform_range(node, results)
         else:
             raise ValueError(repr(name))
 
     def transform_xrange(self, node, results):
         name = results["name"]
-        name.replace(Name("range", prefix=name.get_prefix()))
+        name.replace(Name(u"range", prefix=name.prefix))
 
     def transform_range(self, node, results):
         if not self.in_special_context(node):
-            range_call = Call(Name("range"), [results["args"].clone()])
+            range_call = Call(Name(u"range"), [results["args"].clone()])
             # Encase the range call in list().
-            list_call = Call(Name("list"), [range_call],
-                             prefix=node.get_prefix())
+            list_call = Call(Name(u"list"), [range_call],
+                             prefix=node.prefix)
             # Put things that were after the range() call after the list call.
             for n in results["rest"]:
                 list_call.append_child(n)
             return list_call
-        return node
 
     P1 = "power< func=NAME trailer< '(' node=any ')' > any* >"
     p1 = patcomp.compile_pattern(P1)

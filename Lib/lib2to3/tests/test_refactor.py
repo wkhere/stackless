@@ -4,23 +4,30 @@ Unit tests for refactor.py.
 
 import sys
 import os
+import codecs
 import operator
 import StringIO
 import tempfile
+import shutil
 import unittest
+import warnings
 
 from lib2to3 import refactor, pygram, fixer_base
+from lib2to3.pgen2 import token
 
 from . import support
 
 
-FIXER_DIR = os.path.join(os.path.dirname(__file__), "data/fixers")
+TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+FIXER_DIR = os.path.join(TEST_DATA_DIR, "fixers")
 
 sys.path.append(FIXER_DIR)
 try:
     _DEFAULT_FIXERS = refactor.get_fixers_from_package("myfixes")
 finally:
     sys.path.pop()
+
+_2TO3_FIXERS = refactor.get_fixers_from_package("lib2to3.fixes")
 
 class TestRefactoringTool(unittest.TestCase):
 
@@ -39,14 +46,10 @@ class TestRefactoringTool(unittest.TestCase):
         return refactor.RefactoringTool(fixers, options, explicit)
 
     def test_print_function_option(self):
-        gram = pygram.python_grammar
-        save = gram.keywords["print"]
-        try:
-            rt = self.rt({"print_function" : True})
-            self.assertRaises(KeyError, operator.itemgetter("print"),
-                              gram.keywords)
-        finally:
-            gram.keywords["print"] = save
+        rt = self.rt({"print_function" : True})
+        self.assertTrue(rt.grammar is pygram.python_grammar_no_print_statement)
+        self.assertTrue(rt.driver.grammar is
+                        pygram.python_grammar_no_print_statement)
 
     def test_fixer_loading_helpers(self):
         contents = ["explicit", "first", "last", "parrot", "preorder"]
@@ -58,19 +61,63 @@ class TestRefactoringTool(unittest.TestCase):
         self.assertEqual(full_names,
                          ["myfixes.fix_" + name for name in contents])
 
+    def test_detect_future_print(self):
+        run = refactor._detect_future_print
+        self.assertFalse(run(""))
+        self.assertTrue(run("from __future__ import print_function"))
+        self.assertFalse(run("from __future__ import generators"))
+        self.assertFalse(run("from __future__ import generators, feature"))
+        input = "from __future__ import generators, print_function"
+        self.assertTrue(run(input))
+        input ="from __future__ import print_function, generators"
+        self.assertTrue(run(input))
+        input = "from __future__ import (print_function,)"
+        self.assertTrue(run(input))
+        input = "from __future__ import (generators, print_function)"
+        self.assertTrue(run(input))
+        input = "from __future__ import (generators, nested_scopes)"
+        self.assertFalse(run(input))
+        input = """from __future__ import generators
+from __future__ import print_function"""
+        self.assertTrue(run(input))
+        self.assertFalse(run("from"))
+        self.assertFalse(run("from 4"))
+        self.assertFalse(run("from x"))
+        self.assertFalse(run("from x 5"))
+        self.assertFalse(run("from x im"))
+        self.assertFalse(run("from x import"))
+        self.assertFalse(run("from x import 4"))
+        input = "'docstring'\nfrom __future__ import print_function"
+        self.assertTrue(run(input))
+        input = "'docstring'\n'somng'\nfrom __future__ import print_function"
+        self.assertFalse(run(input))
+        input = "# comment\nfrom __future__ import print_function"
+        self.assertTrue(run(input))
+        input = "# comment\n'doc'\nfrom __future__ import print_function"
+        self.assertTrue(run(input))
+        input = "class x: pass\nfrom __future__ import print_function"
+        self.assertFalse(run(input))
+
     def test_get_headnode_dict(self):
         class NoneFix(fixer_base.BaseFix):
-            PATTERN = None
+            pass
 
         class FileInputFix(fixer_base.BaseFix):
             PATTERN = "file_input< any * >"
 
+        class SimpleFix(fixer_base.BaseFix):
+            PATTERN = "'name'"
+
         no_head = NoneFix({}, [])
         with_head = FileInputFix({}, [])
-        d = refactor.get_headnode_dict([no_head, with_head])
-        expected = {None: [no_head],
-                    pygram.python_symbols.file_input : [with_head]}
-        self.assertEqual(d, expected)
+        simple = SimpleFix({}, [])
+        d = refactor._get_headnode_dict([no_head, with_head, simple])
+        top_fixes = d.pop(pygram.python_symbols.file_input)
+        self.assertEqual(top_fixes, [with_head, no_head])
+        name_fixes = d.pop(token.NAME)
+        self.assertEqual(name_fixes, [simple, no_head])
+        for fixes in d.itervalues():
+            self.assertEqual(fixes, [no_head])
 
     def test_fixer_loading(self):
         from myfixes.fix_first import FixFirst
@@ -103,10 +150,10 @@ class TestRefactoringTool(unittest.TestCase):
 
         class MyRT(refactor.RefactoringTool):
 
-            def print_output(self, lines):
-                diff_lines.extend(lines)
+            def print_output(self, old_text, new_text, filename, equal):
+                results.extend([old_text, new_text, filename, equal])
 
-        diff_lines = []
+        results = []
         rt = MyRT(_DEFAULT_FIXERS)
         save = sys.stdin
         sys.stdin = StringIO.StringIO("def parrot(): pass\n\n")
@@ -114,45 +161,100 @@ class TestRefactoringTool(unittest.TestCase):
             rt.refactor_stdin()
         finally:
             sys.stdin = save
-        expected = """--- <stdin> (original)
-+++ <stdin> (refactored)
-@@ -1,2 +1,2 @@
--def parrot(): pass
-+def cheese(): pass""".splitlines()
-        self.assertEqual(diff_lines[:-1], expected)
+        expected = ["def parrot(): pass\n\n",
+                    "def cheese(): pass\n\n",
+                    "<stdin>", False]
+        self.assertEqual(results, expected)
+
+    def check_file_refactoring(self, test_file, fixers=_2TO3_FIXERS):
+        def read_file():
+            with open(test_file, "rb") as fp:
+                return fp.read()
+        old_contents = read_file()
+        rt = self.rt(fixers=fixers)
+
+        rt.refactor_file(test_file)
+        self.assertEqual(old_contents, read_file())
+
+        try:
+            rt.refactor_file(test_file, True)
+            new_contents = read_file()
+            self.assertNotEqual(old_contents, new_contents)
+        finally:
+            with open(test_file, "wb") as fp:
+                fp.write(old_contents)
+        return new_contents
 
     def test_refactor_file(self):
         test_file = os.path.join(FIXER_DIR, "parrot_example.py")
-        old_contents = open(test_file, "r").read()
-        rt = self.rt()
+        self.check_file_refactoring(test_file, _DEFAULT_FIXERS)
 
-        rt.refactor_file(test_file)
-        self.assertEqual(old_contents, open(test_file, "r").read())
+    def test_refactor_dir(self):
+        def check(structure, expected):
+            def mock_refactor_file(self, f, *args):
+                got.append(f)
+            save_func = refactor.RefactoringTool.refactor_file
+            refactor.RefactoringTool.refactor_file = mock_refactor_file
+            rt = self.rt()
+            got = []
+            dir = tempfile.mkdtemp(prefix="2to3-test_refactor")
+            try:
+                os.mkdir(os.path.join(dir, "a_dir"))
+                for fn in structure:
+                    open(os.path.join(dir, fn), "wb").close()
+                rt.refactor_dir(dir)
+            finally:
+                refactor.RefactoringTool.refactor_file = save_func
+                shutil.rmtree(dir)
+            self.assertEqual(got,
+                             [os.path.join(dir, path) for path in expected])
+        check([], [])
+        tree = ["nothing",
+                "hi.py",
+                ".dumb",
+                ".after.py",
+                "sappy"]
+        expected = ["hi.py"]
+        check(tree, expected)
+        tree = ["hi.py",
+                os.path.join("a_dir", "stuff.py")]
+        check(tree, tree)
 
-        rt.refactor_file(test_file, True)
+    def test_file_encoding(self):
+        fn = os.path.join(TEST_DATA_DIR, "different_encoding.py")
+        self.check_file_refactoring(fn)
+
+    def test_bom(self):
+        fn = os.path.join(TEST_DATA_DIR, "bom.py")
+        data = self.check_file_refactoring(fn)
+        self.assertTrue(data.startswith(codecs.BOM_UTF8))
+
+    def test_crlf_newlines(self):
+        old_sep = os.linesep
+        os.linesep = "\r\n"
         try:
-            self.assertNotEqual(old_contents, open(test_file, "r").read())
+            fn = os.path.join(TEST_DATA_DIR, "crlf.py")
+            fixes = refactor.get_fixers_from_package("lib2to3.fixes")
+            self.check_file_refactoring(fn, fixes)
         finally:
-            open(test_file, "w").write(old_contents)
+            os.linesep = old_sep
 
     def test_refactor_docstring(self):
         rt = self.rt()
 
-        def example():
-            """
-            >>> example()
-            42
-            """
-        out = rt.refactor_docstring(example.__doc__, "<test>")
-        self.assertEqual(out, example.__doc__)
+        doc = """
+>>> example()
+42
+"""
+        out = rt.refactor_docstring(doc, "<test>")
+        self.assertEqual(out, doc)
 
-        def parrot():
-            """
-            >>> def parrot():
-            ...      return 43
-            """
-        out = rt.refactor_docstring(parrot.__doc__, "<test>")
-        self.assertNotEqual(out, parrot.__doc__)
+        doc = """
+>>> def parrot():
+...      return 43
+"""
+        out = rt.refactor_docstring(doc, "<test>")
+        self.assertNotEqual(out, doc)
 
     def test_explicit(self):
         from myfixes.fix_explicit import FixExplicit

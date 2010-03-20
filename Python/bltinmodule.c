@@ -226,7 +226,7 @@ static PyObject *
 builtin_callable(PyObject *self, PyObject *v)
 {
 	if (PyErr_WarnPy3k("callable() not supported in 3.x; "
-			   "use hasattr(o, '__call__')", 1) < 0)
+			   "use isinstance(x, collections.Callable)", 1) < 0)
 		return NULL;
 	return PyBool_FromLong((long)PyCallable_Check(v));
 }
@@ -467,6 +467,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 	int mode = -1;
 	int dont_inherit = 0;
 	int supplied_flags = 0;
+	int is_ast;
 	PyCompilerFlags cf;
 	PyObject *result = NULL, *cmd, *tmp = NULL;
 	Py_ssize_t length;
@@ -506,7 +507,10 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
-	if (PyAST_Check(cmd)) {
+	is_ast = PyAST_Check(cmd);
+	if (is_ast == -1)
+		return NULL;
+	if (is_ast) {
 		if (supplied_flags & PyCF_ONLY_AST) {
 			Py_INCREF(cmd);
 			result = cmd;
@@ -2129,7 +2133,7 @@ For most object types, eval(repr(object)) == object.");
 static PyObject *
 builtin_round(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	double number;
+	double number, abs_number, abs_result;
 	double f;
 	int ndigits = 0;
 	int i;
@@ -2146,10 +2150,14 @@ builtin_round(PyObject *self, PyObject *args, PyObject *kwds)
 		number /= f;
 	else
 		number *= f;
-	if (number >= 0.0)
-		number = floor(number + 0.5);
-	else
-		number = ceil(number - 0.5);
+
+	/* round `number` to nearest integer, rounding halves away from zero */
+	abs_number = fabs(number);
+	abs_result = floor(abs_number);
+	if (abs_number - abs_result >= 0.5)
+		abs_result += 1.0;
+	number = copysign(abs_result, number);
+
 	if (ndigits < 0)
 		number *= f;
 	else

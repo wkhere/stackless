@@ -55,7 +55,9 @@ Additionally, users can run one of  ::
    <yourscript> -h
    <yourscript> --help
 
-and :mod:`optparse` will print out a brief summary of your script's options::
+and :mod:`optparse` will print out a brief summary of your script's options:
+
+.. code-block:: text
 
    usage: <yourscript> [options]
 
@@ -130,12 +132,16 @@ option argument
    an argument that follows an option, is closely associated with that option,
    and is consumed from the argument list when that option is. With
    :mod:`optparse`, option arguments may either be in a separate argument from
-   their option::
+   their option:
+
+   .. code-block:: text
 
       -f foo
       --file foo
 
-   or included in the same argument::
+   or included in the same argument:
+
+   .. code-block:: text
 
       -ffoo
       --file=foo
@@ -482,7 +488,9 @@ user-friendly (documented) options::
 
 If :mod:`optparse` encounters either ``"-h"`` or ``"--help"`` on the
 command-line, or if you just call :meth:`parser.print_help`, it prints the
-following to standard output::
+following to standard output:
+
+.. code-block:: text
 
    usage: <yourscript> [options] arg1 arg2
 
@@ -556,7 +564,9 @@ parser is easy::
     group.add_option("-g", action="store_true", help="Group option.")
     parser.add_option_group(group)
 
-This would result in the following help output::
+This would result in the following help output:
+
+.. code-block:: text
 
     usage:  [options] arg1 arg2
 
@@ -594,6 +604,20 @@ For example, if your script is called ``/usr/bin/foo``::
 
    $ /usr/bin/foo --version
    foo 1.0
+
+The following two methods can be used to print and get the ``version`` string:
+
+.. method:: OptionParser.print_version(file=None)
+
+   Print the version message for the current program (``self.version``) to
+   *file* (default stdout).  As with :meth:`print_usage`, any occurrence
+   of ``"%prog"`` in ``self.version`` is replaced with the name of the current
+   program.  Does nothing if ``self.version`` is empty or undefined.
+
+.. method:: OptionParser.get_version()
+
+   Same as :meth:`print_version` but returns the version string instead of
+   printing it.
 
 
 .. _optparse-how-optparse-handles-errors:
@@ -645,8 +669,8 @@ option involved in the error; be sure to do the same when calling
 :func:`OptionParser.error` from your application code.
 
 If :mod:`optparse`'s default error-handling behaviour does not suit your needs,
-you'll need to subclass OptionParser and override its :meth:`exit` and/or
-:meth:`error` methods.
+you'll need to subclass OptionParser and override its :meth:`~OptionParser.exit`
+and/or :meth:`~OptionParser.error` methods.
 
 
 .. _optparse-putting-it-all-together:
@@ -1133,7 +1157,9 @@ must specify for any option using that action.
 
   If :mod:`optparse` sees either ``"-h"`` or ``"--help"`` on the command line,
   it will print something like the following help message to stdout (assuming
-  ``sys.argv[0]`` is ``"foo.py"``)::
+  ``sys.argv[0]`` is ``"foo.py"``):
+
+  .. code-block:: text
 
      usage: foo.py [options]
 
@@ -1378,6 +1404,18 @@ OptionParser supports several other public methods:
    Set the usage string according to the rules described above for the ``usage``
    constructor keyword argument.  Passing ``None`` sets the default usage
    string; use :data:`optparse.SUPPRESS_USAGE` to suppress a usage message.
+
+.. method:: OptionParser.print_usage(file=None)
+
+   Print the usage message for the current program (``self.usage``) to *file*
+   (default stdout).  Any occurrence of the string ``"%prog"`` in ``self.usage``
+   is replaced with the name of the current program.  Does nothing if
+   ``self.usage`` is empty or not defined.
+
+.. method:: OptionParser.get_usage()
+
+   Same as :meth:`print_usage` but returns the usage string instead of
+   printing it.
 
 .. method:: OptionParser.set_defaults(dest=value, ...)
 
@@ -1855,7 +1893,7 @@ would result in a list  ::
 
 Again we define a subclass of Option::
 
-   class MyOption (Option):
+   class MyOption(Option):
 
        ACTIONS = Option.ACTIONS + ("extend",)
        STORE_ACTIONS = Option.STORE_ACTIONS + ("extend",)

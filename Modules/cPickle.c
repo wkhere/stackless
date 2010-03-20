@@ -134,7 +134,7 @@ static PyObject *__class___str, *__getinitargs___str, *__dict___str,
   *__reduce_ex___str,
   *write_str, *append_str,
   *read_str, *readline_str, *__main___str, 
-  *copyreg_str, *dispatch_table_str;
+  *dispatch_table_str;
 
 /*************************************************************************
  Internal Data type for pickle data.                                     */
@@ -3010,7 +3010,7 @@ newPicklerobject(PyObject *file, int proto)
 
 	if (PyEval_GetRestricted()) {
 		/* Restricted execution, get private tables */
-		PyObject *m = PyImport_Import(copyreg_str);
+		PyObject *m = PyImport_ImportModule("copy_reg");
 
 		if (m == NULL)
 			goto err;
@@ -4100,7 +4100,7 @@ load_pop(Unpicklerobject *self)
 	*/
 	if (self->num_marks > 0 && self->marks[self->num_marks - 1] == len) {
 		self->num_marks--;
-	} else if (len >= 0) {
+	} else if (len > 0) {
 		len--;
 		Py_DECREF(self->stack->data[len]);
 		self->stack->length = len;
@@ -5800,7 +5800,6 @@ init_stuff(PyObject *module_dict)
 	INIT_STR(append);
 	INIT_STR(read);
 	INIT_STR(readline);
-	INIT_STR(copyreg);
 	INIT_STR(dispatch_table);
 
 	if (!( copyreg = PyImport_ImportModule("copy_reg")))
@@ -5921,12 +5920,6 @@ initcPickle(void)
 	char *rev = "1.71";	/* XXX when does this change? */
 	PyObject *format_version;
 	PyObject *compatible_formats;
-
-	/* XXX: Should mention that the pickle module will include the C
-	   XXX: optimized implementation automatically. */
-	if (PyErr_WarnPy3k("the cPickle module has been removed in "
-			   "Python 3.0", 2) < 0)
-		return;
 
 	Py_TYPE(&Picklertype) = &PyType_Type;
 	Py_TYPE(&Unpicklertype) = &PyType_Type;

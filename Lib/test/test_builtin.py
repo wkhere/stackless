@@ -1,5 +1,6 @@
 # Python test set -- built-in functions
 
+import platform
 import test.test_support, unittest
 from test.test_support import fcmp, have_unicode, TESTFN, unlink, \
                               run_unittest, run_with_locale
@@ -13,6 +14,7 @@ warnings.filterwarnings("ignore", "integer argument expected",
 
 # count the number of test runs.
 # used to skip running test_execfile() multiple times
+# and to create unique strings to intern in test_intern()
 numruns = 0
 
 class Squares:
@@ -646,7 +648,9 @@ class BuiltinTest(unittest.TestCase):
 
     def test_intern(self):
         self.assertRaises(TypeError, intern)
-        s = "never interned before"
+        # This fails if the test is run twice with a constant string,
+        # therefore append the run counter
+        s = "never interned before " + str(numruns)
         self.assert_(intern(s) is s)
         s2 = s.swapcase().swapcase()
         self.assert_(intern(s2) is s)
@@ -1255,6 +1259,14 @@ class BuiltinTest(unittest.TestCase):
         t.__float__ = lambda *args: args
         self.assertRaises(TypeError, round, t)
         self.assertRaises(TypeError, round, t, 0)
+
+    def test_round_large(self):
+        # Issue #1869: integral floats should remain unchanged
+        self.assertEqual(round(5e15-1), 5e15-1)
+        self.assertEqual(round(5e15), 5e15)
+        self.assertEqual(round(5e15+1), 5e15+1)
+        self.assertEqual(round(5e15+2), 5e15+2)
+        self.assertEqual(round(5e15+3), 5e15+3)
 
     def test_setattr(self):
         setattr(sys, 'spam', 1)

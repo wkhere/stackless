@@ -49,7 +49,7 @@ class FixRenames(fixer_base.BaseFix):
         match = super(FixRenames, self).match
         results = match(node)
         if results:
-            if any([match(obj) for obj in attr_chain(node, "parent")]):
+            if any(match(obj) for obj in attr_chain(node, "parent")):
                 return False
             return results
         return False
@@ -65,5 +65,5 @@ class FixRenames(fixer_base.BaseFix):
         #import_mod = results.get("module")
 
         if mod_name and attr_name:
-            new_attr = LOOKUP[(mod_name.value, attr_name.value)]
-            attr_name.replace(Name(new_attr, prefix=attr_name.get_prefix()))
+            new_attr = unicode(LOOKUP[(mod_name.value, attr_name.value)])
+            attr_name.replace(Name(new_attr, prefix=attr_name.prefix))

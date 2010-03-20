@@ -275,6 +275,8 @@ always available.
    +------------------------------+------------------------------------------+
    | :const:`dont_write_bytecode` | -B                                       |
    +------------------------------+------------------------------------------+
+   | :const:`no_user_site`        | -s                                       |
+   +------------------------------+------------------------------------------+
    | :const:`no_site`             | -S                                       |
    +------------------------------+------------------------------------------+
    | :const:`ignore_environment`  | -E                                       |
@@ -284,6 +286,8 @@ always available.
    | :const:`verbose`             | -v                                       |
    +------------------------------+------------------------------------------+
    | :const:`unicode`             | -U                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`bytes_warning`       | -b                                       |
    +------------------------------+------------------------------------------+
 
    .. versionadded:: 2.6
@@ -417,7 +421,10 @@ always available.
    that is deeper than the call stack, :exc:`ValueError` is raised.  The default
    for *depth* is zero, returning the frame at the top of the call stack.
 
-   This function should be used for internal and specialized purposes only.
+   .. impl-detail::
+
+      This function should be used for internal and specialized purposes only.
+      It is not guaranteed to exist in all implementations of Python.
 
 
 .. function:: getprofile()
@@ -439,12 +446,12 @@ always available.
 
    Get the trace function as set by :func:`settrace`.
 
-   .. note::
+   .. impl-detail::
 
       The :func:`gettrace` function is intended only for implementing debuggers,
-      profilers, coverage tools and the like. Its behavior is part of the
-      implementation platform, rather than part of the language definition,
-      and thus may not be available in all Python implementations.
+      profilers, coverage tools and the like.  Its behavior is part of the
+      implementation platform, rather than part of the language definition, and
+      thus may not be available in all Python implementations.
 
    .. versionadded:: 2.6
 
@@ -795,7 +802,7 @@ always available.
 
    ``'c_call'``
       A C function is about to be called.  This may be an extension function or
-      a builtin.  *arg* is the C function object.
+      a built-in.  *arg* is the C function object.
 
    ``'c_return'``
       A C function has returned. *arg* is ``None``.
@@ -808,12 +815,12 @@ always available.
 
    For more information on code and frame objects, refer to :ref:`types`.
 
-   .. note::
+   .. impl-detail::
 
       The :func:`settrace` function is intended only for implementing debuggers,
-      profilers, coverage tools and the like. Its behavior is part of the
-      implementation platform, rather than part of the language definition, and thus
-      may not be available in all Python implementations.
+      profilers, coverage tools and the like.  Its behavior is part of the
+      implementation platform, rather than part of the language definition, and
+      thus may not be available in all Python implementations.
 
 
 .. function:: settscdump(on_flag)

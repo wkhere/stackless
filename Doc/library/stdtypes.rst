@@ -129,7 +129,17 @@ Notes:
 Comparisons
 ===========
 
-.. index:: pair: chaining; comparisons
+.. index::
+   pair: chaining; comparisons
+   pair: operator; comparison
+   operator: ==
+   operator: <
+   operator: <=
+   operator: >
+   operator: >=
+   operator: !=
+   operator: is
+   operator: is not
 
 Comparison operations are supported by all objects.  They all have the same
 priority (which is higher than that of the Boolean operations). Comparisons can
@@ -159,17 +169,6 @@ This table summarizes the comparison operations:
 | ``is not`` | negated object identity |       |
 +------------+-------------------------+-------+
 
-.. index::
-   pair: operator; comparison
-   operator: ==
-   operator: <
-   operator: <=
-   operator: >
-   operator: >=
-   operator: !=
-   operator: is
-   operator: is not
-
 Notes:
 
 (1)
@@ -196,9 +195,11 @@ Instances of a class normally compare as non-equal unless the class defines the
 :meth:`__cmp__` method.  Refer to :ref:`customization`) for information on the
 use of this method to effect object comparisons.
 
-**Implementation note:** Objects of different types except numbers are ordered
-by their type names; objects of the same types that don't support proper
-comparison are ordered by their address.
+.. impl-detail::
+
+   Objects of different types except numbers are ordered by their type names;
+   objects of the same types that don't support proper comparison are ordered by
+   their address.
 
 .. index::
    operator: in
@@ -262,6 +263,13 @@ part.
    builtin: long
    builtin: float
    builtin: complex
+   operator: +
+   operator: -
+   operator: *
+   operator: /
+   operator: //
+   operator: %
+   operator: **
 
 Python fully supports mixed arithmetic: when a binary arithmetic operator has
 operands of different numeric types, the operand with the "narrower" type is
@@ -271,7 +279,7 @@ numbers of mixed type use the same rule. [#]_ The constructors :func:`int`,
 :func:`long`, :func:`float`, and :func:`complex` can be used to produce numbers
 of a specific type.
 
-All builtin numeric types support the following operations. See
+All built-in numeric types support the following operations. See
 :ref:`power` and later sections for the operators' priorities.
 
 +--------------------+---------------------------------+--------+
@@ -394,7 +402,15 @@ All :class:`numbers.Real` types (:class:`int`, :class:`long`, and
 Bit-string Operations on Integer Types
 --------------------------------------
 
-.. _bit-string-operations:
+.. index::
+   triple: operations on; integer; types
+   pair: bit-string; operations
+   pair: shifting; operations
+   pair: masking; operations
+   operator: ^
+   operator: &
+   operator: <<
+   operator: >>
 
 Plain and long integer types support additional operations that make sense only
 for bit-strings.  Negative numbers are treated as their 2's complement value
@@ -425,12 +441,6 @@ This table lists the bit-string operations sorted in ascending priority:
 +------------+--------------------------------+----------+
 | ``~x``     | the bits of *x* inverted       |          |
 +------------+--------------------------------+----------+
-
-.. index::
-   triple: operations on; integer; types
-   pair: bit-string; operations
-   pair: shifting; operations
-   pair: masking; operations
 
 Notes:
 
@@ -588,10 +598,18 @@ Implementations that do not obey this property are deemed broken.  (This
 constraint was added in Python 2.3; in Python 2.2, various iterators are broken
 according to this rule.)
 
+
+.. _generator-types:
+
+Generator Types
+---------------
+
 Python's :term:`generator`\s provide a convenient way to implement the iterator
 protocol.  If a container object's :meth:`__iter__` method is implemented as a
 generator, it will automatically return an iterator object (technically, a
-generator object) supplying the :meth:`__iter__` and :meth:`next` methods.
+generator object) supplying the :meth:`__iter__` and :meth:`next` methods.  More
+information about generators can be found in :ref:`the documentation for the
+yield expression <yieldexpr>`.
 
 
 .. _typesseq:
@@ -628,7 +646,7 @@ must have the enclosing parentheses, such as ``a, b, c`` or ``()``.  A
 single item tuple must have a trailing comma, such as ``(d,)``.
 
 Buffer objects are not directly supported by Python syntax, but can be created
-by calling the builtin function :func:`buffer`.  They don't support
+by calling the built-in function :func:`buffer`.  They don't support
 concatenation or repetition.
 
 Objects of type xrange are similar to buffers in that there is no specific syntax to
@@ -749,13 +767,15 @@ Notes:
    If *k* is ``None``, it is treated like ``1``.
 
 (6)
-   If *s* and *t* are both strings, some Python implementations such as CPython can
-   usually perform an in-place optimization for assignments of the form ``s=s+t``
-   or ``s+=t``.  When applicable, this optimization makes quadratic run-time much
-   less likely.  This optimization is both version and implementation dependent.
-   For performance sensitive code, it is preferable to use the :meth:`str.join`
-   method which assures consistent linear concatenation performance across versions
-   and implementations.
+   .. impl-detail::
+
+      If *s* and *t* are both strings, some Python implementations such as
+      CPython can usually perform an in-place optimization for assignments of
+      the form ``s = s + t`` or ``s += t``.  When applicable, this optimization
+      makes quadratic run-time much less likely.  This optimization is both
+      version and implementation dependent.  For performance sensitive code, it
+      is preferable to use the :meth:`str.join` method which assures consistent
+      linear concatenation performance across versions and implementations.
 
    .. versionchanged:: 2.4
       Formerly, string concatenation never occurred in-place.
@@ -861,7 +881,7 @@ string functions based on regular expressions.
    found.
 
 
-.. method:: str.format(format_string, *args, **kwargs)
+.. method:: str.format(*args, **kwargs)
 
    Perform a string formatting operation.  The *format_string* argument can
    contain literal text or replacement fields delimited by braces ``{}``.  Each
@@ -945,10 +965,11 @@ string functions based on regular expressions.
    For 8-bit strings, this method is locale-dependent.
 
 
-.. method:: str.join(seq)
+.. method:: str.join(iterable)
 
-   Return a string which is the concatenation of the strings in the sequence *seq*.
-   The separator between elements is the string providing this method.
+   Return a string which is the concatenation of the strings in the
+   :term:`iterable` *iterable*.  The separator between elements is the string
+   providing this method.
 
 
 .. method:: str.ljust(width[, fillchar])
@@ -1341,10 +1362,10 @@ The conversion types are:
 | ``'c'``    | Single character (accepts integer or single         |       |
 |            | character string).                                  |       |
 +------------+-----------------------------------------------------+-------+
-| ``'r'``    | String (converts any python object using            | \(5)  |
+| ``'r'``    | String (converts any Python object using            | \(5)  |
 |            | :func:`repr`).                                      |       |
 +------------+-----------------------------------------------------+-------+
-| ``'s'``    | String (converts any python object using            | \(6)  |
+| ``'s'``    | String (converts any Python object using            | \(6)  |
 |            | :func:`str`).                                       |       |
 +------------+-----------------------------------------------------+-------+
 | ``'%'``    | No argument is converted, results in a ``'%'``      |       |
@@ -1577,10 +1598,13 @@ Notes:
    example, sort by department, then by salary grade).
 
 (10)
-   While a list is being sorted, the effect of attempting to mutate, or even
-   inspect, the list is undefined.  The C implementation of Python 2.3 and newer
-   makes the list appear empty for the duration, and raises :exc:`ValueError` if it
-   can detect that the list has been mutated during a sort.
+   .. impl-detail::
+
+      While a list is being sorted, the effect of attempting to mutate, or even
+      inspect, the list is undefined.  The C implementation of Python 2.3 and
+      newer makes the list appear empty for the duration, and raises
+      :exc:`ValueError` if it can detect that the list has been mutated during a
+      sort.
 
 
 .. _types-set:
@@ -1605,7 +1629,7 @@ set``.  Being an unordered collection, sets do not record element position or
 order of insertion.  Accordingly, sets do not support indexing, slicing, or
 other sequence-like behavior.
 
-There are currently two builtin set types, :class:`set` and :class:`frozenset`.
+There are currently two built-in set types, :class:`set` and :class:`frozenset`.
 The :class:`set` type is mutable --- the contents can be changed using methods
 like :meth:`add` and :meth:`remove`.  Since it is mutable, it has no hash value
 and cannot be used as either a dictionary key or as an element of another set.
@@ -1738,7 +1762,7 @@ The constructors for both classes work the same:
    .. method:: update(other, ...)
                set |= other | ...
 
-      Update the set, adding elements from *other*.
+      Update the set, adding elements from all others.
 
       .. versionchanged:: 2.6
          Accepts multiple input iterables.
@@ -1746,7 +1770,7 @@ The constructors for both classes work the same:
    .. method:: intersection_update(other, ...)
                set &= other & ...
 
-      Update the set, keeping only elements found in it and *other*.
+      Update the set, keeping only elements found in it and all others.
 
       .. versionchanged:: 2.6
          Accepts multiple input iterables.
@@ -1954,20 +1978,21 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
 
       Return a copy of the dictionary's list of ``(key, value)`` pairs.
 
-      .. note::
+      .. impl-detail::
 
          Keys and values are listed in an arbitrary order which is non-random,
          varies across Python implementations, and depends on the dictionary's
-         history of insertions and deletions. If :meth:`items`, :meth:`keys`,
-         :meth:`values`, :meth:`iteritems`, :meth:`iterkeys`, and
-         :meth:`itervalues` are called with no intervening modifications to the
-         dictionary, the lists will directly correspond.  This allows the
-         creation of ``(value, key)`` pairs using :func:`zip`: ``pairs =
-         zip(d.values(), d.keys())``.  The same relationship holds for the
-         :meth:`iterkeys` and :meth:`itervalues` methods: ``pairs =
-         zip(d.itervalues(), d.iterkeys())`` provides the same value for
-         ``pairs``. Another way to create the same list is ``pairs = [(v, k) for
-         (k, v) in d.iteritems()]``.
+         history of insertions and deletions.
+
+      If :meth:`items`, :meth:`keys`, :meth:`values`, :meth:`iteritems`,
+      :meth:`iterkeys`, and :meth:`itervalues` are called with no intervening
+      modifications to the dictionary, the lists will directly correspond.  This
+      allows the creation of ``(value, key)`` pairs using :func:`zip`: ``pairs =
+      zip(d.values(), d.keys())``.  The same relationship holds for the
+      :meth:`iterkeys` and :meth:`itervalues` methods: ``pairs =
+      zip(d.itervalues(), d.iterkeys())`` provides the same value for
+      ``pairs``. Another way to create the same list is ``pairs = [(v, k) for
+      (k, v) in d.iteritems()]``.
 
    .. method:: iteritems()
 
@@ -2034,7 +2059,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
 
       :func:`update` accepts either another dictionary object or an iterable of
       key/value pairs (as a tuple or other iterable of length two).  If keyword
-      arguments are specified, the dictionary is then is updated with those
+      arguments are specified, the dictionary is then updated with those
       key/value pairs: ``d.update(red=1, blue=2)``.
 
       .. versionchanged:: 2.4
@@ -2114,6 +2139,11 @@ Files have the following methods:
    Flush the internal buffer, like ``stdio``'s :cfunc:`fflush`.  This may be a
    no-op on some file-like objects.
 
+   .. note::
+
+      :meth:`flush` does not necessarily write the file's data to disk.  Use
+      :meth:`flush` followed by :func:`os.fsync` to ensure this behavior.
+
 
 .. method:: file.fileno()
 
@@ -2147,12 +2177,12 @@ Files have the following methods:
    A file object is its own iterator, for example ``iter(f)`` returns *f* (unless
    *f* is closed).  When a file is used as an iterator, typically in a
    :keyword:`for` loop (for example, ``for line in f: print line``), the
-   :meth:`next` method is called repeatedly.  This method returns the next input
+   :meth:`.next` method is called repeatedly.  This method returns the next input
    line, or raises :exc:`StopIteration` when EOF is hit when the file is open for
    reading (behavior is undefined when the file is open for writing).  In order to
    make a :keyword:`for` loop the most efficient way of looping over the lines of a
    file (a very common operation), the :meth:`next` method uses a hidden read-ahead
-   buffer.  As a consequence of using a read-ahead buffer, combining :meth:`next`
+   buffer.  As a consequence of using a read-ahead buffer, combining :meth:`.next`
    with other file methods (like :meth:`readline`) does not work right.  However,
    using :meth:`seek` to reposition the file to an absolute position will flush the
    read-ahead buffer.
@@ -2419,9 +2449,9 @@ decimal arithmetic context. The specific types are not treated specially beyond
 their implementation of the context management protocol. See the
 :mod:`contextlib` module for some examples.
 
-Python's :term:`generator`\s and the ``contextlib.contextfactory`` :term:`decorator`
+Python's :term:`generator`\s and the ``contextlib.contextmanager`` :term:`decorator`
 provide a convenient way to implement these protocols.  If a generator function is
-decorated with the ``contextlib.contextfactory`` decorator, it will return a
+decorated with the ``contextlib.contextmanager`` decorator, it will return a
 context manager implementing the necessary :meth:`__enter__` and
 :meth:`__exit__` methods, rather than the iterator produced by an undecorated
 generator function.

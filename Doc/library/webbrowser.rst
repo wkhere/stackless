@@ -10,7 +10,7 @@
 
 The :mod:`webbrowser` module provides a high-level interface to allow displaying
 Web-based documents to users. Under most circumstances, simply calling the
-:func:`open` function from this module will do the right thing.
+:func:`.open` function from this module will do the right thing.
 
 Under Unix, graphical browsers are preferred under X11, but text-mode browsers
 will be used if graphical browsers are not available or an X11 display isn't
@@ -18,10 +18,10 @@ available.  If text-mode browsers are used, the calling process will block until
 the user exits the browser.
 
 If the environment variable :envvar:`BROWSER` exists, it is interpreted to
-override the platform default list of browsers, as a os.pathsep-separated list
-of browsers to try in order.  When the value of a list part contains the string
-``%s``, then it is  interpreted as a literal browser command line to be used
-with the argument URL substituted for ``%s``; if the part does not contain
+override the platform default list of browsers, as a :data:`os.pathsep`-separated
+list of browsers to try in order.  When the value of a list part contains the
+string ``%s``, then it is  interpreted as a literal browser command line to be
+used with the argument URL substituted for ``%s``; if the part does not contain
 ``%s``, it is simply interpreted as the name of the browser to launch. [1]_
 
 For non-Unix platforms, or when a remote browser is available on Unix, the
@@ -46,14 +46,14 @@ The following exception is defined:
 The following functions are defined:
 
 
-.. function:: open(url[, new=0[, autoraise=1]])
+.. function:: open(url[, new=0[, autoraise=True]])
 
-   Display *url* using the default browser. If *new* is 0, the *url* is opened in
-   the same browser window if possible.  If *new* is 1, a new browser window is
-   opened if possible.  If *new* is 2, a new browser page ("tab") is opened if
-   possible.  If *autoraise* is true, the window is raised if possible (note that
-   under many window managers this will occur regardless of the setting of this
-   variable).
+   Display *url* using the default browser. If *new* is 0, the *url* is opened
+   in the same browser window if possible.  If *new* is 1, a new browser window
+   is opened if possible.  If *new* is 2, a new browser page ("tab") is opened
+   if possible.  If *autoraise* is ``True``, the window is raised if possible
+   (note that under many window managers this will occur regardless of the
+   setting of this variable).
 
    Note that on some platforms, trying to open a filename using this function,
    may work and start the operating system's associated program.  However, this
@@ -162,10 +162,10 @@ Notes:
 
 Here are some simple examples::
 
-   url = 'http://www.python.org'
+   url = 'http://www.python.org/'
 
    # Open URL in a new tab, if a browser window is already open.
-   webbrowser.open_new_tab(url + '/doc')
+   webbrowser.open_new_tab(url + 'doc/')
 
    # Open URL in new window, raising the window if possible.
    webbrowser.open_new(url)
@@ -176,11 +176,11 @@ Here are some simple examples::
 Browser Controller Objects
 --------------------------
 
-Browser controllers provide these methods which parallel two of the module-level
-convenience functions:
+Browser controllers provide these methods which parallel three of the
+module-level convenience functions:
 
 
-.. method:: controller.open(url[, new[, autoraise=1]])
+.. method:: controller.open(url[, new=0[, autoraise=True]])
 
    Display *url* using the browser handled by this controller. If *new* is 1, a new
    browser window is opened if possible. If *new* is 2, a new browser page ("tab")

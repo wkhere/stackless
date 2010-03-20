@@ -6194,7 +6194,7 @@ unicode_center(PyUnicodeObject *self, PyObject *args)
 
 /* This code should go into some future Unicode collation support
    module. The basic comparison should compare ordinals on a naive
-   basis (this is what Java does and thus JPython too). */
+   basis (this is what Java does and thus Jython too). */
 
 /* speedy UTF-16 code point order comparison */
 /* gleaned from: */
@@ -7036,10 +7036,10 @@ unicode_isnumeric(PyUnicodeObject *self)
 }
 
 PyDoc_STRVAR(join__doc__,
-             "S.join(sequence) -> unicode\n\
+             "S.join(iterable) -> unicode\n\
 \n\
 Return a string which is the concatenation of the strings in the\n\
-sequence.  The separator between elements is S.");
+iterable.  The separator between elements is S.");
 
 static PyObject*
 unicode_join(PyObject *self, PyObject *data)
@@ -7603,7 +7603,7 @@ unicode_partition(PyUnicodeObject *self, PyObject *separator)
 }
 
 PyDoc_STRVAR(rpartition__doc__,
-             "S.rpartition(sep) -> (tail, sep, head)\n\
+             "S.rpartition(sep) -> (head, sep, tail)\n\
 \n\
 Search for the separator sep in S, starting at the end of S, and return\n\
 the part before it, the separator itself, and the part after it.  If the\n\
@@ -8357,6 +8357,8 @@ formatchar(Py_UNICODE *buf,
            size_t buflen,
            PyObject *v)
 {
+    PyObject *unistr;
+    char *str;
     /* presume that the buffer is at least 2 characters long */
     if (PyUnicode_Check(v)) {
         if (PyUnicode_GET_SIZE(v) != 1)
@@ -8367,7 +8369,22 @@ formatchar(Py_UNICODE *buf,
     else if (PyString_Check(v)) {
         if (PyString_GET_SIZE(v) != 1)
             goto onError;
-        buf[0] = (Py_UNICODE)PyString_AS_STRING(v)[0];
+        /* #7649: "u'%c' % char" should behave like "u'%s' % char" and fail
+           with a UnicodeDecodeError if 'char' is not decodable with the
+           default encoding (usually ASCII, but it might be something else) */
+        str = PyString_AS_STRING(v);
+        if ((unsigned char)str[0] > 0x7F) {
+            /* the char is not ASCII; try to decode the string using the
+               default encoding and return -1 to let the UnicodeDecodeError
+               be raised if the string can't be decoded */
+            unistr = PyUnicode_Decode(str, 1, NULL, "strict");
+            if (unistr == NULL)
+                return -1;
+            buf[0] = PyUnicode_AS_UNICODE(unistr)[0];
+            Py_DECREF(unistr);
+        }
+        else
+            buf[0] = (Py_UNICODE)str[0];
     }
 
     else {

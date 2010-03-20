@@ -19,6 +19,12 @@ import curses.panel
 from test.test_support import requires, TestSkipped
 requires('curses')
 
+# skip all these tests on FreeBSD: test_curses currently hangs the
+# FreeBSD buildbots, preventing other tests from running.  See issue
+# #7384.
+if 'freebsd' in sys.platform:
+    raise unittest.SkipTest('The curses module is broken on FreeBSD.  See http://bugs.python.org/issue7384.')
+
 # XXX: if newterm was supported we could use it instead of initscr and not exit
 term = os.environ.get('TERM')
 if not term or term == 'unknown':
@@ -255,6 +261,10 @@ def test_resize_term(stdscr):
         if curses.LINES != lines - 1 or curses.COLS != cols + 1:
             raise RuntimeError, "Expected resizeterm to update LINES and COLS"
 
+def test_issue6243(stdscr):
+    curses.ungetch(1025)
+    stdscr.getkey()
+
 def main(stdscr):
     curses.savetty()
     try:
@@ -262,6 +272,7 @@ def main(stdscr):
         window_funcs(stdscr)
         test_userptr_without_set(stdscr)
         test_resize_term(stdscr)
+        test_issue6243(stdscr)
     finally:
         curses.resetty()
 
@@ -269,6 +280,8 @@ if __name__ == '__main__':
     curses.wrapper(main)
     unit_tests()
 else:
+    if not sys.__stdout__.isatty():
+        raise TestSkipped("sys.__stdout__ is not a tty")
     # testing setupterm() inside initscr/endwin
     # causes terminal breakage
     curses.setupterm(fd=sys.__stdout__.fileno())

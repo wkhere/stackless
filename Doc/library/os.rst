@@ -528,6 +528,9 @@ by file descriptors.
    Force write of file with filedescriptor *fd* to disk. Does not force update of
    metadata. Availability: Unix.
 
+   .. note::
+      This function is not available on MacOS.
+
 
 .. function:: fpathconf(fd, name)
 
@@ -603,10 +606,10 @@ by file descriptors.
 
    .. note::
 
-      This function is intended for low-level I/O.  For normal usage, use the built-in
-      function :func:`open`, which returns a "file object" with :meth:`~file.read` and
-      :meth:`~file.write` methods (and many more).  To wrap a file descriptor in a "file
-      object", use :func:`fdopen`.
+      This function is intended for low-level I/O.  For normal usage, use the
+      built-in function :func:`open`, which returns a "file object" with
+      :meth:`~file.read` and :meth:`~file.write` methods (and many more).  To
+      wrap a file descriptor in a "file object", use :func:`fdopen`.
 
 
 .. function:: openpty()
@@ -751,10 +754,10 @@ Files and Directories
 
    .. note::
 
-      Using :func:`access` to check if a user is authorized to e.g. open a file before
-      actually doing so using :func:`open` creates a security hole, because the user
-      might exploit the short time interval  between checking and opening the file to
-      manipulate it.
+      Using :func:`access` to check if a user is authorized to e.g. open a file
+      before actually doing so using :func:`open` creates a security hole,
+      because the user might exploit the short time interval between checking
+      and opening the file to manipulate it.
 
    .. note::
 
@@ -915,9 +918,10 @@ Files and Directories
    .. versionadded:: 2.3
 
 
-.. function:: link(src, dst)
+.. function:: link(source, link_name)
 
-   Create a hard link pointing to *src* named *dst*. Availability: Unix.
+   Create a hard link pointing to *source* named *link_name*. Availability:
+   Unix.
 
 
 .. function:: listdir(path)
@@ -1063,12 +1067,12 @@ Files and Directories
 
 .. function:: remove(path)
 
-   Remove the file *path*.  If *path* is a directory, :exc:`OSError` is raised; see
-   :func:`rmdir` below to remove a directory.  This is identical to the
-   :func:`unlink` function documented below.  On Windows, attempting to remove a
-   file that is in use causes an exception to be raised; on Unix, the directory
-   entry is removed but the storage allocated to the file is not made available
-   until the original file is no longer in use. Availability: Unix,
+   Remove (delete) the file *path*.  If *path* is a directory, :exc:`OSError` is
+   raised; see :func:`rmdir` below to remove a directory.  This is identical to
+   the :func:`unlink` function documented below.  On Windows, attempting to
+   remove a file that is in use causes an exception to be raised; on Unix, the
+   directory entry is removed but the storage allocated to the file is not made
+   available until the original file is no longer in use. Availability: Unix,
    Windows.
 
 
@@ -1117,7 +1121,10 @@ Files and Directories
 
 .. function:: rmdir(path)
 
-   Remove the directory *path*. Availability: Unix, Windows.
+   Remove (delete) the directory *path*.  Only works when the directory is
+   empty, otherwise, :exc:`OSError` is raised.  In order to remove whole
+   directory trees, :func:`shutil.rmtree` can be used.  Availability: Unix,
+   Windows.
 
 
 .. function:: stat(path)
@@ -1238,9 +1245,10 @@ Files and Directories
       Added access to values as attributes of the returned object.
 
 
-.. function:: symlink(src, dst)
+.. function:: symlink(source, link_name)
 
-   Create a symbolic link pointing to *src* named *dst*. Availability: Unix.
+   Create a symbolic link pointing to *source* named *link_name*. Availability:
+   Unix.
 
 
 .. function:: tempnam([dir[, prefix]])
@@ -1292,9 +1300,9 @@ Files and Directories
 
 .. function:: unlink(path)
 
-   Remove the file *path*.  This is the same function as :func:`remove`; the
-   :func:`unlink` name is its traditional Unix name. Availability: Unix,
-   Windows.
+   Remove (delete) the file *path*.  This is the same function as
+   :func:`remove`; the :func:`unlink` name is its traditional Unix
+   name. Availability: Unix, Windows.
 
 
 .. function:: utime(path, times)
@@ -1828,9 +1836,9 @@ written in Python, such as a mail server's external command delivery program.
 .. function:: system(command)
 
    Execute the command (a string) in a subshell.  This is implemented by calling
-   the Standard C function :cfunc:`system`, and has the same limitations.  Changes
-   to :data:`os.environ`, :data:`sys.stdin`, etc. are not reflected in the
-   environment of the executed command.
+   the Standard C function :cfunc:`system`, and has the same limitations.
+   Changes to :data:`sys.stdin`, etc. are not reflected in the environment of the
+   executed command.
 
    On Unix, the return value is the exit status of the process encoded in the
    format specified for :func:`wait`.  Note that POSIX does not specify the meaning

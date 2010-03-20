@@ -1620,7 +1620,7 @@ string_partition(PyStringObject *self, PyObject *sep_obj)
 }
 
 PyDoc_STRVAR(rpartition__doc__,
-"S.rpartition(sep) -> (tail, sep, head)\n\
+"S.rpartition(sep) -> (head, sep, tail)\n\
 \n\
 Search for the separator sep in S, starting at the end of S, and return\n\
 the part before it, the separator itself, and the part after it.  If the\n\
@@ -1806,10 +1806,10 @@ onError:
 
 
 PyDoc_STRVAR(join__doc__,
-"S.join(sequence) -> string\n\
+"S.join(iterable) -> string\n\
 \n\
 Return a string which is the concatenation of the strings in the\n\
-sequence.  The separator between elements is S.");
+iterable.  The separator between elements is S.");
 
 static PyObject *
 string_join(PyStringObject *self, PyObject *orig)

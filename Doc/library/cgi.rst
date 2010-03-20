@@ -1,6 +1,5 @@
-
-:mod:`cgi` --- Common Gateway Interface support.
-================================================
+:mod:`cgi` --- Common Gateway Interface support
+===============================================
 
 .. module:: cgi
    :synopsis: Helpers for running Python scripts via the Common Gateway Interface.
@@ -92,12 +91,13 @@ form contents from standard input or the environment (depending on the value of
 various environment variables set according to the CGI standard).  Since it may
 consume standard input, it should be instantiated only once.
 
-The :class:`FieldStorage` instance can be indexed like a Python dictionary, and
-also supports the standard dictionary methods :meth:`has_key` and :meth:`keys`.
-The built-in :func:`len` is also supported.  Form fields containing empty
-strings are ignored and do not appear in the dictionary; to keep such values,
-provide a true value for the optional *keep_blank_values* keyword parameter when
-creating the :class:`FieldStorage` instance.
+The :class:`FieldStorage` instance can be indexed like a Python dictionary.
+It allows membership testing with the :keyword:`in` operator, and also supports
+the standard dictionary method :meth:`keys` and the built-in function
+:func:`len`.  Form fields containing empty strings are ignored and do not appear
+in the dictionary; to keep such values, provide a true value for the optional
+*keep_blank_values* keyword parameter when creating the :class:`FieldStorage`
+instance.
 
 For instance, the following code (which assumes that the
 :mailheader:`Content-Type` header and blank line have already been printed)
@@ -105,7 +105,7 @@ checks that the fields ``name`` and ``addr`` are both set to a non-empty
 string::
 
    form = cgi.FieldStorage()
-   if not (form.has_key("name") and form.has_key("addr")):
+   if "name" not in form or "addr" not in form:
        print "<H1>Error</H1>"
        print "Please fill in the name and addr fields."
        return
@@ -136,8 +136,8 @@ commas::
 If a field represents an uploaded file, accessing the value via the
 :attr:`value` attribute or the :func:`getvalue` method reads the entire file in
 memory as a string.  This may not be what you want. You can test for an uploaded
-file by testing either the :attr:`filename` attribute or the :attr:`file`
-attribute.  You can then read the data at leisure from the :attr:`file`
+file by testing either the :attr:`filename` attribute or the :attr:`!file`
+attribute.  You can then read the data at leisure from the :attr:`!file`
 attribute::
 
    fileitem = form["userfile"]
@@ -157,7 +157,7 @@ field will be set to the value -1.
 The file upload draft standard entertains the possibility of uploading multiple
 files from one field (using a recursive :mimetype:`multipart/\*` encoding).
 When this occurs, the item will be a dictionary-like :class:`FieldStorage` item.
-This can be determined by testing its :attr:`type` attribute, which should be
+This can be determined by testing its :attr:`!type` attribute, which should be
 :mimetype:`multipart/form-data` (or perhaps another MIME type matching
 :mimetype:`multipart/\*`).  In this case, it can be iterated over recursively
 just like the top-level form object.
@@ -165,7 +165,7 @@ just like the top-level form object.
 When a form is submitted in the "old" format (as the query string or as a single
 data part of type :mimetype:`application/x-www-form-urlencoded`), the items will
 actually be instances of the class :class:`MiniFieldStorage`.  In this case, the
-:attr:`list`, :attr:`file`, and :attr:`filename` attributes are always ``None``.
+:attr:`!list`, :attr:`!file`, and :attr:`filename` attributes are always ``None``.
 
 A form submitted via POST that also has a query string will contain both
 :class:`FieldStorage` and :class:`MiniFieldStorage` items.
@@ -213,7 +213,7 @@ The problem with the code is that you should never expect that a client will
 provide valid input to your scripts.  For example, if a curious user appends
 another ``user=foo`` pair to the query string, then the script would crash,
 because in this situation the ``getvalue("user")`` method call returns a list
-instead of a string.  Calling the :meth:`toupper` method on a list is not valid
+instead of a string.  Calling the :meth:`~str.upper` method on a list is not valid
 (since lists do not have a method of this name) and results in an
 :exc:`AttributeError` exception.
 

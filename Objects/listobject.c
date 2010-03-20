@@ -126,11 +126,11 @@ PyList_New(Py_ssize_t size)
 		PyErr_BadInternalCall();
 		return NULL;
 	}
-	nbytes = size * sizeof(PyObject *);
 	/* Check for overflow without an actual overflow,
 	 *  which can cause compiler to optimise out */
-	if (size > PY_SIZE_MAX / sizeof(PyObject *))
+	if ((size_t)size > PY_SIZE_MAX / sizeof(PyObject *))
 		return PyErr_NoMemory();
+	nbytes = size * sizeof(PyObject *);
 	if (numfree) {
 		numfree--;
 		op = free_list[numfree];
@@ -319,6 +319,7 @@ list_print(PyListObject *op, FILE *fp, int flags)
 {
 	int rc;
 	Py_ssize_t i;
+	PyObject *item;
 
 	rc = Py_ReprEnter((PyObject*)op);
 	if (rc != 0) {
@@ -333,15 +334,19 @@ list_print(PyListObject *op, FILE *fp, int flags)
 	fprintf(fp, "[");
 	Py_END_ALLOW_THREADS
 	for (i = 0; i < Py_SIZE(op); i++) {
+		item = op->ob_item[i];
+		Py_INCREF(item);
 		if (i > 0) {
 			Py_BEGIN_ALLOW_THREADS
 			fprintf(fp, ", ");
 			Py_END_ALLOW_THREADS
 		}
-		if (PyObject_Print(op->ob_item[i], fp, 0) != 0) {
+		if (PyObject_Print(item, fp, 0) != 0) {
+			Py_DECREF(item);
 			Py_ReprLeave((PyObject *)op);
 			return -1;
 		}
+		Py_DECREF(item);
 	}
 	Py_BEGIN_ALLOW_THREADS
 	fprintf(fp, "]");
@@ -1421,7 +1426,7 @@ merge_getmem(MergeState *ms, Py_ssize_t need)
 	 * we don't care what's in the block.
 	 */
 	merge_freemem(ms);
-	if (need > PY_SSIZE_T_MAX / sizeof(PyObject*)) {
+	if ((size_t)need > PY_SSIZE_T_MAX / sizeof(PyObject*)) {
 		PyErr_NoMemory();
 		return -1;
 	}
@@ -2511,8 +2516,8 @@ static PySequenceMethods list_as_sequence = {
 };
 
 PyDoc_STRVAR(list_doc,
-"list() -> new list\n"
-"list(sequence) -> new list initialized from sequence's items");
+"list() -> new empty list\n"
+"list(iterable) -> new list initialized from iterable's items");
 
 
 static PyObject *
@@ -2599,7 +2604,8 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 		if (value == NULL) {
 			/* delete slice */
 			PyObject **garbage;
-			Py_ssize_t cur, i;
+			size_t cur;
+			Py_ssize_t i;
 
 			if (slicelength <= 0)
 				return 0;
@@ -2610,7 +2616,8 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 				step = -step;
 			}
 
-			assert(slicelength <= PY_SIZE_MAX / sizeof(PyObject*));
+			assert((size_t)slicelength <=
+			       PY_SIZE_MAX / sizeof(PyObject*));
 
 			garbage = (PyObject**)
 				PyMem_MALLOC(slicelength*sizeof(PyObject*));
@@ -2626,13 +2633,13 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 			   and then tail end of the list that was not
 			   covered by the slice */
 			for (cur = start, i = 0;
-			     cur < stop;
+			     cur < (size_t)stop;
 			     cur += step, i++) {
 				Py_ssize_t lim = step - 1;
 
 				garbage[i] = PyList_GET_ITEM(self, cur);
 
-				if (cur + step >= Py_SIZE(self)) {
+				if (cur + step >= (size_t)Py_SIZE(self)) {
 					lim = Py_SIZE(self) - cur - 1;
 				}
 
@@ -2641,7 +2648,7 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 					lim * sizeof(PyObject *));
 			}
 			cur = start + slicelength*step;
-			if (cur < Py_SIZE(self)) {
+			if (cur < (size_t)Py_SIZE(self)) {
 				memmove(self->ob_item + cur - slicelength,
 					self->ob_item + cur,
 					(Py_SIZE(self) - cur) * 

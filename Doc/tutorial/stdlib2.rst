@@ -61,8 +61,8 @@ formatting numbers with group separators::
    >>> x = 1234567.8
    >>> locale.format("%d", x, grouping=True)
    '1,234,567'
-   >>> locale.format("%s%.*f", (conv['currency_symbol'],
-   ...               conv['frac_digits'], x), grouping=True)
+   >>> locale.format_string("%s%.*f", (conv['currency_symbol'],
+   ...                      conv['frac_digits'], x), grouping=True)
    '$1,234,567.80'
 
 
@@ -289,7 +289,7 @@ The :mod:`array` module provides an :class:`array()` object that is like a list
 that stores only homogeneous data and stores it more compactly.  The following
 example shows an array of numbers stored as two byte unsigned binary numbers
 (typecode ``"H"``) rather than the usual 16 bytes per entry for regular lists of
-python int objects::
+Python int objects::
 
    >>> from array import array
    >>> a = array('H', [4000, 10, 700, 22222])
@@ -347,12 +347,15 @@ Decimal Floating Point Arithmetic
 
 The :mod:`decimal` module offers a :class:`Decimal` datatype for decimal
 floating point arithmetic.  Compared to the built-in :class:`float`
-implementation of binary floating point, the new class is especially helpful for
-financial applications and other uses which require exact decimal
-representation, control over precision, control over rounding to meet legal or
-regulatory requirements, tracking of significant decimal places, or for
-applications where the user expects the results to match calculations done by
-hand.
+implementation of binary floating point, the class is especially helpful for
+
+* financial applications and other uses which require exact decimal
+  representation,
+* control over precision,
+* control over rounding to meet legal or regulatory requirements,
+* tracking of significant decimal places, or
+* applications where the user expects the results to match calculations done by
+  hand.
 
 For example, calculating a 5% tax on a 70 cent phone charge gives different
 results in decimal floating point and binary floating point. The difference

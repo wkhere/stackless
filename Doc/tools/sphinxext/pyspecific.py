@@ -20,12 +20,55 @@ Body.enum.converters['loweralpha'] = \
     Body.enum.converters['lowerroman'] = \
     Body.enum.converters['upperroman'] = lambda x: None
 
+# monkey-patch HTML translator to give versionmodified paragraphs a class
+def new_visit_versionmodified(self, node):
+    self.body.append(self.starttag(node, 'p', CLASS=node['type']))
+    text = versionlabels[node['type']] % node['version']
+    if len(node):
+        text += ': '
+    else:
+        text += '.'
+    self.body.append('<span class="versionmodified">%s</span>' % text)
+
+from sphinx.writers.html import HTMLTranslator
+from sphinx.locale import versionlabels
+HTMLTranslator.visit_versionmodified = new_visit_versionmodified
+
+# Support for marking up and linking to bugs.python.org issues
 
 def issue_role(typ, rawtext, text, lineno, inliner, options={}, content=[]):
     issue = utils.unescape(text)
     text = 'issue ' + issue
     refnode = nodes.reference(text, text, refuri=ISSUE_URI % issue)
     return [refnode], []
+
+
+# Support for marking up implementation details
+
+from sphinx.util.compat import Directive
+
+class ImplementationDetail(Directive):
+
+    has_content = True
+    required_arguments = 0
+    optional_arguments = 1
+    final_argument_whitespace = True
+
+    def run(self):
+        pnode = nodes.compound(classes=['impl-detail'])
+        content = self.content
+        add_text = nodes.strong('CPython implementation detail:',
+                                'CPython implementation detail:')
+        if self.arguments:
+            n, m = self.state.inline_text(self.arguments[0], self.lineno)
+            pnode.append(nodes.paragraph('', '', *(n + m)))
+        self.state.nested_parse(content, self.content_offset, pnode)
+        if pnode.children and isinstance(pnode[0], nodes.paragraph):
+            pnode[0].insert(0, add_text)
+            pnode[0].insert(1, nodes.Text(' '))
+        else:
+            pnode.insert(0, nodes.paragraph('', '', add_text))
+        return [pnode]
 
 
 # Support for building "topic help" for pydoc
@@ -105,9 +148,11 @@ class PydocTopicsBuilder(Builder):
         finally:
             f.close()
 
+
 # Support for checking for suspicious markup
 
 import suspicious
+
 
 # Support for documenting Opcodes
 
@@ -131,7 +176,9 @@ def parse_opcode_signature(env, sig, signode):
 
 def setup(app):
     app.add_role('issue', issue_role)
+    app.add_directive('impl-detail', ImplementationDetail)
     app.add_builder(PydocTopicsBuilder)
     app.add_builder(suspicious.CheckSuspiciousMarkupBuilder)
     app.add_description_unit('opcode', 'opcode', '%s (opcode)',
                              parse_opcode_signature)
+    app.add_description_unit('2to3fixer', '2to3fixer', '%s (2to3 fixer)')

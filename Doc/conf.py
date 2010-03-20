@@ -46,6 +46,9 @@ unused_docs = [
     'library/xml.etree',
 ]
 
+# Ignore .rst in Sphinx its self.
+exclude_trees = ['tools/sphinx']
+
 # Relative filename of the reference count data file.
 refcount_file = 'data/refcounts.dat'
 
@@ -145,7 +148,8 @@ latex_preamble = r'''
 # Documents to append as an appendix to all manuals.
 latex_appendices = ['glossary', 'about', 'license', 'copyright']
 
-latex_elements = {'inputenc': '\\usepackage[utf8x]{inputenc}'}
+# Get LaTeX to handle Unicode correctly
+latex_elements = {'inputenc': r'\usepackage[utf8x]{inputenc}'}
 
 # Options for the coverage checker
 # --------------------------------

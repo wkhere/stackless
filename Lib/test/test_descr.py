@@ -1142,6 +1142,15 @@ order (MRO) for bases """
             del h
         self.assertEqual(s.getvalue(), '')
 
+        class X(object):
+            __slots__ = "a"
+        try:
+            del X().a
+        except AttributeError:
+            pass
+        else:
+            self.fail("didn't raise AttributeError")
+
     def test_slots_special(self):
         # Testing __dict__ and __weakref__ in __slots__...
         class D(object):
@@ -1197,6 +1206,15 @@ order (MRO) for bases """
 
         # This used to crash
         self.assertRaises(TypeError, MyABC.a.__set__, u, 3)
+
+    def test_metaclass_cmp(self):
+        # See bug 7491.
+        class M(type):
+            def __cmp__(self, other):
+                return -1
+        class X(object):
+            __metaclass__ = M
+        self.assertTrue(X < M)
 
     def test_dynamics(self):
         # Testing class attribute propagation...
@@ -1767,6 +1785,8 @@ order (MRO) for bases """
 
         # Safety test for __cmp__
         def unsafecmp(a, b):
+            if not hasattr(a.__class__, "__cmp__"):
+                return
             try:
                 a.__class__.__cmp__(a, b)
             except TypeError:

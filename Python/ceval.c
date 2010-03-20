@@ -53,10 +53,28 @@ ppc_getcounter(uint64 *v)
 	((long*)(v))[1] = tb;
 }
 
-#else /* this is for linux/x86 (and probably any other GCC/x86 combo) */
+#elif defined(__i386__)
+
+/* this is for linux/x86 (and probably any other GCC/x86 combo) */
 
 #define READ_TIMESTAMP(val) \
      __asm__ __volatile__("rdtsc" : "=A" (val))
+
+#elif defined(__x86_64__)
+
+/* for gcc/x86_64, the "A" constraint in DI mode means *either* rax *or* rdx;
+   not edx:eax as it does for i386.  Since rdtsc puts its result in edx:eax
+   even in 64-bit mode, we need to use "a" and "d" for the lower and upper
+   32-bit pieces of the result. */
+
+#define READ_TIMESTAMP(val) \
+    __asm__ __volatile__("rdtsc" : \
+                         "=a" (((int*)&(val))[0]), "=d" (((int*)&(val))[1]));
+
+
+#else
+
+#error "Don't know how to implement timestamp counter for this architecture"
 
 #endif
 
@@ -129,6 +147,7 @@ static void reset_exc_info(PyThreadState *);
 static void format_exc_check_arg(PyObject *, char *, PyObject *);
 static PyObject * string_concatenate(PyObject *, PyObject *,
 				    PyFrameObject *, unsigned char *);
+static PyObject * kwd_as_string(PyObject *);
 
 #define NAME_ERROR_MSG \
 	"name '%.200s' is not defined"
@@ -1371,7 +1390,9 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 				register long a, b, i;
 				a = PyInt_AS_LONG(v);
 				b = PyInt_AS_LONG(w);
-				i = a + b;
+				/* cast to avoid undefined behaviour
+				   on overflow */
+				i = (long)((unsigned long)a + b);
 				if ((i^a) < 0 && (i^b) < 0)
 					goto slow_add;
 				x = PyInt_FromLong(i);
@@ -1401,7 +1422,9 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 				register long a, b, i;
 				a = PyInt_AS_LONG(v);
 				b = PyInt_AS_LONG(w);
-				i = a - b;
+				/* cast to avoid undefined behaviour
+				   on overflow */
+				i = (long)((unsigned long)a - b);
 				if ((i^a) < 0 && (i^~b) < 0)
 					goto slow_sub;
 				x = PyInt_FromLong(i);
@@ -3090,7 +3113,8 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 			PyObject *keyword = kws[2*i];
 			PyObject *value = kws[2*i + 1];
 			int j;
-			if (keyword == NULL || !PyString_Check(keyword)) {
+			if (keyword == NULL || !(PyString_Check(keyword) ||
+						 PyUnicode_Check(keyword))) {
 				PyErr_Format(PyExc_TypeError,
 				    "%.200s() keywords must be strings",
 				    PyString_AsString(co->co_name));
@@ -3119,11 +3143,15 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 				goto fail;
 			if (j >= co->co_argcount) {
 				if (kwdict == NULL) {
-					PyErr_Format(PyExc_TypeError,
-					    "%.200s() got an unexpected "
-					    "keyword argument '%.400s'",
-					    PyString_AsString(co->co_name),
-					    PyString_AsString(keyword));
+					PyObject *kwd_str = kwd_as_string(keyword);
+					if (kwd_str) {
+						PyErr_Format(PyExc_TypeError,
+							     "%.200s() got an unexpected "
+							     "keyword argument '%.400s'",
+							     PyString_AsString(co->co_name),
+							     PyString_AsString(kwd_str));
+						Py_DECREF(kwd_str);
+					}
 					goto fail;
 				}
 				PyDict_SetItem(kwdict, keyword, value);
@@ -3131,12 +3159,16 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 			}
 kw_found:
 			if (GETLOCAL(j) != NULL) {
-				PyErr_Format(PyExc_TypeError,
-						"%.200s() got multiple "
-						"values for keyword "
-						"argument '%.400s'",
-						PyString_AsString(co->co_name),
-						PyString_AsString(keyword));
+				PyObject *kwd_str = kwd_as_string(keyword);
+				if (kwd_str) {
+					PyErr_Format(PyExc_TypeError,
+						     "%.200s() got multiple "
+						     "values for keyword "
+						     "argument '%.400s'",
+						     PyString_AsString(co->co_name),
+						     PyString_AsString(kwd_str));
+					Py_DECREF(kwd_str);
+				}
 				goto fail;
 			}
 			Py_INCREF(value);
@@ -3279,6 +3311,17 @@ fail: /* Jump here from prelude on failure */
 	Py_DECREF(f);
 	--tstate->recursion_depth;
 	return retval;
+}
+
+
+static PyObject *
+kwd_as_string(PyObject *kwd) {
+	if (PyString_Check(kwd)) {
+		Py_INCREF(kwd);
+		return kwd;
+	}
+	else
+		return _PyUnicode_AsDefaultEncodedString(kwd, "replace");
 }
 
 
@@ -3517,8 +3560,9 @@ do_raise(PyObject *type, PyObject *value, PyObject *tb)
 		/* Not something you can raise.  You get an exception
 		   anyway, just not what you specified :-) */
 		PyErr_Format(PyExc_TypeError,
-			"exceptions must be classes or instances, not %s",
-			type->ob_type->tp_name);
+			     "exceptions must be old-style classes or "
+			     "derived from BaseException, not %s",
+			     type->ob_type->tp_name);
 		goto raise_error;
 	}
 

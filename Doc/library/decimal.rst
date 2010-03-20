@@ -108,7 +108,7 @@ reset them before monitoring a calculation.
 .. seealso::
 
    * IBM's General Decimal Arithmetic Specification, `The General Decimal Arithmetic
-     Specification <http://www2.hursley.ibm.com/decimal/decarith.html>`_.
+     Specification <http://speleotrove.com/decimal/>`_.
 
    * IEEE standard 854-1987, `Unofficial IEEE 854 Text
      <http://754r.ucbtest.org/standards/854.pdf>`_.
@@ -531,8 +531,11 @@ Decimal objects
 
    .. method:: is_normal()
 
-      Return :const:`True` if the argument is a *normal* finite number.  Return
-      :const:`False` if the argument is zero, subnormal, infinite or a NaN.
+      Return :const:`True` if the argument is a *normal* finite non-zero
+      number with an adjusted exponent greater than or equal to *Emin*.
+      Return :const:`False` if the argument is zero, subnormal, infinite or a
+      NaN.  Note, the term *normal* is used here in a different sense with
+      the :meth:`normalize` method which is used to create canonical values.
 
       .. versionadded:: 2.6
 
@@ -560,7 +563,8 @@ Decimal objects
    .. method:: is_subnormal()
 
       Return :const:`True` if the argument is subnormal, and :const:`False`
-      otherwise.
+      otherwise. A number is subnormal is if it is nonzero, finite, and has an
+      adjusted exponent less than *Emin*.
 
       .. versionadded:: 2.6
 
@@ -603,10 +607,9 @@ Decimal objects
 
       .. versionadded:: 2.6
 
-   .. method:: logical_invert(other[, context])
+   .. method:: logical_invert([context])
 
-      :meth:`logical_invert` is a logical operation.  The argument must
-      be a *logical operand* (see :ref:`logical_operands_label`).  The
+      :meth:`logical_invert` is a logical operation.  The
       result is the digit-wise inversion of the operand.
 
       .. versionadded:: 2.6
@@ -636,7 +639,7 @@ Decimal objects
 
    .. method:: max_mag(other[, context])
 
-      Similar to the :meth:`max` method, but the comparison is done using the
+      Similar to the :meth:`.max` method, but the comparison is done using the
       absolute values of the operands.
 
       .. versionadded:: 2.6
@@ -650,7 +653,7 @@ Decimal objects
 
    .. method:: min_mag(other[, context])
 
-      Similar to the :meth:`min` method, but the comparison is done using the
+      Similar to the :meth:`.min` method, but the comparison is done using the
       absolute values of the operands.
 
       .. versionadded:: 2.6
@@ -1272,9 +1275,12 @@ In addition to the three supplied contexts, new contexts can be created with the
          - at least one of ``x`` or ``y`` must be nonzero
          - ``modulo`` must be nonzero and have at most 'precision' digits
 
-      The result of ``Context.power(x, y, modulo)`` is identical to the result
-      that would be obtained by computing ``(x**y) % modulo`` with unbounded
-      precision, but is computed more efficiently.  It is always exact.
+      The value resulting from ``Context.power(x, y, modulo)`` is
+      equal to the value that would be obtained by computing ``(x**y)
+      % modulo`` with unbounded precision, but is computed more
+      efficiently.  The exponent of the result is zero, regardless of
+      the exponents of ``x``, ``y`` and ``modulo``.  The result is
+      always exact.
 
       .. versionchanged:: 2.6
          ``y`` may now be nonintegral in ``x**y``.

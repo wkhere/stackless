@@ -11,6 +11,7 @@ from distutils.errors import DistutilsPlatformError
 from distutils.dep_util import newer
 from distutils.spawn import spawn
 from distutils import log
+from distutils.errors import DistutilsByteCompileError
 
 def get_platform ():
     """Return a string that identifies the current platform.  This is used
@@ -162,10 +163,20 @@ def get_platform ():
                     raise ValueError(
                        "Don't know machine value for archs=%r"%(archs,))
 
+            elif machine == 'i386':
+                # On OSX the machine type returned by uname is always the
+                # 32-bit variant, even if the executable architecture is
+                # the 64-bit variant
+                if sys.maxint >= 2**32:
+                    machine = 'x86_64'
 
             elif machine in ('PowerPC', 'Power_Macintosh'):
                 # Pick a sane name for the PPC architecture.
                 machine = 'ppc'
+
+                # See 'i386' case
+                if sys.maxint >= 2**32:
+                    machine = 'ppc64'
 
     return "%s-%s-%s" % (osname, release, machine)
 
@@ -447,6 +458,9 @@ def byte_compile (py_files,
     generated in indirect mode; unless you know what you're doing, leave
     it set to None.
     """
+    # nothing is done if sys.dont_write_bytecode is True
+    if sys.dont_write_bytecode:
+        raise DistutilsByteCompileError('byte-compiling is disabled.')
 
     # First, if the caller didn't force us into direct or indirect mode,
     # figure out which mode we should be in.  We take a conservative
@@ -559,6 +573,5 @@ def rfc822_escape (header):
     RFC-822 header, by ensuring there are 8 spaces space after each newline.
     """
     lines = string.split(header, '\n')
-    lines = map(string.strip, lines)
     header = string.join(lines, '\n' + 8*' ')
     return header

@@ -6,6 +6,7 @@
 #include "bytes_methods.h"
 
 static PyByteArrayObject *nullbytes = NULL;
+char _PyByteArray_empty_string[] = "";
 
 void
 PyByteArray_Fini(void)
@@ -74,7 +75,7 @@ bytes_buffer_getreadbuf(PyByteArrayObject *self, Py_ssize_t index, const void **
                 "accessing non-existent bytes segment");
         return -1;
     }
-    *ptr = (void *)self->ob_bytes;
+    *ptr = (void *)PyByteArray_AS_STRING(self);
     return Py_SIZE(self);
 }
 
@@ -86,7 +87,7 @@ bytes_buffer_getwritebuf(PyByteArrayObject *self, Py_ssize_t index, const void *
                 "accessing non-existent bytes segment");
         return -1;
     }
-    *ptr = (void *)self->ob_bytes;
+    *ptr = (void *)PyByteArray_AS_STRING(self);
     return Py_SIZE(self);
 }
 
@@ -106,7 +107,7 @@ bytes_buffer_getcharbuf(PyByteArrayObject *self, Py_ssize_t index, const char **
                 "accessing non-existent bytes segment");
         return -1;
     }
-    *ptr = self->ob_bytes;
+    *ptr = PyByteArray_AS_STRING(self);
     return Py_SIZE(self);
 }
 
@@ -119,10 +120,7 @@ bytes_getbuffer(PyByteArrayObject *obj, Py_buffer *view, int flags)
                 obj->ob_exports++;
                 return 0;
         }
-        if (obj->ob_bytes == NULL)
-                ptr = "";
-        else
-                ptr = obj->ob_bytes;
+        ptr = (void *) PyByteArray_AS_STRING(obj);
         ret = PyBuffer_FillInfo(view, (PyObject*)obj, ptr, Py_SIZE(obj), 0, flags);
         if (ret >= 0) {
                 obj->ob_exports++;
@@ -201,7 +199,7 @@ PyByteArray_FromStringAndSize(const char *bytes, Py_ssize_t size)
             Py_DECREF(new);
             return PyErr_NoMemory();
         }
-        if (bytes != NULL)
+        if (bytes != NULL && size > 0)
             memcpy(new->ob_bytes, bytes, size);
         new->ob_bytes[size] = '\0';  /* Trailing null byte */
     }
@@ -701,7 +699,8 @@ bytes_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *values)
     else {
         if (needed == 0) {
             /* Delete slice */
-            Py_ssize_t cur, i;
+            size_t cur;
+            Py_ssize_t i;
 
             if (!_canresize(self))
                 return -1;
@@ -714,7 +713,7 @@ bytes_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *values)
                  i < slicelen; cur += step, i++) {
                 Py_ssize_t lim = step - 1;
 
-                if (cur + step >= PyByteArray_GET_SIZE(self))
+                if (cur + step >= (size_t)PyByteArray_GET_SIZE(self))
                     lim = PyByteArray_GET_SIZE(self) - cur - 1;
 
                 memmove(self->ob_bytes + cur - i,
@@ -722,7 +721,7 @@ bytes_ass_subscript(PyByteArrayObject *self, PyObject *index, PyObject *values)
             }
             /* Move the tail of the bytes, in one chunk */
             cur = start + slicelen*step;
-            if (cur < PyByteArray_GET_SIZE(self)) {
+            if (cur < (size_t)PyByteArray_GET_SIZE(self)) {
                 memmove(self->ob_bytes + cur - slicelen,
                         self->ob_bytes + cur,
                         PyByteArray_GET_SIZE(self) - cur);
@@ -922,13 +921,14 @@ bytes_repr(PyByteArrayObject *self)
     const char *quote_postfix = ")";
     Py_ssize_t length = Py_SIZE(self);
     /* 14 == strlen(quote_prefix) + 2 + strlen(quote_postfix) */
-    size_t newsize = 14 + 4 * length;
+    size_t newsize;
     PyObject *v;
-    if (newsize > PY_SSIZE_T_MAX || newsize / 4 - 3 != length) {
+    if (length > (PY_SSIZE_T_MAX - 14) / 4) {
         PyErr_SetString(PyExc_OverflowError,
             "bytearray object is too large to make repr");
         return NULL;
     }
+    newsize = 14 + 4 * length;
     v = PyUnicode_FromUnicode(NULL, newsize);
     if (v == NULL) {
         return NULL;
@@ -1029,7 +1029,7 @@ bytes_richcompare(PyObject *self, PyObject *other, int op)
         PyObject_IsInstance(other, (PyObject*)&PyUnicode_Type)) {
         if (Py_BytesWarningFlag && op == Py_EQ) {
             if (PyErr_WarnEx(PyExc_BytesWarning,
-                            "Comparsion between bytearray and string", 1))
+                            "Comparison between bytearray and string", 1))
                 return NULL;
         }
 
@@ -2392,7 +2392,7 @@ bytes_partition(PyByteArrayObject *self, PyObject *sep_obj)
 }
 
 PyDoc_STRVAR(rpartition__doc__,
-"B.rpartition(sep) -> (tail, sep, head)\n\
+"B.rpartition(sep) -> (head, sep, tail)\n\
 \n\
 Searches for the separator sep in B, starting at the end of B,\n\
 and returns the part before it, the separator itself, and the\n\

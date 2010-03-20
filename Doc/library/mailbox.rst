@@ -602,7 +602,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
    `nmh - Message Handling System <http://www.nongnu.org/nmh/>`_
       Home page of :program:`nmh`, an updated version of the original :program:`mh`.
 
-   `MH & nmh: Email for Users & Programmers <http://www.ics.uci.edu/~mh/book/>`_
+   `MH & nmh: Email for Users & Programmers <http://rand-mh.sourceforge.net/book/>`_
       A GPL-licensed book on :program:`mh` and :program:`nmh`, with some information
       on the mailbox format.
 
@@ -1530,7 +1530,7 @@ Older mailbox objects support only iteration and provide a single public method:
 
 Most of the older mailbox classes have names that differ from the current
 mailbox class names, except for :class:`Maildir`. For this reason, the new
-:class:`Maildir` class defines a :meth:`next` method and its constructor differs
+:class:`Maildir` class defines a :meth:`!next` method and its constructor differs
 slightly from those of the other new mailbox classes.
 
 The older mailbox classes whose names are not the same as their newer
@@ -1543,7 +1543,7 @@ counterparts are as follows:
    single file and separated by ``From`` (a.k.a. ``From_``) lines.  The file object
    *fp* points to the mailbox file.  The optional *factory* parameter is a callable
    that should create new message objects.  *factory* is called with one argument,
-   *fp* by the :meth:`next` method of the mailbox object.  The default is the
+   *fp* by the :meth:`!next` method of the mailbox object.  The default is the
    :class:`rfc822.Message` class (see the :mod:`rfc822` module -- and the note
    below).
 

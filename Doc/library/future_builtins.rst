@@ -6,7 +6,7 @@
 .. versionadded:: 2.6
 
 This module provides functions that exist in 2.x, but have different behavior in
-Python 3, so they cannot be put into the 2.x builtin namespace.
+Python 3, so they cannot be put into the 2.x builtins namespace.
 
 Instead, if you want to write code compatible with Python 3 builtins, import
 them from this module, like this::
@@ -42,7 +42,7 @@ Available builtins are:
 
 .. function:: hex(object)
 
-   Works like the builtin :func:`hex`, but instead of :meth:`__hex__` it will
+   Works like the built-in :func:`hex`, but instead of :meth:`__hex__` it will
    use the :meth:`__index__` method on its argument to get an integer that is
    then converted to hexadecimal.
 
@@ -52,7 +52,7 @@ Available builtins are:
 
 .. function:: oct(object)
 
-   Works like the builtin :func:`oct`, but instead of :meth:`__oct__` it will
+   Works like the built-in :func:`oct`, but instead of :meth:`__oct__` it will
    use the :meth:`__index__` method on its argument to get an integer that is
    then converted to octal.
 

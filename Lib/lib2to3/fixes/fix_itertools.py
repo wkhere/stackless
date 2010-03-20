@@ -27,15 +27,15 @@ class FixItertools(fixer_base.BaseFix):
     def transform(self, node, results):
         prefix = None
         func = results['func'][0]
-        if 'it' in results and func.value != 'ifilterfalse':
+        if 'it' in results and func.value != u'ifilterfalse':
             dot, it = (results['dot'], results['it'])
             # Remove the 'itertools'
-            prefix = it.get_prefix()
+            prefix = it.prefix
             it.remove()
             # Replace the node wich contains ('.', 'function') with the
             # function (to be consistant with the second part of the pattern)
             dot.remove()
             func.parent.replace(func)
 
-        prefix = prefix or func.get_prefix()
+        prefix = prefix or func.prefix
         func.replace(Name(func.value[1:], prefix=prefix))

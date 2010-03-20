@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.5
 # Copyright 2006 Google, Inc. All Rights Reserved.
 # Licensed to PSF under a Contributor Agreement.
 
@@ -15,20 +14,15 @@ __author__ = "Guido van Rossum <guido@python.org>"
 # Python imports
 import os
 import sys
-import difflib
 import logging
 import operator
-from collections import defaultdict
+import collections
+import StringIO
 from itertools import chain
 
 # Local imports
-from .pgen2 import driver
-from .pgen2 import tokenize
-
-from . import pytree
-from . import patcomp
-from . import fixes
-from . import pygram
+from .pgen2 import driver, tokenize, token
+from . import pytree, pygram
 
 
 def get_all_fix_names(fixer_pkg, remove_prefix=True):
@@ -43,7 +37,12 @@ def get_all_fix_names(fixer_pkg, remove_prefix=True):
             fix_names.append(name[:-3])
     return fix_names
 
-def get_head_types(pat):
+
+class _EveryNode(Exception):
+    pass
+
+
+def _get_head_types(pat):
     """ Accepts a pytree Pattern Node and returns a set
         of the pattern types which will match first. """
 
@@ -51,34 +50,50 @@ def get_head_types(pat):
         # NodePatters must either have no type and no content
         #   or a type and content -- so they don't get any farther
         # Always return leafs
+        if pat.type is None:
+            raise _EveryNode
         return set([pat.type])
 
     if isinstance(pat, pytree.NegatedPattern):
         if pat.content:
-            return get_head_types(pat.content)
-        return set([None]) # Negated Patterns don't have a type
+            return _get_head_types(pat.content)
+        raise _EveryNode # Negated Patterns don't have a type
 
     if isinstance(pat, pytree.WildcardPattern):
         # Recurse on each node in content
         r = set()
         for p in pat.content:
             for x in p:
-                r.update(get_head_types(x))
+                r.update(_get_head_types(x))
         return r
 
     raise Exception("Oh no! I don't understand pattern %s" %(pat))
 
-def get_headnode_dict(fixer_list):
+
+def _get_headnode_dict(fixer_list):
     """ Accepts a list of fixers and returns a dictionary
         of head node type --> fixer list.  """
-    head_nodes = defaultdict(list)
+    head_nodes = collections.defaultdict(list)
+    every = []
     for fixer in fixer_list:
-        if not fixer.pattern:
-            head_nodes[None].append(fixer)
-            continue
-        for t in get_head_types(fixer.pattern):
-            head_nodes[t].append(fixer)
-    return head_nodes
+        if fixer.pattern:
+            try:
+                heads = _get_head_types(fixer.pattern)
+            except _EveryNode:
+                every.append(fixer)
+            else:
+                for node_type in heads:
+                    head_nodes[node_type].append(fixer)
+        else:
+            if fixer._accept_type is not None:
+                head_nodes[fixer._accept_type].append(fixer)
+            else:
+                every.append(fixer)
+    for node_type in chain(pygram.python_grammar.symbol2number.itervalues(),
+                           pygram.python_grammar.tokens):
+        head_nodes[node_type].extend(every)
+    return dict(head_nodes)
+
 
 def get_fixers_from_package(pkg_name):
     """
@@ -87,6 +102,65 @@ def get_fixers_from_package(pkg_name):
     return [pkg_name + "." + fix_name
             for fix_name in get_all_fix_names(pkg_name, False)]
 
+def _identity(obj):
+    return obj
+
+if sys.version_info < (3, 0):
+    import codecs
+    _open_with_encoding = codecs.open
+    # codecs.open doesn't translate newlines sadly.
+    def _from_system_newlines(input):
+        return input.replace(u"\r\n", u"\n")
+    def _to_system_newlines(input):
+        if os.linesep != "\n":
+            return input.replace(u"\n", os.linesep)
+        else:
+            return input
+else:
+    _open_with_encoding = open
+    _from_system_newlines = _identity
+    _to_system_newlines = _identity
+
+
+def _detect_future_print(source):
+    have_docstring = False
+    gen = tokenize.generate_tokens(StringIO.StringIO(source).readline)
+    def advance():
+        tok = next(gen)
+        return tok[0], tok[1]
+    ignore = frozenset((token.NEWLINE, tokenize.NL, token.COMMENT))
+    try:
+        while True:
+            tp, value = advance()
+            if tp in ignore:
+                continue
+            elif tp == token.STRING:
+                if have_docstring:
+                    break
+                have_docstring = True
+            elif tp == token.NAME and value == u"from":
+                tp, value = advance()
+                if tp != token.NAME and value != u"__future__":
+                    break
+                tp, value = advance()
+                if tp != token.NAME and value != u"import":
+                    break
+                tp, value = advance()
+                if tp == token.OP and value == u"(":
+                    tp, value = advance()
+                while tp == token.NAME:
+                    if value == u"print_function":
+                        return True
+                    tp, value = advance()
+                    if tp != token.OP and value != u",":
+                        break
+                    tp, value = advance()
+            else:
+                break
+    except StopIteration:
+        pass
+    return False
+
 
 class FixerError(Exception):
     """A fixer could not be loaded."""
@@ -94,7 +168,7 @@ class FixerError(Exception):
 
 class RefactoringTool(object):
 
-    _default_options = {"print_function": False}
+    _default_options = {"print_function" : False}
 
     CLASS_PREFIX = "Fix" # The prefix for fixer classes
     FILE_PREFIX = "fix_" # The prefix for modules with a fixer within
@@ -112,19 +186,21 @@ class RefactoringTool(object):
         self.options = self._default_options.copy()
         if options is not None:
             self.options.update(options)
+        if self.options["print_function"]:
+            self.grammar = pygram.python_grammar_no_print_statement
+        else:
+            self.grammar = pygram.python_grammar
         self.errors = []
         self.logger = logging.getLogger("RefactoringTool")
         self.fixer_log = []
         self.wrote = False
-        if self.options["print_function"]:
-            del pygram.python_grammar.keywords["print"]
-        self.driver = driver.Driver(pygram.python_grammar,
+        self.driver = driver.Driver(self.grammar,
                                     convert=pytree.convert,
                                     logger=self.logger)
         self.pre_order, self.post_order = self.get_fixers()
 
-        self.pre_order_heads = get_headnode_dict(self.pre_order)
-        self.post_order_heads = get_headnode_dict(self.post_order)
+        self.pre_order_heads = _get_headnode_dict(self.pre_order)
+        self.post_order_heads = _get_headnode_dict(self.post_order)
 
         self.files = []  # List of files that were or should be modified
 
@@ -183,8 +259,9 @@ class RefactoringTool(object):
             msg = msg % args
         self.logger.debug(msg)
 
-    def print_output(self, lines):
-        """Called with lines of output to give to the user."""
+    def print_output(self, old_text, new_text, filename, equal):
+        """Called with the old version, new version, and filename of a
+        refactored file."""
         pass
 
     def refactor(self, items, write=False, doctests_only=False):
@@ -207,35 +284,49 @@ class RefactoringTool(object):
             dirnames.sort()
             filenames.sort()
             for name in filenames:
-                if not name.startswith(".") and name.endswith("py"):
+                if not name.startswith(".") and \
+                        os.path.splitext(name)[1].endswith("py"):
                     fullname = os.path.join(dirpath, name)
                     self.refactor_file(fullname, write, doctests_only)
             # Modify dirnames in-place to remove subdirs with leading dots
             dirnames[:] = [dn for dn in dirnames if not dn.startswith(".")]
 
-    def refactor_file(self, filename, write=False, doctests_only=False):
-        """Refactors a file."""
+    def _read_python_source(self, filename):
+        """
+        Do our best to decode a Python source file correctly.
+        """
         try:
-            f = open(filename)
+            f = open(filename, "rb")
         except IOError, err:
             self.log_error("Can't open %s: %s", filename, err)
-            return
+            return None, None
         try:
-            input = f.read() + "\n" # Silence certain parse errors
+            encoding = tokenize.detect_encoding(f.readline)[0]
         finally:
             f.close()
+        with _open_with_encoding(filename, "r", encoding=encoding) as f:
+            return _from_system_newlines(f.read()), encoding
+
+    def refactor_file(self, filename, write=False, doctests_only=False):
+        """Refactors a file."""
+        input, encoding = self._read_python_source(filename)
+        if input is None:
+            # Reading the file failed.
+            return
+        input += u"\n" # Silence certain parse errors
         if doctests_only:
             self.log_debug("Refactoring doctests in %s", filename)
             output = self.refactor_docstring(input, filename)
             if output != input:
-                self.processed_file(output, filename, input, write=write)
+                self.processed_file(output, filename, input, write, encoding)
             else:
                 self.log_debug("No doctest changes in %s", filename)
         else:
             tree = self.refactor_string(input, filename)
             if tree and tree.was_changed:
                 # The [:-1] is to take off the \n we added earlier
-                self.processed_file(str(tree)[:-1], filename, write=write)
+                self.processed_file(unicode(tree)[:-1], filename,
+                                    write=write, encoding=encoding)
             else:
                 self.log_debug("No changes in %s", filename)
 
@@ -250,12 +341,16 @@ class RefactoringTool(object):
             An AST corresponding to the refactored input stream; None if
             there were errors during the parse.
         """
+        if _detect_future_print(data):
+            self.driver.grammar = pygram.python_grammar_no_print_statement
         try:
             tree = self.driver.parse_string(data)
         except Exception, err:
             self.log_error("Can't parse %s: %s: %s",
                            name, err.__class__.__name__, err)
             return
+        finally:
+            self.driver.grammar = self.grammar
         self.log_debug("Refactoring %s", name)
         self.refactor_tree(tree, name)
         return tree
@@ -272,7 +367,7 @@ class RefactoringTool(object):
         else:
             tree = self.refactor_string(input, "<stdin>")
             if tree and tree.was_changed:
-                self.processed_file(str(tree), "<stdin>", input)
+                self.processed_file(unicode(tree), "<stdin>", input)
             else:
                 self.log_debug("No changes in stdin")
 
@@ -312,40 +407,35 @@ class RefactoringTool(object):
         if not fixers:
             return
         for node in traversal:
-            for fixer in fixers[node.type] + fixers[None]:
+            for fixer in fixers[node.type]:
                 results = fixer.match(node)
                 if results:
                     new = fixer.transform(node, results)
-                    if new is not None and (new != node or
-                                            str(new) != str(node)):
+                    if new is not None:
                         node.replace(new)
                         node = new
 
-    def processed_file(self, new_text, filename, old_text=None, write=False):
+    def processed_file(self, new_text, filename, old_text=None, write=False,
+                       encoding=None):
         """
         Called when a file has been refactored, and there are changes.
         """
         self.files.append(filename)
         if old_text is None:
-            try:
-                f = open(filename, "r")
-            except IOError, err:
-                self.log_error("Can't read %s: %s", filename, err)
+            old_text = self._read_python_source(filename)[0]
+            if old_text is None:
                 return
-            try:
-                old_text = f.read()
-            finally:
-                f.close()
-        if old_text == new_text:
+        equal = old_text == new_text
+        self.print_output(old_text, new_text, filename, equal)
+        if equal:
             self.log_debug("No changes to %s", filename)
             return
-        self.print_output(diff_texts(old_text, new_text, filename))
         if write:
-            self.write_file(new_text, filename, old_text)
+            self.write_file(new_text, filename, old_text, encoding)
         else:
             self.log_debug("Not writing changes to %s", filename)
 
-    def write_file(self, new_text, filename, old_text):
+    def write_file(self, new_text, filename, old_text, encoding=None):
         """Writes a string to a file.
 
         It first shows a unified diff between the old text and the new text, and
@@ -353,12 +443,12 @@ class RefactoringTool(object):
         set.
         """
         try:
-            f = open(filename, "w")
+            f = _open_with_encoding(filename, "w", encoding=encoding)
         except os.error, err:
             self.log_error("Can't create %s: %s", filename, err)
             return
         try:
-            f.write(new_text)
+            f.write(_to_system_newlines(new_text))
         except os.error, err:
             self.log_error("Can't write %s: %s", filename, err)
         finally:
@@ -398,7 +488,7 @@ class RefactoringTool(object):
                 indent = line[:i]
             elif (indent is not None and
                   (line.startswith(indent + self.PS2) or
-                   line == indent + self.PS2.rstrip() + "\n")):
+                   line == indent + self.PS2.rstrip() + u"\n")):
                 block.append(line)
             else:
                 if block is not None:
@@ -410,7 +500,7 @@ class RefactoringTool(object):
         if block is not None:
             result.extend(self.refactor_doctest(block, block_lineno,
                                                 indent, filename))
-        return "".join(result)
+        return u"".join(result)
 
     def refactor_doctest(self, block, lineno, indent, filename):
         """Refactors one doctest.
@@ -425,17 +515,17 @@ class RefactoringTool(object):
         except Exception, err:
             if self.log.isEnabledFor(logging.DEBUG):
                 for line in block:
-                    self.log_debug("Source: %s", line.rstrip("\n"))
+                    self.log_debug("Source: %s", line.rstrip(u"\n"))
             self.log_error("Can't parse docstring in %s line %s: %s: %s",
                            filename, lineno, err.__class__.__name__, err)
             return block
         if self.refactor_tree(tree, filename):
-            new = str(tree).splitlines(True)
+            new = unicode(tree).splitlines(True)
             # Undo the adjustment of the line numbers in wrap_toks() below.
             clipped, new = new[:lineno-1], new[lineno-1:]
-            assert clipped == ["\n"] * (lineno-1), clipped
-            if not new[-1].endswith("\n"):
-                new[-1] += "\n"
+            assert clipped == [u"\n"] * (lineno-1), clipped
+            if not new[-1].endswith(u"\n"):
+                new[-1] += u"\n"
             block = [indent + self.PS1 + new.pop(0)]
             if new:
                 block += [indent + self.PS2 + line for line in new]
@@ -497,8 +587,8 @@ class RefactoringTool(object):
         for line in block:
             if line.startswith(prefix):
                 yield line[len(prefix):]
-            elif line == prefix.rstrip() + "\n":
-                yield "\n"
+            elif line == prefix.rstrip() + u"\n":
+                yield u"\n"
             else:
                 raise AssertionError("line=%r, prefix=%r" % (line, prefix))
             prefix = prefix2
@@ -506,10 +596,58 @@ class RefactoringTool(object):
             yield ""
 
 
-def diff_texts(a, b, filename):
-    """Return a unified diff of two strings."""
-    a = a.splitlines()
-    b = b.splitlines()
-    return difflib.unified_diff(a, b, filename, filename,
-                                "(original)", "(refactored)",
-                                lineterm="")
+class MultiprocessingUnsupported(Exception):
+    pass
+
+
+class MultiprocessRefactoringTool(RefactoringTool):
+
+    def __init__(self, *args, **kwargs):
+        super(MultiprocessRefactoringTool, self).__init__(*args, **kwargs)
+        self.queue = None
+
+    def refactor(self, items, write=False, doctests_only=False,
+                 num_processes=1):
+        if num_processes == 1:
+            return super(MultiprocessRefactoringTool, self).refactor(
+                items, write, doctests_only)
+        try:
+            import multiprocessing
+        except ImportError:
+            raise MultiprocessingUnsupported
+        if self.queue is not None:
+            raise RuntimeError("already doing multiple processes")
+        self.queue = multiprocessing.JoinableQueue()
+        processes = [multiprocessing.Process(target=self._child)
+                     for i in xrange(num_processes)]
+        try:
+            for p in processes:
+                p.start()
+            super(MultiprocessRefactoringTool, self).refactor(items, write,
+                                                              doctests_only)
+        finally:
+            self.queue.join()
+            for i in xrange(num_processes):
+                self.queue.put(None)
+            for p in processes:
+                if p.is_alive():
+                    p.join()
+            self.queue = None
+
+    def _child(self):
+        task = self.queue.get()
+        while task is not None:
+            args, kwargs = task
+            try:
+                super(MultiprocessRefactoringTool, self).refactor_file(
+                    *args, **kwargs)
+            finally:
+                self.queue.task_done()
+            task = self.queue.get()
+
+    def refactor_file(self, *args, **kwargs):
+        if self.queue is not None:
+            self.queue.put((args, kwargs))
+        else:
+            return super(MultiprocessRefactoringTool, self).refactor_file(
+                *args, **kwargs)

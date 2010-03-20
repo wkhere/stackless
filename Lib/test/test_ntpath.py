@@ -123,6 +123,11 @@ class TestNtpath(unittest.TestCase):
         tester("ntpath.normpath('C:////a/b')", r'C:\a\b')
         tester("ntpath.normpath('//machine/share//a/b')", r'\\machine\share\a\b')
 
+        # Issue 5827: Make sure normpath preserves unicode
+        for path in (u'', u'.', u'/', u'\\', u'///foo/.//bar//'):
+            self.assertTrue(isinstance(ntpath.normpath(path), unicode),
+                            'normpath() returned str instead of unicode')
+
     def test_expandvars(self):
         oldenv = os.environ.copy()
         try:
@@ -159,12 +164,31 @@ class TestNtpath(unittest.TestCase):
         # the rest of the tests for the ntpath module to be run to completion
         # on any platform, since most of the module is intended to be usable
         # from any platform.
+        # XXX this needs more tests
         try:
             import nt
         except ImportError:
-            pass
+            # check that the function is there even if we are not on Windows
+            ntpath.abspath
         else:
             tester('ntpath.abspath("C:\\")', "C:\\")
+
+            # Issue 3426: check that abspath retuns unicode when the arg is
+            # unicode and str when it's str, with both ASCII and non-ASCII cwds
+            saved_cwd = os.getcwd()
+            for cwd in (u'cwd', u'\xe7w\xf0'):
+                try:
+                    os.mkdir(cwd)
+                    os.chdir(cwd)
+                    for path in ('', 'foo', 'f\xf2\xf2', '/foo', 'C:\\'):
+                        self.assertTrue(isinstance(ntpath.abspath(path), str))
+                    for upath in (u'', u'fuu', u'f\xf9\xf9', u'/fuu', u'U:\\'):
+                        self.assertTrue(isinstance(ntpath.abspath(upath),
+                                                   unicode))
+                finally:
+                    os.chdir(saved_cwd)
+                    os.rmdir(cwd)
+
 
     def test_relpath(self):
         currentdir = os.path.split(os.getcwd())[-1]

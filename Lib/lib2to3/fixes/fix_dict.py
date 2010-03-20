@@ -11,6 +11,10 @@ d.iterkeys() -> iter(d.keys())
 d.iteritems() -> iter(d.items())
 d.itervalues() -> iter(d.values())
 
+d.viewkeys() -> d.keys()
+d.viewitems() -> d.items()
+d.viewvalues() -> d.values()
+
 Except in certain very specific contexts: the iter() can be dropped
 when the context is list(), sorted(), iter() or for...in; the list()
 can be dropped when the context is list() or sorted() (but not iter()
@@ -39,7 +43,8 @@ class FixDict(fixer_base.BaseFix):
     PATTERN = """
     power< head=any+
          trailer< '.' method=('keys'|'items'|'values'|
-                              'iterkeys'|'iteritems'|'itervalues') >
+                              'iterkeys'|'iteritems'|'itervalues'|
+                              'viewkeys'|'viewitems'|'viewvalues') >
          parens=trailer< '(' ')' >
          tail=any*
     >
@@ -51,25 +56,26 @@ class FixDict(fixer_base.BaseFix):
         tail = results["tail"]
         syms = self.syms
         method_name = method.value
-        isiter = method_name.startswith("iter")
-        if isiter:
+        isiter = method_name.startswith(u"iter")
+        isview = method_name.startswith(u"view")
+        if isiter or isview:
             method_name = method_name[4:]
-        assert method_name in ("keys", "items", "values"), repr(method)
+        assert method_name in (u"keys", u"items", u"values"), repr(method)
         head = [n.clone() for n in head]
         tail = [n.clone() for n in tail]
         special = not tail and self.in_special_context(node, isiter)
         args = head + [pytree.Node(syms.trailer,
                                    [Dot(),
                                     Name(method_name,
-                                         prefix=method.get_prefix())]),
+                                         prefix=method.prefix)]),
                        results["parens"].clone()]
         new = pytree.Node(syms.power, args)
-        if not special:
-            new.set_prefix("")
-            new = Call(Name(isiter and "iter" or "list"), [new])
+        if not (special or isview):
+            new.prefix = u""
+            new = Call(Name(u"iter" if isiter else u"list"), [new])
         if tail:
             new = pytree.Node(syms.power, [new] + tail)
-        new.set_prefix(node.get_prefix())
+        new.prefix = node.prefix
         return new
 
     P1 = "power< func=NAME trailer< '(' node=any ')' > any* >"

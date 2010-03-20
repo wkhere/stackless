@@ -52,10 +52,10 @@ One of the most awful question asked on the newsgroup is why this code::
    f.read()
 
 does not work. Of course, it works just fine (assuming you have a file called
-"www".) But it does not work if somewhere in the module, the statement ``from os
-import *`` is present. The :mod:`os` module has a function called :func:`open`
-which returns an integer. While it is very useful, shadowing builtins is one of
-its least useful properties.
+"www".) But it does not work if somewhere in the module, the statement ``from
+os import *`` is present. The :mod:`os` module has a function called
+:func:`open` which returns an integer. While it is very useful, shadowing a
+builtin is one of its least useful properties.
 
 Remember, you can never know for sure what names a module exports, so either
 take what you need --- ``from module import name1, name2``, or keep them in the
@@ -261,7 +261,7 @@ Compare::
 More useful functions in :mod:`os.path`: :func:`basename`,  :func:`dirname` and
 :func:`splitext`.
 
-There are also many useful builtin functions people seem not to be aware of for
+There are also many useful built-in functions people seem not to be aware of for
 some reason: :func:`min` and :func:`max` can find the minimum/maximum of any
 sequence with comparable semantics, for example, yet many people write their own
 :func:`max`/:func:`min`. Another highly useful function is :func:`reduce`. A

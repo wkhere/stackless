@@ -2194,7 +2194,7 @@ empty:
 }
 
 PyDoc_STRVAR(combinations_doc,
-"combinations(iterable[, r]) --> combinations object\n\
+"combinations(iterable, r) --> combinations object\n\
 \n\
 Return successive r-length combinations of elements in the iterable.\n\n\
 combinations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)");
@@ -2906,6 +2906,22 @@ count_repr(countobject *lz)
 	return result;
 }
 
+static PyObject *
+count_reduce(countobject *lz)
+{
+	if (lz->cnt == PY_SSIZE_T_MAX)
+		return Py_BuildValue("O(O)", Py_TYPE(lz), lz->long_cnt);
+	return Py_BuildValue("O(n)", Py_TYPE(lz), lz->cnt);
+}
+
+PyDoc_STRVAR(count_reduce_doc, "Return state information for pickling.");
+
+static PyMethodDef count_methods[] = {
+	{"__reduce__",	(PyCFunction)count_reduce,	METH_NOARGS,
+	 count_reduce_doc},
+	{NULL,		NULL}	/* sentinel */
+};
+
 PyDoc_STRVAR(count_doc,
 "count([firstval]) --> count object\n\
 \n\
@@ -2941,7 +2957,7 @@ static PyTypeObject count_type = {
 	0,				/* tp_weaklistoffset */
 	PyObject_SelfIter,		/* tp_iter */
 	(iternextfunc)count_next,	/* tp_iternext */
-	0,				/* tp_methods */
+	count_methods,				/* tp_methods */
 	0,				/* tp_members */
 	0,				/* tp_getset */
 	0,				/* tp_base */
@@ -3392,30 +3408,31 @@ izip_longest_traverse(iziplongestobject *lz, visitproc visit, void *arg)
 static PyObject *
 izip_longest_next(iziplongestobject *lz)
 {
-	Py_ssize_t i;
-	Py_ssize_t tuplesize = lz->tuplesize;
-	PyObject *result = lz->result;
-	PyObject *it;
-	PyObject *item;
-	PyObject *olditem;
+        Py_ssize_t i;
+        Py_ssize_t tuplesize = lz->tuplesize;
+        PyObject *result = lz->result;
+        PyObject *it;
+        PyObject *item;
+        PyObject *olditem;
 
-	if (tuplesize == 0)
-		return NULL;
+        if (tuplesize == 0)
+                return NULL;
         if (lz->numactive == 0)
                 return NULL;
-	if (Py_REFCNT(result) == 1) {
-		Py_INCREF(result);
-		for (i=0 ; i < tuplesize ; i++) {
-			it = PyTuple_GET_ITEM(lz->ittuple, i);
+        if (Py_REFCNT(result) == 1) {
+                Py_INCREF(result);
+                for (i=0 ; i < tuplesize ; i++) {
+                        it = PyTuple_GET_ITEM(lz->ittuple, i);
                         if (it == NULL) {
                                 Py_INCREF(lz->fillvalue);
                                 item = lz->fillvalue;
                         } else {
                                 assert(PyIter_Check(it));
-                                item = (*Py_TYPE(it)->tp_iternext)(it);
+                                item = PyIter_Next(it);
                                 if (item == NULL) {
-                                        lz->numactive -= 1;      
-                                        if (lz->numactive == 0) {
+                                        lz->numactive -= 1;
+                                        if (lz->numactive == 0 || PyErr_Occurred()) {
+                                                lz->numactive = 0;
                                                 Py_DECREF(result);
                                                 return NULL;
                                         } else {
@@ -3426,25 +3443,26 @@ izip_longest_next(iziplongestobject *lz)
                                         }
                                 }
                         }
-			olditem = PyTuple_GET_ITEM(result, i);
-			PyTuple_SET_ITEM(result, i, item);
-			Py_DECREF(olditem);
-		}
-	} else {
-		result = PyTuple_New(tuplesize);
-		if (result == NULL)
-			return NULL;
-		for (i=0 ; i < tuplesize ; i++) {
-			it = PyTuple_GET_ITEM(lz->ittuple, i);
+                        olditem = PyTuple_GET_ITEM(result, i);
+                        PyTuple_SET_ITEM(result, i, item);
+                        Py_DECREF(olditem);
+                }
+        } else {
+                result = PyTuple_New(tuplesize);
+                if (result == NULL)
+                        return NULL;
+                for (i=0 ; i < tuplesize ; i++) {
+                        it = PyTuple_GET_ITEM(lz->ittuple, i);
                         if (it == NULL) {
                                 Py_INCREF(lz->fillvalue);
                                 item = lz->fillvalue;
                         } else {
                                 assert(PyIter_Check(it));
-                                item = (*Py_TYPE(it)->tp_iternext)(it);
+                                item = PyIter_Next(it);
                                 if (item == NULL) {
-                                        lz->numactive -= 1;      
-                                        if (lz->numactive == 0) {
+                                        lz->numactive -= 1;
+                                        if (lz->numactive == 0 || PyErr_Occurred()) {
+                                                lz->numactive = 0;
                                                 Py_DECREF(result);
                                                 return NULL;
                                         } else {
@@ -3455,10 +3473,10 @@ izip_longest_next(iziplongestobject *lz)
                                         }
                                 }
                         }
-			PyTuple_SET_ITEM(result, i, item);
-		}
-	}
-	return result;
+                        PyTuple_SET_ITEM(result, i, item);
+                }
+        }
+        return result;
 }
 
 PyDoc_STRVAR(izip_longest_doc,
@@ -3540,6 +3558,11 @@ chain(p, q, ...) --> p0, p1, ... plast, q0, q1, ... \n\
 takewhile(pred, seq) --> seq[0], seq[1], until pred fails\n\
 dropwhile(pred, seq) --> seq[n], seq[n+1], starting when pred fails\n\
 groupby(iterable[, keyfunc]) --> sub-iterators grouped by value of keyfunc(v)\n\
+\n\
+Combinatoric generators:\n\
+product(p, q, ... [repeat=1]) --> cartesian product\n\
+permutations(p[, r])\n\
+combinations(p, r)\n\
 ");
 
 

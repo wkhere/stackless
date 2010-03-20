@@ -194,13 +194,13 @@ boundary::
    >>> def fib(n):    # write Fibonacci series up to n
    ...     """Print a Fibonacci series up to n."""
    ...     a, b = 0, 1
-   ...     while b < n:
-   ...         print b,
+   ...     while a < n:
+   ...         print a,
    ...         a, b = b, a+b
    ...
    >>> # Now call the function we just defined:
    ... fib(2000)
-   1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
+   0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
 
 .. index::
    single: documentation strings
@@ -244,7 +244,7 @@ mechanism::
    <function fib at 10042ed0>
    >>> f = fib
    >>> f(100)
-   1 1 2 3 5 8 13 21 34 55 89
+   0 1 1 2 3 5 8 13 21 34 55 89
 
 Coming from other languages, you might object that ``fib`` is not a function but
 a procedure since it doesn't return a value.  In fact, even functions without a
@@ -264,14 +264,14 @@ Fibonacci series, instead of printing it::
    ...     """Return a list containing the Fibonacci series up to n."""
    ...     result = []
    ...     a, b = 0, 1
-   ...     while b < n:
-   ...         result.append(b)    # see below
+   ...     while a < n:
+   ...         result.append(a)    # see below
    ...         a, b = b, a+b
    ...     return result
    ...
    >>> f100 = fib2(100)    # call it
    >>> f100                # write the result
-   [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
+   [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
 
 This example, as usual, demonstrates some new Python features:
 
@@ -279,16 +279,16 @@ This example, as usual, demonstrates some new Python features:
   :keyword:`return` without an expression argument returns ``None``. Falling off
   the end of a function also returns ``None``.
 
-* The statement ``result.append(b)`` calls a *method* of the list object
+* The statement ``result.append(a)`` calls a *method* of the list object
   ``result``.  A method is a function that 'belongs' to an object and is named
   ``obj.methodname``, where ``obj`` is some object (this may be an expression),
   and ``methodname`` is the name of a method that is defined by the object's type.
   Different types define different methods.  Methods of different types may have
   the same name without causing ambiguity.  (It is possible to define your own
-  object types and methods, using *classes*, as discussed later in this tutorial.)
+  object types and methods, using *classes*, see :ref:`tut-classes`)
   The method :meth:`append` shown in the example is defined for list objects; it
   adds a new element at the end of the list.  In this example it is equivalent to
-  ``result = result + [b]``, but more efficient.
+  ``result = result + [a]``, but more efficient.
 
 
 .. _tut-defining:
@@ -312,14 +312,23 @@ defined to allow.  For example::
    def ask_ok(prompt, retries=4, complaint='Yes or no, please!'):
        while True:
            ok = raw_input(prompt)
-           if ok in ('y', 'ye', 'yes'): return True
-           if ok in ('n', 'no', 'nop', 'nope'): return False
+           if ok in ('y', 'ye', 'yes'):
+               return True
+           if ok in ('n', 'no', 'nop', 'nope'):
+               return False
            retries = retries - 1
-           if retries < 0: raise IOError, 'refusenik user'
+           if retries < 0:
+               raise IOError('refusenik user')
            print complaint
 
-This function can be called either like this: ``ask_ok('Do you really want to
-quit?')`` or like this: ``ask_ok('OK to overwrite the file?', 2)``.
+This function can be called in several ways:
+
+* giving only the mandatory argument:
+  ``ask_ok('Do you really want to quit?')``
+* giving one of the optional arguments:
+  ``ask_ok('OK to overwrite the file?', 2)``
+* or even giving all arguments:
+  ``ask_ok('OK to overwrite the file?', 2, 'Come on, only yes or no!')``
 
 This example also introduces the :keyword:`in` keyword. This tests whether or
 not a sequence contains a certain value.

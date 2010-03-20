@@ -223,7 +223,8 @@ The grammar for a replacement field is as follows:
       replacement_field: "{" `field_name` ["!" `conversion`] [":" `format_spec`] "}"
       field_name: (`identifier` | `integer`) ("." `attribute_name` | "[" `element_index` "]")*
       attribute_name: `identifier`
-      element_index: `integer`
+      element_index: `integer` | `index_string`
+      index_string: <any source character except "]"> +
       conversion: "r" | "s"
       format_spec: <described in the next section>
 
@@ -264,7 +265,7 @@ Some examples::
 
 The *format_spec* field contains a specification of how the value should be
 presented, including such details as field width, alignment, padding, decimal
-precision and so on.  Each value type can define it's own "formatting
+precision and so on.  Each value type can define its own "formatting
 mini-language" or interpretation of the *format_spec*.
 
 Most built-in types support a common formatting mini-language, which is
@@ -305,15 +306,16 @@ Format Specification Mini-Language
 
 "Format specifications" are used within replacement fields contained within a
 format string to define how individual values are presented (see
-:ref:`formatstrings`.)  They can also be passed directly to the builtin
+:ref:`formatstrings`.)  They can also be passed directly to the built-in
 :func:`format` function.  Each formattable type may define how the format
 specification is to be interpreted.
 
 Most built-in types implement the following options for format specifications,
 although some of the formatting options are only supported by the numeric types.
 
-A general convention is that an empty format string (``""``) produces the same
-result as if you had called :func:`str` on the value.
+A general convention is that an empty format string (``""``) produces
+the same result as if you had called :func:`str` on the value. A
+non-empty format string typically modifies the result.
 
 The general form of a *standard format specifier* is:
 
@@ -324,7 +326,7 @@ The general form of a *standard format specifier* is:
    sign: "+" | "-" | " "
    width: `integer`
    precision: `integer`
-   type: "b" | "c" | "d" | "e" | "E" | "f" | "F" | "g" | "G" | "n" | "o" | "x" | "X" | "%"
+   type: "b" | "c" | "d" | "e" | "E" | "f" | "F" | "g" | "G" | "n" | "o" | "s" | "x" | "X" | "%"
 
 The *fill* character can be any character other than '}' (which signifies the
 end of the field).  The presence of a fill character is signaled by the *next*
@@ -392,6 +394,17 @@ used from the field content. The *precision* is not allowed for integer values.
 
 Finally, the *type* determines how the data should be presented.
 
+The available string presentation types are:
+
+   +---------+----------------------------------------------------------+
+   | Type    | Meaning                                                  |
+   +=========+==========================================================+
+   | ``'s'`` | String format. This is the default type for strings and  |
+   |         | may be omitted.                                          |
+   +---------+----------------------------------------------------------+
+   | None    | The same as ``'s'``.                                     |
+   +---------+----------------------------------------------------------+
+
 The available integer presentation types are:
 
    +---------+----------------------------------------------------------+
@@ -419,6 +432,11 @@ The available integer presentation types are:
    | None    | The same as ``'d'``.                                     |
    +---------+----------------------------------------------------------+
 
+In addition to the above presentation types, integers can be formatted
+with the floating point presentation types listed below (except
+``'n'`` and None). When doing so, :func:`float` is used to convert the
+integer to a floating point number before formatting.
+
 The available presentation types for floating point and decimal values are:
 
    +---------+----------------------------------------------------------+
@@ -435,15 +453,33 @@ The available presentation types for floating point and decimal values are:
    +---------+----------------------------------------------------------+
    | ``'F'`` | Fixed point. Same as ``'f'``.                            |
    +---------+----------------------------------------------------------+
-   | ``'g'`` | General format. This prints the number as a fixed-point  |
-   |         | number, unless the number is too large, in which case    |
-   |         | it switches to ``'e'`` exponent notation. Infinity and   |
-   |         | NaN values are formatted as ``inf``, ``-inf`` and        |
-   |         | ``nan``, respectively.                                   |
+   | ``'g'`` | General format.  For a given precision ``p >= 1``,       |
+   |         | this rounds the number to ``p`` significant digits and   |
+   |         | then formats the result in either fixed-point format     |
+   |         | or in scientific notation, depending on its magnitude.   |
+   |         |                                                          |
+   |         | The precise rules are as follows: suppose that the       |
+   |         | result formatted with presentation type ``'e'`` and      |
+   |         | precision ``p-1`` would have exponent ``exp``.  Then     |
+   |         | if ``-4 <= exp < p``, the number is formatted            |
+   |         | with presentation type ``'f'`` and precision             |
+   |         | ``p-1-exp``.  Otherwise, the number is formatted         |
+   |         | with presentation type ``'e'`` and precision ``p-1``.    |
+   |         | In both cases insignificant trailing zeros are removed   |
+   |         | from the significand, and the decimal point is also      |
+   |         | removed if there are no remaining digits following it.   |
+   |         |                                                          |
+   |         | Postive and negative infinity, positive and negative     |
+   |         | zero, and nans, are formatted as ``inf``, ``-inf``,      |
+   |         | ``0``, ``-0`` and ``nan`` respectively, regardless of    |
+   |         | the precision.                                           |
+   |         |                                                          |
+   |         | A precision of ``0`` is treated as equivalent to a       |
+   |         | precision of ``1``.                                      |
    +---------+----------------------------------------------------------+
    | ``'G'`` | General format. Same as ``'g'`` except switches to       |
-   |         | ``'E'`` if the number gets to large. The representations |
-   |         | of infinity and NaN are uppercased, too.                 |
+   |         | ``'E'`` if the number gets too large. The                |
+   |         | representations of infinity and NaN are uppercased, too. |
    +---------+----------------------------------------------------------+
    | ``'n'`` | Number. This is the same as ``'g'``, except that it uses |
    |         | the current locale setting to insert the appropriate     |
@@ -824,14 +860,15 @@ not be removed until Python 3.0.  The functions defined in this module are:
    Return a copy of *s*, but with lower case letters converted to upper case.
 
 
-.. function:: ljust(s, width)
-              rjust(s, width)
-              center(s, width)
+.. function:: ljust(s, width[, fillchar])
+              rjust(s, width[, fillchar])
+              center(s, width[, fillchar])
 
    These functions respectively left-justify, right-justify and center a string in
    a field of given width.  They return a string that is at least *width*
-   characters wide, created by padding the string *s* with spaces until the given
-   width on the right, left or both sides.  The string is never truncated.
+   characters wide, created by padding the string *s* with the character *fillchar*
+   (default is a space) until the given width on the right, left or both sides.
+   The string is never truncated.
 
 
 .. function:: zfill(s, width)
