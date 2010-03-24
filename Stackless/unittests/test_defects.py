@@ -58,7 +58,7 @@ class TestTaskletDel(unittest.TestCase):
 
             
     #a gc.collect() in a tasklet's __del__ method causes
-    def _testCrash1(self):
+    def testCrash1(self):
         #we need a lost blocked tasklet here (print the ids for debugging)
         hex(id(self.BlockingReceive()))
         gc.collect() #so that there isn't any garbage

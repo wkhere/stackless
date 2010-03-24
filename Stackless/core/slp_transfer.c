@@ -145,6 +145,9 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
 		 * when saving the stack, the serial number is taken from serial_last_jump
 		 */
 		ts->st.serial_last_jump = _cst->serial;
+
+		/* release any objects that needed to wait until after the switch */
+		Py_CLEAR(ts->st.del_post_switch);
 	}
 	return error;
 }

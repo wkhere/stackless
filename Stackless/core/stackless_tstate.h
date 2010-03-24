@@ -44,6 +44,7 @@ typedef struct _sts {
 #endif
 	/* number of nested interpreters (1.0/2.0 merge) */
 	int nesting_level;
+	PyObject *del_post_switch;		/* To decref after a switch */
 } PyStacklessState;
 
 /* internal macro to temporarily disable soft interrupts */
@@ -64,7 +65,8 @@ typedef struct _sts {
 	tstate->st.current = NULL; \
 	tstate->st.runcount = 0; \
 	tstate->st.nesting_level = 0; \
-	tstate->st.runflags = 0;
+	tstate->st.runflags = 0; \
+	tstate->st.del_post_switch = NULL;
 
 /* note that the scheduler knows how to zap. It checks if it is in charge
    for this tstate and then clears everything. This will not work if
