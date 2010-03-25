@@ -1119,9 +1119,8 @@ tasklet_end(PyObject *retval)
 		 * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
 		 * the original stub, so we take the stub from the cstate)
 		 */
-		if (ts->st.serial_last_jump != ts->st.serial) {
+		if (ts->st.serial_last_jump != ts->st.initial_stub->serial)
 			slp_transfer_return(ts->st.initial_stub);
-		}
 	}
 
 	/* remove from runnables */
@@ -1215,6 +1214,8 @@ slp_run_tasklet(void)
 		retval = tasklet_end(retval);
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);
+		/* if we softswitched out from the tasklet end */
+		Py_CLEAR(ts->st.del_post_switch);
 	}
 	return retval;
 }
