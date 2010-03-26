@@ -341,12 +341,24 @@ int
 slp_schedule_callback(PyTaskletObject *prev, PyTaskletObject *next)
 {
 	PyObject *type, *value, *traceback, *ret;
+	PyObject *tmp;
+	PyThreadState *ts = PyThreadState_GET();
 
 	if (prev == NULL) prev = (PyTaskletObject *)Py_None;
 	if (next == NULL) next = (PyTaskletObject *)Py_None;
 
+	/* store the del post switch away temporarily to not have it
+	 * released in the dispatching loop we are about to invoke
+	 */
+	 tmp = ts->st.del_post_switch;
+	 ts->st.del_post_switch = NULL;
+		
 	PyErr_Fetch(&type, &value, &traceback);
 	ret = PyObject_CallFunction(_slp_schedule_hook, "(OO)", prev, next);
+		
+	assert(ts->st.del_post_switch == NULL);
+	ts->st.del_post_switch = tmp;
+		
 	if (ret != NULL)
 		PyErr_Restore(type, value, traceback);
 	else {
@@ -471,6 +483,12 @@ jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
 	PyThreadState *ts = PyThreadState_GET();
 
 	ts->frame = f->f_back;
+	
+	/* reinstate the del_post_switch */
+	assert(ts->st.del_post_switch == NULL);
+	ts->st.del_post_switch = ((PyCFrameObject*)f)->ob1;
+	((PyCFrameObject*)f)->ob1 = NULL;
+
 	Py_DECREF(f);
 	/* ignore retval. everything is in the tasklet. */
 	Py_DECREF(retval); /* consume ref according to protocol */
@@ -915,6 +933,13 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 			ts->frame = prev->f.frame;
 			return NULL;
 		}
+
+		/* Move the del_post_switch into the cframe for it to resurrect it.
+		 * switching isn't complete until after it has run
+		 */
+		((PyCFrameObject*)ts->frame)->ob1 = ts->st.del_post_switch;
+		ts->st.del_post_switch = NULL;
+
 		/* note that we don't explode any bomb now and leave it in next->tempval */
 		/* retval will be ignored eventually */
 		retval = next->tempval;
@@ -1011,15 +1036,11 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 {
 	/*
 	 * The problem is to leave the dying tasklet alive
-	 * until we have done the switch.
-	 * This cannot easily be done by hard switching, since
-	 * the C stack we are leaving is never returned to,
-	 * and who should do the dereferencing?
-	 * Therefore, we enforce a soft-switch.
+	 * until we have done the switch.  We use the st->ts.del_post_switch
+	 * field to help us with that, someone else with decref it.
 	 */
 	PyThreadState *ts = PyThreadState_GET();
 	PyObject *retval;
-	int unwinding = 0;
 
 	/* we should have no nesting level */
 	assert(ts->st.nesting_level == 0);
@@ -1047,31 +1068,23 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 	assert(ts->frame == NULL);
 	prev->f.frame = NULL;
 
+	/* The tasklet can only be cleanly decrefed after we have completely
+	 * switched to another one, because the decref can trigger tasklet
+	 * swithes. this would otherwise mess up our soft switching.  Generally
+	 * nothing significant must happen once we are unwinding the stack.
+	 */
+	assert(ts->st.del_post_switch == NULL);
+	ts->st.del_post_switch = (PyObject *)prev;
+
 	/* do a soft switch */
 	if (prev != next)
 		retval = slp_schedule_task(prev, next, 1);
 	else {
+		/* main is exiting */
 		TASKLET_CLAIMVAL(prev, &retval);
 		if (PyBomb_Check(retval))
 			retval = slp_bomb_explode(retval);
 	}
-
-	/* when destroying the tasklet, __del__ can be called, so we
-	 * must temporarily suspend our unwinding state
-	 */
-	/* TODO: make sure that no stackless action happens here */
-	if (STACKLESS_UNWINDING(retval)) {
-		retval = STACKLESS_UNPACK(retval);
-		unwinding = 1;
-	}
-
-	/* clear the tasklet's tempval */
-	Py_TYPE(prev)->tp_clear((PyObject *)prev);
-	/* now it is safe to derefence prev */
-	Py_DECREF(prev);
-	
-	if (unwinding)
-		retval = STACKLESS_PACK(retval);
 	return retval;
 }
 
@@ -1121,9 +1134,8 @@ tasklet_end(PyObject *retval)
 		 * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
 		 * the original stub, so we take the stub from the cstate)
 		 */
-		if (ts->st.serial_last_jump != ts->st.serial) {
+		if (ts->st.serial_last_jump != ts->st.initial_stub->serial)
 			slp_transfer_return(ts->st.initial_stub);
-		}
 	}
 
 	/* remove from runnables */
@@ -1216,6 +1228,8 @@ slp_run_tasklet(void)
 		retval = tasklet_end(retval);
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);
+		/* if we softswitched out from the tasklet end */
+		Py_CLEAR(ts->st.del_post_switch);
 	}
 	return retval;
 }
