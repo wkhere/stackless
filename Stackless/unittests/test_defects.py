@@ -1,5 +1,6 @@
 import unittest
 import stackless
+import gc
 
 """
 Various regression tests for stackless defects.
@@ -25,10 +26,19 @@ class TestTaskletDel(unittest.TestCase):
             self.func()
         def func(self):
             pass
+    
+    class TaskletWithDelAndCollect(stackless.tasklet):
+        def __del__(self):  
+            gc.collect()
 
-    class TaskletWithDelAndImport(stackless.tasklet):
-        def __del__(self):
-            import ctypes
+    def BlockingReceive(self):
+        # Function to block when run in a tasklet.
+        def f():
+            #must store c in locals
+            c = stackless.channel()
+            c.receive()
+        return stackless.tasklet(f)()
+
             
     #Test that a tasklet tempval's __del__ operator works.
     def testTempval(self):
@@ -46,15 +56,18 @@ class TestTaskletDel(unittest.TestCase):
         self.TaskletWithDel(TaskletFunc)(self)
         stackless.run()
 
-    #This test crashes.  Something strange happens, needs work
-    #an import in the __del__ causes strange things.
-    def _testTasklet2(self):
+            
+    #a gc.collect() in a tasklet's __del__ method causes
+    def testCrash1(self):
+        #we need a lost blocked tasklet here (print the ids for debugging)
+        hex(id(self.BlockingReceive()))
+        gc.collect() #so that there isn't any garbage
+        stackless.run()
         def TaskletFunc(self):
             pass
-
-        self.TaskletWithDelAndImport(TaskletFunc)(self)
-        stackless.run()
-
+        hex(id(self.TaskletWithDelAndCollect(TaskletFunc)(self)))
+        stackless.run() #crash here
+        
 class Schedule(unittest.TestCase):
     def testScheduleRemove(self):
         #schedule remove doesn't work if it is the only tasklet running under watchdog
@@ -68,12 +81,40 @@ class Schedule(unittest.TestCase):
     def testScheduleRemove2(self):
         #schedule remove doesn't work if it is the only tasklet with main blocked
             #main tasklet is blocked, this should raise an error
+        def func(self, chan):
             self.assertRaises(RuntimeError, stackless.schedule_remove)
             chan.send(None)
         stackless.run() #flush all runnables
         chan = stackless.channel()
         stackless.tasklet(func)(self, chan)
         chan.receive()
+        
+class Channel(unittest.TestCase):
+    def testTemporaryChannel(self):
+        def f1():
+            stackless.channel().receive()
+            
+        stackless.tasklet(f1)()
+        old = stackless.enable_softswitch(True)
+        try:
+            stackless.run()
+        finally:
+            stackless.enable_softswitch(old)
+    
+    def testTemporaryChannel2(self):
+        def f1():
+            stackless.channel().receive()
+        def f2():
+            pass
+            
+        stackless.tasklet(f1)()
+        stackless.tasklet(f2)()
+        old = stackless.enable_softswitch(True)
+        try:
+            stackless.run()
+        finally:
+            stackless.enable_softswitch(old)
+
 
 if __name__ == '__main__':
     import sys
