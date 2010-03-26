@@ -88,6 +88,33 @@ class Schedule(unittest.TestCase):
         chan = stackless.channel()
         stackless.tasklet(func)(self, chan)
         chan.receive()
+        
+class Channel(unittest.TestCase):
+    def testTemporaryChannel(self):
+        def f1():
+            stackless.channel().receive()
+            
+        stackless.tasklet(f1)()
+        old = stackless.enable_softswitch(True)
+        try:
+            stackless.run()
+        finally:
+            stackless.enable_softswitch(old)
+    
+    def testTemporaryChannel2(self):
+        def f1():
+            stackless.channel().receive()
+        def f2():
+            pass
+            
+        stackless.tasklet(f1)()
+        stackless.tasklet(f2)()
+        old = stackless.enable_softswitch(True)
+        try:
+            stackless.run()
+        finally:
+            stackless.enable_softswitch(old)
+
 
 if __name__ == '__main__':
     import sys
