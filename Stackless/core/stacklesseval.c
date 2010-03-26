@@ -690,9 +690,11 @@ slp_frame_dispatch(PyFrameObject *f, PyFrameObject *stopframe, int exc, PyObject
 
 	while (1) {
 		retval = f->f_execute(f, exc, retval);
-		f = ts->frame;
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);
+		/* A soft switch is only complete here */
+		Py_CLEAR(ts->st.del_post_switch);
+		f = ts->frame;
 		if (f == stopframe)
 			break;
 		exc = 0;
@@ -717,9 +719,11 @@ slp_frame_dispatch_top(PyObject *retval)
 	while (1) {
 
 		retval = f->f_execute(f, 0, retval);
-		f = ts->frame;
 		if (STACKLESS_UNWINDING(retval))
 			STACKLESS_UNPACK(retval);
+		/* A soft switch is only complete here */
+		Py_CLEAR(ts->st.del_post_switch);
+		f = ts->frame;
 		if (f == NULL)
 			break;
 	}

@@ -471,8 +471,18 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
 		slp_channel_insert(self, source, dir);
 		target = ts->st.current;
 	}
+	
+	/* Make sure that the channel will exist past the actual switch, if
+	 * we are softswitching.  A temporary channel might disappear.
+	 */
+	if (self->ob_refcnt==1) {
+		assert(ts->st.del_post_switch == NULL);
+		ts->st.del_post_switch = (PyObject*)self;
+		Py_INCREF(self);
+	}
 	ts->st.runflags |= runflags; /* extra info for slp_schedule_task */
 	retval = slp_schedule_task(source, target, stackless);
+
 	if (interthread) {
 		if (cando) {
 			Py_DECREF(target);
