@@ -26,6 +26,8 @@
 #include "switch_arm32_gcc.h" /* gcc using arm32 */
 #elif defined(__GNUC__) && defined(__mips__) && defined(__linux__)
 #include "switch_mips_unix.h" /* MIPS */
+#elif defined(SN_TARGET_PS3)
+#include "switch_ps3_SNTools.h" /* Sony PS3 */
 #endif
 
 /* default definitions if not defined in above files */
