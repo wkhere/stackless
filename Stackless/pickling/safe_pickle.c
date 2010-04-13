@@ -38,6 +38,14 @@ slp_safe_pickling(int(*save)(PyObject *, PyObject *, int),
 	int ret = -1;
 	PyCFrameObject *cf = NULL;
 	PyCStackObject *cst;
+	
+	if (ts->st.cstack_root == NULL) {
+		/* mark the stack spilling base */
+		ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &save;
+		ret = (*save)(self, args, pers_save);
+		ts->st.cstack_root = NULL;
+		return ret;
+	}
 
 	cPickle_save = save;
 
@@ -93,13 +101,16 @@ pickle_M(PyObject *self, PyObject *args, int pers_save)
 	PyThreadState *ts = PyThreadState_GET();
 	PyCFrameObject *cf = slp_cframe_new(pickle_runmain, 0);
 	int ret;
+	intptr_t *old_root;
 
 	if (cf == NULL) return -1;
 	_self = self;
 	_args = args;
 	_pers_save = pers_save;
+	old_root = ts->st.cstack_root;
 	ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &self;
 	ret = slp_int_wrapper(slp_eval_frame((PyFrameObject *)cf));
+	ts->st.cstack_root = old_root;
 	return ret;
 }
 
