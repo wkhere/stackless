@@ -46,5 +46,8 @@ class ChannelCallbackTestCase(unittest.TestCase):
         self.failUnlessEqual(val, found)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    import sys
+    if not sys.argv[1:]:
+        sys.argv.append('-v')
     unittest.main()

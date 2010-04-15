@@ -70,5 +70,8 @@ class SchedulingCallbackTestCase(unittest.TestCase):
         fu(c2p == c2, "No calls to previous callback after setting it to None")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    import sys
+    if not sys.argv[1:]:
+        sys.argv.append('-v')
     unittest.main()

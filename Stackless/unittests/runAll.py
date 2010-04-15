@@ -48,6 +48,20 @@ def main():
             target = TARGET
         except NameError:
             target = 0
+
+    for use_psyco in (False, True):
+        if use_psyco:
+            # we import psyco so late, because we want to avoid side-effects
+            # from functions like sys.getframe, which are overridden at import
+            # time.
+            try:
+                import psyco
+                if not psyco._psyco.stackless_compatible:
+                    raise AttributeError
+                psyco.full()
+            except (ImportError, AttributeError):
+                break
+
     try:
         flags = True, False
         if target:
