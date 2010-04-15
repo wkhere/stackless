@@ -35,5 +35,6 @@ class TestTaskletBecome(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    if not sys.argv[1:]: sys.argv.append('-v')
+    if not sys.argv[1:]:
+        sys.argv.append('-v')
     unittest.main()

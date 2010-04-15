@@ -279,6 +279,13 @@ class TestWatchdog(unittest.TestCase):
         r = stackless.run()
         self.assertEqual(r, None)
         
+    def test_lone_receive(self):
+        #This is a bug, but we can't fix it now
+        return
+        def f():
+            stackless.channel().receive()
+        stackless.tasklet(f)()
+        stackless.run()
         
 class TestWatchdogSoft(TestWatchdog):
     softSchedule = True
@@ -328,5 +335,4 @@ if __name__ == '__main__':
     import sys
     if not sys.argv[1:]:
         sys.argv.append('-v')
-
     unittest.main()

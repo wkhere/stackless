@@ -21,5 +21,16 @@ class TestGarbageCollection(unittest.TestCase):
             if x is not before and id(x) not in bset:
                 leakage.append(x)
 
-        if len(leakage):
+        try:
+            __in_psyco__
+            relevant = False
+        except NameError:
+            relevant = True
+        if relevant and len(leakage):
             self.failUnless(len(leakage) == 0, "Leaked %s" % repr(leakage))
+
+if __name__ == '__main__':
+    import sys
+    if not sys.argv[1:]:
+        sys.argv.append('-v')
+    unittest.main()

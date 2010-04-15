@@ -48,18 +48,32 @@ def main():
             target = TARGET
         except NameError:
             target = 0
-    try:
-        flags = True, False
-        if target:
-            flags = (flags[target > 0],)
-            if abs(target) == 42:
-                target = 0
-        for switch in flags:
-            stackless.enable_softswitch(switch)
-            testSuite = makeSuite(abs(target), path)
-            unittest.TextTestRunner().run(testSuite)
-    finally:
-        stackless.enable_softswitch(hold)
+
+    for use_psyco in (False, True):
+        if use_psyco:
+            # we import psyco so late, because we want to avoid side-effects
+            # from functions like sys.getframe, which are overridden at import
+            # time.
+            try:
+                import psyco
+                if not psyco._psyco.stackless_compatible:
+                    raise AttributeError
+                psyco.full()
+            except (ImportError, AttributeError):
+                break
+
+        try:
+            flags = True, False
+            if target:
+                flags = (flags[target > 0],)
+                if abs(target) == 42:
+                    target = 0
+            for switch in flags:
+                stackless.enable_softswitch(switch)
+                testSuite = makeSuite(abs(target), path)
+                unittest.TextTestRunner().run(testSuite)
+        finally:
+            stackless.enable_softswitch(hold)
         
 if __name__ == '__main__':
     main()
