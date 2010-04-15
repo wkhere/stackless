@@ -185,31 +185,56 @@ if IS_SLP:
         except:
             print "*** GHOST ALERT ***"
             raise
-    
-enable_softswitch(0)
-res = []
-res.append(tester(f, niter, (schedule,),        "frame switches     "))
-enable_softswitch(1)
-res.append(tester(f, niter, (schedule,),        "frame softswitches "))
-res.append(tester(f, niter, (sys._getframe,),   "cfunction calls    "))
-res.append(tester(test_cframe_nr, niter, (),    "cframe softswitches"))
-enable_softswitch(0)
-res.append(tester(chantest, niter, (),          "channel hard top   "))
-res.append(tester(chantest, niter, (3,),        "channel hard nest 3"))
-enable_softswitch(1)
-res.append(tester(chantest, niter, (),          "channel soft       "))
-res.append(tester(chantest, niter, (0, 0, 1),   "channel iterator   "))
-res.append(tester(chantest, niter//10, (0, 1),  "channel real thread"))
-res.append(tester(f, niter, (lambda:0,),        "function calls     "))
-res.append(tester(gentest, niter, (),           "generator calls    "))
-res.append(tester(test_cframe, niter//10, (),   "cframe from outside", 1, test_outside))
-res.append(tester(test_cframe, niter, (),       "cframe switches    "))
-res.append(tester(test_cframe, niter, (100,),   "cframe 100 words   "))
+
+# _getframe becomes replaced by a much slower version, actually.
+# But this one is nice because it does almost nothing.
+
+orig_getframe = sys._getframe
+
+for use_psyco in (False, True):
+    if use_psyco:
+        # we import psyco so late, because we want to avoid side-effects
+        # from functions like sys.getframe, which are overridden at import
+        # time.
+        try:
+            import psyco
+            if not psyco._psyco.stackless_compatible:
+                raise AttributeError
+            print "----------------------- testing with psyco.full() ------------------------"
+            psyco.full()
+        except ImportError:
+            print "--- psyco is not installed ---"
+            break
+        except AttributeError:
+            print "--- this psyco version has no stackless support ---"
+            break
+    else:
+        print "----------------------- testing without psyco ------------------------"
+        
+    enable_softswitch(0)
+    res = []
+    res.append(tester(f, niter, (schedule,),        "frame switches     "))
+    enable_softswitch(1)
+    res.append(tester(f, niter, (schedule,),        "frame softswitches "))
+    res.append(tester(f, niter, (orig_getframe,),   "cfunction calls    "))
+    res.append(tester(test_cframe_nr, niter, (),    "cframe softswitches"))
+    enable_softswitch(0)
+    res.append(tester(chantest, niter, (),          "channel hard top   "))
+    res.append(tester(chantest, niter, (3,),        "channel hard nest 3"))
+    enable_softswitch(1)
+    res.append(tester(chantest, niter, (),          "channel soft       "))
+    res.append(tester(chantest, niter, (0, 0, 1),   "channel iterator   "))
+    res.append(tester(chantest, niter//10, (0, 1),  "channel real thread"))
+    res.append(tester(f, niter, (lambda:0,),        "function calls     "))
+    res.append(tester(gentest, niter, (),           "generator calls    "))
+    res.append(tester(test_cframe, niter//10, (),   "cframe from outside", 1, test_outside))
+    res.append(tester(test_cframe, niter, (),       "cframe switches    "))
+    res.append(tester(test_cframe, niter, (500,),   "cframe 500 words   "))
 
 if IS_SLP:
     if len(res) >= 2:
         print "The penalty per stack word is about %0.3f percent of raw switching." % (
-            (res[-1]-res[-2]) / res[-2])
+            (res[-1]-res[-2]) / res[-2] * 100 / 500)
 
     import struct
     adrsize = len(struct.pack("P", 0))

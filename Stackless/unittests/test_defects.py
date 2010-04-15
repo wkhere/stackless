@@ -26,9 +26,9 @@ class TestTaskletDel(unittest.TestCase):
             self.func()
         def func(self):
             pass
-    
+
     class TaskletWithDelAndCollect(stackless.tasklet):
-        def __del__(self):  
+        def __del__(self):
             gc.collect()
 
     def BlockingReceive(self):
@@ -56,7 +56,7 @@ class TestTaskletDel(unittest.TestCase):
         self.TaskletWithDel(TaskletFunc)(self)
         stackless.run()
 
-            
+
     #a gc.collect() in a tasklet's __del__ method causes
     def testCrash1(self):
         #we need a lost blocked tasklet here (print the ids for debugging)
@@ -67,7 +67,7 @@ class TestTaskletDel(unittest.TestCase):
             pass
         hex(id(self.TaskletWithDelAndCollect(TaskletFunc)(self)))
         stackless.run() #crash here
-        
+
 class Schedule(unittest.TestCase):
     def testScheduleRemove(self):
         #schedule remove doesn't work if it is the only tasklet running under watchdog
