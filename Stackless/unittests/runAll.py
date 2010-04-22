@@ -43,7 +43,8 @@ def main():
     hold = stackless.enable_softswitch(True)
     try:
         target = int(sys.argv[1])
-    except IndexError:
+        del sys.argv[1]
+    except (IndexError, ValueError):
         try:
             target = TARGET
         except NameError:
@@ -71,7 +72,7 @@ def main():
             for switch in flags:
                 stackless.enable_softswitch(switch)
                 testSuite = makeSuite(abs(target), path)
-                unittest.TextTestRunner().run(testSuite)
+                unittest.TextTestRunner(verbosity=2).run(testSuite)
         finally:
             stackless.enable_softswitch(hold)
         

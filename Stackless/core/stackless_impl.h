@@ -18,7 +18,7 @@ extern "C" {
 #include "pickling/prickelpit.h"
 
 #undef STACKLESS_SPY
-/* 
+/*
  * if a platform wants to support self-inspection via _peek,
  * it must provide a function or macro CANNOT_READ_MEM(adr, len)
  * which allows to spy at memory without causing exceptions.
@@ -34,6 +34,7 @@ extern "C" {
 /*** access to system-wide globals from stacklesseval.c ***/
 
 PyAPI_DATA(int) slp_enable_softswitch;
+PyAPI_DATA(int) slp_in_psyco;
 PyAPI_DATA(int) slp_try_stackless;
 PyAPI_DATA(PyCStackObject *) slp_cstack_chain;
 
@@ -60,7 +61,7 @@ PyAPI_FUNC(void) _PyStackless_Init(void);
 
 PyAPI_FUNC(void) slp_stacklesseval_fini(void);
 PyAPI_FUNC(void) slp_scheduling_fini(void);
-PyAPI_FUNC(void) slp_cstack_fini(void);
+PyAPI_FUNC(void) slp_cframe_fini(void);
 
 PyAPI_FUNC(void) PyStackless_Fini(void);
 
@@ -70,7 +71,7 @@ PyAPI_FUNC(void) PyStackless_kill_tasks_with_stacks(int allthreads);
 PyAPI_FUNC(PyObject *) slp_eval_frame(struct _frame *f);
 
 /* the frame dispatcher */
-PyAPI_FUNC(PyObject *) slp_frame_dispatch(PyFrameObject *f, 
+PyAPI_FUNC(PyObject *) slp_frame_dispatch(PyFrameObject *f,
 					  PyFrameObject *stopframe, int exc,
 					  PyObject *retval);
 
@@ -149,6 +150,9 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 
 /* macros for setting/resetting the stackless flag */
 
+#define STACKLESS_POSSIBLE()                                        \
+    (slp_enable_softswitch && !slp_in_psyco)
+
 #define STACKLESS_GETARG() int stackless = (stackless = slp_try_stackless, \
 			   slp_try_stackless = 0, stackless)
 
@@ -168,16 +172,26 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 
 #define STACKLESS_PROMOTE_ALL() (slp_try_stackless = stackless, NULL)
 
-#define STACKLESS_PROPOSE(func) {int stackless = slp_enable_softswitch; \
-				 STACKLESS_PROMOTE(func);}
+#define STACKLESS_PROPOSE(func)                                     \
+    {                                                               \
+        int stackless = STACKLESS_POSSIBLE();                       \
+        STACKLESS_PROMOTE(func);                                    \
+    }
 
-#define STACKLESS_PROPOSE_FLAG(flag) {int stackless = slp_enable_softswitch; \
-				      STACKLESS_PROMOTE_FLAG(flag);}
+#define STACKLESS_PROPOSE_FLAG(flag)                                \
+    {                                                               \
+        int stackless = STACKLESS_POSSIBLE();                       \
+	STACKLESS_PROMOTE_FLAG(flag);                               \
+    }
 
-#define STACKLESS_PROPOSE_METHOD(obj, meth) {int stackless = slp_enable_softswitch; \
-				 STACKLESS_PROMOTE_METHOD(obj, meth);}
+#define STACKLESS_PROPOSE_METHOD(obj, meth)                         \
+    {                                                               \
+        int stackless = STACKLESS_POSSIBLE();                       \
+	STACKLESS_PROMOTE_METHOD(obj, meth);                        \
+    }
 
-#define STACKLESS_PROPOSE_ALL() slp_try_stackless = slp_enable_softswitch;
+#define STACKLESS_PROPOSE_ALL()                                     \
+    slp_try_stackless = STACKLESS_POSSIBLE()
 
 #define STACKLESS_RETRACT() slp_try_stackless = 0;
 
@@ -209,7 +223,7 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 	move the slp_try_stackless flag into the local variable "stackless".
 
   PROMOTE(func)
-  
+
 	if stackless was set and the function's type has set
 	Py_TPFLAGS_HAVE_STACKLESS_CALL, then this flag will be
 	put back into slp_try_stackless, and we expect that the
@@ -238,14 +252,22 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 
   ASSERT()
 
-	make sure that slp_ry_stackless was cleared. This debug feature
+	make sure that slp_try_stackless was cleared. This debug feature
 	tries to ensure that no unexpected nonrecursive call can happen.
-	
+
   Some functions which are known to be stackless by nature
   just use the PROPOSE macros. They do not care about prior state.
   Most of them are used in ceval.c and other contexts which are
   stackless by definition. All possible nonrecursive calls are
   initiated by these macros.
+
+  Compatibility with Psyco:
+  Psyco is not compatible with soft switching and will presumably
+  never be. An extra flag 'slp_in_psyco' has been added, which
+  overrides 'slp_enable_softswitch'. This flag will be set by Psyco
+  whenever Psyco is calling into stackless.
+  In the future, a new way of softswitching will be developed, which
+  will be understood by Stackless and Psyco.
 
 */
 
@@ -442,12 +464,12 @@ PyAPI_FUNC(int) slp_return_wrapper(PyObject *retval);
 PyAPI_FUNC(int) slp_int_wrapper(PyObject *retval);
 PyAPI_FUNC(int) slp_current_wrapper(int(*func)(PyTaskletObject*),
 				    PyTaskletObject *task);
-PyAPI_FUNC(int) slp_resurrect_and_kill(PyObject *self, 
+PyAPI_FUNC(int) slp_resurrect_and_kill(PyObject *self,
 				       void(*killer)(PyObject *));
 
 /* stackless pickling support */
 
-PyAPI_FUNC(int) slp_safe_pickling(int(*save)(PyObject *, PyObject *, int), 
+PyAPI_FUNC(int) slp_safe_pickling(int(*save)(PyObject *, PyObject *, int),
 				  PyObject *self, PyObject *args,
 				  int pers_save);
 

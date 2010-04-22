@@ -383,7 +383,7 @@ PyChannel_Send_nr(PyChannelObject *self, PyObject *arg)
 {
 	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
 
-	slp_try_stackless = slp_enable_softswitch;
+	STACKLESS_PROPOSE_ALL();
 	return slp_return_wrapper(t->send(self, arg));
 }
 
@@ -459,7 +459,7 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
 		}
 	}
 	else {
-		/* communication 2): there is nobody waiting */
+		/* communication 2): there is nobody waiting, so we must switch */
 		if (source->flags.block_trap)
 			RUNTIME_ERROR("this tasklet does not like to be"
 				      " blocked.", NULL);
@@ -470,15 +470,15 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
 		slp_current_remove();
 		slp_channel_insert(self, source, dir);
 		target = ts->st.current;
-	}
-	
-	/* Make sure that the channel will exist past the actual switch, if
-	 * we are softswitching.  A temporary channel might disappear.
-	 */
-	if (self->ob_refcnt==1) {
-		assert(ts->st.del_post_switch == NULL);
-		ts->st.del_post_switch = (PyObject*)self;
-		Py_INCREF(self);
+
+		/* Make sure that the channel will exist past the actual switch, if
+		 * we are softswitching.  A temporary channel might disappear.
+		 */
+		if (self->ob_refcnt==1) {
+			assert(ts->st.del_post_switch == NULL);
+			ts->st.del_post_switch = (PyObject*)self;
+			Py_INCREF(self);
+		}
 	}
 	ts->st.runflags |= runflags; /* extra info for slp_schedule_task */
 	retval = slp_schedule_task(source, target, stackless);
@@ -606,7 +606,7 @@ PyChannel_Receive_nr(PyChannelObject *self)
 	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
 	PyObject *ret;
 
-	slp_try_stackless = 1;
+	;
 	ret = t->receive(self);
 	STACKLESS_ASSERT();
 	return ret;

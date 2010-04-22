@@ -313,9 +313,7 @@ PyAPI_FUNC(PyObject *) PyStackless_GetCurrent(void);
  * after the action. You will write your exception handler
  * here, since every uncaught exception will be directed
  * to main.
- * In case of a timeout (tick count), If a tasklet runs for
- * more than 'timeout' ticks at a time, it will be interrupted.
- * the return value
+ * In case on a timeout (opcode count), the return value
  * will be the long-running tasklet, removed from the queue.
  * You might decide to kill it or to insert it again.
  * flags is interpreted as an OR of :

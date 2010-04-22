@@ -1046,15 +1046,10 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 	Normal tasklets when created have no recursion depth yet, but the main
 	tasklet is initialized in the middle of an existing indeterminate call
 	stack.  Therefore it is not guaranteed that there is not a pre-existing
-	recursion depth from before its initialization.
-
-	Previously, we exited a main tasklet with the expectation that there would
-	be no current one.  This is incorrect, and the case of the interpreter where
-	each command creates a new main tasklet to create a new tasklet, which is
-	scheduled (made the current now) but not run yet, means we need to expand
-	this check.
+	recursion depth from before its initialization. So, assert that this
+	is zero, or that we are the main tasklet being destroyed (see tasklet_end)
 	*/
-	assert(ts->recursion_depth == 0 || ts->st.main == NULL && ts->st.current != next && prev == next);
+	assert(ts->recursion_depth == 0 || (ts->st.main == NULL && prev == next));
 	prev->recursion_depth = 0;
 	assert(ts->frame == NULL);
 	prev->f.frame = NULL;

@@ -4,10 +4,16 @@ import pickle
 import unittest
 import stackless
 
+def in_psyco():
+    try:
+        return __in_psyco__
+    except NameError:
+        return False
+    
 def is_soft():
     softswitch = stackless.enable_softswitch(0)
     stackless.enable_softswitch(softswitch)
-    return softswitch
+    return softswitch and not in_psyco()
 
 def runtask():
     x = 0
@@ -27,7 +33,7 @@ class TestWatchdog(unittest.TestCase):
         # allow hard switching
         t.set_ignore_nesting(1)
         
-        softSwitching = stackless.enable_softswitch(0); stackless.enable_softswitch(softSwitching)
+        softSwitching = is_soft()
         
         # Run a little
         res = stackless.run(10)
@@ -74,7 +80,7 @@ class TestWatchdog(unittest.TestCase):
         self.assert_(t.scheduled)
         self.assertEquals(t.recursion_depth, 0)
 
-        softSwitching = stackless.enable_softswitch(0); stackless.enable_softswitch(softSwitching)
+        softSwitching = is_soft()
 
         # Run a little
         res = stackless.run(100)

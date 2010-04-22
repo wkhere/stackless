@@ -320,7 +320,7 @@ int init_cframetype(void)
 /* Clear out the free list */
 
 void
-slp_cstack_fini(void)
+slp_cframe_fini(void)
 {
 	while (free_list != NULL) {
 		PyCFrameObject *cf = free_list;
