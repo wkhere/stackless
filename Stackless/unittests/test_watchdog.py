@@ -5,10 +5,16 @@ import random
 
 # Helpers
 
+def in_psyco():
+    try:
+        return __in_psyco__
+    except NameError:
+        return False
+    
 def is_soft():
     softswitch = stackless.enable_softswitch(0)
     stackless.enable_softswitch(softswitch)
-    return softswitch
+    return softswitch and not in_psyco()
 
 class SimpleScheduler(object):
     """ Not really scheduler as such but used here to implement
@@ -280,8 +286,7 @@ class TestWatchdog(unittest.TestCase):
         self.assertEqual(r, None)
         
     def test_lone_receive(self):
-        #This is a bug, but we can't fix it now
-        return
+
         def f():
             stackless.channel().receive()
         stackless.tasklet(f)()

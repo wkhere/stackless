@@ -12,7 +12,7 @@ extern "C" {
 
 /****************************************************************************
 
-  Stackless Python Internal Configuration 
+  Stackless Python Internal Configuration
 
   Some preliminary description can be found in the draft document readme.txt
 
@@ -27,7 +27,7 @@ extern "C" {
 
  ****************************************************************************/
 
-/* 
+/*
  * every platform needs to define its own interface here.
  * If this isn't defined, stackless is simply not compiled in.
  * Repeat the following sequence for every platform you support...
@@ -63,9 +63,6 @@ extern "C" {
 	/* no supported platform */
 #undef STACKLESS
 #endif
-
-/* get some definitions for backward compatibility */
-#include "core/backwardcompat.h"
 
 #ifdef __cplusplus
 }

@@ -43,7 +43,8 @@ def main():
     hold = stackless.enable_softswitch(True)
     try:
         target = int(sys.argv[1])
-    except IndexError:
+        del sys.argv[1]
+    except (IndexError, ValueError):
         try:
             target = TARGET
         except NameError:
@@ -62,18 +63,18 @@ def main():
             except (ImportError, AttributeError):
                 break
 
-    try:
-        flags = True, False
-        if target:
-            flags = (flags[target > 0],)
-            if abs(target) == 42:
-                target = 0
-        for switch in flags:
-            stackless.enable_softswitch(switch)
-            testSuite = makeSuite(abs(target), path)
-            unittest.TextTestRunner().run(testSuite)
-    finally:
-        stackless.enable_softswitch(hold)
+        try:
+            flags = True, False
+            if target:
+                flags = (flags[target > 0],)
+                if abs(target) == 42:
+                    target = 0
+            for switch in flags:
+                stackless.enable_softswitch(switch)
+                testSuite = makeSuite(abs(target), path)
+                unittest.TextTestRunner(verbosity=2).run(testSuite)
+        finally:
+            stackless.enable_softswitch(hold)
         
 if __name__ == '__main__':
     main()

@@ -3,6 +3,11 @@
 #ifdef STACKLESS
 #include "stackless_impl.h"
 
+/* backward compatibility */
+#ifndef Py_TYPE
+#define Py_TYPE(ob)	(ob->ob_type)
+#endif
+
 /* Shorthands to return certain errors */
 
 PyObject *

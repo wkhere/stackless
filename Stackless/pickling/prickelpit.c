@@ -1792,7 +1792,7 @@ rangeiter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	it = PyObject_New(rangeiterobject, type);
 	if (it == NULL)
 		return NULL;
-	if (!PyArg_ParseTuple(args, "iiii:rangeiterator",
+	if (!PyArg_ParseTuple(args, "llll:rangeiterator",
 				    &it->index,
 				    &it->start,
 				    &it->step,
@@ -2050,9 +2050,10 @@ typedef struct {
 	/* True if generator is being executed. */
 	int gi_running;
 
+#if PY_VERSION_HEX >= 0x02060000   /* 2.6 */
 	/* The code object backing the generator */
 	PyObject *gi_code;
-
+#endif
 	/* List of weak reference. */
 	PyObject *gi_weakreflist;
 } genobject;
@@ -2110,9 +2111,11 @@ gen_setstate(PyObject *self, PyObject *args)
 			Py_INCREF(f);
 			Py_DECREF(gen->gi_frame);
 			gen->gi_frame = f;
+#if PY_VERSION_HEX >= 0x02060000   /* 2.6 */
 			Py_INCREF(f->f_code);
 			Py_DECREF(gen->gi_code);
 			gen->gi_code = (PyObject *)f->f_code;
+#endif
 			/* The frame the temporary generator references
 			   will have GeneratorExit raised on it, when the
 			   temporary generator is torn down.  So clearing
@@ -2138,9 +2141,11 @@ gen_setstate(PyObject *self, PyObject *args)
 	Py_INCREF(f);
 	Py_DECREF(gen->gi_frame);
 	gen->gi_frame = f;
+#if PY_VERSION_HEX >= 0x02060000   /* 2.6 */
 	Py_INCREF(f->f_code);
 	Py_DECREF(gen->gi_code);
 	gen->gi_code = (PyObject *)f->f_code;
+#endif
 	gen->gi_running = gi_running;
 	gen->ob_type = gen->ob_type->tp_base;
 	Py_INCREF(gen);

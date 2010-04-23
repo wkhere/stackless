@@ -1042,11 +1042,12 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 	}
 
 	/* update what's not yet updated
+
 	Normal tasklets when created have no recursion depth yet, but the main
 	tasklet is initialized in the middle of an existing indeterminate call
 	stack.  Therefore it is not guaranteed that there is not a pre-existing
 	recursion depth from before its initialization. So, assert that this
-	is zero, or that we are the main tasklet being destroyed (line 1130)
+	is zero, or that we are the main tasklet being destroyed (see tasklet_end)
 	*/
 	assert(ts->recursion_depth == 0 || (ts->st.main == NULL && prev == next));
 	prev->recursion_depth = 0;
@@ -1130,7 +1131,7 @@ tasklet_end(PyObject *retval)
 	 * clean up any current exception - this tasklet is dead.
 	 * This only happens if we are killing tasklets in the middle
 	 * of their execution.
-	*/
+         */
 	if (ts->exc_type != NULL && ts->exc_type != Py_None) {
 		Py_DECREF(ts->exc_type);
 		Py_XDECREF(ts->exc_value);

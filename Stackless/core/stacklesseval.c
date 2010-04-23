@@ -23,6 +23,11 @@
 
 int slp_enable_softswitch = 1;
 
+/* compatibility mask for Psyco. It will be set to nonzero when
+ * psyco-compiled code is run. Suppresses soft-switching.
+ */
+int slp_in_psyco = 0;
+
 /* 
  * flag whether the next call should try to be stackless.
  * The protocol is: This flag may be only set if the called

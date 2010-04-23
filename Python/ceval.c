@@ -4082,7 +4082,7 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
 		}
 #ifdef STACKLESS
 		f->f_execute = PyEval_EvalFrameEx_slp;
-		if (slp_enable_softswitch) {
+		if (STACKLESS_POSSIBLE()) {
 			Py_INCREF(Py_None);
 			retval = Py_None;
 			tstate->frame = f;

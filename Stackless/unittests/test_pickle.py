@@ -126,10 +126,16 @@ def cellpickling():
     schedule()
     return the_closure()
 
+def in_psyco():
+    try:
+        return __in_psyco__
+    except NameError:
+        return False
+    
 def is_soft():
     softswitch = stackless.enable_softswitch(0)
     stackless.enable_softswitch(softswitch)
-    return softswitch
+    return softswitch and not in_psyco()
 
 class TestPickledTasklets(unittest.TestCase):
     def setUp(self):
