@@ -843,24 +843,36 @@ exit_eval_frame:
 PyObject *
 PyEval_EvalFrame_noval(PyFrameObject *f, int throwflag, PyObject *retval)
 {
-	/*
-	 * this function is identical to PyEval_EvalFrame_value.
-	 * it serves as a marker whether we expect a value or
-	 * not, and it makes debugging a little easier.
-	 */
-	return PyEval_EvalFrame_value(f, throwflag, retval);
+        PyObject *r;
+        /*
+         * this function is identical to PyEval_EvalFrame_value.
+         * it serves as a marker whether we expect a value or
+         * not, and it makes debugging a little easier.
+         * NOTE: We must make it sufficiently different to the target that
+         * a linker optimizer doesn't optimize it away!
+         * XXX We could save a cycle with a compiler specific #ifdef...
+         */
+        Py_XINCREF(f); /* fool the link optimizer */
+        r = PyEval_EvalFrame_value(f, throwflag, retval);
+        Py_XDECREF(f);
+        return r;
 }
 
 PyObject *
 PyEval_EvalFrame_iter(PyFrameObject *f, int throwflag, PyObject *retval)
 {
-	/*
-	 * this function is identical to PyEval_EvalFrame_value.
-	 * it serves as a marker whether we are inside of a
-	 * for_iter operation. In this case we need to handle
-	 * null without error as valid result.
-	 */
-	return PyEval_EvalFrame_value(f, throwflag, retval);
+        PyObject *r;
+        /*
+         * this function is identical to PyEval_EvalFrame_value.
+         * it serves as a marker whether we are inside of a
+         * for_iter operation. In this case we need to handle
+         * null without error as valid result.
+         * NOTE / XXX: see above.
+         */
+        Py_XINCREF(retval); /* fool the link optimizer */
+        r = PyEval_EvalFrame_value(f, throwflag, retval);
+        Py_XDECREF(retval);
+        return r;
 }
 
 PyObject *
