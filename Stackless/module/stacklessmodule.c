@@ -47,6 +47,7 @@ PyStackless_Schedule(PyObject *retval, int remove)
 	PyObject *ret = NULL;
 
 	if (ts->st.main == NULL) return PyStackless_Schedule_M(retval, remove);
+	/* make sure we hold a reference to the previous tasklet */
 	Py_INCREF(prev);
 	TASKLET_SETVAL(prev, retval);
 	if (remove) {
@@ -55,9 +56,16 @@ PyStackless_Schedule(PyObject *retval, int remove)
 		if (next == prev)
 			next = 0; /* we were the last runnable tasklet */
 	}
-	ret = slp_schedule_task(prev, next, stackless);
-	Py_DECREF(prev);
-	return ret;
+	/* we mustn't DECREF prev here (after the slp_schedule_task().
+	 * This could be the last reference, thus
+	 * promting emergency reactivation of the tasklet,
+	 * and soft switching isn't really done until we have unwound.
+	 * Use the delayed release mechanism instead.
+	 */
+	assert(ts->st.del_post_switch == NULL);
+	ts->st.del_post_switch = (PyObject*)prev;
+	
+	return slp_schedule_task(prev, next, stackless);
 }
 
 PyObject *
