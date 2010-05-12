@@ -89,6 +89,21 @@ class Schedule(unittest.TestCase):
         stackless.tasklet(func)(self, chan)
         chan.receive()
         
+    def testScheduleRemove3(self):
+        '''Schedule-remove the last reference to a tasklet 1'''
+        def func():
+            stackless.schedule_remove(None)
+        stackless.tasklet(func)()
+        stackless.run()
+        
+    def testScheduleRemove4(self):
+        '''Schedule-remove the last reference to a tasklet 2'''
+        def func():
+            stackless.schedule_remove(None)
+        stackless.tasklet(func)()
+        stackless.schedule_remove(None)        
+            
+        
 class Channel(unittest.TestCase):
     def testTemporaryChannel(self):
         def f1():
