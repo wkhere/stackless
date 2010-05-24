@@ -360,9 +360,16 @@ class ItimerTest(unittest.TestCase):
         signal.signal(signal.SIGVTALRM, self.sig_vtalrm)
         signal.setitimer(self.itimer, 0.3, 0.2)
 
-        for i in range(100000000):
+        start_time = time.time()
+        while time.time() - start_time < 5.0:
+            # use up some virtual time by doing real work
+            _ = pow(12345, 67890, 10000019)
             if signal.getitimer(self.itimer) == (0.0, 0.0):
                 break # sig_vtalrm handler stopped this itimer
+        else:
+            self.fail('timeout waiting for sig_vtalrm signal; '
+                      'signal.getitimer(self.itimer) gives: %s' %
+                       (signal.getitimer(self.itimer),))
 
         # virtual itimer should be (0.0, 0.0) now
         self.assertEquals(signal.getitimer(self.itimer), (0.0, 0.0))
@@ -374,9 +381,14 @@ class ItimerTest(unittest.TestCase):
         signal.signal(signal.SIGPROF, self.sig_prof)
         signal.setitimer(self.itimer, 0.2, 0.2)
 
-        for i in range(100000000):
+        start_time = time.time()
+        while time.time() - start_time < 5.0:
+            # do some work
+            _ = pow(12345, 67890, 10000019)
             if signal.getitimer(self.itimer) == (0.0, 0.0):
                 break # sig_prof handler stopped this itimer
+        else:
+            self.fail('timeout waiting for sig_prof signal')
 
         # profiling itimer should be (0.0, 0.0) now
         self.assertEquals(signal.getitimer(self.itimer), (0.0, 0.0))

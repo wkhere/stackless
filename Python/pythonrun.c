@@ -18,6 +18,7 @@
 #include "eval.h"
 #include "marshal.h"
 #include "osdefs.h"
+#include "abstract.h"
 #include "core/stackless_impl.h"
 
 #ifdef HAVE_SIGNAL_H
@@ -67,6 +68,7 @@ static PyObject *run_pyc_file(FILE *, const char *, PyObject *, PyObject *,
 static void err_input(perrdetail *);
 static void initsigs(void);
 static void call_py_exitfuncs(void);
+static void wait_for_thread_shutdown(void);
 static void call_ll_exitfuncs(void);
 extern void _PyUnicode_Init(void);
 extern void _PyUnicode_Fini(void);
@@ -373,6 +375,8 @@ Py_Finalize(void)
 
 	if (!initialized)
 		return;
+
+	wait_for_thread_shutdown();
 
 	/* The interpreter is still entirely intact at this point, and the
 	 * exit funcs may be relying on that.  In particular, if some thread
@@ -1604,7 +1608,7 @@ print_exception_recursive(PyObject *f, PyObject *value, PyObject *seen)
 						cause_message, f);
 				}
 			}
-			if (context) {
+			else if (context) {
 				res = PySet_Contains(seen, context);
 				if (res == -1)
 					PyErr_Clear();
@@ -2097,6 +2101,34 @@ call_py_exitfuncs(void)
 
 	(*pyexitfunc)();
 	PyErr_Clear();
+}
+
+/* Wait until threading._shutdown completes, provided
+   the threading module was imported in the first place.
+   The shutdown routine will wait until all non-daemon
+   "threading" threads have completed. */
+static void
+wait_for_thread_shutdown(void)
+{
+#ifdef WITH_THREAD
+	PyObject *result;
+	PyThreadState *tstate = PyThreadState_GET();
+	PyObject *threading = PyMapping_GetItemString(tstate->interp->modules,
+						      "threading");
+	if (threading == NULL) {
+		/* threading not imported */
+		PyErr_Clear();
+		return;
+	}
+	result = PyObject_CallMethod(threading, "_shutdown", "");
+	if (result == NULL) {
+		PyErr_WriteUnraisable(threading);
+	}
+	else {
+		Py_DECREF(result);
+	}
+	Py_DECREF(threading);
+#endif
 }
 
 #define NEXITFUNCS 32

@@ -10,7 +10,7 @@
 """
 #    This module is maintained by Marc-Andre Lemburg <mal@egenix.com>.
 #    If you find problems, please submit bug reports/patches via the
-#    Python SourceForge Project Page and assign them to "lemburg".
+#    Python bug tracker (http://bugs.python.org) and assign them to "lemburg".
 #
 #    Still needed:
 #    * more support for WinCE
@@ -89,7 +89,7 @@
 
 __copyright__ = """
     Copyright (c) 1999-2000, Marc-Andre Lemburg; mailto:mal@lemburg.com
-    Copyright (c) 2000-2008, eGenix.com Software GmbH; mailto:info@egenix.com
+    Copyright (c) 2000-2010, eGenix.com Software GmbH; mailto:info@egenix.com
 
     Permission to use, copy, modify, and distribute this software and its
     documentation for any purpose and without fee or royalty is hereby granted,
@@ -245,6 +245,12 @@ _supported_dists = (
 
 def _parse_release_file(firstline):
 
+    # Default to empty 'version' and 'id' strings.  Both defaults are used
+    # when 'firstline' is empty.  'id' defaults to empty when an id can not
+    # be deduced.
+    version = ''
+    id = ''
+
     # Parse the first line
     m = _lsb_release_version.match(firstline)
     if m is not None:
@@ -262,8 +268,6 @@ def _parse_release_file(firstline):
         version = l[0]
         if len(l) > 1:
             id = l[1]
-        else:
-            id = ''
     return '', version, id
 
 def linux_distribution(distname='', version='', id='',
@@ -694,7 +698,7 @@ def mac_ver(release='',versioninfo=('','',''),machine=''):
     except ImportError:
         return release,versioninfo,machine
     # Get the infos
-    sysv,sysu,sysa = _mac_ver_lookup(('sysv','sysu','sysa'))
+    sysv, sysa = _mac_ver_lookup(('sysv','sysa'))
     # Decode the infos
     if sysv:
         major = (sysv & 0xFF00) >> 8
@@ -711,24 +715,6 @@ def mac_ver(release='',versioninfo=('','',''),machine=''):
             release = '%i.%i.%i' %(major, minor, patch)
         else:
             release = '%s.%i.%i' % (_bcd2str(major),minor,patch)
-
-    if sysu:
-        # NOTE: this block is left as documentation of the
-        # intention of this function, the 'sysu' gestalt is no
-        # longer available and there are no alternatives.
-        major =  int((sysu & 0xFF000000) >> 24)
-        minor =  (sysu & 0x00F00000) >> 20
-        bugfix = (sysu & 0x000F0000) >> 16
-        stage =  (sysu & 0x0000FF00) >> 8
-        nonrel = (sysu & 0x000000FF)
-        version = '%s.%i.%i' % (_bcd2str(major),minor,bugfix)
-        nonrel = _bcd2str(nonrel)
-        stage = {0x20:'development',
-                 0x40:'alpha',
-                 0x60:'beta',
-                 0x80:'final'}.get(stage,'')
-        versioninfo = (version,stage,nonrel)
-
 
     if sysa:
         machine = {0x1: '68k',

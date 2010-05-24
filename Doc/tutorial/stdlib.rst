@@ -152,6 +152,7 @@ from urls and :mod:`smtplib` for sending mail::
 
    >>> from urllib.request import urlopen
    >>> for line in urlopen('http://tycho.usno.navy.mil/cgi-bin/timer.pl'):
+   ...     line = line.decode('utf-8')  # Decoding the binary data to text.
    ...     if 'EST' in line or 'EDT' in line:  # look for Eastern Time
    ...         print(line)
 
@@ -181,7 +182,7 @@ focus of the implementation is on efficient member extraction for output
 formatting and manipulation.  The module also supports objects that are timezone
 aware. ::
 
-   # dates are easily constructed and formatted
+   >>> # dates are easily constructed and formatted
    >>> from datetime import date
    >>> now = date.today()
    >>> now
@@ -189,7 +190,7 @@ aware. ::
    >>> now.strftime("%m-%d-%y. %d %b %Y is a %A on the %d day of %B.")
    '12-02-03. 02 Dec 2003 is a Tuesday on the 02 day of December.'
 
-   # dates support calendar arithmetic
+   >>> # dates support calendar arithmetic
    >>> birthday = date(1964, 7, 31)
    >>> age = now - birthday
    >>> age.days
@@ -308,7 +309,7 @@ sophisticated and robust capabilities of its larger packages. For example:
 * The :mod:`xml.dom` and :mod:`xml.sax` packages provide robust support for
   parsing this popular data interchange format. Likewise, the :mod:`csv` module
   supports direct reads and writes in a common database format. Together, these
-  modules and packages greatly simplify data interchange between python
+  modules and packages greatly simplify data interchange between Python
   applications and other tools.
 
 * Internationalization is supported by a number of modules including

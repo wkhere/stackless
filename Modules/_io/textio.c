@@ -190,9 +190,9 @@ typedef struct {
     PyObject_HEAD
     PyObject *decoder;
     PyObject *errors;
-    int pendingcr:1;
-    int translate:1;
-    unsigned int seennl:3;
+    signed int pendingcr: 1;
+    signed int translate: 1;
+    unsigned int seennl: 3;
 } nldecoder_object;
 
 static int
@@ -1213,11 +1213,18 @@ findchar(const Py_UNICODE *s, Py_ssize_t size, Py_UNICODE ch)
 static int
 _textiowrapper_writeflush(textio *self)
 {
-    PyObject *b, *ret;
+    PyObject *pending, *b, *ret;
 
     if (self->pending_bytes == NULL)
         return 0;
-    b = _PyBytes_Join(_PyIO_empty_bytes, self->pending_bytes);
+
+    pending = self->pending_bytes;
+    Py_INCREF(pending);
+    self->pending_bytes_count = 0;
+    Py_CLEAR(self->pending_bytes);
+
+    b = _PyBytes_Join(_PyIO_empty_bytes, pending);
+    Py_DECREF(pending);
     if (b == NULL)
         return -1;
     ret = PyObject_CallMethodObjArgs(self->buffer,
@@ -1226,8 +1233,6 @@ _textiowrapper_writeflush(textio *self)
     if (ret == NULL)
         return -1;
     Py_DECREF(ret);
-    Py_CLEAR(self->pending_bytes);
-    self->pending_bytes_count = 0;
     return 0;
 }
 
@@ -1474,7 +1479,7 @@ textiowrapper_read(textio *self, PyObject *args)
 
     CHECK_INITIALIZED(self);
 
-    if (!PyArg_ParseTuple(args, "|n:read", &n))
+    if (!PyArg_ParseTuple(args, "|O&:read", &_PyIO_ConvertSsize_t, &n))
         return NULL;
 
     CHECK_CLOSED(self);
@@ -2313,15 +2318,7 @@ textiowrapper_truncate(textio *self, PyObject *args)
         return NULL;
     Py_DECREF(res);
 
-    if (pos != Py_None) {
-        res = PyObject_CallMethodObjArgs((PyObject *) self,
-                                          _PyIO_str_seek, pos, NULL);
-        if (res == NULL)
-            return NULL;
-        Py_DECREF(res);
-    }
-
-    return PyObject_CallMethodObjArgs(self->buffer, _PyIO_str_truncate, NULL);
+    return PyObject_CallMethodObjArgs(self->buffer, _PyIO_str_truncate, pos, NULL);
 }
 
 static PyObject *

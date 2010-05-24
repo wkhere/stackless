@@ -142,9 +142,9 @@ are always available.  They are listed here in alphabetical order.
 .. function:: compile(source, filename, mode, flags=0, dont_inherit=False)
 
    Compile the *source* into a code or AST object.  Code objects can be executed
-   by an :keyword:`exec` statement or evaluated by a call to :func:`eval`.
-   *source* can either be a string or an AST object.  Refer to the :mod:`ast`
-   module documentation for information on how to work with AST objects.
+   by:func:`exec` or :func:`eval`.  *source* can either be a string or an AST
+   object.  Refer to the :mod:`ast` module documentation for information on how
+   to work with AST objects.
 
    The *filename* argument should give the file from which the code was read;
    pass some recognizable value if it wasn't read from a file (``'<string>'`` is
@@ -489,13 +489,20 @@ are always available.  They are listed here in alphabetical order.
    expression.  If *x* is not a Python :class:`int` object, it has to define an
    :meth:`__index__` method that returns an integer.
 
+   .. note::
+
+      To obtain a hexadecimal string representation for a float, use the
+      :meth:`float.hex` method.
+
 
 .. function:: id(object)
 
    Return the "identity" of an object.  This is an integer which
    is guaranteed to be unique and constant for this object during its lifetime.
-   Two objects with non-overlapping lifetimes may have the same :func:`id` value.
-   (Implementation note: this is the address of the object.)
+   Two objects with non-overlapping lifetimes may have the same :func:`id`
+   value.
+
+   .. impl-detail:: This is the address of the object.
 
 
 .. function:: input([prompt])
@@ -595,16 +602,12 @@ are always available.  They are listed here in alphabetical order.
 .. function:: locals()
 
    Update and return a dictionary representing the current local symbol table.
+   Free variables are returned by :func:`locals` when it is called in function
+   blocks, but not in class blocks.
 
    .. note::
-
       The contents of this dictionary should not be modified; changes may not
-      affect the values of local variables used by the interpreter.
-
-   Free variables are returned by :func:`locals` when it is called in a function
-   block.  Modifications of free variables may not affect the values used by the
-   interpreter.  Free variables are not returned in class blocks.
-
+      affect the values of local and free variables used by the interpreter.
 
 .. function:: map(function, iterable, ...)
 
@@ -962,7 +965,7 @@ are always available.  They are listed here in alphabetical order.
 .. function:: set([iterable])
    :noindex:
 
-   Return a new set, optionally with elements are taken from *iterable*.
+   Return a new set, optionally with elements taken from *iterable*.
    The set type is described in :ref:`types-set`.
 
 
@@ -1167,10 +1170,10 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: vars([object])
 
-   Without arguments, return a dictionary corresponding to the current local symbol
-   table.  With a module, class or class instance object as argument (or anything
-   else that has a :attr:`__dict__` attribute), returns a dictionary corresponding
-   to the object's symbol table.
+   Without an argument, act like :func:`locals`.
+
+   With a module, class or class instance object as argument (or anything else that
+   has a :attr:`__dict__` attribute), return that attribute.
 
    .. note::
       The returned dictionary should not be modified:

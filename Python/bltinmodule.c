@@ -111,8 +111,16 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 	}
 	prep = PyObject_GetAttrString(meta, "__prepare__");
 	if (prep == NULL) {
-		PyErr_Clear();
-		ns = PyDict_New();
+		if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+			PyErr_Clear();
+			ns = PyDict_New();
+		}
+		else {
+			Py_DECREF(meta);
+			Py_XDECREF(mkw);
+			Py_DECREF(bases);
+			return NULL;
+		}
 	}
 	else {
 		PyObject *pargs = PyTuple_Pack(2, name, bases);
@@ -126,12 +134,12 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 		ns = PyEval_CallObjectWithKeywords(prep, pargs, mkw);
 		Py_DECREF(pargs);
 		Py_DECREF(prep);
-		if (ns == NULL) {
-			Py_DECREF(meta);
-			Py_XDECREF(mkw);
-			Py_DECREF(bases);
-			return NULL;
-		}
+	}
+	if (ns == NULL) {
+		Py_DECREF(meta);
+		Py_XDECREF(mkw);
+		Py_DECREF(bases);
+		return NULL;
 	}
 	cell = PyObject_CallFunctionObjArgs(func, ns, NULL);
 	if (cell != NULL) {
@@ -532,6 +540,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 	int mode = -1;
 	int dont_inherit = 0;
 	int supplied_flags = 0;
+	int is_ast;
 	PyCompilerFlags cf;
 	PyObject *cmd;
 	static char *kwlist[] = {"source", "filename", "mode", "flags",
@@ -570,7 +579,10 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
-	if (PyAST_Check(cmd)) {
+	is_ast = PyAST_Check(cmd);
+	if (is_ast == -1)
+		return NULL;
+	if (is_ast) {
 		PyObject *result;
 		if (supplied_flags & PyCF_ONLY_AST) {
 			Py_INCREF(cmd);
@@ -816,7 +828,7 @@ builtin_exec(PyObject *self, PyObject *args)
 PyDoc_STRVAR(exec_doc,
 "exec(object[, globals[, locals]])\n\
 \n\
-Read and execute code from a object, which can be a string or a code\n\
+Read and execute code from an object, which can be a string or a code\n\
 object.\n\
 The globals and locals are dictionaries, defaulting to the current\n\
 globals and locals.  If only globals is given, locals defaults to it.");

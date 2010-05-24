@@ -6932,6 +6932,11 @@ PyUnicode_CompareWithASCIIString(PyObject* uni, const char* str)
     for (i = 0; id[i] && str[i]; i++)
         if (id[i] != str[i])
             return ((int)id[i] < (int)str[i]) ? -1 : 1;
+    /* This check keeps Python strings that end in '\0' from comparing equal
+     to C strings identical up to that point. */
+    if (PyUnicode_GET_SIZE(uni) != i)
+        /* We'll say the Python string is longer. */
+        return 1;
     if (id[i])
         return 1; /* uni is longer */
     if (str[i])
@@ -7708,10 +7713,10 @@ unicode_isprintable(PyObject *self)
 }
 
 PyDoc_STRVAR(join__doc__,
-             "S.join(sequence) -> str\n\
+             "S.join(iterable) -> str\n\
 \n\
 Return a string which is the concatenation of the strings in the\n\
-sequence.  The separator between elements is S.");
+iterable.  The separator between elements is S.");
 
 static PyObject*
 unicode_join(PyObject *self, PyObject *data)
@@ -8381,7 +8386,7 @@ unicode_partition(PyUnicodeObject *self, PyObject *separator)
 }
 
 PyDoc_STRVAR(rpartition__doc__,
-             "S.rpartition(sep) -> (tail, sep, head)\n\
+             "S.rpartition(sep) -> (head, sep, tail)\n\
 \n\
 Search for the separator sep in S, starting at the end of S, and return\n\
 the part before it, the separator itself, and the part after it.  If the\n\

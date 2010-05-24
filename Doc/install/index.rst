@@ -703,7 +703,8 @@ Notes:
 (2)
    On Unix, if the :envvar:`HOME` environment variable is not defined, the user's
    home directory will be determined with the :func:`getpwuid` function from the
-   standard :mod:`pwd` module.
+   standard :mod:`pwd` module. This is done by the :func:`os.path.expanduser`
+   function used by Distutils.
 
 (3)
    I.e., in the current directory (usually the location of the setup script).
@@ -718,9 +719,10 @@ Notes:
    1.5.2 installation under Windows.
 
 (5)
-   On Windows, if the :envvar:`HOME` environment variable is not defined, no
-   personal configuration file will be found or used.  (In other words, the
-   Distutils make no attempt to guess your home directory on Windows.)
+   On Windows, if the :envvar:`HOME` environment variable is not defined,
+   :envvar:`USERPROFILE` then :envvar:`HOMEDRIVE` and :envvar:`HOMEPATH` will
+   be tried. This is done by the :func:`os.path.expanduser` function used
+   by Distutils.
 
 
 .. _inst-config-syntax:
@@ -935,7 +937,8 @@ following steps.
 These compilers require some special libraries. This task is more complex than
 for Borland's C++, because there is no program to convert the library.  First
 you have to create a list of symbols which the Python DLL exports. (You can find
-a good program for this task at http://www.emmestech.com/software/cygwin/pexports-0.43/download_pexports.html)
+a good program for this task at
+http://www.emmestech.com/software/pexports-0.43/download_pexports.html).
 
 .. I don't understand what the next line means. --amk
 .. (inclusive the references on data structures.)

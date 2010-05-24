@@ -11,6 +11,8 @@ import time
 import unittest
 import weakref
 
+from test import lock_tests
+
 # A trivial mutable counter.
 class Counter(object):
     def __init__(self):
@@ -101,6 +103,8 @@ class ThreadTests(unittest.TestCase):
         _thread.start_new_thread(f, ())
         done.wait()
         self.assertFalse(ident[0] is None)
+        # Kill the "immortal" _DummyThread
+        del threading._active[ident[0]]
 
     # run with a small(ish) thread stack size (256kB)
     def test_various_ops_small_stack(self):
@@ -131,11 +135,9 @@ class ThreadTests(unittest.TestCase):
     def test_foreign_thread(self):
         # Check that a "foreign" thread can use the threading module.
         def f(mutex):
-            # Acquiring an RLock forces an entry for the foreign
+            # Calling current_thread() forces an entry for the foreign
             # thread to get made in the threading._active map.
-            r = threading.RLock()
-            r.acquire()
-            r.release()
+            threading.current_thread()
             mutex.release()
 
         mutex = threading.Lock()
@@ -219,6 +221,21 @@ class ThreadTests(unittest.TestCase):
             t.join()
         # else the thread is still running, and we have no way to kill it
 
+    def test_limbo_cleanup(self):
+        # Issue 7481: Failure to start thread should cleanup the limbo map.
+        def fail_new_thread(*args):
+            raise threading.ThreadError()
+        _start_new_thread = threading._start_new_thread
+        threading._start_new_thread = fail_new_thread
+        try:
+            t = threading.Thread(target=lambda: None)
+            self.assertRaises(threading.ThreadError, t.start)
+            self.assertFalse(
+                t in threading._limbo,
+                "Failed to cleanup _limbo map on failure of Thread.start().")
+        finally:
+            threading._start_new_thread = _start_new_thread
+
     def test_finalize_runnning_thread(self):
         # Issue 1402: the PyGILState_Ensure / _Release functions may be called
         # very late on python exit: on deallocation of a running thread for
@@ -286,6 +303,30 @@ class ThreadTests(unittest.TestCase):
         self.assertFalse(rc == 2, "interpreted was blocked")
         self.assertTrue(rc == 0, "Unexpected error")
 
+    def test_join_nondaemon_on_shutdown(self):
+        # Issue 1722344
+        # Raising SystemExit skipped threading._shutdown
+        import subprocess
+        p = subprocess.Popen([sys.executable, "-c", """if 1:
+                import threading
+                from time import sleep
+
+                def child():
+                    sleep(1)
+                    # As a non-daemon thread we SHOULD wake up and nothing
+                    # should be torn down yet
+                    print("Woke up, sleep function is:", sleep)
+
+                threading.Thread(target=child).start()
+                raise SystemExit
+            """],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(stdout.strip(),
+            b"Woke up, sleep function is: <built-in function sleep>")
+        stderr = re.sub(br"^\[\d+ refs\]", b"", stderr, re.MULTILINE).strip()
+        self.assertEqual(stderr, b"")
 
     def test_enumerate_after_join(self):
         # Try hard to trigger #1703448: a thread is still returned in
@@ -414,8 +455,8 @@ class ThreadJoinOnShutdown(unittest.TestCase):
         # Skip platforms with known problems forking from a worker thread.
         # See http://bugs.python.org/issue3863.
         if sys.platform in ('freebsd4', 'freebsd5', 'freebsd6', 'os2emx'):
-            print >>sys.stderr, ('Skipping test_3_join_in_forked_from_thread'
-                                 ' due to known OS bugs on'), sys.platform
+            print('Skipping test_3_join_in_forked_from_thread'
+                  ' due to known OS bugs on', sys.platform, file=sys.stderr)
             return
         script = """if 1:
             main_thread = threading.current_thread()
@@ -445,22 +486,6 @@ class ThreadingExceptionTests(unittest.TestCase):
         thread.start()
         self.assertRaises(RuntimeError, thread.start)
 
-    def test_releasing_unacquired_rlock(self):
-        rlock = threading.RLock()
-        self.assertRaises(RuntimeError, rlock.release)
-
-    def test_waiting_on_unacquired_condition(self):
-        cond = threading.Condition()
-        self.assertRaises(RuntimeError, cond.wait)
-
-    def test_notify_on_unacquired_condition(self):
-        cond = threading.Condition()
-        self.assertRaises(RuntimeError, cond.notify)
-
-    def test_semaphore_with_negative_value(self):
-        self.assertRaises(ValueError, threading.Semaphore, value = -1)
-        self.assertRaises(ValueError, threading.Semaphore, value = -sys.maxsize)
-
     def test_joining_current_thread(self):
         current_thread = threading.current_thread()
         self.assertRaises(RuntimeError, current_thread.join);
@@ -475,11 +500,37 @@ class ThreadingExceptionTests(unittest.TestCase):
         self.assertRaises(RuntimeError, setattr, thread, "daemon", True)
 
 
+class LockTests(lock_tests.LockTests):
+    locktype = staticmethod(threading.Lock)
+
+class RLockTests(lock_tests.RLockTests):
+    locktype = staticmethod(threading.RLock)
+
+class EventTests(lock_tests.EventTests):
+    eventtype = staticmethod(threading.Event)
+
+class ConditionAsRLockTests(lock_tests.RLockTests):
+    # An Condition uses an RLock by default and exports its API.
+    locktype = staticmethod(threading.Condition)
+
+class ConditionTests(lock_tests.ConditionTests):
+    condtype = staticmethod(threading.Condition)
+
+class SemaphoreTests(lock_tests.SemaphoreTests):
+    semtype = staticmethod(threading.Semaphore)
+
+class BoundedSemaphoreTests(lock_tests.BoundedSemaphoreTests):
+    semtype = staticmethod(threading.BoundedSemaphore)
+
+
 def test_main():
-    test.support.run_unittest(ThreadTests,
-                                   ThreadJoinOnShutdown,
-                                   ThreadingExceptionTests,
-                                   )
+    test.support.run_unittest(LockTests, RLockTests, EventTests,
+                              ConditionAsRLockTests, ConditionTests,
+                              SemaphoreTests, BoundedSemaphoreTests,
+                              ThreadTests,
+                              ThreadJoinOnShutdown,
+                              ThreadingExceptionTests,
+                              )
 
 if __name__ == "__main__":
     test_main()

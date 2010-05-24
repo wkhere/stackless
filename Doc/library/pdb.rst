@@ -41,7 +41,7 @@ of the debugger is::
 :file:`pdb.py` can also be invoked as a script to debug other scripts.  For
 example::
 
-   python -m pdb myscript.py
+   python3 -m pdb myscript.py
 
 When invoked as a script, pdb will automatically enter post-mortem debugging if
 the program being debugged exits abnormally. After post-mortem debugging (or
@@ -55,7 +55,7 @@ insert ::
    import pdb; pdb.set_trace()
 
 at the location you want to break into the debugger.  You can then step through
-the code following this statement, and continue running without debugger using
+the code following this statement, and continue running without the debugger using
 the ``c`` command.
 
 The typical usage to inspect a crashed program is::
@@ -369,7 +369,7 @@ unalias *name*
       (Pdb)
 
 run [*args* ...]
-   Restart the debugged python program. If an argument is supplied, it is split
+   Restart the debugged Python program. If an argument is supplied, it is split
    with "shlex" and the result is used as the new sys.argv. History, breakpoints,
    actions and debugger options are preserved. "restart" is an alias for "run".
 

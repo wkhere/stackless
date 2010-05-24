@@ -12,7 +12,7 @@ interpreter.
 
 .. index:: pair: built-in; types
 
-The principal built-in types are numerics, sequences, mappings, files, classes,
+The principal built-in types are numerics, sequences, mappings, classes,
 instances and exceptions.
 
 Some operations are supported by several object types; in particular,
@@ -165,7 +165,7 @@ This table summarizes the comparison operations:
    pair: objects; comparing
 
 Objects of different types, except different numeric types, never compare equal.
-Furthermore, some types (for example, file objects) support only a degenerate
+Furthermore, some types (for example, function objects) support only a degenerate
 notion of comparison where any two objects of that type are unequal.  The ``<``,
 ``<=``, ``>`` and ``>=`` operators will raise a :exc:`TypeError` exception when
 any operand is a complex number, the objects are of different types that cannot
@@ -650,7 +650,7 @@ string syntax: ``b'xyzzy'``.  To construct byte arrays, use the
    Also, while in previous Python versions, byte strings and Unicode strings
    could be exchanged for each other rather freely (barring encoding issues),
    strings and bytes are now completely separate concepts.  There's no implicit
-   en-/decoding if you pass and object of the wrong type.  A string always
+   en-/decoding if you pass an object of the wrong type.  A string always
    compares unequal to a bytes or bytearray object.
 
 Lists are constructed with square brackets, separating items with commas: ``[a,
@@ -772,13 +772,15 @@ Notes:
    If *k* is ``None``, it is treated like ``1``.
 
 (6)
-   If *s* and *t* are both strings, some Python implementations such as CPython can
-   usually perform an in-place optimization for assignments of the form ``s=s+t``
-   or ``s+=t``.  When applicable, this optimization makes quadratic run-time much
-   less likely.  This optimization is both version and implementation dependent.
-   For performance sensitive code, it is preferable to use the :meth:`str.join`
-   method which assures consistent linear concatenation performance across versions
-   and implementations.
+   .. impl-detail::
+
+      If *s* and *t* are both strings, some Python implementations such as
+      CPython can usually perform an in-place optimization for assignments of
+      the form ``s = s + t`` or ``s += t``.  When applicable, this optimization
+      makes quadratic run-time much less likely.  This optimization is both
+      version and implementation dependent.  For performance sensitive code, it
+      is preferable to use the :meth:`str.join` method which assures consistent
+      linear concatenation performance across versions and implementations.
 
 
 .. _string-methods:
@@ -950,12 +952,12 @@ functions based on regular expressions.
    least one cased character, false otherwise.
 
 
-.. method:: str.join(seq)
+.. method:: str.join(iterable)
 
-   Return a string which is the concatenation of the strings in the sequence
-   *seq*.  A :exc:`TypeError` will be raised if there are any non-string values
-   in *seq*, including :class:`bytes` objects.  The separator between elements
-   is the string providing this method.
+   Return a string which is the concatenation of the strings in the
+   :term:`iterable` *iterable*.  A :exc:`TypeError` will be raised if there are
+   any non-string values in *seq*, including :class:`bytes` objects.  The
+   separator between elements is the string providing this method.
 
 
 .. method:: str.ljust(width[, fillchar])
@@ -1125,8 +1127,28 @@ functions based on regular expressions.
 
 .. method:: str.title()
 
-   Return a titlecased version of the string: words start with uppercase
-   characters, all remaining cased characters are lowercase.
+   Return a titlecased version of the string where words start with an uppercase
+   character and the remaining characters are lowercase.
+
+   The algorithm uses a simple language-independent definition of a word as
+   groups of consecutive letters.  The definition works in many contexts but
+   it means that apostrophes in contractions and possessives form word
+   boundaries, which may not be the desired result::
+
+        >>> "they're bill's friends from the UK".title()
+        "They'Re Bill'S Friends From The Uk"
+
+   A workaround for apostrophes can be constructed using regular expressions::
+
+        >>> import re
+        >>> def titlecase(s):
+                return re.sub(r"[A-Za-z]+('[A-Za-z]+)?",
+                              lambda mo: mo.group(0)[0].upper() +
+                                         mo.group(0)[1:].lower(),
+                              s)
+
+        >>> titlecase("they're bill's friends.")
+        "They're Bill's Friends."
 
 
 .. method:: str.translate(map)
@@ -1288,10 +1310,10 @@ The conversion types are:
 | ``'c'``    | Single character (accepts integer or single         |       |
 |            | character string).                                  |       |
 +------------+-----------------------------------------------------+-------+
-| ``'r'``    | String (converts any python object using            | \(5)  |
+| ``'r'``    | String (converts any Python object using            | \(5)  |
 |            | :func:`repr`).                                      |       |
 +------------+-----------------------------------------------------+-------+
-| ``'s'``    | String (converts any python object using            |       |
+| ``'s'``    | String (converts any Python object using            |       |
 |            | :func:`str`).                                       |       |
 +------------+-----------------------------------------------------+-------+
 | ``'%'``    | No argument is converted, results in a ``'%'``      |       |
@@ -1489,13 +1511,16 @@ Notes:
    that compare equal --- this is helpful for sorting in multiple passes (for
    example, sort by department, then by salary grade).
 
-   While a list is being sorted, the effect of attempting to mutate, or even
-   inspect, the list is undefined.  The C implementation
-   makes the list appear empty for the duration, and raises :exc:`ValueError` if it
-   can detect that the list has been mutated during a sort.
+   .. impl-detail::
+
+      While a list is being sorted, the effect of attempting to mutate, or even
+      inspect, the list is undefined.  The C implementation of Python makes the
+      list appear empty for the duration, and raises :exc:`ValueError` if it can
+      detect that the list has been mutated during a sort.
 
 (8)
    :meth:`sort` is not supported by :class:`bytearray` objects.
+
 
 .. _bytes-methods:
 
@@ -1724,12 +1749,12 @@ The constructors for both classes work the same:
    .. method:: update(other, ...)
                set |= other | ...
 
-      Update the set, adding elements from *other*.
+      Update the set, adding elements from all others.
 
    .. method:: intersection_update(other, ...)
                set &= other & ...
 
-      Update the set, keeping only elements found in it and *other*.
+      Update the set, keeping only elements found in it and all others.
 
    .. method:: difference_update(other, ...)
                set -= other | ...
@@ -1938,7 +1963,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
 
       :meth:`update` accepts either another dictionary object or an iterable of
       key/value pairs (as a tuple or other iterable of length two).  If keyword
-      arguments are specified, the dictionary is then is updated with those
+      arguments are specified, the dictionary is then updated with those
       key/value pairs: ``d.update(red=1, blue=2)``.
 
    .. method:: values()
@@ -2039,283 +2064,6 @@ An example of dictionary view usage::
    >>> # set operations
    >>> keys & {'eggs', 'bacon', 'salad'}
    {'bacon'}
-
-
-.. _bltin-file-objects:
-
-File Objects
-============
-
-.. index::
-   object: file
-   builtin: file
-   module: os
-   module: socket
-
-.. XXX this is quite out of date, must be updated with "io" module
-
-File objects are implemented using C's ``stdio`` package and can be
-created with the built-in :func:`open` function.  File
-objects are also returned by some other built-in functions and methods,
-such as :func:`os.popen` and :func:`os.fdopen` and the :meth:`makefile`
-method of socket objects. Temporary files can be created using the
-:mod:`tempfile` module, and high-level file operations such as copying,
-moving, and deleting files and directories can be achieved with the
-:mod:`shutil` module.
-
-When a file operation fails for an I/O-related reason, the exception
-:exc:`IOError` is raised.  This includes situations where the operation is not
-defined for some reason, like :meth:`seek` on a tty device or writing a file
-opened for reading.
-
-Files have the following methods:
-
-
-.. method:: file.close()
-
-   Close the file.  A closed file cannot be read or written any more. Any operation
-   which requires that the file be open will raise a :exc:`ValueError` after the
-   file has been closed.  Calling :meth:`close` more than once is allowed.
-
-   You can avoid having to call this method explicitly if you use
-   the :keyword:`with` statement.  For example, the following code will
-   automatically close *f* when the :keyword:`with` block is exited::
-
-      from __future__ import with_statement # This isn't required in Python 2.6
-
-      with open("hello.txt") as f:
-          for line in f:
-              print(line)
-
-   In older versions of Python, you would have needed to do this to get the same
-   effect::
-
-      f = open("hello.txt")
-      try:
-          for line in f:
-              print(line)
-      finally:
-          f.close()
-
-   .. note::
-
-      Not all "file-like" types in Python support use as a context manager for the
-      :keyword:`with` statement.  If your code is intended to work with any file-like
-      object, you can use the function :func:`contextlib.closing` instead of using
-      the object directly.
-
-
-.. method:: file.flush()
-
-   Flush the internal buffer, like ``stdio``'s :cfunc:`fflush`.  This may be a
-   no-op on some file-like objects.
-
-   .. note::
-
-      :meth:`flush` does not necessarily write the file's data to disk.  Use
-      :meth:`flush` followed by :func:`os.fsync` to ensure this behavior.
-
-
-.. method:: file.fileno()
-
-   .. index::
-      pair: file; descriptor
-      module: fcntl
-
-   Return the integer "file descriptor" that is used by the underlying
-   implementation to request I/O operations from the operating system.  This can be
-   useful for other, lower level interfaces that use file descriptors, such as the
-   :mod:`fcntl` module or :func:`os.read` and friends.
-
-   .. note::
-
-      File-like objects which do not have a real file descriptor should *not* provide
-      this method!
-
-
-.. method:: file.isatty()
-
-   Return ``True`` if the file is connected to a tty(-like) device, else ``False``.
-
-   .. note::
-
-      If a file-like object is not associated with a real file, this method should
-      *not* be implemented.
-
-
-.. method:: file.__next__()
-
-   A file object is its own iterator, for example ``iter(f)`` returns *f* (unless
-   *f* is closed).  When a file is used as an iterator, typically in a
-   :keyword:`for` loop (for example, ``for line in f: print(line)``), the
-   :meth:`__next__` method is called repeatedly.  This method returns the next
-   input line, or raises :exc:`StopIteration` when EOF is hit when the file is open
-   for reading (behavior is undefined when the file is open for writing).  In order
-   to make a :keyword:`for` loop the most efficient way of looping over the lines
-   of a file (a very common operation), the :meth:`__next__` method uses a hidden
-   read-ahead buffer.  As a consequence of using a read-ahead buffer, combining
-   :meth:`__next__` with other file methods (like :meth:`readline`) does not work
-   right.  However, using :meth:`seek` to reposition the file to an absolute
-   position will flush the read-ahead buffer.
-
-
-.. method:: file.read([size])
-
-   Read at most *size* bytes from the file (less if the read hits EOF before
-   obtaining *size* bytes).  If the *size* argument is negative or omitted, read
-   all data until EOF is reached.  The bytes are returned as a string object.  An
-   empty string is returned when EOF is encountered immediately.  (For certain
-   files, like ttys, it makes sense to continue reading after an EOF is hit.)  Note
-   that this method may call the underlying C function :cfunc:`fread` more than
-   once in an effort to acquire as close to *size* bytes as possible. Also note
-   that when in non-blocking mode, less data than was requested may be
-   returned, even if no *size* parameter was given.
-
-
-.. method:: file.readline([size])
-
-   Read one entire line from the file.  A trailing newline character is kept in the
-   string (but may be absent when a file ends with an incomplete line). [#]_  If
-   the *size* argument is present and non-negative, it is a maximum byte count
-   (including the trailing newline) and an incomplete line may be returned. An
-   empty string is returned *only* when EOF is encountered immediately.
-
-   .. note::
-
-      Unlike ``stdio``'s :cfunc:`fgets`, the returned string contains null characters
-      (``'\0'``) if they occurred in the input.
-
-
-.. method:: file.readlines([sizehint])
-
-   Read until EOF using :meth:`readline` and return a list containing the lines
-   thus read.  If the optional *sizehint* argument is present, instead of
-   reading up to EOF, whole lines totalling approximately *sizehint* bytes
-   (possibly after rounding up to an internal buffer size) are read.  Objects
-   implementing a file-like interface may choose to ignore *sizehint* if it
-   cannot be implemented, or cannot be implemented efficiently.
-
-
-.. method:: file.seek(offset[, whence])
-
-   Set the file's current position, like ``stdio``'s :cfunc:`fseek`. The *whence*
-   argument is optional and defaults to  ``os.SEEK_SET`` or ``0`` (absolute file
-   positioning); other values are ``os.SEEK_CUR`` or ``1`` (seek relative to the
-   current position) and ``os.SEEK_END`` or ``2``  (seek relative to the file's
-   end).  There is no return value.
-
-   For example, ``f.seek(2, os.SEEK_CUR)`` advances the position by two and
-   ``f.seek(-3, os.SEEK_END)`` sets the position to the third to last.
-
-   Note that if the file is opened for appending
-   (mode ``'a'`` or ``'a+'``), any :meth:`seek` operations will be undone at the
-   next write.  If the file is only opened for writing in append mode (mode
-   ``'a'``), this method is essentially a no-op, but it remains useful for files
-   opened in append mode with reading enabled (mode ``'a+'``).  If the file is
-   opened in text mode (without ``'b'``), only offsets returned by :meth:`tell` are
-   legal.  Use of other offsets causes undefined behavior.
-
-   Note that not all file objects are seekable.
-
-
-.. method:: file.tell()
-
-   Return the file's current position, like ``stdio``'s :cfunc:`ftell`.
-
-   .. note::
-
-      On Windows, :meth:`tell` can return illegal values (after an :cfunc:`fgets`)
-      when reading files with Unix-style line-endings. Use binary mode (``'rb'``) to
-      circumvent this problem.
-
-
-.. method:: file.truncate([size])
-
-   Truncate the file's size.  If the optional *size* argument is present, the file
-   is truncated to (at most) that size.  The size defaults to the current position.
-   The current file position is not changed.  Note that if a specified size exceeds
-   the file's current size, the result is platform-dependent:  possibilities
-   include that the file may remain unchanged, increase to the specified size as if
-   zero-filled, or increase to the specified size with undefined new content.
-   Availability:  Windows, many Unix variants.
-
-
-.. method:: file.write(str)
-
-   Write a string to the file.  Due to buffering, the string may not actually
-   show up in the file until the :meth:`flush` or :meth:`close` method is
-   called.
-
-   The meaning of the return value is not defined for every file-like object.
-   Some (mostly low-level) file-like objects may return the number of bytes
-   actually written, others return ``None``.
-
-
-.. method:: file.writelines(sequence)
-
-   Write a sequence of strings to the file.  The sequence can be any iterable
-   object producing strings, typically a list of strings. There is no return value.
-   (The name is intended to match :meth:`readlines`; :meth:`writelines` does not
-   add line separators.)
-
-Files support the iterator protocol.  Each iteration returns the same result as
-``file.readline()``, and iteration ends when the :meth:`readline` method returns
-an empty string.
-
-File objects also offer a number of other interesting attributes. These are not
-required for file-like objects, but should be implemented if they make sense for
-the particular object.
-
-
-.. attribute:: file.closed
-
-   bool indicating the current state of the file object.  This is a read-only
-   attribute; the :meth:`close` method changes the value. It may not be available
-   on all file-like objects.
-
-
-.. XXX does this still apply?
-.. attribute:: file.encoding
-
-   The encoding that this file uses. When strings are written to a file,
-   they will be converted to byte strings using this encoding. In addition, when
-   the file is connected to a terminal, the attribute gives the encoding that the
-   terminal is likely to use (that  information might be incorrect if the user has
-   misconfigured the  terminal). The attribute is read-only and may not be present
-   on all file-like objects. It may also be ``None``, in which case the file uses
-   the system default encoding for converting strings.
-
-
-.. attribute:: file.errors
-
-   The Unicode error handler used along with the encoding.
-
-
-.. attribute:: file.mode
-
-   The I/O mode for the file.  If the file was created using the :func:`open`
-   built-in function, this will be the value of the *mode* parameter.  This is a
-   read-only attribute and may not be present on all file-like objects.
-
-
-.. attribute:: file.name
-
-   If the file object was created using :func:`open`, the name of the file.
-   Otherwise, some string that indicates the source of the file object, of the
-   form ``<...>``.  This is a read-only attribute and may not be present on all
-   file-like objects.
-
-
-.. attribute:: file.newlines
-
-   If Python was built with the :option:`--with-universal-newlines` option to
-   :program:`configure` (the default) this read-only attribute exists, and for
-   files opened in universal newline read mode it keeps track of the types of
-   newlines encountered while reading the file. The values it can take are
-   ``'\r'``, ``'\n'``, ``'\r\n'``, ``None`` (unknown, no newlines read yet) or a
-   tuple containing all the newline types seen, to indicate that multiple newline
-   conventions were encountered. For files not opened in universal newline read
-   mode the value of this attribute will be ``None``.
 
 
 .. _typememoryview:
@@ -2478,9 +2226,9 @@ decimal arithmetic context. The specific types are not treated specially beyond
 their implementation of the context management protocol. See the
 :mod:`contextlib` module for some examples.
 
-Python's :term:`generator`\s and the ``contextlib.contextfactory`` :term:`decorator`
+Python's :term:`generator`\s and the ``contextlib.contextmanager`` :term:`decorator`
 provide a convenient way to implement these protocols.  If a generator function is
-decorated with the ``contextlib.contextfactory`` decorator, it will return a
+decorated with the ``contextlib.contextmanager`` decorator, it will return a
 context manager implementing the necessary :meth:`__enter__` and
 :meth:`__exit__` methods, rather than the iterator produced by an undecorated
 generator function.
@@ -2706,8 +2454,7 @@ types, where they are relevant.  Some of these are not reported by the
 
 .. attribute:: class.__bases__
 
-   The tuple of base classes of a class object.  If there are no base classes, this
-   will be an empty tuple.
+   The tuple of base classes of a class object.
 
 
 .. attribute:: class.__name__
@@ -2752,9 +2499,3 @@ The following attributes are only supported by :term:`new-style class`\ es.
 
 .. [#] To format only a tuple you should therefore provide a singleton tuple whose only
    element is the tuple to be formatted.
-
-.. [#] The advantage of leaving the newline on is that returning an empty string is
-   then an unambiguous EOF indication.  It is also possible (in cases where it
-   might matter, for example, if you want to make an exact copy of a file while
-   scanning its lines) to tell whether the last line of a file ended in a newline
-   or not (yes this happens!).

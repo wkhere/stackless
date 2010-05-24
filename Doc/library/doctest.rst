@@ -343,7 +343,7 @@ The fine print:
      >>> assert "Easy!"
            >>> import math
                >>> math.floor(1.9)
-               1.0
+               1
 
   and as many leading whitespace characters are stripped from the expected output
   as appeared in the initial ``'>>> '`` line that started the example.
@@ -701,8 +701,7 @@ is vulnerable!  One workaround is to do ::
 
 instead.  Another is to do ::
 
-   >>> d = foo().items()
-   >>> d.sort()
+   >>> d = sorted(foo().items())
    >>> d
    [('Harry', 'broomstick'), ('Hermione', 'hippogryph')]
 
@@ -1060,7 +1059,7 @@ capabilities, then you should use the advanced API.
 The advanced API revolves around two container classes, which are used to store
 the interactive examples extracted from doctest cases:
 
-* :class:`Example`: A single python :term:`statement`, paired with its expected
+* :class:`Example`: A single Python :term:`statement`, paired with its expected
   output.
 
 * :class:`DocTest`: A collection of :class:`Example`\ s, typically extracted

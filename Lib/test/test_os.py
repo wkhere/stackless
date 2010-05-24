@@ -400,6 +400,14 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         for key, value in self._reference().items():
             self.assertEqual(os.environ.get(key), value)
 
+    # Issue 7310
+    def test___repr__(self):
+        """Check that the repr() of os.environ looks like environ({...})."""
+        env = os.environ
+        self.assertTrue(isinstance(env.data, dict))
+        self.assertEqual(repr(env), 'environ({!r})'.format(env.data))
+
+
 class WalkTests(unittest.TestCase):
     """Tests for os.walk()."""
 
@@ -564,6 +572,14 @@ class ExecTests(unittest.TestCase):
     def test_execvpe_with_bad_arglist(self):
         self.assertRaises(ValueError, os.execvpe, 'notepad', [], None)
 
+class ArgTests(unittest.TestCase):
+    def test_bytearray(self):
+        # Issue #7561: posix module didn't release bytearray exports properly.
+        b = bytearray(os.sep.encode('ascii'))
+        self.assertRaises(OSError, os.mkdir, b)
+        # Check object is still resizable.
+        b[:] = b''
+
 class Win32ErrorTests(unittest.TestCase):
     def test_rename(self):
         self.assertRaises(WindowsError, os.rename, support.TESTFN, support.TESTFN+".bak")
@@ -702,12 +718,28 @@ if sys.platform != 'win32':
                 self.assertRaises(OverflowError, os.setreuid, 1<<32, 0)
                 self.assertRaises(OverflowError, os.setreuid, 0, 1<<32)
 
+            def test_setreuid_neg1(self):
+                # Needs to accept -1.  We run this in a subprocess to avoid
+                # altering the test runner's process state (issue8045).
+                import subprocess
+                subprocess.check_call([
+                        sys.executable, '-c',
+                        'import os,sys;os.setreuid(-1,-1);sys.exit(0)'])
+
         if hasattr(os, 'setregid'):
             def test_setregid(self):
                 if os.getuid() != 0:
                     self.assertRaises(os.error, os.setregid, 0, 0)
                 self.assertRaises(OverflowError, os.setregid, 1<<32, 0)
                 self.assertRaises(OverflowError, os.setregid, 0, 1<<32)
+
+            def test_setregid_neg1(self):
+                # Needs to accept -1.  We run this in a subprocess to avoid
+                # altering the test runner's process state (issue8045).
+                import subprocess
+                subprocess.check_call([
+                        sys.executable, '-c',
+                        'import os,sys;os.setregid(-1,-1);sys.exit(0)'])
 
     @unittest.skipIf(sys.platform == 'darwin', "tests don't apply to OS X")
     class Pep383Tests(unittest.TestCase):
@@ -750,6 +782,7 @@ else:
 
 def test_main():
     support.run_unittest(
+        ArgTests,
         FileTests,
         StatAttributeTests,
         EnvironTests,

@@ -79,12 +79,12 @@ This example uses the iterator form::
    >>> c = conn.cursor()
    >>> c.execute('select * from stocks order by price')
    >>> for row in c:
-   ...    print(row)
+   ...     print(row)
    ...
-   (u'2006-01-05', u'BUY', u'RHAT', 100, 35.14)
-   (u'2006-03-28', u'BUY', u'IBM', 1000, 45.0)
-   (u'2006-04-06', u'SELL', u'IBM', 500, 53.0)
-   (u'2006-04-05', u'BUY', u'MSOFT', 1000, 72.0)
+   ('2006-01-05', 'BUY', 'RHAT', 100, 35.14)
+   ('2006-03-28', 'BUY', 'IBM', 1000, 45.0)
+   ('2006-04-06', 'SELL', 'IBM', 500, 53.0)
+   ('2006-04-05', 'BUY', 'MSOFT', 1000, 72.0)
    >>>
 
 
@@ -187,7 +187,7 @@ Module functions and constants
    Registers a callable to convert the custom Python type *type* into one of
    SQLite's supported types. The callable *callable* accepts as single parameter
    the Python value, and must return a value of the following types: int,
-   float, str, bytes (UTF-8 encoded) or buffer.
+   float, str or bytes.
 
 
 .. function:: complete_statement(sql)
@@ -256,22 +256,23 @@ Connection Objects
 .. method:: Connection.execute(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`execute` method with
-   the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`execute<Cursor.execute>` method with the parameters given.
 
 
 .. method:: Connection.executemany(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`executemany` method
-   with the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`executemany<Cursor.executemany>` method with the parameters given.
 
 
 .. method:: Connection.executescript(sql_script)
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`executescript` method
-   with the parameters given.
+   calling the cursor method, then calls the cursor's
+   :meth:`executescript<Cursor.executescript>` method with the parameters
+   given.
 
 
 .. method:: Connection.create_function(name, num_params, func)
@@ -282,7 +283,7 @@ Connection Objects
    as the SQL function.
 
    The function can return any of the types supported by SQLite: bytes, str, int,
-   float, buffer and None.
+   float and None.
 
    Example:
 
@@ -298,7 +299,7 @@ Connection Objects
    final result of the aggregate.
 
    The ``finalize`` method can return any of the types supported by SQLite:
-   bytes, str, int, float, buffer and None.
+   bytes, str, int, float and None.
 
    Example:
 
@@ -589,18 +590,19 @@ Now we plug :class:`Row` in::
     <sqlite3.Cursor object at 0x7f4e7dd8fa80>
     >>> r = c.fetchone()
     >>> type(r)
-    <type 'sqlite3.Row'>
-    >>> r
-    (u'2006-01-05', u'BUY', u'RHAT', 100.0, 35.14)
+    <class 'sqlite3.Row'>
+    >>> tuple(r)
+    ('2006-01-05', 'BUY', 'RHAT', 100.0, 35.14)
     >>> len(r)
     5
     >>> r[2]
-    u'RHAT'
+    'RHAT'
     >>> r.keys()
     ['date', 'trans', 'symbol', 'qty', 'price']
     >>> r['qty']
     100.0
-    >>> for member in r: print member
+    >>> for member in r:
+    ...     print(member)
     ...
     2006-01-05
     BUY
@@ -632,11 +634,9 @@ The following Python types can thus be sent to SQLite without any problem:
 +-------------------------------+-------------+
 | :class:`float`                | ``REAL``    |
 +-------------------------------+-------------+
-| :class:`bytes` (UTF8-encoded) | ``TEXT``    |
-+-------------------------------+-------------+
 | :class:`str`                  | ``TEXT``    |
 +-------------------------------+-------------+
-| :class:`buffer`               | ``BLOB``    |
+| :class:`bytes`                | ``BLOB``    |
 +-------------------------------+-------------+
 
 
@@ -647,13 +647,13 @@ This is how SQLite types are converted to Python types by default:
 +=============+=============================================+
 | ``NULL``    | :const:`None`                               |
 +-------------+---------------------------------------------+
-| ``INTEGER`` | :class`int`                                 |
+| ``INTEGER`` | :class:`int`                                |
 +-------------+---------------------------------------------+
 | ``REAL``    | :class:`float`                              |
 +-------------+---------------------------------------------+
 | ``TEXT``    | depends on text_factory, str by default     |
 +-------------+---------------------------------------------+
-| ``BLOB``    | buffer                                      |
+| ``BLOB``    | :class:`bytes`                              |
 +-------------+---------------------------------------------+
 
 The type system of the :mod:`sqlite3` module is extensible in two ways: you can
@@ -668,7 +668,7 @@ Using adapters to store additional Python types in SQLite databases
 As described before, SQLite supports only a limited set of types natively. To
 use other Python types with SQLite, you must **adapt** them to one of the
 sqlite3 module's supported types for SQLite: one of NoneType, int, float,
-str, bytes, buffer.
+str, bytes.
 
 The :mod:`sqlite3` module uses Python object adaptation, as described in
 :pep:`246` for this.  The protocol to use is :class:`PrepareProtocol`.

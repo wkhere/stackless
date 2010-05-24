@@ -26,11 +26,8 @@ except ImportError:
 def md5sum(data):
     return md5(data).hexdigest()
 
-def path(path):
-    return support.findfile(path)
-
-TEMPDIR = os.path.join(tempfile.gettempdir(), "test_tarfile_tmp")
-tarname = path("testtar.tar")
+TEMPDIR = os.path.abspath(support.TESTFN)
+tarname = support.findfile("testtar.tar")
 gzipname = os.path.join(TEMPDIR, "testtar.tar.gz")
 bz2name = os.path.join(TEMPDIR, "testtar.tar.bz2")
 tmpname = os.path.join(TEMPDIR, "tmp.tar")
@@ -265,6 +262,24 @@ class MiscReadTest(ReadTest):
                 self.assertEqual(tarinfo.mode & 0o777, os.stat(path).st_mode & 0o777)
             self.assertEqual(tarinfo.mtime, os.path.getmtime(path))
         tar.close()
+
+    def test_init_close_fobj(self):
+        # Issue #7341: Close the internal file object in the TarFile
+        # constructor in case of an error. For the test we rely on
+        # the fact that opening an invalid file raises a ReadError.
+        invalid = os.path.join(TEMPDIR, "invalid")
+        open(invalid, "wb").write(b"foo")
+
+        try:
+            tar = object.__new__(tarfile.TarFile)
+            try:
+                tar.__init__(invalid)
+            except tarfile.ReadError:
+                self.assertTrue(tar.fileobj.closed)
+            else:
+                self.fail("ReadError not raised")
+        finally:
+            os.remove(invalid)
 
 
 class StreamReadTest(ReadTest):
@@ -1146,8 +1161,7 @@ class Bz2PartialReadTest(unittest.TestCase):
 
 
 def test_main():
-    if not os.path.exists(TEMPDIR):
-        os.mkdir(TEMPDIR)
+    os.makedirs(TEMPDIR)
 
     tests = [
         UstarReadTest,

@@ -231,9 +231,11 @@ RawConfigParser Objects
 .. method:: RawConfigParser.readfp(fp, filename=None)
 
    Read and parse configuration data from the file or file-like object in *fp*
-   (only the :meth:`readline` method is used).  If *filename* is omitted and *fp*
-   has a :attr:`name` attribute, that is used for *filename*; the default is
-   ``<???>``.
+   (only the :meth:`readline` method is used).  The file-like object must
+   operate in text mode, i.e. return strings from :meth:`readline`.
+
+   If *filename* is omitted and *fp* has a :attr:`name` attribute, that is used
+   for *filename*; the default is ``<???>``.
 
 
 .. method:: RawConfigParser.get(section, option)
@@ -279,8 +281,9 @@ RawConfigParser Objects
 
 .. method:: RawConfigParser.write(fileobject)
 
-   Write a representation of the configuration to the specified file object.  This
-   representation can be parsed by a future :meth:`read` call.
+   Write a representation of the configuration to the specified file object,
+   which must be opened in text mode (accepting strings).  This representation
+   can be parsed by a future :meth:`read` call.
 
 
 .. method:: RawConfigParser.remove_option(section, option)
@@ -298,12 +301,23 @@ RawConfigParser Objects
 
 .. method:: RawConfigParser.optionxform(option)
 
-   Transforms the option name *option* as found in an input file or as passed in by
-   client code to the form that should be used in the internal structures.  The
-   default implementation returns a lower-case version of *option*; subclasses may
-   override this or client code can set an attribute of this name on instances to
-   affect this behavior.  Setting this to :func:`str`, for example, would make
-   option names case sensitive.
+   Transforms the option name *option* as found in an input file or as passed in
+   by client code to the form that should be used in the internal structures.
+   The default implementation returns a lower-case version of *option*;
+   subclasses may override this or client code can set an attribute of this name
+   on instances to affect this behavior.
+
+   You don't necessarily need to subclass a ConfigParser to use this method, you
+   can also re-set it on an instance, to a function that takes a string
+   argument.  Setting it to ``str``, for example, would make option names case
+   sensitive::
+
+      cfgparser = ConfigParser()
+      ...
+      cfgparser.optionxform = str
+
+   Note that when reading configuration files, whitespace around the
+   option names are stripped before :meth:`optionxform` is called.
 
 
 .. _configparser-objects:
@@ -370,7 +384,7 @@ An example of writing to a configuration file::
    config.set('Section1', 'foo', '%(bar)s is %(baz)s!')
 
    # Writing our configuration file to 'example.cfg'
-   with open('example.cfg', 'wb') as configfile:
+   with open('example.cfg', 'w') as configfile:
        config.write(configfile)
 
 An example of reading the configuration file again::

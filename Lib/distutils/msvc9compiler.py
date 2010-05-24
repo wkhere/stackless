@@ -17,6 +17,7 @@ __revision__ = "$Id$"
 import os
 import subprocess
 import sys
+import re
 
 from distutils.errors import DistutilsExecError, DistutilsPlatformError, \
                              CompileError, LibError, LinkError
@@ -645,6 +646,8 @@ class MSVCCompiler(CCompiler) :
                 mfid = 1
             else:
                 mfid = 2
+                # Remove references to the Visual C runtime
+                self._remove_visual_c_ref(temp_manifest)
             out_arg = '-outputresource:%s;%s' % (output_filename, mfid)
             try:
                 self.spawn(['mt.exe', '-nologo', '-manifest',
@@ -654,6 +657,33 @@ class MSVCCompiler(CCompiler) :
         else:
             log.debug("skipping %s (up-to-date)", output_filename)
 
+    def _remove_visual_c_ref(self, manifest_file):
+        try:
+            # Remove references to the Visual C runtime, so they will
+            # fall through to the Visual C dependency of Python.exe.
+            # This way, when installed for a restricted user (e.g.
+            # runtimes are not in WinSxS folder, but in Python's own
+            # folder), the runtimes do not need to be in every folder
+            # with .pyd's.
+            manifest_f = open(manifest_file)
+            try:
+                manifest_buf = manifest_f.read()
+            finally:
+                manifest_f.close()
+            pattern = re.compile(
+                r"""<assemblyIdentity.*?name=("|')Microsoft\."""\
+                r"""VC\d{2}\.CRT("|').*?(/>|</assemblyIdentity>)""",
+                re.DOTALL)
+            manifest_buf = re.sub(pattern, "", manifest_buf)
+            pattern = "<dependentAssembly>\s*</dependentAssembly>"
+            manifest_buf = re.sub(pattern, "", manifest_buf)
+            manifest_f = open(manifest_file, 'w')
+            try:
+                manifest_f.write(manifest_buf)
+            finally:
+                manifest_f.close()
+        except IOError:
+            pass
 
     # -- Miscellaneous methods -----------------------------------------
     # These are all used by the 'gen_lib_options() function, in

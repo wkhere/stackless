@@ -1,4 +1,3 @@
-
 :mod:`unicodedata` --- Unicode Database
 =======================================
 
@@ -146,7 +145,7 @@ Examples:
 
    >>> import unicodedata
    >>> unicodedata.lookup('LEFT CURLY BRACKET')
-   u'{'
+   '{'
    >>> unicodedata.name('/')
    'SOLIDUS'
    >>> unicodedata.decimal('9')

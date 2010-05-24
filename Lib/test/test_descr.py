@@ -1044,6 +1044,11 @@ order (MRO) for bases """
             del h
         self.assertEqual(s.getvalue(), '')
 
+        class X(object):
+            __slots__ = "a"
+        with self.assertRaises(AttributeError):
+            del X().a
+
     def test_slots_special(self):
         # Testing __dict__ and __weakref__ in __slots__...
         class D(object):
@@ -1268,13 +1273,9 @@ order (MRO) for bases """
         self.assertEqual(super(D,D).goo(), (D,))
         self.assertEqual(super(D,d).goo(), (D,))
 
-        # Verify that argument is checked for callability (SF bug 753451)
-        try:
-            classmethod(1).__get__(1)
-        except TypeError:
-            pass
-        else:
-            self.fail("classmethod should check for callability")
+        # Verify that a non-callable will raise
+        meth = classmethod(1).__get__(1)
+        self.assertRaises(TypeError, meth)
 
         # Verify that classmethod() doesn't allow keyword args
         try:
@@ -4157,6 +4158,26 @@ order (MRO) for bases """
         c = C()
         c[1:2] = 3
         self.assertEqual(c.value, 3)
+
+    def test_set_and_no_get(self):
+        # See
+        # http://mail.python.org/pipermail/python-dev/2010-January/095637.html
+        class Descr(object):
+
+            def __init__(self, name):
+                self.name = name
+
+            def __set__(self, obj, value):
+                obj.__dict__[self.name] = value
+        descr = Descr("a")
+
+        class X(object):
+            a = descr
+
+        x = X()
+        self.assertIs(x.a, descr)
+        x.a = 42
+        self.assertEqual(x.a, 42)
 
     def test_getattr_hooks(self):
         # issue 4230

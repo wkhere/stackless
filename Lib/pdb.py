@@ -208,7 +208,9 @@ class Pdb(bdb.Bdb, cmd.Cmd):
         """Custom displayhook for the exec in default(), which prevents
         assignment of the _ variable in the builtins.
         """
-        print(repr(obj))
+        # reproduce the behavior of the standard displayhook, not printing None
+        if obj is not None:
+            print(repr(obj))
 
     def default(self, line):
         if line[:1] == '!': line = line[1:]
@@ -841,8 +843,7 @@ class Pdb(bdb.Bdb, cmd.Cmd):
     def do_alias(self, arg):
         args = arg.split()
         if len(args) == 0:
-            keys = self.aliases.keys()
-            keys.sort()
+            keys = sorted(self.aliases.keys())
             for alias in keys:
                 print("%s = %s" % (alias, self.aliases[alias]), file=self.stdout)
             return

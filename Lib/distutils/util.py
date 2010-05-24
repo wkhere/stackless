@@ -11,6 +11,7 @@ from distutils.errors import DistutilsPlatformError
 from distutils.dep_util import newer
 from distutils.spawn import spawn
 from distutils import log
+from distutils.errors import DistutilsByteCompileError
 
 def get_platform ():
     """Return a string that identifies the current platform.  This is used
@@ -141,15 +142,40 @@ def get_platform ():
                 machine = 'fat'
                 cflags = get_config_vars().get('CFLAGS')
 
-                if '-arch x86_64' in cflags:
-                    if '-arch i386' in cflags:
-                        machine = 'universal'
-                    else:
-                        machine = 'fat64'
+                archs = re.findall('-arch\s+(\S+)', cflags)
+                archs.sort()
+                archs = tuple(archs)
+
+                if len(archs) == 1:
+                    machine = archs[0]
+                elif archs == ('i386', 'ppc'):
+                    machine = 'fat'
+                elif archs == ('i386', 'x86_64'):
+                    machine = 'intel'
+                elif archs == ('i386', 'ppc', 'x86_64'):
+                    machine = 'fat3'
+                elif archs == ('ppc64', 'x86_64'):
+                    machine = 'fat64'
+                elif archs == ('i386', 'ppc', 'ppc64', 'x86_64'):
+                    machine = 'universal'
+                else:
+                    raise ValueError(
+                       "Don't know machine value for archs=%r"%(archs,))
+
+            elif machine == 'i386':
+                # On OSX the machine type returned by uname is always the
+                # 32-bit variant, even if the executable architecture is
+                # the 64-bit variant
+                if sys.maxsize >= 2**32:
+                    machine = 'x86_64'
 
             elif machine in ('PowerPC', 'Power_Macintosh'):
                 # Pick a sane name for the PPC architecture.
                 machine = 'ppc'
+
+                # See 'i386' case
+                if sys.maxsize >= 2**32:
+                    machine = 'ppc64'
 
     return "%s-%s-%s" % (osname, release, machine)
 
@@ -428,6 +454,9 @@ def byte_compile (py_files,
     generated in indirect mode; unless you know what you're doing, leave
     it set to None.
     """
+    # nothing is done if sys.dont_write_bytecode is True
+    if sys.dont_write_bytecode:
+        raise DistutilsByteCompileError('byte-compiling is disabled.')
 
     # First, if the caller didn't force us into direct or indirect mode,
     # figure out which mode we should be in.  We take a conservative
@@ -538,8 +567,8 @@ def rfc822_escape (header):
     """Return a version of the string escaped for inclusion in an
     RFC-822 header, by ensuring there are 8 spaces space after each newline.
     """
-    lines = [x.strip() for x in header.split('\n')]
-    sep = '\n' + 8*' '
+    lines = header.split('\n')
+    sep = '\n' + 8 * ' '
     return sep.join(lines)
 
 # 2to3 support

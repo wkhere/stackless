@@ -53,10 +53,28 @@ ppc_getcounter(uint64 *v)
 	((long*)(v))[1] = tb;
 }
 
-#else /* this is for linux/x86 (and probably any other GCC/x86 combo) */
+#elif defined(__i386__)
+
+/* this is for linux/x86 (and probably any other GCC/x86 combo) */
 
 #define READ_TIMESTAMP(val) \
      __asm__ __volatile__("rdtsc" : "=A" (val))
+
+#elif defined(__x86_64__)
+
+/* for gcc/x86_64, the "A" constraint in DI mode means *either* rax *or* rdx;
+   not edx:eax as it does for i386.  Since rdtsc puts its result in edx:eax
+   even in 64-bit mode, we need to use "a" and "d" for the lower and upper
+   32-bit pieces of the result. */
+
+#define READ_TIMESTAMP(val) \
+    __asm__ __volatile__("rdtsc" : \
+                         "=a" (((int*)&(val))[0]), "=d" (((int*)&(val))[1]));
+
+
+#else
+
+#error "Don't know how to implement timestamp counter for this architecture"
 
 #endif
 
@@ -1210,7 +1228,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 	assert(stack_pointer != NULL);
 	f->f_stacktop = NULL;	/* remains NULL unless yield suspends frame */
 
-	if (f->f_code->co_flags & CO_GENERATOR) {
+	if (co->co_flags & CO_GENERATOR && !throwflag) {
 		if (f->f_exc_type != NULL && f->f_exc_type != Py_None) {
 			/* We were in an except handler when we left,
 			   restore the exception state which was put aside

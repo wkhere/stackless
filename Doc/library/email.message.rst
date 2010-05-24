@@ -40,7 +40,10 @@ Here are the methods of the :class:`Message` class:
 
       Return the entire message flattened as a string.  When optional *unixfrom*
       is ``True``, the envelope header is included in the returned string.
-      *unixfrom* defaults to ``False``.
+      *unixfrom* defaults to ``False``.  Flattening the message may trigger
+      changes to the :class:`Message` if defaults need to be filled in to
+      complete the transformation to a string (for example, MIME boundaries may
+      be generated or modified).
 
       Note that this method is provided as a convenience and may not always
       format the message the way you want.  For example, by default it mangles
@@ -412,9 +415,10 @@ Here are the methods of the :class:`Message` class:
       Return the value of the ``filename`` parameter of the
       :mailheader:`Content-Disposition` header of the message.  If the header
       does not have a ``filename`` parameter, this method falls back to looking
-      for the ``name`` parameter.  If neither is found, or the header is
-      missing, then *failobj* is returned.  The returned string will always be
-      unquoted as per :func:`email.utils.unquote`.
+      for the ``name`` parameter on the :mailheader:`Content-Type` header.  If
+      neither is found, or the header is missing, then *failobj* is returned.
+      The returned string will always be unquoted as per
+      :func:`email.utils.unquote`.
 
 
    .. method:: get_boundary(failobj=None)

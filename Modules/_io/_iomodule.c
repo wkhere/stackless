@@ -219,10 +219,20 @@ PyDoc_STRVAR(open_doc,
 "returned as strings, the bytes having been first decoded using a\n"
 "platform-dependent encoding or using the specified encoding if given.\n"
 "\n"
-"buffering is an optional integer used to set the buffering policy. By\n"
-"default full buffering is on. Pass 0 to switch buffering off (only\n"
-"allowed in binary mode), 1 to set line buffering, and an integer > 1\n"
-"for full buffering.\n"
+"buffering is an optional integer used to set the buffering policy.\n"
+"Pass 0 to switch buffering off (only allowed in binary mode), 1 to select\n"
+"line buffering (only usable in text mode), and an integer > 1 to indicate\n"
+"the size of a fixed-size chunk buffer.  When no buffering argument is\n"
+"given, the default buffering policy works as follows:\n"
+"\n"
+"* Binary files are buffered in fixed-size chunks; the size of the buffer\n"
+"  is chosen using a heuristic trying to determine the underlying device's\n"
+"  \"block size\" and falling back on `io.DEFAULT_BUFFER_SIZE`.\n"
+"  On many systems, the buffer will typically be 4096 or 8192 bytes long.\n"
+"\n"
+"* \"Interactive\" text files (files for which isatty() returns True)\n"
+"  use line buffering.  Other text files use the policy described above\n"
+"  for binary files.\n"
 "\n"
 "encoding is the name of the encoding used to decode or encode the\n"
 "file. This should only be used in text mode. The default encoding is\n"
@@ -561,6 +571,30 @@ PyNumber_AsOff_t(PyObject *item, PyObject *err)
     return result;
 }
 
+
+/* Basically the "n" format code with the ability to turn None into -1. */
+int 
+_PyIO_ConvertSsize_t(PyObject *obj, void *result) {
+    Py_ssize_t limit;
+    if (obj == Py_None) {
+        limit = -1;
+    }
+    else if (PyNumber_Check(obj)) {
+        limit = PyNumber_AsSsize_t(obj, PyExc_OverflowError);
+        if (limit == -1 && PyErr_Occurred())
+            return 0;
+    }
+    else {
+        PyErr_Format(PyExc_TypeError,
+                     "integer argument expected, got '%.200s'",
+                     Py_TYPE(obj)->tp_name);
+        return 0;
+    }
+    *((Py_ssize_t *)result) = limit;
+    return 1;
+}
+
+
 static int
 iomodule_traverse(PyObject *mod, visitproc visit, void *arg) {
     _PyIO_State *state = IO_MOD_STATE(mod);
@@ -573,6 +607,7 @@ iomodule_traverse(PyObject *mod, visitproc visit, void *arg) {
     Py_VISIT(state->unsupported_operation);
     return 0;
 }
+
 
 static int
 iomodule_clear(PyObject *mod) {
@@ -590,6 +625,7 @@ static void
 iomodule_free(PyObject *mod) {
     iomodule_clear(mod);
 }
+
 
 /*
  * Module definition

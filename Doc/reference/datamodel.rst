@@ -59,13 +59,16 @@ Objects are never explicitly destroyed; however, when they become unreachable
 they may be garbage-collected.  An implementation is allowed to postpone garbage
 collection or omit it altogether --- it is a matter of implementation quality
 how garbage collection is implemented, as long as no objects are collected that
-are still reachable.  (Implementation note: CPython currently uses a
-reference-counting scheme with (optional) delayed detection of cyclically linked
-garbage, which collects most objects as soon as they become unreachable, but is
-not guaranteed to collect garbage containing circular references.  See the
-documentation of the :mod:`gc` module for information on controlling the
-collection of cyclic garbage.  Other implementations act differently and CPython
-may change.)
+are still reachable.
+
+.. impl-detail::
+
+   CPython currently uses a reference-counting scheme with (optional) delayed
+   detection of cyclically linked garbage, which collects most objects as soon
+   as they become unreachable, but is not guaranteed to collect garbage
+   containing circular references.  See the documentation of the :mod:`gc`
+   module for information on controlling the collection of cyclic garbage.
+   Other implementations act differently and CPython may change.
 
 Note that the use of the implementation's tracing or debugging facilities may
 keep objects alive that would normally be collectable. Also note that catching
@@ -666,7 +669,7 @@ Modules
    of the shared library file.
 
 Custom classes
-   Custon class types are typically created by class definitions (see section
+   Custom class types are typically created by class definitions (see section
    :ref:`class`).  A class has a namespace implemented by a dictionary object.
    Class attribute references are translated to lookups in this dictionary, e.g.,
    ``C.x`` is translated to ``C.__dict__["x"]`` (although there are a number of
@@ -764,10 +767,10 @@ Class instances
    Special attributes: :attr:`__dict__` is the attribute dictionary;
    :attr:`__class__` is the instance's class.
 
-Files
+I/O objects (also known as file objects)
    .. index::
-      object: file
       builtin: open
+      module: io
       single: popen() (in module os)
       single: makefile() (socket method)
       single: sys.stdin
@@ -778,14 +781,17 @@ Files
       single: stdout (in module sys)
       single: stderr (in module sys)
 
-   A file object represents an open file.  File objects are created by the
-   :func:`open` built-in function, and also by :func:`os.popen`,
-   :func:`os.fdopen`, and the :meth:`makefile` method of socket objects (and
-   perhaps by other functions or methods provided by extension modules).  The
-   objects ``sys.stdin``, ``sys.stdout`` and ``sys.stderr`` are initialized to
-   file objects corresponding to the interpreter's standard input, output and
-   error streams.  See :ref:`bltin-file-objects` for complete documentation of
-   file objects.
+   A file object represents an open file.  Various shortcuts are available
+   to create file objects: the :func:`open` built-in function, and also
+   :func:`os.popen`, :func:`os.fdopen`, and the :meth:`makefile` method
+   of socket objects (and perhaps by other functions or methods provided
+   by extension modules).
+
+   The objects ``sys.stdin``, ``sys.stdout`` and ``sys.stderr`` are
+   initialized to file objects corresponding to the interpreter's standard
+   input, output and error streams; they are all open in text mode and
+   therefore follow the interface defined by the :class:`io.TextIOBase`
+   abstract class.
 
 Internal types
    .. index::
@@ -863,6 +869,8 @@ Internal types
 
       If a code object represents a function, the first item in :attr:`co_consts` is
       the documentation string of the function, or ``None`` if undefined.
+
+   .. _frame-objects:
 
    Frame objects
       .. index:: object: frame
@@ -1405,11 +1413,17 @@ Super Binding
    ``A.__dict__['m'].__get__(obj, A)``.
 
 For instance bindings, the precedence of descriptor invocation depends on the
-which descriptor methods are defined.  Normally, data descriptors define both
-:meth:`__get__` and :meth:`__set__`, while non-data descriptors have just the
-:meth:`__get__` method.  Data descriptors always override a redefinition in an
+which descriptor methods are defined.  A descriptor can define any combination
+of :meth:`__get__`, :meth:`__set__` and :meth:`__delete__`.  If it does not
+define :meth:`__get__`, then accessing the attribute will return the descriptor
+object itself unless there is a value in the object's instance dictionary.  If
+the descriptor defines :meth:`__set__` and/or :meth:`__delete__`, it is a data
+descriptor; if it defines neither, it is a non-data descriptor.  Normally, data
+descriptors define both :meth:`__get__` and :meth:`__set__`, while non-data
+descriptors have just the :meth:`__get__` method.  Data descriptors with
+:meth:`__set__` and :meth:`__get__` defined always override a redefinition in an
 instance dictionary.  In contrast, non-data descriptors can be overridden by
-instances. [#]_
+instances.
 
 Python methods (including :func:`staticmethod` and :func:`classmethod`) are
 implemented as non-data descriptors.  Accordingly, instances can redefine and
@@ -1467,14 +1481,14 @@ Notes on using *__slots__*
   *__slots__*; otherwise, the class attribute would overwrite the descriptor
   assignment.
 
+* The action of a *__slots__* declaration is limited to the class where it is
+  defined.  As a result, subclasses will have a *__dict__* unless they also define
+  *__slots__* (which must only contain names of any *additional* slots).
+
 * If a class defines a slot also defined in a base class, the instance variable
   defined by the base class slot is inaccessible (except by retrieving its
   descriptor directly from the base class). This renders the meaning of the
   program undefined.  In the future, a check may be added to prevent this.
-
-* The action of a *__slots__* declaration is limited to the class where it is
-  defined.  As a result, subclasses will have a *__dict__* unless they also define
-  *__slots__*.
 
 * Nonempty *__slots__* does not work for classes derived from "variable-length"
   built-in types such as :class:`int`, :class:`str` and :class:`tuple`.
@@ -1530,7 +1544,7 @@ returning an ordered dictionary.
 
 The appropriate metaclass is determined by the following precedence rules:
 
-* If the ``metaclass`` keyword argument is based with the bases, it is used.
+* If the ``metaclass`` keyword argument is passed with the bases, it is used.
 
 * Otherwise, if there is at least one base class, its metaclass is used.
 
@@ -1712,12 +1726,16 @@ implemented as an iteration through a sequence.  However, container objects can
 supply the following special method with a more efficient implementation, which
 also does not require the object be a sequence.
 
-
 .. method:: object.__contains__(self, item)
 
-   Called to implement membership test operators.  Should return true if *item* is
-   in *self*, false otherwise.  For mapping objects, this should consider the keys
-   of the mapping rather than the values or the key-item pairs.
+   Called to implement membership test operators.  Should return true if *item*
+   is in *self*, false otherwise.  For mapping objects, this should consider the
+   keys of the mapping rather than the values or the key-item pairs.
+
+   For objects that don't define :meth:`__contains__`, the membership test first
+   tries iteration via :meth:`__iter__`, then the old sequence iteration
+   protocol via :meth:`__getitem__`, see :ref:`this section in the language
+   reference <membership-test-details>`.
 
 
 .. _numeric-types:
@@ -1993,13 +2011,6 @@ object itself in order to be consistently invoked by the interpreter).
 .. [#] It *is* possible in some cases to change an object's type, under certain
    controlled conditions. It generally isn't a good idea though, since it can
    lead to some very strange behaviour if it is handled incorrectly.
-
-.. [#] A descriptor can define any combination of :meth:`__get__`,
-   :meth:`__set__` and :meth:`__delete__`.  If it does not define :meth:`__get__`,
-   then accessing the attribute even on an instance will return the descriptor
-   object itself.  If the descriptor defines :meth:`__set__` and/or
-   :meth:`__delete__`, it is a data descriptor; if it defines neither, it is a
-   non-data descriptor.
 
 .. [#] For operands of the same type, it is assumed that if the non-reflected method
    (such as :meth:`__add__`) fails the operation is not supported, which is why the

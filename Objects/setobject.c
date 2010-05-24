@@ -1343,9 +1343,9 @@ set_intersection_multi(PySetObject *so, PyObject *args)
 }
 
 PyDoc_STRVAR(intersection_doc,
-"Return the intersection of two sets as a new set.\n\
+"Return the intersection of two or more sets as a new set.\n\
 \n\
-(i.e. all elements that are in both sets.)");
+(i.e. elements that are common to all of the sets.)");
 
 static PyObject *
 set_intersection_update(PySetObject *so, PyObject *other)
@@ -2090,7 +2090,8 @@ static PyNumberMethods set_as_number = {
 };
 
 PyDoc_STRVAR(set_doc,
-"set(iterable) --> set object\n\
+"set() -> new empty set object\n\
+set(iterable) -> new set object\n\
 \n\
 Build an unordered collection of unique elements.");
 
@@ -2187,7 +2188,8 @@ static PyNumberMethods frozenset_as_number = {
 };
 
 PyDoc_STRVAR(frozenset_doc,
-"frozenset(iterable) --> frozenset object\n\
+"frozenset() -> empty frozenset object\n\
+frozenset(iterable) -> frozenset object\n\
 \n\
 Build an immutable unordered collection of unique elements.");
 

@@ -77,14 +77,14 @@ To show the individual process IDs involved, here is an expanded example::
     import os
 
     def info(title):
-        print title
-        print 'module name:', __name__
-        print 'parent process:', os.getppid()
-        print 'process id:', os.getpid()
+        print(title)
+        print('module name:', __name__)
+        print('parent process:', os.getppid())
+        print('process id:', os.getpid())
 
     def f(name):
         info('function f')
-        print 'hello', name
+        print('hello', name)
 
     if __name__ == '__main__':
         info('main line')
@@ -279,10 +279,10 @@ For example::
        return x*x
 
    if __name__ == '__main__':
-       pool = Pool(processes=4)              # start 4 worker processes
+       pool = Pool(processes=4)               # start 4 worker processes
        result = pool.apply_async(f, [10])     # evaluate "f(10)" asynchronously
-       print result.get(timeout=1)           # prints "100" unless your computer is *very* slow
-       print pool.map(f, range(10))          # prints "[0, 1, 4,..., 81]"
+       print(result.get(timeout=1))           # prints "100" unless your computer is *very* slow
+       print(pool.map(f, range(10)))          # prints "[0, 1, 4,..., 81]"
 
 
 Reference
@@ -686,7 +686,7 @@ Miscellaneous
 
 .. function:: set_executable()
 
-   Sets the path of the python interpreter to use when starting a child process.
+   Sets the path of the Python interpreter to use when starting a child process.
    (By default :data:`sys.executable` is used).  Embedders will probably need to
    do some thing like ::
 
@@ -1150,11 +1150,6 @@ their parent process exits.  The manager classes are defined in the
    .. method:: serve_forever()
 
       Run the server in the current process.
-
-   .. method:: from_address(address, authkey)
-
-      A class method which creates a manager object referring to a pre-existing
-      server process which is using the given address and authentication key.
 
    .. method:: get_server()
 
@@ -2233,10 +2228,3 @@ Some simple benchmarks comparing :mod:`multiprocessing` with :mod:`threading`:
 
 .. literalinclude:: ../includes/mp_benchmarks.py
 
-An example/demo of how to use the :class:`managers.SyncManager`, :class:`Process`
-and others to build a system which can distribute processes and work via a
-distributed queue to a "cluster" of machines on a network, accessible via SSH.
-You will need to have private key authentication for all hosts configured for
-this to work.
-
-.. literalinclude:: ../includes/mp_distributing.py

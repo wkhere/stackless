@@ -9,6 +9,7 @@ This software comes with no warranty. Use at your own risk.
 
 ******************************************************************/
 
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 
 #include <stdio.h>
@@ -30,10 +31,6 @@ This software comes with no warranty. Use at your own risk.
 
 #ifdef HAVE_WCHAR_H
 #include <wchar.h>
-#endif
-
-#if defined(__APPLE__)
-#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 #if defined(MS_WINDOWS)
@@ -135,6 +132,14 @@ PyLocale_setlocale(PyObject* self, PyObject* args)
 
     if (!PyArg_ParseTuple(args, "i|z:setlocale", &category, &locale))
         return NULL;
+
+#if defined(MS_WINDOWS)
+    if (category < LC_MIN || category > LC_MAX)
+    {
+        PyErr_SetString(Error, "invalid locale category");
+        return NULL;
+    }
+#endif
 
     if (locale) {
         /* set locale */
@@ -284,7 +289,9 @@ PyLocale_strxfrm(PyObject* self, PyObject* args)
     wchar_t *s, *buf = NULL;
     size_t n1, n2;
     PyObject *result = NULL;
+#ifndef HAVE_USABLE_WCHAR_T
     Py_ssize_t i;
+#endif
 
     if (!PyArg_ParseTuple(args, "u#:strxfrm", &s0, &n0))
         return NULL;
@@ -319,7 +326,7 @@ PyLocale_strxfrm(PyObject* self, PyObject* args)
     result = PyUnicode_FromWideChar(buf, n2);
  exit:
     if (buf) PyMem_Free(buf);
-#ifdef HAVE_USABLE_WCHAR_T
+#ifndef HAVE_USABLE_WCHAR_T
     PyMem_Free(s);
 #endif
     return result;

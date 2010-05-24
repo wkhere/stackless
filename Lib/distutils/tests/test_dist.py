@@ -5,6 +5,7 @@ import io
 import sys
 import unittest
 import warnings
+import textwrap
 
 from distutils.dist import Distribution, fix_help_options
 from distutils.cmd import Command
@@ -37,15 +38,17 @@ class TestDistribution(Distribution):
 
 
 class DistributionTestCase(support.LoggingSilencer,
+                           support.EnvironGuard,
                            unittest.TestCase):
 
     def setUp(self):
         super(DistributionTestCase, self).setUp()
-        self.argv = sys.argv[:]
+        self.argv = sys.argv, sys.argv[:]
         del sys.argv[1:]
 
     def tearDown(self):
-        sys.argv[:] = self.argv
+        sys.argv = self.argv[0]
+        sys.argv[:] = self.argv[1]
         super(DistributionTestCase, self).tearDown()
 
     def create_distribution(self, configfiles=()):
@@ -149,8 +152,24 @@ class DistributionTestCase(support.LoggingSilencer,
         self.assertEquals(cmds, ['distutils.command', 'one', 'two'])
 
 
+    def test_announce(self):
+        # make sure the level is known
+        dist = Distribution()
+        args = ('ok',)
+        kwargs = {'level': 'ok2'}
+        self.assertRaises(ValueError, dist.announce, args, kwargs)
+
 class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
                        unittest.TestCase):
+
+    def setUp(self):
+        super(MetadataTestCase, self).setUp()
+        self.argv = sys.argv, sys.argv[:]
+
+    def tearDown(self):
+        sys.argv = self.argv[0]
+        sys.argv[:] = self.argv[1]
+        super(MetadataTestCase, self).tearDown()
 
     def test_simple_metadata(self):
         attrs = {"name": "package",
@@ -250,14 +269,14 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
 
             # linux-style
             if sys.platform in ('linux', 'darwin'):
-                self.environ['HOME'] = temp_dir
+                os.environ['HOME'] = temp_dir
                 files = dist.find_config_files()
                 self.assertTrue(user_filename in files)
 
             # win32-style
             if sys.platform == 'win32':
                 # home drive should be found
-                self.environ['HOME'] = temp_dir
+                os.environ['HOME'] = temp_dir
                 files = dist.find_config_files()
                 self.assertTrue(user_filename in files,
                              '%r not found in %r' % (user_filename, files))
@@ -273,19 +292,30 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
     def test_show_help(self):
         # smoke test, just makes sure some help is displayed
         dist = Distribution()
-        old_argv = sys.argv
         sys.argv = []
-        try:
-            dist.help = 1
-            dist.script_name = 'setup.py'
-            with captured_stdout() as s:
-                dist.parse_command_line()
-        finally:
-            sys.argv = old_argv
+        dist.help = 1
+        dist.script_name = 'setup.py'
+        with captured_stdout() as s:
+            dist.parse_command_line()
 
         output = [line for line in s.getvalue().split('\n')
                   if line.strip() != '']
         self.assertTrue(len(output) > 0)
+
+    def test_long_description(self):
+        long_desc = textwrap.dedent("""\
+        example::
+              We start here
+            and continue here
+          and end here.""")
+        attrs = {"name": "package",
+                 "version": "1.0",
+                 "long_description": long_desc}
+
+        dist = Distribution(attrs)
+        meta = self.format_metadata(dist)
+        meta = meta.replace('\n' + 8 * ' ', '\n')
+        self.assertTrue(long_desc in meta)
 
 def test_suite():
     suite = unittest.TestSuite()

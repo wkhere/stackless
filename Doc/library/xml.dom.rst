@@ -1,4 +1,3 @@
-
 :mod:`xml.dom` --- The Document Object Model API
 ================================================
 
@@ -77,7 +76,7 @@ implementations are free to support the strict mapping from IDL).  See section
    `Document Object Model (DOM) Level 1 Specification <http://www.w3.org/TR/REC-DOM-Level-1/>`_
       The W3C recommendation for the DOM supported by :mod:`xml.dom.minidom`.
 
-   `Python Language Mapping Specification <http://www.omg.org/docs/formal/02-11-05.pdf>`_
+   `Python Language Mapping Specification <http://www.omg.org/spec/PYTH/1.2/PDF>`_
       This specifies the mapping from OMG IDL to Python.
 
 
@@ -96,7 +95,7 @@ The :mod:`xml.dom` contains the following functions:
    implementation supports some customization).
 
 
-.. function:: getDOMImplementation([name[, features]])
+.. function:: getDOMImplementation(name=None, features=())
 
    Return a suitable DOM implementation. The *name* is either well-known, the
    module name of a DOM implementation, or ``None``. If it is not ``None``, imports

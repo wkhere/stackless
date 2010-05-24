@@ -115,12 +115,12 @@ Here is a short script to test three functions from the :mod:`random` module::
 
        def test_choice(self):
            element = random.choice(self.seq)
-           self.assert_(element in self.seq)
+           self.assertIn(element, self.seq)
 
        def test_sample(self):
            self.assertRaises(ValueError, random.sample, self.seq, 20)
            for element in random.sample(self.seq, 5):
-               self.assert_(element in self.seq)
+               self.assertIn(element, self.seq)
 
    if __name__ == '__main__':
        unittest.main()
@@ -162,9 +162,9 @@ command line.  For example, the last two lines may be replaced with::
 Running the revised script from the interpreter or another script produces the
 following output::
 
-   testchoice (__main__.TestSequenceFunctions) ... ok
-   testsample (__main__.TestSequenceFunctions) ... ok
-   testshuffle (__main__.TestSequenceFunctions) ... ok
+   test_choice (__main__.TestSequenceFunctions) ... ok
+   test_sample (__main__.TestSequenceFunctions) ... ok
+   test_shuffle (__main__.TestSequenceFunctions) ... ok
 
    ----------------------------------------------------------------------
    Ran 3 tests in 0.110s
@@ -236,14 +236,14 @@ us when we run the test::
 
    class DefaultWidgetSizeTestCase(SimpleWidgetTestCase):
        def runTest(self):
-           self.assertTrue(self.widget.size() == (50,50),
-                           'incorrect default size')
+           self.assertEqual(self.widget.size(), (50,50),
+                            'incorrect default size')
 
    class WidgetResizeTestCase(SimpleWidgetTestCase):
        def runTest(self):
            self.widget.resize(100,150)
-           self.assertTrue(self.widget.size() == (100,150),
-                           'wrong size after resize')
+           self.assertEqual(self.widget.size(), (100,150),
+                            'wrong size after resize')
 
 If the :meth:`~TestCase.setUp` method raises an exception while the test is
 running, the framework will consider the test to have suffered an error, and the
@@ -283,32 +283,32 @@ mechanism::
            self.widget.dispose()
            self.widget = None
 
-       def testDefaultSize(self):
-           self.assertTrue(self.widget.size() == (50,50),
-                           'incorrect default size')
+       def test_default_size(self):
+           self.assertEqual(self.widget.size(), (50,50),
+                            'incorrect default size')
 
-       def testResize(self):
+       def test_resize(self):
            self.widget.resize(100,150)
-           self.assertTrue(self.widget.size() == (100,150),
-                           'wrong size after resize')
+           self.assertEqual(self.widget.size(), (100,150),
+                            'wrong size after resize')
 
 Here we have not provided a :meth:`~TestCase.runTest` method, but have instead
 provided two different test methods.  Class instances will now each run one of
-the :meth:`test\*` methods, with ``self.widget`` created and destroyed
+the :meth:`test_\*` methods, with ``self.widget`` created and destroyed
 separately for each instance.  When creating an instance we must specify the
 test method it is to run.  We do this by passing the method name in the
 constructor::
 
-   defaultSizeTestCase = WidgetTestCase('testDefaultSize')
-   resizeTestCase = WidgetTestCase('testResize')
+   defaultSizeTestCase = WidgetTestCase('test_default_size')
+   resizeTestCase = WidgetTestCase('test_resize')
 
 Test case instances are grouped together according to the features they test.
 :mod:`unittest` provides a mechanism for this: the :dfn:`test suite`,
 represented by :mod:`unittest`'s :class:`TestSuite` class::
 
    widgetTestSuite = unittest.TestSuite()
-   widgetTestSuite.addTest(WidgetTestCase('testDefaultSize'))
-   widgetTestSuite.addTest(WidgetTestCase('testResize'))
+   widgetTestSuite.addTest(WidgetTestCase('test_default_size'))
+   widgetTestSuite.addTest(WidgetTestCase('test_resize'))
 
 For the ease of running tests, as we will see later, it is a good idea to
 provide in each test module a callable object that returns a pre-built test
@@ -316,14 +316,14 @@ suite::
 
    def suite():
        suite = unittest.TestSuite()
-       suite.addTest(WidgetTestCase('testDefaultSize'))
-       suite.addTest(WidgetTestCase('testResize'))
+       suite.addTest(WidgetTestCase('test_default_size'))
+       suite.addTest(WidgetTestCase('test_resize'))
        return suite
 
 or even::
 
    def suite():
-       tests = ['testDefaultSize', 'testResize']
+       tests = ['test_default_size', 'test_resize']
 
        return unittest.TestSuite(map(WidgetTestCase, tests))
 
@@ -334,8 +334,8 @@ populating it with individual tests. For example, ::
 
    suite = unittest.TestLoader().loadTestsFromTestCase(WidgetTestCase)
 
-will create a test suite that will run ``WidgetTestCase.testDefaultSize()`` and
-``WidgetTestCase.testResize``. :class:`TestLoader` uses the ``'test'`` method
+will create a test suite that will run ``WidgetTestCase.test_default_size()`` and
+``WidgetTestCase.test_resize``. :class:`TestLoader` uses the ``'test'`` method
 name prefix to identify test methods automatically.
 
 Note that the order in which the various test cases will be run is
@@ -525,7 +525,7 @@ This section describes in depth the API of :mod:`unittest`.
 Test cases
 ~~~~~~~~~~
 
-.. class:: TestCase([methodName])
+.. class:: TestCase(methodName='runTest')
 
    Instances of the :class:`TestCase` class represent the smallest testable units
    in the :mod:`unittest` universe.  This class is intended to be used as a base
@@ -540,8 +540,8 @@ Test cases
 
       def suite():
           suite = unittest.TestSuite()
-          suite.addTest(WidgetTestCase('testDefaultSize'))
-          suite.addTest(WidgetTestCase('testResize'))
+          suite.addTest(WidgetTestCase('test_default_size'))
+          suite.addTest(WidgetTestCase('test_resize'))
           return suite
 
    Here, we create two instances of :class:`WidgetTestCase`, each of which runs a
@@ -576,7 +576,7 @@ Test cases
       the outcome of the test method. The default implementation does nothing.
 
 
-   .. method:: run([result])
+   .. method:: run(result=None)
 
       Run the test, collecting the result into the test result object passed as
       *result*.  If *result* is omitted or :const:`None`, a temporary result
@@ -603,9 +603,9 @@ Test cases
    failures.
 
 
-   .. method:: assertTrue(expr[, msg])
-               assert_(expr[, msg])
-               failUnless(expr[, msg])
+   .. method:: assertTrue(expr, msg=None)
+               assert_(expr, msg=None)
+               failUnless(expr, msg=None)
 
       Signal a test failure if *expr* is false; the explanation for the failure
       will be *msg* if given, otherwise it will be :const:`None`.
@@ -614,8 +614,8 @@ Test cases
          :meth:`failUnless`.
 
 
-   .. method:: assertEqual(first, second[, msg])
-               failUnlessEqual(first, second[, msg])
+   .. method:: assertEqual(first, second, msg=None)
+               failUnlessEqual(first, second, msg=None)
 
       Test that *first* and *second* are equal.  If the values do not compare
       equal, the test will fail with the explanation given by *msg*, or
@@ -636,8 +636,8 @@ Test cases
          :meth:`failUnlessEqual`.
 
 
-   .. method:: assertNotEqual(first, second[, msg])
-               failIfEqual(first, second[, msg])
+   .. method:: assertNotEqual(first, second, msg=None)
+               failIfEqual(first, second, msg=None)
 
       Test that *first* and *second* are not equal.  If the values do compare
       equal, the test will fail with the explanation given by *msg*, or
@@ -650,8 +650,8 @@ Test cases
          :meth:`failIfEqual`.
 
 
-   .. method:: assertAlmostEqual(first, second[, places[, msg]])
-               failUnlessAlmostEqual(first, second[, places[, msg]])
+   .. method:: assertAlmostEqual(first, second, *, places=7, msg=None)
+               failUnlessAlmostEqual(first, second, *, places=7, msg=None)
 
       Test that *first* and *second* are approximately equal by computing the
       difference, rounding to the given number of decimal *places* (default 7),
@@ -666,8 +666,8 @@ Test cases
          :meth:`failUnlessAlmostEqual`.
 
 
-   .. method:: assertNotAlmostEqual(first, second[, places[, msg]])
-               failIfAlmostEqual(first, second[, places[, msg]])
+   .. method:: assertNotAlmostEqual(first, second, *, places=7, msg=None)
+               failIfAlmostEqual(first, second, *, places=7, msg=None)
 
       Test that *first* and *second* are not approximately equal by computing
       the difference, rounding to the given number of decimal *places* (default
@@ -708,7 +708,7 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: assertRegexpMatches(text, regexp[, msg=None]):
+   .. method:: assertRegexpMatches(text, regexp, msg=None):
 
       Verifies that a *regexp* search matches *text*.  Fails with an error
       message including the pattern and the *text*.  *regexp* may be
@@ -729,11 +729,15 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: assertSameElements(expected, actual, msg=None)
+   .. method:: assertSameElements(actual, expected, msg=None)
 
-      Test that sequence *expected* contains the same elements as *actual*.
-      When they don't an error message listing the differences between the
-      sequences will be generated.
+      Test that sequence *expected* contains the same elements as *actual*,
+      regardless of their order. When they don't, an error message listing
+      the differences between the sequences will be generated.
+
+      Duplicate elements are ignored when comparing *actual* and *expected*.
+      It is the equivalent of ``assertEqual(set(expected), set(actual))``
+      but it works with sequences of unhashable objects as well.
 
       If specified *msg* will be used as the error message on failure.
 
@@ -801,8 +805,10 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: assertRaises(exception[, callable, ...])
-               failUnlessRaises(exception[, callable, ...])
+   .. method:: assertRaises(exception, callable, *args, **kwds)
+               failUnlessRaises(exception, callable, *args, **kwds)
+               assertRaises(exception)
+               failUnlessRaises(exception)
 
       Test that an exception is raised when *callable* is called with any
       positional or keyword arguments that are also passed to
@@ -811,10 +817,10 @@ Test cases
       To catch any of a group of exceptions, a tuple containing the exception
       classes may be passed as *exception*.
 
-      If *callable* is omitted or None, returns a context manager so that the
-      code under test can be written inline rather than as a function::
+      If only the *exception* argument is given, returns a context manager so
+      that the code under test can be written inline rather than as a function::
 
-         with self.failUnlessRaises(some_error_class):
+         with self.assertRaises(SomeException):
              do_something()
 
       .. versionchanged:: 3.1
@@ -842,14 +848,14 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: assertIsNone(expr[, msg])
+   .. method:: assertIsNone(expr, msg=None)
 
       This signals a test failure if *expr* is not None.
 
       .. versionadded:: 3.1
 
 
-   .. method:: assertIsNotNone(expr[, msg])
+   .. method:: assertIsNotNone(expr, msg=None)
 
       The inverse of the :meth:`assertIsNone` method.
       This signals a test failure if *expr* is None.
@@ -857,7 +863,7 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: assertIs(expr1, expr2[, msg])
+   .. method:: assertIs(expr1, expr2, msg=None)
 
       This signals a test failure if *expr1* and *expr2* don't evaluate to the same
       object.
@@ -865,7 +871,7 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: assertIsNot(expr1, expr2[, msg])
+   .. method:: assertIsNot(expr1, expr2, msg=None)
 
       The inverse of the :meth:`assertIs` method.
       This signals a test failure if *expr1* and *expr2* evaluate to the same
@@ -874,8 +880,8 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: assertFalse(expr[, msg])
-               failIf(expr[, msg])
+   .. method:: assertFalse(expr, msg=None)
+               failIf(expr, msg=None)
 
       The inverse of the :meth:`assertTrue` method is the :meth:`assertFalse` method.
       This signals a test failure if *expr* is true, with *msg* or :const:`None`
@@ -885,7 +891,7 @@ Test cases
          :meth:`failIf`.
 
 
-   .. method:: fail([msg])
+   .. method:: fail(msg=None)
 
       Signals a test failure unconditionally, with *msg* or :const:`None` for
       the error message.
@@ -976,7 +982,7 @@ Test cases
       .. versionadded:: 3.1
 
 
-   .. method:: addCleanup(function[, *args[, **kwargs]])
+   .. method:: addCleanup(function, *args, **kwargs)
 
       Add a function to be called after :meth:`tearDown` to cleanup resources
       used during the test. Functions will be called in reverse order to the
@@ -1006,7 +1012,7 @@ Test cases
       .. versionadded:: 2.7
 
 
-.. class:: FunctionTestCase(testFunc[, setUp[, tearDown[, description]]])
+.. class:: FunctionTestCase(testFunc, setUp=None, tearDown=None, description=None)
 
    This class implements the portion of the :class:`TestCase` interface which
    allows the test runner to drive the test, but does not provide the methods which
@@ -1020,7 +1026,7 @@ Test cases
 Grouping tests
 ~~~~~~~~~~~~~~
 
-.. class:: TestSuite([tests])
+.. class:: TestSuite(tests=())
 
    This class represents an aggregation of individual tests cases and test suites.
    The class presents the interface needed by the test runner to allow it to be run
@@ -1127,7 +1133,7 @@ Loading and running tests
          be useful when the fixtures are different and defined in subclasses.
 
 
-   .. method:: loadTestsFromName(name[, module])
+   .. method:: loadTestsFromName(name, module=None)
 
       Return a suite of all tests cases given a string specifier.
 
@@ -1152,7 +1158,7 @@ Loading and running tests
       The method optionally resolves *name* relative to the given *module*.
 
 
-   .. method:: loadTestsFromNames(names[, module])
+   .. method:: loadTestsFromNames(names, module=None)
 
       Similar to :meth:`loadTestsFromName`, but takes a sequence of names rather
       than a single name.  The return value is a test suite which supports all
@@ -1369,7 +1375,7 @@ Loading and running tests
    instead of repeatedly creating new instances.
 
 
-.. class:: TextTestRunner([stream[, descriptions[, verbosity]]])
+.. class:: TextTestRunner(stream=sys.stderr, descriptions=True, verbosity=1)
 
    A basic test runner implementation which prints results on standard error.  It
    has a few configurable parameters, but is essentially very simple.  Graphical
@@ -1382,7 +1388,7 @@ Loading and running tests
       subclasses to provide a custom ``TestResult``.
 
 
-.. function:: main([module[, defaultTest[, argv[, testRunner[, testLoader[, exit]]]]]])
+.. function:: main(module='__main__', defaultTest=None, argv=None, testRunner=TextTestRunner, testLoader=unittest.defaultTestLoader, exit=True)
 
    A command-line program that runs a set of tests; this is primarily for making
    test modules conveniently executable.  The simplest use for this function is to

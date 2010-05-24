@@ -25,12 +25,13 @@ typedef struct {
 static void
 lock_dealloc(lockobject *self)
 {
-	assert(self->lock_lock);
-	/* Unlock the lock so it's safe to free it */
-	PyThread_acquire_lock(self->lock_lock, 0);
-	PyThread_release_lock(self->lock_lock);
-	
-	PyThread_free_lock(self->lock_lock);
+	if (self->lock_lock != NULL) {
+		/* Unlock the lock so it's safe to free it */
+		PyThread_acquire_lock(self->lock_lock, 0);
+		PyThread_release_lock(self->lock_lock);
+		
+		PyThread_free_lock(self->lock_lock);
+	}
 	PyObject_Del(self);
 }
 
@@ -160,9 +161,9 @@ newlockobject(void)
 		return NULL;
 	self->lock_lock = PyThread_allocate_lock();
 	if (self->lock_lock == NULL) {
-		PyObject_Del(self);
-		self = NULL;
+		Py_DECREF(self);
 		PyErr_SetString(ThreadError, "can't allocate lock");
+		return NULL;
 	}
 	return self;
 }
@@ -239,7 +240,6 @@ local_traverse(localobject *self, visitproc visit, void *arg)
 static int
 local_clear(localobject *self)
 {
-	Py_CLEAR(self->key);
 	Py_CLEAR(self->args);
 	Py_CLEAR(self->kw);
 	Py_CLEAR(self->dict);
@@ -261,6 +261,7 @@ local_dealloc(localobject *self)
 				PyDict_DelItem(tstate->dict, self->key);
 	}
 
+	Py_XDECREF(self->key);
 	local_clear(self);
 	Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -422,6 +423,7 @@ struct bootstate {
 	PyObject *func;
 	PyObject *args;
 	PyObject *keyw;
+	PyThreadState *tstate;
 };
 
 static void
@@ -431,8 +433,9 @@ t_bootstrap(void *boot_raw)
 	PyThreadState *tstate;
 	PyObject *res;
 
-	tstate = PyThreadState_New(boot->interp);
-
+	tstate = boot->tstate;
+	tstate->thread_id = PyThread_get_thread_ident();
+	_PyThreadState_Init(tstate);
 	PyEval_AcquireThread(tstate);
 	res = PyEval_CallObjectWithKeywords(
 		boot->func, boot->args, boot->keyw);
@@ -495,6 +498,11 @@ thread_PyThread_start_new_thread(PyObject *self, PyObject *fargs)
 	boot->func = func;
 	boot->args = args;
 	boot->keyw = keyw;
+	boot->tstate = _PyThreadState_Prealloc(boot->interp);
+	if (boot->tstate == NULL) {
+		PyMem_DEL(boot);
+		return PyErr_NoMemory();
+	}
 	Py_INCREF(func);
 	Py_INCREF(args);
 	Py_XINCREF(keyw);
@@ -505,6 +513,7 @@ thread_PyThread_start_new_thread(PyObject *self, PyObject *fargs)
 		Py_DECREF(func);
 		Py_DECREF(args);
 		Py_XDECREF(keyw);
+		PyThreadState_Clear(boot->tstate);
 		PyMem_DEL(boot);
 		return NULL;
 	}

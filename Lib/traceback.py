@@ -70,11 +70,11 @@ def print_tb(tb, limit=None, file=None):
         tb = tb.tb_next
         n = n+1
 
-def format_tb(tb, limit = None):
+def format_tb(tb, limit=None):
     """A shorthand for 'format_list(extract_stack(f, limit))."""
     return format_list(extract_tb(tb, limit))
 
-def extract_tb(tb, limit = None):
+def extract_tb(tb, limit=None):
     """Return list of up to limit pre-processed entries from traceback.
 
     This is useful for alternate formatting of stack traces.  If
@@ -120,13 +120,14 @@ def _iter_chain(exc, custom_tb=None, seen=None):
     seen.add(exc)
     its = []
     cause = exc.__cause__
-    context = exc.__context__
     if cause is not None and cause not in seen:
         its.append(_iter_chain(cause, None, seen))
         its.append([(_cause_message, None)])
-    if context is not None and context is not cause and context not in seen:
-        its.append(_iter_chain(context, None, seen))
-        its.append([(_context_message, None)])
+    else:
+        context = exc.__context__
+        if context is not None and context not in seen:
+            its.append(_iter_chain(context, None, seen))
+            its.append([(_context_message, None)])
     its.append([(exc, custom_tb or exc.__traceback__)])
     # itertools.chain is in an extension module and may be unavailable
     for it in its:
@@ -304,7 +305,7 @@ def format_stack(f=None, limit=None):
             f = sys.exc_info()[2].tb_frame.f_back
     return format_list(extract_stack(f, limit))
 
-def extract_stack(f=None, limit = None):
+def extract_stack(f=None, limit=None):
     """Extract the raw traceback from the current stack frame.
 
     The return value has the same format as for extract_tb().  The

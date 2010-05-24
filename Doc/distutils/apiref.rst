@@ -1095,7 +1095,10 @@ other utility module.
    the univeral binary status instead of the architecture of the current
    processor. For 32-bit universal binaries the architecture is ``fat``,
    for 64-bit universal binaries the architecture is ``fat64``, and
-   for 4-way universal binaries the architecture is ``universal``.
+   for 4-way universal binaries the architecture is ``universal``. Starting
+   from Python 2.7 and Python 3.2 the architecture ``fat3`` is used for
+   a 3-way universal build (ppc, i386, x86_64) and ``intel`` is used for
+   a univeral build with the i386 and x86_64 architectures
 
    Examples of returned values on Mac OS X:
 
@@ -1104,6 +1107,8 @@ other utility module.
    * ``macosx-10.3-fat``
 
    * ``macosx-10.5-universal``
+
+   * ``macosx-10.6-intel``
 
    .. % XXX isn't this also provided by some other non-distutils module?
 
@@ -1947,7 +1952,7 @@ This is described in more detail in :pep:`301`.
 
 
 The ``check`` command performs some tests on the meta-data of a package.
-It makes sure for example that all required meta-data are provided through
+For example, it verifies that all required meta-data are provided as
 the arguments passed to the :func:`setup` function.
 
 .. % todo
@@ -1971,9 +1976,9 @@ it so that it's implementing the class :class:`peel_banana`, a subclass of
 Subclasses of :class:`Command` must define the following methods.
 
 
-.. method:: Command.initialize_options()(S)
+.. method:: Command.initialize_options()
 
-   et default values for all the options that this command supports.  Note that
+   Set default values for all the options that this command supports.  Note that
    these defaults may be overridden by other commands, by the setup script, by
    config files, or by the command-line.  Thus, this is not the place to code
    dependencies between options; generally, :meth:`initialize_options`

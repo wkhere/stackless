@@ -329,7 +329,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
       Return a list of the names of all folders.
 
 
-   .. method:: .et_folder(folder)
+   .. method:: get_folder(folder)
 
       Return a :class:`Maildir` instance representing the folder whose name is
       *folder*. A :exc:`NoSuchMailboxError` exception is raised if the folder
@@ -595,7 +595,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
    `nmh - Message Handling System <http://www.nongnu.org/nmh/>`_
       Home page of :program:`nmh`, an updated version of the original :program:`mh`.
 
-   `MH & nmh: Email for Users & Programmers <http://www.ics.uci.edu/~mh/book/>`_
+   `MH & nmh: Email for Users & Programmers <http://rand-mh.sourceforge.net/book/>`_
       A GPL-licensed book on :program:`mh` and :program:`nmh`, with some information
       on the mailbox format.
 

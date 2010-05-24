@@ -238,7 +238,7 @@ def isroutine(object):
 
 def isabstract(object):
     """Return true if the object is an abstract base class (ABC)."""
-    return isinstance(object, type) and object.__flags__ & TPFLAGS_IS_ABSTRACT
+    return bool(isinstance(object, type) and object.__flags__ & TPFLAGS_IS_ABSTRACT)
 
 def getmembers(object, predicate=None):
     """Return all members of an object as (name, value) pairs sorted by name.
@@ -398,12 +398,12 @@ def getfile(object):
     if ismodule(object):
         if hasattr(object, '__file__'):
             return object.__file__
-        raise TypeError('arg is a built-in module')
+        raise TypeError('{!r} is a built-in module'.format(object))
     if isclass(object):
         object = sys.modules.get(object.__module__)
         if hasattr(object, '__file__'):
             return object.__file__
-        raise TypeError('arg is a built-in class')
+        raise TypeError('{!r} is a built-in class'.format(object))
     if ismethod(object):
         object = object.__func__
     if isfunction(object):
@@ -414,8 +414,8 @@ def getfile(object):
         object = object.f_code
     if iscode(object):
         return object.co_filename
-    raise TypeError('arg is not a module, class, method, '
-                    'function, traceback, frame, or code object')
+    raise TypeError('{!r} is not a module, class, method, '
+                    'function, traceback, frame, or code object'.format(object))
 
 ModuleInfo = namedtuple('ModuleInfo', 'name suffix mode module_type')
 
@@ -747,7 +747,7 @@ def _getfullargs(co):
     names of the * and ** arguments or None."""
 
     if not iscode(co):
-        raise TypeError('arg is not a code object')
+        raise TypeError('{!r} is not a code object'.format(co))
 
     nargs = co.co_argcount
     names = co.co_varnames
@@ -811,7 +811,7 @@ def getfullargspec(func):
     if ismethod(func):
         func = func.__func__
     if not isfunction(func):
-        raise TypeError('arg is not a Python function')
+        raise TypeError('{!r} is not a Python function'.format(func))
     args, varargs, kwonlyargs, varkw = _getfullargs(func.__code__)
     return FullArgSpec(args, varargs, varkw, func.__defaults__,
             kwonlyargs, func.__kwdefaults__, func.__annotations__)
@@ -944,7 +944,7 @@ def getframeinfo(frame, context=1):
     else:
         lineno = frame.f_lineno
     if not isframe(frame):
-        raise TypeError('arg is not a frame or traceback object')
+        raise TypeError('{!r} is not a frame or traceback object'.format(frame))
 
     filename = getsourcefile(frame) or getfile(frame)
     if context > 0:

@@ -82,10 +82,20 @@ def open(file: (str, bytes), mode: str = "r", buffering: int = None,
     returned as strings, the bytes having been first decoded using a
     platform-dependent encoding or using the specified encoding if given.
 
-    buffering is an optional integer used to set the buffering policy. By
-    default full buffering is on. Pass 0 to switch buffering off (only
-    allowed in binary mode), 1 to set line buffering, and an integer > 1
-    for full buffering.
+    buffering is an optional integer used to set the buffering policy.
+    Pass 0 to switch buffering off (only allowed in binary mode), 1 to select
+    line buffering (only usable in text mode), and an integer > 1 to indicate
+    the size of a fixed-size chunk buffer.  When no buffering argument is
+    given, the default buffering policy works as follows:
+
+    * Binary files are buffered in fixed-size chunks; the size of the buffer
+      is chosen using a heuristic trying to determine the underlying device's
+      "block size" and falling back on `io.DEFAULT_BUFFER_SIZE`.
+      On many systems, the buffer will typically be 4096 or 8192 bytes long.
+
+    * "Interactive" text files (files for which isatty() returns True)
+      use line buffering.  Other text files use the policy described above
+      for binary files.
 
     encoding is the name of the encoding used to decode or encode the
     file. This should only be used in text mode. The default encoding is
@@ -841,7 +851,7 @@ class BytesIO(BufferedIOBase):
         elif pos < 0:
             raise ValueError("negative truncate position %r" % (pos,))
         del self._buffer[pos:]
-        return self.seek(pos)
+        return pos
 
     def readable(self):
         return True
@@ -1200,8 +1210,7 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         if pos is None:
             pos = self.tell()
         # Use seek to flush the read buffer.
-        self.seek(pos)
-        return BufferedWriter.truncate(self)
+        return BufferedWriter.truncate(self, pos)
 
     def read(self, n=None):
         if n is None:
@@ -1702,8 +1711,7 @@ class TextIOWrapper(TextIOBase):
         self.flush()
         if pos is None:
             pos = self.tell()
-        self.seek(pos)
-        return self.buffer.truncate()
+        return self.buffer.truncate(pos)
 
     def detach(self):
         if self.buffer is None:

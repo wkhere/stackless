@@ -6,7 +6,8 @@ import unittest
 import pickle
 import weakref
 
-from test.support import TESTFN, unlink, run_unittest, captured_output
+from test.support import (TESTFN, unlink, run_unittest, captured_output,
+                          gc_collect)
 
 # XXX This is not really enough, each *operation* should be tested!
 
@@ -399,13 +400,11 @@ class ExceptionTests(unittest.TestCase):
                 return -1
         self.assertRaises(RuntimeError, g)
 
-    def testUnicodeStrUsage(self):
-        # Make sure both instances and classes have a str and unicode
-        # representation.
-        self.assertTrue(str(Exception))
+    def test_str(self):
+        # Make sure both instances and classes have a str representation.
         self.assertTrue(str(Exception))
         self.assertTrue(str(Exception('a')))
-        self.assertTrue(str(Exception('a')))
+        self.assertTrue(str(Exception('a', 'b')))
 
     def testExceptionCleanupNames(self):
         # Make sure the local variable bound to the exception instance by
@@ -556,6 +555,20 @@ class ExceptionTests(unittest.TestCase):
             del g
             self.assertEquals(sys.exc_info()[0], TypeError)
 
+    def test_generator_finalizing_and_exc_info(self):
+        # See #7173
+        def simple_gen():
+            yield 1
+        def run_gen():
+            gen = simple_gen()
+            try:
+                raise RuntimeError
+            except RuntimeError:
+                return next(gen)
+        run_gen()
+        gc_collect()
+        self.assertEqual(sys.exc_info(), (None, None, None))
+
     def test_3114(self):
         # Bug #3114: in its destructor, MyObject retrieves a pointer to
         # obsolete and/or deallocated objects.
@@ -570,6 +583,42 @@ class ExceptionTests(unittest.TestCase):
             pass
         self.assertEquals(e, (None, None, None))
 
+    def testUnicodeChangeAttributes(self):
+        # See issue 7309. This was a crasher.
+
+        u = UnicodeEncodeError('baz', 'xxxxx', 1, 5, 'foo')
+        self.assertEqual(str(u), "'baz' codec can't encode characters in position 1-4: foo")
+        u.end = 2
+        self.assertEqual(str(u), "'baz' codec can't encode character '\\x78' in position 1: foo")
+        u.end = 5
+        u.reason = 0x345345345345345345
+        self.assertEqual(str(u), "'baz' codec can't encode characters in position 1-4: 965230951443685724997")
+        u.encoding = 4000
+        self.assertEqual(str(u), "'4000' codec can't encode characters in position 1-4: 965230951443685724997")
+        u.start = 1000
+        self.assertEqual(str(u), "'4000' codec can't encode characters in position 1000-4: 965230951443685724997")
+
+        u = UnicodeDecodeError('baz', b'xxxxx', 1, 5, 'foo')
+        self.assertEqual(str(u), "'baz' codec can't decode bytes in position 1-4: foo")
+        u.end = 2
+        self.assertEqual(str(u), "'baz' codec can't decode byte 0x78 in position 1: foo")
+        u.end = 5
+        u.reason = 0x345345345345345345
+        self.assertEqual(str(u), "'baz' codec can't decode bytes in position 1-4: 965230951443685724997")
+        u.encoding = 4000
+        self.assertEqual(str(u), "'4000' codec can't decode bytes in position 1-4: 965230951443685724997")
+        u.start = 1000
+        self.assertEqual(str(u), "'4000' codec can't decode bytes in position 1000-4: 965230951443685724997")
+
+        u = UnicodeTranslateError('xxxx', 1, 5, 'foo')
+        self.assertEqual(str(u), "can't translate characters in position 1-4: foo")
+        u.end = 2
+        self.assertEqual(str(u), "can't translate character '\\x78' in position 1: foo")
+        u.end = 5
+        u.reason = 0x345345345345345345
+        self.assertEqual(str(u), "can't translate characters in position 1-4: 965230951443685724997")
+        u.start = 1000
+        self.assertEqual(str(u), "can't translate characters in position 1000-4: 965230951443685724997")
 
     def test_badisinstance(self):
         # Bug #2542: if issubclass(e, MyException) raises an exception,

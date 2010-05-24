@@ -256,14 +256,15 @@ Initialization, Finalization, and Threads
       triple: module; search; path
       single: path (in module sys)
 
-   Return the default module search path; this is computed from the  program name
-   (set by :cfunc:`Py_SetProgramName` above) and some environment variables.  The
-   returned string consists of a series of directory names separated by a platform
-   dependent delimiter character.  The delimiter character is ``':'`` on Unix and
-   Mac OS X, ``';'`` on Windows.  The returned string points into static storage;
-   the caller should not modify its value.  The value is available to Python code
-   as the list ``sys.path``, which may be modified to change the future search path
-   for loaded modules.
+   Return the default module search path; this is computed from the program name
+   (set by :cfunc:`Py_SetProgramName` above) and some environment variables.
+   The returned string consists of a series of directory names separated by a
+   platform dependent delimiter character.  The delimiter character is ``':'``
+   on Unix and Mac OS X, ``';'`` on Windows.  The returned string points into
+   static storage; the caller should not modify its value.  The list
+   :data:`sys.path` is initialized with this value on interpreter startup; it
+   can be (and usually is) modified later to change the search path for loading
+   modules.
 
    .. XXX should give the exact rules
 
@@ -366,14 +367,18 @@ Initialization, Finalization, and Threads
       check w/ Guido.
 
 
-.. cfunction:: void Py_SetPythonHome(char *home)
+.. cfunction:: void Py_SetPythonHome(wchar_t *home)
 
    Set the default "home" directory, that is, the location of the standard
    Python libraries.  The libraries are searched in
    :file:`{home}/lib/python{version}` and :file:`{home}/lib/python{version}`.
+   The argument should point to a zero-terminated character string in static
+   storage whose contents will not change for the duration of the program's
+   execution.  No code in the Python interpreter will change the contents of
+   this storage.
 
 
-.. cfunction:: char* Py_GetPythonHome()
+.. cfunction:: w_char* Py_GetPythonHome()
 
    Return the default "home", that is, the value set by a previous call to
    :cfunc:`Py_SetPythonHome`, or the value of the :envvar:`PYTHONHOME`
@@ -516,6 +521,22 @@ supports the creation of additional interpreters (using
 :cfunc:`Py_NewInterpreter`), but mixing multiple interpreters and the
 :cfunc:`PyGILState_\*` API is unsupported.
 
+Another important thing to note about threads is their behaviour in the face
+of the C :cfunc:`fork` call. On most systems with :cfunc:`fork`, after a
+process forks only the thread that issued the fork will exist. That also
+means any locks held by other threads will never be released. Python solves
+this for :func:`os.fork` by acquiring the locks it uses internally before
+the fork, and releasing them afterwards. In addition, it resets any
+:ref:`lock-objects` in the child. When extending or embedding Python, there
+is no way to inform Python of additional (non-Python) locks that need to be
+acquired before or reset after a fork. OS facilities such as
+:cfunc:`posix_atfork` would need to be used to accomplish the same thing.
+Additionally, when extending or embedding Python, calling :cfunc:`fork`
+directly rather than through :func:`os.fork` (and returning to or calling
+into Python) may result in a deadlock by one of Python's internal locks
+being held by a thread that is defunct after the fork.
+:cfunc:`PyOS_AfterFork` tries to reset the necessary locks, but is not
+always able to.
 
 .. ctype:: PyInterpreterState
 
@@ -795,7 +816,7 @@ pointer and a void argument.
 .. index:: single: setcheckinterval() (in module sys)
 
 Every check interval, when the global interpreter lock is released and
-reacquired, python will also call any such provided functions.  This can be used
+reacquired, Python will also call any such provided functions.  This can be used
 for example by asynchronous IO handlers.  The notification can be scheduled from
 a worker thread and the actual call than made at the earliest convenience by the
 main thread where it has possession of the global interpreter lock and can
@@ -813,7 +834,7 @@ perform any Python API calls.
    exception.  The notification function won't be interrupted to perform another
    asynchronous notification recursively, but it can still be interrupted to
    switch threads if the global interpreter lock is released, for example, if it
-   calls back into python code.
+   calls back into Python code.
 
    This function returns 0 on success in which case the notification has been
    scheduled.  Otherwise, for example if the notification buffer is full, it

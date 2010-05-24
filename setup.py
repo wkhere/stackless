@@ -893,14 +893,15 @@ class PyBuildExt(build_ext):
         else:
             missing.append('_sqlite3')
 
+        dbm_order = ['gdbm']
         # The standard Unix dbm module:
         if platform not in ['cygwin']:
             config_args = [arg.strip("'")
                            for arg in sysconfig.get_config_var("CONFIG_ARGS").split()]
-            dbm_args = [arg.split('=')[-1] for arg in config_args
+            dbm_args = [arg for arg in config_args
                         if arg.startswith('--with-dbmliborder=')]
             if dbm_args:
-                dbm_order = dbm_args[-1].split(":")
+                dbm_order = [arg.split('=')[-1] for arg in dbm_args][-1].split(":")
             else:
                 dbm_order = "ndbm:gdbm:bdb".split(":")
             dbmext = None
@@ -962,7 +963,8 @@ class PyBuildExt(build_ext):
                 missing.append('_dbm')
 
         # Anthony Baxter's gdbm module.  GNU dbm(3) will require -lgdbm:
-        if (self.compiler.find_library_file(lib_dirs, 'gdbm')):
+        if ('gdbm' in dbm_order and
+            self.compiler.find_library_file(lib_dirs, 'gdbm')):
             exts.append( Extension('_gdbm', ['_gdbmmodule.c'],
                                    libraries = ['gdbm'] ) )
         else:
@@ -979,7 +981,8 @@ class PyBuildExt(build_ext):
                 missing.append('resource')
 
             # Sun yellow pages. Some systems have the functions in libc.
-            if platform not in ['cygwin', 'atheos', 'qnx6']:
+            if (platform not in ['cygwin', 'qnx6'] and
+                find_file('rpcsvc/yp_prot.h', inc_dirs, []) is not None):
                 if (self.compiler.find_library_file(lib_dirs, 'nsl')):
                     libs = ['nsl']
                 else:
@@ -1191,7 +1194,8 @@ class PyBuildExt(build_ext):
             multiprocessing_srcs = [ '_multiprocessing/multiprocessing.c',
                                      '_multiprocessing/socket_connection.c'
                                    ]
-            if sysconfig.get_config_var('HAVE_SEM_OPEN'):
+            if (sysconfig.get_config_var('HAVE_SEM_OPEN') and not
+                sysconfig.get_config_var('POSIX_SEMAPHORES_NOT_ENABLED')):
                 multiprocessing_srcs.append('_multiprocessing/semaphore.c')
 
         if sysconfig.get_config_var('WITH_THREAD'):
@@ -1272,19 +1276,26 @@ class PyBuildExt(build_ext):
         # architectures.
         cflags = sysconfig.get_config_vars('CFLAGS')[0]
         archs = re.findall('-arch\s+(\w+)', cflags)
-        if 'x86_64' in archs or 'ppc64' in archs:
-            try:
-                archs.remove('x86_64')
-            except ValueError:
-                pass
-            try:
-                archs.remove('ppc64')
-            except ValueError:
-                pass
 
-            for a in archs:
-                frameworks.append('-arch')
-                frameworks.append(a)
+        tmpfile = os.path.join(self.build_temp, 'tk.arch')
+        if not os.path.exists(self.build_temp):
+            os.makedirs(self.build_temp)
+
+        # Note: cannot use os.popen or subprocess here, that
+        # requires extensions that are not available here.
+        os.system("file %s/Tk.framework/Tk | grep 'for architecture' > %s"%(F, tmpfile))
+        fp = open(tmpfile)
+        detected_archs = []
+        for ln in fp:
+            a = ln.split()[-1]
+            if a in archs:
+                detected_archs.append(ln.split()[-1])
+        fp.close()
+        os.unlink(tmpfile)
+
+        for a in detected_archs:
+            frameworks.append('-arch')
+            frameworks.append(a)
 
         ext = Extension('_tkinter', ['_tkinter.c', 'tkappinit.c'],
                         define_macros=[('WITH_APPINIT', 1)],

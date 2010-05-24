@@ -150,8 +150,10 @@ Power and logarithmic functions
 
 .. function:: log(x[, base])
 
-   Return the logarithm of *x* to the given *base*. If the *base* is not specified,
-   return the natural logarithm of *x* (that is, the logarithm to base *e*).
+   With one argument, return the natural logarithm of *x* (to base *e*).
+
+   With two arguments, return the logarithm of *x* to the given *base*,
+   calculated as ``log(x)/log(base)``.
 
 
 .. function:: log1p(x)
@@ -162,7 +164,8 @@ Power and logarithmic functions
 
 .. function:: log10(x)
 
-   Return the base-10 logarithm of *x*.
+   Return the base-10 logarithm of *x*.  This is usually more accurate
+   than ``log(x, 10)``.
 
 
 .. function:: pow(x, y)
@@ -288,7 +291,7 @@ Constants
    The mathematical constant *e*.
 
 
-.. note::
+.. impl-detail::
 
    The :mod:`math` module consists mostly of thin wrappers around the platform C
    math library functions.  Behavior in exceptional cases is loosely specified
@@ -296,10 +299,7 @@ Constants
    error-reporting behavior from the platform C implementation.  As a result,
    the specific exceptions raised in error cases (and even whether some
    arguments are considered to be exceptional at all) are not defined in any
-   useful cross-platform or cross-release way.  For example, whether
-   ``math.log(0)`` returns ``-Inf`` or raises :exc:`ValueError` or
-   :exc:`OverflowError` isn't defined, and in cases where ``math.log(0)`` raises
-   :exc:`OverflowError`, ``math.log(0L)`` may raise :exc:`ValueError` instead.
+   useful cross-platform or cross-release way.
 
    All functions return a quiet *NaN* if at least one of the args is *NaN*.
    Signaling *NaN*\s raise an exception. The exception type still depends on the

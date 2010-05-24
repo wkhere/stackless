@@ -464,7 +464,7 @@ added elements by appending to the right and popping to the left::
             yield s / n
 
 The :meth:`rotate` method provides a way to implement :class:`deque` slicing and
-deletion.  For example, a pure python implementation of ``del d[n]`` relies on
+deletion.  For example, a pure Python implementation of ``del d[n]`` relies on
 the :meth:`rotate` method to position elements to be popped::
 
    def delete_nth(d, n):
@@ -538,7 +538,7 @@ sequence of key-value pairs into a dictionary of lists:
    >>> for k, v in s:
    ...     d[k].append(v)
    ...
-   >>> d.items()
+   >>> list(d.items())
    [('blue', [2, 4]), ('red', [1]), ('yellow', [1, 3])]
 
 When each key is encountered for the first time, it is not already in the
@@ -553,7 +553,7 @@ simpler and faster than an equivalent technique using :meth:`dict.setdefault`:
    >>> for k, v in s:
    ...     d.setdefault(k, []).append(v)
    ...
-   >>> d.items()
+   >>> list(d.items())
    [('blue', [2, 4]), ('red', [1]), ('yellow', [1, 3])]
 
 Setting the :attr:`default_factory` to :class:`int` makes the
@@ -565,7 +565,7 @@ languages):
    >>> for k in s:
    ...     d[k] += 1
    ...
-   >>> d.items()
+   >>> list(d.items())
    [('i', 4), ('p', 2), ('s', 4), ('m', 1)]
 
 When a letter is first encountered, it is missing from the mapping, so the
@@ -592,7 +592,7 @@ Setting the :attr:`default_factory` to :class:`set` makes the
    >>> for k, v in s:
    ...     d[k].add(v)
    ...
-   >>> d.items()
+   >>> list(d.items())
    [('blue', set([2, 4])), ('red', set([1, 3]))]
 
 
@@ -669,7 +669,7 @@ Example:
                'Return a new Point object replacing specified fields with new values'
                result = _self._make(map(kwds.pop, ('x', 'y'), _self))
                if kwds:
-                   raise ValueError('Got unexpected field names: %r' % kwds.keys())
+                   raise ValueError('Got unexpected field names: %r' % list(kwds.keys()))
                return result
    <BLANKLINE>
            def __getnewargs__(self):
@@ -861,6 +861,28 @@ semantics pass-in keyword arguments using a regular unordered dictionary.
 
    `Equivalent OrderedDict recipe <http://code.activestate.com/recipes/576693/>`_
    that runs on Python 2.4 or later.
+
+Since an ordered dictionary remembers its insertion order, it can be used
+in conjuction with sorting to make a sorted dictionary::
+
+    >>> # regular unsorted dictionary
+    >>> d = {'banana': 3, 'apple':4, 'pear': 1, 'orange': 2}
+
+    >>> # dictionary sorted by key
+    >>> OrderedDict(sorted(d.items(), key=lambda t: t[0]))
+    OrderedDict([('apple', 4), ('banana', 3), ('orange', 2), ('pear', 1)])
+
+    >>> # dictionary sorted by value
+    >>> OrderedDict(sorted(d.items(), key=lambda t: t[1]))
+    OrderedDict([('pear', 1), ('orange', 2), ('banana', 3), ('apple', 4)])
+
+    >>> # dictionary sorted by length of the key string
+    >>> OrderedDict(sorted(d.items(), key=lambda t: len(t[0])))
+    OrderedDict([('pear', 1), ('apple', 4), ('orange', 2), ('banana', 3)])
+
+The new sorted dictionaries maintain their sort order when entries
+are deleted.  But when new keys are added, the keys are appended
+to the end and the sort is not maintained.
 
 
 :class:`UserDict` objects

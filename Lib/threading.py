@@ -92,14 +92,16 @@ class _RLock(_Verbose):
 
     def __repr__(self):
         owner = self._owner
-        return "<%s(%s, %d)>" % (
-                self.__class__.__name__,
-                owner and owner.name,
-                self._count)
+        try:
+            owner = _active[owner].name
+        except KeyError:
+            pass
+        return "<%s owner=%r count=%d>" % (
+                self.__class__.__name__, owner, self._count)
 
-    def acquire(self, blocking=1):
-        me = current_thread()
-        if self._owner is me:
+    def acquire(self, blocking=True):
+        me = _get_ident()
+        if self._owner == me:
             self._count = self._count + 1
             if __debug__:
                 self._note("%s.acquire(%s): recursive success", self, blocking)
@@ -118,8 +120,8 @@ class _RLock(_Verbose):
     __enter__ = acquire
 
     def release(self):
-        if self._owner is not current_thread():
-            raise RuntimeError("cannot release un-aquired lock")
+        if self._owner != _get_ident():
+            raise RuntimeError("cannot release un-acquired lock")
         self._count = count = self._count - 1
         if not count:
             self._owner = None
@@ -152,7 +154,7 @@ class _RLock(_Verbose):
         return (count, owner)
 
     def _is_owned(self):
-        return self._owner is current_thread()
+        return self._owner == _get_ident()
 
 
 def Condition(*args, **kwargs):
@@ -211,7 +213,7 @@ class _Condition(_Verbose):
 
     def wait(self, timeout=None):
         if not self._is_owned():
-            raise RuntimeError("cannot wait on un-aquired lock")
+            raise RuntimeError("cannot wait on un-acquired lock")
         waiter = _allocate_lock()
         waiter.acquire()
         self._waiters.append(waiter)
@@ -253,7 +255,7 @@ class _Condition(_Verbose):
 
     def notify(self, n=1):
         if not self._is_owned():
-            raise RuntimeError("cannot notify on un-aquired lock")
+            raise RuntimeError("cannot notify on un-acquired lock")
         __waiters = self._waiters
         waiters = __waiters[:n]
         if not waiters:
@@ -289,7 +291,7 @@ class _Semaphore(_Verbose):
         self._cond = Condition(Lock())
         self._value = value
 
-    def acquire(self, blocking=1):
+    def acquire(self, blocking=True):
         rc = False
         self._cond.acquire()
         while self._value == 0:
@@ -453,7 +455,12 @@ class Thread(_Verbose):
             self._note("%s.start(): starting thread", self)
         with _active_limbo_lock:
             _limbo[self] = self
-        _start_new_thread(self._bootstrap, ())
+        try:
+            _start_new_thread(self._bootstrap, ())
+        except Exception:
+            with _active_limbo_lock:
+                del _limbo[self]
+            raise
         self._started.wait()
 
     def run(self):
@@ -797,6 +804,10 @@ def active_count():
         return len(_active) + len(_limbo)
 
 activeCount = active_count
+
+def _enumerate():
+    # Same as enumerate(), but without the lock. Internal use only.
+    return list(_active.values()) + list(_limbo.values())
 
 def enumerate():
     with _active_limbo_lock:

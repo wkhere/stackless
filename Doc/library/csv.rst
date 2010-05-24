@@ -97,7 +97,7 @@ The :mod:`csv` module defines the following functions:
 
       >>> import csv
       >>> spamWriter = csv.writer(open('eggs.csv', 'w'), delimiter=' ',
-      ...                         quotechar='|', quoting=QUOTE_MINIMAL)
+      ...                         quotechar='|', quoting=csv.QUOTE_MINIMAL)
       >>> spamWriter.writerow(['Spam'] * 5 + ['Baked Beans'])
       >>> spamWriter.writerow(['Spam', 'Lovely Spam', 'Wonderful Spam'])
 
@@ -141,13 +141,12 @@ The :mod:`csv` module defines the following classes:
    Create an object which operates like a regular reader but maps the information
    read into a dict whose keys are given by the optional  *fieldnames* parameter.
    If the *fieldnames* parameter is omitted, the values in the first row of the
-   *csvfile* will be used as the fieldnames. If the row read has fewer fields than
-   the fieldnames sequence, the value of *restval* will be used as the default
-   value.  If the row read has more fields than the fieldnames sequence, the
-   remaining data is added as a sequence keyed by the value of *restkey*.  If the
-   row read has fewer fields than the fieldnames sequence, the remaining keys take
-   the value of the optional *restval* parameter.  Any other optional or keyword
-   arguments are passed to the underlying :class:`reader` instance.
+   *csvfile* will be used as the fieldnames.  If the row read has more fields
+   than the fieldnames sequence, the remaining data is added as a sequence
+   keyed by the value of *restkey*.  If the row read has fewer fields than the
+   fieldnames sequence, the remaining keys take the value of the optional
+   *restval* parameter.  Any other optional or keyword arguments are passed to
+   the underlying :class:`reader` instance.
 
 
 .. class:: DictWriter(csvfile, fieldnames, restval='', extrasaction='raise', dialect='excel', *args, **kwds)

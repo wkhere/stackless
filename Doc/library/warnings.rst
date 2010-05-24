@@ -1,4 +1,3 @@
-
 :mod:`warnings` --- Warning control
 ===================================
 
@@ -131,16 +130,16 @@ the disposition of the match.  Each entry is a tuple of the form (*action*,
   +---------------+----------------------------------------------+
 
 * *message* is a string containing a regular expression that the warning message
-  must match (the match is compiled to always be  case-insensitive)
+  must match (the match is compiled to always be case-insensitive).
 
 * *category* is a class (a subclass of :exc:`Warning`) of which the warning
-  category must be a subclass in order to match
+  category must be a subclass in order to match.
 
 * *module* is a string containing a regular expression that the module name must
-  match (the match is compiled to be case-sensitive)
+  match (the match is compiled to be case-sensitive).
 
 * *lineno* is an integer that the line number where the warning occurred must
-  match, or ``0`` to match all line numbers
+  match, or ``0`` to match all line numbers.
 
 Since the :exc:`Warning` class is derived from the built-in :exc:`Exception`
 class, to turn a warning into an error we simply raise ``category(message)``.
@@ -235,7 +234,7 @@ Available Functions
 -------------------
 
 
-.. function:: warn(message[, category[, stacklevel]])
+.. function:: warn(message, category=None, stacklevel=1)
 
    Issue a warning, or maybe ignore it or raise an exception.  The *category*
    argument, if given, must be a warning category class (see above); it defaults to
@@ -254,7 +253,7 @@ Available Functions
    of the warning message).
 
 
-.. function:: warn_explicit(message, category, filename, lineno[, module[, registry[, module_globals]]])
+.. function:: warn_explicit(message, category, filename, lineno, module=None, registry=None, module_globals=None)
 
    This is a low-level interface to the functionality of :func:`warn`, passing in
    explicitly the message, category, filename and line number, and optionally the
@@ -271,7 +270,7 @@ Available Functions
    sources).
 
 
-.. function:: showwarning(message, category, filename, lineno[, file[, line]])
+.. function:: showwarning(message, category, filename, lineno, file=None, line=None)
 
    Write a warning to a file.  The default implementation calls
    ``formatwarning(message, category, filename, lineno, line)`` and writes the
@@ -283,31 +282,34 @@ Available Functions
    try to read the line specified by *filename* and *lineno*.
 
 
-.. function:: formatwarning(message, category, filename, lineno[, line])
+.. function:: formatwarning(message, category, filename, lineno, line=None)
 
-   Format a warning the standard way.  This returns a string  which may contain
-   embedded newlines and ends in a newline.  *line* is
-   a line of source code to be included in the warning message; if *line* is not supplied,
-   :func:`formatwarning` will try to read the line specified by *filename* and *lineno*.
+   Format a warning the standard way.  This returns a string which may contain
+   embedded newlines and ends in a newline.  *line* is a line of source code to
+   be included in the warning message; if *line* is not supplied,
+   :func:`formatwarning` will try to read the line specified by *filename* and
+   *lineno*.
 
 
-.. function:: filterwarnings(action[, message[, category[, module[, lineno[, append]]]]])
+.. function:: filterwarnings(action, message='', category=Warning, module='', lineno=0, append=False)
 
-   Insert an entry into the list of warnings filters.  The entry is inserted at the
-   front by default; if *append* is true, it is inserted at the end. This checks
-   the types of the arguments, compiles the message and module regular expressions,
-   and inserts them as a tuple in the  list of warnings filters.  Entries closer to
+   Insert an entry into the list of :ref:`warnings filter specifications
+   <warning-filter>`.  The entry is inserted at the front by default; if
+   *append* is true, it is inserted at the end.  This checks the types of the
+   arguments, compiles the *message* and *module* regular expressions, and
+   inserts them as a tuple in the list of warnings filters.  Entries closer to
    the front of the list override entries later in the list, if both match a
    particular warning.  Omitted arguments default to a value that matches
    everything.
 
 
-.. function:: simplefilter(action[, category[, lineno[, append]]])
+.. function:: simplefilter(action, category=Warning, lineno=0, append=False)
 
-   Insert a simple entry into the list of warnings filters. The meaning of the
-   function parameters is as for :func:`filterwarnings`, but regular expressions
-   are not needed as the filter inserted always matches any message in any module
-   as long as the category and line number match.
+   Insert a simple entry into the list of :ref:`warnings filter specifications
+   <warning-filter>`.  The meaning of the function parameters is as for
+   :func:`filterwarnings`, but regular expressions are not needed as the filter
+   inserted always matches any message in any module as long as the category and
+   line number match.
 
 
 .. function:: resetwarnings()
@@ -320,7 +322,7 @@ Available Functions
 Available Context Managers
 --------------------------
 
-.. class:: catch_warnings([\*, record=False, module=None])
+.. class:: catch_warnings(\*, record=False, module=None)
 
     A context manager that copies and, upon exit, restores the warnings filter
     and the :func:`showwarning` function.

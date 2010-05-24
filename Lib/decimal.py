@@ -648,8 +648,8 @@ class Decimal(object):
             return self
 
         if isinstance(value, float):
-            raise TypeError("Cannot convert float to Decimal.  " +
-                            "First convert the float to a string")
+            raise TypeError("Cannot convert float in Decimal constructor. "
+                            "Use from_float class method.")
 
         raise TypeError("Cannot convert %r to Decimal" % value)
 
@@ -1553,10 +1553,9 @@ class Decimal(object):
         """Converts self to an int, truncating if necessary."""
         if self._is_special:
             if self._isnan():
-                context = getcontext()
-                return context._raise_error(InvalidContext)
+                raise ValueError("Cannot convert NaN to integer")
             elif self._isinfinity():
-                raise OverflowError("Cannot convert infinity to int")
+                raise OverflowError("Cannot convert infinity to integer")
         s = (-1)**self._sign
         if self._exp >= 0:
             return s*int(self._int)*10**self._exp
@@ -2807,6 +2806,8 @@ class Decimal(object):
         value. Note that a total ordering is defined for all possible abstract
         representations.
         """
+        other = _convert_other(other, raiseit=True)
+
         # if one is negative and the other is positive, it's easy
         if self._sign and not other._sign:
             return _NegativeOne
@@ -2819,12 +2820,15 @@ class Decimal(object):
         other_nan = other._isnan()
         if self_nan or other_nan:
             if self_nan == other_nan:
-                if self._int < other._int:
+                # compare payloads as though they're integers
+                self_key = len(self._int), self._int
+                other_key = len(other._int), other._int
+                if self_key < other_key:
                     if sign:
                         return _One
                     else:
                         return _NegativeOne
-                if self._int > other._int:
+                if self_key > other_key:
                     if sign:
                         return _NegativeOne
                     else:
@@ -2873,6 +2877,8 @@ class Decimal(object):
 
         Like compare_total, but with operand's sign ignored and assumed to be 0.
         """
+        other = _convert_other(other, raiseit=True)
+
         s = self.copy_abs()
         o = other.copy_abs()
         return s.compare_total(o)
@@ -2998,7 +3004,7 @@ class Decimal(object):
             return False
         if context is None:
             context = getcontext()
-        return context.Emin <= self.adjusted() <= context.Emax
+        return context.Emin <= self.adjusted()
 
     def is_qnan(self):
         """Return True if self is a quiet NaN; otherwise return False."""
@@ -3207,7 +3213,8 @@ class Decimal(object):
         # otherwise, simply return the adjusted exponent of self, as a
         # Decimal.  Note that no attempt is made to fit the result
         # into the current context.
-        return Decimal(self.adjusted())
+        ans = Decimal(self.adjusted())
+        return ans._fix(context)
 
     def _islogical(self):
         """Return True if self is a logical operand.
@@ -3240,6 +3247,9 @@ class Decimal(object):
         """Applies an 'and' operation between self and other's digits."""
         if context is None:
             context = getcontext()
+
+        other = _convert_other(other, raiseit=True)
+
         if not self._islogical() or not other._islogical():
             return context._raise_error(InvalidOperation)
 
@@ -3261,6 +3271,9 @@ class Decimal(object):
         """Applies an 'or' operation between self and other's digits."""
         if context is None:
             context = getcontext()
+
+        other = _convert_other(other, raiseit=True)
+
         if not self._islogical() or not other._islogical():
             return context._raise_error(InvalidOperation)
 
@@ -3275,6 +3288,9 @@ class Decimal(object):
         """Applies an 'xor' operation between self and other's digits."""
         if context is None:
             context = getcontext()
+
+        other = _convert_other(other, raiseit=True)
+
         if not self._islogical() or not other._islogical():
             return context._raise_error(InvalidOperation)
 
@@ -3488,6 +3504,8 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
+        other = _convert_other(other, raiseit=True)
+
         ans = self._check_nans(other, context)
         if ans:
             return ans
@@ -3504,18 +3522,22 @@ class Decimal(object):
         torot = int(other)
         rotdig = self._int
         topad = context.prec - len(rotdig)
-        if topad:
+        if topad > 0:
             rotdig = '0'*topad + rotdig
+        elif topad < 0:
+            rotdig = rotdig[-topad:]
 
         # let's rotate!
         rotated = rotdig[torot:] + rotdig[:torot]
         return _dec_from_triple(self._sign,
                                 rotated.lstrip('0') or '0', self._exp)
 
-    def scaleb (self, other, context=None):
+    def scaleb(self, other, context=None):
         """Returns self operand after adding the second value to its exp."""
         if context is None:
             context = getcontext()
+
+        other = _convert_other(other, raiseit=True)
 
         ans = self._check_nans(other, context)
         if ans:
@@ -3540,6 +3562,8 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
+        other = _convert_other(other, raiseit=True)
+
         ans = self._check_nans(other, context)
         if ans:
             return ans
@@ -3554,22 +3578,22 @@ class Decimal(object):
 
         # get values, pad if necessary
         torot = int(other)
-        if not torot:
-            return Decimal(self)
         rotdig = self._int
         topad = context.prec - len(rotdig)
-        if topad:
+        if topad > 0:
             rotdig = '0'*topad + rotdig
+        elif topad < 0:
+            rotdig = rotdig[-topad:]
 
         # let's shift!
         if torot < 0:
-            rotated = rotdig[:torot]
+            shifted = rotdig[:torot]
         else:
-            rotated = rotdig + '0'*torot
-            rotated = rotated[-context.prec:]
+            shifted = rotdig + '0'*torot
+            shifted = shifted[-context.prec:]
 
         return _dec_from_triple(self._sign,
-                                    rotated.lstrip('0') or '0', self._exp)
+                                    shifted.lstrip('0') or '0', self._exp)
 
     # Support for pickling, copy, and deepcopy
     def __reduce__(self):
@@ -4108,6 +4132,13 @@ class Context(object):
         return a.__floordiv__(b, context=self)
 
     def divmod(self, a, b):
+        """Return (a // b, a % b)
+
+        >>> ExtendedContext.divmod(Decimal(8), Decimal(3))
+        (Decimal('2'), Decimal('2'))
+        >>> ExtendedContext.divmod(Decimal(8), Decimal(4))
+        (Decimal('2'), Decimal('0'))
+        """
         return a.__divmod__(b, context=self)
 
     def exp(self, a):
@@ -5589,7 +5620,7 @@ def _parse_format_specifier(format_spec, _localeconv=None):
     # if format type is 'g' or 'G' then a precision of 0 makes little
     # sense; convert it to 1.  Same if format type is unspecified.
     if format_dict['precision'] == 0:
-        if format_dict['type'] in 'gG' or format_dict['type'] is None:
+        if format_dict['type'] is None or format_dict['type'] in 'gG':
             format_dict['precision'] = 1
 
     # determine thousands separator, grouping, and decimal separator, and

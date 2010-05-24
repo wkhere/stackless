@@ -105,8 +105,6 @@ resources to test.  Currently only the following are defined:
     curses -    Tests that use curses and will modify the terminal's
                 state and output modes.
 
-    lib2to3 -   Run the tests for 2to3 (They take a while.)
-
     largefile - It is okay to run some test that may create huge
                 files.  These tests can take a long time and may
                 consume >2GB of disk space temporarily.
@@ -330,6 +328,10 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
                 for m in [msvcrt.CRT_WARN, msvcrt.CRT_ERROR, msvcrt.CRT_ASSERT]:
                     msvcrt.CrtSetReportMode(m, msvcrt.CRTDBG_MODE_FILE)
                     msvcrt.CrtSetReportFile(m, msvcrt.CRTDBG_FILE_STDERR)
+        else:
+            print(("No handler for option {}.  Please report this as a bug "
+                  "at http://bugs.python.org.").format(o), file=sys.stderr)
+            sys.exit(1)
     if generate and verbose:
         usage("-g and -v don't go together!")
     if single and fromfile:
@@ -598,6 +600,10 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
     refleak = False  # True if the test leaked references.
     try:
         save_stdout = sys.stdout
+        # Save various things that tests may mess up so we can restore
+        # them afterward.
+        save_environ = dict(os.environ)
+        save_argv = sys.argv[:]
         try:
             if cfp:
                 sys.stdout = cfp
@@ -622,6 +628,17 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
             test_times.append((test_time, test))
         finally:
             sys.stdout = save_stdout
+            # Restore what we saved if needed, but also complain if the test
+            # changed it so that the test may eventually get fixed.
+            if not os.environ == save_environ:
+                if not quiet:
+                    print("Warning: os.environ was modified by", test)
+                os.environ.clear()
+                os.environ.update(save_environ)
+            if not sys.argv == save_argv:
+                if not quiet:
+                    print("Warning: argv was modified by", test)
+                sys.argv[:] = save_argv
     except support.ResourceDenied as msg:
         if not quiet:
             print(test, "skipped --", msg)
@@ -1212,11 +1229,9 @@ if __name__ == '__main__':
     # much of the testing framework relies on the globals in the
     # test.support module.
     mydir = os.path.abspath(os.path.normpath(os.path.dirname(sys.argv[0])))
-    i = pathlen = len(sys.path)
+    i = len(sys.path)
     while i >= 0:
         i -= 1
         if os.path.abspath(os.path.normpath(sys.path[i])) == mydir:
             del sys.path[i]
-    if len(sys.path) == pathlen:
-        print('Could not find %r in sys.path to remove it' % mydir)
     main()

@@ -139,8 +139,14 @@ _ctypes_get_errobj(int **pspace)
 			return NULL;
 	}
 	errobj = PyDict_GetItem(dict, error_object_name);
-	if (errobj)
+	if (errobj) {
+		if (!PyCapsule_IsValid(errobj, CTYPES_CAPSULE_NAME_PYMEM)) {
+			PyErr_SetString(PyExc_RuntimeError,
+				"ctypes.error_object is an invalid capsule");
+			return NULL;
+		}
 		Py_INCREF(errobj);
+	}
 	else {
 		void *space = PyMem_Malloc(sizeof(int) * 2);
 		if (space == NULL)
@@ -547,6 +553,7 @@ PyTypeObject PyCArg_Type = {
  * C function call.
  *
  * 1. Python integers are converted to C int and passed by value.
+ *    Py_None is converted to a C NULL pointer.
  *
  * 2. 3-tuples are expected to have a format character in the first
  *    item, which must be 'i', 'f', 'd', 'q', or 'P'.

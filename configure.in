@@ -78,12 +78,17 @@ define_xopen_source=yes
 AC_SUBST(CONFIG_ARGS)
 CONFIG_ARGS="$ac_configure_args"
 
+AC_MSG_CHECKING([for --enable-universalsdk])
 AC_ARG_ENABLE(universalsdk,
 	AC_HELP_STRING(--enable-universalsdk@<:@=SDKDIR@:>@, Build against Mac OS X 10.4u SDK (ppc/i386)),
 [
 	case $enableval in
 	yes)
 		enableval=/Developer/SDKs/MacOSX10.4u.sdk
+		if test ! -d "${enableval}"
+		then
+			enableval=/
+		fi
 		;;
 	esac
 	case $enableval in
@@ -93,21 +98,33 @@ AC_ARG_ENABLE(universalsdk,
 		;;
 	*)
 		UNIVERSALSDK=$enableval
+		if test ! -d "${UNIVERSALSDK}"
+		then
+			AC_MSG_ERROR([--enable-universalsdk specifies non-existing SDK: ${UNIVERSALSDK}])
+		fi
 		;;
 	esac
+	
 ],[
    	UNIVERSALSDK=
 	enable_universalsdk=
 ])
+if test -n "${UNIVERSALSDK}"
+then
+	AC_MSG_RESULT(${UNIVERSALSDK})
+else
+	AC_MSG_RESULT(no)
+fi
 AC_SUBST(UNIVERSALSDK)
 
-ARCH_RUN_32BIT=
 AC_SUBST(ARCH_RUN_32BIT)
 
 UNIVERSAL_ARCHS="32-bit"
+AC_SUBST(LIPO_32BIT_FLAGS)
+AC_SUBST(LIPO_64BIT_FLAGS)
 AC_MSG_CHECKING(for --with-universal-archs)
 AC_ARG_WITH(universal-archs,
-    AC_HELP_STRING(--with-universal-archs=ARCH, select architectures for universal build ("32-bit", "64-bit" or "all")),
+    AC_HELP_STRING(--with-universal-archs=ARCH, select architectures for universal build ("32-bit", "64-bit", "3-way", "intel" or "all")),
 [
 	AC_MSG_RESULT($withval)
 	UNIVERSAL_ARCHS="$withval"
@@ -166,14 +183,16 @@ AC_ARG_ENABLE(framework,
 		PYTHONFRAMEWORKINSTALLDIR=$PYTHONFRAMEWORKPREFIX/$PYTHONFRAMEWORKDIR
 		FRAMEWORKINSTALLFIRST="frameworkinstallstructure"
 		FRAMEWORKALTINSTALLFIRST="frameworkinstallstructure "
-		if test "$UNIVERSAL_ARCHS" = "all"
-		then
+		case "${UNIVERSAL_ARCHS}" in
+		all|3-way|intel)
 			FRAMEWORKINSTALLLAST="frameworkinstallmaclib frameworkinstallapps4way frameworkinstallunixtools4way"
 			FRAMEWORKALTINSTALLLAST="frameworkinstallmaclib frameworkinstallapps4way frameworkaltinstallunixtools4way"
-		else
+			;;
+		*)
 			FRAMEWORKINSTALLLAST="frameworkinstallmaclib frameworkinstallapps frameworkinstallunixtools"
 			FRAMEWORKALTINSTALLLAST="frameworkinstallmaclib frameworkinstallapps frameworkaltinstallunixtools"
-		fi
+			;;
+		esac
 
 		if test "x${prefix}" = "xNONE" ; then
 			FRAMEWORKUNIXTOOLSPREFIX="${ac_default_prefix}"
@@ -232,7 +251,7 @@ AC_MSG_CHECKING(MACHDEP)
 if test -z "$MACHDEP"
 then
 	ac_sys_system=`uname -s`
-	if test "$ac_sys_system" = "AIX" -o "$ac_sys_system" = "Monterey64" \
+	if test "$ac_sys_system" = "AIX" \
 	-o "$ac_sys_system" = "UnixWare" -o "$ac_sys_system" = "OpenUNIX"; then
 		ac_sys_release=`uname -v`
 	else
@@ -278,8 +297,16 @@ case $ac_sys_system/$ac_sys_release in
   # On OpenBSD, select(2) is not available if _XOPEN_SOURCE is defined,
   # even though select is a POSIX function. Reported by J. Ribbens.
   # Reconfirmed for OpenBSD 3.3 by Zachary Hamm, for 3.4 by Jason Ish.
-  OpenBSD/2.* | OpenBSD/3.@<:@0123456789@:>@ | OpenBSD/4.@<:@0123@:>@) 
+  # In addition, Stefan Krah confirms that issue #1244610 exists through
+  # OpenBSD 4.6, but is fixed in 4.7.
+  OpenBSD/2.* | OpenBSD/3.@<:@0123456789@:>@ | OpenBSD/4.@<:@0123456@:>@) 
     define_xopen_source=no
+    # OpenBSD undoes our definition of __BSD_VISIBLE if _XOPEN_SOURCE is
+    # also defined. This can be overridden by defining _BSD_SOURCE
+    # As this has a different meaning on Linux, only define it on OpenBSD
+    AC_DEFINE(_BSD_SOURCE, 1, [Define on OpenBSD to activate all library features])
+    ;;
+  OpenBSD/4.@<:@789@:>@)
     # OpenBSD undoes our definition of __BSD_VISIBLE if _XOPEN_SOURCE is
     # also defined. This can be overridden by defining _BSD_SOURCE
     # As this has a different meaning on Linux, only define it on OpenBSD
@@ -315,6 +342,8 @@ case $ac_sys_system/$ac_sys_release in
   # On Mac OS X 10.3, defining _POSIX_C_SOURCE or _XOPEN_SOURCE 
   # has no effect, don't bother defining them
   Darwin/@<:@6789@:>@.*)
+    define_xopen_source=no;;
+  Darwin/1@<:@0-9@:>@.*)
     define_xopen_source=no;;
   # On AIX 4 and 5.1, mbstate_t is defined only when _XOPEN_SOURCE == 500 but
   # used in wcsnrtombs() and mbsnrtowcs() even if _XOPEN_SOURCE is not defined
@@ -425,9 +454,6 @@ AC_ARG_WITH(gcc,
 	case $ac_sys_system in
 	AIX*)   CC=cc_r
 		without_gcc=;;
-    Monterey*)
-        RANLIB=:
-        without_gcc=;;
 	*)	without_gcc=no;;
 	esac])
 AC_MSG_RESULT($without_gcc)
@@ -549,10 +575,6 @@ hp*|HP*)
     case $CC in
     cc|*/cc) CC="$CC -Ae";;
     esac;;
-Monterey*)
-    case $CC in
-    cc) CC="$CC -Wl,-Bexport";;
-    esac;;
 SunOS*)
     # Some functions have a prototype only with that define, e.g. confstr
     AC_DEFINE(__EXTENSIONS__, 1, [Defined on Solaris to see additional function prototypes.])
@@ -613,8 +635,6 @@ then
 	       exp_extra="."
 	   fi
 	   LINKCC="\$(srcdir)/Modules/makexp_aix Modules/python.exp $exp_extra \$(LIBRARY); $LINKCC";;
-	Monterey64*)
-	   LINKCC="$LINKCC -L/usr/lib/ia64l64";;
 	QNX*)
 	   # qcc must be used because the other compilers do not
 	   # support -N.
@@ -829,7 +849,7 @@ fi],
 # tweak OPT based on compiler and platform, only if the user didn't set
 # it on the command line
 AC_SUBST(OPT)
-if test -z "$OPT"
+if test "${OPT-unset}" == "unset"
 then
     case $GCC in
     yes)
@@ -864,15 +884,6 @@ then
 	OPT="-O"
 	;;
     esac
-
-    # The current (beta) Monterey compiler dies with optimizations
-    # XXX what is Monterey? Does it still die w/ -O? Can we get rid of this?
-    case $ac_sys_system in
-	Monterey*)
-	    OPT=""
-	    ;;
-    esac
-
 fi
 
 AC_SUBST(BASECFLAGS)
@@ -924,18 +935,33 @@ yes)
 	    if test "${enable_universalsdk}"; then
 		UNIVERSAL_ARCH_FLAGS=""
 	        if test "$UNIVERSAL_ARCHS" = "32-bit" ; then
-		   UNIVERSAL_ARCH_FLAGS="-arch ppc -arch i386"
 		   ARCH_RUN_32BIT=""
+		   UNIVERSAL_ARCH_FLAGS="-arch ppc -arch i386"
 
 	         elif test "$UNIVERSAL_ARCHS" = "64-bit" ; then
+		   ARCH_RUN_32BIT="true"
 		   UNIVERSAL_ARCH_FLAGS="-arch ppc64 -arch x86_64"
 
 	         elif test "$UNIVERSAL_ARCHS" = "all" ; then
+		   ARCH_RUN_32BIT="/usr/bin/arch -i386 -ppc"
 		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch ppc -arch ppc64 -arch x86_64"
-		   ARCH_RUN_32BIT="arch -i386 -ppc"
+		   LIPO_32BIT_FLAGS="-extract i386 -extract ppc7400"
+		   LIPO_64BIT_FLAGS="-extract x86_64 -extract ppc64"
+
+	         elif test "$UNIVERSAL_ARCHS" = "intel" ; then
+		   ARCH_RUN_32BIT="/usr/bin/arch -i386"
+		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch x86_64"
+		   LIPO_32BIT_FLAGS="-extract i386"
+		   LIPO_64BIT_FLAGS="-extract x86_64"
+
+	         elif test "$UNIVERSAL_ARCHS" = "3-way" ; then
+		   ARCH_RUN_32BIT="/usr/bin/arch -i386 -ppc"
+		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch ppc -arch x86_64"
+		   LIPO_32BIT_FLAGS="-extract i386 -extract ppc7400"
+		   LIPO_64BIT_FLAGS="-extract x86_64"
 
 		 else
-	           AC_MSG_ERROR([proper usage is --with-universalarch=32-bit|64-bit|all])
+	           AC_MSG_ERROR([proper usage is --with-universal-arch=32-bit|64-bit|all|intel|3-way])
 
 		 fi
 
@@ -952,12 +978,31 @@ yes)
 	    cur_target=`sw_vers -productVersion | sed 's/\(10\.[[0-9]]*\).*/\1/'`
 	    if test ${cur_target} '>' 10.2; then
 		    cur_target=10.3
-	    fi
-	    if test "${UNIVERSAL_ARCHS}" = "all"; then
-		    # Ensure that the default platform for a 4-way
-		    # universal build is OSX 10.5, that's the first
-		    # OS release where 4-way builds make sense.
-		    cur_target='10.5'
+		    if test ${enable_universalsdk}; then
+			    if test "${UNIVERSAL_ARCHS}" = "all"; then
+				    # Ensure that the default platform for a 
+				    # 4-way universal build is OSX 10.5, 
+				    # that's the first OS release where 
+				    # 4-way builds make sense.
+				    cur_target='10.5'
+
+			    elif test "${UNIVERSAL_ARCHS}" = "3-way"; then
+				    cur_target='10.5'
+
+			    elif test "${UNIVERSAL_ARCHS}" = "intel"; then
+				    cur_target='10.5'
+
+			    elif test "${UNIVERSAL_ARCHS}" = "64-bit"; then
+				    cur_target='10.5'
+			    fi
+		    else
+			    if test `/usr/bin/arch` = "i386"; then
+				    # On Intel macs default to a deployment
+				    # target of 10.4, that's the first OSX
+				    # release with Intel support.
+				    cur_target="10.4"
+			    fi
+		    fi
 	    fi
 	    CONFIGURE_MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET-${cur_target}}
 	    
@@ -1424,8 +1469,9 @@ AC_DEFINE_UNQUOTED(SIZEOF_OFF_T, $ac_cv_sizeof_off_t,
 [The number of bytes in an off_t.])
 
 AC_MSG_CHECKING(whether to enable large file support)
-if test "$have_long_long" = yes -a \
-	"$ac_cv_sizeof_off_t" -gt "$ac_cv_sizeof_long" -a \
+if test "$have_long_long" = yes
+then
+if test "$ac_cv_sizeof_off_t" -gt "$ac_cv_sizeof_long" -a \
 	"$ac_cv_sizeof_long_long" -ge "$ac_cv_sizeof_off_t"; then
   AC_DEFINE(HAVE_LARGEFILE_SUPPORT, 1, 
   [Defined to enable large file support when an off_t is bigger than a long
@@ -1433,6 +1479,9 @@ if test "$have_long_long" = yes -a \
    to add some flags for configuration and compilation to enable this mode.
    (For Solaris and Linux, the necessary defines are already defined.)])
   AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi
 else
   AC_MSG_RESULT(no)
 fi
@@ -1506,6 +1555,8 @@ case $ac_sys_system/$ac_sys_release in
     ;;
 esac
 
+
+ARCH_RUN_32BIT=""
 AC_SUBST(LIBTOOL_CRUFT)
 case $ac_sys_system/$ac_sys_release in
   Darwin/@<:@01567@:>@\..*) 
@@ -1513,19 +1564,61 @@ case $ac_sys_system/$ac_sys_release in
     if test "${enable_universalsdk}"; then
 	    :
     else
-	LIBTOOL_CRUFT="${LIBTOOL_CRUFT} -arch_only `arch`"
+        LIBTOOL_CRUFT="${LIBTOOL_CRUFT} -arch_only `/usr/bin/arch`"
     fi
     LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -install_name $(PYTHONFRAMEWORKINSTALLDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
     LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -compatibility_version $(VERSION) -current_version $(VERSION)';;
   Darwin/*)
-    gcc_version=`gcc -v 2>&1 |  grep version | cut -d\  -f3`
+    gcc_version=`gcc -dumpversion`
     if test ${gcc_version} '<' 4.0
         then
             LIBTOOL_CRUFT="-lcc_dynamic"
         else 
             LIBTOOL_CRUFT=""
     fi
-    LIBTOOL_CRUFT=$LIBTOOL_CRUFT" -lSystem -lSystemStubs -arch_only `arch`"
+    AC_TRY_RUN([
+    #include <unistd.h>
+    int main(int argc, char*argv[])
+    {
+      if (sizeof(long) == 4) {
+    	  return 0;
+      } else {
+      	  return 1;
+      }
+    }
+    ], ac_osx_32bit=yes,
+       ac_osx_32bit=no,
+       ac_osx_32bit=yes)
+    
+    if test "${ac_osx_32bit}" = "yes"; then
+    	case `/usr/bin/arch` in
+    	i386) 
+    		MACOSX_DEFAULT_ARCH="i386" 
+    		;;
+    	ppc) 
+    		MACOSX_DEFAULT_ARCH="ppc" 
+    		;;
+    	*)
+    		AC_MSG_ERROR([Unexpected output of 'arch' on OSX])
+    		;;
+    	esac
+    else
+    	case `/usr/bin/arch` in
+    	i386) 
+    		MACOSX_DEFAULT_ARCH="x86_64" 
+    		;;
+    	ppc) 
+    		MACOSX_DEFAULT_ARCH="ppc64" 
+    		;;
+    	*)
+    		AC_MSG_ERROR([Unexpected output of 'arch' on OSX])
+    		;;
+    	esac
+
+	#ARCH_RUN_32BIT="true"
+    fi
+
+    LIBTOOL_CRUFT=$LIBTOOL_CRUFT" -lSystem -lSystemStubs -arch_only ${MACOSX_DEFAULT_ARCH}"
     LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -install_name $(PYTHONFRAMEWORKINSTALLDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
     LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -compatibility_version $(VERSION) -current_version $(VERSION)';;
 esac
@@ -1698,7 +1791,6 @@ then
 		else LDSHARED='$(CC) -G'
 		fi;;
 	SCO_SV*) LDSHARED='$(CC) -Wl,-G,-Bexport';;
-	Monterey*) LDSHARED="cc -G -dy -Bdynamic -Bexport -L/usr/lib/ia64l64";;
 	CYGWIN*) LDSHARED="gcc -shared -Wl,--enable-auto-image-base";;
 	atheos*) LDSHARED="gcc -shared";;
 	*)	LDSHARED="ld";;
@@ -1735,7 +1827,6 @@ then
 		then CCSHARED="-fPIC"
 		else CCSHARED="-Kpic -belf"
 		fi;;
-	Monterey*) CCSHARED="-G";;
 	IRIX*/6*)  case $CC in
 		   *gcc*) CCSHARED="-shared";;
 		   *) CCSHARED="";;
@@ -2555,8 +2646,8 @@ AC_CHECK_LIB(c, inet_aton, [$ac_cv_prog_TRUE],
 
 # On Tru64, chflags seems to be present, but calling it will
 # exit Python
-AC_MSG_CHECKING(for chflags)
-AC_TRY_RUN([
+AC_CACHE_CHECK([for chflags], [ac_cv_have_chflags], [dnl
+AC_TRY_RUN([[
 #include <sys/stat.h>
 #include <unistd.h>
 int main(int argc, char*argv[])
@@ -2565,13 +2656,19 @@ int main(int argc, char*argv[])
     return 1;
   return 0;
 }
-],AC_DEFINE(HAVE_CHFLAGS, 1, Define to 1 if you have the `chflags' function.)
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-)
+]], ac_cv_have_chflags=yes,
+   ac_cv_have_chflags=no,
+   ac_cv_have_chflags=cross)
+])
+if test "$ac_cv_have_chflags" = cross ; then
+  AC_CHECK_FUNC([chflags], [ac_cv_have_chflags="yes"], [ac_cv_have_chflags="no"])
+fi
+if test "$ac_cv_have_chflags" = yes ; then
+  AC_DEFINE(HAVE_CHFLAGS, 1, Define to 1 if you have the `chflags' function.)
+fi
 
-AC_MSG_CHECKING(for lchflags)
-AC_TRY_RUN([
+AC_CACHE_CHECK([for lchflags], [ac_cv_have_lchflags], [dnl
+AC_TRY_RUN([[
 #include <sys/stat.h>
 #include <unistd.h>
 int main(int argc, char*argv[])
@@ -2580,10 +2677,16 @@ int main(int argc, char*argv[])
     return 1;
   return 0;
 }
-],AC_DEFINE(HAVE_LCHFLAGS, 1, Define to 1 if you have the `lchflags' function.)
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-)
+]], ac_cv_have_lchflags=yes,
+   ac_cv_have_lchflags=no,
+   ac_cv_have_lchflags=cross)
+])
+if test "$ac_cv_have_lchflags" = cross ; then
+  AC_CHECK_FUNC([lchflags], [ac_cv_have_lchflags="yes"], [ac_cv_have_lchflags="no"])
+fi
+if test "$ac_cv_have_lchflags" = yes ; then
+  AC_DEFINE(HAVE_LCHFLAGS, 1, Define to 1 if you have the `lchflags' function.)
+fi
 
 dnl Check if system zlib has *Copy() functions
 dnl
@@ -3305,6 +3408,41 @@ AC_CHECK_DECLS([isinf, isnan, isfinite], [], [], [[#include <math.h>]])
 
 LIBS=$LIBS_SAVE
 
+# For multiprocessing module, check that sem_open
+# actually works.  For FreeBSD versions <= 7.2,
+# the kernel module that provides POSIX semaphores
+# isn't loaded by default, so an attempt to call
+# sem_open results in a 'Signal 12' error.
+AC_MSG_CHECKING(whether POSIX semaphores are enabled)
+AC_CACHE_VAL(ac_cv_posix_semaphores_enabled,
+AC_TRY_RUN([
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <semaphore.h>
+#include <sys/stat.h>
+
+int main(void) {
+  sem_t *a = sem_open("/autoconf", O_CREAT, S_IRUSR|S_IWUSR, 0);
+  if (a == SEM_FAILED) {
+    perror("sem_open");
+    return 1;
+  }
+  sem_close(a);
+  sem_unlink("/autoconf");
+  return 0;
+}
+], ac_cv_posix_semaphores_enabled=yes,
+   ac_cv_posix_semaphores_enabled=no,
+   ac_cv_posix_semaphores_enabled=yes)
+)
+AC_MSG_RESULT($ac_cv_posix_semaphores_enabled)
+if test $ac_cv_posix_semaphores_enabled = no
+then
+  AC_DEFINE(POSIX_SEMAPHORES_NOT_ENABLED, 1,
+            [Define if POSIX semaphores aren't enabled on your system])
+fi
+
 # Multiprocessing check for broken sem_getvalue
 AC_MSG_CHECKING(for broken sem_getvalue)
 AC_TRY_RUN([
@@ -3315,7 +3453,7 @@ AC_TRY_RUN([
 #include <sys/stat.h>
 
 int main(void){
-  sem_t *a = sem_open("/autoconf", O_CREAT, S_IRUSR|S_IWUSR, 0);
+  sem_t *a = sem_open("/autocftw", O_CREAT, S_IRUSR|S_IWUSR, 0);
   int count;
   int res;
   if(a==SEM_FAILED){
@@ -3325,6 +3463,7 @@ int main(void){
   }
   res = sem_getvalue(a, &count);
   sem_close(a);
+  sem_unlink("/autocftw");
   return res==-1 ? 1 : 0;
 }
 ]
@@ -3535,6 +3674,10 @@ then
   [readline/readline.h],
   AC_DEFINE(HAVE_RL_COMPLETION_APPEND_CHARACTER, 1,
   [Define if you have readline 2.2]), )
+  AC_EGREP_HEADER([extern int rl_completion_suppress_append;],
+  [readline/readline.h],
+  AC_DEFINE(HAVE_RL_COMPLETION_SUPPRESS_APPEND, 1,
+  [Define if you have rl_completion_suppress_append]), )
 fi
 
 # check for readline 4.0
@@ -3901,6 +4044,12 @@ then
 else AC_MSG_RESULT(no)
 fi],
 [AC_MSG_RESULT(no)])
+
+if test $ac_sys_system = Darwin
+then
+	LIBS="$LIBS -framework CoreFoundation"
+fi
+
 
 
 AC_SUBST(THREADHEADERS)

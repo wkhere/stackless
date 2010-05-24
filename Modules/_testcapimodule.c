@@ -283,6 +283,95 @@ test_lazy_hash_inheritance(PyObject* self)
 }
 
 
+/* Issue #7385: Check that memoryview() does not crash
+ *   when bf_getbuffer returns an error
+ */
+
+static int
+broken_buffer_getbuffer(PyObject *self, Py_buffer *view, int flags)
+{
+	PyErr_SetString(
+		TestError,
+		"test_broken_memoryview: expected error in bf_getbuffer");
+	return -1;
+}
+
+static PyBufferProcs memoryviewtester_as_buffer = {
+	(getbufferproc)broken_buffer_getbuffer,	/* bf_getbuffer */
+	0,	/* bf_releasebuffer */
+};
+
+static PyTypeObject _MemoryViewTester_Type = {
+	PyVarObject_HEAD_INIT(NULL, 0)
+	"memoryviewtester",	/* Name of this type */
+	sizeof(PyObject),	/* Basic object size */
+	0,			/* Item size for varobject */
+	(destructor)PyObject_Del, /* tp_dealloc */
+	0,			/* tp_print */
+	0,			/* tp_getattr */
+	0,			/* tp_setattr */
+	0,			/* tp_compare */
+	0,			/* tp_repr */
+	0,			/* tp_as_number */
+	0,			/* tp_as_sequence */
+	0,			/* tp_as_mapping */
+	0,			/* tp_hash */
+	0,			/* tp_call */
+	0,			/* tp_str */
+	PyObject_GenericGetAttr,  /* tp_getattro */
+	0,			/* tp_setattro */
+	&memoryviewtester_as_buffer,			/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,	/* tp_flags */
+	0,			/* tp_doc */
+	0,			/* tp_traverse */
+	0,			/* tp_clear */
+	0,			/* tp_richcompare */
+	0,			/* tp_weaklistoffset */
+	0,			/* tp_iter */
+	0,			/* tp_iternext */
+	0,			/* tp_methods */
+	0,			/* tp_members */
+	0,			/* tp_getset */
+	0,			/* tp_base */
+	0,			/* tp_dict */
+	0,			/* tp_descr_get */
+	0,			/* tp_descr_set */
+	0,			/* tp_dictoffset */
+	0,			/* tp_init */
+	0,			/* tp_alloc */
+	PyType_GenericNew,		/* tp_new */
+};
+
+static PyObject*
+test_broken_memoryview(PyObject* self)
+{
+	PyObject *obj = PyObject_New(PyObject, &_MemoryViewTester_Type);
+	PyObject *res;
+
+	if (obj == NULL) {
+		PyErr_Clear();
+		PyErr_SetString(
+			TestError,
+			"test_broken_memoryview: failed to create object");
+		return NULL;
+	}
+
+	res = PyMemoryView_FromObject(obj);
+	if (res || !PyErr_Occurred()){
+		PyErr_SetString(
+			TestError,
+			"test_broken_memoryview: memoryview() didn't raise an Exception");
+		Py_XDECREF(res);
+		Py_DECREF(obj);
+		return NULL;
+	}
+
+	PyErr_Clear();
+	Py_DECREF(obj);
+	Py_RETURN_NONE;
+}
+
+
 /* Tests of PyLong_{As, From}{Unsigned,}Long(), and (#ifdef HAVE_LONG_LONG)
    PyLong_{As, From}{Unsigned,}LongLong().
 
@@ -615,6 +704,52 @@ test_s_code(PyObject *self)
     Py_DECREF(tuple);
     Py_RETURN_NONE;
 }
+
+static PyObject *
+test_bug_7414(PyObject *self)
+{
+	/* Issue #7414: for PyArg_ParseTupleAndKeywords, 'C' code wasn't being
+	   skipped properly in skipitem() */
+	int a = 0, b = 0, result;
+	char *kwlist[] = {"a", "b", NULL};
+	PyObject *tuple = NULL, *dict = NULL, *b_str;
+
+	tuple = PyTuple_New(0);
+	if (tuple == NULL)
+		goto failure;
+	dict = PyDict_New();
+	if (dict == NULL)
+		goto failure;
+	b_str = PyUnicode_FromString("b");
+	if (b_str == NULL)
+		goto failure;
+	result = PyDict_SetItemString(dict, "b", b_str);
+	Py_DECREF(b_str);
+	if (result < 0)
+		goto failure;
+
+	result = PyArg_ParseTupleAndKeywords(tuple, dict, "|CC",
+					     kwlist, &a, &b);
+	if (!result)
+		goto failure;
+
+	if (a != 0)
+		return raiseTestError("test_bug_7414",
+			"C format code not skipped properly");
+	if (b != 'b')
+		return raiseTestError("test_bug_7414",
+			"C format code returned wrong value");
+
+	Py_DECREF(dict);
+	Py_DECREF(tuple);
+	Py_RETURN_NONE;
+
+  failure:
+	Py_XDECREF(dict);
+	Py_XDECREF(tuple);
+	return NULL;
+}
+
 
 static volatile int x;
 
@@ -1047,6 +1182,23 @@ test_string_from_format(PyObject *self, PyObject *args)
 #undef CHECK_1_FORMAT
 }
 
+
+static PyObject *
+test_unicode_compare_with_ascii(PyObject *self) {
+	PyObject *py_s = PyUnicode_FromStringAndSize("str\0", 4);
+	int result;
+	if (py_s == NULL)
+		return NULL;
+	result = PyUnicode_CompareWithASCIIString(py_s, "str");
+	Py_DECREF(py_s);
+	if (!result) {
+		PyErr_SetString(TestError, "Python string ending in NULL "
+				"should not compare equal to c string.");
+		return NULL;
+	}
+	Py_RETURN_NONE;
+};
+
 /* This is here to provide a docstring for test_descr. */
 static PyObject *
 test_with_docstring(PyObject *self)
@@ -1241,6 +1393,8 @@ test_capsule(PyObject *self, PyObject *args)
 			Py_DECREF(object);
 			Py_DECREF(module);
 		}
+		else
+			PyErr_Clear();
 	}
 
   exit:
@@ -1453,15 +1607,18 @@ static PyMethodDef TestMethods[] = {
 	{"test_list_api",	(PyCFunction)test_list_api,	 METH_NOARGS},
 	{"test_dict_iteration",	(PyCFunction)test_dict_iteration,METH_NOARGS},
 	{"test_lazy_hash_inheritance",	(PyCFunction)test_lazy_hash_inheritance,METH_NOARGS},
+	{"test_broken_memoryview",	(PyCFunction)test_broken_memoryview,METH_NOARGS},
 	{"test_long_api",	(PyCFunction)test_long_api,	 METH_NOARGS},
 	{"test_long_numbits",	(PyCFunction)test_long_numbits,	 METH_NOARGS},
 	{"test_k_code",		(PyCFunction)test_k_code,	 METH_NOARGS},
 	{"test_empty_argparse", (PyCFunction)test_empty_argparse,METH_NOARGS},
+	{"test_bug_7414", (PyCFunction)test_bug_7414, METH_NOARGS},
 	{"test_null_strings",	(PyCFunction)test_null_strings,	 METH_NOARGS},
 	{"test_string_from_format", (PyCFunction)test_string_from_format, METH_NOARGS},
 	{"test_with_docstring", (PyCFunction)test_with_docstring, METH_NOARGS,
 	 PyDoc_STR("This is a pretty normal docstring.")},
 	{"test_string_to_double", (PyCFunction)test_string_to_double, METH_NOARGS},
+	{"test_unicode_compare_with_ascii", (PyCFunction)test_unicode_compare_with_ascii, METH_NOARGS},
 	{"test_capsule", (PyCFunction)test_capsule, METH_NOARGS},
 	{"getargs_tuple",	getargs_tuple,			 METH_VARARGS},
 	{"getargs_keywords", (PyCFunction)getargs_keywords, 
@@ -1661,6 +1818,7 @@ PyInit__testcapi(void)
 		return NULL;
 
 	Py_TYPE(&_HashInheritanceTester_Type)=&PyType_Type;
+	Py_TYPE(&_MemoryViewTester_Type)=&PyType_Type;
 
 	Py_TYPE(&test_structmembersType)=&PyType_Type;
 	Py_INCREF(&test_structmembersType);

@@ -170,6 +170,25 @@ Assignment of an object to a single target is recursively defined as follows.
   perform the assignment, it raises an exception (usually but not necessarily
   :exc:`AttributeError`).
 
+  .. _attr-target-note:
+
+  Note: If the object is a class instance and the attribute reference occurs on
+  both sides of the assignment operator, the RHS expression, ``a.x`` can access
+  either an instance attribute or (if no instance attribute exists) a class
+  attribute.  The LHS target ``a.x`` is always set as an instance attribute,
+  creating it if necessary.  Thus, the two occurrences of ``a.x`` do not
+  necessarily refer to the same attribute: if the RHS expression refers to a
+  class attribute, the LHS creates a new instance attribute as the target of the
+  assignment::
+
+     class Cls:
+         x = 3             # class variable
+     inst = Cls()
+     inst.x = inst.x + 1   # writes inst.x as 4 leaving Cls.x as 3
+
+  This description does not necessarily apply to descriptor attributes, such as
+  properties created with :func:`property`.
+
   .. index::
      pair: subscription; assignment
      object: mutable
@@ -217,9 +236,11 @@ Assignment of an object to a single target is recursively defined as follows.
   from the length of the assigned sequence, thus changing the length of the
   target sequence, if the object allows it.
 
-(In the current implementation, the syntax for targets is taken to be the same
-as for expressions, and invalid syntax is rejected during the code generation
-phase, causing less detailed error messages.)
+.. impl-detail::
+
+   In the current implementation, the syntax for targets is taken to be the same
+   as for expressions, and invalid syntax is rejected during the code generation
+   phase, causing less detailed error messages.
 
 WARNING: Although the definition of assignment implies that overlaps between the
 left-hand side and the right-hand side are 'safe' (for example ``a, b = b, a``
@@ -276,16 +297,8 @@ same way as normal assignments. Similarly, with the exception of the possible
 *in-place* behavior, the binary operation performed by augmented assignment is
 the same as the normal binary operations.
 
-For targets which are attribute references, the initial value is retrieved with
-a :meth:`getattr` and the result is assigned with a :meth:`setattr`.  Notice
-that the two methods do not necessarily refer to the same variable.  When
-:meth:`getattr` refers to a class variable, :meth:`setattr` still writes to an
-instance variable. For example::
-
-   class A:
-       x = 3    # class variable
-   a = A()
-   a.x += 1     # writes a.x as 4 leaving A.x as 3
+For targets which are attribute references, the same :ref:`caveat about class
+and instance attributes <attr-target-note>` applies as for regular assignments.
 
 
 .. _assert:
@@ -796,7 +809,7 @@ modules which were imported and used within the module).
 
 The :keyword:`from` form with ``*`` may only occur in a module scope.  The wild
 card form of import --- ``import *`` --- is only allowed at the module level.
-Attempting to use it in class for function definitions will raise a
+Attempting to use it in class or function definitions will raise a
 :exc:`SyntaxError`.
 
 .. index::
@@ -924,9 +937,11 @@ Names listed in a :keyword:`global` statement must not be defined as formal
 parameters or in a :keyword:`for` loop control target, :keyword:`class`
 definition, function definition, or :keyword:`import` statement.
 
-(The current implementation does not enforce the latter two restrictions, but
-programs should not abuse this freedom, as future implementations may enforce
-them or silently change the meaning of the program.)
+.. impl-detail::
+
+   The current implementation does not enforce the latter two restrictions, but
+   programs should not abuse this freedom, as future implementations may enforce
+   them or silently change the meaning of the program.
 
 .. index::
    builtin: exec

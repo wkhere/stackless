@@ -580,7 +580,7 @@ static void
 release_bytes(PyObject* o)
 {
 	if (PyByteArray_Check(o))
-		o->ob_type->tp_as_buffer->bf_releasebuffer(NULL, 0);
+		o->ob_type->tp_as_buffer->bf_releasebuffer(o, 0);
 	Py_DECREF(o);
 }
 
@@ -2088,9 +2088,10 @@ fd to the numeric uid and gid.");
 static PyObject *
 posix_fchown(PyObject *self, PyObject *args)
 {
-	int fd, uid, gid;
+	int fd;
+	long uid, gid;
 	int res;
-	if (!PyArg_ParseTuple(args, "iii:chown", &fd, &uid, &gid))
+	if (!PyArg_ParseTuple(args, "ill:chown", &fd, &uid, &gid))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 	res = fchown(fd, (uid_t) uid, (gid_t) gid);
@@ -2112,9 +2113,9 @@ posix_lchown(PyObject *self, PyObject *args)
 {
 	PyObject *opath;
 	char *path;
-	int uid, gid;
+	long uid, gid;
 	int res;
-	if (!PyArg_ParseTuple(args, "O&ii:lchown",
+	if (!PyArg_ParseTuple(args, "O&ll:lchown",
 	                      PyUnicode_FSConverter, &opath,
 	                      &uid, &gid))
 		return NULL;
@@ -3831,11 +3832,21 @@ Return 0 to child process and PID of child to parent process.");
 static PyObject *
 posix_fork1(PyObject *self, PyObject *noargs)
 {
-	pid_t pid = fork1();
+	pid_t pid;
+	int result;
+	_PyImport_AcquireLock();
+	pid = fork1();
+	result = _PyImport_ReleaseLock();
 	if (pid == -1)
 		return posix_error();
 	if (pid == 0)
 		PyOS_AfterFork();
+	if (result < 0) {
+		/* Don't clobber the OSError if the fork failed. */
+		PyErr_SetString(PyExc_RuntimeError,
+				"not holding the import lock");
+		return NULL;
+	}
 	return PyLong_FromPid(pid);
 }
 #endif
@@ -3850,11 +3861,21 @@ Return 0 to child process and PID of child to parent process.");
 static PyObject *
 posix_fork(PyObject *self, PyObject *noargs)
 {
-	pid_t pid = fork();
+	pid_t pid;
+	int result;
+	_PyImport_AcquireLock();
+	pid = fork();
+	result = _PyImport_ReleaseLock();
 	if (pid == -1)
 		return posix_error();
 	if (pid == 0)
 		PyOS_AfterFork();
+	if (result < 0) {
+		/* Don't clobber the OSError if the fork failed. */
+		PyErr_SetString(PyExc_RuntimeError,
+				"not holding the import lock");
+		return NULL;
+	}
 	return PyLong_FromPid(pid);
 }
 #endif
@@ -3957,14 +3978,22 @@ To both, return fd of newly opened pseudo-terminal.\n");
 static PyObject *
 posix_forkpty(PyObject *self, PyObject *noargs)
 {
-	int master_fd = -1;
+	int master_fd = -1, result;
 	pid_t pid;
 
+	_PyImport_AcquireLock();
 	pid = forkpty(&master_fd, NULL, NULL, NULL);
+	result = _PyImport_ReleaseLock();
 	if (pid == -1)
 		return posix_error();
 	if (pid == 0)
 		PyOS_AfterFork();
+	if (result < 0) {
+		/* Don't clobber the OSError if the fork failed. */
+		PyErr_SetString(PyExc_RuntimeError,
+				"not holding the import lock");
+		return NULL;
+	}
 	return Py_BuildValue("(Ni)", PyLong_FromPid(pid), master_fd);
 }
 #endif
@@ -4341,9 +4370,16 @@ posix_setreuid (PyObject *self, PyObject *args)
 	uid_t ruid, euid;
 	if (!PyArg_ParseTuple(args, "ll", &ruid_arg, &euid_arg))
 		return NULL;
-	ruid = ruid_arg;
-	euid = euid_arg;
-	if (euid != euid_arg || ruid != ruid_arg) {
+	if (ruid_arg == -1)
+		ruid = (uid_t)-1;  /* let the compiler choose how -1 fits */
+	else
+		ruid = ruid_arg;  /* otherwise, assign from our long */
+	if (euid_arg == -1)
+		euid = (uid_t)-1;
+	else
+		euid = euid_arg;
+	if ((euid_arg != -1 && euid != euid_arg) || 
+	    (ruid_arg != -1 && ruid != ruid_arg)) {
 		PyErr_SetString(PyExc_OverflowError, "user id too big");
 		return NULL;
 	}
@@ -4368,9 +4404,16 @@ posix_setregid (PyObject *self, PyObject *args)
 	gid_t rgid, egid;
 	if (!PyArg_ParseTuple(args, "ll", &rgid_arg, &egid_arg))
 		return NULL;
-	rgid = rgid_arg;
-	egid = egid_arg;
-	if (egid != egid_arg || rgid != rgid_arg) {
+	if (rgid_arg == -1)
+		rgid = (gid_t)-1;  /* let the compiler choose how -1 fits */
+	else
+		rgid = rgid_arg;  /* otherwise, assign from our long */
+	if (egid_arg == -1)
+		egid = (gid_t)-1;
+	else
+		egid = egid_arg;
+	if ((egid_arg != -1 && egid != egid_arg) || 
+	    (rgid_arg != -1 && rgid != rgid_arg)) {
 		PyErr_SetString(PyExc_OverflowError, "group id too big");
 		return NULL;
 	}

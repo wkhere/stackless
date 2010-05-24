@@ -518,10 +518,7 @@ class HTTPResponse(io.RawIOBase):
     def _read_chunked(self, amt):
         assert self.chunked != _UNKNOWN
         chunk_left = self.chunk_left
-        value = b""
-
-        # XXX This accumulates chunks by repeated string concatenation,
-        # which is not efficient as the number or size of chunks gets big.
+        value = []
         while True:
             if chunk_left is None:
                 line = self.fp.readline()
@@ -534,22 +531,22 @@ class HTTPResponse(io.RawIOBase):
                     # close the connection as protocol synchronisation is
                     # probably lost
                     self.close()
-                    raise IncompleteRead(value)
+                    raise IncompleteRead(b''.join(value))
                 if chunk_left == 0:
                     break
             if amt is None:
-                value += self._safe_read(chunk_left)
+                value.append(self._safe_read(chunk_left))
             elif amt < chunk_left:
-                value += self._safe_read(amt)
+                value.append(self._safe_read(amt))
                 self.chunk_left = chunk_left - amt
-                return value
+                return b''.join(value)
             elif amt == chunk_left:
-                value += self._safe_read(amt)
+                value.append(self._safe_read(amt))
                 self._safe_read(2)  # toss the CRLF at the end of the chunk
                 self.chunk_left = None
-                return value
+                return b''.join(value)
             else:
-                value += self._safe_read(chunk_left)
+                value.append(self._safe_read(chunk_left))
                 amt -= chunk_left
 
             # we read the whole chunk, get another
@@ -570,7 +567,7 @@ class HTTPResponse(io.RawIOBase):
         # we read everything; close the "file"
         self.close()
 
-        return value
+        return b''.join(value)
 
     def _safe_read(self, amt):
         """Read the number of bytes requested, compensating for partial reads.
@@ -651,9 +648,13 @@ class HTTPConnection:
         if strict is not None:
             self.strict = strict
 
-    def _set_tunnel(self, host, port=None):
+    def _set_tunnel(self, host, port=None, headers=None):
         self._tunnel_host = host
         self._tunnel_port = port
+        if headers:
+            self._tunnel_headers = headers
+        else:
+            self._tunnel_headers.clear()
 
     def _set_hostport(self, host, port):
         if port is None:
@@ -677,12 +678,18 @@ class HTTPConnection:
 
     def _tunnel(self):
         self._set_hostport(self._tunnel_host, self._tunnel_port)
-        connect_str = "CONNECT %s:%d HTTP/1.0\r\n\r\n" %(self.host, self.port)
+        connect_str = "CONNECT %s:%d HTTP/1.0\r\n" %(self.host, self.port)
         connect_bytes = connect_str.encode("ascii")
         self.send(connect_bytes)
+        for header, value in self._tunnel_headers.iteritems():
+            header_str = "%s: %s\r\n" % (header, value)
+            header_bytes = header_str.encode("ascii")
+            self.send(header_bytes)
+
         response = self.response_class(self.sock, strict = self.strict,
-                                       method= self._method)
+                                       method = self._method)
         (version, code, message) = response._read_status()
+
         if code != 200:
             self.close()
             raise socket.error("Tunnel connection failed: %d %s" % (code,
@@ -729,10 +736,17 @@ class HTTPConnection:
             if self.debuglevel > 0:
                 print("sendIng a read()able")
             encode = False
-            if "b" not in str.mode:
-                encode = True
-                if self.debuglevel > 0:
-                    print("encoding file using iso-8859-1")
+            try:
+                mode = str.mode
+            except AttributeError:
+                # io.BytesIO and other file-like objects don't have a `mode`
+                # attribute.
+                pass
+            else:
+                if "b" not in mode:
+                    encode = True
+                    if self.debuglevel > 0:
+                        print("encoding file using iso-8859-1")
             while 1:
                 data = str.read(blocksize)
                 if not data:

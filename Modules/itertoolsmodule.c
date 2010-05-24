@@ -2017,7 +2017,7 @@ empty:
 }
 
 PyDoc_STRVAR(combinations_doc,
-"combinations(iterable[, r]) --> combinations object\n\
+"combinations(iterable, r) --> combinations object\n\
 \n\
 Return successive r-length combinations of elements in the iterable.\n\n\
 combinations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)");
@@ -2262,7 +2262,7 @@ empty:
 }
 
 PyDoc_STRVAR(cwr_doc,
-"combinations_with_replacement(iterable[, r]) --> combinations_with_replacement object\n\
+"combinations_with_replacement(iterable, r) --> combinations_with_replacement object\n\
 \n\
 Return successive r-length combinations of elements in the iterable\n\
 allowing individual elements to have successive repeats.\n\
@@ -3049,6 +3049,22 @@ count_repr(countobject *lz)
 								lz->long_cnt, lz->long_step);
 }
 
+static PyObject *
+count_reduce(countobject *lz)
+{
+	if (lz->cnt == PY_SSIZE_T_MAX)
+		return Py_BuildValue("O(OO)", Py_TYPE(lz), lz->long_cnt, lz->long_step);
+	return Py_BuildValue("O(n)", Py_TYPE(lz), lz->cnt);
+}
+
+PyDoc_STRVAR(count_reduce_doc, "Return state information for pickling.");
+
+static PyMethodDef count_methods[] = {
+	{"__reduce__",	(PyCFunction)count_reduce,	METH_NOARGS,
+	 count_reduce_doc},
+	{NULL,		NULL}	/* sentinel */
+};
+
 PyDoc_STRVAR(count_doc,
 			 "count(start=0, step=1]) --> count object\n\
 \n\
@@ -3090,7 +3106,7 @@ static PyTypeObject count_type = {
 	0,				/* tp_weaklistoffset */
 	PyObject_SelfIter,		/* tp_iter */
 	(iternextfunc)count_next,	/* tp_iternext */
-	0,				/* tp_methods */
+	count_methods,				/* tp_methods */
 	0,				/* tp_members */
 	0,				/* tp_getset */
 	0,				/* tp_base */
@@ -3344,71 +3360,73 @@ zip_longest_traverse(ziplongestobject *lz, visitproc visit, void *arg)
 static PyObject *
 zip_longest_next(ziplongestobject *lz)
 {
-	Py_ssize_t i;
-	Py_ssize_t tuplesize = lz->tuplesize;
-	PyObject *result = lz->result;
-	PyObject *it;
-	PyObject *item;
-	PyObject *olditem;
+        Py_ssize_t i;
+        Py_ssize_t tuplesize = lz->tuplesize;
+        PyObject *result = lz->result;
+        PyObject *it;
+        PyObject *item;
+        PyObject *olditem;
 
-	if (tuplesize == 0)
-		return NULL;
+        if (tuplesize == 0)
+                return NULL;
         if (lz->numactive == 0)
                 return NULL;
-	if (Py_REFCNT(result) == 1) {
-		Py_INCREF(result);
-		for (i=0 ; i < tuplesize ; i++) {
-			it = PyTuple_GET_ITEM(lz->ittuple, i);
+        if (Py_REFCNT(result) == 1) {
+                Py_INCREF(result);
+                for (i=0 ; i < tuplesize ; i++) {
+                        it = PyTuple_GET_ITEM(lz->ittuple, i);
                         if (it == NULL) {
                                 Py_INCREF(lz->fillvalue);
                                 item = lz->fillvalue;
                         } else {
-                                item = (*Py_TYPE(it)->tp_iternext)(it);
+                                item = PyIter_Next(it);
                                 if (item == NULL) {
-                                        lz->numactive -= 1;      
-                                        if (lz->numactive == 0) {
+                                        lz->numactive -= 1;
+                                        if (lz->numactive == 0 || PyErr_Occurred()) {
+                                                lz->numactive = 0;
                                                 Py_DECREF(result);
                                                 return NULL;
                                         } else {
                                                 Py_INCREF(lz->fillvalue);
-                                                item = lz->fillvalue;                                        
+                                                item = lz->fillvalue;
                                                 PyTuple_SET_ITEM(lz->ittuple, i, NULL);
                                                 Py_DECREF(it);
                                         }
                                 }
                         }
-			olditem = PyTuple_GET_ITEM(result, i);
-			PyTuple_SET_ITEM(result, i, item);
-			Py_DECREF(olditem);
-		}
-	} else {
-		result = PyTuple_New(tuplesize);
-		if (result == NULL)
-			return NULL;
-		for (i=0 ; i < tuplesize ; i++) {
-			it = PyTuple_GET_ITEM(lz->ittuple, i);
+                        olditem = PyTuple_GET_ITEM(result, i);
+                        PyTuple_SET_ITEM(result, i, item);
+                        Py_DECREF(olditem);
+                }
+        } else {
+                result = PyTuple_New(tuplesize);
+                if (result == NULL)
+                        return NULL;
+                for (i=0 ; i < tuplesize ; i++) {
+                        it = PyTuple_GET_ITEM(lz->ittuple, i);
                         if (it == NULL) {
                                 Py_INCREF(lz->fillvalue);
                                 item = lz->fillvalue;
                         } else {
-                                item = (*Py_TYPE(it)->tp_iternext)(it);
+                                item = PyIter_Next(it);
                                 if (item == NULL) {
-                                        lz->numactive -= 1;      
-                                        if (lz->numactive == 0) {
+                                        lz->numactive -= 1;
+                                        if (lz->numactive == 0 || PyErr_Occurred()) {
+                                                lz->numactive = 0;
                                                 Py_DECREF(result);
                                                 return NULL;
                                         } else {
                                                 Py_INCREF(lz->fillvalue);
-                                                item = lz->fillvalue;                                        
+                                                item = lz->fillvalue;
                                                 PyTuple_SET_ITEM(lz->ittuple, i, NULL);
                                                 Py_DECREF(it);
                                         }
                                 }
                         }
-			PyTuple_SET_ITEM(result, i, item);
-		}
-	}
-	return result;
+                        PyTuple_SET_ITEM(result, i, item);
+                }
+        }
+        return result;
 }
 
 PyDoc_STRVAR(zip_longest_doc,
@@ -3492,8 +3510,8 @@ zip_longest(p, q, ...) --> (p[0], q[0]), (p[1], q[1]), ... \n\
 Combinatoric generators:\n\
 product(p, q, ... [repeat=1]) --> cartesian product\n\
 permutations(p[, r])\n\
-combinations(p[, r])\n\
-combinations_with_replacement(p[, r])\n\
+combinations(p, r)\n\
+combinations_with_replacement(p, r)\n\
 ");
 
 

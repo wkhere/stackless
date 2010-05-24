@@ -81,7 +81,7 @@ class FixTupleParams(fixer_base.BaseFix):
                     handle_tuple(arg, add_prefix=(i > 0))
 
         if not new_lines:
-            return node
+            return
 
         # This isn't strictly necessary, but it plays nicely with other fixers.
         # TODO(cwinter) get rid of this when children becomes a smart list
@@ -96,6 +96,8 @@ class FixTupleParams(fixer_base.BaseFix):
             new_lines[0].prefix = indent
             after = start + 1
 
+        for line in new_lines:
+            line.parent = suite[0]
         suite[0].children[after:after] = new_lines
         for i in range(after+1, after+len(new_lines)+1):
             suite[0].children[i].prefix = indent

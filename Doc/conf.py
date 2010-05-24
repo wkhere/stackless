@@ -86,7 +86,7 @@ html_additional_pages = {
 }
 
 # Output an OpenSearch description file.
-html_use_opensearch = 'http://docs.python.org/dev/3.0'
+html_use_opensearch = 'http://docs.python.org/3.1'
 
 # Additional static files.
 html_static_path = ['tools/sphinxext/static']
@@ -150,6 +150,9 @@ latex_preamble = r'''
 
 # Documents to append as an appendix to all manuals.
 latex_appendices = ['glossary', 'about', 'license', 'copyright']
+
+# Get LaTeX to handle Unicode correctly
+latex_elements = {'inputenc': r'\usepackage[utf8x]{inputenc}'}
 
 # Options for the coverage checker
 # --------------------------------

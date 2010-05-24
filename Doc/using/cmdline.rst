@@ -8,7 +8,7 @@ Command line and environment
 The CPython interpreter scans the command line and the environment for various
 settings.
 
-.. note::
+.. impl-detail::
 
    Other implementations' command line schemes may differ.  See
    :ref:`implementations` for further resources.
@@ -21,7 +21,7 @@ Command line
 
 When invoking Python, you may specify any of these options::
 
-    python [-bdEiOsStuUvxX?] [-c command | -m module-name | script | - ] [args]
+    python [-bBdEhiOsSuvVWx?] [-c command | -m module-name | script | - ] [args]
 
 The most common use case is, of course, a simple invocation of a script::
 
@@ -235,15 +235,8 @@ Miscellaneous options
    Force stdin, stdout and stderr to be totally unbuffered.  On systems where it
    matters, also put stdin, stdout and stderr in binary mode.
 
-   Note that there is internal buffering in :meth:`file.readlines` and
-   :ref:`bltin-file-objects` (``for line in sys.stdin``) which is not influenced
-   by this option.  To work around this, you will want to use
-   :meth:`file.readline` inside a ``while 1:`` loop.
-
    See also :envvar:`PYTHONUNBUFFERED`.
 
-
-.. XXX should the -U option be documented?
 
 .. cmdoption:: -v
 
@@ -319,6 +312,20 @@ Miscellaneous options
    ``#!cmd``.  This is intended for a DOS specific hack only.
 
    .. note:: The line numbers in error messages will be off by one.
+
+Options you shouldn't use
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. cmdoption:: -J
+
+   Reserved for use by Jython_.
+
+.. _Jython: http://jython.org
+
+.. cmdoption:: -X
+
+    Reserved for alternative implementations of Python to use for their own
+    purposes.
 
 .. _using-on-envvars:
 

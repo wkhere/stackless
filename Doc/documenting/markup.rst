@@ -597,8 +597,10 @@ units as well as normal text:
    An important bit of information about an API that a user should be aware of
    when using whatever bit of API the warning pertains to.  The content of the
    directive should be written in complete sentences and include all appropriate
-   punctuation.  This should only be chosen over ``note`` for information
-   regarding the possibility of crashes, data loss, or security implications.
+   punctuation.  In the interest of not scaring users away from pages filled
+   with warnings, this directive should only be chosen over ``note`` for
+   information regarding the possibility of crashes, data loss, or security
+   implications.
 
 .. describe:: versionadded
 
@@ -623,6 +625,24 @@ units as well as normal text:
    feature in some way (new parameters, changed side effects, etc.).
 
 --------------
+
+.. describe:: impl-detail
+
+   This directive is used to mark CPython-specific information.  Use either with
+   a block content or a single sentence as an argument, i.e. either ::
+
+      .. impl-detail::
+
+         This describes some implementation detail.
+
+         More explanation.
+
+   or ::
+
+      .. impl-detail:: This shortly mentions an implementation detail.
+
+   "\ **CPython implementation detail:**\ " is automatically prepended to the
+   content.
 
 .. describe:: seealso
 

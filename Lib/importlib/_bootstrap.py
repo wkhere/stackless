@@ -407,19 +407,24 @@ class PyPycLoader(PyLoader):
         bytecode_path = self.bytecode_path(fullname)
         if bytecode_path:
             data = self.get_data(bytecode_path)
-            magic = data[:4]
-            pyc_timestamp = marshal._r_long(data[4:8])
-            bytecode = data[8:]
             try:
+                magic = data[:4]
+                if len(magic) < 4:
+                    raise ImportError("bad magic number in {}".format(fullname))
+                raw_timestamp = data[4:8]
+                if len(raw_timestamp) < 4:
+                    raise EOFError("bad timestamp in {}".format(fullname))
+                pyc_timestamp = marshal._r_long(raw_timestamp)
+                bytecode = data[8:]
                 # Verify that the magic number is valid.
                 if imp.get_magic() != magic:
-                    raise ImportError("bad magic number")
+                    raise ImportError("bad magic number in {}".format(fullname))
                 # Verify that the bytecode is not stale (only matters when
                 # there is source to fall back on.
                 if source_timestamp:
                     if pyc_timestamp < source_timestamp:
                         raise ImportError("bytecode is stale")
-            except ImportError:
+            except (ImportError, EOFError):
                 # If source is available give it a shot.
                 if source_timestamp is not None:
                     pass
@@ -522,9 +527,9 @@ class _PyPycFileLoader(PyPycLoader, _PyFileLoader):
         bytecode_path = self.bytecode_path(name)
         if not bytecode_path:
             bytecode_path = self._base_path + _suffix_list(imp.PY_COMPILED)[0]
-        file = _io.FileIO(bytecode_path, 'w')  # Assuming bytes.
         try:
-            with _closing(file) as bytecode_file:
+            # Assuming bytes.
+            with _closing(_io.FileIO(bytecode_path, 'w')) as bytecode_file:
                 bytecode_file.write(data)
                 return True
         except IOError as exc:
@@ -860,7 +865,12 @@ def _gcd_import(name, package=None, level=0):
             name = package[:dot]
     with _ImportLockContext():
         try:
-            return sys.modules[name]
+            module = sys.modules[name]
+            if module is None:
+                message = ("import of {} halted; "
+                            "None in sys.modules".format(name))
+                raise ImportError(message)
+            return module
         except KeyError:
             pass
         parent = name.rpartition('.')[0]

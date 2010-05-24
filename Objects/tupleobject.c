@@ -656,10 +656,10 @@ tuple_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 PyDoc_STRVAR(tuple_doc,
-"tuple() -> an empty tuple\n"
-"tuple(sequence) -> tuple initialized from sequence's items\n"
-"\n"
-"If the argument is a tuple, the return value is the same object.");
+"tuple() -> empty tuple\n\
+tuple(iterable) -> tuple initialized from iterable's items\n\
+\n\
+If the argument is a tuple, the return value is the same object.");
 
 static PySequenceMethods tuple_as_sequence = {
 	(lenfunc)tuplelength,			/* sq_length */
@@ -850,7 +850,8 @@ _PyTuple_Resize(PyObject **pv, Py_ssize_t newsize)
 
 	/* XXX UNREF/NEWREF interface should be more symmetrical */
 	_Py_DEC_REFTOTAL;
-	_PyObject_GC_UNTRACK(v);
+	if (_PyObject_GC_IS_TRACKED(v))
+		_PyObject_GC_UNTRACK(v);
 	_Py_ForgetReference((PyObject *) v);
 	/* DECREF items deleted by shrinkage */
 	for (i = newsize; i < oldsize; i++) {

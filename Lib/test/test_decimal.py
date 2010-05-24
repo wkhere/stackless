@@ -63,6 +63,13 @@ directory = testdir + os.sep + TESTDATADIR + os.sep
 
 skip_expected = not os.path.isdir(directory)
 
+# list of individual .decTest test ids that correspond to tests that
+# we're skipping for one reason or another.
+skipped_test_ids = [
+    'scbx164',  # skipping apparently implementation-specific scaleb
+    'scbx165',  # tests, pending clarification of scaleb rules.
+]
+
 # Make sure it actually raises errors when not expected and caught in flags
 # Slower, since it runs some things several times.
 EXTENDEDERRORTEST = False
@@ -262,6 +269,10 @@ class DecimalTest(unittest.TestCase):
             val = val.replace("'", '').replace('"', '')
             val = val.replace('SingleQuote', "'").replace('DoubleQuote', '"')
             return val
+
+        if id in skipped_test_ids:
+            return
+
         fname = nameAdapter.get(funct, funct)
         if fname == 'rescale':
             return
@@ -749,6 +760,9 @@ class DecimalFormatTest(unittest.TestCase):
             (',%', '123.456789', '12,345.6789%'),
             (',e', '123456', '1.23456e+5'),
             (',E', '123456', '1.23456E+5'),
+
+            # issue 6850
+            ('a=-7.0', '0.12345', 'aaaa0.1'),
             ]
         for fmt, d, result in test_values:
             self.assertEqual(format(Decimal(d), fmt), result)
@@ -1515,6 +1529,53 @@ class DecimalUsabilityTest(unittest.TestCase):
         self.assertEqual(str(Decimal(0).sqrt()),
                          str(c.sqrt(Decimal(0))))
 
+    def test_conversions_from_int(self):
+        # Check that methods taking a second Decimal argument will
+        # always accept an integer in place of a Decimal.
+        self.assertEqual(Decimal(4).compare(3),
+                         Decimal(4).compare(Decimal(3)))
+        self.assertEqual(Decimal(4).compare_signal(3),
+                         Decimal(4).compare_signal(Decimal(3)))
+        self.assertEqual(Decimal(4).compare_total(3),
+                         Decimal(4).compare_total(Decimal(3)))
+        self.assertEqual(Decimal(4).compare_total_mag(3),
+                         Decimal(4).compare_total_mag(Decimal(3)))
+        self.assertEqual(Decimal(10101).logical_and(1001),
+                         Decimal(10101).logical_and(Decimal(1001)))
+        self.assertEqual(Decimal(10101).logical_or(1001),
+                         Decimal(10101).logical_or(Decimal(1001)))
+        self.assertEqual(Decimal(10101).logical_xor(1001),
+                         Decimal(10101).logical_xor(Decimal(1001)))
+        self.assertEqual(Decimal(567).max(123),
+                         Decimal(567).max(Decimal(123)))
+        self.assertEqual(Decimal(567).max_mag(123),
+                         Decimal(567).max_mag(Decimal(123)))
+        self.assertEqual(Decimal(567).min(123),
+                         Decimal(567).min(Decimal(123)))
+        self.assertEqual(Decimal(567).min_mag(123),
+                         Decimal(567).min_mag(Decimal(123)))
+        self.assertEqual(Decimal(567).next_toward(123),
+                         Decimal(567).next_toward(Decimal(123)))
+        self.assertEqual(Decimal(1234).quantize(100),
+                         Decimal(1234).quantize(Decimal(100)))
+        self.assertEqual(Decimal(768).remainder_near(1234),
+                         Decimal(768).remainder_near(Decimal(1234)))
+        self.assertEqual(Decimal(123).rotate(1),
+                         Decimal(123).rotate(Decimal(1)))
+        self.assertEqual(Decimal(1234).same_quantum(1000),
+                         Decimal(1234).same_quantum(Decimal(1000)))
+        self.assertEqual(Decimal('9.123').scaleb(-100),
+                         Decimal('9.123').scaleb(Decimal(-100)))
+        self.assertEqual(Decimal(456).shift(-1),
+                         Decimal(456).shift(Decimal(-1)))
+
+        self.assertEqual(Decimal(-12).fma(Decimal(45), 67),
+                         Decimal(-12).fma(Decimal(45), Decimal(67)))
+        self.assertEqual(Decimal(-12).fma(45, 67),
+                         Decimal(-12).fma(Decimal(45), Decimal(67)))
+        self.assertEqual(Decimal(-12).fma(45, Decimal(67)),
+                         Decimal(-12).fma(Decimal(45), Decimal(67)))
+
 
 class DecimalPythonAPItests(unittest.TestCase):
 
@@ -1539,6 +1600,11 @@ class DecimalPythonAPItests(unittest.TestCase):
             d = Decimal(s)
             r = d.to_integral(ROUND_DOWN)
             self.assertEqual(Decimal(int(d)), r)
+
+        self.assertRaises(ValueError, int, Decimal('-nan'))
+        self.assertRaises(ValueError, int, Decimal('snan'))
+        self.assertRaises(OverflowError, int, Decimal('inf'))
+        self.assertRaises(OverflowError, int, Decimal('-inf'))
 
     def test_trunc(self):
         for x in range(-250, 250):

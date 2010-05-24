@@ -455,9 +455,16 @@ def open_urlresource(url, *args, **kw):
             return open(fn, *args, **kw)
 
     print('\tfetching %s ...' % url, file=get_original_stdout())
-    fn, _ = urllib.request.urlretrieve(url, filename)
-    return open(fn, *args, **kw)
-
+    f = urllib.request.urlopen(url, timeout=15)
+    try:
+        with open(filename, "wb") as out:
+            s = f.read()
+            while s:
+                out.write(s)
+                s = f.read()
+    finally:
+        f.close()
+    return open(filename, *args, **kw)
 
 class WarningsRecorder(object):
     """Convenience wrapper for the warnings list returned on
@@ -857,7 +864,8 @@ def _run_suite(suite):
         elif len(result.failures) == 1 and not result.errors:
             err = result.failures[0][1]
         else:
-            err = "errors occurred; run in verbose mode for details"
+            err = "multiple errors occurred"
+            if not verbose: err += "; run in verbose mode for details"
         raise TestFailed(err)
 
 
@@ -910,6 +918,23 @@ def run_doctest(module, verbosity=None):
         print('doctest (%s) ... %d tests with zero failures' %
               (module.__name__, t))
     return f, t
+
+
+#=======================================================================
+# Support for saving and restoring the imported modules.
+
+def modules_setup():
+    return sys.modules.copy(),
+
+def modules_cleanup(oldmodules):
+    # Encoders/decoders are registered permanently within the internal
+    # codec cache. If we destroy the corresponding modules their
+    # globals will be set to None which will trip up the cached functions.
+    encodings = [(k, v) for k, v in sys.modules.items()
+                 if k.startswith('encodings.')]
+    sys.modules.clear()
+    sys.modules.update(encodings)
+    sys.modules.update(oldmodules)
 
 #=======================================================================
 # Threading support to prevent reporting refleaks when running regrtest.py -R

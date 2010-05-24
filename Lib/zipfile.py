@@ -200,7 +200,10 @@ def _EndRecData(fpin):
     # Check to see if this is ZIP file with no archive comment (the
     # "end of central directory" structure should be the last item in the
     # file if this is the case).
-    fpin.seek(-sizeEndCentDir, 2)
+    try:
+        fpin.seek(-sizeEndCentDir, 2)
+    except IOError:
+        return None
     data = fpin.read()
     if data[0:4] == stringEndArchive and data[-2:] == b"\000\000":
         # the signature is correct and there's no comment, unpack structure
@@ -1188,22 +1191,21 @@ class ZipFile:
                 try:
                     filename, flag_bits = zinfo._encodeFilenameFlags()
                     centdir = struct.pack(structCentralDir,
-                     stringCentralDir, create_version,
-                     zinfo.create_system, extract_version, zinfo.reserved,
-                     flag_bits, zinfo.compress_type, dostime, dosdate,
-                     zinfo.CRC, compress_size, file_size,
-                     len(filename), len(extra_data), len(zinfo.comment),
-                     0, zinfo.internal_attr, zinfo.external_attr,
-                     header_offset)
+                        stringCentralDir, create_version,
+                        zinfo.create_system, extract_version, zinfo.reserved,
+                        flag_bits, zinfo.compress_type, dostime, dosdate,
+                        zinfo.CRC, compress_size, file_size,
+                        len(filename), len(extra_data), len(zinfo.comment),
+                        0, zinfo.internal_attr, zinfo.external_attr,
+                        header_offset)
                 except DeprecationWarning:
-                    print >>sys.stderr, (structCentralDir,
-                     stringCentralDir, create_version,
-                     zinfo.create_system, extract_version, zinfo.reserved,
-                     zinfo.flag_bits, zinfo.compress_type, dostime, dosdate,
-                     zinfo.CRC, compress_size, file_size,
-                     len(zinfo.filename), len(extra_data), len(zinfo.comment),
-                     0, zinfo.internal_attr, zinfo.external_attr,
-                     header_offset)
+                    print((structCentralDir, stringCentralDir, create_version,
+                        zinfo.create_system, extract_version, zinfo.reserved,
+                        zinfo.flag_bits, zinfo.compress_type, dostime, dosdate,
+                        zinfo.CRC, compress_size, file_size,
+                        len(zinfo.filename), len(extra_data), len(zinfo.comment),
+                        0, zinfo.internal_attr, zinfo.external_attr,
+                        header_offset), file=sys.stderr)
                     raise
                 self.fp.write(centdir)
                 self.fp.write(filename)
@@ -1255,7 +1257,7 @@ class ZipFile:
 class PyZipFile(ZipFile):
     """Class to create ZIP archives with Python library files and packages."""
 
-    def writepy(self, pathname, basename = ""):
+    def writepy(self, pathname, basename=""):
         """Add all files from "pathname" to the ZIP archive.
 
         If pathname is a package directory, search the directory and

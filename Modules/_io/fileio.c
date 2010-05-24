@@ -45,10 +45,10 @@
 typedef struct {
 	PyObject_HEAD
 	int fd;
-	unsigned readable : 1;
-	unsigned writable : 1;
-	int seekable : 2; /* -1 means unknown */
-	int closefd : 1;
+	unsigned int readable : 1;
+	unsigned int writable : 1;
+	signed int seekable : 2; /* -1 means unknown */
+	unsigned int closefd : 1;
 	PyObject *weakreflist;
 	PyObject *dict;
 } fileio;
@@ -602,7 +602,7 @@ fileio_read(fileio *self, PyObject *args)
 	if (!self->readable)
 		return err_mode("reading");
 
-	if (!PyArg_ParseTuple(args, "|n", &size))
+	if (!PyArg_ParseTuple(args, "|O&", &_PyIO_ConvertSsize_t, &size))
 		return NULL;
 
         if (size < 0) {
@@ -651,7 +651,7 @@ fileio_write(fileio *self, PyObject *args)
 	if (!self->writable)
 		return err_mode("writing");
 
-	if (!PyArg_ParseTuple(args, "s*", &pbuf))
+	if (!PyArg_ParseTuple(args, "y*", &pbuf))
 		return NULL;
 
 	if (_PyVerify_fd(self->fd)) {
@@ -761,8 +761,10 @@ fileio_tell(fileio *self, PyObject *args)
 static PyObject *
 fileio_truncate(fileio *self, PyObject *args)
 {
-	PyObject *posobj = NULL;
+	PyObject *posobj = NULL; /* the new size wanted by the user */
+#ifndef MS_WINDOWS
 	Py_off_t pos;
+#endif
 	int ret;
 	int fd;
 
@@ -777,58 +779,86 @@ fileio_truncate(fileio *self, PyObject *args)
 
 	if (posobj == Py_None || posobj == NULL) {
 		/* Get the current position. */
-                posobj = portable_lseek(fd, NULL, 1);
-                if (posobj == NULL)
+		posobj = portable_lseek(fd, NULL, 1);
+		if (posobj == NULL)
 			return NULL;
-        }
-        else {
-		/* Move to the position to be truncated. */
-                posobj = portable_lseek(fd, posobj, 0);
-        }
-	if (posobj == NULL)
-		return NULL;
-
-#if defined(HAVE_LARGEFILE_SUPPORT)
-	pos = PyLong_AsLongLong(posobj);
-#else
-	pos = PyLong_AsLong(posobj);
-#endif
-	if (pos == -1 && PyErr_Occurred())
-		return NULL;
+	}
+	else {
+		Py_INCREF(posobj);
+	}
 
 #ifdef MS_WINDOWS
 	/* MS _chsize doesn't work if newsize doesn't fit in 32 bits,
 	   so don't even try using it. */
 	{
+		PyObject *oldposobj, *tempposobj;
 		HANDLE hFile;
+	
+		/* we save the file pointer position */
+		oldposobj = portable_lseek(fd, NULL, 1); 
+		if (oldposobj == NULL) {
+			Py_DECREF(posobj);
+			return NULL;
+		}
+
+		/* we then move to the truncation position */
+		tempposobj = portable_lseek(fd, posobj, 0);
+		if (tempposobj == NULL) {
+			Py_DECREF(oldposobj);
+			Py_DECREF(posobj);
+			return NULL;
+		}
+		Py_DECREF(tempposobj);
 
 		/* Truncate.  Note that this may grow the file! */
 		Py_BEGIN_ALLOW_THREADS
 		errno = 0;
 		hFile = (HANDLE)_get_osfhandle(fd);
-		ret = hFile == (HANDLE)-1;
+		ret = hFile == (HANDLE)-1; /* testing for INVALID_HANDLE value */
 		if (ret == 0) {
 			ret = SetEndOfFile(hFile) == 0;
 			if (ret)
 				errno = EACCES;
 		}
 		Py_END_ALLOW_THREADS
+
+		/* we restore the file pointer position in any case */
+		tempposobj = portable_lseek(fd, oldposobj, 0);
+		Py_DECREF(oldposobj);
+		if (tempposobj == NULL) {
+			Py_DECREF(posobj);
+			return NULL;
+		}
+		Py_DECREF(tempposobj);
 	}
 #else
+
+#if defined(HAVE_LARGEFILE_SUPPORT)
+	pos = PyLong_AsLongLong(posobj);
+#else
+	pos = PyLong_AsLong(posobj);
+#endif
+	if (PyErr_Occurred()){
+		Py_DECREF(posobj);
+		return NULL;
+	}
+
 	Py_BEGIN_ALLOW_THREADS
 	errno = 0;
 	ret = ftruncate(fd, pos);
 	Py_END_ALLOW_THREADS
+
 #endif /* !MS_WINDOWS */
 
 	if (ret != 0) {
+		Py_DECREF(posobj);
 		PyErr_SetFromErrno(PyExc_IOError);
 		return NULL;
 	}
 
 	return posobj;
 }
-#endif
+#endif /* HAVE_FTRUNCATE */
 
 static char *
 mode_string(fileio *self)

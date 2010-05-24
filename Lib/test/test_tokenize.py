@@ -531,6 +531,24 @@ pass the '-ucompiler' option to process the full directory.
     ...         break
     ... else: True
     True
+
+Evil tabs
+    >>> dump_tokens("def f():\\n\\tif x\\n        \\tpass")
+    ENCODING   'utf-8'       (0, 0) (0, 0)
+    NAME       'def'         (1, 0) (1, 3)
+    NAME       'f'           (1, 4) (1, 5)
+    OP         '('           (1, 5) (1, 6)
+    OP         ')'           (1, 6) (1, 7)
+    OP         ':'           (1, 7) (1, 8)
+    NEWLINE    '\\n'          (1, 8) (1, 9)
+    INDENT     '\\t'          (2, 0) (2, 1)
+    NAME       'if'          (2, 1) (2, 3)
+    NAME       'x'           (2, 4) (2, 5)
+    NEWLINE    '\\n'          (2, 5) (2, 6)
+    INDENT     '        \\t'  (3, 0) (3, 9)
+    NAME       'pass'        (3, 9) (3, 13)
+    DEDENT     ''            (4, 0) (4, 0)
+    DEDENT     ''            (4, 0) (4, 0)
 """
 
 from test import support
@@ -719,7 +737,7 @@ class TestDetectEncoding(TestCase):
             b'do_something(else)\n'
         )
         encoding, consumed_lines = detect_encoding(self.get_readline(lines))
-        self.assertEquals(encoding, 'latin-1')
+        self.assertEquals(encoding, 'iso-8859-1')
         self.assertEquals(consumed_lines, [b'# -*- coding: latin-1 -*-\n'])
 
     def test_matched_bom_and_cookie_first_line(self):
@@ -774,6 +792,34 @@ class TestDetectEncoding(TestCase):
         )
         readline = self.get_readline(lines)
         self.assertRaises(SyntaxError, detect_encoding, readline)
+
+    def test_latin1_normalization(self):
+        # See get_normal_name() in tokenizer.c.
+        encodings = ("latin-1", "iso-8859-1", "iso-latin-1", "latin-1-unix",
+                     "iso-8859-1-unix", "iso-latin-1-mac")
+        for encoding in encodings:
+            for rep in ("-", "_"):
+                enc = encoding.replace("-", rep)
+                lines = (b"#!/usr/bin/python\n",
+                         b"# coding: " + enc.encode("ascii") + b"\n",
+                         b"print(things)\n",
+                         b"do_something += 4\n")
+                rl = self.get_readline(lines)
+                found, consumed_lines = detect_encoding(rl)
+                self.assertEquals(found, "iso-8859-1")
+
+    def test_utf8_normalization(self):
+        # See get_normal_name() in tokenizer.c.
+        encodings = ("utf-8", "utf-8-mac", "utf-8-unix")
+        for encoding in encodings:
+            for rep in ("-", "_"):
+                enc = encoding.replace("-", rep)
+                lines = (b"#!/usr/bin/python\n",
+                         b"# coding: " + enc.encode("ascii") + b"\n",
+                         b"1 + 3\n")
+                rl = self.get_readline(lines)
+                found, consumed_lines = detect_encoding(rl)
+                self.assertEquals(found, "utf-8")
 
     def test_short_files(self):
         readline = self.get_readline((b'print(something)\n',))

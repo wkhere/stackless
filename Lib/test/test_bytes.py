@@ -452,8 +452,9 @@ class BaseBytesTest(unittest.TestCase):
 
     def test_maketrans(self):
         transtable = b'\000\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037 !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`xyzdefghijklmnopqrstuvwxyz{|}~\177\200\201\202\203\204\205\206\207\210\211\212\213\214\215\216\217\220\221\222\223\224\225\226\227\230\231\232\233\234\235\236\237\240\241\242\243\244\245\246\247\250\251\252\253\254\255\256\257\260\261\262\263\264\265\266\267\270\271\272\273\274\275\276\277\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317\320\321\322\323\324\325\326\327\330\331\332\333\334\335\336\337\340\341\342\343\344\345\346\347\350\351\352\353\354\355\356\357\360\361\362\363\364\365\366\367\370\371\372\373\374\375\376\377'
-
         self.assertEqual(self.type2test.maketrans(b'abc', b'xyz'), transtable)
+        transtable = b'\000\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037 !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\177\200\201\202\203\204\205\206\207\210\211\212\213\214\215\216\217\220\221\222\223\224\225\226\227\230\231\232\233\234\235\236\237\240\241\242\243\244\245\246\247\250\251\252\253\254\255\256\257\260\261\262\263\264\265\266\267\270\271\272\273\274\275\276\277\300\301\302\303\304\305\306\307\310\311\312\313\314\315\316\317\320\321\322\323\324\325\326\327\330\331\332\333\334\335\336\337\340\341\342\343\344\345\346\347\350\351\352\353\354\355\356\357\360\361\362\363\364\365\366\367\370\371\372\373\374xyz'
+        self.assertEqual(self.type2test.maketrans(b'\375\376\377', b'xyz'), transtable)
         self.assertRaises(ValueError, self.type2test.maketrans, b'abc', b'xyzq')
         self.assertRaises(TypeError, self.type2test.maketrans, 'abc', 'def')
 
@@ -594,7 +595,7 @@ class ByteArrayTest(BaseBytesTest):
         self.assertEqual(b, bytearray([0, 1, 2, 42, 42, 42, 3, 4, 5, 6, 7, 8, 9]))
 
     def test_extended_set_del_slice(self):
-        indices = (0, None, 1, 3, 19, 300, -1, -2, -31, -300)
+        indices = (0, None, 1, 3, 19, 300, 1<<333, -1, -2, -31, -300)
         for start in indices:
             for stop in indices:
                 # Skip invalid step 0
@@ -716,6 +717,8 @@ class ByteArrayTest(BaseBytesTest):
         self.assertEqual(b.pop(-2), ord('r'))
         self.assertRaises(IndexError, lambda: b.pop(10))
         self.assertRaises(OverflowError, lambda: bytearray().pop())
+        # test for issue #6846
+        self.assertEqual(bytearray(b'\xff').pop(), 0xff)
 
     def test_nosort(self):
         self.assertRaises(AttributeError, lambda: bytearray().sort())
@@ -807,6 +810,14 @@ class ByteArrayTest(BaseBytesTest):
             b[1:-1:2] = b""
         self.assertRaises(BufferError, delslice)
         self.assertEquals(b, orig)
+
+    def test_empty_bytearray(self):
+        # Issue #7561: operations on empty bytearrays could crash in many
+        # situations, due to a fragile implementation of the
+        # PyByteArray_AS_STRING() C macro.
+        self.assertRaises(ValueError, int, bytearray(b''))
+        self.assertRaises((ValueError, OSError), os.mkdir, bytearray(b''))
+
 
 class AssortedBytesTest(unittest.TestCase):
     #
@@ -930,7 +941,7 @@ class AssortedBytesTest(unittest.TestCase):
             self.assertRaises(BytesWarning, operator.eq, bytearray(b''), '')
             self.assertRaises(BytesWarning, operator.ne, bytearray(b''), '')
         else:
-            # raise test.support.TestSkipped("BytesWarning is needed for this test: use -bb option")
+            # self.skipTest("BytesWarning is needed for this test: use -bb option")
             pass
 
     # Optimizations:
@@ -1070,13 +1081,10 @@ class ByteArraySubclassTest(unittest.TestCase):
 
 
 def test_main():
-    test.support.run_unittest(BytesTest)
-    test.support.run_unittest(ByteArrayTest)
-    test.support.run_unittest(AssortedBytesTest)
-    test.support.run_unittest(BytesAsStringTest)
-    test.support.run_unittest(ByteArrayAsStringTest)
-    test.support.run_unittest(ByteArraySubclassTest)
-    test.support.run_unittest(BytearrayPEP3137Test)
+    test.support.run_unittest(
+        BytesTest, AssortedBytesTest, BytesAsStringTest,
+        ByteArrayTest, ByteArrayAsStringTest, ByteArraySubclassTest,
+        BytearrayPEP3137Test)
 
 if __name__ == "__main__":
     test_main()

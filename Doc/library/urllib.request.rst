@@ -14,7 +14,7 @@ authentication, redirections, cookies and more.
 The :mod:`urllib.request` module defines the following functions:
 
 
-.. function:: urlopen(url[, data][, timeout])
+.. function:: urlopen(url, data=None[, timeout])
 
    Open the URL *url*, which can be either a string or a
    :class:`Request` object.
@@ -49,6 +49,9 @@ The :mod:`urllib.request` module defines the following functions:
    the default installed global :class:`OpenerDirector` uses
    :class:`UnknownHandler` to ensure this never happens).
 
+   In addition, default installed :class:`ProxyHandler` makes sure the requests
+   are handled through the proxy when they are set.
+
    The legacy ``urllib.urlopen`` function from Python 2.6 and earlier has been
    discontinued; :func:`urlopen` corresponds to the old ``urllib2.urlopen``.
    Proxy handling, which was done by passing a dictionary parameter to
@@ -75,13 +78,14 @@ The :mod:`urllib.request` module defines the following functions:
    :class:`HTTPRedirectHandler`, :class:`FTPHandler`, :class:`FileHandler`,
    :class:`HTTPErrorProcessor`.
 
-   If the Python installation has SSL support (i.e., if the :mod:`ssl` module can be imported),
-   :class:`HTTPSHandler` will also be added.
+   If the Python installation has SSL support (i.e., if the :mod:`ssl` module
+   can be imported), :class:`HTTPSHandler` will also be added.
 
    A :class:`BaseHandler` subclass may also change its :attr:`handler_order`
    member variable to modify its position in the handlers list.
 
-.. function:: urlretrieve(url[, filename[, reporthook[, data]]])
+
+.. function:: urlretrieve(url, filename=None, reporthook=None, data=None)
 
    Copy a network object denoted by a URL to a local file, if necessary. If the URL
    points to a local file, or a valid cached copy of the object exists, the object
@@ -160,9 +164,18 @@ The :mod:`urllib.request` module defines the following functions:
    path.  This does not accept a complete URL.  This function uses :func:`unquote`
    to decode *path*.
 
+.. function:: getproxies()
+
+   This helper function returns a dictionary of scheme to proxy server URL
+   mappings. It scans the environment for variables named ``<scheme>_proxy``
+   for all operating systems first, and when it cannot find it, looks for proxy
+   information from Mac OSX System Configuration for Mac OS X and Windows
+   Systems Registry for Windows.
+
+
 The following classes are provided:
 
-.. class:: Request(url[, data][, headers][, origin_req_host][, unverifiable])
+.. class:: Request(url, data=None, headers={}, origin_req_host=None, unverifiable=False)
 
    This class is an abstraction of a URL request.
 
@@ -205,7 +218,8 @@ The following classes are provided:
    document, and the user had no option to approve the automatic
    fetching of the image, this should be true.
 
-.. class:: URLopener([proxies[, **x509]])
+
+.. class:: URLopener(proxies=None, **x509)
 
    Base class for opening and reading URLs.  Unless you need to support opening
    objects using schemes other than :file:`http:`, :file:`ftp:`, or :file:`file:`,
@@ -230,7 +244,7 @@ The following classes are provided:
    :class:`URLopener` objects will raise an :exc:`IOError` exception if the server
    returns an error code.
 
-    .. method:: open(fullurl[, data])
+    .. method:: open(fullurl, data=None)
 
        Open *fullurl* using the appropriate protocol.  This method sets up cache and
        proxy information, then calls the appropriate open method with its input
@@ -239,12 +253,12 @@ The following classes are provided:
        :func:`urlopen`.
 
 
-    .. method:: open_unknown(fullurl[, data])
+    .. method:: open_unknown(fullurl, data=None)
 
        Overridable interface to open unknown URL types.
 
 
-    .. method:: retrieve(url[, filename[, reporthook[, data]]])
+    .. method:: retrieve(url, filename=None, reporthook=None, data=None)
 
        Retrieves the contents of *url* and places it in *filename*.  The return value
        is a tuple consisting of a local filename and either a
@@ -337,16 +351,21 @@ The following classes are provided:
    A class to handle redirections.
 
 
-.. class:: HTTPCookieProcessor([cookiejar])
+.. class:: HTTPCookieProcessor(cookiejar=None)
 
    A class to handle HTTP Cookies.
 
 
-.. class:: ProxyHandler([proxies])
+.. class:: ProxyHandler(proxies=None)
 
    Cause requests to go through a proxy. If *proxies* is given, it must be a
    dictionary mapping protocol names to URLs of proxies. The default is to read the
    list of proxies from the environment variables :envvar:`<protocol>_proxy`.
+   If no proxy environment variables are set, in a Windows environment, proxy
+   settings are obtained from the registry's Internet Settings section and in a
+   Mac OS X environment, proxy information is retrieved from the OS X System
+   Configuration Framework.
+
    To disable autodetected proxy pass an empty dictionary.
 
 
@@ -362,7 +381,7 @@ The following classes are provided:
    fits.
 
 
-.. class:: AbstractBasicAuthHandler([password_mgr])
+.. class:: AbstractBasicAuthHandler(password_mgr=None)
 
    This is a mixin class that helps with HTTP authentication, both to the remote
    host and to a proxy. *password_mgr*, if given, should be something that is
@@ -371,7 +390,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: HTTPBasicAuthHandler([password_mgr])
+.. class:: HTTPBasicAuthHandler(password_mgr=None)
 
    Handle authentication with the remote host. *password_mgr*, if given, should be
    something that is compatible with :class:`HTTPPasswordMgr`; refer to section
@@ -379,7 +398,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: ProxyBasicAuthHandler([password_mgr])
+.. class:: ProxyBasicAuthHandler(password_mgr=None)
 
    Handle authentication with the proxy. *password_mgr*, if given, should be
    something that is compatible with :class:`HTTPPasswordMgr`; refer to section
@@ -387,7 +406,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: AbstractDigestAuthHandler([password_mgr])
+.. class:: AbstractDigestAuthHandler(password_mgr=None)
 
    This is a mixin class that helps with HTTP authentication, both to the remote
    host and to a proxy. *password_mgr*, if given, should be something that is
@@ -396,7 +415,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: HTTPDigestAuthHandler([password_mgr])
+.. class:: HTTPDigestAuthHandler(password_mgr=None)
 
    Handle authentication with the remote host. *password_mgr*, if given, should be
    something that is compatible with :class:`HTTPPasswordMgr`; refer to section
@@ -404,7 +423,7 @@ The following classes are provided:
    supported.
 
 
-.. class:: ProxyDigestAuthHandler([password_mgr])
+.. class:: ProxyDigestAuthHandler(password_mgr=None)
 
    Handle authentication with the proxy. *password_mgr*, if given, should be
    something that is compatible with :class:`HTTPPasswordMgr`; refer to section
@@ -597,7 +616,7 @@ OpenerDirector Objects
      post-process *protocol* responses.
 
 
-.. method:: OpenerDirector.open(url[, data][, timeout])
+.. method:: OpenerDirector.open(url, data=None[, timeout])
 
    Open the given *url* (which can be a request object or a string), optionally
    passing the given *data*. Arguments, return values and exceptions raised are
@@ -609,7 +628,7 @@ OpenerDirector Objects
    HTTP, HTTPS, FTP and FTPS connections).
 
 
-.. method:: OpenerDirector.error(proto[, arg[, ...]])
+.. method:: OpenerDirector.error(proto, *args)
 
    Handle an error of the given protocol.  This will call the registered error
    handlers for the given protocol with the given arguments (which are protocol
@@ -1105,10 +1124,10 @@ programmatically-supplied proxy URLs, and adds proxy authorization support with
 :class:`ProxyBasicAuthHandler`. ::
 
    proxy_handler = urllib.request.ProxyHandler({'http': 'http://www.example.com:3128/'})
-   proxy_auth_handler = urllib.request.HTTPBasicAuthHandler()
+   proxy_auth_handler = urllib.request.ProxyBasicAuthHandler()
    proxy_auth_handler.add_password('realm', 'host', 'username', 'password')
 
-   opener = build_opener(proxy_handler, proxy_auth_handler)
+   opener = urllib.request.build_opener(proxy_handler, proxy_auth_handler)
    # This time, rather than install the OpenerDirector, we use it directly:
    opener.open('http://www.example.com/login.html')
 

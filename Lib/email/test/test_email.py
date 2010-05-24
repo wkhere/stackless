@@ -1,4 +1,4 @@
-# Copyright (C) 2001-2007 Python Software Foundation
+# Copyright (C) 2001-2010 Python Software Foundation
 # Contact: email-sig@python.org
 # email package unit tests
 
@@ -177,6 +177,18 @@ class TestMessageAPI(TestEmailBase):
         msg = self._msgobj('msg_03.txt')
         self.assertRaises(errors.HeaderParseError,
                           msg.set_boundary, 'BOUNDARY')
+
+    def test_message_rfc822_only(self):
+        # Issue 7970: message/rfc822 not in multipart parsed by
+        # HeaderParser caused an exception when flattened.
+        fp = openfile(findfile('msg_46.txt'))
+        msgdata = fp.read()
+        parser = HeaderParser()
+        msg = parser.parsestr(msgdata)
+        out = StringIO()
+        gen = Generator(out, True, 0)
+        gen.flatten(msg, False)
+        self.assertEqual(out.getvalue(), msgdata)
 
     def test_get_decoded_payload(self):
         eq = self.assertEqual
@@ -3384,6 +3396,44 @@ Content-Type: application/x-foo;
         eq(charset, 'us-ascii')
         eq(language, 'en-us')
         eq(s, 'My Document For You')
+
+
+
+# Tests to ensure that signed parts of an email are completely preserved, as
+# required by RFC1847 section 2.1.  Note that these are incomplete, because the
+# email package does not currently always preserve the body.  See issue 1670765.
+class TestSigned(TestEmailBase):
+
+    def _msg_and_obj(self, filename):
+        with openfile(findfile(filename)) as fp:
+            original = fp.read()
+            msg = email.message_from_string(original)
+        return original, msg
+
+    def _signed_parts_eq(self, original, result):
+        # Extract the first mime part of each message
+        import re
+        repart = re.compile(r'^--([^\n]+)\n(.*?)\n--\1$', re.S | re.M)
+        inpart = repart.search(original).group(2)
+        outpart = repart.search(result).group(2)
+        self.assertEqual(outpart, inpart)
+
+    def test_long_headers_as_string(self):
+        original, msg = self._msg_and_obj('msg_45.txt')
+        result = msg.as_string()
+        self._signed_parts_eq(original, result)
+
+    def test_long_headers_as_string_maxheaderlen(self):
+        original, msg = self._msg_and_obj('msg_45.txt')
+        result = msg.as_string(maxheaderlen=60)
+        self._signed_parts_eq(original, result)
+
+    def test_long_headers_flatten(self):
+        original, msg = self._msg_and_obj('msg_45.txt')
+        fp = StringIO()
+        Generator(fp).flatten(msg)
+        result = fp.getvalue()
+        self._signed_parts_eq(original, result)
 
 
 

@@ -35,13 +35,13 @@ programmer to use all the commands, classes and methods interactively when using
 the module from within IDLE run with the ``-n`` switch.
 
 The turtle module provides turtle graphics primitives, in both object-oriented
-and procedure-oriented ways.  Because it uses :mod:`Tkinter` for the underlying
-graphics, it needs a version of python installed with Tk support.
+and procedure-oriented ways.  Because it uses :mod:`tkinter` for the underlying
+graphics, it needs a version of Python installed with Tk support.
 
 The object-oriented interface uses essentially two+two classes:
 
 1. The :class:`TurtleScreen` class defines graphics windows as a playground for
-   the drawing turtles.  Its constructor needs a :class:`Tkinter.Canvas` or a
+   the drawing turtles.  Its constructor needs a :class:`tkinter.Canvas` or a
    :class:`ScrolledCanvas` as argument.  It should be used when :mod:`turtle` is
    used as part of some application.
 
@@ -645,7 +645,7 @@ Tell Turtle's state
       >>> turtle.forward(100)
       >>> turtle.pos()
       (64.28,76.60)
-      >>> print turtle.xcor()
+      >>> print(turtle.xcor())
       64.2787609687
 
 
@@ -658,9 +658,9 @@ Tell Turtle's state
       >>> turtle.home()
       >>> turtle.left(60)
       >>> turtle.forward(100)
-      >>> print turtle.pos()
+      >>> print(turtle.pos())
       (50.00,86.60)
-      >>> print turtle.ycor()
+      >>> print(turtle.ycor())
       86.6025403784
 
 
@@ -1223,6 +1223,8 @@ Appearance
       >>> turtle.settiltangle(-45)
       >>> turtle.fd(50)
 
+   .. deprecated:: 3.1
+
 
 .. function:: tiltangle(angle=None)
 
@@ -1235,8 +1237,6 @@ Appearance
    If angle is not given: return the current tilt-angle, i. e. the angle
    between the orientation of the turtleshape and the heading of the
    turtle (its direction of movement).
-
-   Deprecated since Python 3.1
 
    .. doctest::
 
@@ -1998,7 +1998,7 @@ The public classes of the module :mod:`turtle`
 .. class:: RawTurtle(canvas)
            RawPen(canvas)
 
-   :param canvas: a :class:`Tkinter.Canvas`, a :class:`ScrolledCanvas` or a
+   :param canvas: a :class:`tkinter.Canvas`, a :class:`ScrolledCanvas` or a
                   :class:`TurtleScreen`
 
    Create a turtle.  The turtle has all methods described above as "methods of
@@ -2013,7 +2013,7 @@ The public classes of the module :mod:`turtle`
 
 .. class:: TurtleScreen(cv)
 
-   :param cv: a :class:`Tkinter.Canvas`
+   :param cv: a :class:`tkinter.Canvas`
 
    Provides screen oriented methods like :func:`setbg` etc. that are described
    above.
@@ -2023,7 +2023,7 @@ The public classes of the module :mod:`turtle`
    Subclass of TurtleScreen, with :ref:`four methods added <screenspecific>`.
 
 
-.. class:: ScrolledCavas(master)
+.. class:: ScrolledCanvas(master)
 
    :param master: some Tkinter widget to contain the ScrolledCanvas, i.e.
       a Tkinter-canvas with scrollbars added

@@ -521,6 +521,9 @@
 /* Define if you have readline 4.2 */
 #undef HAVE_RL_COMPLETION_MATCHES
 
+/* Define if you have rl_completion_suppress_append */
+#undef HAVE_RL_COMPLETION_SUPPRESS_APPEND
+
 /* Define if you have readline 4.0 */
 #undef HAVE_RL_PRE_INPUT_HOOK
 
@@ -891,6 +894,9 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* Define if POSIX semaphores aren't enabled on your system */
+#undef POSIX_SEMAPHORES_NOT_ENABLED
 
 /* Defined if PTHREAD_SCOPE_SYSTEM supported. */
 #undef PTHREAD_SYSTEM_SCHED_SUPPORTED

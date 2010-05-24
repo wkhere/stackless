@@ -130,12 +130,12 @@ This module offers the following functions:
    +-------+--------------------------------------------+
 
 
-.. function:: ExpandEnvironmentStrings(unicode)
+.. function:: ExpandEnvironmentStrings(str)
 
-   Expands environment strings %NAME% in unicode string like const:`REG_EXPAND_SZ`::
+   Expands environment strings %NAME% in unicode string like :const:`REG_EXPAND_SZ`::
 
-      >>> ExpandEnvironmentStrings(u"%windir%")
-      u"C:\\Windows"
+      >>> ExpandEnvironmentStrings('%windir%')
+      'C:\\Windows'
 
 
 .. function:: FlushKey(key)
@@ -183,7 +183,7 @@ This module offers the following functions:
    :const:`HKEY_LOCAL_MACHINE` tree. This may or may not be true.
 
 
-.. function:: OpenKey(key, sub_key[, res=0][, sam=KEY_READ])
+.. function:: OpenKey(key, sub_key, res=0, sam=KEY_READ)
 
    Opens the specified key, returning a :dfn:`handle object`
 
@@ -195,7 +195,7 @@ This module offers the following functions:
    *res* is a reserved integer, and must be zero.  The default is zero.
 
    *sam* is an integer that specifies an access mask that describes  the desired
-   security access for the key.  Default is :const:`KEY_READ`
+   security access for the key.  Default is :const:`KEY_READ`.
 
    The result is a new handle to the specified key.
 
@@ -367,7 +367,7 @@ This module offers the following functions:
    key.  The key identified by the key parameter must have been opened with
    :const:`KEY_SET_VALUE` access.
 
-   To open the key, use the :func:`CreateKeyEx` or  :func:`OpenKey` methods.
+   To open the key, use the :func:`CreateKey` or  :func:`OpenKey` methods.
 
    Value lengths are limited by available memory. Long values (more than 2048
    bytes) should be stored as files with the filenames stored in the configuration

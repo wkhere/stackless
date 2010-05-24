@@ -1,4 +1,3 @@
-
 :mod:`sys` --- System-specific parameters and functions
 =======================================================
 
@@ -200,11 +199,7 @@ always available.
    +==============================+==========================================+
    | :const:`debug`               | -d                                       |
    +------------------------------+------------------------------------------+
-   | :const:`py3k_warning`        | -3                                       |
-   +------------------------------+------------------------------------------+
    | :const:`division_warning`    | -Q                                       |
-   +------------------------------+------------------------------------------+
-   | :const:`division_new`        | -Qnew                                    |
    +------------------------------+------------------------------------------+
    | :const:`inspect`             | -i                                       |
    +------------------------------+------------------------------------------+
@@ -214,13 +209,15 @@ always available.
    +------------------------------+------------------------------------------+
    | :const:`dont_write_bytecode` | -B                                       |
    +------------------------------+------------------------------------------+
+   | :const:`no_user_site`        | -s                                       |
+   +------------------------------+------------------------------------------+
    | :const:`no_site`             | -S                                       |
    +------------------------------+------------------------------------------+
    | :const:`ignore_environment`  | -E                                       |
    +------------------------------+------------------------------------------+
    | :const:`verbose`             | -v                                       |
    +------------------------------+------------------------------------------+
-   | :const:`unicode`             | -U                                       |
+   | :const:`bytes_warning`       | -b                                       |
    +------------------------------+------------------------------------------+
 
 
@@ -338,12 +335,12 @@ always available.
    does not have to hold true for third-party extensions as it is implementation
    specific.
 
-   The *default* argument allows to define a value which will be returned
-   if the object type does not provide means to retrieve the size and would
-   cause a `TypeError`.
+   If given, *default* will be returned if the object does not provide means to
+   retrieve the size.  Otherwise a `TypeError` will be raised.
 
-   func:`getsizeof` calls the object's __sizeof__ method and adds an additional
-   garbage collector overhead if the object is managed by the garbage collector.
+   :func:`getsizeof` calls the object's ``__sizeof__`` method and adds an
+   additional garbage collector overhead if the object is managed by the garbage
+   collector.
 
 
 .. function:: _getframe([depth])
@@ -353,7 +350,10 @@ always available.
    that is deeper than the call stack, :exc:`ValueError` is raised.  The default
    for *depth* is zero, returning the frame at the top of the call stack.
 
-   This function should be used for internal and specialized purposes only.
+   .. impl-detail::
+
+      This function should be used for internal and specialized purposes only.
+      It is not guaranteed to exist in all implementations of Python.
 
 
 .. function:: getprofile()
@@ -373,12 +373,12 @@ always available.
 
    Get the trace function as set by :func:`settrace`.
 
-   .. note::
+   .. impl-detail::
 
       The :func:`gettrace` function is intended only for implementing debuggers,
-      profilers, coverage tools and the like. Its behavior is part of the
-      implementation platform, rather than part of the language definition,
-      and thus may not be available in all Python implementations.
+      profilers, coverage tools and the like.  Its behavior is part of the
+      implementation platform, rather than part of the language definition, and
+      thus may not be available in all Python implementations.
 
 
 .. function:: getwindowsversion()
@@ -749,12 +749,12 @@ always available.
 
    For more information on code and frame objects, refer to :ref:`types`.
 
-   .. note::
+   .. impl-detail::
 
       The :func:`settrace` function is intended only for implementing debuggers,
-      profilers, coverage tools and the like. Its behavior is part of the
-      implementation platform, rather than part of the language definition, and thus
-      may not be available in all Python implementations.
+      profilers, coverage tools and the like.  Its behavior is part of the
+      implementation platform, rather than part of the language definition, and
+      thus may not be available in all Python implementations.
 
 
 .. function:: settscdump(on_flag)

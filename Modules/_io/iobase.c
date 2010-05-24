@@ -102,8 +102,8 @@ iobase_tell(PyObject *self, PyObject *args)
 PyDoc_STRVAR(iobase_truncate_doc,
     "Truncate file to size bytes.\n"
     "\n"
-    "Size defaults to the current IO position as reported by tell().  Return\n"
-    "the new size.");
+    "File pointer is left unchanged.  Size defaults to the current IO\n"
+    "position as reported by tell().  Returns the new size.");
 
 static PyObject *
 iobase_truncate(PyObject *self, PyObject *args)
@@ -455,7 +455,7 @@ iobase_readline(PyObject *self, PyObject *args)
     PyObject *buffer, *result;
     Py_ssize_t old_size = -1;
 
-    if (!PyArg_ParseTuple(args, "|n:readline", &limit)) {
+    if (!PyArg_ParseTuple(args, "|O&:readline", &_PyIO_ConvertSsize_t, &limit)) {
         return NULL;
     }
 
@@ -577,15 +577,10 @@ static PyObject *
 iobase_readlines(PyObject *self, PyObject *args)
 {
     Py_ssize_t hint = -1, length = 0;
-    PyObject *hintobj = Py_None, *result;
+    PyObject *result;
 
-    if (!PyArg_ParseTuple(args, "|O:readlines", &hintobj)) {
+    if (!PyArg_ParseTuple(args, "|O&:readlines", &_PyIO_ConvertSsize_t, &hint)) {
         return NULL;
-    }
-    if (hintobj != Py_None) {
-        hint = PyNumber_AsSsize_t(hintobj, PyExc_ValueError);
-        if (hint == -1 && PyErr_Occurred())
-            return NULL;
     }
 
     result = PyList_New(0);

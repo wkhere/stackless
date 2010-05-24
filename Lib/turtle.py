@@ -2,7 +2,7 @@
 # turtle.py: a Tkinter based turtle graphics module for Python
 # Version 1.1b - 4. 5. 2009
 #
-# Copyright (C) 2006 - 2009  Gregor Lingl
+# Copyright (C) 2006 - 2010  Gregor Lingl
 # email: glingl@aon.at
 #
 # This software is provided 'as-is', without any express or implied
@@ -126,7 +126,7 @@ _tg_screen_functions = ['addshape', 'bgcolor', 'bgpic', 'bye',
 _tg_turtle_functions = ['back', 'backward', 'begin_fill', 'begin_poly', 'bk',
         'circle', 'clear', 'clearstamp', 'clearstamps', 'clone', 'color',
         'degrees', 'distance', 'dot', 'down', 'end_fill', 'end_poly', 'fd',
-        'fillcolor', 'forward', 'get_poly', 'getpen', 'getscreen', 'get_shapepoly',
+        'fillcolor', 'filling', 'forward', 'get_poly', 'getpen', 'getscreen', 'get_shapepoly',
         'getturtle', 'goto', 'heading', 'hideturtle', 'home', 'ht', 'isdown',
         'isvisible', 'left', 'lt', 'onclick', 'ondrag', 'onrelease', 'pd',
         'pen', 'pencolor', 'pendown', 'pensize', 'penup', 'pos', 'position',

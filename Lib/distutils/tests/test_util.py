@@ -1,16 +1,13 @@
 """Tests for distutils.util."""
-# not covered yet:
-#    - byte_compile
-#
 import os
 import sys
 import unittest
 from copy import copy
 
-from distutils.errors import DistutilsPlatformError
+from distutils.errors import DistutilsPlatformError, DistutilsByteCompileError
 from distutils.util import (get_platform, convert_path, change_root,
                             check_environ, split_quoted, strtobool,
-                            rfc822_escape)
+                            rfc822_escape, byte_compile)
 from distutils import util # used to patch _environ_checked
 from distutils.sysconfig import get_config_vars
 from distutils import sysconfig
@@ -94,15 +91,20 @@ class UtilTestCase(support.EnvironGuard, unittest.TestCase):
                    ('Darwin Kernel Version 8.11.1: '
                     'Wed Oct 10 18:23:28 PDT 2007; '
                     'root:xnu-792.25.20~1/RELEASE_I386'), 'i386'))
-        self.environ['MACOSX_DEPLOYMENT_TARGET'] = '10.3'
+        os.environ['MACOSX_DEPLOYMENT_TARGET'] = '10.3'
 
         get_config_vars()['CFLAGS'] = ('-fno-strict-aliasing -DNDEBUG -g '
                                        '-fwrapv -O3 -Wall -Wstrict-prototypes')
 
-        self.assertEquals(get_platform(), 'macosx-10.3-i386')
+        cursize = sys.maxsize
+        sys.maxsize = (2 ** 31)-1
+        try:
+            self.assertEquals(get_platform(), 'macosx-10.3-i386')
+        finally:
+            sys.maxsize = cursize
 
         # macbook with fat binaries (fat, universal or fat64)
-        self.environ['MACOSX_DEPLOYMENT_TARGET'] = '10.4'
+        os.environ['MACOSX_DEPLOYMENT_TARGET'] = '10.4'
         get_config_vars()['CFLAGS'] = ('-arch ppc -arch i386 -isysroot '
                                        '/Developer/SDKs/MacOSX10.4u.sdk  '
                                        '-fno-strict-aliasing -fno-common '
@@ -115,14 +117,34 @@ class UtilTestCase(support.EnvironGuard, unittest.TestCase):
                                        '-fno-strict-aliasing -fno-common '
                                        '-dynamic -DNDEBUG -g -O3')
 
+        self.assertEquals(get_platform(), 'macosx-10.4-intel')
+
+        get_config_vars()['CFLAGS'] = ('-arch x86_64 -arch ppc -arch i386 -isysroot '
+                                       '/Developer/SDKs/MacOSX10.4u.sdk  '
+                                       '-fno-strict-aliasing -fno-common '
+                                       '-dynamic -DNDEBUG -g -O3')
+        self.assertEquals(get_platform(), 'macosx-10.4-fat3')
+
+        get_config_vars()['CFLAGS'] = ('-arch ppc64 -arch x86_64 -arch ppc -arch i386 -isysroot '
+                                       '/Developer/SDKs/MacOSX10.4u.sdk  '
+                                       '-fno-strict-aliasing -fno-common '
+                                       '-dynamic -DNDEBUG -g -O3')
         self.assertEquals(get_platform(), 'macosx-10.4-universal')
 
-        get_config_vars()['CFLAGS'] = ('-arch x86_64 -isysroot '
+        get_config_vars()['CFLAGS'] = ('-arch x86_64 -arch ppc64 -isysroot '
                                        '/Developer/SDKs/MacOSX10.4u.sdk  '
                                        '-fno-strict-aliasing -fno-common '
                                        '-dynamic -DNDEBUG -g -O3')
 
         self.assertEquals(get_platform(), 'macosx-10.4-fat64')
+
+        for arch in ('ppc', 'i386', 'x86_64', 'ppc64'):
+            get_config_vars()['CFLAGS'] = ('-arch %s -isysroot '
+                                           '/Developer/SDKs/MacOSX10.4u.sdk  '
+                                           '-fno-strict-aliasing -fno-common '
+                                           '-dynamic -DNDEBUG -g -O3'%(arch,))
+
+            self.assertEquals(get_platform(), 'macosx-10.4-%s'%(arch,))
 
         # linux debian sarge
         os.name = 'posix'
@@ -203,17 +225,18 @@ class UtilTestCase(support.EnvironGuard, unittest.TestCase):
 
     def test_check_environ(self):
         util._environ_checked = 0
+        if 'HOME' in os.environ:
+            del os.environ['HOME']
 
         # posix without HOME
         if os.name == 'posix':  # this test won't run on windows
             check_environ()
             import pwd
-            self.assertEquals(self.environ['HOME'],
-                            pwd.getpwuid(os.getuid())[5])
+            self.assertEquals(os.environ['HOME'], pwd.getpwuid(os.getuid())[5])
         else:
             check_environ()
 
-        self.assertEquals(self.environ['PLAT'], get_platform())
+        self.assertEquals(os.environ['PLAT'], get_platform())
         self.assertEquals(util._environ_checked, 1)
 
     def test_split_quoted(self):
@@ -236,6 +259,16 @@ class UtilTestCase(support.EnvironGuard, unittest.TestCase):
         wanted = ('I am a%(8s)spoor%(8s)slonesome%(8s)s'
                   'header%(8s)s') % {'8s': '\n'+8*' '}
         self.assertEquals(res, wanted)
+
+    def test_dont_write_bytecode(self):
+        # makes sure byte_compile raise a DistutilsError
+        # if sys.dont_write_bytecode is True
+        old_dont_write_bytecode = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        try:
+            self.assertRaises(DistutilsByteCompileError, byte_compile, [])
+        finally:
+            sys.dont_write_bytecode = old_dont_write_bytecode
 
 def test_suite():
     return unittest.makeSuite(UtilTestCase)

@@ -13,25 +13,33 @@ module.  For creating temporary files and directories see the :mod:`tempfile`
 module, and for high-level file and directory handling see the :mod:`shutil`
 module.
 
-The design of all built-in operating system dependent modules of Python is such
-that as long as the same functionality is available, it uses the same interface;
-for example, the function ``os.stat(path)`` returns stat information about
-*path* in the same format (which happens to have originated with the POSIX
-interface).
+Notes on the availability of these functions:
 
-Extensions peculiar to a particular operating system are also available through
-the :mod:`os` module, but using them is of course a threat to portability!
+* The design of all built-in operating system dependent modules of Python is
+  such that as long as the same functionality is available, it uses the same
+  interface; for example, the function ``os.stat(path)`` returns stat
+  information about *path* in the same format (which happens to have originated
+  with the POSIX interface).
 
-.. note::
+* Extensions peculiar to a particular operating system are also available
+  through the :mod:`os` module, but using them is of course a threat to
+  portability.
 
-   All functions accepting path or file names accept both bytes and string
-   objects, and result in an object of the same type, if a path or file name is
-   returned.
+* All functions accepting path or file names accept both bytes and string
+  objects, and result in an object of the same type, if a path or file name is
+  returned.
 
 .. note::
 
    If not separately noted, all functions that claim "Availability: Unix" are
    supported on Mac OS X, which builds on a Unix core.
+
+* An "Availability: Unix" note means that this function is commonly found on
+  Unix systems.  It does not make any claims about its existence on a specific
+  operating system.
+
+* If not separately noted, all functions that claim "Availability: Unix" are
+  supported on Mac OS X, which builds on a Unix core.
 
 .. note::
 
@@ -46,9 +54,9 @@ the :mod:`os` module, but using them is of course a threat to portability!
 
 .. data:: name
 
-   The name of the operating system dependent module imported.  The following names
-   have currently been registered: ``'posix'``, ``'nt'``, ``'mac'``, ``'os2'``,
-   ``'ce'``, ``'java'``.
+   The name of the operating system dependent module imported.  The following
+   names have currently been registered: ``'posix'``, ``'nt'``, ``'mac'``,
+   ``'os2'``, ``'ce'``, ``'java'``.
 
 
 .. _os-filenames:
@@ -396,7 +404,7 @@ by file descriptors.
    Close all file descriptors from *fd_low* (inclusive) to *fd_high* (exclusive),
    ignoring errors. Availability: Unix, Windows. Equivalent to::
 
-      for fd in xrange(fd_low, fd_high):
+      for fd in range(fd_low, fd_high):
           try:
               os.close(fd)
           except OSError:
@@ -589,7 +597,7 @@ The following constants are options for the *flags* parameter to the
 :func:`~os.open` function.  They can be combined using the bitwise OR operator
 ``|``.  Some of them are not available on all platforms.  For descriptions of
 their availability and use, consult the :manpage:`open(2)` manual page on Unix
-or `the MSDN <http://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>` on Windows.
+or `the MSDN <http://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>`_ on Windows.
 
 
 .. data:: O_RDONLY
@@ -947,12 +955,12 @@ Files and Directories
 
 .. function:: remove(path)
 
-   Remove the file *path*.  If *path* is a directory, :exc:`OSError` is raised; see
-   :func:`rmdir` below to remove a directory.  This is identical to the
-   :func:`unlink` function documented below.  On Windows, attempting to remove a
-   file that is in use causes an exception to be raised; on Unix, the directory
-   entry is removed but the storage allocated to the file is not made available
-   until the original file is no longer in use. Availability: Unix,
+   Remove (delete) the file *path*.  If *path* is a directory, :exc:`OSError` is
+   raised; see :func:`rmdir` below to remove a directory.  This is identical to
+   the :func:`unlink` function documented below.  On Windows, attempting to
+   remove a file that is in use causes an exception to be raised; on Unix, the
+   directory entry is removed but the storage allocated to the file is not made
+   available until the original file is no longer in use. Availability: Unix,
    Windows.
 
 
@@ -997,7 +1005,10 @@ Files and Directories
 
 .. function:: rmdir(path)
 
-   Remove the directory *path*. Availability: Unix, Windows.
+   Remove (delete) the directory *path*.  Only works when the directory is
+   empty, otherwise, :exc:`OSError` is raised.  In order to remove whole
+   directory trees, :func:`shutil.rmtree` can be used.  Availability: Unix,
+   Windows.
 
 
 .. function:: stat(path)
@@ -1015,9 +1026,9 @@ Files and Directories
       >>> import os
       >>> statinfo = os.stat('somefile.txt')
       >>> statinfo
-      (33188, 422511L, 769L, 1, 1032, 100, 926L, 1105022698,1105022732, 1105022732)
+      (33188, 422511, 769, 1, 1032, 100, 926, 1105022698,1105022732, 1105022732)
       >>> statinfo.st_size
-      926L
+      926
       >>>
 
 
@@ -1099,9 +1110,9 @@ Files and Directories
 
 .. function:: unlink(path)
 
-   Remove the file *path*.  This is the same function as :func:`remove`; the
-   :func:`unlink` name is its traditional Unix name. Availability: Unix,
-   Windows.
+   Remove (delete) the file *path*.  This is the same function as
+   :func:`remove`; the :func:`unlink` name is its traditional Unix
+   name. Availability: Unix, Windows.
 
 
 .. function:: utime(path, times)
@@ -1575,9 +1586,9 @@ written in Python, such as a mail server's external command delivery program.
 .. function:: system(command)
 
    Execute the command (a string) in a subshell.  This is implemented by calling
-   the Standard C function :cfunc:`system`, and has the same limitations.  Changes
-   to :data:`os.environ`, :data:`sys.stdin`, etc. are not reflected in the
-   environment of the executed command.
+   the Standard C function :cfunc:`system`, and has the same limitations.
+   Changes to :data:`sys.stdin`, etc. are not reflected in the environment of the
+   executed command.
 
    On Unix, the return value is the exit status of the process encoded in the
    format specified for :func:`wait`.  Note that POSIX does not specify the meaning

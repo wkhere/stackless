@@ -339,6 +339,12 @@ class Test_reduce(FixerTestCase):
         a = "from functools import reduce\nreduce(a, b, c)"
         self.check(b, a)
 
+    def test_bug_7253(self):
+        # fix_tuple_params was being bad and orphaning nodes in the tree.
+        b = "def x(arg): reduce(sum, [])"
+        a = "from functools import reduce\ndef x(arg): reduce(sum, [])"
+        self.check(b, a)
+
     def test_call_with_lambda(self):
         b = "reduce(lambda x, y: x + y, seq)"
         a = "from functools import reduce\nreduce(lambda x, y: x + y, seq)"
@@ -1209,6 +1215,14 @@ class Test_dict(FixerTestCase):
         a = "[i for i in    d.  keys(  )  ]"
         self.check(b, a)
 
+        b = "if   d. viewkeys  ( )  : pass"
+        a = "if   d. keys  ( )  : pass"
+        self.check(b, a)
+
+        b = "[i for i in    d.  viewkeys(  )  ]"
+        a = "[i for i in    d.  keys(  )  ]"
+        self.check(b, a)
+
     def test_trailing_comment(self):
         b = "d.keys() # foo"
         a = "list(d.keys()) # foo"
@@ -1226,6 +1240,16 @@ class Test_dict(FixerTestCase):
                ]"""
         a = """[i for i in d.keys() # foo
                ]"""
+        self.check(b, a)
+
+        b = """[i for i in d.iterkeys() # foo
+               ]"""
+        a = """[i for i in d.keys() # foo
+               ]"""
+        self.check(b, a)
+
+        b = "d.viewitems()  # foo"
+        a = "d.items()  # foo"
         self.check(b, a)
 
     def test_unchanged(self):
@@ -1359,6 +1383,46 @@ class Test_dict(FixerTestCase):
     def test_24(self):
         b = "for x in h.keys()[0]: print x"
         a = "for x in list(h.keys())[0]: print x"
+        self.check(b, a)
+
+    def test_25(self):
+        b = "d.viewkeys()"
+        a = "d.keys()"
+        self.check(b, a)
+
+    def test_26(self):
+        b = "d.viewitems()"
+        a = "d.items()"
+        self.check(b, a)
+
+    def test_27(self):
+        b = "d.viewvalues()"
+        a = "d.values()"
+        self.check(b, a)
+
+    def test_14(self):
+        b = "[i for i in d.viewkeys()]"
+        a = "[i for i in d.keys()]"
+        self.check(b, a)
+
+    def test_15(self):
+        b = "(i for i in d.viewkeys())"
+        a = "(i for i in d.keys())"
+        self.check(b, a)
+
+    def test_17(self):
+        b = "iter(d.viewkeys())"
+        a = "iter(d.keys())"
+        self.check(b, a)
+
+    def test_18(self):
+        b = "list(d.viewkeys())"
+        a = "list(d.keys())"
+        self.check(b, a)
+
+    def test_19(self):
+        b = "sorted(d.viewkeys())"
+        a = "sorted(d.keys())"
         self.check(b, a)
 
 class Test_xrange(FixerTestCase):
@@ -1747,6 +1811,8 @@ class Test_urllib(FixerTestCase):
         for old, changes in self.modules.items():
             for new, members in changes:
                 for member in members:
+                    new_import = ", ".join([n for (n, mems)
+                                            in self.modules[old]])
                     b = """
                         import %s
                         foo(%s.%s)
@@ -1754,9 +1820,16 @@ class Test_urllib(FixerTestCase):
                     a = """
                         import %s
                         foo(%s.%s)
-                        """ % (", ".join([n for (n, mems)
-                                           in self.modules[old]]),
-                                         new, member)
+                        """ % (new_import, new, member)
+                    self.check(b, a)
+                    b = """
+                        import %s
+                        %s.%s(%s.%s)
+                        """ % (old, old, member, old, member)
+                    a = """
+                        import %s
+                        %s.%s(%s.%s)
+                        """ % (new_import, new, member, new, member)
                     self.check(b, a)
 
 
@@ -2710,16 +2783,79 @@ class Test_callable(FixerTestCase):
 
     def test_prefix_preservation(self):
         b = """callable(    x)"""
-        a = """hasattr(    x, '__call__')"""
+        a = """import collections\nisinstance(    x, collections.Callable)"""
         self.check(b, a)
 
         b = """if     callable(x): pass"""
-        a = """if     hasattr(x, '__call__'): pass"""
+        a = """import collections
+if     isinstance(x, collections.Callable): pass"""
         self.check(b, a)
 
     def test_callable_call(self):
         b = """callable(x)"""
-        a = """hasattr(x, '__call__')"""
+        a = """import collections\nisinstance(x, collections.Callable)"""
+        self.check(b, a)
+
+    def test_global_import(self):
+        b = """
+def spam(foo):
+    callable(foo)"""[1:]
+        a = """
+import collections
+def spam(foo):
+    isinstance(foo, collections.Callable)"""[1:]
+        self.check(b, a)
+
+        b = """
+import collections
+def spam(foo):
+    callable(foo)"""[1:]
+        # same output if it was already imported
+        self.check(b, a)
+
+        b = """
+from collections import *
+def spam(foo):
+    callable(foo)"""[1:]
+        a = """
+from collections import *
+import collections
+def spam(foo):
+    isinstance(foo, collections.Callable)"""[1:]
+        self.check(b, a)
+
+        b = """
+do_stuff()
+do_some_other_stuff()
+assert callable(do_stuff)"""[1:]
+        a = """
+import collections
+do_stuff()
+do_some_other_stuff()
+assert isinstance(do_stuff, collections.Callable)"""[1:]
+        self.check(b, a)
+
+        b = """
+if isinstance(do_stuff, Callable):
+    assert callable(do_stuff)
+    do_stuff(do_stuff)
+    if not callable(do_stuff):
+        exit(1)
+    else:
+        assert callable(do_stuff)
+else:
+    assert not callable(do_stuff)"""[1:]
+        a = """
+import collections
+if isinstance(do_stuff, Callable):
+    assert isinstance(do_stuff, collections.Callable)
+    do_stuff(do_stuff)
+    if not isinstance(do_stuff, collections.Callable):
+        exit(1)
+    else:
+        assert isinstance(do_stuff, collections.Callable)
+else:
+    assert not isinstance(do_stuff, collections.Callable)"""[1:]
         self.check(b, a)
 
     def test_callable_should_not_change(self):
@@ -2834,6 +2970,11 @@ class Test_map(FixerTestCase):
         a = """x = list(map(f, 'abc'))   #   foo"""
         self.check(b, a)
 
+    def test_None_with_multiple_arguments(self):
+        s = """x = map(None, a, b, c)"""
+        self.warns_unchanged(s, "cannot convert map(None, ...) with "
+                             "multiple arguments")
+
     def test_map_basic(self):
         b = """x = map(f, 'abc')"""
         a = """x = list(map(f, 'abc'))"""
@@ -2845,10 +2986,6 @@ class Test_map(FixerTestCase):
 
         b = """x = map(None, 'abc')"""
         a = """x = list('abc')"""
-        self.check(b, a)
-
-        b = """x = map(None, 'abc', 'def')"""
-        a = """x = list(map(None, 'abc', 'def'))"""
         self.check(b, a)
 
         b = """x = map(lambda x: x+1, range(4))"""
@@ -3236,6 +3373,46 @@ class Test_idioms(FixerTestCase):
             v = sorted(   t)
             foo(v)
             """
+        self.check(b, a)
+
+        b = r"""
+            try:
+                m = list(s)
+                m.sort()
+            except: pass
+            """
+
+        a = r"""
+            try:
+                m = sorted(s)
+            except: pass
+            """
+        self.check(b, a)
+
+        b = r"""
+            try:
+                m = list(s)
+                # foo
+                m.sort()
+            except: pass
+            """
+
+        a = r"""
+            try:
+                m = sorted(s)
+                # foo
+            except: pass
+            """
+        self.check(b, a)
+
+        b = r"""
+            m = list(s)
+            # more comments
+            m.sort()"""
+
+        a = r"""
+            m = sorted(s)
+            # more comments"""
         self.check(b, a)
 
     def test_sort_simple_expr(self):

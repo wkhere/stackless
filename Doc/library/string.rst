@@ -86,6 +86,7 @@ substitutions and value formatting via the :func:`format` method described in
 you to create and customize your own string formatting behaviors using the same
 implementation as the built-in :meth:`format` method.
 
+
 .. class:: Formatter
 
    The :class:`Formatter` class has the following public methods:
@@ -194,15 +195,16 @@ literal text, it can be escaped by doubling: ``{{`` and ``}}``.
 The grammar for a replacement field is as follows:
 
    .. productionlist:: sf
-      replacement_field: "{" `field_name` ["!" `conversion`] [":" `format_spec`] "}"
+      replacement_field: "{" [`field_name`] ["!" `conversion`] [":" `format_spec`] "}"
       field_name: arg_name ("." `attribute_name` | "[" `element_index` "]")*
       arg_name: (`identifier` | `integer`)?
       attribute_name: `identifier`
-      element_index: `integer`
+      element_index: `integer` | `index_string`
+      index_string: <any source character except "]"> +
       conversion: "r" | "s" | "a"
       format_spec: <described in the next section>
 
-In less formal terms, the replacement field starts with a *field_name* that specifies
+In less formal terms, the replacement field can start with a *field_name* that specifies
 the object whose value is to be formatted and inserted
 into the output instead of the replacement field.
 The *field_name* is optionally followed by a  *conversion* field, which is
@@ -223,7 +225,7 @@ Some simple format string examples::
 
    "First, thou shalt count to {0}" # References first positional argument
    "Bring me a {}"                  # Implicitly references the first positional argument
-   "From {} to {}"                  # Same as "From {0] to {1}"
+   "From {} to {}"                  # Same as "From {0} to {1}"
    "My quest is {name}"             # References keyword argument 'name'
    "Weight in tons {0.weight}"      # 'weight' attribute of first positional arg
    "Units destroyed: {players[0]}"  # First element of keyword argument 'players'.
@@ -243,10 +245,11 @@ Some examples::
 
    "Harold's a clever {0!s}"        # Calls str() on the argument first
    "Bring out the holy {name!r}"    # Calls repr() on the argument first
+   "More {!a}"                      # Calls ascii() on the argument first
 
 The *format_spec* field contains a specification of how the value should be
 presented, including such details as field width, alignment, padding, decimal
-precision and so on.  Each value type can define it's own "formatting
+precision and so on.  Each value type can define its own "formatting
 mini-language" or interpretation of the *format_spec*.
 
 Most built-in types support a common formatting mini-language, which is
@@ -294,8 +297,9 @@ specification is to be interpreted.
 Most built-in types implement the following options for format specifications,
 although some of the formatting options are only supported by the numeric types.
 
-A general convention is that an empty format string (``""``) produces the same
-result as if you had called :func:`str` on the value.
+A general convention is that an empty format string (``""``) produces
+the same result as if you had called :func:`str` on the value. A
+non-empty format string typically modifies the result.
 
 The general form of a *standard format specifier* is:
 
@@ -306,7 +310,7 @@ The general form of a *standard format specifier* is:
    sign: "+" | "-" | " "
    width: `integer`
    precision: `integer`
-   type: "b" | "c" | "d" | "e" | "E" | "f" | "F" | "g" | "G" | "n" | "o" | "x" | "X" | "%"
+   type: "b" | "c" | "d" | "e" | "E" | "f" | "F" | "g" | "G" | "n" | "o" | "s" | "x" | "X" | "%"
 
 The *fill* character can be any character other than '}' (which signifies the
 end of the field).  The presence of a fill character is signaled by the *next*
@@ -378,6 +382,17 @@ used from the field content. The *precision* is not allowed for integer values.
 
 Finally, the *type* determines how the data should be presented.
 
+The available string presentation types are:
+
+   +---------+----------------------------------------------------------+
+   | Type    | Meaning                                                  |
+   +=========+==========================================================+
+   | ``'s'`` | String format. This is the default type for strings and  |
+   |         | may be omitted.                                          |
+   +---------+----------------------------------------------------------+
+   | None    | The same as ``'s'``.                                     |
+   +---------+----------------------------------------------------------+
+
 The available integer presentation types are:
 
    +---------+----------------------------------------------------------+
@@ -405,6 +420,11 @@ The available integer presentation types are:
    | None    | The same as ``'d'``.                                     |
    +---------+----------------------------------------------------------+
 
+In addition to the above presentation types, integers can be formatted
+with the floating point presentation types listed below (except
+``'n'`` and None). When doing so, :func:`float` is used to convert the
+integer to a floating point number before formatting.
+
 The available presentation types for floating point and decimal values are:
 
    +---------+----------------------------------------------------------+
@@ -422,15 +442,33 @@ The available presentation types for floating point and decimal values are:
    | ``'F'`` | Fixed point. Same as ``'f'``, but converts ``nan`` to    |
    |         | ``NAN`` and ``inf`` to ``INF``.                          |
    +---------+----------------------------------------------------------+
-   | ``'g'`` | General format. This prints the number as a fixed-point  |
-   |         | number, unless the number is too large, in which case    |
-   |         | it switches to ``'e'`` exponent notation. Infinity and   |
-   |         | NaN values are formatted as ``inf``, ``-inf`` and        |
-   |         | ``nan``, respectively.                                   |
+   | ``'g'`` | General format.  For a given precision ``p >= 1``,       |
+   |         | this rounds the number to ``p`` significant digits and   |
+   |         | then formats the result in either fixed-point format     |
+   |         | or in scientific notation, depending on its magnitude.   |
+   |         |                                                          |
+   |         | The precise rules are as follows: suppose that the       |
+   |         | result formatted with presentation type ``'e'`` and      |
+   |         | precision ``p-1`` would have exponent ``exp``.  Then     |
+   |         | if ``-4 <= exp < p``, the number is formatted            |
+   |         | with presentation type ``'f'`` and precision             |
+   |         | ``p-1-exp``.  Otherwise, the number is formatted         |
+   |         | with presentation type ``'e'`` and precision ``p-1``.    |
+   |         | In both cases insignificant trailing zeros are removed   |
+   |         | from the significand, and the decimal point is also      |
+   |         | removed if there are no remaining digits following it.   |
+   |         |                                                          |
+   |         | Postive and negative infinity, positive and negative     |
+   |         | zero, and nans, are formatted as ``inf``, ``-inf``,      |
+   |         | ``0``, ``-0`` and ``nan`` respectively, regardless of    |
+   |         | the precision.                                           |
+   |         |                                                          |
+   |         | A precision of ``0`` is treated as equivalent to a       |
+   |         | precision of ``1``.                                      |
    +---------+----------------------------------------------------------+
    | ``'G'`` | General format. Same as ``'g'`` except switches to       |
-   |         | ``'E'`` if the number gets to large. The representations |
-   |         | of infinity and NaN are uppercased, too.                 |
+   |         | ``'E'`` if the number gets too large. The                |
+   |         | representations of infinity and NaN are uppercased, too. |
    +---------+----------------------------------------------------------+
    | ``'n'`` | Number. This is the same as ``'g'``, except that it uses |
    |         | the current locale setting to insert the appropriate     |
@@ -478,19 +516,19 @@ these rules.  The methods of :class:`Template` are:
    The constructor takes a single argument which is the template string.
 
 
-   .. method:: substitute(mapping[, **kws])
+   .. method:: substitute(mapping, **kwds)
 
       Performs the template substitution, returning a new string.  *mapping* is
       any dictionary-like object with keys that match the placeholders in the
       template.  Alternatively, you can provide keyword arguments, where the
-      keywords are the placeholders.  When both *mapping* and *kws* are given
-      and there are duplicates, the placeholders from *kws* take precedence.
+      keywords are the placeholders.  When both *mapping* and *kwds* are given
+      and there are duplicates, the placeholders from *kwds* take precedence.
 
 
-   .. method:: safe_substitute(mapping[, **kws])
+   .. method:: safe_substitute(mapping, **kwds)
 
       Like :meth:`substitute`, except that if placeholders are missing from
-      *mapping* and *kws*, instead of raising a :exc:`KeyError` exception, the
+      *mapping* and *kwds*, instead of raising a :exc:`KeyError` exception, the
       original placeholder will appear in the resulting string intact.  Also,
       unlike with :meth:`substitute`, any other appearances of the ``$`` will
       simply return ``$`` instead of raising :exc:`ValueError`.
@@ -502,13 +540,12 @@ these rules.  The methods of :class:`Template` are:
       templates containing dangling delimiters, unmatched braces, or
       placeholders that are not valid Python identifiers.
 
-:class:`Template` instances also provide one public data attribute:
+   :class:`Template` instances also provide one public data attribute:
 
+   .. attribute:: template
 
-.. attribute:: string.template
-
-   This is the object passed to the constructor's *template* argument.  In general,
-   you shouldn't change it, but read-only access is not enforced.
+      This is the object passed to the constructor's *template* argument.  In
+      general, you shouldn't change it, but read-only access is not enforced.
 
 Here is an example of how to use a Template:
 
@@ -564,12 +601,14 @@ rule:
 Helper functions
 ----------------
 
-.. function:: capwords(s)
+.. function:: capwords(s[, sep])
 
-   Split the argument into words using :func:`split`, capitalize each word using
-   :func:`capitalize`, and join the capitalized words using :func:`join`.  Note
-   that this replaces runs of whitespace characters by a single space, and removes
-   leading and trailing whitespace.
+   Split the argument into words using :meth:`str.split`, capitalize each word
+   using :meth:`str.capitalize`, and join the capitalized words using
+   :meth:`str.join`.  If the optional second argument *sep* is absent
+   or ``None``, runs of whitespace characters are replaced by a single space
+   and leading and trailing whitespace are removed, otherwise *sep* is used to
+   split and join the words.
 
 
 .. function:: maketrans(frm, to)

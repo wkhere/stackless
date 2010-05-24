@@ -30,7 +30,9 @@ handler, the argument will be installed instead of the default.
 install_opener -- Installs a new opener as the default opener.
 
 objects of interest:
-OpenerDirector --
+
+OpenerDirector -- Sets up the User Agent as the Python-urllib client and manages
+the Handler classes, while dealing with requests and responses.
 
 Request -- An object that encapsulates the state of a request.  The
 state can be as simple as the URL.  It can also include extra HTTP
@@ -398,7 +400,7 @@ def build_opener(*handlers):
     """Create an opener object from a list of handlers.
 
     The opener will use several default handlers, including support
-    for HTTP and FTP.
+    for HTTP, FTP and when applicable HTTPS.
 
     If any of the handlers passed as arguments are subclasses of the
     default handlers, the default handlers will not be used.
@@ -657,6 +659,10 @@ class ProxyHandler(BaseHandler):
         proxy_type, user, password, hostport = _parse_proxy(proxy)
         if proxy_type is None:
             proxy_type = orig_type
+
+        if req.host and proxy_bypass(req.host):
+            return None
+
         if user and password:
             user_pass = '%s:%s' % (unquote(user),
                                    unquote(password))
@@ -789,7 +795,7 @@ class AbstractBasicAuthHandler:
             auth = "Basic " + base64.b64encode(raw.encode()).decode("ascii")
             if req.headers.get(self.auth_header, None) == auth:
                 return None
-            req.add_header(self.auth_header, auth)
+            req.add_unredirected_header(self.auth_header, auth)
             return self.parent.open(req, timeout=req.timeout)
         else:
             return None
@@ -841,6 +847,7 @@ class AbstractDigestAuthHandler:
         self.add_password = self.passwd.add_password
         self.retried = 0
         self.nonce_count = 0
+        self.last_nonce = None
 
     def reset_retry_count(self):
         self.retried = 0
@@ -916,7 +923,11 @@ class AbstractDigestAuthHandler:
                         # XXX selector: what about proxies and full urls
                         req.selector)
         if qop == 'auth':
-            self.nonce_count += 1
+            if nonce == self.last_nonce:
+                self.nonce_count += 1
+            else:
+                self.nonce_count = 1
+                self.last_nonce = nonce
             ncvalue = '%08x' % self.nonce_count
             cnonce = self.get_cnonce(nonce)
             noncebit = "%s:%s:%s:%s:%s" % (nonce, ncvalue, cnonce, qop, H(A2))
@@ -1048,7 +1059,14 @@ class AbstractHTTPHandler(BaseHandler):
         headers = dict((name.title(), val) for name, val in headers.items())
 
         if req._tunnel_host:
-            h._set_tunnel(req._tunnel_host)
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h._set_tunnel(req._tunnel_host, headers=tunnel_headers)
 
         try:
             h.request(req.get_method(), req.selector, req.data, headers)
@@ -1172,8 +1190,9 @@ class FileHandler(BaseHandler):
     def get_names(self):
         if FileHandler.names is None:
             try:
-                FileHandler.names = (socket.gethostbyname('localhost'),
-                                    socket.gethostbyname(socket.gethostname()))
+                FileHandler.names = tuple(
+                    socket.gethostbyname_ex('localhost')[2] +
+                    socket.gethostbyname_ex(socket.gethostname())[2])
             except socket.gaierror:
                 FileHandler.names = (socket.gethostbyname('localhost'),)
         return FileHandler.names
@@ -1407,7 +1426,7 @@ class URLopener:
     def open(self, fullurl, data=None):
         """Use URLopener().open(file) instead of open(file, 'r')."""
         fullurl = unwrap(to_bytes(fullurl))
-        fullurl = quote(fullurl, safe="%/:=&?~#+!$,;'@()*[]")
+        fullurl = quote(fullurl, safe="%/:=&?~#+!$,;'@()*[]|")
         if self.tempcache and fullurl in self.tempcache:
             filename, headers = self.tempcache[fullurl]
             fp = open(filename, 'rb')
@@ -1672,7 +1691,7 @@ class URLopener:
             return addinfourl(open(localname, 'rb'), headers, urlfile)
         host, port = splitport(host)
         if (not port
-           and socket.gethostbyname(host) in (localhost(), thishost())):
+           and socket.gethostbyname(host) in (localhost() + thishost())):
             urlfile = file
             if file[:1] == '/':
                 urlfile = 'file://' + file
@@ -1982,10 +2001,10 @@ def localhost():
 
 _thishost = None
 def thishost():
-    """Return the IP address of the current host."""
+    """Return the IP addresses of the current host."""
     global _thishost
     if _thishost is None:
-        _thishost = socket.gethostbyname(socket.gethostname())
+        _thishost = tuple(socket.gethostbyname_ex(socket.gethostname()[2]))
     return _thishost
 
 _ftperrors = None

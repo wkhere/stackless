@@ -322,7 +322,7 @@ def execlpe(file, *args):
     execvpe(file, args[:-1], env)
 
 def execvp(file, args):
-    """execp(file, args)
+    """execvp(file, args)
 
     Execute the executable file (which is searched for along $PATH)
     with argument list args, replacing the current process.
@@ -387,22 +387,32 @@ class _Environ(MutableMapping):
         self.data = data = {}
         for key, value in environ.items():
             data[keymap(key)] = str(value)
+
     def __getitem__(self, key):
         return self.data[self.keymap(key)]
+
     def __setitem__(self, key, value):
         value = str(value)
         self.putenv(key, value)
         self.data[self.keymap(key)] = value
+
     def __delitem__(self, key):
         self.unsetenv(key)
         del self.data[self.keymap(key)]
+
     def __iter__(self):
         for key in self.data:
             yield key
+
     def __len__(self):
         return len(self.data)
+
+    def __repr__(self):
+        return 'environ({!r})'.format(self.data)
+
     def copy(self):
         return dict(self)
+
     def setdefault(self, key, value):
         if key not in self:
             self[key] = value
@@ -650,6 +660,10 @@ class _wrap_close:
             return returncode
         else:
             return returncode << 8  # Shift left to match old behavior
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        self.close()
     def __getattr__(self, name):
         return getattr(self._stream, name)
     def __iter__(self):

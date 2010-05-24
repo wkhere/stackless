@@ -740,7 +740,7 @@ class IMAP4:
     def thread(self, threading_algorithm, charset, *search_criteria):
         """IMAPrev1 extension THREAD command.
 
-        (type, [data]) = <instance>.thread(threading_alogrithm, charset, search_criteria, ...)
+        (type, [data]) = <instance>.thread(threading_algorithm, charset, search_criteria, ...)
         """
         name = 'THREAD'
         typ, dat = self._simple_command(name, threading_algorithm, charset, *search_criteria)
@@ -1023,6 +1023,8 @@ class IMAP4:
             raise self.abort('socket error: EOF')
 
         # Protocol mandates all lines terminated by CRLF
+        if not line.endswith(b'\r\n'):
+            raise self.abort('socket error: unterminated line')
 
         line = line[:-2]
         if __debug__:

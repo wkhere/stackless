@@ -565,17 +565,19 @@ correspond to Unix system calls applicable to sockets.
    is system-dependent (usually 5).
 
 
-.. method:: socket.makefile([mode[, bufsize]])
+.. method:: socket.makefile(mode='r', buffering=None, *, encoding=None, newline=None)
 
    .. index:: single: I/O control; buffering
 
-   Return a :dfn:`file object` associated with the socket.  (File objects are
-   described in :ref:`bltin-file-objects`.) The file object
-   references a :cfunc:`dup`\ ped version of the socket file descriptor, so the
-   file object and socket object may be closed or garbage-collected independently.
-   The socket must be in blocking mode (it can not have a timeout). The optional
-   *mode* and *bufsize* arguments are interpreted the same way as by the built-in
-   :func:`file` function.
+   Return a :dfn:`file object` associated with the socket.  The exact
+   returned type depends on the arguments given to :meth:`makefile`.  These
+   arguments are interpreted the same way as by the built-in :func:`open`
+   function.
+
+   The returned file object references a :cfunc:`dup`\ ped version of the
+   socket file descriptor, so the file object and socket object may be
+   closed or garbage-collected independently.  The socket must be in
+   blocking mode (it can not have a timeout).
 
 
 .. method:: socket.recv(bufsize[, flags])
@@ -697,7 +699,7 @@ Note that the :meth:`connect` operation is subject to the timeout setting, and
 in general it is recommended to call :meth:`settimeout` before calling
 :meth:`connect` or pass a timeout parameter to :meth:`create_connection`.
 The system network stack may return a connection timeout error
-of its own regardless of any python socket timeout setting.
+of its own regardless of any Python socket timeout setting.
 
 
 .. method:: socket.setsockopt(level, optname, value)
