@@ -35,7 +35,7 @@ Type Objects
    .. versionadded:: 2.2
 
 
-.. cfunction:: unsigned int PyType_ClearCache(void)
+.. cfunction:: unsigned int PyType_ClearCache()
 
    Clear the internal lookup cache. Return the current version tag.
 
@@ -75,6 +75,10 @@ Type Objects
 .. cfunction:: PyObject* PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
 
    .. versionadded:: 2.2
+
+   .. versionchanged:: 2.5
+      This function used an :ctype:`int` type for *nitems*. This might require
+      changes in your code for properly supporting 64-bit systems.
 
 
 .. cfunction:: PyObject* PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds)

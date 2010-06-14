@@ -88,7 +88,19 @@ been GPL-compatible; the table below summarizes the various releases.
 +----------------+--------------+-----------+------------+-----------------+
 | 2.5.1          | 2.5          | 2007      | PSF        | yes             |
 +----------------+--------------+-----------+------------+-----------------+
+| 2.5.2          | 2.5.1        | 2008      | PSF        | yes             |
++----------------+--------------+-----------+------------+-----------------+
+| 2.5.3          | 2.5.2        | 2008      | PSF        | yes             |
++----------------+--------------+-----------+------------+-----------------+
 | 2.6            | 2.5          | 2008      | PSF        | yes             |
++----------------+--------------+-----------+------------+-----------------+
+| 2.6.1          | 2.6          | 2008      | PSF        | yes             |
++----------------+--------------+-----------+------------+-----------------+
+| 2.6.2          | 2.6.1        | 2009      | PSF        | yes             |
++----------------+--------------+-----------+------------+-----------------+
+| 2.6.3          | 2.6.2        | 2009      | PSF        | yes             |
++----------------+--------------+-----------+------------+-----------------+
+| 2.6.4          | 2.6.3        | 2009      | PSF        | yes             |
 +----------------+--------------+-----------+------------+-----------------+
 
 .. note::
@@ -118,7 +130,7 @@ Terms and conditions for accessing or otherwise using Python
    analyze, test, perform and/or display publicly, prepare derivative works,
    distribute, and otherwise use Python |release| alone or in any derivative
    version, provided, however, that PSF's License Agreement and PSF's notice of
-   copyright, i.e., "Copyright © 2001-2008 Python Software Foundation; All Rights
+   copyright, i.e., "Copyright © 2001-2010 Python Software Foundation; All Rights
    Reserved" are retained in Python |release| alone or in any derivative version
    prepared by Licensee.
 
@@ -380,8 +392,8 @@ Floating point exception control
 
 The source for the :mod:`fpectl` module includes the following notice::
 
-     ---------------------------------------------------------------------  
-    /                       Copyright (c) 1996.                           \ 
+     ---------------------------------------------------------------------
+    /                       Copyright (c) 1996.                           \
    |          The Regents of the University of California.                 |
    |                        All rights reserved.                           |
    |                                                                       |
@@ -413,7 +425,7 @@ The source for the :mod:`fpectl` module includes the following notice::
    |   opinions  of authors expressed herein do not necessarily state or   |
    |   reflect those of the United States Government or  the  University   |
    |   of  California,  and shall not be used for advertising or product   |
-    \  endorsement purposes.                                              / 
+    \  endorsement purposes.                                              /
      ---------------------------------------------------------------------
 
 
@@ -447,7 +459,7 @@ The source code for the :mod:`md5` module contains the following notice::
 
      This code implements the MD5 Algorithm defined in RFC 1321, whose
      text is available at
-   	http://www.ietf.org/rfc/rfc1321.txt
+           http://www.ietf.org/rfc/rfc1321.txt
      The code is derived from the text of the RFC, including the test suite
      (section A.5) but excluding the rest of Appendix A.  It does not include
      any code or documentation that is identified in the RFC as being
@@ -458,12 +470,12 @@ The source code for the :mod:`md5` module contains the following notice::
      that follows (in reverse chronological order):
 
      2002-04-13 lpd Removed support for non-ANSI compilers; removed
-   	references to Ghostscript; clarified derivation from RFC 1321;
-   	now handles byte order either statically or dynamically.
+           references to Ghostscript; clarified derivation from RFC 1321;
+           now handles byte order either statically or dynamically.
      1999-11-04 lpd Edited comments slightly for automatic TOC extraction.
      1999-10-18 lpd Fixed typo in header comment (ansi2knr rather than md5);
-   	added conditionalization for C++ compilation from Martin
-   	Purschke <purschke@bnl.gov>.
+           added conditionalization for C++ compilation from Martin
+           Purschke <purschke@bnl.gov>.
      1999-05-03 lpd Original version.
 
 
@@ -612,7 +624,7 @@ The :mod:`uu` module contains the following notice::
    - Use binascii module to do the actual line-by-line conversion
      between ascii and binary. This results in a 1000-fold speedup. The C
      version is still 5 times faster, though.
-   - Arguments more compliant with python standard
+   - Arguments more compliant with Python standard
 
 
 XML Remote Procedure Calls
@@ -702,3 +714,35 @@ The :mod:`select` and contains the following notice for the kqueue interface::
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
   OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
   SUCH DAMAGE.
+
+
+strtod and dtoa
+---------------
+
+The file :file:`Python/dtoa.c`, which supplies C functions dtoa and
+strtod for conversion of C doubles to and from strings, is derived
+from the file of the same name by David M. Gay, currently available
+from http://www.netlib.org/fp/.  The original file, as retrieved on
+March 16, 2009, contains the following copyright and licensing
+notice::
+
+   /****************************************************************
+    *
+    * The author of this software is David M. Gay.
+    *
+    * Copyright (c) 1991, 2000, 2001 by Lucent Technologies.
+    *
+    * Permission to use, copy, modify, and distribute this software for any
+    * purpose without fee is hereby granted, provided that this entire notice
+    * is included in all copies of any software which is or includes a copy
+    * or modification of this software and in all copies of the supporting
+    * documentation for such software.
+    *
+    * THIS SOFTWARE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
+    * WARRANTY.  IN PARTICULAR, NEITHER THE AUTHOR NOR LUCENT MAKES ANY
+    * REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
+    * OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
+    *
+    ***************************************************************/
+
+

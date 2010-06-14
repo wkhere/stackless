@@ -20,6 +20,13 @@ source file by including the header ``"Python.h"``.
 The compilation of an extension module depends on its intended use as well as on
 your system setup; details are given in later chapters.
 
+Do note that if your use case is calling C library functions or system calls,
+you should consider using the :mod:`ctypes` module rather than writing custom
+C code. Not only does :mod:`ctypes` let you write Python code to interface
+with C code, but it is more portable between implementations of Python than
+writing and compiling an extension module which typically ties you to CPython.
+
+
 
 .. _extending-simpleexample:
 
@@ -47,7 +54,7 @@ The first line of our file can be::
 which pulls in the Python API (you can add a comment describing the purpose of
 the module and a copyright notice if you like).
 
-.. warning::
+.. note::
 
    Since Python may define some pre-processor definitions which affect the standard
    headers on some systems, you *must* include :file:`Python.h` before any standard
@@ -365,12 +372,7 @@ source distribution.
 
 A more substantial example module is included in the Python source distribution
 as :file:`Modules/xxmodule.c`.  This file may be used as a  template or simply
-read as an example.  The :program:`modulator.py` script included in the source
-distribution or Windows install provides  a simple graphical user interface for
-declaring the functions and objects which a module should implement, and can
-generate a template which can be filled in.  The script lives in the
-:file:`Tools/modulator/` directory; see the :file:`README` file there for more
-information.
+read as an example.
 
 
 .. _compilation:
@@ -465,13 +467,13 @@ reference count of an object and are safe in the presence of *NULL* pointers
 (but note that *temp* will not be  *NULL* in this context).  More info on them
 in section :ref:`refcounts`.
 
-.. index:: single: PyEval_CallObject()
+.. index:: single: PyObject_CallObject()
 
 Later, when it is time to call the function, you call the C function
-:cfunc:`PyEval_CallObject`.  This function has two arguments, both pointers to
+:cfunc:`PyObject_CallObject`.  This function has two arguments, both pointers to
 arbitrary Python objects: the Python function, and the argument list.  The
 argument list must always be a tuple object, whose length is the number of
-arguments.  To call the Python function with no arguments, pass in NULL, or 
+arguments.  To call the Python function with no arguments, pass in NULL, or
 an empty tuple; to call it with one argument, pass a singleton tuple.
 :cfunc:`Py_BuildValue` returns a tuple when its format string consists of zero
 or more format codes between parentheses.  For example::
@@ -484,16 +486,16 @@ or more format codes between parentheses.  For example::
    ...
    /* Time to call the callback */
    arglist = Py_BuildValue("(i)", arg);
-   result = PyEval_CallObject(my_callback, arglist);
+   result = PyObject_CallObject(my_callback, arglist);
    Py_DECREF(arglist);
 
-:cfunc:`PyEval_CallObject` returns a Python object pointer: this is the return
-value of the Python function.  :cfunc:`PyEval_CallObject` is
+:cfunc:`PyObject_CallObject` returns a Python object pointer: this is the return
+value of the Python function.  :cfunc:`PyObject_CallObject` is
 "reference-count-neutral" with respect to its arguments.  In the example a new
 tuple was created to serve as the argument list, which is :cfunc:`Py_DECREF`\
 -ed immediately after the call.
 
-The return value of :cfunc:`PyEval_CallObject` is "new": either it is a brand
+The return value of :cfunc:`PyObject_CallObject` is "new": either it is a brand
 new object, or it is an existing object whose reference count has been
 incremented.  So, unless you want to save it in a global variable, you should
 somehow :cfunc:`Py_DECREF` the result, even (especially!) if you are not
@@ -501,7 +503,7 @@ interested in its value.
 
 Before you do this, however, it is important to check that the return value
 isn't *NULL*.  If it is, the Python function terminated by raising an exception.
-If the C code that called :cfunc:`PyEval_CallObject` is called from Python, it
+If the C code that called :cfunc:`PyObject_CallObject` is called from Python, it
 should now return an error indication to its Python caller, so the interpreter
 can print a stack trace, or the calling Python code can handle the exception.
 If this is not possible or desirable, the exception should be cleared by calling
@@ -510,10 +512,10 @@ If this is not possible or desirable, the exception should be cleared by calling
    if (result == NULL)
        return NULL; /* Pass error back */
    ...use result...
-   Py_DECREF(result); 
+   Py_DECREF(result);
 
 Depending on the desired interface to the Python callback function, you may also
-have to provide an argument list to :cfunc:`PyEval_CallObject`.  In some cases
+have to provide an argument list to :cfunc:`PyObject_CallObject`.  In some cases
 the argument list is also provided by the Python program, through the same
 interface that specified the callback function.  It can then be saved and used
 in the same manner as the function object.  In other cases, you may have to
@@ -524,7 +526,7 @@ event code, you might use the following code::
    PyObject *arglist;
    ...
    arglist = Py_BuildValue("(l)", eventcode);
-   result = PyEval_CallObject(my_callback, arglist);
+   result = PyObject_CallObject(my_callback, arglist);
    Py_DECREF(arglist);
    if (result == NULL)
        return NULL; /* Pass error back */
@@ -535,19 +537,20 @@ Note the placement of ``Py_DECREF(arglist)`` immediately after the call, before
 the error check!  Also note that strictly speaking this code is not complete:
 :cfunc:`Py_BuildValue` may run out of memory, and this should be checked.
 
-You may also call a function with keyword arguments by using 
-:cfunc:`PyEval_CallObjectWithKeywords`.  As in the above example, we use
-:cfunc:`Py_BuildValue` to construct the dictionary. ::
+You may also call a function with keyword arguments by using
+:cfunc:`PyObject_Call`, which supports arguments and keyword arguments.  As in
+the above example, we use :cfunc:`Py_BuildValue` to construct the dictionary. ::
 
    PyObject *dict;
    ...
    dict = Py_BuildValue("{s:i}", "name", val);
-   result = PyEval_CallObjectWithKeywords(my_callback, NULL, dict);
+   result = PyObject_Call(my_callback, NULL, dict);
    Py_DECREF(dict);
    if (result == NULL)
        return NULL; /* Pass error back */
    /* Here maybe use the result */
    Py_DECREF(result);
+
 
 .. _parsetuple:
 
@@ -671,7 +674,7 @@ Philbrick (philbrick@hks.com)::
 
    static PyObject *
    keywdarg_parrot(PyObject *self, PyObject *args, PyObject *keywds)
-   {  
+   {
        int voltage;
        char *state = "a stiff";
        char *action = "voom";
@@ -679,11 +682,11 @@ Philbrick (philbrick@hks.com)::
 
        static char *kwlist[] = {"voltage", "state", "action", "type", NULL};
 
-       if (!PyArg_ParseTupleAndKeywords(args, keywds, "i|sss", kwlist, 
+       if (!PyArg_ParseTupleAndKeywords(args, keywds, "i|sss", kwlist,
                                         &voltage, &state, &action, &type))
-           return NULL; 
+           return NULL;
 
-       printf("-- This parrot wouldn't %s if you put %i Volts through it.\n", 
+       printf("-- This parrot wouldn't %s if you put %i Volts through it.\n",
               action, voltage);
        printf("-- Lovely plumage, the %s -- It's %s!\n", type, state);
 
@@ -865,7 +868,7 @@ memory and should be avoided completely. [#]_
 The advantage of borrowing over owning a reference is that you don't need to
 take care of disposing of the reference on all possible paths through the code
 --- in other words, with a borrowed reference you don't run the risk of leaking
-when a premature exit is taken.  The disadvantage of borrowing over leaking is
+when a premature exit is taken.  The disadvantage of borrowing over owning is
 that there are some subtle situations where in seemingly correct code a borrowed
 reference can be used after the owner from which it was borrowed has in fact
 disposed of it.
@@ -1057,7 +1060,7 @@ already if the symbol ``__cplusplus`` is defined (all recent C++ compilers
 define this symbol).
 
 
-.. _using-cobjects:
+.. _using-capsules:
 
 Providing a C API for an Extension Module
 =========================================
@@ -1093,23 +1096,40 @@ avoid name clashes with other extension modules (as discussed in section
 other extension modules must be exported in a different way.
 
 Python provides a special mechanism to pass C-level information (pointers) from
-one extension module to another one: CObjects. A CObject is a Python data type
-which stores a pointer (:ctype:`void \*`).  CObjects can only be created and
+one extension module to another one: Capsules. A Capsule is a Python data type
+which stores a pointer (:ctype:`void \*`).  Capsules can only be created and
 accessed via their C API, but they can be passed around like any other Python
 object. In particular,  they can be assigned to a name in an extension module's
 namespace. Other extension modules can then import this module, retrieve the
-value of this name, and then retrieve the pointer from the CObject.
+value of this name, and then retrieve the pointer from the Capsule.
 
-There are many ways in which CObjects can be used to export the C API of an
-extension module. Each name could get its own CObject, or all C API pointers
-could be stored in an array whose address is published in a CObject. And the
+There are many ways in which Capsules can be used to export the C API of an
+extension module. Each function could get its own Capsule, or all C API pointers
+could be stored in an array whose address is published in a Capsule. And the
 various tasks of storing and retrieving the pointers can be distributed in
 different ways between the module providing the code and the client modules.
+
+Whichever method you choose, it's important to name your Capsules properly.
+The function :cfunc:`PyCapsule_New` takes a name parameter
+(:ctype:`const char \*`); you're permitted to pass in a *NULL* name, but
+we strongly encourage you to specify a name.  Properly named Capsules provide
+a degree of runtime type-safety; there is no feasible way to tell one unnamed
+Capsule from another.
+
+In particular, Capsules used to expose C APIs should be given a name following
+this convention::
+
+    modulename.attributename
+
+The convenience function :cfunc:`PyCapsule_Import` makes it easy to
+load a C API provided via a Capsule, but only if the Capsule's name
+matches this convention.  This behavior gives C API users a high degree
+of certainty that the Capsule they load contains the correct C API.
 
 The following example demonstrates an approach that puts most of the burden on
 the writer of the exporting module, which is appropriate for commonly used
 library modules. It stores all C API pointers (just one in the example!) in an
-array of :ctype:`void` pointers which becomes the value of a CObject. The header
+array of :ctype:`void` pointers which becomes the value of a Capsule. The header
 file corresponding to the module provides a macro that takes care of importing
 the module and retrieving its C API pointers; client modules only have to call
 this macro before accessing the C API.
@@ -1171,8 +1191,8 @@ function must take care of initializing the C API pointer array::
        /* Initialize the C API pointer array */
        PySpam_API[PySpam_System_NUM] = (void *)PySpam_System;
 
-       /* Create a CObject containing the API pointer array's address */
-       c_api_object = PyCObject_FromVoidPtr((void *)PySpam_API, NULL);
+       /* Create a Capsule containing the API pointer array's address */
+       c_api_object = PyCapsule_New((void *)PySpam_API, "spam._C_API", NULL);
 
        if (c_api_object != NULL)
            PyModule_AddObject(m, "_C_API", c_api_object);
@@ -1214,21 +1234,14 @@ like this::
    #define PySpam_System \
     (*(PySpam_System_RETURN (*)PySpam_System_PROTO) PySpam_API[PySpam_System_NUM])
 
-   /* Return -1 and set exception on error, 0 on success. */
+   /* Return -1 on error, 0 on success.
+    * PyCapsule_Import will set an exception if there's an error.
+    */
    static int
    import_spam(void)
    {
-       PyObject *module = PyImport_ImportModule("spam");
-
-       if (module != NULL) {
-           PyObject *c_api_object = PyObject_GetAttrString(module, "_C_API");
-           if (c_api_object == NULL)
-               return -1;
-           if (PyCObject_Check(c_api_object))
-               PySpam_API = (void **)PyCObject_AsVoidPtr(c_api_object);
-           Py_DECREF(c_api_object);
-       }
-       return 0;
+       PySpam_API = (void **)PyCapsule_Import("spam._C_API", 0);
+       return (PySpam_API != NULL) ? 0 : -1;
    }
 
    #endif
@@ -1260,11 +1273,11 @@ The main disadvantage of this approach is that the file :file:`spammodule.h` is
 rather complicated. However, the basic structure is the same for each function
 that is exported, so it has to be learned only once.
 
-Finally it should be mentioned that CObjects offer additional functionality,
+Finally it should be mentioned that Capsules offer additional functionality,
 which is especially useful for memory allocation and deallocation of the pointer
-stored in a CObject. The details are described in the Python/C API Reference
-Manual in the section :ref:`cobjects` and in the implementation of CObjects (files
-:file:`Include/cobject.h` and :file:`Objects/cobject.c` in the Python source
+stored in a Capsule. The details are described in the Python/C API Reference
+Manual in the section :ref:`capsules` and in the implementation of Capsules (files
+:file:`Include/pycapsule.h` and :file:`Objects/pycapsule.c` in the Python source
 code distribution).
 
 .. rubric:: Footnotes

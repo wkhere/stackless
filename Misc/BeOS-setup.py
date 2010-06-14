@@ -195,7 +195,7 @@ class PyBuildExt(build_ext):
                                libraries=math_libs) )
         # operator.add() and similar goodies
         exts.append( Extension('operator', ['operator.c']) )
-        # access to the builtin codecs and codec registry
+        # access to the built-in codecs and codec registry
         exts.append( Extension('_codecs', ['_codecsmodule.c']) )
         # Python C API test module
         exts.append( Extension('_testcapi', ['_testcapimodule.c']) )
@@ -356,7 +356,7 @@ class PyBuildExt(build_ext):
                                    libraries = dblib) )
 
         # Unix-only modules
-        if platform not in ['mac', 'win32']:
+        if platform == 'win32':
             # Steen Lumholt's termios module
             exts.append( Extension('termios', ['termios.c']) )
             # Jeremy Hylton's rlimit interface

@@ -20,7 +20,7 @@ XML-RPC servers written in Python.  Servers can either be free standing, using
 :class:`CGIXMLRPCRequestHandler`.
 
 
-.. class:: SimpleXMLRPCServer(addr[, requestHandler[, logRequests[, allow_none[, encoding]]]])
+.. class:: SimpleXMLRPCServer(addr[, requestHandler[, logRequests[, allow_none[, encoding[, bind_and_activate]]]])
 
    Create a new server instance.  This class provides methods for registration of
    functions that can be called by the XML-RPC protocol.  The *requestHandler*
@@ -133,6 +133,15 @@ alone XML-RPC servers.
 
    .. versionadded:: 2.5
 
+.. attribute:: SimpleXMLRPCRequestHandler.encode_threshold
+
+   If this attribute is not ``None``, responses larger than this value
+   will be encoded using the *gzip* transfer encoding, if permitted by
+   the client.  The default is ``1400`` which corresponds roughly
+   to a single TCP packet.
+
+   .. versionadded:: 2.7
+
 .. _simplexmlrpcserver-example:
 
 SimpleXMLRPCServer Example
@@ -151,7 +160,7 @@ Server code::
                                requestHandler=RequestHandler)
    server.register_introspection_functions()
 
-   # Register pow() function; this will use the value of 
+   # Register pow() function; this will use the value of
    # pow.__name__ as the name, which is just 'pow'.
    server.register_function(pow)
 
@@ -160,10 +169,10 @@ Server code::
        return x + y
    server.register_function(adder_function, 'add')
 
-   # Register an instance; all the methods of the instance are 
+   # Register an instance; all the methods of the instance are
    # published as XML-RPC methods (in this case, just 'div').
    class MyFuncs:
-       def div(self, x, y): 
+       def div(self, x, y):
            return x // y
 
    server.register_instance(MyFuncs())

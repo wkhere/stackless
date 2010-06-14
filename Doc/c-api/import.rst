@@ -28,10 +28,10 @@ Importing Modules
    leaves the module in ``sys.modules``.
 
    .. versionchanged:: 2.4
-      failing imports remove incomplete module objects.
+      Failing imports remove incomplete module objects.
 
    .. versionchanged:: 2.6
-      always use absolute imports
+      Always uses absolute imports.
 
 
 .. cfunction:: PyObject* PyImport_ImportModuleNoBlock(const char *name)
@@ -62,7 +62,7 @@ Importing Modules
    unless a non-empty *fromlist* was given.
 
    .. versionchanged:: 2.4
-      failing imports remove incomplete module objects.
+      Failing imports remove incomplete module objects.
 
    .. versionchanged:: 2.6
       The function is an alias for :cfunc:`PyImport_ImportModuleLevel` with
@@ -95,7 +95,7 @@ Importing Modules
    are installed in the current environment, e.g. by :mod:`rexec` or :mod:`ihooks`.
 
    .. versionchanged:: 2.6
-      always use absolute imports
+      Always uses absolute imports.
 
 
 .. cfunction:: PyObject* PyImport_ReloadModule(PyObject *m)
@@ -138,6 +138,9 @@ Importing Modules
    such modules have no way to know that the module object is an unknown (and
    probably damaged with respect to the module author's intents) state.
 
+   The module's :attr:`__file__` attribute will be set to the code object's
+   :cmember:`co_filename`.
+
    This function will reload the module if it was already imported.  See
    :cfunc:`PyImport_ReloadModule` for the intended way to reload a module.
 
@@ -146,6 +149,12 @@ Importing Modules
 
    .. versionchanged:: 2.4
       *name* is removed from :attr:`sys.modules` in error cases.
+
+
+.. cfunction:: PyObject* PyImport_ExecCodeModuleEx(char *name, PyObject *co, char *pathname)
+
+   Like :cfunc:`PyImport_ExecCodeModule`, but the :attr:`__file__` attribute of
+   the module object is set to *pathname* if it is non-``NULL``.
 
 
 .. cfunction:: long PyImport_GetMagicNumber()
@@ -167,7 +176,7 @@ Importing Modules
    *path*, possibly by fetching it from the :data:`sys.path_importer_cache`
    dict.  If it wasn't yet cached, traverse :data:`sys.path_hooks` until a hook
    is found that can handle the path item.  Return ``None`` if no hook could;
-   this tells our caller it should fall back to the builtin import mechanism.
+   this tells our caller it should fall back to the built-in import mechanism.
    Cache the result in :data:`sys.path_importer_cache`.  Return a new reference
    to the importer object.
 
@@ -232,7 +241,7 @@ Importing Modules
    tricks with this to provide a dynamically created collection of frozen modules.
 
 
-.. cfunction:: int PyImport_AppendInittab(char *name, void (*initfunc)(void))
+.. cfunction:: int PyImport_AppendInittab(const char *name, void (*initfunc)(void))
 
    Add a single module to the existing table of built-in modules.  This is a
    convenience wrapper around :cfunc:`PyImport_ExtendInittab`, returning ``-1`` if

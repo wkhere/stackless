@@ -14,7 +14,7 @@ syntax (ECMA-262 3rd edition) used as a lightweight data interchange format.
 :mod:`marshal` and :mod:`pickle` modules.
 
 Encoding basic Python object hierarchies::
-    
+
     >>> import json
     >>> json.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
     '["foo", {"bar": ["baz", null, 1.0, 2]}]'
@@ -43,12 +43,12 @@ Pretty printing::
     >>> import json
     >>> print json.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4)
     {
-        "4": 5, 
+        "4": 5,
         "6": 7
     }
 
 Decoding JSON::
-    
+
     >>> import json
     >>> json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]')
     [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
@@ -66,7 +66,7 @@ Specializing JSON object decoding::
     ...     if '__complex__' in dct:
     ...         return complex(dct['real'], dct['imag'])
     ...     return dct
-    ... 
+    ...
     >>> json.loads('{"__complex__": true, "real": 1, "imag": 2}',
     ...     object_hook=as_complex)
     (1+2j)
@@ -75,26 +75,26 @@ Specializing JSON object decoding::
     Decimal('1.1')
 
 Extending :class:`JSONEncoder`::
-    
+
     >>> import json
     >>> class ComplexEncoder(json.JSONEncoder):
     ...     def default(self, obj):
     ...         if isinstance(obj, complex):
     ...             return [obj.real, obj.imag]
     ...         return json.JSONEncoder.default(self, obj)
-    ... 
+    ...
     >>> dumps(2 + 1j, cls=ComplexEncoder)
     '[2.0, 1.0]'
     >>> ComplexEncoder().encode(2 + 1j)
     '[2.0, 1.0]'
     >>> list(ComplexEncoder().iterencode(2 + 1j))
     ['[', '2.0', ', ', '1.0', ']']
-    
+
 
 .. highlight:: none
 
 Using json.tool from the shell to validate and pretty-print::
-    
+
     $ echo '{"json":"obj"}' | python -mjson.tool
     {
         "json": "obj"
@@ -104,7 +104,7 @@ Using json.tool from the shell to validate and pretty-print::
 
 .. highlight:: python
 
-.. note:: 
+.. note::
 
    The JSON produced by this module's default settings is a subset of
    YAML, so it may be used as a serializer for that as well.
@@ -152,7 +152,7 @@ Basic Usage
    *default(obj)* is a function that should return a serializable version of
    *obj* or raise :exc:`TypeError`.  The default simply raises :exc:`TypeError`.
 
-   To use a custom :class:`JSONEncoder`` subclass (e.g. one that overrides the
+   To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
    :meth:`default` method to serialize additional types), specify it with the
    *cls* kwarg.
 
@@ -166,7 +166,7 @@ Basic Usage
    :func:`dump`.
 
 
-.. function load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, **kw]]]]]]])
+.. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, **kw]]]]]]]])
 
    Deserialize *fp* (a ``.read()``-supporting file-like object containing a JSON
    document) to a Python object.
@@ -174,13 +174,24 @@ Basic Usage
    If the contents of *fp* are encoded with an ASCII based encoding other than
    UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be specified.
    Encodings that are not ASCII based (such as UCS-2) are not allowed, and
-   should be wrapped with ``codecs.getreader(fp)(encoding)``, or simply decoded
+   should be wrapped with ``codecs.getreader(encoding)(fp)``, or simply decoded
    to a :class:`unicode` object and passed to :func:`loads`.
 
    *object_hook* is an optional function that will be called with the result of
-   any object literal decode (a :class:`dict`).  The return value of
+   any object literal decoded (a :class:`dict`).  The return value of
    *object_hook* will be used instead of the :class:`dict`.  This feature can be used
    to implement custom decoders (e.g. JSON-RPC class hinting).
+
+   *object_pairs_hook* is an optional function that will be called with the
+   result of any object literal decoded with an ordered list of pairs.  The
+   return value of *object_pairs_hook* will be used instead of the
+   :class:`dict`.  This feature can be used to implement custom decoders that
+   rely on the order that the key and value pairs are decoded (for example,
+   :func:`collections.OrderedDict` will remember the order of insertion). If
+   *object_hook* is also defined, the *object_pairs_hook* takes priority.
+
+   .. versionchanged:: 2.7
+      Added support for *object_pairs_hook*.
 
    *parse_float*, if specified, will be called with the string of every JSON
    float to be decoded.  By default, this is equivalent to ``float(num_str)``.
@@ -202,7 +213,7 @@ Basic Usage
    class.
 
 
-.. function loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, **kw]]]]]]])
+.. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, **kw]]]]]]]])
 
    Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
    document) to a Python object.
@@ -212,13 +223,13 @@ Basic Usage
    specified.  Encodings that are not ASCII based (such as UCS-2) are not
    allowed and should be decoded to :class:`unicode` first.
 
-   The other arguments have the same meaning as in :func:`dump`.
+   The other arguments have the same meaning as in :func:`load`.
 
 
 Encoders and decoders
 ---------------------
 
-.. class:: JSONDecoder([encoding[, object_hook[, parse_float[, parse_int[, parse_constant[, strict]]]]]])
+.. class:: JSONDecoder([encoding[, object_hook[, parse_float[, parse_int[, parse_constant[, strict[, object_pairs_hook]]]]]]])
 
    Simple JSON decoder.
 
@@ -258,6 +269,17 @@ Encoders and decoders
    object decoded and its return value will be used in place of the given
    :class:`dict`.  This can be used to provide custom deserializations (e.g. to
    support JSON-RPC class hinting).
+
+   *object_pairs_hook*, if specified will be called with the result of every
+   JSON object decoded with an ordered list of pairs.  The return value of
+   *object_pairs_hook* will be used instead of the :class:`dict`.  This
+   feature can be used to implement custom decoders that rely on the order
+   that the key and value pairs are decoded (for example,
+   :func:`collections.OrderedDict` will remember the order of insertion). If
+   *object_hook* is also defined, the *object_pairs_hook* takes priority.
+
+   .. versionchanged:: 2.7
+      Added support for *object_pairs_hook*.
 
    *parse_float*, if specified, will be called with the string of every JSON
    float to be decoded.  By default, this is equivalent to ``float(num_str)``.
@@ -368,7 +390,7 @@ Encoders and decoders
 
       For example, to support arbitrary iterators, you could implement default
       like this::
-            
+
          def default(self, o):
             try:
                 iterable = iter(o)
@@ -392,6 +414,6 @@ Encoders and decoders
 
       Encode the given object, *o*, and yield each string representation as
       available.  For example::
-            
+
             for chunk in JSONEncoder().iterencode(bigobject):
                 mysocket.write(chunk)

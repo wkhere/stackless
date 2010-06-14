@@ -39,12 +39,12 @@ rules for working with signals and their handlers:
 * Some care must be taken if both signals and threads are used in the same
   program.  The fundamental thing to remember in using signals and threads
   simultaneously is: always perform :func:`signal` operations in the main thread
-  of execution.  Any thread can perform an :func:`alarm`, :func:`getsignal`, 
-  :func:`pause`, :func:`setitimer` or :func:`getitimer`; only the main thread 
-  can set a new signal handler, and the main thread will be the only one to 
-  receive signals (this is enforced by the Python :mod:`signal` module, even 
-  if the underlying thread implementation supports sending signals to 
-  individual threads).  This means that signals can't be used as a means of 
+  of execution.  Any thread can perform an :func:`alarm`, :func:`getsignal`,
+  :func:`pause`, :func:`setitimer` or :func:`getitimer`; only the main thread
+  can set a new signal handler, and the main thread will be the only one to
+  receive signals (this is enforced by the Python :mod:`signal` module, even
+  if the underlying thread implementation supports sending signals to
+  individual threads).  This means that signals can't be used as a means of
   inter-thread communication.  Use locks instead.
 
 The variables defined in the :mod:`signal` module are:
@@ -52,10 +52,10 @@ The variables defined in the :mod:`signal` module are:
 
 .. data:: SIG_DFL
 
-   This is one of two standard signal handling options; it will simply perform the
-   default function for the signal.  For example, on most systems the default
-   action for :const:`SIGQUIT` is to dump core and exit, while the default action
-   for :const:`SIGCLD` is to simply ignore it.
+   This is one of two standard signal handling options; it will simply perform
+   the default function for the signal.  For example, on most systems the
+   default action for :const:`SIGQUIT` is to dump core and exit, while the
+   default action for :const:`SIGCHLD` is to simply ignore it.
 
 
 .. data:: SIG_IGN
@@ -75,27 +75,43 @@ The variables defined in the :mod:`signal` module are:
    the system are defined by this module.
 
 
+.. data:: CTRL_C_EVENT
+
+   The signal corresponding to the CTRL+C keystroke event.
+   Availability: Windows.
+
+   .. versionadded:: 2.7
+
+
+.. data:: CTRL_BREAK_EVENT
+
+   The signal corresponding to the CTRL+BREAK keystroke event.
+   Availability: Windows.
+
+   .. versionadded:: 2.7
+
+
 .. data:: NSIG
 
    One more than the number of the highest signal number.
 
 
-.. data:: ITIMER_REAL    
+.. data:: ITIMER_REAL
 
    Decrements interval timer in real time, and delivers :const:`SIGALRM` upon expiration.
 
 
-.. data:: ITIMER_VIRTUAL 
+.. data:: ITIMER_VIRTUAL
 
-   Decrements interval timer only when the process is executing, and delivers 
+   Decrements interval timer only when the process is executing, and delivers
    SIGVTALRM upon expiration.
 
 
 .. data:: ITIMER_PROF
-   
-   Decrements interval timer both when the process executes and when the 
-   system is executing on behalf of the process. Coupled with ITIMER_VIRTUAL, 
-   this timer is usually used to profile the time spent by the application 
+
+   Decrements interval timer both when the process executes and when the
+   system is executing on behalf of the process. Coupled with ITIMER_VIRTUAL,
+   this timer is usually used to profile the time spent by the application
    in user and kernel space. SIGPROF is delivered upon expiration.
 
 
@@ -105,7 +121,7 @@ The :mod:`signal` module defines one exception:
 
    Raised to signal an error from the underlying :func:`setitimer` or
    :func:`getitimer` implementation. Expect this error if an invalid
-   interval timer or a negative time is passed to :func:`setitimer`. 
+   interval timer or a negative time is passed to :func:`setitimer`.
    This error is a subtype of :exc:`IOError`.
 
 
@@ -143,22 +159,22 @@ The :mod:`signal` module defines the following functions:
 
 .. function:: setitimer(which, seconds[, interval])
 
-   Sets given interval timer (one of :const:`signal.ITIMER_REAL`, 
+   Sets given interval timer (one of :const:`signal.ITIMER_REAL`,
    :const:`signal.ITIMER_VIRTUAL` or :const:`signal.ITIMER_PROF`) specified
-   by *which* to fire after *seconds* (float is accepted, different from 
+   by *which* to fire after *seconds* (float is accepted, different from
    :func:`alarm`) and after that every *interval* seconds. The interval
    timer specified by *which* can be cleared by setting seconds to zero.
 
    When an interval timer fires, a signal is sent to the process.
-   The signal sent is dependent on the timer being used; 
-   :const:`signal.ITIMER_REAL` will deliver :const:`SIGALRM`, 
+   The signal sent is dependent on the timer being used;
+   :const:`signal.ITIMER_REAL` will deliver :const:`SIGALRM`,
    :const:`signal.ITIMER_VIRTUAL` sends :const:`SIGVTALRM`,
    and :const:`signal.ITIMER_PROF` will deliver :const:`SIGPROF`.
 
    The old values are returned as a tuple: (delay, interval).
 
-   Attempting to pass an invalid interval timer will cause a 
-   :exc:`ItimerError`.
+   Attempting to pass an invalid interval timer will cause an
+   :exc:`ItimerError`.  Availability: Unix.
 
    .. versionadded:: 2.6
 
@@ -166,6 +182,7 @@ The :mod:`signal` module defines the following functions:
 .. function:: getitimer(which)
 
    Returns current value of a given interval timer specified by *which*.
+   Availability: Unix.
 
    .. versionadded:: 2.6
 
@@ -186,14 +203,14 @@ The :mod:`signal` module defines the following functions:
 
 .. function:: siginterrupt(signalnum, flag)
 
-   Change system call restart behaviour: if *flag* is :const:`False`, system calls
-   will be restarted when interrupted by signal *signalnum*, otherwise system calls will
-   be interrupted. Returns nothing. Availability: Unix (see the man page
-   :manpage:`siginterrupt(3)` for further information).
-   
-   Note that installing a signal handler with :func:`signal` will reset the restart
-   behaviour to interruptible by implicitly calling :cfunc:`siginterrupt` with a true *flag*
-   value for the given signal.
+   Change system call restart behaviour: if *flag* is :const:`False`, system
+   calls will be restarted when interrupted by signal *signalnum*, otherwise
+   system calls will be interrupted.  Returns nothing.  Availability: Unix (see
+   the man page :manpage:`siginterrupt(3)` for further information).
+
+   Note that installing a signal handler with :func:`signal` will reset the
+   restart behaviour to interruptible by implicitly calling
+   :cfunc:`siginterrupt` with a true *flag* value for the given signal.
 
    .. versionadded:: 2.6
 
@@ -211,9 +228,9 @@ The :mod:`signal` module defines the following functions:
    exception to be raised.
 
    The *handler* is called with two arguments: the signal number and the current
-   stack frame (``None`` or a frame object; for a description of frame objects, see
-   the reference manual section on the standard type hierarchy or see the attribute
-   descriptions in the :mod:`inspect` module).
+   stack frame (``None`` or a frame object; for a description of frame objects,
+   see the :ref:`description in the type hierarchy <frame-objects>` or see the
+   attribute descriptions in the :mod:`inspect` module).
 
 
 .. _signal-example:
@@ -232,14 +249,14 @@ be sent, and the handler raises an exception. ::
 
    def handler(signum, frame):
        print 'Signal handler called with signal', signum
-       raise IOError, "Couldn't open device!"
+       raise IOError("Couldn't open device!")
 
    # Set the signal handler and a 5-second alarm
    signal.signal(signal.SIGALRM, handler)
    signal.alarm(5)
 
    # This open() may hang indefinitely
-   fd = os.open('/dev/ttyS0', os.O_RDWR)  
+   fd = os.open('/dev/ttyS0', os.O_RDWR)
 
    signal.alarm(0)          # Disable the alarm
 

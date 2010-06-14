@@ -12,7 +12,7 @@
 This module adds the ability to import Python modules (:file:`\*.py`,
 :file:`\*.py[co]`) and packages from ZIP-format archives. It is usually not
 needed to use the :mod:`zipimport` module explicitly; it is automatically used
-by the builtin :keyword:`import` mechanism for ``sys.path`` items that are paths
+by the built-in :keyword:`import` mechanism for ``sys.path`` items that are paths
 to ZIP archives.
 
 Typically, ``sys.path`` is a list of directory names as strings.  This module
@@ -33,18 +33,20 @@ Using the built-in :func:`reload` function will fail if called on a module
 loaded from a ZIP archive; it is unlikely that :func:`reload` would be needed,
 since this would imply that the ZIP has been altered during runtime.
 
+ZIP archives with an archive comment are currently not supported.
+
 .. seealso::
 
    `PKZIP Application Note <http://www.pkware.com/documents/casestudies/APPNOTE.TXT>`_
       Documentation on the ZIP file format by Phil Katz, the creator of the format and
       algorithms used.
 
-   :pep:`0273` - Import Modules from Zip Archives
+   :pep:`273` - Import Modules from Zip Archives
       Written by James C. Ahlstrom, who also provided an implementation. Python 2.3
       follows the specification in PEP 273, but uses an implementation written by Just
       van Rossum that uses the import hooks described in PEP 302.
 
-   :pep:`0302` - New Import Hooks
+   :pep:`302` - New Import Hooks
       The PEP to add the import hooks that help this module work.
 
 
@@ -92,6 +94,15 @@ zipimporter Objects
 
       Return the data associated with *pathname*. Raise :exc:`IOError` if the
       file wasn't found.
+
+
+   .. method:: get_filename(fullname)
+
+      Return the value ``__file__`` would be set to if the specified module
+      was imported. Raise :exc:`ZipImportError` if the module couldn't be
+      found.
+
+   .. versionadded:: 2.7
 
 
    .. method:: get_source(fullname)
@@ -148,7 +159,7 @@ Here is an example that imports a module from a ZIP archive - note that the
     --------                   -------
         8467                   1 file
    $ ./python
-   Python 2.3 (#1, Aug 1 2003, 19:54:32) 
+   Python 2.3 (#1, Aug 1 2003, 19:54:32)
    >>> import sys
    >>> sys.path.insert(0, '/tmp/example.zip')  # Add .zip file to front of path
    >>> import jwzthreading

@@ -1,4 +1,3 @@
-
 :mod:`gl` --- *Graphics Library* interface
 ==========================================
 
@@ -6,8 +5,8 @@
    :platform: IRIX
    :synopsis: Functions from the Silicon Graphics Graphics Library.
    :deprecated:
-   
-   
+
+
 .. deprecated:: 2.6
     The :mod:`gl` module has been deprecated for removal in Python 3.0.
 
@@ -17,9 +16,9 @@ available only on Silicon Graphics machines.
 
 .. warning::
 
-   Some illegal calls to the GL library cause the Python interpreter to dump core.
-   In particular, the use of most GL calls is unsafe before the first window is
-   opened.
+   Some illegal calls to the GL library cause the Python interpreter to dump
+   core.  In particular, the use of most GL calls is unsafe before the first
+   window is opened.
 
 The module is too large to document here in its entirety, but the following
 should help you to get started. The parameter conventions for the C functions
@@ -166,8 +165,8 @@ Here is a tiny but complete example GL program in Python::
    :platform: IRIX
    :synopsis: Constants used with the gl module.
    :deprecated:
-   
-   
+
+
 .. deprecated:: 2.6
     The :mod:`DEVICE` module has been deprecated for removal in Python 3.0.
 
@@ -184,8 +183,8 @@ module source file for details.
    :platform: IRIX
    :synopsis: Constants used with the gl module.
    :deprecated:
-   
-   
+
+
 .. deprecated:: 2.6
     The :mod:`GL` module has been deprecated for removal in Python 3.0.
 

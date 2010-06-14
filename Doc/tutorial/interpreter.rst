@@ -22,16 +22,16 @@ guru or system administrator.  (E.g., :file:`/usr/local/python` is a popular
 alternative location.)
 
 On Windows machines, the Python installation is usually placed in
-:file:`C:\\Python26`, though you can change this when you're running the
+:file:`C:\\Python27`, though you can change this when you're running the
 installer.  To add this directory to your path,  you can type the following
 command into the command prompt in a DOS box::
 
-   set path=%path%;C:\python26
+   set path=%path%;C:\python27
 
 Typing an end-of-file character (:kbd:`Control-D` on Unix, :kbd:`Control-Z` on
 Windows) at the primary prompt causes the interpreter to exit with a zero exit
 status.  If that doesn't work, you can exit the interpreter by typing the
-following commands: ``import sys; sys.exit()``.
+following command: ``quit()``.
 
 The interpreter's line-editing features usually aren't very sophisticated.  On
 Unix, whoever installed the interpreter may have enabled support for the GNU
@@ -102,7 +102,7 @@ prints a welcome message stating its version number and a copyright notice
 before printing the first prompt::
 
    python
-   Python 2.6 (#1, Feb 28 2007, 00:02:06)
+   Python 2.7 (#1, Feb 28 2010, 00:02:06)
    Type "help", "copyright", "credits" or "license" for more information.
    >>>
 
@@ -112,7 +112,7 @@ example, take a look at this :keyword:`if` statement::
    >>> the_world_is_flat = 1
    >>> if the_world_is_flat:
    ...     print "Be careful not to fall off!"
-   ... 
+   ...
    Be careful not to fall off!
 
 
@@ -180,7 +180,7 @@ It is possible to use encodings different than ASCII in Python source files. The
 best way to do it is to put one more special comment line right after the ``#!``
 line to define the source file encoding::
 
-   # -*- coding: encoding -*- 
+   # -*- coding: encoding -*-
 
 
 With that declaration, all characters in the source file will be treated as

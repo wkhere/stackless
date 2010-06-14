@@ -118,8 +118,8 @@ Assignment of an object to a target list is recursively defined as follows.
 
 * If the target list is a single target: The object is assigned to that target.
 
-* If the target list is a comma-separated list of targets: The object must be a
-  sequence with the same number of items as there are targets in the target list,
+* If the target list is a comma-separated list of targets: The object must be an
+  iterable with the same number of items as there are targets in the target list,
   and the items are assigned, from left to right, to the corresponding targets.
   (This rule is relaxed as of Python 1.5; in earlier versions, the object had to
   be a tuple.  Since strings are sequences, an assignment like ``a, b = "xy"`` is
@@ -143,18 +143,37 @@ Assignment of an object to a single target is recursively defined as follows.
   be deallocated and its destructor (if it has one) to be called.
 
 * If the target is a target list enclosed in parentheses or in square brackets:
-  The object must be a sequence with the same number of items as there are targets
-  in the target list, and its items are assigned, from left to right, to the
-  corresponding targets.
+  The object must be an iterable with the same number of items as there are
+  targets in the target list, and its items are assigned, from left to right,
+  to the corresponding targets.
 
   .. index:: pair: attribute; assignment
 
 * If the target is an attribute reference: The primary expression in the
   reference is evaluated.  It should yield an object with assignable attributes;
-  if this is not the case, :exc:`TypeError` is raised.  That object is then asked
-  to assign the assigned object to the given attribute; if it cannot perform the
-  assignment, it raises an exception (usually but not necessarily
+  if this is not the case, :exc:`TypeError` is raised.  That object is then
+  asked to assign the assigned object to the given attribute; if it cannot
+  perform the assignment, it raises an exception (usually but not necessarily
   :exc:`AttributeError`).
+
+  .. _attr-target-note:
+
+  Note: If the object is a class instance and the attribute reference occurs on
+  both sides of the assignment operator, the RHS expression, ``a.x`` can access
+  either an instance attribute or (if no instance attribute exists) a class
+  attribute.  The LHS target ``a.x`` is always set as an instance attribute,
+  creating it if necessary.  Thus, the two occurrences of ``a.x`` do not
+  necessarily refer to the same attribute: if the RHS expression refers to a
+  class attribute, the LHS creates a new instance attribute as the target of the
+  assignment::
+
+     class Cls:
+         x = 3             # class variable
+     inst = Cls()
+     inst.x = inst.x + 1   # writes inst.x as 4 leaving Cls.x as 3
+
+  This description does not necessarily apply to descriptor attributes, such as
+  properties created with :func:`property`.
 
   .. index::
      pair: subscription; assignment
@@ -200,9 +219,11 @@ Assignment of an object to a single target is recursively defined as follows.
   the length of the assigned sequence, thus changing the length of the target
   sequence, if the object allows it.
 
-(In the current implementation, the syntax for targets is taken to be the same
-as for expressions, and invalid syntax is rejected during the code generation
-phase, causing less detailed error messages.)
+.. impl-detail::
+
+   In the current implementation, the syntax for targets is taken to be the same
+   as for expressions, and invalid syntax is rejected during the code generation
+   phase, causing less detailed error messages.
 
 WARNING: Although the definition of assignment implies that overlaps between the
 left-hand side and the right-hand side are 'safe' (for example ``a, b = b, a``
@@ -228,7 +249,8 @@ Augmented assignment is the combination, in a single statement, of a binary
 operation and an assignment statement:
 
 .. productionlist::
-   augmented_assignment_stmt: `target` `augop` (`expression_list` | `yield_expression`)
+   augmented_assignment_stmt: `augtarget` `augop` (`expression_list` | `yield_expression`)
+   augtarget: `identifier` | `attributeref` | `subscription` | `slicing`
    augop: "+=" | "-=" | "*=" | "/=" | "//=" | "%=" | "**="
         : | ">>=" | "<<=" | "&=" | "^=" | "|="
 
@@ -252,16 +274,8 @@ same way as normal assignments. Similarly, with the exception of the possible
 *in-place* behavior, the binary operation performed by augmented assignment is
 the same as the normal binary operations.
 
-For targets which are attribute references, the initial value is retrieved with
-a :meth:`getattr` and the result is assigned with a :meth:`setattr`.  Notice
-that the two methods do not necessarily refer to the same variable.  When
-:meth:`getattr` refers to a class variable, :meth:`setattr` still writes to an
-instance variable. For example::
-
-   class A:
-       x = 3    # class variable
-   a = A()
-   a.x += 1     # writes a.x as 4 leaving A.x as 3
+For targets which are attribute references, the same :ref:`caveat about class
+and instance attributes <attr-target-note>` applies as for regular assignments.
 
 
 .. _assert:
@@ -287,7 +301,7 @@ The simple form, ``assert expression``, is equivalent to ::
 The extended form, ``assert expression1, expression2``, is equivalent to ::
 
    if __debug__:
-      if not expression1: raise AssertionError, expression2
+      if not expression1: raise AssertionError(expression2)
 
 .. index::
    single: __debug__
@@ -385,9 +399,10 @@ first converted to a string using the rules for string conversions.  The
 object is (converted and) written, unless the output system believes it is
 positioned at the beginning of a line.  This is the case (1) when no characters
 have yet been written to standard output, (2) when the last character written to
-standard output is ``'\n'``, or (3) when the last write operation on standard
-output was not a :keyword:`print` statement.  (In some cases it may be
-functional to write an empty string to standard output for this reason.)
+standard output is a whitespace character except ``' '``, or (3) when the last
+write operation on standard output was not a :keyword:`print` statement.
+(In some cases it may be functional to write an empty string to standard output
+for this reason.)
 
 .. note::
 
@@ -652,48 +667,124 @@ The :keyword:`import` statement
 
 Import statements are executed in two steps: (1) find a module, and initialize
 it if necessary; (2) define a name or names in the local namespace (of the scope
-where the :keyword:`import` statement occurs). The first form (without
-:keyword:`from`) repeats these steps for each identifier in the list.  The form
-with :keyword:`from` performs step (1) once, and then performs step (2)
-repeatedly.
-
-In this context, to "initialize" a built-in or extension module means to call an
-initialization function that the module must provide for the purpose (in the
-reference implementation, the function's name is obtained by prepending string
-"init" to the module's name); to "initialize" a Python-coded module means to
-execute the module's body.
+where the :keyword:`import` statement occurs). The statement comes in two
+forms differing on whether it uses the :keyword:`from` keyword. The first form
+(without :keyword:`from`) repeats these steps for each identifier in the list.
+The form with :keyword:`from` performs step (1) once, and then performs step
+(2) repeatedly.
 
 .. index::
-   single: modules (in module sys)
-   single: sys.modules
-   pair: module; name
-   pair: built-in; module
-   pair: user-defined; module
-   module: sys
-   pair: filename; extension
-   triple: module; search; path
+    single: package
 
-The system maintains a table of modules that have been or are being initialized,
-indexed by module name.  This table is accessible as ``sys.modules``.  When a
-module name is found in this table, step (1) is finished.  If not, a search for
-a module definition is started.  When a module is found, it is loaded.  Details
-of the module searching and loading process are implementation and platform
-specific.  It generally involves searching for a "built-in" module with the
-given name and then searching a list of locations given as ``sys.path``.
+To understand how step (1) occurs, one must first understand how Python handles
+hierarchical naming of modules. To help organize modules and provide a
+hierarchy in naming, Python has a concept of packages. A package can contain
+other packages and modules while modules cannot contain other modules or
+packages. From a file system perspective, packages are directories and modules
+are files. The original `specification for packages
+<http://www.python.org/doc/essays/packages.html>`_ is still available to read,
+although minor details have changed since the writing of that document.
 
 .. index::
-   pair: module; initialization
-   exception: ImportError
-   single: code block
-   exception: SyntaxError
+    single: sys.modules
 
-If a built-in module is found, its built-in initialization code is executed and
-step (1) is finished.  If no matching file is found, :exc:`ImportError` is
-raised. If a file is found, it is parsed, yielding an executable code block.  If
-a syntax error occurs, :exc:`SyntaxError` is raised.  Otherwise, an empty module
-of the given name is created and inserted in the module table, and then the code
-block is executed in the context of this module.  Exceptions during this
-execution terminate step (1).
+Once the name of the module is known (unless otherwise specified, the term
+"module" will refer to both packages and modules), searching
+for the module or package can begin. The first place checked is
+:data:`sys.modules`, the cache of all modules that have been imported
+previously. If the module is found there then it is used in step (2) of import.
+
+.. index::
+    single: sys.meta_path
+    single: finder
+    pair: finder; find_module
+    single: __path__
+
+If the module is not found in the cache, then :data:`sys.meta_path` is searched
+(the specification for :data:`sys.meta_path` can be found in :pep:`302`).
+The object is a list of :term:`finder` objects which are queried in order as to
+whether they know how to load the module by calling their :meth:`find_module`
+method with the name of the module. If the module happens to be contained
+within a package (as denoted by the existence of a dot in the name), then a
+second argument to :meth:`find_module` is given as the value of the
+:attr:`__path__` attribute from the parent package (everything up to the last
+dot in the name of the module being imported). If a finder can find the module
+it returns a :term:`loader` (discussed later) or returns :keyword:`None`.
+
+.. index::
+    single: sys.path_hooks
+    single: sys.path_importer_cache
+    single: sys.path
+
+If none of the finders on :data:`sys.meta_path` are able to find the module
+then some implicitly defined finders are queried. Implementations of Python
+vary in what implicit meta path finders are defined. The one they all do
+define, though, is one that handles :data:`sys.path_hooks`,
+:data:`sys.path_importer_cache`, and :data:`sys.path`.
+
+The implicit finder searches for the requested module in the "paths" specified
+in one of two places ("paths" do not have to be file system paths). If the
+module being imported is supposed to be contained within a package then the
+second argument passed to :meth:`find_module`, :attr:`__path__` on the parent
+package, is used as the source of paths. If the module is not contained in a
+package then :data:`sys.path` is used as the source of paths.
+
+Once the source of paths is chosen it is iterated over to find a finder that
+can handle that path. The dict at :data:`sys.path_importer_cache` caches
+finders for paths and is checked for a finder. If the path does not have a
+finder cached then :data:`sys.path_hooks` is searched by calling each object in
+the list with a single argument of the path, returning a finder or raises
+:exc:`ImportError`. If a finder is returned then it is cached in
+:data:`sys.path_importer_cache` and then used for that path entry. If no finder
+can be found but the path exists then a value of :keyword:`None` is
+stored in :data:`sys.path_importer_cache` to signify that an implicit,
+file-based finder that handles modules stored as individual files should be
+used for that path. If the path does not exist then a finder which always
+returns :keyword:`None` is placed in the cache for the path.
+
+.. index::
+    single: loader
+    pair: loader; load_module
+    exception: ImportError
+
+If no finder can find the module then :exc:`ImportError` is raised. Otherwise
+some finder returned a loader whose :meth:`load_module` method is called with
+the name of the module to load (see :pep:`302` for the original definition of
+loaders). A loader has several responsibilities to perform on a module it
+loads. First, if the module already exists in :data:`sys.modules` (a
+possibility if the loader is called outside of the import machinery) then it
+is to use that module for initialization and not a new module. But if the
+module does not exist in :data:`sys.modules` then it is to be added to that
+dict before initialization begins. If an error occurs during loading of the
+module and it was added to :data:`sys.modules` it is to be removed from the
+dict. If an error occurs but the module was already in :data:`sys.modules` it
+is left in the dict.
+
+.. index::
+    single: __name__
+    single: __file__
+    single: __path__
+    single: __package__
+    single: __loader__
+
+The loader must set several attributes on the module. :data:`__name__` is to be
+set to the name of the module. :data:`__file__` is to be the "path" to the file
+unless the module is built-in (and thus listed in
+:data:`sys.builtin_module_names`) in which case the attribute is not set.
+If what is being imported is a package then :data:`__path__` is to be set to a
+list of paths to be searched when looking for modules and packages contained
+within the package being imported. :data:`__package__` is optional but should
+be set to the name of package that contains the module or package (the empty
+string is used for module not contained in a package). :data:`__loader__` is
+also optional but should be set to the loader object that is loading the
+module.
+
+.. index::
+    exception: ImportError
+
+If an error occurs during loading then the loader raises :exc:`ImportError` if
+some other exception is not already being propagated. Otherwise the loader
+returns the module that was loaded and initialized.
 
 When step (1) finishes without raising an exception, step (2) can begin.
 
@@ -733,29 +824,23 @@ function contains or is a nested block with free variables, the compiler will
 raise a :exc:`SyntaxError`.
 
 .. index::
-   keyword: from
-   statement: from
-   triple: hierarchical; module; names
-   single: packages
-   single: __init__.py
+    single: relative; import
 
-**Hierarchical module names:** when the module names contains one or more dots,
-the module search path is carried out differently.  The sequence of identifiers
-up to the last dot is used to find a "package"; the final identifier is then
-searched inside the package.  A package is generally a subdirectory of a
-directory on ``sys.path`` that has a file :file:`__init__.py`.
+When specifying what module to import you do not have to specify the absolute
+name of the module. When a module or package is contained within another
+package it is possible to make a relative import within the same top package
+without having to mention the package name. By using leading dots in the
+specified module or package after :keyword:`from` you can specify how high to
+traverse up the current package hierarchy without specifying exact names. One
+leading dot means the current package where the module making the import
+exists. Two dots means up one package level. Three dots is up two levels, etc.
+So if you execute ``from . import mod`` from a module in the ``pkg`` package
+then you will end up importing ``pkg.mod``. If you execute ``from ..subpkg2
+imprt mod`` from within ``pkg.subpkg1`` you will import ``pkg.subpkg2.mod``.
+The specification for relative imports is contained within :pep:`328`.
 
-.. 
-   [XXX Can't be
-   bothered to spell this out right now; see the URL
-   http://www.python.org/doc/essays/packages.html for more details, also about how
-   the module search works from inside a package.]
-
-.. index:: builtin: __import__
-
-The built-in function :func:`__import__` is provided to support applications
-that determine which modules need to be loaded dynamically; refer to
-:ref:`built-in-funcs` for additional information.
+:func:`importlib.import_module` is provided to support applications that
+determine which modules need to be loaded dynamically.
 
 
 .. _future:
@@ -819,7 +904,7 @@ Note that there is nothing special about the statement::
 That is not a future statement; it's an ordinary import statement with no
 special semantics or syntax restrictions.
 
-Code compiled by an :keyword:`exec` statement or calls to the builtin functions
+Code compiled by an :keyword:`exec` statement or calls to the built-in functions
 :func:`compile` and :func:`execfile` that occur in a module :mod:`M` containing
 a future statement will, by default, use the new  syntax or semantics associated
 with the future statement.  This can, starting with Python 2.2 be controlled by
@@ -831,6 +916,11 @@ for the rest of the interpreter session.  If an interpreter is started with the
 :option:`-i` option, is passed a script name to execute, and the script includes
 a future statement, it will be in effect in the interactive session started
 after the script is executed.
+
+.. seealso::
+
+   :pep:`236` - Back to the __future__
+      The original proposal for the __future__ mechanism.
 
 
 .. _global:
@@ -858,9 +948,11 @@ Names listed in a :keyword:`global` statement must not be defined as formal
 parameters or in a :keyword:`for` loop control target, :keyword:`class`
 definition, function definition, or :keyword:`import` statement.
 
-(The current implementation does not enforce the latter two restrictions, but
-programs should not abuse this freedom, as future implementations may enforce
-them or silently change the meaning of the program.)
+.. impl-detail::
+
+   The current implementation does not enforce the latter two restrictions, but
+   programs should not abuse this freedom, as future implementations may enforce
+   them or silently change the meaning of the program.
 
 .. index::
    statement: exec
@@ -891,7 +983,7 @@ The :keyword:`exec` statement
 This statement supports dynamic execution of Python code.  The first expression
 should evaluate to either a string, an open file object, or a code object.  If
 it is a string, the string is parsed as a suite of Python statements which is
-then executed (unless a syntax error occurs).  If it is an open file, the file
+then executed (unless a syntax error occurs). [#]_  If it is an open file, the file
 is parsed until EOF and executed.  If it is a code object, it is simply
 executed.  In all cases, the code that's executed is expected to be valid as
 file input (see section :ref:`file-input`).  Be aware that the
@@ -929,3 +1021,8 @@ built-in function :func:`eval`.  The built-in functions :func:`globals` and
 which may be useful to pass around for use by :keyword:`exec`.
 
 
+.. rubric:: Footnotes
+
+.. [#] Note that the parser only accepts the Unix-style end of line convention.
+       If you are reading the code from a file, make sure to use universal
+       newline mode to convert Windows or Mac-style newlines.

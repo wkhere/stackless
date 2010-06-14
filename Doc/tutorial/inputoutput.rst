@@ -49,10 +49,10 @@ Some examples::
    'Hello, world.'
    >>> repr(s)
    "'Hello, world.'"
-   >>> str(0.1)
-   '0.1'
-   >>> repr(0.1)
-   '0.10000000000000001'
+   >>> str(1.0/7.0)
+   '0.142857142857'
+   >>> repr(1.0/7.0)
+   '0.14285714285714285'
    >>> x = 10 * 3.25
    >>> y = 200 * 200
    >>> s = 'The value of x is ' + repr(x) + ', and y is ' + repr(y) + '...'
@@ -87,7 +87,7 @@ Here are two ways to write a table of squares and cubes::
 
    >>> for x in range(1,11):
    ...     print '{0:2d} {1:3d} {2:4d}'.format(x, x*x, x*x*x)
-   ... 
+   ...
     1   1    1
     2   4    8
     3   9   27
@@ -123,20 +123,21 @@ with zeros.  It understands about plus and minus signs::
 
 Basic usage of the :meth:`str.format` method looks like this::
 
-   >>> print 'We are the {0} who say "{1}!"'.format('knights', 'Ni')
+   >>> print 'We are the {} who say "{}!"'.format('knights', 'Ni')
    We are the knights who say "Ni!"
 
 The brackets and characters within them (called format fields) are replaced with
-the objects passed into the format method.  The number in the brackets refers to
-the position of the object passed into the format method. ::
+the objects passed into the :meth:`~str.format` method.  A number in the
+brackets refers to the position of the object passed into the
+:meth:`~str.format` method. ::
 
    >>> print '{0} and {1}'.format('spam', 'eggs')
    spam and eggs
    >>> print '{1} and {0}'.format('spam', 'eggs')
    eggs and spam
 
-If keyword arguments are used in the format method, their values are referred to
-by using the name of the argument. ::
+If keyword arguments are used in the :meth:`~str.format` method, their values
+are referred to by using the name of the argument. ::
 
    >>> print 'This {food} is {adjective}.'.format(
    ...       food='spam', adjective='absolutely horrible')
@@ -148,21 +149,30 @@ Positional and keyword arguments can be arbitrarily combined::
    ...                                                    other='Georg')
    The story of Bill, Manfred, and Georg.
 
-An optional ``':``` and format specifier can follow the field name. This also
+``'!s'`` (apply :func:`str`) and ``'!r'`` (apply :func:`repr`) can be used to
+convert the value before it is formatted. ::
+
+   >>> import math
+   >>> print 'The value of PI is approximately {}.'.format(math.pi)
+   The value of PI is approximately 3.14159265359.
+   >>> print 'The value of PI is approximately {!r}.'.format(math.pi)
+   The value of PI is approximately 3.141592653589793.
+
+An optional ``':'`` and format specifier can follow the field name. This allows
 greater control over how the value is formatted.  The following example
-truncates the Pi to three places after the decimal.
+truncates Pi to three places after the decimal.
 
    >>> import math
    >>> print 'The value of PI is approximately {0:.3f}.'.format(math.pi)
    The value of PI is approximately 3.142.
 
 Passing an integer after the ``':'`` will cause that field to be a minimum
-number of characters wide.  This is useful for making tables pretty.::
+number of characters wide.  This is useful for making tables pretty. ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 7678}
    >>> for name, phone in table.items():
    ...     print '{0:10} ==> {1:10d}'.format(name, phone)
-   ... 
+   ...
    Jack       ==>       4098
    Dcab       ==>       7678
    Sjoerd     ==>       4127
@@ -178,7 +188,7 @@ square brackets ``'[]'`` to access the keys ::
    Jack: 4098; Sjoerd: 4127; Dcab: 8637678
 
 This could also be done by passing the table as keyword arguments with the '**'
-notation.::
+notation. ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 8637678}
    >>> print 'Jack: {Jack:d}; Sjoerd: {Sjoerd:d}; Dcab: {Dcab:d}'.format(**table)
@@ -187,7 +197,7 @@ notation.::
 This is particularly useful in combination with the new built-in :func:`vars`
 function, which returns a dictionary containing all local variables.
 
-For a complete overview of string formating with :meth:`str.format`, see
+For a complete overview of string formatting with :meth:`str.format`, see
 :ref:`formatstrings`.
 
 
@@ -204,8 +214,8 @@ operation. For example::
    The value of PI is approximately 3.142.
 
 Since :meth:`str.format` is quite new, a lot of Python code still uses the ``%``
-operator. However, because this old style of formatting will eventually removed
-from the language :meth:`str.format` should generally be used.
+operator. However, because this old style of formatting will eventually be
+removed from the language, :meth:`str.format` should generally be used.
 
 More information can be found in the :ref:`string-formatting` section.
 
@@ -238,8 +248,8 @@ writing. The *mode* argument is optional; ``'r'`` will be assumed if it's
 omitted.
 
 On Windows, ``'b'`` appended to the mode opens the file in binary mode, so there
-are also modes like ``'rb'``, ``'wb'``, and ``'r+b'``.  Windows makes a
-distinction between text and binary files; the end-of-line characters in text
+are also modes like ``'rb'``, ``'wb'``, and ``'r+b'``.  Python on Windows makes
+a distinction between text and binary files; the end-of-line characters in text
 files are automatically altered slightly when data is read or written.  This
 behind-the-scenes modification to file data is fine for ASCII text files, but
 it'll corrupt binary data like that in :file:`JPEG` or :file:`EXE` files.  Be
@@ -330,7 +340,7 @@ beginning of the file as the reference point. ::
    >>> f = open('/tmp/workfile', 'r+')
    >>> f.write('0123456789abcdef')
    >>> f.seek(5)     # Go to the 6th byte in the file
-   >>> f.read(1)        
+   >>> f.read(1)
    '5'
    >>> f.seek(-3, 2) # Go to the 3rd byte before the end
    >>> f.read(1)
@@ -356,9 +366,9 @@ shorter than writing equivalent :keyword:`try`\ -\ :keyword:`finally` blocks::
     >>> f.closed
     True
 
-File objects have some additional methods, such as :meth:`isatty` and
-:meth:`truncate` which are less frequently used; consult the Library Reference
-for a complete guide to file objects.
+File objects have some additional methods, such as :meth:`~file.isatty` and
+:meth:`~file.truncate` which are less frequently used; consult the Library
+Reference for a complete guide to file objects.
 
 
 .. _tut-pickle:

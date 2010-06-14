@@ -4,8 +4,8 @@
 
 .. module:: hashlib
    :synopsis: Secure hash and message digest algorithms.
-.. moduleauthor:: Gregory P. Smith <greg@users.sourceforge.net>
-.. sectionauthor:: Gregory P. Smith <greg@users.sourceforge.net>
+.. moduleauthor:: Gregory P. Smith <greg@krypto.org>
+.. sectionauthor:: Gregory P. Smith <greg@krypto.org>
 
 
 .. versionadded:: 2.5
@@ -74,15 +74,24 @@ Using :func:`new` with an algorithm provided by OpenSSL:
    >>> h.hexdigest()
    'cc4a5ce1b3df48aec5d22d1f16b894a0b894eccc'
 
+This module provides the following constant attribute:
+
+.. data:: hashlib.algorithms
+
+   A tuple providing the names of the hash algorithms guaranteed to be
+   supported by this module.
+
+   .. versionadded:: 2.7
+
 The following values are provided as constant attributes of the hash objects
 returned by the constructors:
 
 
-.. data:: digest_size
+.. data:: hash.digest_size
 
    The size of the resulting hash in bytes.
 
-.. data:: block_size
+.. data:: hash.block_size
 
    The internal block size of the hash algorithm in bytes.
 
@@ -94,6 +103,12 @@ A hash object has the following methods:
    Update the hash object with the string *arg*.  Repeated calls are equivalent to
    a single call with the concatenation of all the arguments: ``m.update(a);
    m.update(b)`` is equivalent to ``m.update(a+b)``.
+
+   .. versionchanged:: 2.7
+
+      The Python GIL is released to allow other threads to run while
+      hash updates on data larger than 2048 bytes is taking place when
+      using hash algorithms supplied by OpenSSL.
 
 
 .. method:: hash.digest()
@@ -127,7 +142,7 @@ A hash object has the following methods:
    http://csrc.nist.gov/publications/fips/fips180-2/fips180-2.pdf
       The FIPS 180-2 publication on Secure Hash Algorithms.
 
-   http://www.cryptography.com/cnews/hash.html
-      Hash Collision FAQ with information on which algorithms have known issues and
+   http://en.wikipedia.org/wiki/Cryptographic_hash_function#Cryptographic_hash_algorithms
+      Wikipedia article with information on which algorithms have known issues and
       what that means regarding their use.
 

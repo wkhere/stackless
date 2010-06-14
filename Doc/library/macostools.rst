@@ -13,9 +13,11 @@ Macintosh. All file parameters can be specified as pathnames, :class:`FSRef` or
 :class:`FSSpec` objects.  This module expects a filesystem which supports forked
 files, so it should not be used on UFS partitions.
 
-.. warning::
+.. note::
 
-   This module is removed in 3.0.
+   This module has been removed in Python 3.0.
+
+
 
 The :mod:`macostools` module defines the following functions:
 
@@ -28,16 +30,29 @@ The :mod:`macostools` module defines the following functions:
    modification and backup times (default is to copy them). Custom icons, comments
    and icon position are not copied.
 
+   .. note::
+
+      This function does not work in 64-bit code because it uses APIs that
+      are not available in 64-bit mode.
 
 .. function:: copytree(src, dst)
 
    Recursively copy a file tree from *src* to *dst*, creating folders as needed.
    *src* and *dst* should be specified as pathnames.
 
+   .. note::
+
+      This function does not work in 64-bit code because it uses APIs that
+      are not available in 64-bit mode.
 
 .. function:: mkalias(src, dst)
 
    Create a finder alias *dst* pointing to *src*.
+
+   .. note::
+
+      This function does not work in 64-bit code because it uses APIs that
+      are not available in 64-bit mode.
 
 
 .. function:: touched(dst)
@@ -60,7 +75,7 @@ have incompatible behaviour in some cases.
 
 
 :mod:`findertools` --- The :program:`finder`'s Apple Events interface
-=====================================================================
+======================================================================
 
 .. module:: findertools
    :platform: Mac

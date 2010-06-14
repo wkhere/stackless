@@ -33,7 +33,7 @@ contain control characters.
 
 .. seealso::
 
-   `PList manual page <http://developer.apple.com/documentation/Darwin/Reference/ManPages/man5/plist.5.html>`
+   `PList manual page <http://developer.apple.com/documentation/Darwin/Reference/ManPages/man5/plist.5.html>`_
       Apple's documentation of the file format.
 
 
@@ -75,10 +75,9 @@ This module defines the following functions:
     Read a plist from the resource with type *restype* from the resource fork of
     *path*.  Availability: Mac OS X.
 
-    .. warning::
+    .. note::
 
-       In 3.0, this function is removed.
-
+       In Python 3.x, this function has been removed.
 
 
 .. function:: writePlistToResource(rootObject, path[, restype='plst'[, resid=0]])
@@ -86,9 +85,9 @@ This module defines the following functions:
     Write *rootObject* as a resource with type *restype* to the resource fork of
     *path*.  Availability: Mac OS X.
 
-    .. warning::
+    .. note::
 
-       In 3.0, this function is removed.
+       In Python 3.x, this function has been removed.
 
 
 

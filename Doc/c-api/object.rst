@@ -42,6 +42,16 @@ Object Protocol
    expression ``o.attr_name``.
 
 
+.. cfunction:: PyObject* PyObject_GenericGetAttr(PyObject *o, PyObject *name)
+
+   Generic attribute getter function that is meant to be put into a type
+   object's ``tp_getattro`` slot.  It looks for a descriptor in the dictionary
+   of classes in the object's MRO as well as an attribute in the object's
+   :attr:`__dict__` (if present).  As outlined in :ref:`descriptors`, data
+   descriptors take preference over instance attributes, while non-data
+   descriptors don't.  Otherwise, an :exc:`AttributeError` is raised.
+
+
 .. cfunction:: int PyObject_SetAttr(PyObject *o, PyObject *attr_name, PyObject *v)
 
    Set the value of the attribute named *attr_name*, for object *o*, to the value
@@ -54,6 +64,16 @@ Object Protocol
    Set the value of the attribute named *attr_name*, for object *o*, to the value
    *v*. Returns ``-1`` on failure.  This is the equivalent of the Python statement
    ``o.attr_name = v``.
+
+
+.. cfunction:: int PyObject_GenericSetAttr(PyObject *o, PyObject *name, PyObject *value)
+
+   Generic attribute setter function that is meant to be put into a type
+   object's ``tp_setattro`` slot.  It looks for a data descriptor in the
+   dictionary of classes in the object's MRO, and if found it takes preference
+   over setting the attribute in the instance dictionary. Otherwise, the
+   attribute is set in the object's :attr:`__dict__` (if present).  Otherwise,
+   an :exc:`AttributeError` is raised and ``-1`` is returned.
 
 
 .. cfunction:: int PyObject_DelAttr(PyObject *o, PyObject *attr_name)
@@ -330,6 +350,10 @@ is considered sufficient for this determination.
    Return the length of object *o*.  If the object *o* provides either the sequence
    and mapping protocols, the sequence length is returned.  On error, ``-1`` is
    returned.  This is the equivalent to the Python expression ``len(o)``.
+
+   .. versionchanged:: 2.5
+      These functions returned an :ctype:`int` type. This might require
+      changes in your code for properly supporting 64-bit systems.
 
 
 .. cfunction:: PyObject* PyObject_GetItem(PyObject *o, PyObject *key)

@@ -81,7 +81,8 @@ any that have been added to the map during asynchronous service) is closed.
    +----------------------+----------------------------------------+
    | Event                | Description                            |
    +======================+========================================+
-   | ``handle_connect()`` | Implied by the first write event       |
+   | ``handle_connect()`` | Implied by the first read or write     |
+   |                      | event                                  |
    +----------------------+----------------------------------------+
    | ``handle_close()``   | Implied by a read event with no data   |
    |                      | available                              |
@@ -201,7 +202,8 @@ any that have been added to the map during asynchronous service) is closed.
    .. method:: bind(address)
 
       Bind the socket to *address*.  The socket must not already be bound.  (The
-      format of *address* depends on the address family --- see above.)  To mark
+      format of *address* depends on the address family --- refer to the
+      :mod:`socket` documentation for more information.)  To mark
       the socket as re-usable (setting the :const:`SO_REUSEADDR` option), call
       the :class:`dispatcher` object's :meth:`set_reuse_addr` method.
 

@@ -54,7 +54,7 @@ Long Integer Objects
    Return a new :ctype:`PyLongObject` object from a C :ctype:`Py_ssize_t`, or
    *NULL* on failure.
 
-   .. versionadded:: 2.5
+   .. versionadded:: 2.6
 
 
 .. cfunction:: PyObject* PyLong_FromSize_t(size_t v)
@@ -62,7 +62,7 @@ Long Integer Objects
    Return a new :ctype:`PyLongObject` object from a C :ctype:`size_t`, or
    *NULL* on failure.
 
-   .. versionadded:: 2.5
+   .. versionadded:: 2.6
 
 
 .. cfunction:: PyObject* PyLong_FromLongLong(PY_LONG_LONG v)
@@ -87,7 +87,7 @@ Long Integer Objects
 
    Return a new :ctype:`PyLongObject` based on the string value in *str*, which is
    interpreted according to the radix in *base*.  If *pend* is non-*NULL*,
-   ``*pend`` will point to the first character in *str* which follows the
+   *\*pend* will point to the first character in *str* which follows the
    representation of the number.  If *base* is ``0``, the radix will be determined
    based on the leading characters of *str*: if *str* starts with ``'0x'`` or
    ``'0X'``, radix 16 will be used; if *str* starts with ``'0'``, radix 8 will be
@@ -105,6 +105,10 @@ Long Integer Objects
    will be raised.
 
    .. versionadded:: 1.6
+
+   .. versionchanged:: 2.5
+      This function used an :ctype:`int` for *length*. This might require
+      changes in your code for properly supporting 64-bit systems.
 
 
 .. cfunction:: PyObject* PyLong_FromVoidPtr(void *p)
@@ -126,7 +130,33 @@ Long Integer Objects
 
    Return a C :ctype:`long` representation of the contents of *pylong*.  If
    *pylong* is greater than :const:`LONG_MAX`, an :exc:`OverflowError` is raised
-   and ``-1`` will be returned. 
+   and ``-1`` will be returned.
+
+
+.. cfunction:: long PyLong_AsLongAndOverflow(PyObject *pylong, int *overflow)
+
+   Return a C :ctype:`long` representation of the contents of
+   *pylong*.  If *pylong* is greater than :const:`LONG_MAX` or less
+   than :const:`LONG_MIN`, set *\*overflow* to ``1`` or ``-1``,
+   respectively, and return ``-1``; otherwise, set *\*overflow* to
+   ``0``.  If any other exception occurs (for example a TypeError or
+   MemoryError), then ``-1`` will be returned and *\*overflow* will
+   be ``0``.
+
+   .. versionadded:: 2.7
+
+
+.. cfunction:: PY_LONG_LONG PyLong_AsLongLongAndOverflow(PyObject *pylong, int *overflow)
+
+   Return a C :ctype:`long long` representation of the contents of
+   *pylong*.  If *pylong* is greater than :const:`PY_LLONG_MAX` or less
+   than :const:`PY_LLONG_MIN`, set *\*overflow* to ``1`` or ``-1``,
+   respectively, and return ``-1``; otherwise, set *\*overflow* to
+   ``0``.  If any other exception occurs (for example a TypeError or
+   MemoryError), then ``-1`` will be returned and *\*overflow* will
+   be ``0``.
+
+   .. versionadded:: 2.7
 
 
 .. cfunction:: Py_ssize_t PyLong_AsSsize_t(PyObject *pylong)
@@ -139,7 +169,7 @@ Long Integer Objects
    *pylong* is greater than :const:`PY_SSIZE_T_MAX`, an :exc:`OverflowError` is raised
    and ``-1`` will be returned.
 
-   .. versionadded:: 2.5
+   .. versionadded:: 2.6
 
 
 .. cfunction:: unsigned long PyLong_AsUnsignedLong(PyObject *pylong)
@@ -155,20 +185,31 @@ Long Integer Objects
 
 .. cfunction:: PY_LONG_LONG PyLong_AsLongLong(PyObject *pylong)
 
-   Return a C :ctype:`long long` from a Python long integer.  If *pylong* cannot be
-   represented as a :ctype:`long long`, an :exc:`OverflowError` will be raised.
+   .. index::
+      single: OverflowError (built-in exception)
+
+   Return a C :ctype:`long long` from a Python long integer.  If
+   *pylong* cannot be represented as a :ctype:`long long`, an
+   :exc:`OverflowError` is raised and ``-1`` is returned.
 
    .. versionadded:: 2.2
 
 
 .. cfunction:: unsigned PY_LONG_LONG PyLong_AsUnsignedLongLong(PyObject *pylong)
 
-   Return a C :ctype:`unsigned long long` from a Python long integer. If *pylong*
-   cannot be represented as an :ctype:`unsigned long long`, an :exc:`OverflowError`
-   will be raised if the value is positive, or a :exc:`TypeError` will be raised if
-   the value is negative.
+   .. index::
+      single: OverflowError (built-in exception)
+
+   Return a C :ctype:`unsigned long long` from a Python long integer. If
+   *pylong* cannot be represented as an :ctype:`unsigned long long`, an
+   :exc:`OverflowError` is raised and ``(unsigned long long)-1`` is
+   returned.
 
    .. versionadded:: 2.2
+
+   .. versionchanged:: 2.7
+      A negative *pylong* now raises :exc:`OverflowError`, not
+      :exc:`TypeError`.
 
 
 .. cfunction:: unsigned long PyLong_AsUnsignedLongMask(PyObject *io)

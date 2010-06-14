@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import sys
 import os
 
@@ -98,6 +98,7 @@ class DemoWindow(object):
         turtle._Screen._canvas = turtle.ScrolledCanvas(g_frame, 800, 600, 1000, 800)
         #xturtle.Screen._canvas.pack(expand=1, fill="both")
         self.screen = _s_ = turtle.Screen()
+        turtle.TurtleScreen.__init__(_s_, _s_._canvas)
         self.scanvas = _s_._canvas
         #xturtle.RawTurtle.canvases = [self.scanvas]
         turtle.RawTurtle.screens = [_s_]
@@ -211,7 +212,7 @@ class DemoWindow(object):
             self.text.delete("1.0", "end")
             self.text.insert("1.0",chars)
             direc, fname = os.path.split(filename)
-            self.root.title(fname[6:-3]+" - an xturtle example")
+            self.root.title(fname[6:-3]+" - a Python turtle graphics example")
             self.module = __import__(fname[:-3])
             reload(self.module)
             self.configGUI(NORMAL, NORMAL, DISABLED, DISABLED,

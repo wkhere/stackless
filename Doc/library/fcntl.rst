@@ -9,8 +9,8 @@
 
 
 .. index::
-   pair: UNIX@Unix; file control
-   pair: UNIX@Unix; I/O control
+   pair: UNIX; file control
+   pair: UNIX; I/O control
 
 This module performs file control and I/O control on file descriptors. It is an
 interface to the :cfunc:`fcntl` and :cfunc:`ioctl` Unix routines.
@@ -96,7 +96,7 @@ The module defines the following functions:
 
    Perform the lock operation *op* on file descriptor *fd* (file objects providing
    a :meth:`fileno` method are accepted as well). See the Unix manual
-   :manpage:`flock(3)` for details.  (On some systems, this function is emulated
+   :manpage:`flock(2)` for details.  (On some systems, this function is emulated
    using :cfunc:`fcntl`.)
 
 
@@ -151,7 +151,6 @@ lay-out for the *lockdata* variable is system dependent --- therefore using the
 
    Module :mod:`os`
       If the locking flags :const:`O_SHLOCK` and :const:`O_EXLOCK` are present
-      in the :mod:`os` module, the :func:`os.open` function provides a more
-      platform-independent alternative to the :func:`lockf` and :func:`flock`
-      functions.
+      in the :mod:`os` module (on BSD only), the :func:`os.open` function
+      provides an alternative to the :func:`lockf` and :func:`flock` functions.
 

@@ -126,7 +126,7 @@ attributes:
 | frame     | f_back          | next outer frame object   |       |
 |           |                 | (this frame's caller)     |       |
 +-----------+-----------------+---------------------------+-------+
-|           | f_builtins      | built-in namespace seen   |       |
+|           | f_builtins      | builtins namespace seen   |       |
 |           |                 | by this frame             |       |
 +-----------+-----------------+---------------------------+-------+
 |           | f_code          | code object being         |       |
@@ -353,9 +353,11 @@ Note:
 
    Return true if the object is a getset descriptor.
 
-   getsets are attributes defined in extension modules via ``PyGetSetDef``
-   structures.  For Python implementations without such types, this method will
-   always return ``False``.
+   .. impl-detail::
+
+      getsets are attributes defined in extension modules via
+      :ctype:`PyGetSetDef` structures.  For Python implementations without such
+      types, this method will always return ``False``.
 
    .. versionadded:: 2.5
 
@@ -364,9 +366,11 @@ Note:
 
    Return true if the object is a member descriptor.
 
-   Member descriptors are attributes defined in extension modules via
-   ``PyMemberDef`` structures.  For Python implementations without such types,
-   this method will always return ``False``.
+   .. impl-detail::
+
+      Member descriptors are attributes defined in extension modules via
+      :ctype:`PyMemberDef` structures.  For Python implementations without such
+      types, this method will always return ``False``.
 
    .. versionadded:: 2.5
 
@@ -453,7 +457,7 @@ Classes and functions
 
 .. function:: getargspec(func)
 
-   Get the names and default values of a function's arguments. A tuple of four
+   Get the names and default values of a Python function's arguments. A tuple of four
    things is returned: ``(args, varargs, varkw, defaults)``. *args* is a list of
    the argument names (it may contain nested lists). *varargs* and *varkw* are the
    names of the ``*`` and ``**`` arguments or ``None``. *defaults* is a tuple of
@@ -500,6 +504,32 @@ Classes and functions
    metatype is in use, cls will be the first element of the tuple.
 
 
+.. function:: getcallargs(func[, *args][, **kwds])
+
+   Bind the *args* and *kwds* to the argument names of the Python function or
+   method *func*, as if it was called with them. For bound methods, bind also the
+   first argument (typically named ``self``) to the associated instance. A dict
+   is returned, mapping the argument names (including the names of the ``*`` and
+   ``**`` arguments, if any) to their values from *args* and *kwds*. In case of
+   invoking *func* incorrectly, i.e. whenever ``func(*args, **kwds)`` would raise
+   an exception because of incompatible signature, an exception of the same type
+   and the same or similar message is raised. For example::
+
+    >>> from inspect import getcallargs
+    >>> def f(a, b=1, *pos, **named):
+    ...     pass
+    >>> getcallargs(f, 1, 2, 3)
+    {'a': 1, 'named': {}, 'b': 2, 'pos': (3,)}
+    >>> getcallargs(f, a=2, x=4)
+    {'a': 2, 'named': {'x': 4}, 'b': 1, 'pos': ()}
+    >>> getcallargs(f)
+    Traceback (most recent call last):
+    ...
+    TypeError: f() takes at least 1 argument (0 given)
+
+   .. versionadded:: 2.7
+
+
 .. _inspect-stack:
 
 The interpreter stack
@@ -510,7 +540,7 @@ six items: the frame object, the filename, the line number of the current line,
 the function name, a list of lines of context from the source code, and the
 index of the current line within that list.
 
-.. warning::
+.. note::
 
    Keeping references to frame objects, as found in the first element of the frame
    records these functions return, can cause your program to create reference
@@ -566,6 +596,13 @@ line.
 .. function:: currentframe()
 
    Return the frame object for the caller's stack frame.
+
+   .. impl-detail::
+
+      This function relies on Python stack frame support in the interpreter,
+      which isn't guaranteed to exist in all implementations of Python.  If
+      running in an implementation without Python stack frame support this
+      function returns ``None``.
 
 
 .. function:: stack([context])

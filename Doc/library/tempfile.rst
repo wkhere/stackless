@@ -51,7 +51,7 @@ The module defines the following user-callable functions:
    The *dir*, *prefix* and *suffix* parameters are passed to :func:`mkstemp`.
 
    The returned object is a true file object on POSIX platforms.  On other
-   platforms, it is a file-like object whose :attr:`file` attribute is the
+   platforms, it is a file-like object whose :attr:`!file` attribute is the
    underlying true file object. This file-like object can be used in a
    :keyword:`with` statement, just like a normal file.
 
@@ -67,7 +67,7 @@ The module defines the following user-callable functions:
    on Windows NT or later).  If *delete* is true (the default), the file is
    deleted as soon as it is closed.
 
-   The returned object is always a file-like object whose :attr:`file`
+   The returned object is always a file-like object whose :attr:`!file`
    attribute is the underlying true file object. This file-like object can
    be used in a :keyword:`with` statement, just like a normal file.
 
@@ -164,11 +164,11 @@ The module defines the following user-callable functions:
 
    .. warning::
 
-      Use of this function may introduce a security hole in your program.
-      By the time you get around to doing anything with the file name it
-      returns, someone else may have beaten you to the punch.
-      :func:`mktemp` usage can be replaced easily with
-      :func:`NamedTemporaryFile`, passing it the  `delete=False` parameter::
+      Use of this function may introduce a security hole in your program.  By
+      the time you get around to doing anything with the file name it returns,
+      someone else may have beaten you to the punch.  :func:`mktemp` usage can
+      be replaced easily with :func:`NamedTemporaryFile`, passing it the
+      ``delete=False`` parameter::
 
          >>> f = NamedTemporaryFile(delete=False)
          >>> f
@@ -223,6 +223,8 @@ the appropriate function arguments, instead.
    Return the directory currently selected to create temporary files in. If
    :data:`tempdir` is not ``None``, this simply returns its contents; otherwise,
    the search described above is performed, and the result returned.
+
+   .. versionadded:: 2.3
 
 
 .. data:: template

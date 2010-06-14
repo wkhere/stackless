@@ -5,17 +5,17 @@
 .. module:: Bastion
    :synopsis: Providing restricted access to objects.
    :deprecated:
-   
+
 .. deprecated:: 2.6
    The :mod:`Bastion` module has been removed in Python 3.0.
-   
+
 .. moduleauthor:: Barry Warsaw <bwarsaw@python.org>
 
 
 .. versionchanged:: 2.3
    Disabled module.
 
-.. warning::
+.. note::
 
    The documentation has been left in place to help in reading old code that uses
    the module.

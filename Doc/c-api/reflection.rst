@@ -15,7 +15,7 @@ Reflection
 
    Return a dictionary of the local variables in the current execution frame,
    or *NULL* if no frame is currently executing.
-   
+
 
 .. cfunction:: PyObject* PyEval_GetGlobals()
 
@@ -27,6 +27,11 @@ Reflection
 
    Return the current thread state's frame, which is *NULL* if no frame is
    currently executing.
+
+
+.. cfunction:: int PyFrame_GetLineNumber(PyFrameObject *frame)
+
+   Return the line number that *frame* is currently executing.
 
 
 .. cfunction:: int PyEval_GetRestricted()

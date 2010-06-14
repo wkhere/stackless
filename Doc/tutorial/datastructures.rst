@@ -138,21 +138,25 @@ Using Lists as Queues
 
 .. sectionauthor:: Ka-Ping Yee <ping@lfw.org>
 
+It is also possible to use a list as a queue, where the first element added is
+the first element retrieved ("first-in, first-out"); however, lists are not
+efficient for this purpose.  While appends and pops from the end of list are
+fast, doing inserts or pops from the beginning of a list is slow (because all
+of the other elements have to be shifted by one).
 
-You can also use a list conveniently as a queue, where the first element added
-is the first element retrieved ("first-in, first-out").  To add an item to the
-back of the queue, use :meth:`append`.  To retrieve an item from the front of
-the queue, use :meth:`pop` with ``0`` as the index.  For example::
+To implement a queue, use :class:`collections.deque` which was designed to
+have fast appends and pops from both ends.  For example::
 
-   >>> queue = ["Eric", "John", "Michael"]
+   >>> from collections import deque
+   >>> queue = deque(["Eric", "John", "Michael"])
    >>> queue.append("Terry")           # Terry arrives
    >>> queue.append("Graham")          # Graham arrives
-   >>> queue.pop(0)
+   >>> queue.popleft()                 # The first to arrive now leaves
    'Eric'
-   >>> queue.pop(0)
+   >>> queue.popleft()                 # The second to arrive now leaves
    'John'
-   >>> queue
-   ['Michael', 'Terry', 'Graham']
+   >>> queue                           # Remaining queue in order of arrival
+   deque(['Michael', 'Terry', 'Graham'])
 
 
 .. _tut-functional:
@@ -214,7 +218,7 @@ and the next item, and so on.  For example, ::
    >>> def sum(seq):
    ...     def add(x,y): return x+y
    ...     return reduce(add, seq, 0)
-   ... 
+   ...
    >>> sum(range(1, 11))
    55
    >>> sum([])
@@ -251,7 +255,7 @@ would evaluate to a tuple, it must be parenthesized. ::
    []
    >>> [[x,x**2] for x in vec]
    [[2, 4], [4, 16], [6, 36]]
-   >>> [x, x**2 for x in vec]	# error - parens required for tuples
+   >>> [x, x**2 for x in vec]  # error - parens required for tuples
      File "<stdin>", line 1, in ?
        [x, x**2 for x in vec]
                   ^
@@ -281,7 +285,7 @@ If you've got the stomach for it, list comprehensions can be nested. They are a
 powerful tool but -- like all powerful tools -- they need to be used carefully,
 if at all.
 
-Consider the following example of a 3x3 matrix held as a list containing three 
+Consider the following example of a 3x3 matrix held as a list containing three
 lists, one list per row::
 
     >>> mat = [
@@ -290,7 +294,7 @@ lists, one list per row::
     ...        [7, 8, 9],
     ...       ]
 
-Now, if you wanted to swap rows and columns, you could use a list 
+Now, if you wanted to swap rows and columns, you could use a list
 comprehension::
 
     >>> print [[row[i] for row in mat] for i in [0, 1, 2]]
@@ -308,7 +312,7 @@ A more verbose version of this snippet shows the flow explicitly::
             print row[i],
         print
 
-In real world, you should prefer builtin functions to complex flow statements. 
+In real world, you should prefer built-in functions to complex flow statements.
 The :func:`zip` function would do a great job for this use case::
 
     >>> zip(*mat)
@@ -401,13 +405,11 @@ The reverse operation is also possible::
 
    >>> x, y, z = t
 
-This is called, appropriately enough, *sequence unpacking*. Sequence unpacking
-requires the list of variables on the left to have the same number of elements
-as the length of the sequence.  Note that multiple assignment is really just a
-combination of tuple packing and sequence unpacking!
-
-There is a small bit of asymmetry here:  packing multiple values always creates
-a tuple, and unpacking works for any sequence.
+This is called, appropriately enough, *sequence unpacking* and works for any
+sequence on the right-hand side.  Sequence unpacking requires the list of
+variables on the left to have the same number of elements as the length of the
+sequence.  Note that multiple assignment is really just a combination of tuple
+packing and sequence unpacking.
 
 .. XXX Add a bit on the difference between tuples and lists.
 
@@ -551,7 +553,7 @@ with the :func:`zip` function. ::
    >>> answers = ['lancelot', 'the holy grail', 'blue']
    >>> for q, a in zip(questions, answers):
    ...     print 'What is your {0}?  It is {1}.'.format(q, a)
-   ...	
+   ...
    What is your name?  It is lancelot.
    What is your quest?  It is the holy grail.
    What is your favorite color?  It is blue.
@@ -574,7 +576,7 @@ returns a new sorted list while leaving the source unaltered. ::
    >>> basket = ['apple', 'orange', 'apple', 'pear', 'orange', 'banana']
    >>> for f in sorted(set(basket)):
    ...     print f
-   ... 	
+   ...
    apple
    banana
    orange

@@ -41,11 +41,20 @@ is a separate error indicator for each thread.
    Either alphabetical or some kind of structure.
 
 
-.. cfunction:: void PyErr_Print()
+.. cfunction:: void PyErr_PrintEx(int set_sys_last_vars)
 
    Print a standard traceback to ``sys.stderr`` and clear the error indicator.
    Call this function only when the error indicator is set.  (Otherwise it will
    cause a fatal error!)
+
+   If *set_sys_last_vars* is nonzero, the variables :data:`sys.last_type`,
+   :data:`sys.last_value` and :data:`sys.last_traceback` will be set to the
+   type, value and traceback of the printed exception, respectively.
+
+
+.. cfunction:: void PyErr_Print()
+
+   Alias for ``PyErr_PrintEx(1)``.
 
 
 .. cfunction:: PyObject* PyErr_Occurred()
@@ -73,11 +82,10 @@ is a separate error indicator for each thread.
 
 .. cfunction:: int PyErr_GivenExceptionMatches(PyObject *given, PyObject *exc)
 
-   Return true if the *given* exception matches the exception in *exc*.  If *exc*
-   is a class object, this also returns true when *given* is an instance of a
-   subclass.  If *exc* is a tuple, all exceptions in the tuple (and recursively in
-   subtuples) are searched for a match.  If *given* is *NULL*, a memory access
-   violation will occur.
+   Return true if the *given* exception matches the exception in *exc*.  If
+   *exc* is a class object, this also returns true when *given* is an instance
+   of a subclass.  If *exc* is a tuple, all exceptions in the tuple (and
+   recursively in subtuples) are searched for a match.
 
 
 .. cfunction:: void PyErr_NormalizeException(PyObject**exc, PyObject**val, PyObject**tb)
@@ -153,6 +161,8 @@ is a separate error indicator for each thread.
    .. % The descriptions for %zd and %zu are wrong, but the truth is complicated
    .. % because not all compilers support the %z width modifier -- we fake it
    .. % when necessary via interpolating PY_FORMAT_SIZE_T.
+   .. % Similar comments apply to the %ll width modifier and
+   .. % PY_FORMAT_LONG_LONG.
    .. % %u, %lu, %zu should have "new in Python 2.5" blurbs.
 
    +-------------------+---------------+--------------------------------+
@@ -174,6 +184,12 @@ is a separate error indicator for each thread.
    +-------------------+---------------+--------------------------------+
    | :attr:`%lu`       | unsigned long | Exactly equivalent to          |
    |                   |               | ``printf("%lu")``.             |
+   +-------------------+---------------+--------------------------------+
+   | :attr:`%lld`      | long long     | Exactly equivalent to          |
+   |                   |               | ``printf("%lld")``.            |
+   +-------------------+---------------+--------------------------------+
+   | :attr:`%llu`      | unsigned      | Exactly equivalent to          |
+   |                   | long long     | ``printf("%llu")``.            |
    +-------------------+---------------+--------------------------------+
    | :attr:`%zd`       | Py_ssize_t    | Exactly equivalent to          |
    |                   |               | ``printf("%zd")``.             |
@@ -201,6 +217,14 @@ is a separate error indicator for each thread.
 
    An unrecognized format character causes all the rest of the format string to be
    copied as-is to the result string, and any extra arguments discarded.
+
+   .. note::
+
+      The `"%lld"` and `"%llu"` format specifiers are only available
+      when :const:`HAVE_LONG_LONG` is defined.
+
+   .. versionchanged:: 2.7
+      Support for `"%lld"` and `"%llu"` added.
 
 
 .. cfunction:: void PyErr_SetNone(PyObject *type)
@@ -283,9 +307,10 @@ is a separate error indicator for each thread.
 
 .. cfunction:: void PyErr_BadInternalCall()
 
-   This is a shorthand for ``PyErr_SetString(PyExc_TypeError, message)``, where
-   *message* indicates that an internal operation (e.g. a Python/C API function)
-   was invoked with an illegal argument.  It is mostly for internal use.
+   This is a shorthand for ``PyErr_SetString(PyExc_SystemError, message)``,
+   where *message* indicates that an internal operation (e.g. a Python/C API
+   function) was invoked with an illegal argument.  It is mostly for internal
+   use.
 
 
 .. cfunction:: int PyErr_WarnEx(PyObject *category, char *message, int stacklevel)
@@ -408,6 +433,15 @@ is a separate error indicator for each thread.
    argument can be used to specify a dictionary of class variables and methods.
 
 
+.. cfunction:: PyObject* PyErr_NewExceptionWithDoc(char *name, char *doc, PyObject *base, PyObject *dict)
+
+   Same as :cfunc:`PyErr_NewException`, except that the new exception class can
+   easily be given a docstring: If *doc* is non-*NULL*, it will be used as the
+   docstring for the exception class.
+
+   .. versionadded:: 2.7
+
+
 .. cfunction:: void PyErr_WriteUnraisable(PyObject *obj)
 
    This utility function prints a warning message to ``sys.stderr`` when an
@@ -418,6 +452,36 @@ is a separate error indicator for each thread.
    The function is called with a single argument *obj* that identifies the context
    in which the unraisable exception occurred. The repr of *obj* will be printed in
    the warning message.
+
+
+Recursion Control
+=================
+
+These two functions provide a way to perform safe recursive calls at the C
+level, both in the core and in extension modules.  They are needed if the
+recursive code does not necessarily invoke Python code (which tracks its
+recursion depth automatically).
+
+.. cfunction:: int Py_EnterRecursiveCall(char *where)
+
+   Marks a point where a recursive C-level call is about to be performed.
+
+   If :const:`USE_STACKCHECK` is defined, this function checks if the the OS
+   stack overflowed using :cfunc:`PyOS_CheckStack`.  In this is the case, it
+   sets a :exc:`MemoryError` and returns a nonzero value.
+
+   The function then checks if the recursion limit is reached.  If this is the
+   case, a :exc:`RuntimeError` is set and a nonzero value is returned.
+   Otherwise, zero is returned.
+
+   *where* should be a string such as ``" in instance check"`` to be
+   concatenated to the :exc:`RuntimeError` message caused by the recursion depth
+   limit.
+
+.. cfunction:: void Py_LeaveRecursiveCall()
+
+   Ends a :cfunc:`Py_EnterRecursiveCall`.  Must be called once for each
+   *successful* invocation of :cfunc:`Py_EnterRecursiveCall`.
 
 
 .. _standardexceptions:

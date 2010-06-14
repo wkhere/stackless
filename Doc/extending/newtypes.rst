@@ -252,7 +252,7 @@ This version of the module has a number of changes.
 
 We've added an extra include::
 
-   #include "structmember.h"
+   #include <structmember.h>
 
 This include provides declarations that we use to handle attributes, as
 described a bit later.
@@ -446,7 +446,7 @@ and put the definitions in the :attr:`tp_members` slot::
    Noddy_members,             /* tp_members */
 
 Each member definition has a member name, type, offset, access flags and
-documentation string. See the "Generic Attribute Management" section below for
+documentation string. See the :ref:`Generic-Attribute-Management` section below for
 details.
 
 A disadvantage of this approach is that it doesn't provide a way to restrict the
@@ -819,7 +819,7 @@ easily use the :class:`PyTypeObject` it needs. It can be difficult to share
 these :class:`PyTypeObject` structures between extension modules.
 
 In this example we will create a :class:`Shoddy` type that inherits from the
-builtin :class:`list` type. The new type will be completely compatible with
+built-in :class:`list` type. The new type will be completely compatible with
 regular lists, but will have an additional :meth:`increment` method that
 increases an internal counter. ::
 
@@ -840,8 +840,8 @@ As you can see, the source code closely resembles the :class:`Noddy` examples in
 previous sections. We will break down the main differences between them. ::
 
    typedef struct {
-   	PyListObject list;
-   	int state;
+       PyListObject list;
+       int state;
    } Shoddy;
 
 The primary difference for derived type objects is that the base type's object
@@ -854,10 +854,10 @@ be safely cast to both *PyListObject\** and *Shoddy\**. ::
    static int
    Shoddy_init(Shoddy *self, PyObject *args, PyObject *kwds)
    {
-   	if (PyList_Type.tp_init((PyObject *)self, args, kwds) < 0)
-   		return -1;
-   	self->state = 0;
-   	return 0;
+       if (PyList_Type.tp_init((PyObject *)self, args, kwds) < 0)
+          return -1;
+       self->state = 0;
+       return 0;
    }
 
 In the :attr:`__init__` method for our type, we can see how to call through to
@@ -876,18 +876,18 @@ the module's :cfunc:`init` function. ::
    PyMODINIT_FUNC
    initshoddy(void)
    {
-   	PyObject *m;
+       PyObject *m;
 
-   	ShoddyType.tp_base = &PyList_Type;
-   	if (PyType_Ready(&ShoddyType) < 0)
-   		return;
+       ShoddyType.tp_base = &PyList_Type;
+       if (PyType_Ready(&ShoddyType) < 0)
+           return;
 
-   	m = Py_InitModule3("shoddy", NULL, "Shoddy module");
-   	if (m == NULL)
-   		return;
+       m = Py_InitModule3("shoddy", NULL, "Shoddy module");
+       if (m == NULL)
+           return;
 
-   	Py_INCREF(&ShoddyType);
-   	PyModule_AddObject(m, "Shoddy", (PyObject *) &ShoddyType);
+       Py_INCREF(&ShoddyType);
+       PyModule_AddObject(m, "Shoddy", (PyObject *) &ShoddyType);
    }
 
 Before calling :cfunc:`PyType_Ready`, the type structure must have the
@@ -1129,6 +1129,8 @@ disappeared starting with Python 2.2, though there are many examples which have
 not been updated to use some of the new generic mechanism that is available.
 
 
+.. _generic-attribute-management:
+
 Generic Attribute Management
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1167,7 +1169,7 @@ structure::
    typedef struct PyMethodDef {
        char        *ml_name;       /* method name */
        PyCFunction  ml_meth;       /* implementation function */
-       int	         ml_flags;      /* flags */
+       int          ml_flags;      /* flags */
        char        *ml_doc;        /* docstring */
    } PyMethodDef;
 
@@ -1234,7 +1236,7 @@ As with the :attr:`tp_methods` table, a sentinel entry with a :attr:`name` value
 of *NULL* is required.
 
 .. XXX Descriptors need to be explained in more detail somewhere, but not here.
-   
+
    Descriptor objects have two handler functions which correspond to the
    \member{tp_getattro} and \member{tp_setattro} handlers.  The
    \method{__get__()} handler is a function which is passed the descriptor,

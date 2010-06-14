@@ -11,9 +11,9 @@ This module provides access to MacOS specific functionality in the Python
 interpreter, such as how the interpreter eventloop functions and the like. Use
 with care.
 
-.. warning::
+.. note::
 
-   This module is removed in 3.0.
+   This module has been removed in Python 3.x.
 
 Note the capitalization of the module name; this is a historical artifact.
 
@@ -82,7 +82,7 @@ Note the capitalization of the module name; this is a historical artifact.
    parameter can be a pathname or an ``FSSpec`` or  ``FSRef`` object.
 
    .. note::
-      
+
       It is not possible to use an ``FSSpec`` in 64-bit mode.
 
 
@@ -93,7 +93,7 @@ Note the capitalization of the module name; this is a historical artifact.
    strings.
 
    .. note::
-      
+
       It is not possible to use an ``FSSpec`` in 64-bit mode.
 
 .. function:: openrf(name [, mode])

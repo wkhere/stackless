@@ -11,9 +11,9 @@
 
 .. note::
 
-   The :mod:`ConfigParser` module has been renamed to `configparser` in Python
-   3.0.  The :term:`2to3` tool will automatically adapt imports when converting
-   your sources to 3.0.
+   The :mod:`ConfigParser` module has been renamed to :mod:`configparser` in
+   Python 3.0.  The :term:`2to3` tool will automatically adapt imports when
+   converting your sources to 3.0.
 
 .. index::
    pair: .ini; file
@@ -27,10 +27,10 @@ structure similar to what you would find on Microsoft Windows INI files.  You
 can use this to write Python programs which can be customized by end users
 easily.
 
-.. warning::
+.. note::
 
-   This library does *not* interpret or write the value-type prefixes used in the
-   Windows Registry extended version of INI syntax.
+   This library does *not* interpret or write the value-type prefixes used in
+   the Windows Registry extended version of INI syntax.
 
 The configuration file consists of sections, led by a ``[section]`` header and
 followed by ``name: value`` entries, with continuations in the style of
@@ -56,18 +56,22 @@ Default values can be specified by passing them into the :class:`ConfigParser`
 constructor as a dictionary.  Additional defaults  may be passed into the
 :meth:`get` method which will override all others.
 
-Sections are normally stored in a builtin dictionary. An alternative dictionary
+Sections are normally stored in a built-in dictionary. An alternative dictionary
 type can be passed to the :class:`ConfigParser` constructor. For example, if a
 dictionary type is passed that sorts its keys, the sections will be sorted on
 write-back, as will be the keys within each section.
 
 
-.. class:: RawConfigParser([defaults[, dict_type]])
+.. class:: RawConfigParser([defaults[, dict_type[, allow_no_value]]])
 
    The basic configuration object.  When *defaults* is given, it is initialized
    into the dictionary of intrinsic defaults.  When *dict_type* is given, it will
    be used to create the dictionary objects for the list of sections, for the
-   options within a section, and for the default values. This class does not
+   options within a section, and for the default values.  When *allow_no_value*
+   is true (default: ``False``), options without values are accepted; the value
+   presented for these is ``None``.
+
+   This class does not
    support the magical interpolation behavior.
 
    .. versionadded:: 2.3
@@ -75,8 +79,12 @@ write-back, as will be the keys within each section.
    .. versionchanged:: 2.6
       *dict_type* was added.
 
+   .. versionchanged:: 2.7
+      The default *dict_type* is :class:`collections.OrderedDict`.
+      *allow_no_value* was added.
 
-.. class:: ConfigParser([defaults])
+
+.. class:: ConfigParser([defaults[, dict_type[, allow_no_value]]])
 
    Derived class of :class:`RawConfigParser` that implements the magical
    interpolation feature and adds optional arguments to the :meth:`get` and
@@ -91,8 +99,17 @@ write-back, as will be the keys within each section.
    option names to lower case), the values ``foo %(bar)s`` and ``foo %(BAR)s`` are
    equivalent.
 
+   .. versionadded:: 2.3
 
-.. class:: SafeConfigParser([defaults])
+   .. versionchanged:: 2.6
+      *dict_type* was added.
+
+   .. versionchanged:: 2.7
+      The default *dict_type* is :class:`collections.OrderedDict`.
+      *allow_no_value* was added.
+
+
+.. class:: SafeConfigParser([defaults[, dict_type[, allow_no_value]]])
 
    Derived class of :class:`ConfigParser` that implements a more-sane variant of
    the magical interpolation feature.  This implementation is more predictable as
@@ -102,6 +119,13 @@ write-back, as will be the keys within each section.
    .. XXX Need to explain what's safer/more predictable about it.
 
    .. versionadded:: 2.3
+
+   .. versionchanged:: 2.6
+      *dict_type* was added.
+
+   .. versionchanged:: 2.7
+      The default *dict_type* is :class:`collections.OrderedDict`.
+      *allow_no_value* was added.
 
 
 .. exception:: NoSectionError
@@ -317,12 +341,23 @@ RawConfigParser Objects
 
 .. method:: RawConfigParser.optionxform(option)
 
-   Transforms the option name *option* as found in an input file or as passed in by
-   client code to the form that should be used in the internal structures.  The
-   default implementation returns a lower-case version of *option*; subclasses may
-   override this or client code can set an attribute of this name on instances to
-   affect this behavior.  Setting this to :func:`str`, for example, would make
-   option names case sensitive.
+   Transforms the option name *option* as found in an input file or as passed in
+   by client code to the form that should be used in the internal structures.
+   The default implementation returns a lower-case version of *option*;
+   subclasses may override this or client code can set an attribute of this name
+   on instances to affect this behavior.
+
+   You don't necessarily need to subclass a ConfigParser to use this method, you
+   can also re-set it on an instance, to a function that takes a string
+   argument.  Setting it to ``str``, for example, would make option names case
+   sensitive::
+
+      cfgparser = ConfigParser()
+      ...
+      cfgparser.optionxform = str
+
+   Note that when reading configuration files, whitespace around the
+   option names are stripped before :meth:`optionxform` is called.
 
 
 .. _configparser-objects:
@@ -456,3 +491,38 @@ The function ``opt_move`` below can be used to move options between sections::
            opt_move(config, section1, section2, option)
        else:
            config.remove_option(section1, option)
+
+Some configuration files are known to include settings without values, but which
+otherwise conform to the syntax supported by :mod:`ConfigParser`.  The
+*allow_no_value* parameter to the constructor can be used to indicate that such
+values should be accepted:
+
+.. doctest::
+
+   >>> import ConfigParser
+   >>> import io
+
+   >>> sample_config = """
+   ... [mysqld]
+   ... user = mysql
+   ... pid-file = /var/run/mysqld/mysqld.pid
+   ... skip-external-locking
+   ... old_passwords = 1
+   ... skip-bdb
+   ... skip-innodb
+   ... """
+   >>> config = ConfigParser.RawConfigParser(allow_no_value=True)
+   >>> config.readfp(io.BytesIO(sample_config))
+
+   >>> # Settings with values are treated as before:
+   >>> config.get("mysqld", "user")
+   'mysql'
+
+   >>> # Settings without values provide None:
+   >>> config.get("mysqld", "skip-bdb")
+
+   >>> # Settings which aren't specified still raise an error:
+   >>> config.get("mysqld", "does-not-exist")
+   Traceback (most recent call last):
+     ...
+   ConfigParser.NoOptionError: No option 'does-not-exist' in section: 'mysqld'

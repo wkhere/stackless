@@ -3,12 +3,14 @@ About these documents
 =====================
 
 
-These documents are generated from `reStructuredText
-<http://docutils.sf.net/rst.html>`_ sources by *Sphinx*, a document processor
-specifically written for the Python documentation.
+These documents are generated from `reStructuredText`_ sources by `Sphinx`_, a
+document processor specifically written for the Python documentation.
 
-In the online version of these documents, you can submit comments and suggest
-changes directly on the documentation pages.
+.. _reStructuredText: http://docutils.sf.net/rst.html
+.. _Sphinx: http://sphinx.pocoo.org/
+
+.. In the online version of these documents, you can submit comments and suggest
+   changes directly on the documentation pages.
 
 Development of the documentation and its toolchain takes place on the
 docs@python.org mailing list.  We're always looking for volunteers wanting
@@ -24,7 +26,8 @@ Many thanks go to:
   <http://effbot.org/zone/pyref.htm>`_ project from which Sphinx got many good
   ideas.
 
-See :ref:`reporting-bugs` for information how to report bugs in Python itself.
+See :ref:`reporting-bugs` for information how to report bugs in this
+documentation, or Python itself.
 
 .. including the ACKS file here so that it can be maintained separately
 .. include:: ACKS.txt

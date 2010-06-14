@@ -205,13 +205,13 @@ the built-in namespace as the function :func:`_`.
 
 .. function:: install(domain[, localedir[, unicode [, codeset[, names]]]])
 
-   This installs the function :func:`_` in Python's builtin namespace, based on
+   This installs the function :func:`_` in Python's builtins namespace, based on
    *domain*, *localedir*, and *codeset* which are passed to the function
    :func:`translation`.  The *unicode* flag is passed to the resulting translation
-   object's :meth:`install` method.
+   object's :meth:`~NullTranslations.install` method.
 
    For the *names* parameter, please see the description of the translation
-   object's :meth:`install` method.
+   object's :meth:`~NullTranslations.install` method.
 
    As seen below, you usually mark the strings in your application that are
    candidates for translation, by wrapping them in a call to the :func:`_`
@@ -220,7 +220,7 @@ the built-in namespace as the function :func:`_`.
       print _('This string will be translated.')
 
    For convenience, you want the :func:`_` function to be installed in Python's
-   builtin namespace, so it is easily accessible in all modules of your
+   builtins namespace, so it is easily accessible in all modules of your
    application.
 
    .. versionchanged:: 2.4
@@ -347,7 +347,7 @@ are the methods of :class:`NullTranslations`:
       it binds :meth:`self.ugettext` instead.  By default, *unicode* is false.
 
       If the *names* parameter is given, it must be a sequence containing the
-      names of functions you want to install in the builtin namespace in
+      names of functions you want to install in the builtins namespace in
       addition to :func:`_`.  Supported names are ``'gettext'`` (bound to
       :meth:`self.gettext` or :meth:`self.ugettext` according to the *unicode*
       flag), ``'ngettext'`` (bound to :meth:`self.ngettext` or
@@ -648,10 +648,9 @@ translation until later.  A classic example is::
 
    animals = ['mollusk',
               'albatross',
-   	   'rat',
-   	   'penguin',
-   	   'python',
-   	   ]
+              'rat',
+              'penguin',
+              'python', ]
    # ...
    for a in animals:
        print a
@@ -666,10 +665,9 @@ Here is one way you can handle this situation::
 
    animals = [_('mollusk'),
               _('albatross'),
-   	   _('rat'),
-   	   _('penguin'),
-   	   _('python'),
-   	   ]
+              _('rat'),
+              _('penguin'),
+              _('python'), ]
 
    del _
 
@@ -692,10 +690,9 @@ Another way to handle this is with the following example::
 
    animals = [N_('mollusk'),
               N_('albatross'),
-   	   N_('rat'),
-   	   N_('penguin'),
-   	   N_('python'),
-   	   ]
+              N_('rat'),
+              N_('penguin'),
+              N_('python'), ]
 
    # ...
    for a in animals:

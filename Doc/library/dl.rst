@@ -6,11 +6,11 @@
    :platform: Unix
    :synopsis: Call C functions in shared objects.
    :deprecated:
-   
+
 .. deprecated:: 2.6
     The :mod:`dl` module has been removed in Python 3.0. Use the :mod:`ctypes`
     module instead.
-   
+
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
 
 The :mod:`dl` module defines an interface to the :cfunc:`dlopen` function, which
@@ -44,12 +44,12 @@ The :mod:`dl` module defines the following constants:
 
 .. data:: RTLD_LAZY
 
-   Useful as an argument to :func:`open`.
+   Useful as an argument to :func:`.open`.
 
 
 .. data:: RTLD_NOW
 
-   Useful as an argument to :func:`open`.  Note that on systems which do not
+   Useful as an argument to :func:`.open`.  Note that on systems which do not
    support immediate binding, this constant will not appear in the module. For
    maximum portability, use :func:`hasattr` to determine if the system supports
    immediate binding.
@@ -78,7 +78,7 @@ the fact that using this module is usually a bad alternative.
 Dl Objects
 ----------
 
-Dl objects, as returned by :func:`open` above, have the following methods:
+Dl objects, as returned by :func:`.open` above, have the following methods:
 
 
 .. method:: dl.close()
@@ -91,9 +91,9 @@ Dl objects, as returned by :func:`open` above, have the following methods:
    Return the pointer for the function named *name*, as a number, if it exists in
    the referenced shared object, otherwise ``None``. This is useful in code like::
 
-      >>> if a.sym('time'): 
+      >>> if a.sym('time'):
       ...     a.call('time')
-      ... else: 
+      ... else:
       ...     time.time()
 
    (Note that this function will return a non-zero number, as zero is the *NULL*

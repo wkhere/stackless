@@ -1,11 +1,17 @@
 
-:mod:`getopt` --- Parser for command line options
-=================================================
+:mod:`getopt` --- C-style parser for command line options
+=========================================================
 
 .. module:: getopt
    :synopsis: Portable parser for command line options; support both short and long option
               names.
 
+.. note::
+   The :mod:`getopt` module is a parser for command line options whose API is
+   designed to be familiar to users of the C :cfunc:`getopt` function. Users who
+   are unfamiliar with the C :cfunc:`getopt` function or who would like to write
+   less code and get better help and error messages should consider using the
+   :mod:`argparse` module instead.
 
 This module helps scripts to parse the command line arguments in ``sys.argv``.
 It supports the same conventions as the Unix :cfunc:`getopt` function (including
@@ -30,19 +36,20 @@ exception:
 
    .. note::
 
-      Unlike GNU :cfunc:`getopt`, after a non-option argument, all further arguments
-      are considered also non-options. This is similar to the way non-GNU Unix systems
-      work.
+      Unlike GNU :cfunc:`getopt`, after a non-option argument, all further
+      arguments are considered also non-options. This is similar to the way
+      non-GNU Unix systems work.
 
    *long_options*, if specified, must be a list of strings with the names of the
-   long options which should be supported.  The leading ``'-``\ ``-'`` characters
-   should not be included in the option name.  Long options which require an
-   argument should be followed by an equal sign (``'='``).  To accept only long
-   options, *options* should be an empty string.  Long options on the command line
-   can be recognized so long as they provide a prefix of the option name that
-   matches exactly one of the accepted options.  For example, if *long_options* is
-   ``['foo', 'frob']``, the option :option:`--fo` will match as :option:`--foo`,
-   but :option:`--f` will not match uniquely, so :exc:`GetoptError` will be raised.
+   long options which should be supported.  The leading ``'-``\ ``-'``
+   characters should not be included in the option name.  Long options which
+   require an argument should be followed by an equal sign (``'='``).  Optional
+   arguments are not supported.  To accept only long options, *options* should
+   be an empty string.  Long options on the command line can be recognized so
+   long as they provide a prefix of the option name that matches exactly one of
+   the accepted options.  For example, if *long_options* is ``['foo', 'frob']``,
+   the option :option:`--fo` will match as :option:`--foo`, but :option:`--f`
+   will not match uniquely, so :exc:`GetoptError` will be raised.
 
    The return value consists of two elements: the first is a list of ``(option,
    value)`` pairs; the second is the list of program arguments left after the
@@ -63,8 +70,8 @@ exception:
    non-option argument is encountered.
 
    If the first character of the option string is '+', or if the environment
-   variable POSIXLY_CORRECT is set, then option processing stops as soon as a
-   non-option argument is encountered.
+   variable :envvar:`POSIXLY_CORRECT` is set, then option processing stops as
+   soon as a non-option argument is encountered.
 
    .. versionadded:: 2.3
 
@@ -141,9 +148,21 @@ In a script, typical usage is something like this::
    if __name__ == "__main__":
        main()
 
+Note that an equivalent command line interface could be produced with less code
+and more informative help and error messages by using the :mod:`argparse` module::
+
+   import argparse
+
+   if __name__ == '__main__':
+       parser = argparse.ArgumentParser()
+       parser.add_argument('-o', '--output')
+       parser.add_argument('-v', dest='verbose', action='store_true')
+       args = parser.parse_args()
+       # ... do something with args.output ...
+       # ... do something with args.verbose ..
 
 .. seealso::
 
-   Module :mod:`optparse`
-      More object-oriented command line option parsing.
+   Module :mod:`argparse`
+      Alternative command line option and argument parsing library.
 

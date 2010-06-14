@@ -26,14 +26,14 @@ lowest valued entry is retrieved first.
 
 The :mod:`Queue` module defines the following classes and exceptions:
 
-.. class:: Queue(maxsize)
+.. class:: Queue(maxsize=0)
 
    Constructor for a FIFO queue.  *maxsize* is an integer that sets the upperbound
    limit on the number of items that can be placed in the queue.  Insertion will
    block once this size has been reached, until queue items are consumed.  If
    *maxsize* is less than or equal to zero, the queue size is infinite.
 
-.. class:: LifoQueue(maxsize)
+.. class:: LifoQueue(maxsize=0)
 
    Constructor for a LIFO queue.  *maxsize* is an integer that sets the upperbound
    limit on the number of items that can be placed in the queue.  Insertion will
@@ -42,7 +42,7 @@ The :mod:`Queue` module defines the following classes and exceptions:
 
    .. versionadded:: 2.6
 
-.. class:: PriorityQueue(maxsize)
+.. class:: PriorityQueue(maxsize=0)
 
    Constructor for a priority queue.  *maxsize* is an integer that sets the upperbound
    limit on the number of items that can be placed in the queue.  Insertion will
@@ -65,6 +65,12 @@ The :mod:`Queue` module defines the following classes and exceptions:
 
    Exception raised when non-blocking :meth:`put` (or :meth:`put_nowait`) is called
    on a :class:`Queue` object which is full.
+
+.. seealso::
+
+   :class:`collections.deque` is an alternative implementation of unbounded
+   queues with fast atomic :func:`append` and :func:`popleft` operations that
+   do not require locking.
 
 
 .. _queueobjects:
@@ -162,7 +168,7 @@ fully processed by daemon consumer threads.
    The count of unfinished tasks goes up whenever an item is added to the queue.
    The count goes down whenever a consumer thread calls :meth:`task_done` to
    indicate that the item was retrieved and all work on it is complete. When the
-   count of unfinished tasks drops to zero, join() unblocks.
+   count of unfinished tasks drops to zero, :meth:`join` unblocks.
 
    .. versionadded:: 2.5
 
@@ -177,7 +183,7 @@ Example of how to wait for enqueued tasks to be completed::
    q = Queue()
    for i in range(num_worker_threads):
         t = Thread(target=worker)
-        t.setDaemon(True)
+        t.daemon = True
         t.start()
 
    for item in source():

@@ -49,7 +49,7 @@ High-level interface
    .. index:: module: mimetools
 
    The :meth:`info` method returns an instance of the class
-   :class:`mimetools.Message` containing meta-information associated with the
+   :class:`httplib.HTTPMessage` containing meta-information associated with the
    URL.  When the method is HTTP, these headers are those returned by the server
    at the head of the retrieved HTML page (including Content-Length and
    Content-Type).  When the method is FTP, a Content-Length header will be
@@ -96,8 +96,10 @@ High-level interface
 
    .. index:: single: Internet Config
 
-   In a Macintosh environment, :func:`urlopen` will retrieve proxy information from
-   Internet Config.
+   In a Mac OS X  environment, :func:`urlopen` will retrieve proxy information
+   from the OS X System Configuration Framework, which can be managed with
+   Network System Preferences panel.
+
 
    Alternatively, the optional *proxies* argument may be used to explicitly specify
    proxies.  It must be a dictionary mapping scheme names to proxy URLs, where an
@@ -123,7 +125,7 @@ High-level interface
    .. versionchanged:: 2.6
       Added :meth:`getcode` to returned object and support for the
       :envvar:`no_proxy` environment variable.
-      
+
    .. deprecated:: 2.6
       The :func:`urlopen` function has been removed in Python 3.0 in favor
       of :func:`urllib2.urlopen`.
@@ -203,9 +205,10 @@ Utility functions
 .. function:: quote(string[, safe])
 
    Replace special characters in *string* using the ``%xx`` escape. Letters,
-   digits, and the characters ``'_.-'`` are never quoted. The optional *safe*
-   parameter specifies additional characters that should not be quoted --- its
-   default value is ``'/'``.
+   digits, and the characters ``'_.-'`` are never quoted. By default, this
+   function is intended for quoting the path section of the URL.The optional
+   *safe* parameter specifies additional characters that should not be quoted
+   --- its default value is ``'/'``.
 
    Example: ``quote('/~connolly/')`` yields ``'/%7econnolly/'``.
 
@@ -213,8 +216,9 @@ Utility functions
 .. function:: quote_plus(string[, safe])
 
    Like :func:`quote`, but also replaces spaces by plus signs, as required for
-   quoting HTML form values.  Plus signs in the original string are escaped unless
-   they are included in *safe*.  It also does not have *safe* default to ``'/'``.
+   quoting HTML form values when building up a query string to go into a URL.
+   Plus signs in the original string are escaped unless they are included in
+   *safe*.  It also does not have *safe* default to ``'/'``.
 
 
 .. function:: unquote(string)
@@ -232,17 +236,19 @@ Utility functions
 
 .. function:: urlencode(query[, doseq])
 
-   Convert a mapping object or a sequence of two-element tuples  to a "url-encoded"
-   string, suitable to pass to :func:`urlopen` above as the optional *data*
-   argument.  This is useful to pass a dictionary of form fields to a ``POST``
-   request.  The resulting string is a series of ``key=value`` pairs separated by
-   ``'&'`` characters, where both *key* and *value* are quoted using
-   :func:`quote_plus` above.  If the optional parameter *doseq* is present and
-   evaluates to true, individual ``key=value`` pairs are generated for each element
-   of the sequence. When a sequence of two-element tuples is used as the *query*
-   argument, the first element of each tuple is a key and the second is a value.
-   The order of parameters in the encoded string will match the order of parameter
-   tuples in the sequence. The :mod:`urlparse` module provides the functions
+   Convert a mapping object or a sequence of two-element tuples to a
+   "url-encoded" string, suitable to pass to :func:`urlopen` above as the
+   optional *data* argument.  This is useful to pass a dictionary of form
+   fields to a ``POST`` request.  The resulting string is a series of
+   ``key=value`` pairs separated by ``'&'`` characters, where both *key* and
+   *value* are quoted using :func:`quote_plus` above.  When a sequence of
+   two-element tuples is used as the *query* argument, the first element of
+   each tuple is a key and the second is a value. The value element in itself
+   can be a sequence and in that case, if the optional parameter *doseq* is
+   evaluates to *True*, individual ``key=value`` pairs separated by ``'&'`` are
+   generated for each element of the value sequence for the key.  The order of
+   parameters in the encoded string will match the order of parameter tuples in
+   the sequence. The :mod:`urlparse` module provides the functions
    :func:`parse_qs` and :func:`parse_qsl` which are used to parse query strings
    into Python data structures.
 
@@ -259,6 +265,15 @@ Utility functions
    Convert the path component *path* from an encoded URL to the local syntax for a
    path.  This does not accept a complete URL.  This function uses :func:`unquote`
    to decode *path*.
+
+
+.. function:: getproxies()
+
+   This helper function returns a dictionary of scheme to proxy server URL
+   mappings. It scans the environment for variables named ``<scheme>_proxy``
+   for all operating systems first, and when it cannot find it, looks for proxy
+   information from Mac OSX System Configuration for Mac OS X and Windows
+   Systems Registry for Windows.
 
 
 URL Opener objects

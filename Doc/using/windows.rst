@@ -69,9 +69,9 @@ key features:
 `ActivePython <http://www.activestate.com/Products/activepython/>`_
     Installer with multi-platform compatibility, documentation, PyWin32
 
-`Python Enthought Edition <http://code.enthought.com/enthon/>`_
+`Enthought Python Distribution <http://www.enthought.com/products/epd.php>`_
     Popular modules (such as PyWin32) with their respective documentation, tool
-    suite for building extensible python applications
+    suite for building extensible Python applications
 
 Notice that these packages are likely to install *older* versions of Python.
 
@@ -88,9 +88,9 @@ Excursus: Setting environment variables
 ---------------------------------------
 
 Windows has a built-in dialog for changing environment variables (following
-guide applies to XP classical view): Right-click the icon for your machine 
-(usually located on your Desktop and called "My Computer") and choose 
-:menuselection:`Properties` there.  Then, open the :guilabel:`Advanced` tab 
+guide applies to XP classical view): Right-click the icon for your machine
+(usually located on your Desktop and called "My Computer") and choose
+:menuselection:`Properties` there.  Then, open the :guilabel:`Advanced` tab
 and click the :guilabel:`Environment Variables` button.
 
 In short, your path is:
@@ -168,12 +168,13 @@ separated by semicolons, though, to distinguish them from drive identifiers
 
 .. ``
 
-Modifying the module search path can also be done through the Windows registry:
-Edit
-:file:`HKEY_LOCAL_MACHINE\\SOFTWARE\\Python\\PythonCore\\{version}\\PythonPath\\`,
-as described above for the environment variable :envvar:`%PYTHONPATH%`.  A
-convenient registry editor is :program:`regedit` (start it by typing "regedit"
-into :menuselection:`Start --> Run`).
+Modifying the module search path can also be done through the Windows registry
+under the key :file:`HKLM\\SOFTWARE\\Python\\PythonCore\\{version}\\PythonPath`.
+Subkeys which have semicolon-delimited path strings as their default value will
+cause each path to be searched.  Multiple subkeys can be created and are
+appended to the path in alphabetical order.  A convenient registry editor is
+:program:`regedit` (start it by typing "regedit" into :menuselection:`Start -->
+Run`).
 
 
 Executing scripts
@@ -193,11 +194,11 @@ administrative rights):
 
 #. Launch a command prompt.
 #. Associate the correct file group with ``.py`` scripts::
-   
+
       assoc .py=Python.File
 
 #. Redirect all Python files to the new executable::
-   
+
       ftype Python.File=C:\Path\to\pythonw.exe "%1" %*
 
 
@@ -223,8 +224,7 @@ utilities for:
 * Win32 API calls
 * Registry
 * Event log
-* `Microsoft Foundation Classes <http://msdn.microsoft.com/library/
-  en-us/vclib/html/_mfc_Class_Library_Reference_Introduction.asp>`_ (MFC)
+* `Microsoft Foundation Classes <http://msdn.microsoft.com/en-us/library/fe1cf721%28VS.80%29.aspx>`_ (MFC)
   user interfaces
 
 `PythonWin <http://web.archive.org/web/20060524042422/
@@ -301,7 +301,7 @@ For extension modules, consult :ref:`building-on-windows`.
       MinGW gcc under Windows" or "Installing Python extension with distutils
       and without Microsoft Visual C++" by Sébastien Sauvage, 2003
 
-   `MingW -- Python extensions <http://www.mingw.org/MinGWiki/index.php/Python%20extensions>`_
+   `MingW -- Python extensions <http://oldwiki.mingw.org/index.php/Python%20extensions>`_
       by Trent Apted et al, 2007
 
 

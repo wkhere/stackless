@@ -99,7 +99,7 @@ It defines the following constant and functions:
    *size* argument specifies the stack size to be used for subsequently created
    threads, and must be 0 (use platform or configured default) or a positive
    integer value of at least 32,768 (32kB). If changing the thread stack size is
-   unsupported, a :exc:`ThreadError` is raised.  If the specified stack size is
+   unsupported, the :exc:`error` exception is raised.  If the specified stack size is
    invalid, a :exc:`ValueError` is raised and the stack size is unmodified.  32kB
    is currently the minimum supported stack size value to guarantee sufficient
    stack space for the interpreter itself.  Note that some platforms may have
@@ -111,6 +111,7 @@ It defines the following constant and functions:
    Availability: Windows, systems with POSIX threads.
 
    .. versionadded:: 2.5
+
 
 Lock objects have the following methods:
 
@@ -156,7 +157,7 @@ In addition to these methods, lock objects can also be used via the
   module is available, interrupts always go to the main thread.)
 
 * Calling :func:`sys.exit` or raising the :exc:`SystemExit` exception is
-  equivalent to calling :func:`exit`.
+  equivalent to calling :func:`thread.exit`.
 
 * Not all built-in functions that may block waiting for I/O allow other threads
   to run.  (The most popular ones (:func:`time.sleep`, :meth:`file.read`,

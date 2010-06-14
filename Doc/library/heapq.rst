@@ -88,6 +88,21 @@ Example of use:
    >>> print data == ordered
    True
 
+Using a heap to insert items at the correct place in a priority queue:
+
+   >>> heap = []
+   >>> data = [(1, 'J'), (4, 'N'), (3, 'H'), (2, 'O')]
+   >>> for item in data:
+   ...     heappush(heap, item)
+   ...
+   >>> while heap:
+   ...     print heappop(heap)[1]
+   J
+   O
+   H
+   N
+
+
 The module also offers three general purpose functions based on heaps.
 
 
@@ -95,7 +110,7 @@ The module also offers three general purpose functions based on heaps.
 
    Merge multiple sorted inputs into a single sorted output (for example, merge
    timestamped entries from multiple log files).  Returns an :term:`iterator`
-   over over the sorted values.
+   over the sorted values.
 
    Similar to ``sorted(itertools.chain(*iterables))`` but returns an iterable, does
    not pull the data into memory all at once, and assumes that each of the input
@@ -132,7 +147,7 @@ The module also offers three general purpose functions based on heaps.
 
 The latter two functions perform best for smaller values of *n*.  For larger
 values, it is more efficient to use the :func:`sorted` function.  Also, when
-``n==1``, it is more efficient to use the builtin :func:`min` and :func:`max`
+``n==1``, it is more efficient to use the built-in :func:`min` and :func:`max`
 functions.
 
 

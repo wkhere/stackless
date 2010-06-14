@@ -4,8 +4,10 @@
 ## does this:
 ##   svn up ; ./configure ; make ; make test ; make install ; cd Doc ; make
 ##
-## Logs are kept and rsync'ed to the host.  If there are test failure(s),
+## Logs are kept and rsync'ed to the webhost.  If there are test failure(s),
 ## information about the failure(s) is mailed.
+##
+## The user must be a member of the webmaster group locally and on webhost.
 ##
 ## This script is run on the PSF's machine as user neal via crontab.
 ##
@@ -53,7 +55,7 @@ REMOTE_SYSTEM="neal@dinsdale.python.org"
 REMOTE_DIR="/data/ftp.python.org/pub/docs.python.org/dev/"
 RESULT_FILE="$DIR/build/index.html"
 INSTALL_DIR="/tmp/python-test/local"
-RSYNC_OPTS="-aC -e ssh"
+RSYNC_OPTS="-C -e ssh -rlogD"
 
 # Always run the installed version of Python.
 PYTHON=$INSTALL_DIR/bin/python
@@ -67,14 +69,15 @@ REFLOG="build/reflog.txt.out"
 # Note: test_XXX (none currently) really leak, but are disabled
 # so we don't send spam.  Any test which really leaks should only 
 # be listed here if there are also test cases under Lib/test/leakers.
-LEAKY_TESTS="test_(asynchat|cmd_line|docxmlrpc|dumbdbm|file|ftplib|httpservers|imaplib|popen2|socket|smtplib|sys|telnetlib|threadedtempfile|threading|threadsignals|urllib2_localnet|xmlrpc)"
+LEAKY_TESTS="test_(asynchat|cmd_line|docxmlrpc|dumbdbm|file|ftplib|httpservers|imaplib|popen2|socket|smtplib|sys|telnetlib|threadedtempfile|threading|threadsignals|xmlrpc)"
 
 # Skip these tests altogether when looking for leaks.  These tests
 # do not need to be stored above in LEAKY_TESTS too.
 # test_compiler almost never finishes with the same number of refs
 # since it depends on other modules, skip it.
 # test_logging causes hangs, skip it.
-LEAKY_SKIPS="-x test_compiler test_logging"
+# KBK 21Apr09: test_httpservers causes hangs, skip for now.
+LEAKY_SKIPS="-x test_compiler test_logging test_httpservers"
 
 # Change this flag to "yes" for old releases to only update/build the docs.
 BUILD_DISABLED="no"
@@ -131,9 +134,14 @@ mail_on_failure() {
 
 ## setup
 cd $DIR
+make clobber > /dev/null 2>&1
+cp -p Modules/Setup.dist Modules/Setup
+# But maybe there was no Makefile - we are only building docs. Clear build:
+rm -rf build/
 mkdir -p build
-rm -f $RESULT_FILE build/*.out
 rm -rf $INSTALL_DIR
+## get the path we are building
+repo_path=$(grep "url=" .svn/entries | sed -e s/\\W*url=// -e s/\"//g)
 
 ## create results file
 TITLE="Automated Python Build Results"
@@ -151,6 +159,8 @@ echo "  </tr><tr>" >> $RESULT_FILE
 echo "    <td>Hostname:</td><td>`uname -n`</td>" >> $RESULT_FILE
 echo "  </tr><tr>" >> $RESULT_FILE
 echo "    <td>Platform:</td><td>`uname -srmpo`</td>" >> $RESULT_FILE
+echo "  </tr><tr>" >> $RESULT_FILE
+echo "    <td>URL:</td><td>$repo_path</td>" >> $RESULT_FILE
 echo "  </tr>" >> $RESULT_FILE
 echo "</table>" >> $RESULT_FILE
 echo "<ul>" >> $RESULT_FILE
@@ -202,7 +212,7 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             ## make and run basic tests
             F=make-test.out
             start=`current_time`
-            $PYTHON $REGRTEST_ARGS -u urlfetch >& build/$F
+            $PYTHON $REGRTEST_ARGS -W -u urlfetch >& build/$F
             NUM_FAILURES=`count_failures build/$F`
             place_summary_first build/$F
             update_status "Testing basics ($NUM_FAILURES failures)" "$F" $start
@@ -210,7 +220,7 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
 
             F=make-test-opt.out
             start=`current_time`
-            $PYTHON -O $REGRTEST_ARGS -u urlfetch >& build/$F
+            $PYTHON -O $REGRTEST_ARGS -W -u urlfetch >& build/$F
             NUM_FAILURES=`count_failures build/$F`
             place_summary_first build/$F
             update_status "Testing opt ($NUM_FAILURES failures)" "$F" $start
@@ -221,7 +231,7 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             start=`current_time`
             ## ensure that the reflog exists so the grep doesn't fail
             touch $REFLOG
-            $PYTHON $REGRTEST_ARGS -R 4:3:$REFLOG -u network,urlfetch $LEAKY_SKIPS >& build/$F
+            $PYTHON $REGRTEST_ARGS -R 4:3:$REFLOG -u network $LEAKY_SKIPS >& build/$F
             LEAK_PAT="($LEAKY_TESTS|sum=0)"
             NUM_FAILURES=`egrep -vc "$LEAK_PAT" $REFLOG`
             place_summary_first build/$F
@@ -233,7 +243,7 @@ if [ $err = 0 -a "$BUILD_DISABLED" != "yes" ]; then
             start=`current_time`
             ## skip curses when running from cron since there's no terminal
             ## skip sound since it's not setup on the PSF box (/dev/dsp)
-            $PYTHON $REGRTEST_ARGS -uall -x test_curses test_linuxaudiodev test_ossaudiodev >& build/$F
+            $PYTHON $REGRTEST_ARGS -W -uall -x test_curses test_linuxaudiodev test_ossaudiodev >& build/$F
             NUM_FAILURES=`count_failures build/$F`
             place_summary_first build/$F
             update_status "Testing all except curses and sound ($NUM_FAILURES failures)" "$F" $start
@@ -247,24 +257,9 @@ fi
 cd $DIR/Doc
 F="make-doc.out"
 start=`current_time`
-# XXX(nnorwitz): For now, keep the code that checks for a conflicted file until
-# after the first release of 2.6a1 or 3.0a1.  At that point, it will be clear
-# if there will be a similar problem with the new doc system.
-
-# Doc/commontex/boilerplate.tex is expected to always have an outstanding
-# modification for the date.  When a release is cut, a conflict occurs.
-# This allows us to detect this problem and not try to build the docs
-# which will definitely fail with a conflict. 
-#CONFLICTED_FILE=commontex/boilerplate.tex
-#conflict_count=`grep -c "<<<" $CONFLICTED_FILE`
-conflict_count=0
-if [ $conflict_count != 0 ]; then
-    echo "Conflict detected in $CONFLICTED_FILE.  Doc build skipped." > ../build/$F
-    err=1
-else
-    make update html >& ../build/$F
-    err=$?
-fi
+make clean > ../build/$F 2>&1
+make checkout html >> ../build/$F 2>&1
+err=$?
 update_status "Making doc" "$F" $start
 if [ $err != 0 ]; then
     NUM_FAILURES=1
@@ -276,6 +271,9 @@ echo "</body>" >> $RESULT_FILE
 echo "</html>" >> $RESULT_FILE
 
 ## copy results
-rsync $RSYNC_OPTS build/html/* $REMOTE_SYSTEM:$REMOTE_DIR
-cd ../build
-rsync $RSYNC_OPTS index.html *.out $REMOTE_SYSTEM:$REMOTE_DIR/results/
+## (not used anymore, the daily build is now done directly on the server)
+#chgrp -R webmaster build/html
+#chmod -R g+w build/html
+#rsync $RSYNC_OPTS build/html/* $REMOTE_SYSTEM:$REMOTE_DIR
+#cd ../build
+#rsync $RSYNC_OPTS index.html *.out $REMOTE_SYSTEM:$REMOTE_DIR/results/

@@ -80,7 +80,7 @@ The available formats for built distributions are:
 +-------------+------------------------------+---------+
 | ``tar``     | tar file (:file:`.tar`)      | \(3)    |
 +-------------+------------------------------+---------+
-| ``zip``     | zip file (:file:`.zip`)      | \(4)    |
+| ``zip``     | zip file (:file:`.zip`)      | (2),(4) |
 +-------------+------------------------------+---------+
 | ``rpm``     | RPM                          | \(5)    |
 +-------------+------------------------------+---------+
@@ -90,9 +90,12 @@ The available formats for built distributions are:
 +-------------+------------------------------+---------+
 | ``rpm``     | RPM                          | \(5)    |
 +-------------+------------------------------+---------+
-| ``wininst`` | self-extracting ZIP file for | (2),(4) |
+| ``wininst`` | self-extracting ZIP file for | \(4)    |
 |             | Windows                      |         |
 +-------------+------------------------------+---------+
+| ``msi``     | Microsoft Installer.         |         |
++-------------+------------------------------+---------+
+
 
 Notes:
 
@@ -101,8 +104,6 @@ Notes:
 
 (2)
    default on Windows
-
-   **\*\*** to-do! **\*\***
 
 (3)
    requires external utilities: :program:`tar` and possibly one of :program:`gzip`,
@@ -132,6 +133,8 @@ generates all the "dumb" archive formats (``tar``, ``ztar``, ``gztar``, and
 | :command:`bdist_rpm`     | rpm, srpm             |
 +--------------------------+-----------------------+
 | :command:`bdist_wininst` | wininst               |
++--------------------------+-----------------------+
+| :command:`bdist_msi`     | msi                   |
 +--------------------------+-----------------------+
 
 The following sections give details on the individual :command:`bdist_\*`
@@ -238,7 +241,8 @@ tedious and error-prone, so it's usually best to put them in the setup
 configuration file, :file:`setup.cfg`\ ---see section :ref:`setup-config`.  If
 you distribute or package many Python module distributions, you might want to
 put options that apply to all of them in your personal Distutils configuration
-file (:file:`~/.pydistutils.cfg`).
+file (:file:`~/.pydistutils.cfg`).  If you want to temporarily disable
+this file, you can pass the --no-user-cfg option to setup.py.
 
 There are three steps to building a binary RPM package, all of which are
 handled automatically by the Distutils:
@@ -268,13 +272,13 @@ file winds up deep in the "build tree," in a temporary directory created by
 .. % \longprogramopt{spec-file} option; used in conjunction with
 .. % \longprogramopt{spec-only}, this gives you an opportunity to customize
 .. % the \file{.spec} file manually:
-.. % 
+.. %
 .. % \ begin{verbatim}
 .. % > python setup.py bdist_rpm --spec-only
 .. % # ...edit dist/FooBar-1.0.spec
 .. % > python setup.py bdist_rpm --spec-file=dist/FooBar-1.0.spec
 .. % \ end{verbatim}
-.. % 
+.. %
 .. % (Although a better way to do this is probably to override the standard
 .. % \command{bdist\_rpm} command with one that writes whatever else you want
 .. % to the \file{.spec} file.)
@@ -318,7 +322,7 @@ the :option:`--no-target-compile` and/or the :option:`--no-target-optimize`
 option.
 
 By default the installer will display the cool "Python Powered" logo when it is
-run, but you can also supply your own bitmap which must be a Windows
+run, but you can also supply your own 152x161 bitmap which must be a Windows
 :file:`.bmp` file with the :option:`--bitmap` option.
 
 The installer will also display a large title on the desktop background window
@@ -334,31 +338,31 @@ The installer file will be written to the "distribution directory" --- normally
 Cross-compiling on Windows
 ==========================
 
-Starting with Python 2.6, distutils is capable of cross-compiling between 
-Windows platforms.  In practice, this means that with the correct tools 
+Starting with Python 2.6, distutils is capable of cross-compiling between
+Windows platforms.  In practice, this means that with the correct tools
 installed, you can use a 32bit version of Windows to create 64bit extensions
 and vice-versa.
 
-To build for an alternate platform, specify the :option:`--plat-name` option 
-to the build command.  Valid values are currently 'win32', 'win-amd64' and 
+To build for an alternate platform, specify the :option:`--plat-name` option
+to the build command.  Valid values are currently 'win32', 'win-amd64' and
 'win-ia64'.  For example, on a 32bit version of Windows, you could execute::
 
    python setup.py build --plat-name=win-amd64
 
-to build a 64bit version of your extension.  The Windows Installers also 
+to build a 64bit version of your extension.  The Windows Installers also
 support this option, so the command::
 
    python setup.py build --plat-name=win-amd64 bdist_wininst
 
 would create a 64bit installation executable on your 32bit version of Windows.
 
-To cross-compile, you must download the Python source code and cross-compile 
+To cross-compile, you must download the Python source code and cross-compile
 Python itself for the platform you are targetting - it is not possible from a
 binary installtion of Python (as the .lib etc file for other platforms are
-not included.)  In practice, this means the user of a 32 bit operating 
-system will need to use Visual Studio 2008 to open the 
-:file:`PCBuild/PCbuild.sln` solution in the Python source tree and build the 
-"x64" configuration of the 'pythoncore' project before cross-compiling 
+not included.)  In practice, this means the user of a 32 bit operating
+system will need to use Visual Studio 2008 to open the
+:file:`PCBuild/PCbuild.sln` solution in the Python source tree and build the
+"x64" configuration of the 'pythoncore' project before cross-compiling
 extensions is possible.
 
 Note that by default, Visual Studio 2008 does not install 64bit compilers or
@@ -426,13 +430,6 @@ built-in functions in the installation script.
    also the configuration.  For details refer to Microsoft's documentation of the
    :cfunc:`SHGetSpecialFolderPath` function.
 
-Vista User Access Control (UAC)
-===============================
-
-Starting with Python 2.6, bdist_wininst supports a :option:`--user-access-control`
-option.  The default is 'none' (meaning no UAC handling is done), and other
-valid values are 'auto' (meaning prompt for UAC elevation if Python was
-installed for all users) and 'force' (meaning always prompt for elevation)
 
 .. function:: create_shortcut(target, description, filename[, arguments[, workdir[, iconpath[, iconindex]]]])
 
@@ -444,3 +441,12 @@ installed for all users) and 'force' (meaning always prompt for elevation)
    and *iconindex* is the index of the icon in the file *iconpath*.  Again, for
    details consult the Microsoft documentation for the :class:`IShellLink`
    interface.
+
+
+Vista User Access Control (UAC)
+===============================
+
+Starting with Python 2.6, bdist_wininst supports a :option:`--user-access-control`
+option.  The default is 'none' (meaning no UAC handling is done), and other
+valid values are 'auto' (meaning prompt for UAC elevation if Python was
+installed for all users) and 'force' (meaning always prompt for elevation).

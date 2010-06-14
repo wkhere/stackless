@@ -1,4 +1,3 @@
-
 :mod:`shelve` --- Python object persistence
 ===========================================
 
@@ -29,27 +28,48 @@ lots of shared  sub-objects.  The keys are ordinary strings.
    .. versionchanged:: 2.3
       The *protocol* parameter was added.
 
-   By default, mutations to persistent-dictionary mutable entries are not
-   automatically written back.  If the optional *writeback* parameter is set to
-   *True*, all entries accessed are cached in memory, and written back at close
-   time; this can make it handier to mutate mutable entries in the persistent
-   dictionary, but, if many entries are accessed, it can consume vast amounts of
-   memory for the cache, and it can make the close operation very slow since all
-   accessed entries are written back (there is no way to determine which accessed
-   entries are mutable, nor which ones were actually mutated).
+   Because of Python semantics, a shelf cannot know when a mutable
+   persistent-dictionary entry is modified.  By default modified objects are
+   written *only* when assigned to the shelf (see :ref:`shelve-example`).  If the
+   optional *writeback* parameter is set to *True*, all entries accessed are also
+   cached in memory, and written back on :meth:`~Shelf.sync` and
+   :meth:`~Shelf.close`; this can make it handier to mutate mutable entries in
+   the persistent dictionary, but, if many entries are accessed, it can consume
+   vast amounts of memory for the cache, and it can make the close operation
+   very slow since all accessed entries are written back (there is no way to
+   determine which accessed entries are mutable, nor which ones were actually
+   mutated).
 
-Shelve objects support all methods supported by dictionaries.  This eases the
+   .. note::
+
+      Do not rely on the shelf being closed automatically; always call
+      :meth:`close` explicitly when you don't need it any more, or use a
+      :keyword:`with` statement with :func:`contextlib.closing`.
+
+
+Shelf objects support all methods supported by dictionaries.  This eases the
 transition from dictionary based scripts to those requiring persistent storage.
 
-One additional method is supported:
-
+Two additional methods are supported:
 
 .. method:: Shelf.sync()
 
-   Write back all entries in the cache if the shelf was opened with *writeback* set
-   to *True*. Also empty the cache and synchronize the persistent dictionary on
-   disk, if feasible.  This is called automatically when the shelf is closed with
-   :meth:`close`.
+   Write back all entries in the cache if the shelf was opened with *writeback*
+   set to :const:`True`.  Also empty the cache and synchronize the persistent
+   dictionary on disk, if feasible.  This is called automatically when the shelf
+   is closed with :meth:`close`.
+
+.. method:: Shelf.close()
+
+   Synchronize and close the persistent *dict* object.  Operations on a closed
+   shelf will fail with a :exc:`ValueError`.
+
+
+.. seealso::
+
+   `Persistent dictionary recipe <http://code.activestate.com/recipes/576642/>`_
+   with widely supported storage formats and having the speed of native
+   dictionaries.
 
 
 Restrictions
@@ -67,11 +87,6 @@ Restrictions
   this means that (the pickled representation of) the objects stored in the
   database should be fairly small, and in rare cases key collisions may cause the
   database to refuse updates.
-
-* Depending on the implementation, closing a persistent dictionary may or may
-  not be necessary to flush changes to disk.  The :meth:`__del__` method of the
-  :class:`Shelf` class calls the :meth:`close` method, so the programmer generally
-  need not do this explicitly.
 
 * The :mod:`shelve` module does not support *concurrent* read/write access to
   shelved objects.  (Multiple simultaneous read accesses are safe.)  When a
@@ -101,7 +116,7 @@ Restrictions
 
 .. class:: BsdDbShelf(dict[, protocol=None[, writeback=False]])
 
-   A subclass of :class:`Shelf` which exposes :meth:`first`, :meth:`next`,
+   A subclass of :class:`Shelf` which exposes :meth:`first`, :meth:`!next`,
    :meth:`previous`, :meth:`last` and :meth:`set_location` which are available in
    the :mod:`bsddb` module but not in other database modules.  The *dict* object
    passed to the constructor must support those methods.  This is generally
@@ -115,10 +130,12 @@ Restrictions
    A subclass of :class:`Shelf` which accepts a *filename* instead of a dict-like
    object.  The underlying file will be opened using :func:`anydbm.open`.  By
    default, the file will be created and opened for both read and write.  The
-   optional *flag* parameter has the same interpretation as for the :func:`open`
+   optional *flag* parameter has the same interpretation as for the :func:`.open`
    function.  The optional *protocol* and *writeback* parameters have the same
    interpretation as for the :class:`Shelf` class.
 
+
+.. _shelve-example:
 
 Example
 -------
@@ -142,7 +159,7 @@ object)::
 
    # as d was opened WITHOUT writeback=True, beware:
    d['xx'] = range(4)  # this works as expected, but...
-   d['xx'].append(5)   # *this doesn't!* -- d['xx'] is STILL range(4)!!!
+   d['xx'].append(5)   # *this doesn't!* -- d['xx'] is STILL range(4)!
 
    # having opened d without writeback=True, you need to code carefully:
    temp = d['xx']      # extracts the copy
@@ -165,8 +182,8 @@ object)::
       BSD ``db`` database interface.
 
    Module :mod:`dbhash`
-      Thin layer around the :mod:`bsddb` which provides an :func:`open` function like
-      the other database modules.
+      Thin layer around the :mod:`bsddb` which provides an :func:`~dbhash.open`
+      function like the other database modules.
 
    Module :mod:`dbm`
       Standard Unix database interface.

@@ -55,6 +55,45 @@ PyBuffer_FromReadWriteMemory:int:size::
 PyBuffer_New:PyObject*::+1:
 PyBuffer_New:int:size::
 
+PyCapsule_GetContext:void *:::
+PyCapsule_GetContext:PyObject*:self:0:
+
+PyCapsule_GetDestructor:void (*)(PyObject *):::
+PyCapsule_GetDestructor:PyObject*:self:0:
+
+PyCapsule_GetName:const char *:::
+PyCapsule_GetName:PyObject*:self:0:
+
+PyCapsule_GetPointer:void*:::
+PyCapsule_GetPointer:PyObject*:self:0:
+PyCapsule_GetPointer:const char *:name::
+
+PyCapsule_Import:void *:::
+PyCapsule_Import:const char *:name::
+PyCapsule_Import:int:no_block::
+
+PyCapsule_New:PyObject*::+1:
+PyCapsule_New:void*:pointer::
+PyCapsule_New:const char *:name::
+PyCapsule_New::void (* destructor)(PyObject* )::
+
+PyCapsule_SetContext:int:::
+PyCapsule_SetContext:PyObject*:self:0:
+PyCapsule_SetContext:void *:context::
+
+PyCapsule_SetDestructor:int:::
+PyCapsule_SetDestructor:PyObject*:self:0:
+PyCapsule_SetDestructor:void (*)(PyObject *):destructor::
+
+PyCapsule_SetName:int:::
+PyCapsule_SetName:PyObject*:self:0:
+PyCapsule_SetName:const char *:name::
+
+PyCapsule_SetPointer:int:::
+PyCapsule_SetPointer:PyObject*:self:0:
+PyCapsule_SetPointer:void*:pointer::
+
+
 PyCObject_AsVoidPtr:void*:::
 PyCObject_AsVoidPtr:PyObject*:self:0:
 
@@ -241,6 +280,12 @@ PyErr_NewException:PyObject*::+1:
 PyErr_NewException:char*:name::
 PyErr_NewException:PyObject*:base:0:
 PyErr_NewException:PyObject*:dict:0:
+
+PyErr_NewExceptionWithDoc:PyObject*::+1:
+PyErr_NewExceptionWithDoc:char*:name::
+PyErr_NewExceptionWithDoc:char*:doc::
+PyErr_NewExceptionWithDoc:PyObject*:base:0:
+PyErr_NewExceptionWithDoc:PyObject*:dict:0:
 
 PyErr_NoMemory:PyObject*::null:
 
@@ -450,6 +495,11 @@ PyImport_ExecCodeModule:PyObject*::+1:
 PyImport_ExecCodeModule:char*:name::
 PyImport_ExecCodeModule:PyObject*:co:0:
 
+PyImport_ExecCodeModuleEx:PyObject*::+1:
+PyImport_ExecCodeModuleEx:char*:name::
+PyImport_ExecCodeModuleEx:PyObject*:co:0:
+PyImport_ExecCodeModuleEx:char*:pathname::
+
 PyImport_GetMagicNumber:long:::
 
 PyImport_GetModuleDict:PyObject*::0:
@@ -468,6 +518,13 @@ PyImport_ImportModuleEx:char*:name::
 PyImport_ImportModuleEx:PyObject*:globals:0:???
 PyImport_ImportModuleEx:PyObject*:locals:0:???
 PyImport_ImportModuleEx:PyObject*:fromlist:0:???
+
+PyImport_ImportModuleLevel:PyObject*::+1:
+PyImport_ImportModuleLevel:char*:name::
+PyImport_ImportModuleLevel:PyObject*:globals:0:???
+PyImport_ImportModuleLevel:PyObject*:locals:0:???
+PyImport_ImportModuleLevel:PyObject*:fromlist:0:???
+PyImport_ImportModuleLevel:int:level::
 
 PyImport_ReloadModule:PyObject*::+1:
 PyImport_ReloadModule:PyObject*:m:0:
@@ -840,9 +897,6 @@ PyNumber_TrueDivide:PyObject*:w:0:
 PyNumber_Xor:PyObject*::+1:
 PyNumber_Xor:PyObject*:o1:0:
 PyNumber_Xor:PyObject*:o2:0:
-
-PyOS_GetLastModificationTime:long:::
-PyOS_GetLastModificationTime:char*:filename::
 
 PyObject_AsFileDescriptor:int::: 
 PyObject_AsFileDescriptor:PyObject*:o:0:
@@ -1595,7 +1649,7 @@ PyUnicode_Join:PyObject*::+1:
 PyUnicode_Join:PyObject*:separator:0:
 PyUnicode_Join:PyObject*:seq:0:
 
-PyUnicode_Tailmatch:PyObject*::+1:
+PyUnicode_Tailmatch:int:::
 PyUnicode_Tailmatch:PyObject*:str:0:
 PyUnicode_Tailmatch:PyObject*:substr:0:
 PyUnicode_Tailmatch:int:start::

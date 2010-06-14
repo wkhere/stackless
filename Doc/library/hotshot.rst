@@ -26,7 +26,7 @@ in C, it should result in a much smaller performance impact than the existing
    The results should be more meaningful than in the past: the timing core
    contained a critical bug.
 
-.. warning::
+.. note::
 
    The :mod:`hotshot` profiler does not yet work well with threads. It is useful to
    use an unthreaded script to run the profiler over the code you're interested in
@@ -127,7 +127,7 @@ objects.
 Example Usage
 -------------
 
-Note that this example runs the python "benchmark" pystones.  It can take some
+Note that this example runs the Python "benchmark" pystones.  It can take some
 time to run, and will produce large output files. ::
 
    >>> import hotshot, hotshot.stats, test.pystone

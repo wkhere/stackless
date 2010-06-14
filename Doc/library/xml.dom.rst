@@ -79,7 +79,7 @@ implementations are free to support the strict mapping from IDL).  See section
    `Document Object Model (DOM) Level 1 Specification <http://www.w3.org/TR/REC-DOM-Level-1/>`_
       The W3C recommendation for the DOM supported by :mod:`xml.dom.minidom`.
 
-   `Python Language Mapping Specification <http://www.omg.org/docs/formal/02-11-05.pdf>`_
+   `Python Language Mapping Specification <http://www.omg.org/spec/PYTH/1.2/PDF>`_
       This specifies the mapping from OMG IDL to Python.
 
 
@@ -611,7 +611,7 @@ of that class.
    Same as equivalent method in the :class:`Document` class.
 
 
-.. method:: Element.getElementsByTagNameNS(tagName)
+.. method:: Element.getElementsByTagNameNS(namespaceURI, localName)
 
    Same as equivalent method in the :class:`Document` class.
 
@@ -705,18 +705,27 @@ Attr Objects
 
 .. attribute:: Attr.name
 
-   The attribute name.  In a namespace-using document it may have colons in it.
+   The attribute name.
+   In a namespace-using document it may include a colon.
 
 
 .. attribute:: Attr.localName
 
-   The part of the name following the colon if there is one, else the entire name.
+   The part of the name following the colon if there is one, else the
+   entire name.
    This is a read-only attribute.
 
 
 .. attribute:: Attr.prefix
 
-   The part of the name preceding the colon if there is one, else the empty string.
+   The part of the name preceding the colon if there is one, else the
+   empty string.
+
+
+.. attribute:: Attr.value
+
+   The text value of the attribute.  This is a synonym for the
+   :attr:`nodeValue` attribute.
 
 
 .. _dom-attributelist-objects:

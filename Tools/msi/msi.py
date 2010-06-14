@@ -7,6 +7,7 @@ import uisample
 from win32com.client import constants
 from distutils.spawn import find_executable
 from uuids import product_codes
+import tempfile
 
 # Settings can be overridden in config.py below
 # 0 for official python.org releases
@@ -28,6 +29,8 @@ have_tcl = True
 PCBUILD="PCbuild"
 # msvcrt version
 MSVCR = "90"
+# Name of certificate in default store to sign MSI with
+certname = None
 
 try:
     from config import *
@@ -116,8 +119,13 @@ pythondll_uuid = {
 
 # Compute the name that Sphinx gives to the docfile
 docfile = ""
+if int(micro):
+    docfile = micro
 if level < 0xf:
-    docfile = '%x%s' % (level, serial)
+    if level == 0xC:
+        docfile += "rc%s" % (serial,)
+    else:
+        docfile += '%x%s' % (level, serial)
 docfile = 'python%s%s%s.chm' % (major, minor, docfile)
 
 # Build the mingw import library, libpythonXY.a
@@ -166,12 +174,6 @@ mingw_lib = os.path.join(srcdir, PCBUILD, "libpython%s%s.a" % (major, minor))
 
 have_mingw = build_mingw_lib(lib_file, def_file, dll_file, mingw_lib)
 
-try:
-    import stackless
-    have_stackless = True
-except ImportError:
-    have_stackless = False
-
 # Determine the target architechture
 dll_path = os.path.join(srcdir, PCBUILD, dll_file)
 msilib.set_arch_from_file(dll_path)
@@ -213,17 +215,18 @@ def build_database():
     else:
         uc = upgrade_code
     if msilib.Win64:
-        productsuffix = " (Stackless) (64-bit)"
+        productsuffix = " (64-bit)"
     else:
-        productsuffix = " (Stackless)"
+        productsuffix = ""
     # schema represents the installer 2.0 database schema.
     # sequence is the set of standard sequences
     # (ui/execute, admin/advt/install)
-    db = msilib.init_database("python-%s%s.msi" % (full_current_version, msilib.arch_ext),
+    msiname = "python-%s%s.msi" % (full_current_version, msilib.arch_ext)
+    db = msilib.init_database(msiname,
                   schema, ProductName="Python "+full_current_version+productsuffix,
                   ProductCode=product_code,
                   ProductVersion=current_version,
-                  Manufacturer=u"Richard Tew",
+                  Manufacturer=u"Python Software Foundation",
                   request_uac = True)
     # The default sequencing of the RemoveExistingProducts action causes
     # removal of files that got just installed. Place it after
@@ -242,7 +245,7 @@ def build_database():
                               ("ProductLine", "Python%s%s" % (major, minor)),
                              ])
     db.Commit()
-    return db
+    return db, msiname
 
 def remove_old_versions(db):
     "Fill the upgrade table."
@@ -403,7 +406,7 @@ def add_ui(db):
               ("VerdanaRed9", "Verdana", 9, 255, 0),
              ])
 
-    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x bad_coding|badsyntax|site-packages|py3_ "[TARGETDIR]Lib"'
+    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x "bad_coding|badsyntax|site-packages|py3_" "[TARGETDIR]Lib"'
     lib2to3args = r'-c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"'
     # See "CustomAction Table"
     add_data(db, "CustomAction", [
@@ -500,9 +503,9 @@ def add_ui(db):
       "    would still be Python for DOS.")
 
     c = exit_dialog.text("warning", 135, 200, 220, 40, 0x30003,
-            "{\\VerdanaRed9}Warning: Python 2.5.x is the last "
-            "Python release for Windows 9x.")
-    c.condition("Hide", "NOT Version9X")
+            "{\\VerdanaRed9}Warning: Python 2.7.x is the last "
+            "Python release for Windows 2000.")
+    c.condition("Hide", "VersionNT > 500")
 
     exit_dialog.text("Description", 135, 235, 220, 20, 0x30003,
                "Click the Finish button to exit the Installer.")
@@ -722,17 +725,14 @@ def add_ui(db):
     #####################################################################
     # Advanced Dialog.
     advanced = PyDialog(db, "AdvancedDlg", x, y, w, h, modal, title,
-                        "CompilePyc", "Next", "Cancel")
+                        "CompilePyc", "Ok", "Ok")
     advanced.title("Advanced Options for [ProductName]")
     # A radio group with two options: allusers, justme
     advanced.checkbox("CompilePyc", 135, 60, 230, 50, 3,
-                      "COMPILEALL", "Compile .py files to byte code after installation", "Next")
+                      "COMPILEALL", "Compile .py files to byte code after installation", "Ok")
 
-    c = advanced.next("Finish", "Cancel")
+    c = advanced.cancel("Ok", "CompilePyc", name="Ok") # Button just has location of cancel button.
     c.event("EndDialog", "Return")
-
-    c = advanced.cancel("Cancel", "CompilePyc")
-    c.event("SpawnDialog", "CancelDlg")
 
     #####################################################################
     # Existing Directory dialog
@@ -1009,18 +1009,20 @@ def add_files(db):
             lib.add_file("audiotest.au")
             lib.add_file("cfgparser.1")
             lib.add_file("sgml_input.html")
-            lib.add_file("test.xml")
-            lib.add_file("test.xml.out")
             lib.add_file("testtar.tar")
             lib.add_file("test_difflib_expect.html")
             lib.add_file("check_soundcard.vbs")
             lib.add_file("empty.vbs")
+            lib.add_file("Sine-1000Hz-300ms.aif")
             lib.glob("*.uue")
             lib.glob("*.pem")
             lib.glob("*.pck")
-            lib.add_file("readme.txt", src="README")
+            lib.add_file("zipdir.zip")
         if dir=='decimaltestdata':
             lib.glob("*.decTest")
+        if dir=='xmltestdata':
+            lib.glob("*.xml")
+            lib.add_file("test.xml.out")
         if dir=='output':
             lib.glob("test_*")
         if dir=='idlelib':
@@ -1093,18 +1095,6 @@ def add_files(db):
     lib = PyDirectory(db, cab, root, "include", "include", "INCLUDE|include")
     lib.glob("*.h")
     lib.add_file("pyconfig.h", src="../PC/pyconfig.h")
-    # Add the Stackless headers in a sub-directory.
-    if have_stackless:
-        slp = "Stackless"
-        lib = PyDirectory(db, cab, lib, os.path.join("..", slp), slp, "%s|%s" % (lib.make_short(slp), slp))
-        lib.glob("*.h")
-        for f in os.listdir(lib.absolute):
-            slpsubdir = os.path.join(lib.absolute, f)
-            if os.path.isdir(slpsubdir):
-                if f not in ("core", "module", "pickling", "platf"):
-                    continue
-                sublib = PyDirectory(db, cab, lib, f, f, "%s|%s" % (parent.make_short(f), f))
-                sublib.glob("*.h")
     # Add import libraries
     lib = PyDirectory(db, cab, root, PCBUILD, "libs", "LIBS|libs")
     for f in dlls:
@@ -1205,10 +1195,10 @@ def add_registry(db):
     if have_tcl:
         tcl_verbs=[
              ("py.IDLE", -1, pat % (testprefix, "", ewi), "",
-              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -n -e "%1"',
+              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -e "%1"',
               "REGISTRY.tcl"),
              ("pyw.IDLE", -1, pat % (testprefix, "NoCon", ewi), "",
-              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -n -e "%1"',
+              r'"[TARGETDIR]pythonw.exe" "[TARGETDIR]Lib\idlelib\idle.pyw" -e "%1"',
               "REGISTRY.tcl"),
         ]
     add_data(db, "Registry",
@@ -1269,7 +1259,10 @@ def add_registry(db):
                "[TARGETDIR]Doc\\"+docfile , "REGISTRY.doc"),
               ("Modules", -1, prefix+r"\Modules", "+", None, "REGISTRY"),
               ("AppPaths", -1, r"Software\Microsoft\Windows\CurrentVersion\App Paths\Python.exe",
-               "", r"[TARGETDIR]Python.exe", "REGISTRY.def")
+               "", r"[TARGETDIR]Python.exe", "REGISTRY.def"),
+              ("DisplayIcon", -1,
+               r"Software\Microsoft\Windows\CurrentVersion\Uninstall\%s" % product_code,
+               "DisplayIcon", "[TARGETDIR]python.exe", "REGISTRY")
               ])
     # Shortcuts, see "Shortcut Table"
     add_data(db, "Directory",
@@ -1304,7 +1297,7 @@ def add_registry(db):
               ])
     db.Commit()
 
-db = build_database()
+db,msiname = build_database()
 try:
     add_features(db)
     add_ui(db)
@@ -1314,3 +1307,75 @@ try:
     db.Commit()
 finally:
     del db
+
+# Merge CRT into MSI file. This requires the database to be closed.
+mod_dir = os.path.join(os.environ["ProgramFiles"], "Common Files", "Merge Modules")
+if msilib.Win64:
+    modules = ["Microsoft_VC90_CRT_x86_x64.msm", "policy_9_0_Microsoft_VC90_CRT_x86_x64.msm"]
+else:
+    modules = ["Microsoft_VC90_CRT_x86.msm","policy_9_0_Microsoft_VC90_CRT_x86.msm"]
+
+for i, n in enumerate(modules):
+    modules[i] = os.path.join(mod_dir, n)
+
+def merge(msi, feature, rootdir, modules):
+    cab_and_filecount = []
+    # Step 1: Merge databases, extract cabfiles
+    m = msilib.MakeMerge2()
+    m.OpenLog("merge.log")
+    m.OpenDatabase(msi)
+    for module in modules:
+        print module
+        m.OpenModule(module,0)
+        m.Merge(feature, rootdir)
+        print "Errors:"
+        for e in m.Errors:
+            print e.Type, e.ModuleTable, e.DatabaseTable
+            print "   Modkeys:",
+            for s in e.ModuleKeys: print s,
+            print
+            print "   DBKeys:",
+            for s in e.DatabaseKeys: print s,
+            print
+        cabname = tempfile.mktemp(suffix=".cab")
+        m.ExtractCAB(cabname)
+        cab_and_filecount.append((cabname, len(m.ModuleFiles)))
+        m.CloseModule()
+    m.CloseDatabase(True)
+    m.CloseLog()
+
+    # Step 2: Add CAB files
+    i = msilib.MakeInstaller()
+    db = i.OpenDatabase(msi, constants.msiOpenDatabaseModeTransact)
+
+    v = db.OpenView("SELECT LastSequence FROM Media")
+    v.Execute(None)
+    maxmedia = -1
+    while 1:
+        r = v.Fetch()
+        if not r: break
+        seq = r.IntegerData(1)
+        if seq > maxmedia:
+            maxmedia = seq
+    print "Start of Media", maxmedia
+
+    for cabname, count in cab_and_filecount:
+        stream = "merged%d" % maxmedia
+        msilib.add_data(db, "Media",
+                [(maxmedia+1, maxmedia+count, None, "#"+stream, None, None)])
+        msilib.add_stream(db, stream,  cabname)
+        os.unlink(cabname)
+        maxmedia += count
+    # The merge module sets ALLUSERS to 1 in the property table.
+    # This is undesired; delete that
+    v = db.OpenView("DELETE FROM Property WHERE Property='ALLUSERS'")
+    v.Execute(None)
+    v.Close()
+    db.Commit()
+
+merge(msiname, "SharedCRT", "TARGETDIR", modules)
+
+# certname (from config.py) should be (a substring of)
+# the certificate subject, e.g. "Python Software Foundation"
+if certname:
+    os.system('signtool sign /n "%s" /t http://timestamp.verisign.com/scripts/timestamp.dll %s' % (certname, msiname))

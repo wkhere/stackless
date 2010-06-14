@@ -65,7 +65,7 @@ atoms is:
 .. productionlist::
    atom: `identifier` | `literal` | `enclosure`
    enclosure: `parenth_form` | `list_display`
-            : | `generator_expression` | `dict_display`
+            : | `generator_expression` | `dict_display` | `set_display`
             : | `string_conversion` | `yield_atom`
 
 
@@ -185,6 +185,7 @@ brackets:
    list_comprehension: `expression` `list_for`
    list_for: "for" `target_list` "in" `old_expression_list` [`list_iter`]
    old_expression_list: `old_expression` [("," `old_expression`)+ [","]]
+   old_expression: `or_test` | `old_lambda_form`
    list_iter: `list_for` | `list_if`
    list_if: "if" `old_expression` [`list_iter`]
 
@@ -205,44 +206,66 @@ block, nesting from left to right, and evaluating the expression to produce a
 list element each time the innermost block is reached [#]_.
 
 
+.. _comprehensions:
+
+Displays for sets and dictionaries
+----------------------------------
+
+For constructing a set or a dictionary Python provides special syntax
+called "displays", each of them in two flavors:
+
+* either the container contents are listed explicitly, or
+
+* they are computed via a set of looping and filtering instructions, called a
+  :dfn:`comprehension`.
+
+Common syntax elements for comprehensions are:
+
+.. productionlist::
+   comprehension: `expression` `comp_for`
+   comp_for: "for" `target_list` "in" `or_test` [`comp_iter`]
+   comp_iter: `comp_for` | `comp_if`
+   comp_if: "if" `expression_nocond` [`comp_iter`]
+
+The comprehension consists of a single expression followed by at least one
+:keyword:`for` clause and zero or more :keyword:`for` or :keyword:`if` clauses.
+In this case, the elements of the new container are those that would be produced
+by considering each of the :keyword:`for` or :keyword:`if` clauses a block,
+nesting from left to right, and evaluating the expression to produce an element
+each time the innermost block is reached.
+
+Note that the comprehension is executed in a separate scope, so names assigned
+to in the target list don't "leak" in the enclosing scope.
+
+
 .. _genexpr:
 
 Generator expressions
 ---------------------
 
 .. index:: pair: generator; expression
+           object: generator
 
 A generator expression is a compact generator notation in parentheses:
 
 .. productionlist::
-   generator_expression: "(" `expression` `genexpr_for` ")"
-   genexpr_for: "for" `target_list` "in" `or_test` [`genexpr_iter`]
-   genexpr_iter: `genexpr_for` | `genexpr_if`
-   genexpr_if: "if" `old_expression` [`genexpr_iter`]
+   generator_expression: "(" `expression` `comp_for` ")"
 
-.. index:: object: generator
+A generator expression yields a new generator object.  Its syntax is the same as
+for comprehensions, except that it is enclosed in parentheses instead of
+brackets or curly braces.
 
-A generator expression yields a new generator object.  It consists of a single
-expression followed by at least one :keyword:`for` clause and zero or more
-:keyword:`for` or :keyword:`if` clauses.  The iterating values of the new
-generator are those that would be produced by considering each of the
-:keyword:`for` or :keyword:`if` clauses a block, nesting from left to right, and
-evaluating the expression to yield a value that is reached the innermost block
-for each iteration.
-
-Variables used in the generator expression are evaluated lazily in a separate
-scope when the :meth:`next` method is called for the generator object (in the
-same fashion as for normal generators).  However, the :keyword:`in` expression
-of the leftmost :keyword:`for` clause is immediately evaluated in the current
-scope so that an error produced by it can be seen before any other possible
+Variables used in the generator expression are evaluated lazily when the
+:meth:`__next__` method is called for generator object (in the same fashion as
+normal generators).  However, the leftmost :keyword:`for` clause is immediately
+evaluated, so that an error produced by it can be seen before any other possible
 error in the code that handles the generator expression.  Subsequent
-:keyword:`for` and :keyword:`if` clauses cannot be evaluated immediately since
-they may depend on the previous :keyword:`for` loop.  For example:
-``(x*y for x in range(10) for y in bar(x))``.
+:keyword:`for` clauses cannot be evaluated immediately since they may depend on
+the previous :keyword:`for` loop. For example: ``(x*y for x in range(10) for y
+in bar(x))``.
 
-The parentheses can be omitted on calls with only one argument. See section
+The parentheses can be omitted on calls with only one argument.  See section
 :ref:`calls` for the detail.
-
 
 .. _dict:
 
@@ -250,35 +273,63 @@ Dictionary displays
 -------------------
 
 .. index:: pair: dictionary; display
-
-.. index::
-   single: key
-   single: datum
-   single: key/datum pair
+           key, datum, key/datum pair
+           object: dictionary
 
 A dictionary display is a possibly empty series of key/datum pairs enclosed in
 curly braces:
 
 .. productionlist::
-   dict_display: "{" [`key_datum_list`] "}"
+   dict_display: "{" [`key_datum_list` | `dict_comprehension`] "}"
    key_datum_list: `key_datum` ("," `key_datum`)* [","]
    key_datum: `expression` ":" `expression`
-
-.. index:: object: dictionary
+   dict_comprehension: `expression` ":" `expression` `comp_for`
 
 A dictionary display yields a new dictionary object.
 
-The key/datum pairs are evaluated from left to right to define the entries of
-the dictionary: each key object is used as a key into the dictionary to store
-the corresponding datum.
+If a comma-separated sequence of key/datum pairs is given, they are evaluated
+from left to right to define the entries of the dictionary: each key object is
+used as a key into the dictionary to store the corresponding datum.  This means
+that you can specify the same key multiple times in the key/datum list, and the
+final dictionary's value for that key will be the last one given.
+
+A dict comprehension, in contrast to list and set comprehensions, needs two
+expressions separated with a colon followed by the usual "for" and "if" clauses.
+When the comprehension is run, the resulting key and value elements are inserted
+in the new dictionary in the order they are produced.
 
 .. index:: pair: immutable; object
+           hashable
 
 Restrictions on the types of the key values are listed earlier in section
 :ref:`types`.  (To summarize, the key type should be :term:`hashable`, which excludes
 all mutable objects.)  Clashes between duplicate keys are not detected; the last
 datum (textually rightmost in the display) stored for a given key value
 prevails.
+
+
+.. _set:
+
+Set displays
+------------
+
+.. index:: pair: set; display
+           object: set
+
+A set display is denoted by curly braces and distinguishable from dictionary
+displays by the lack of colons separating keys and values:
+
+.. productionlist::
+   set_display: "{" (`expression_list` | `comprehension`) "}"
+
+A set display yields a new mutable set object, the contents being specified by
+either a sequence of expressions or a comprehension.  When a comma-separated
+list of expressions is supplied, its elements are evaluated from left to right
+and added to the set object.  When a comprehension is supplied, the set is
+constructed from the elements resulting from the comprehension.
+
+An empty set cannot be constructed with ``{}``; this literal constructs an empty
+dictionary.
 
 
 .. _string-conversions:
@@ -560,7 +611,7 @@ or list).  Slicings may be used as expressions or as targets in assignment or
 .. productionlist::
    slicing: `simple_slicing` | `extended_slicing`
    simple_slicing: `primary` "[" `short_slice` "]"
-   extended_slicing: `primary` "[" `slice_list` "]" 
+   extended_slicing: `primary` "[" `slice_list` "]"
    slice_list: `slice_item` ("," `slice_item`)* [","]
    slice_item: `expression` | `proper_slice` | `ellipsis`
    proper_slice: `short_slice` | `long_slice`
@@ -663,13 +714,13 @@ slots for which no default value is specified, a :exc:`TypeError` exception is
 raised.  Otherwise, the list of filled slots is used as the argument list for
 the call.
 
-.. note::
-   
-   An implementation may provide builtin functions whose positional parameters do
-   not have names, even if they are 'named' for the purpose of documentation, and
-   which therefore cannot be supplied by keyword.  In CPython, this is the case for
-   functions implemented in C that use :cfunc:`PyArg_ParseTuple` to parse their
-   arguments.
+.. impl-detail::
+
+   An implementation may provide built-in functions whose positional parameters
+   do not have names, even if they are 'named' for the purpose of documentation,
+   and which therefore cannot be supplied by keyword.  In CPython, this is the
+   case for functions implemented in C that use :cfunc:`PyArg_ParseTuple` to
+   parse their arguments.
 
 If there are more positional arguments than there are formal parameter slots, a
 :exc:`TypeError` exception is raised, unless a formal parameter using the syntax
@@ -816,14 +867,14 @@ Raising a negative number to a fractional power results in a :exc:`ValueError`.
 
 .. _unary:
 
-Unary arithmetic operations
-===========================
+Unary arithmetic and bitwise operations
+=======================================
 
 .. index::
    triple: unary; arithmetic; operation
    triple: unary; bitwise; operation
 
-All unary arithmetic (and bitwise) operations have the same priority:
+All unary arithmetic and bitwise operations have the same priority:
 
 .. productionlist::
    u_expr: `power` | "-" `u_expr` | "+" `u_expr` | "~" `u_expr`
@@ -949,6 +1000,11 @@ A right shift by *n* bits is defined as division by ``pow(2, n)``.  A left shift
 by *n* bits is defined as multiplication with ``pow(2, n)``.  Negative shift
 counts raise a :exc:`ValueError` exception.
 
+.. note::
+
+   In the current implementation, the right-hand operand is required
+   to be at most :attr:`sys.maxsize`.  If the right-hand operand is larger than
+   :attr:`sys.maxsize` an :exc:`OverflowError` exception is raised.
 
 .. _bitwise:
 
@@ -1032,7 +1088,7 @@ The operators ``<``, ``>``, ``==``, ``>=``, ``<=``, and ``!=`` compare the
 values of two objects.  The objects need not have the same type. If both are
 numbers, they are converted to a common type.  Otherwise, objects of different
 types *always* compare unequal, and are ordered consistently but arbitrarily.
-You can control comparison behavior of objects of non-builtin types by defining
+You can control comparison behavior of objects of non-built-in types by defining
 a ``__cmp__`` method or rich comparison methods like ``__gt__``, described in
 section :ref:`specialnames`.
 
@@ -1063,10 +1119,12 @@ Comparison of objects of the same type depends on the type:
   lists compare equal. [#]_ Outcomes other than equality are resolved
   consistently, but are not otherwise defined. [#]_
 
-* Most other objects of builtin types compare unequal unless they are the same
+* Most other objects of built-in types compare unequal unless they are the same
   object; the choice whether one object is considered smaller or larger than
   another one is made arbitrarily but consistently within one execution of a
   program.
+
+.. _membership-test-details:
 
 The operators :keyword:`in` and :keyword:`not in` test for collection
 membership.  ``x in s`` evaluates to true if *x* is a member of the collection
@@ -1092,7 +1150,12 @@ string, so ``"" in "abc"`` will return ``True``.
 For user-defined classes which define the :meth:`__contains__` method, ``x in
 y`` is true if and only if ``y.__contains__(x)`` is true.
 
-For user-defined classes which do not define :meth:`__contains__` and do define
+For user-defined classes which do not define :meth:`__contains__` but do define
+:meth:`__iter__`, ``x in y`` is true if some value ``z`` with ``x == z`` is
+produced while iterating over ``y``.  If an exception is raised during the
+iteration, it is as if :keyword:`in` raised that exception.
+
+Lastly, the old-style iteration protocol is tried: if a class defines
 :meth:`__getitem__`, ``x in y`` is true if and only if there is a non-negative
 integer index *i* such that ``x == y[i]``, and all lower integer indices do not
 raise :exc:`IndexError` exception. (If any other exception is raised, it is as
@@ -1129,12 +1192,7 @@ Boolean operations
    pair: Conditional; expression
    pair: Boolean; operation
 
-Boolean operations have the lowest priority of all Python operations:
-
 .. productionlist::
-   expression: `conditional_expression` | `lambda_form`
-   old_expression: `or_test` | `old_lambda_form`
-   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
    or_test: `and_test` | `or_test` "or" `and_test`
    and_test: `not_test` | `and_test` "and" `not_test`
    not_test: `comparison` | "not" `not_test`
@@ -1150,12 +1208,6 @@ special method for a way to change this.)
 
 The operator :keyword:`not` yields ``True`` if its argument is false, ``False``
 otherwise.
-
-The expression ``x if C else y`` first evaluates *C* (*not* *x*); if *C* is
-true, *x* is evaluated and its value is returned; otherwise, *y* is evaluated
-and its value is returned.
-
-.. versionadded:: 2.5
 
 .. index:: operator: and
 
@@ -1176,7 +1228,31 @@ not bother to return a value of the same type as its argument, so e.g., ``not
 'foo'`` yields ``False``, not ``''``.)
 
 
+Conditional Expressions
+=======================
+
+.. versionadded:: 2.5
+
+.. index::
+   pair: conditional; expression
+   pair: ternary; operator
+
+.. productionlist::
+   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
+   expression: `conditional_expression` | `lambda_form`
+
+Conditional expressions (sometimes called a "ternary operator") have the lowest
+priority of all Python operations.
+
+The expression ``x if C else y`` first evaluates the condition, *C* (*not* *x*);
+if *C* is true, *x* is evaluated and its value is returned; otherwise, *y* is
+evaluated and its value is returned.
+
+See :pep:`308` for more details about conditional expressions.
+
+
 .. _lambdas:
+.. _lambda:
 
 Lambdas
 =======
@@ -1200,8 +1276,6 @@ behaves like a function object defined with ::
 
 See section :ref:`function` for the syntax of parameter lists.  Note that
 functions created with lambda forms cannot contain statements.
-
-.. _lambda:
 
 
 .. _exprlists:
@@ -1270,18 +1344,17 @@ groups from right to left).
 +===============================================+=====================================+
 | :keyword:`lambda`                             | Lambda expression                   |
 +-----------------------------------------------+-------------------------------------+
+| :keyword:`if` -- :keyword:`else`              | Conditional expression              |
++-----------------------------------------------+-------------------------------------+
 | :keyword:`or`                                 | Boolean OR                          |
 +-----------------------------------------------+-------------------------------------+
 | :keyword:`and`                                | Boolean AND                         |
 +-----------------------------------------------+-------------------------------------+
 | :keyword:`not` *x*                            | Boolean NOT                         |
 +-----------------------------------------------+-------------------------------------+
-| :keyword:`in`, :keyword:`not` :keyword:`in`   | Membership tests                    |
-+-----------------------------------------------+-------------------------------------+
-| :keyword:`is`, :keyword:`is not`              | Identity tests                      |
-+-----------------------------------------------+-------------------------------------+
-| ``<``, ``<=``, ``>``, ``>=``, ``<>``, ``!=``, | Comparisons                         |
-| ``==``                                        |                                     |
+| :keyword:`in`, :keyword:`not` :keyword:`in`,  | Comparisons, including membership   |
+| :keyword:`is`, :keyword:`is not`, ``<``,      | tests and identity tests,           |
+| ``<=``, ``>``, ``>=``, ``<>``, ``!=``, ``==`` |                                     |
 +-----------------------------------------------+-------------------------------------+
 | ``|``                                         | Bitwise OR                          |
 +-----------------------------------------------+-------------------------------------+
@@ -1293,35 +1366,25 @@ groups from right to left).
 +-----------------------------------------------+-------------------------------------+
 | ``+``, ``-``                                  | Addition and subtraction            |
 +-----------------------------------------------+-------------------------------------+
-| ``*``, ``/``, ``%``                           | Multiplication, division, remainder |
+| ``*``, ``/``, ``//``, ``%``                   | Multiplication, division, remainder |
 +-----------------------------------------------+-------------------------------------+
-| ``+x``, ``-x``                                | Positive, negative                  |
+| ``+x``, ``-x``, ``~x``                        | Positive, negative, bitwise NOT     |
 +-----------------------------------------------+-------------------------------------+
-| ``~x``                                        | Bitwise not                         |
+| ``**``                                        | Exponentiation [#]_                 |
 +-----------------------------------------------+-------------------------------------+
-| ``**``                                        | Exponentiation                      |
+| ``x[index]``, ``x[index:index]``,             | Subscription, slicing,              |
+| ``x(arguments...)``, ``x.attribute``          | call, attribute reference           |
 +-----------------------------------------------+-------------------------------------+
-| ``x[index]``                                  | Subscription                        |
-+-----------------------------------------------+-------------------------------------+
-| ``x[index:index]``                            | Slicing                             |
-+-----------------------------------------------+-------------------------------------+
-| ``x(arguments...)``                           | Call                                |
-+-----------------------------------------------+-------------------------------------+
-| ``x.attribute``                               | Attribute reference                 |
-+-----------------------------------------------+-------------------------------------+
-| ``(expressions...)``                          | Binding or tuple display            |
-+-----------------------------------------------+-------------------------------------+
-| ``[expressions...]``                          | List display                        |
-+-----------------------------------------------+-------------------------------------+
-| ``{key:datum...}``                            | Dictionary display                  |
-+-----------------------------------------------+-------------------------------------+
-| ```expressions...```                          | String conversion                   |
+| ``(expressions...)``,                         | Binding or tuple display,           |
+| ``[expressions...]``,                         | list display,                       |
+| ``{key:datum...}``,                           | dictionary display,                 |
+| ```expressions...```                          | string conversion                   |
 +-----------------------------------------------+-------------------------------------+
 
 .. rubric:: Footnotes
 
 .. [#] In Python 2.3 and later releases, a list comprehension "leaks" the control
-   variables of each ``for`` it contains into the containing scope.  However, this 
+   variables of each ``for`` it contains into the containing scope.  However, this
    behavior is deprecated, and relying on it will not work in Python 3.0
 
 .. [#] While ``abs(x%y) < abs(y)`` is true mathematically, for floats it may not be
@@ -1342,7 +1405,7 @@ groups from right to left).
    level, they may be counter-intuitive to users. For example, the
    strings ``u"\u00C7"`` and ``u"\u0043\u0327"`` compare differently,
    even though they both represent the same unicode character (LATIN
-   CAPTITAL LETTER C WITH CEDILLA). To compare strings in a human
+   CAPITAL LETTER C WITH CEDILLA). To compare strings in a human
    recognizable way, compare using :func:`unicodedata.normalize`.
 
 .. [#] The implementation computes this efficiently, without constructing lists or
@@ -1354,7 +1417,10 @@ groups from right to left).
    only, but this caused surprises because people expected to be able to test a
    dictionary for emptiness by comparing it to ``{}``.
 
-.. [#] Due to automatic garbage-collection, free lists, and the dynamic nature of 
+.. [#] Due to automatic garbage-collection, free lists, and the dynamic nature of
    descriptors, you may notice seemingly unusual behaviour in certain uses of
    the :keyword:`is` operator, like those involving comparisons between instance
    methods, or constants.  Check their documentation for more info.
+
+.. [#] The power operator ``**`` binds less tightly than an arithmetic or
+   bitwise unary operator on its right, that is, ``2**-1`` is ``0.5``.

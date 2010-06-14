@@ -96,7 +96,7 @@ In Python 3.0, there is only one integer type.  It is called :func:`int` on the
 Python level, but actually corresponds to 2.x's :func:`long` type.  In the
 C-API, ``PyInt_*`` functions are replaced by their ``PyLong_*`` neighbors.  The
 best course of action here is using the ``PyInt_*`` functions aliased to
-``PyLong_*`` found in :file:`intobject.h`.  The the abstract ``PyNumber_*`` APIs
+``PyLong_*`` found in :file:`intobject.h`.  The abstract ``PyNumber_*`` APIs
 can also be used in some cases. ::
 
    #include "Python.h"
@@ -118,7 +118,7 @@ can also be used in some cases. ::
 Module initialization and state
 ===============================
 
-Python 3.0 has a revamped extension module initialization system.  (See PEP
+Python 3.0 has a revamped extension module initialization system.  (See
 :pep:`3121`.)  Instead of storing module state in globals, they should be stored
 in an interpreter specific structure.  Creating modules that act correctly in
 both 2.x and 3.0 is tricky.  The following simple example demonstrates how. ::

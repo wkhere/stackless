@@ -34,17 +34,20 @@ uses it to handle URLs that use HTTP and HTTPS.
 The module provides the following classes:
 
 
-.. class:: HTTPConnection(host[, port[, strict[, timeout]]])
+.. class:: HTTPConnection(host[, port[, strict[, timeout[, source_address]]]])
 
    An :class:`HTTPConnection` instance represents one transaction with an HTTP
    server.  It should be instantiated passing it a host and optional port
    number.  If no port number is passed, the port is extracted from the host
    string if it has the form ``host:port``, else the default HTTP port (80) is
-   used.  When True, the optional parameter *strict* causes ``BadStatusLine`` to
+   used.  When True, the optional parameter *strict* (which defaults to a false
+   value) causes ``BadStatusLine`` to
    be raised if the status line can't be parsed as a valid HTTP/1.0 or 1.1
    status line.  If the optional *timeout* parameter is given, blocking
    operations (like connection attempts) will timeout after that many seconds
    (if it is not given, the global default timeout setting is used).
+   The optional *source_address* parameter may be a tuple of a (host, port)
+   to use as the source address the HTTP connection is made from.
 
    For example, the following calls all create instances that connect to the server
    at the same host and port::
@@ -59,22 +62,28 @@ The module provides the following classes:
    .. versionchanged:: 2.6
       *timeout* was added.
 
+   .. versionchanged:: 2.7
+      *source_address* was added.
 
-.. class:: HTTPSConnection(host[, port[, key_file[, cert_file[, strict[, timeout]]]]])
+
+.. class:: HTTPSConnection(host[, port[, key_file[, cert_file[, strict[, timeout[, source_address]]]]]])
 
    A subclass of :class:`HTTPConnection` that uses SSL for communication with
    secure servers.  Default port is ``443``. *key_file* is the name of a PEM
    formatted file that contains your private key. *cert_file* is a PEM formatted
    certificate chain file.
 
-   .. warning::
+   .. note::
 
-      This does not do any certificate verification!
+      This does not do any certificate verification.
 
    .. versionadded:: 2.0
 
    .. versionchanged:: 2.6
       *timeout* was added.
+
+   .. versionchanged:: 2.7
+      *source_address* was added.
 
 
 .. class:: HTTPResponse(sock[, debuglevel=0][, strict=0])
@@ -427,6 +436,17 @@ HTTPConnection Objects
    debug level is ``0``, meaning no debugging output is printed.
 
 
+.. method:: HTTPConnection.set_tunnel(host,port=None, headers=None)
+
+   Set the host and the port for HTTP Connect Tunnelling. Normally used when
+   it is required to do HTTPS Conection through a proxy server.
+
+   The headers argument should be a mapping of extra HTTP headers to to sent
+   with the CONNECT request.
+
+   .. versionadded:: 2.7
+
+
 .. method:: HTTPConnection.connect()
 
    Connect to the server specified when the object was created.
@@ -539,6 +559,21 @@ Here is an example session that uses the ``GET`` method::
    404 Not Found
    >>> data2 = r2.read()
    >>> conn.close()
+
+Here is an example session that uses the ``HEAD`` method.  Note that the
+``HEAD`` method never returns any data. ::
+
+   >>> import httplib
+   >>> conn = httplib.HTTPConnection("www.python.org")
+   >>> conn.request("HEAD","/index.html")
+   >>> res = conn.getresponse()
+   >>> print res.status, res.reason
+   200 OK
+   >>> data = res.read()
+   >>> print len(data)
+   0
+   >>> data == ''
+   True
 
 Here is an example session that shows how to ``POST`` requests::
 

@@ -1,5 +1,5 @@
 ************************************
-  Idioms and Anti-Idioms in Python  
+  Idioms and Anti-Idioms in Python
 ************************************
 
 :Author: Moshe Zadka
@@ -30,7 +30,7 @@ Inside Function Definitions
 
 ``from module import *`` is *invalid* inside function definitions. While many
 versions of Python do not check for the invalidity, it does not make it more
-valid, no more then having a smart lawyer makes a man innocent. Do not use it
+valid, no more than having a smart lawyer makes a man innocent. Do not use it
 like that ever. Even in versions where it was accepted, it made the function
 execution slower, because the compiler could not be certain which names are
 local and which are global. In Python 2.1 this construct causes warnings, and
@@ -52,10 +52,10 @@ One of the most awful question asked on the newsgroup is why this code::
    f.read()
 
 does not work. Of course, it works just fine (assuming you have a file called
-"www".) But it does not work if somewhere in the module, the statement ``from os
-import *`` is present. The :mod:`os` module has a function called :func:`open`
-which returns an integer. While it is very useful, shadowing builtins is one of
-its least useful properties.
+"www".) But it does not work if somewhere in the module, the statement ``from
+os import *`` is present. The :mod:`os` module has a function called
+:func:`open` which returns an integer. While it is very useful, shadowing a
+builtin is one of its least useful properties.
 
 Remember, you can never know for sure what names a module exports, so either
 take what you need --- ``from module import name1, name2``, or keep them in the
@@ -111,7 +111,7 @@ Good examples::
 from module import name1, name2
 -------------------------------
 
-This is a "don't" which is much weaker then the previous "don't"s but is still
+This is a "don't" which is much weaker than the previous "don't"s but is still
 something you should not do if you don't have good reasons to do that. The
 reason it is usually bad idea is because you suddenly have an object which lives
 in two separate namespaces. When the binding in one namespace changes, the
@@ -127,7 +127,7 @@ Bad example::
    # bar.py
    from foo import a
    if something():
-       a = 2 # danger: foo.a != a 
+       a = 2 # danger: foo.a != a
 
 Good example::
 
@@ -232,11 +232,8 @@ file would not be closed when an exception is raised until the handler finishes,
 and perhaps not at all in non-C implementations (e.g., Jython). ::
 
    def get_status(file):
-       fp = open(file)
-       try:
+       with open(file) as fp:
            return fp.readline()
-       finally:
-           fp.close()
 
 
 Using the Batteries
@@ -245,11 +242,11 @@ Using the Batteries
 Every so often, people seem to be writing stuff in the Python library again,
 usually poorly. While the occasional module has a poor interface, it is usually
 much better to use the rich standard library and data types that come with
-Python then inventing your own.
+Python than inventing your own.
 
 A useful module very few people know about is :mod:`os.path`. It  always has the
 correct path arithmetic for your operating system, and will usually be much
-better then whatever you come up with yourself.
+better than whatever you come up with yourself.
 
 Compare::
 
@@ -261,7 +258,7 @@ Compare::
 More useful functions in :mod:`os.path`: :func:`basename`,  :func:`dirname` and
 :func:`splitext`.
 
-There are also many useful builtin functions people seem not to be aware of for
+There are also many useful built-in functions people seem not to be aware of for
 some reason: :func:`min` and :func:`max` can find the minimum/maximum of any
 sequence with comparable semantics, for example, yet many people write their own
 :func:`max`/:func:`min`. Another highly useful function is :func:`reduce`. A
@@ -284,7 +281,7 @@ Using Backslash to Continue Statements
 ======================================
 
 Since Python treats a newline as a statement terminator, and since statements
-are often more then is comfortable to put in one line, many people do::
+are often more than is comfortable to put in one line, many people do::
 
    if foo.bar()['first'][0] == baz.quux(1, 2)[5:9] and \
       calculate_number(10, 20) != forbulate(500, 360):
@@ -303,6 +300,6 @@ It is usually much better to use the implicit continuation inside parenthesis:
 
 This version is bulletproof::
 
-   value = (foo.bar()['first'][0]*baz.quux(1, 2)[5:9] 
+   value = (foo.bar()['first'][0]*baz.quux(1, 2)[5:9]
            + calculate_number(10, 20)*forbulate(500, 360))
 

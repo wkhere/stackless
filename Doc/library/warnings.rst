@@ -1,4 +1,3 @@
-
 :mod:`warnings` --- Warning control
 ===================================
 
@@ -60,7 +59,7 @@ following warnings category classes are currently defined:
 | :exc:`UserWarning`               | The default category for :func:`warn`.        |
 +----------------------------------+-----------------------------------------------+
 | :exc:`DeprecationWarning`        | Base category for warnings about deprecated   |
-|                                  | features.                                     |
+|                                  | features (ignored by default).                |
 +----------------------------------+-----------------------------------------------+
 | :exc:`SyntaxWarning`             | Base category for warnings about dubious      |
 |                                  | syntactic features.                           |
@@ -89,6 +88,9 @@ because conceptually they belong to the warnings mechanism.
 User code can define additional warning categories by subclassing one of the
 standard warning categories.  A warning category must always be a subclass of
 the :exc:`Warning` class.
+
+.. versionchanged:: 2.7
+   :exc:`DeprecationWarning` is ignored by default.
 
 
 .. _warning-filter:
@@ -129,16 +131,16 @@ the disposition of the match.  Each entry is a tuple of the form (*action*,
   +---------------+----------------------------------------------+
 
 * *message* is a string containing a regular expression that the warning message
-  must match (the match is compiled to always be  case-insensitive)
+  must match (the match is compiled to always be case-insensitive).
 
 * *category* is a class (a subclass of :exc:`Warning`) of which the warning
-  category must be a subclass in order to match
+  category must be a subclass in order to match.
 
 * *module* is a string containing a regular expression that the module name must
-  match (the match is compiled to be case-sensitive)
+  match (the match is compiled to be case-sensitive).
 
 * *lineno* is an integer that the line number where the warning occurred must
-  match, or ``0`` to match all line numbers
+  match, or ``0`` to match all line numbers.
 
 Since the :exc:`Warning` class is derived from the built-in :exc:`Exception`
 class, to turn a warning into an error we simply raise ``category(message)``.
@@ -148,14 +150,6 @@ interpreter command line.  The interpreter saves the arguments for all
 :option:`-W` options without interpretation in ``sys.warnoptions``; the
 :mod:`warnings` module parses these when it is first imported (invalid options
 are ignored, after printing a message to ``sys.stderr``).
-
-The warnings that are ignored by default may be enabled by passing :option:`-Wd`
-to the interpreter. This enables default handling for all warnings, including
-those that are normally ignored by default. This is particular useful for
-enabling ImportWarning when debugging problems importing a developed package.
-ImportWarning can also be enabled explicitly in Python code using::
-
-   warnings.simplefilter('default', ImportWarning)
 
 
 .. _warning-suppress:
@@ -179,7 +173,10 @@ the warning using the :class:`catch_warnings` context manager::
 While within the context manager all warnings will simply be ignored. This
 allows you to use known-deprecated code without having to see the warning while
 not suppressing the warning for other code that might not be aware of its use
-of deprecated code.
+of deprecated code.  Note: this can only be guaranteed in a single-threaded
+application. If two or more threads use the :class:`catch_warnings` context
+manager at the same time, the behavior is undefined.
+
 
 
 .. _warning-testing:
@@ -204,7 +201,7 @@ check::
         fxn()
         # Verify some things
         assert len(w) == 1
-        assert isinstance(w[-1].category, DeprecationWarning)
+        assert issubclass(w[-1].category, DeprecationWarning)
         assert "deprecated" in str(w[-1].message)
 
 One can also cause all warnings to be exceptions by using ``error`` instead of
@@ -217,7 +214,9 @@ Once the context manager exits, the warnings filter is restored to its state
 when the context was entered. This prevents tests from changing the warnings
 filter in unexpected ways between tests and leading to indeterminate test
 results. The :func:`showwarning` function in the module is also restored to
-its original value.
+its original value.  Note: this can only be guaranteed in a single-threaded
+application. If two or more threads use the :class:`catch_warnings` context
+manager at the same time, the behavior is undefined.
 
 When testing multiple operations that raise the same kind of warning, it
 is important to test them in a manner that confirms each operation is raising
@@ -225,6 +224,37 @@ a new warning (e.g. set warnings to be raised as exceptions and check the
 operations raise exceptions, check that the length of the warning list
 continues to increase after each operation, or else delete the previous
 entries from the warnings list before each new operation).
+
+
+Updating Code For New Versions of Python
+----------------------------------------
+
+Warnings that are only of interest to the developer are ignored by default. As
+such you should make sure to test your code with typically ignored warnings
+made visible. You can do this from the command-line by passing :option:`-Wd`
+to the interpreter (this is shorthand for :option:`-W default`).  This enables
+default handling for all warnings, including those that are ignored by default.
+To change what action is taken for encountered warnings you simply change what
+argument is passed to :option:`-W`, e.g. :option:`-W error`. See the
+:option:`-W` flag for more details on what is possible.
+
+To programmatically do the same as :option:`-Wd`, use::
+
+  warnings.simplefilter('default')
+
+Make sure to execute this code as soon as possible. This prevents the
+registering of what warnings have been raised from unexpectedly influencing how
+future warnings are treated.
+
+Having certain warnings ignored by default is done to prevent a user from
+seeing warnings that are only of interest to the developer. As you do not
+necessarily have control over what interpreter a user uses to run their code,
+it is possible that a new version of Python will be released between your
+release cycles.  The new interpreter release could trigger new warnings in your
+code that were not there in an older interpreter, e.g.
+:exc:`DeprecationWarning` for a module that you are using. While you as a
+developer want to be notified that your code is using a deprecated module, to a
+user this information is essentially noise and provides no benefit to them.
 
 
 .. _warning-functions:
@@ -274,10 +304,12 @@ Available Functions
 
 .. function:: warnpy3k(message[, category[, stacklevel]])
 
-   Issue a warning related to Python 3.x deprecation. Warnings are only shown 
+   Issue a warning related to Python 3.x deprecation. Warnings are only shown
    when Python is started with the -3 option. Like :func:`warn` *message* must
    be a string and *category* a subclass of :exc:`Warning`. :func:`warnpy3k`
    is using :exc:`DeprecationWarning` as default warning class.
+
+   .. versionadded:: 2.6
 
 
 .. function:: showwarning(message, category, filename, lineno[, file[, line]])
@@ -288,20 +320,20 @@ Available Functions
    this function with an alternative implementation by assigning to
    ``warnings.showwarning``.
    *line* is a line of source code to be included in the warning
-   message; if *line* is not supplied, :func:`showwarning` will 
+   message; if *line* is not supplied, :func:`showwarning` will
    try to read the line specified by *filename* and *lineno*.
 
-   .. versionchanged:: 2.6
-      Added the *line* argument. Implementations that lack the new argument
-      will trigger a :exc:`DeprecationWarning`.
+   .. versionchanged:: 2.7
+      The *line* argument is required to be supported.
 
 
 .. function:: formatwarning(message, category, filename, lineno[, line])
 
-   Format a warning the standard way.  This returns a string  which may contain
-   embedded newlines and ends in a newline.  *line* is 
-   a line of source code to be included in the warning message; if *line* is not supplied, 
-   :func:`formatwarning` will try to read the line specified by *filename* and *lineno*.
+   Format a warning the standard way.  This returns a string which may contain
+   embedded newlines and ends in a newline.  *line* is a line of source code to
+   be included in the warning message; if *line* is not supplied,
+   :func:`formatwarning` will try to read the line specified by *filename* and
+   *lineno*.
 
    .. versionchanged:: 2.6
       Added the *line* argument.
@@ -309,10 +341,11 @@ Available Functions
 
 .. function:: filterwarnings(action[, message[, category[, module[, lineno[, append]]]]])
 
-   Insert an entry into the list of warnings filters.  The entry is inserted at the
-   front by default; if *append* is true, it is inserted at the end. This checks
-   the types of the arguments, compiles the message and module regular expressions,
-   and inserts them as a tuple in the  list of warnings filters.  Entries closer to
+   Insert an entry into the list of :ref:`warnings filter specifications
+   <warning-filter>`.  The entry is inserted at the front by default; if
+   *append* is true, it is inserted at the end.  This checks the types of the
+   arguments, compiles the *message* and *module* regular expressions, and
+   inserts them as a tuple in the list of warnings filters.  Entries closer to
    the front of the list override entries later in the list, if both match a
    particular warning.  Omitted arguments default to a value that matches
    everything.
@@ -320,10 +353,11 @@ Available Functions
 
 .. function:: simplefilter(action[, category[, lineno[, append]]])
 
-   Insert a simple entry into the list of warnings filters. The meaning of the
-   function parameters is as for :func:`filterwarnings`, but regular expressions
-   are not needed as the filter inserted always matches any message in any module
-   as long as the category and line number match.
+   Insert a simple entry into the list of :ref:`warnings filter specifications
+   <warning-filter>`.  The meaning of the function parameters is as for
+   :func:`filterwarnings`, but regular expressions are not needed as the filter
+   inserted always matches any message in any module as long as the category and
+   line number match.
 
 
 .. function:: resetwarnings()
@@ -351,6 +385,14 @@ Available Context Managers
     module returned when you import :mod:`warnings` whose filter will be
     protected. This argument exists primarily for testing the :mod:`warnings`
     module itself.
+
+    .. note::
+
+        The :class:`catch_warnings` manager works by replacing and
+        then later restoring the module's
+        :func:`showwarning` function and internal list of filter
+        specifications.  This means the context manager is modifying
+        global state and therefore is not thread-safe.
 
     .. note::
 

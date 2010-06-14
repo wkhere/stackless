@@ -4,7 +4,7 @@
 
 .. toctree::
 
-   whatsnew/2.6.rst
+   whatsnew/index.rst
    tutorial/index.rst
    using/index.rst
    reference/index.rst
@@ -15,6 +15,7 @@
    install/index.rst
    documenting/index.rst
    howto/index.rst
+   faq/index.rst
    glossary.rst
 
    about.rst

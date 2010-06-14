@@ -62,14 +62,22 @@ The :mod:`bdb` module also defines two classes:
       * The breakpoint hit count.
 
 
-.. class:: Bdb()
+.. class:: Bdb(skip=None)
 
-   The :class:`Bdb` acts as a generic Python debugger base class.
+   The :class:`Bdb` class acts as a generic Python debugger base class.
 
    This class takes care of the details of the trace facility; a derived class
    should implement user interaction.  The standard debugger class
    (:class:`pdb.Pdb`) is an example.
 
+   The *skip* argument, if given, must be an iterable of glob-style
+   module name patterns.  The debugger will not step into frames that
+   originate in a module that matches one of these patterns. Whether a
+   frame is considered to originate in a certain module is determined
+   by the ``__name__`` in the frame globals.
+
+   .. versionadded:: 2.7
+      The *skip* argument.
 
    The following methods of :class:`Bdb` normally don't need to be overridden.
 
@@ -107,8 +115,9 @@ The :mod:`bdb` module also defines two classes:
 
       The *arg* parameter depends on the previous event.
 
-      For more information on trace functions, see :ref:`debugger-hooks`.  For
-      more information on code and frame objects, refer to :ref:`types`.
+      See the documentation for :func:`sys.settrace` for more information on the
+      trace function.  For more information on code and frame objects, refer to
+      :ref:`types`.
 
    .. method:: dispatch_line(frame)
 
@@ -324,7 +333,7 @@ Finally, the module defines the following functions:
 
    Check whether we should break here, depending on the way the breakpoint *b*
    was set.
-   
+
    If it was set via line number, it checks if ``b.line`` is the same as the one
    in the frame also passed as argument.  If the breakpoint was set via function
    name, we have to check we are in the right frame (the right function) and if
@@ -334,7 +343,7 @@ Finally, the module defines the following functions:
 
    Determine if there is an effective (active) breakpoint at this line of code.
    Return breakpoint number or 0 if none.
-	
+
    Called only if we know there is a breakpoint at this location.  Returns the
    breakpoint that was triggered and a flag that indicates if it is ok to delete
    a temporary breakpoint.

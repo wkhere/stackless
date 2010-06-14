@@ -1,4 +1,3 @@
-
 :mod:`readline` --- GNU readline interface
 ==========================================
 
@@ -14,6 +13,17 @@ This module can be used directly or via the :mod:`rlcompleter` module.  Settings
 made using  this module affect the behaviour of both the interpreter's
 interactive prompt  and the prompts offered by the :func:`raw_input` and
 :func:`input` built-in functions.
+
+.. note::
+
+  On MacOS X the :mod:`readline` module can be implemented using
+  the ``libedit`` library instead of GNU readline.
+
+  The configuration file for ``libedit`` is different from that
+  of GNU readline. If you programmaticly load configuration strings
+  you can check for the text "libedit" in :const:`readline.__doc__`
+  to differentiate between GNU readline and libedit.
+
 
 The :mod:`readline` module defines the following functions:
 
@@ -182,7 +192,6 @@ The :mod:`readline` module defines the following functions:
 
    Append a line to the history buffer, as if it was the last line typed.
 
-
 .. seealso::
 
    Module :mod:`rlcompleter`
@@ -221,7 +230,7 @@ support history save/restore. ::
    class HistoryConsole(code.InteractiveConsole):
        def __init__(self, locals=None, filename="<console>",
                     histfile=os.path.expanduser("~/.console-history")):
-           code.InteractiveConsole.__init__(self)
+           code.InteractiveConsole.__init__(self, locals, filename)
            self.init_history(histfile)
 
        def init_history(self, histfile):

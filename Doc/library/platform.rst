@@ -1,6 +1,5 @@
-
-:mod:`platform` ---  Access to underlying platform's identifying data.
-======================================================================
+:mod:`platform` ---  Access to underlying platform's identifying data
+=====================================================================
 
 .. module:: platform
    :synopsis: Retrieves as much platform identifying data as possible.
@@ -99,7 +98,7 @@ Cross Platform
 .. function:: python_implementation()
 
    Returns a string identifying the Python implementation. Possible return values
-   are: 'CPython', 'IronPython', 'Jython'
+   are: 'CPython', 'IronPython', 'Jython'.
 
    .. versionadded:: 2.6
 
@@ -169,7 +168,7 @@ Java Platform
 
 .. function:: java_ver(release='', vendor='', vminfo=('','',''), osinfo=('','',''))
 
-   Version interface for JPython.
+   Version interface for Jython.
 
    Returns a tuple ``(release, vendor, vminfo, osinfo)`` with *vminfo* being a
    tuple ``(vm_name, vm_release, vm_vendor)`` and *osinfo* being a tuple
@@ -234,7 +233,15 @@ Unix Platforms
 
 .. function:: dist(distname='', version='', id='', supported_dists=('SuSE','debian','redhat','mandrake',...))
 
-   This is another name for :func:`linux_distribution`.
+   This is an old version of the functionality now provided by
+   :func:`linux_distribution`. For new code, please use the
+   :func:`linux_distribution`.
+
+   The only difference between the two is that ``dist()`` always
+   returns the short name of the distribution taken from the
+   ``supported_dists`` parameter.
+
+   .. deprecated:: 2.6
 
 .. function:: linux_distribution(distname='', version='', id='', supported_dists=('SuSE','debian','redhat','mandrake',...), full_distribution_name=1)
 
@@ -251,6 +258,8 @@ Unix Platforms
    Returns a tuple ``(distname,version,id)`` which defaults to the args given as
    parameters.  ``id`` is the item in parentheses after the version number.  It
    is usually the version codename.
+
+   .. versionadded:: 2.6
 
 .. function:: libc_ver(executable=sys.executable, lib='', version='', chunksize=2048)
 

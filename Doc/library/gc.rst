@@ -48,7 +48,7 @@ The :mod:`gc` module provides the following functions:
       The optional *generation* argument was added.
 
    .. versionchanged:: 2.6
-      The free lists maintained for a number of builtin types are cleared
+      The free lists maintained for a number of built-in types are cleared
       whenever a full collection or collection of the highest generation (2)
       is run.  Not all items in some free lists may be freed due to the
       particular implementation, in particular :class:`int` and :class:`float`.
@@ -139,6 +139,31 @@ The :mod:`gc` module provides the following functions:
    from an argument, that integer object may or may not appear in the result list.
 
    .. versionadded:: 2.3
+
+.. function:: is_tracked(obj)
+
+   Returns True if the object is currently tracked by the garbage collector,
+   False otherwise.  As a general rule, instances of atomic types aren't
+   tracked and instances of non-atomic types (containers, user-defined
+   objects...) are.  However, some type-specific optimizations can be present
+   in order to suppress the garbage collector footprint of simple instances
+   (e.g. dicts containing only atomic keys and values)::
+
+      >>> gc.is_tracked(0)
+      False
+      >>> gc.is_tracked("a")
+      False
+      >>> gc.is_tracked([])
+      True
+      >>> gc.is_tracked({})
+      False
+      >>> gc.is_tracked({"a": 1})
+      False
+      >>> gc.is_tracked({"a": []})
+      True
+
+   .. versionadded:: 2.7
+
 
 The following variable is provided for read-only access (you can mutate its
 value but should not rebind it):

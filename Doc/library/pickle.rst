@@ -77,8 +77,8 @@ The :mod:`pickle` module differs from :mod:`marshal` several significant ways:
 .. warning::
 
    The :mod:`pickle` module is not intended to be secure against erroneous or
-   maliciously constructed data.  Never unpickle data received from an untrusted or
-   unauthenticated source.
+   maliciously constructed data.  Never unpickle data received from an untrusted
+   or unauthenticated source.
 
 Note that serialization is a more primitive notion than persistence; although
 :mod:`pickle` reads and writes file objects, it does not handle the issue of
@@ -413,7 +413,7 @@ Pickling and unpickling normal class instances
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. method:: object.__getinitargs__()
-   
+
    When a pickled class instance is unpickled, its :meth:`__init__` method is
    normally *not* invoked.  If it is desirable that the :meth:`__init__` method
    be called on unpickling, an old-style class can define a method
@@ -430,40 +430,49 @@ Pickling and unpickling normal class instances
    is affected by the values passed to the :meth:`__new__` method for the type
    (as it is for tuples and strings).  Instances of a :term:`new-style class`
    ``C`` are created using ::
-    
+
       obj = C.__new__(C, *args)
-    
+
    where *args* is the result of calling :meth:`__getnewargs__` on the original
    object; if there is no :meth:`__getnewargs__`, an empty tuple is assumed.
 
 .. method:: object.__getstate__()
-   
+
    Classes can further influence how their instances are pickled; if the class
    defines the method :meth:`__getstate__`, it is called and the return state is
    pickled as the contents for the instance, instead of the contents of the
    instance's dictionary.  If there is no :meth:`__getstate__` method, the
    instance's :attr:`__dict__` is pickled.
 
-.. method:: object.__setstate__() 
-   
+.. method:: object.__setstate__()
+
    Upon unpickling, if the class also defines the method :meth:`__setstate__`,
    it is called with the unpickled state. [#]_ If there is no
    :meth:`__setstate__` method, the pickled state must be a dictionary and its
    items are assigned to the new instance's dictionary.  If a class defines both
    :meth:`__getstate__` and :meth:`__setstate__`, the state object needn't be a
    dictionary and these methods can do what they want. [#]_
-    
-   .. warning::
-    
+
+   .. note::
+
       For :term:`new-style class`\es, if :meth:`__getstate__` returns a false
       value, the :meth:`__setstate__` method will not be called.
+
+.. note::
+
+   At unpickling time, some methods like :meth:`__getattr__`,
+   :meth:`__getattribute__`, or :meth:`__setattr__` may be called upon the
+   instance.  In case those methods rely on some internal invariant being
+   true, the type should implement either :meth:`__getinitargs__` or
+   :meth:`__getnewargs__` to establish such an invariant; otherwise, neither
+   :meth:`__new__` nor :meth:`__init__` will be called.
 
 
 Pickling and unpickling extension types
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. method:: object.__reduce__()
-   
+
    When the :class:`Pickler` encounters an object of a type it knows nothing
    about --- such as an extension type --- it looks in two places for a hint of
    how to pickle it.  One alternative is for the object to implement a
@@ -518,7 +527,7 @@ Pickling and unpickling extension types
      is primarily used for dictionary subclasses, but may be used by other
      classes as long as they implement :meth:`__setitem__`.
 
-.. method:: object.__reduce_ex__(protocol) 
+.. method:: object.__reduce_ex__(protocol)
 
    It is sometimes useful to know the protocol version when implementing
    :meth:`__reduce__`.  This can be done by implementing a method named

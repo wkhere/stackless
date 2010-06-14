@@ -52,7 +52,11 @@ known to fail some stringent randomness tests.  See the references below for a
 recent variant that repairs these flaws.
 
 .. versionchanged:: 2.3
-   Substituted MersenneTwister for Wichmann-Hill.
+   MersenneTwister replaced Wichmann-Hill as the default generator.
+
+The :mod:`random` module also provides the :class:`SystemRandom` class which
+uses the system function :func:`os.urandom` to generate random numbers
+from sources provided by the operating system.
 
 Bookkeeping functions:
 
@@ -188,13 +192,15 @@ be found in any statistics text.
 
 .. function:: uniform(a, b)
 
-   Return a random floating point number *N* such that ``a <= N < b`` for
-   ``a <= b`` and ``b <= N < a`` for ``b < a``.
+   Return a random floating point number *N* such that ``a <= N <= b`` for
+   ``a <= b`` and ``b <= N <= a`` for ``b < a``.
 
+   The end-point value ``b`` may or may not be included in the range
+   depending on floating-point rounding in the equation ``a + (b-a) * random()``.
 
 .. function:: triangular(low, high, mode)
 
-   Return a random floating point number *N* such that ``low <= N < high`` and
+   Return a random floating point number *N* such that ``low <= N <= high`` and
    with the specified *mode* between those bounds.  The *low* and *high* bounds
    default to zero and one.  The *mode* argument defaults to the midpoint
    between the bounds, giving a symmetric distribution.
@@ -204,27 +210,30 @@ be found in any statistics text.
 
 .. function:: betavariate(alpha, beta)
 
-   Beta distribution.  Conditions on the parameters are ``alpha > 0`` and ``beta >
-   0``. Returned values range between 0 and 1.
+   Beta distribution.  Conditions on the parameters are ``alpha > 0`` and
+   ``beta > 0``. Returned values range between 0 and 1.
 
 
 .. function:: expovariate(lambd)
 
-   Exponential distribution.  *lambd* is 1.0 divided by the desired mean.  (The
-   parameter would be called "lambda", but that is a reserved word in Python.)
-   Returned values range from 0 to positive infinity.
+   Exponential distribution.  *lambd* is 1.0 divided by the desired
+   mean.  It should be nonzero.  (The parameter would be called
+   "lambda", but that is a reserved word in Python.)  Returned values
+   range from 0 to positive infinity if *lambd* is positive, and from
+   negative infinity to 0 if *lambd* is negative.
 
 
 .. function:: gammavariate(alpha, beta)
 
-   Gamma distribution.  (*Not* the gamma function!)  Conditions on the parameters
-   are ``alpha > 0`` and ``beta > 0``.
+   Gamma distribution.  (*Not* the gamma function!)  Conditions on the
+   parameters are ``alpha > 0`` and ``beta > 0``.
 
 
 .. function:: gauss(mu, sigma)
 
-   Gaussian distribution.  *mu* is the mean, and *sigma* is the standard deviation.
-   This is slightly faster than the :func:`normalvariate` function defined below.
+   Gaussian distribution.  *mu* is the mean, and *sigma* is the standard
+   deviation.  This is slightly faster than the :func:`normalvariate` function
+   defined below.
 
 
 .. function:: lognormvariate(mu, sigma)
@@ -322,3 +331,7 @@ Examples of basic usage::
    Wichmann, B. A. & Hill, I. D., "Algorithm AS 183: An efficient and portable
    pseudo-random number generator", Applied Statistics 31 (1982) 188-190.
 
+   `Complementary-Multiply-with-Carry recipe
+   <http://code.activestate.com/recipes/576707/>`_ for a compatible alternative
+   random number generator with a long period and comparatively simple update
+   operations.

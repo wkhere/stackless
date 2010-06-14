@@ -1,4 +1,3 @@
-
 :mod:`aifc` --- Read and write AIFF and AIFC files
 ==================================================
 
@@ -16,10 +15,11 @@ AIFF is Audio Interchange File Format, a format for storing digital audio
 samples in a file.  AIFF-C is a newer version of the format that includes the
 ability to compress the audio data.
 
-.. warning::
-   
+.. note::
+
    Some operations may only work under IRIX; these will raise :exc:`ImportError`
-   when attempting to import the :mod:`cl` module, which is only available on IRIX.
+   when attempting to import the :mod:`cl` module, which is only available on
+   IRIX.
 
 Audio files have a number of parameters that describe the audio data. The
 sampling rate or frame rate is the number of times per second the sound is
@@ -48,7 +48,7 @@ Module :mod:`aifc` defines the following function:
    time how many samples you are going to write in total and use
    :meth:`writeframesraw` and :meth:`setnframes`.
 
-Objects returned by :func:`open` when a file is opened for reading have the
+Objects returned by :func:`.open` when a file is opened for reading have the
 following methods:
 
 
@@ -131,7 +131,7 @@ following methods:
    Close the AIFF file.  After calling this method, the object can no longer be
    used.
 
-Objects returned by :func:`open` when a file is opened for writing have all the
+Objects returned by :func:`.open` when a file is opened for writing have all the
 above methods, except for :meth:`readframes` and :meth:`setpos`.  In addition
 the following methods exist.  The :meth:`get\*` methods can only be called after
 the corresponding :meth:`set\*` methods have been called.  Before the first

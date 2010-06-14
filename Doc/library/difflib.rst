@@ -146,8 +146,8 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 
    The context diff format normally has a header for filenames and modification
    times.  Any or all of these may be specified using strings for *fromfile*,
-   *tofile*, *fromfiledate*, and *tofiledate*. The modification times are normally
-   expressed in the format returned by :func:`time.ctime`.  If not specified, the
+   *tofile*, *fromfiledate*, and *tofiledate*.  The modification times are normally
+   expressed in the ISO 8601 format. If not specified, the
    strings default to blanks.
 
       >>> s1 = ['bacon\n', 'eggs\n', 'ham\n', 'guido\n']
@@ -281,8 +281,8 @@ diffs. For comparing directories and files, see also, the :mod:`filecmp` module.
 
    The context diff format normally has a header for filenames and modification
    times.  Any or all of these may be specified using strings for *fromfile*,
-   *tofile*, *fromfiledate*, and *tofiledate*. The modification times are normally
-   expressed in the format returned by :func:`time.ctime`.  If not specified, the
+   *tofile*, *fromfiledate*, and *tofiledate*.  The modification times are normally
+   expressed in the ISO 8601 format. If not specified, the
    strings default to blanks.
 
       >>> s1 = ['bacon\n', 'eggs\n', 'ham\n', 'guido\n']
@@ -428,7 +428,7 @@ The :class:`SequenceMatcher` class has this constructor:
 
       .. XXX Explain why a dummy is used!
 
-      .. versionchanged:: 2.5 
+      .. versionchanged:: 2.5
          The guarantee that adjacent triples always describe non-adjacent blocks
          was implemented.
 
@@ -577,8 +577,15 @@ If you want to know how to change the first sequence into the second, use
    insert a[8:8] b[8:17]
     equal a[8:29] b[17:38]
 
-See also the function :func:`get_close_matches` in this module, which shows how
-simple code building on :class:`SequenceMatcher` can be used to do useful work.
+.. seealso::
+
+   * The :func:`get_close_matches` function in this module which shows how
+     simple code building on :class:`SequenceMatcher` can be used to do useful
+     work.
+
+   * `Simple version control recipe
+     <http://code.activestate.com/recipes/576729/>`_ for a small application
+     built with :class:`SequenceMatcher`.
 
 
 .. _differ-objects:

@@ -101,7 +101,7 @@ the constructor functions work with any iterable Python object.
 
    .. versionchanged:: 2.6
       Now guaranteed to return a brand-new :class:`frozenset`.  Formerly,
-      frozensets of zero-length were a singleton.  This got in the way of 
+      frozensets of zero-length were a singleton.  This got in the way of
       building-up new frozensets with :meth:`PySet_Add`.
 
 The following functions and macros are available for instances of :class:`set`
@@ -115,6 +115,10 @@ or :class:`frozenset` or instances of their subtypes.
    Return the length of a :class:`set` or :class:`frozenset` object. Equivalent to
    ``len(anyset)``.  Raises a :exc:`PyExc_SystemError` if *anyset* is not a
    :class:`set`, :class:`frozenset`, or an instance of a subtype.
+
+   .. versionchanged:: 2.5
+      This function returned an :ctype:`int`. This might require changes in
+      your code for properly supporting 64-bit systems.
 
 
 .. cfunction:: Py_ssize_t PySet_GET_SIZE(PyObject *anyset)

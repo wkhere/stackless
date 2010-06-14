@@ -31,22 +31,34 @@ The available exception and functions in this module are:
    Exception raised on compression and decompression errors.
 
 
-.. function:: adler32(string[, value])
+.. function:: adler32(data[, value])
 
-   Computes a Adler-32 checksum of *string*.  (An Adler-32 checksum is almost as
+   Computes a Adler-32 checksum of *data*.  (An Adler-32 checksum is almost as
    reliable as a CRC32 but can be computed much more quickly.)  If *value* is
    present, it is used as the starting value of the checksum; otherwise, a fixed
    default value is used.  This allows computing a running checksum over the
-   concatenation of several input strings.  The algorithm is not cryptographically
+   concatenation of several inputs.  The algorithm is not cryptographically
    strong, and should not be used for authentication or digital signatures.  Since
    the algorithm is designed for use as a checksum algorithm, it is not suitable
    for use as a general hash algorithm.
 
    This function always returns an integer object.
 
-   .. versionchanged:: 2.6
-     For consistent cross-platform behavior we always return a signed integer.
-     ie: Results in the (2**31)...(2**32-1) range will be negative.
+.. note::
+   To generate the same numeric value across all Python versions and
+   platforms use adler32(data) & 0xffffffff.  If you are only using
+   the checksum in packed binary format this is not necessary as the
+   return value is the correct 32bit binary representation
+   regardless of sign.
+
+.. versionchanged:: 2.6
+   The return value is in the range [-2**31, 2**31-1]
+   regardless of platform.  In older versions the value is
+   signed on some platforms and unsigned on others.
+
+.. versionchanged:: 3.0
+   The return value is unsigned and in the range [0, 2**32-1]
+   regardless of platform.
 
 
 .. function:: compress(string[, level])
@@ -66,47 +78,70 @@ The available exception and functions in this module are:
    ``9`` is slowest and produces the most.  The default value is ``6``.
 
 
-.. function:: crc32(string[, value])
+.. function:: crc32(data[, value])
 
    .. index::
       single: Cyclic Redundancy Check
       single: checksum; Cyclic Redundancy Check
 
-   Computes a CRC (Cyclic Redundancy Check)  checksum of *string*. If *value* is
+   Computes a CRC (Cyclic Redundancy Check)  checksum of *data*. If *value* is
    present, it is used as the starting value of the checksum; otherwise, a fixed
    default value is used.  This allows computing a running checksum over the
-   concatenation of several input strings.  The algorithm is not cryptographically
+   concatenation of several inputs.  The algorithm is not cryptographically
    strong, and should not be used for authentication or digital signatures.  Since
    the algorithm is designed for use as a checksum algorithm, it is not suitable
    for use as a general hash algorithm.
 
    This function always returns an integer object.
 
-   .. versionchanged:: 2.6
-     For consistent cross-platform behavior we always return a signed integer.
-     ie: Results in the (2**31)...(2**32-1) range will be negative.
+.. note::
+   To generate the same numeric value across all Python versions and
+   platforms use crc32(data) & 0xffffffff.  If you are only using
+   the checksum in packed binary format this is not necessary as the
+   return value is the correct 32bit binary representation
+   regardless of sign.
+
+.. versionchanged:: 2.6
+   The return value is in the range [-2**31, 2**31-1]
+   regardless of platform.  In older versions the value would be
+   signed on some platforms and unsigned on others.
+
+.. versionchanged:: 3.0
+   The return value is unsigned and in the range [0, 2**32-1]
+   regardless of platform.
 
 
-.. function:: decompress(string[, wbits[, bufsize]])
+.. function:: decompress(string[, wbits[, bufsize[, offset]]])
 
    Decompresses the data in *string*, returning a string containing the
    uncompressed data.  The *wbits* parameter controls the size of the window
-   buffer.  If *bufsize* is given, it is used as the initial size of the output
+   buffer, and is discussed further below.
+   If *bufsize* is given, it is used as the initial size of the output
    buffer.  Raises the :exc:`error` exception if any error occurs.
 
    The absolute value of *wbits* is the base two logarithm of the size of the
    history buffer (the "window size") used when compressing data.  Its absolute
    value should be between 8 and 15 for the most recent versions of the zlib
    library, larger values resulting in better compression at the expense of greater
-   memory usage.  The default value is 15.  When *wbits* is negative, the standard
-   :program:`gzip` header is suppressed; this is an undocumented feature of the
-   zlib library, used for compatibility with :program:`unzip`'s compression file
-   format.
+   memory usage.  When decompressing a stream, *wbits* must not be smaller
+   than the size originally used to compress the stream; using a too-small
+   value will result in an exception. The default value is therefore the
+   highest value, 15.  When *wbits* is negative, the standard
+   :program:`gzip` header is suppressed.
 
    *bufsize* is the initial size of the buffer used to hold decompressed data.  If
    more space is required, the buffer size will be increased as needed, so you
    don't have to get this value exactly right; tuning it will only save a few calls
    to :cfunc:`malloc`.  The default size is 16384.
+
+   *offset* is the initial position in *string* to start decompression.
+   When specified, it will cause the function's return value to be a (uncompressed, offset)
+   tuple, with the second part giving the position in the input string just after
+   any compressed data.  This is useful if *string* contains additional data after
+   any initial compressed part.
+
+.. versionchanged:: 2.7
+   Added the *offset* argument
 
 
 .. function:: decompressobj([wbits])

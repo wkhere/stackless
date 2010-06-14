@@ -228,7 +228,7 @@ The module defines the following variables and functions:
    u-LAW encoding always uses 8 bits samples, so *width* refers only to the sample
    width of the output fragment here.
 
-Note that operations such as :func:`mul` or :func:`max` make no distinction
+Note that operations such as :func:`.mul` or :func:`.max` make no distinction
 between mono and stereo fragments, i.e. all samples are treated equal.  If this
 is a problem the stereo fragment should be split into two mono fragments first
 and recombined later.  Here is an example of how to do that::
@@ -265,7 +265,7 @@ sample and subtract the whole output sample from the input sample::
        in_test = inputdata[pos*2:]
        ipos, factor = audioop.findfit(in_test, out_test)
        # Optional (for better cancellation):
-       # factor = audioop.findfactor(in_test[ipos*2:ipos*2+len(out_test)], 
+       # factor = audioop.findfactor(in_test[ipos*2:ipos*2+len(out_test)],
        #              out_test)
        prefill = '\0'*(pos+ipos)*2
        postfill = '\0'*(len(inputdata)-len(prefill)-len(outputdata))

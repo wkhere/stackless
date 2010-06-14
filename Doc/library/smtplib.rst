@@ -189,9 +189,9 @@ An :class:`SMTP` instance has the following methods:
 
    Identify yourself to an ESMTP server using ``EHLO``.  The hostname argument
    defaults to the fully qualified domain name of the local host.  Examine the
-   response for ESMTP option and store them for use by :meth:`has_extn`. 
-   Also sets several informational attributes: the message returned by 
-   the server is stored as the :attr:`ehlo_resp` attribute, :attr:`does_esmtp` 
+   response for ESMTP option and store them for use by :meth:`has_extn`.
+   Also sets several informational attributes: the message returned by
+   the server is stored as the :attr:`ehlo_resp` attribute, :attr:`does_esmtp`
    is set to true or false depending on whether the server supports ESMTP, and
    :attr:`esmtp_features` will be a dictionary containing the names of the
    SMTP service extensions this server supports, and their
@@ -207,7 +207,7 @@ An :class:`SMTP` instance has the following methods:
    previous ``EHLO`` or ``HELO`` command this session.  It tries ESMTP ``EHLO``
    first.
 
-   :exc:SMTPHeloError
+   :exc:`SMTPHeloError`
      The server didn't reply properly to the ``HELO`` greeting.
 
    .. versionadded:: 2.6
@@ -271,7 +271,7 @@ An :class:`SMTP` instance has the following methods:
    .. versionchanged:: 2.6
 
    :exc:`RuntimeError`
-     SSL/TLS support is not available to your python interpreter.
+     SSL/TLS support is not available to your Python interpreter.
 
 
 .. method:: SMTP.sendmail(from_addr, to_addrs, msg[, mail_options, rcpt_options])
@@ -380,3 +380,8 @@ example doesn't do any processing of the :rfc:`822` headers.  In particular, the
    server.sendmail(fromaddr, toaddrs, msg)
    server.quit()
 
+.. note::
+
+   In general, you will want to use the :mod:`email` package's features to
+   construct an email message, which you can then convert to a string and send
+   via :meth:`sendmail`; see :ref:`email-examples`.

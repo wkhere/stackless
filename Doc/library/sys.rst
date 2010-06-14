@@ -275,6 +275,8 @@ always available.
    +------------------------------+------------------------------------------+
    | :const:`dont_write_bytecode` | -B                                       |
    +------------------------------+------------------------------------------+
+   | :const:`no_user_site`        | -s                                       |
+   +------------------------------+------------------------------------------+
    | :const:`no_site`             | -S                                       |
    +------------------------------+------------------------------------------+
    | :const:`ignore_environment`  | -E                                       |
@@ -284,6 +286,8 @@ always available.
    | :const:`verbose`             | -v                                       |
    +------------------------------+------------------------------------------+
    | :const:`unicode`             | -U                                       |
+   +------------------------------+------------------------------------------+
+   | :const:`bytes_warning`       | -b                                       |
    +------------------------------+------------------------------------------+
 
    .. versionadded:: 2.6
@@ -332,6 +336,18 @@ always available.
 
    .. versionadded:: 2.6
 
+.. data:: float_repr_style
+
+   A string indicating how the :func:`repr` function behaves for
+   floats.  If the string has value ``'short'`` then for a finite
+   float ``x``, ``repr(x)`` aims to produce a short string with the
+   property that ``float(repr(x)) == x``.  This is the usual behaviour
+   in Python 2.7 and later.  Otherwise, ``float_repr_style`` has value
+   ``'legacy'`` and ``repr(x)`` behaves in the same way as it did in
+   versions of Python prior to 2.7.
+
+   .. versionadded:: 2.7
+
 
 .. function:: getcheckinterval()
 
@@ -363,17 +379,19 @@ always available.
    file names, or ``None`` if the system default encoding is used. The result value
    depends on the operating system:
 
-   * On Windows 9x, the encoding is "mbcs".
-
-   * On Mac OS X, the encoding is "utf-8".
+   * On Mac OS X, the encoding is ``'utf-8'``.
 
    * On Unix, the encoding is the user's preference according to the result of
-     nl_langinfo(CODESET), or :const:`None` if the ``nl_langinfo(CODESET)`` failed.
+     nl_langinfo(CODESET), or ``None`` if the ``nl_langinfo(CODESET)``
+     failed.
 
    * On Windows NT+, file names are Unicode natively, so no conversion is
-     performed. :func:`getfilesystemencoding` still returns ``'mbcs'``, as this is
-     the encoding that applications should use when they explicitly want to convert
-     Unicode strings to byte strings that are equivalent when used as file names.
+     performed. :func:`getfilesystemencoding` still returns ``'mbcs'``, as
+     this is the encoding that applications should use when they explicitly
+     want to convert Unicode strings to byte strings that are equivalent when
+     used as file names.
+
+   * On Windows 9x, the encoding is ``'mbcs'``.
 
    .. versionadded:: 2.3
 
@@ -400,12 +418,12 @@ always available.
    does not have to hold true for third-party extensions as it is implementation
    specific.
 
-   The *default* argument allows to define a value which will be returned
-   if the object type does not provide means to retrieve the size and would
-   cause a `TypeError`. 
+   If given, *default* will be returned if the object does not provide means to
+   retrieve the size.  Otherwise a :exc:`TypeError` will be raised.
 
-   func:`getsizeof` calls the object's __sizeof__ method and adds an additional
-   garbage collector overhead if the object is managed by the garbage collector.
+   :func:`getsizeof` calls the object's ``__sizeof__`` method and adds an
+   additional garbage collector overhead if the object is managed by the garbage
+   collector.
 
    .. versionadded:: 2.6
 
@@ -417,7 +435,10 @@ always available.
    that is deeper than the call stack, :exc:`ValueError` is raised.  The default
    for *depth* is zero, returning the frame at the top of the call stack.
 
-   This function should be used for internal and specialized purposes only.
+   .. impl-detail::
+
+      This function should be used for internal and specialized purposes only.
+      It is not guaranteed to exist in all implementations of Python.
 
 
 .. function:: getprofile()
@@ -439,21 +460,27 @@ always available.
 
    Get the trace function as set by :func:`settrace`.
 
-   .. note::
+   .. impl-detail::
 
       The :func:`gettrace` function is intended only for implementing debuggers,
-      profilers, coverage tools and the like. Its behavior is part of the
-      implementation platform, rather than part of the language definition,
-      and thus may not be available in all Python implementations.
+      profilers, coverage tools and the like.  Its behavior is part of the
+      implementation platform, rather than part of the language definition, and
+      thus may not be available in all Python implementations.
 
    .. versionadded:: 2.6
 
 
 .. function:: getwindowsversion()
 
-   Return a tuple containing five components, describing the Windows version
-   currently running.  The elements are *major*, *minor*, *build*, *platform*, and
-   *text*.  *text* contains a string while all other values are integers.
+   Return a named tuple describing the Windows version
+   currently running.  The named elements are *major*, *minor*,
+   *build*, *platform*, *service_pack*, *service_pack_minor*,
+   *service_pack_major*, *suite_mask*, and *product_type*.
+   *service_pack* contains a string while all other values are
+   integers. The components can also be accessed by name, so
+   ``sys.getwindowsversion()[0]`` is equivalent to
+   ``sys.getwindowsversion().major``. For compatibility with prior
+   versions, only the first 5 elements are retrievable by indexing.
 
    *platform* may be one of the following values:
 
@@ -469,12 +496,31 @@ always available.
    | :const:`3 (VER_PLATFORM_WIN32_CE)`      | Windows CE              |
    +-----------------------------------------+-------------------------+
 
-   This function wraps the Win32 :cfunc:`GetVersionEx` function; see the Microsoft
-   documentation for more information about these fields.
+   *product_type* may be one of the following values:
+
+   +---------------------------------------+---------------------------------+
+   | Constant                              | Meaning                         |
+   +=======================================+=================================+
+   | :const:`1 (VER_NT_WORKSTATION)`       | The system is a workstation.    |
+   +---------------------------------------+---------------------------------+
+   | :const:`2 (VER_NT_DOMAIN_CONTROLLER)` | The system is a domain          |
+   |                                       | controller.                     |
+   +---------------------------------------+---------------------------------+
+   | :const:`3 (VER_NT_SERVER)`            | The system is a server, but not |
+   |                                       | a domain controller.            |
+   +---------------------------------------+---------------------------------+
+
+
+   This function wraps the Win32 :cfunc:`GetVersionEx` function; see the
+   Microsoft documentation on :cfunc:`OSVERSIONINFOEX` for more information
+   about these fields.
 
    Availability: Windows.
 
    .. versionadded:: 2.3
+   .. versionchanged:: 2.7
+      Changed to a named tuple and added *service_pack_minor*,
+      *service_pack_major*, *suite_mask*, and *product_type*.
 
 
 .. data:: hexversion
@@ -496,6 +542,25 @@ always available.
    same information.
 
    .. versionadded:: 1.5.2
+
+
+.. data:: long_info
+
+   A struct sequence that holds information about Python's
+   internal representation of integers.  The attributes are read only.
+
+   +-------------------------+----------------------------------------------+
+   | attribute               | explanation                                  |
+   +=========================+==============================================+
+   | :const:`bits_per_digit` | number of bits held in each digit.  Python   |
+   |                         | integers are stored internally in base       |
+   |                         | ``2**long_info.bits_per_digit``              |
+   +-------------------------+----------------------------------------------+
+   | :const:`sizeof_digit`   | size in bytes of the C type used to          |
+   |                         | represent a digit                            |
+   +-------------------------+----------------------------------------------+
+
+   .. versionadded:: 2.7
 
 
 .. data:: last_type
@@ -535,6 +600,22 @@ always available.
    characters are stored as UCS-2 or UCS-4.
 
 
+.. data:: meta_path
+
+    A list of :term:`finder` objects that have their :meth:`find_module`
+    methods called to see if one of the objects can find the module to be
+    imported. The :meth:`find_module` method is called at least with the
+    absolute name of the module being imported. If the module to be imported is
+    contained in package then the parent package's :attr:`__path__` attribute
+    is passed in as a second argument. The method returns :keyword:`None` if
+    the module cannot be found, else returns a :term:`loader`.
+
+    :data:`sys.meta_path` is searched before any implicit default finders or
+    :data:`sys.path`.
+
+    See :pep:`302` for the original specification.
+
+
 .. data:: modules
 
    .. index:: builtin: reload
@@ -566,6 +647,31 @@ always available.
    .. versionchanged:: 2.3
       Unicode strings are no longer ignored.
 
+   .. seealso::
+      Module :mod:`site` This describes how to use .pth files to extend
+      :data:`sys.path`.
+
+
+.. data:: path_hooks
+
+    A list of callables that take a path argument to try to create a
+    :term:`finder` for the path. If a finder can be created, it is to be
+    returned by the callable, else raise :exc:`ImportError`.
+
+    Originally specified in :pep:`302`.
+
+
+.. data:: path_importer_cache
+
+    A dictionary acting as a cache for :term:`finder` objects. The keys are
+    paths that have been passed to :data:`sys.path_hooks` and the values are
+    the finders that are found. If a path is a valid file system path but no
+    explicit finder is found on :data:`sys.path_hooks` then :keyword:`None` is
+    stored to represent the implicit default finder should be used. If the path
+    is not an existing path then :class:`imp.NullImporter` is set.
+
+    Originally specified in :pep:`302`.
+
 
 .. data:: platform
 
@@ -583,7 +689,6 @@ always available.
    Windows          ``'win32'``
    Windows/Cygwin   ``'cygwin'``
    Mac OS X         ``'darwin'``
-   Mac OS 9         ``'mac'``
    OS/2             ``'os2'``
    OS/2 EMX         ``'os2emx'``
    RiscOS           ``'riscos'``
@@ -621,7 +726,9 @@ always available.
 .. data:: py3kwarning
 
    Bool containing the status of the Python 3.0 warning flag. It's ``True``
-   when Python is started with the -3 option.
+   when Python is started with the -3 option.  (This should be considered
+   read-only; setting it to a different value doesn't have an effect on
+   Python 3.0 warnings.)
 
    .. versionadded:: 2.6
 
@@ -712,17 +819,68 @@ always available.
       single: debugger
 
    Set the system's trace function, which allows you to implement a Python
-   source code debugger in Python.  See section :ref:`debugger-hooks` in the
-   chapter on the Python debugger.  The function is thread-specific; for a
+   source code debugger in Python.  The function is thread-specific; for a
    debugger to support multiple threads, it must be registered using
    :func:`settrace` for each thread being debugged.
 
-   .. note::
+   Trace functions should have three arguments: *frame*, *event*, and
+   *arg*. *frame* is the current stack frame.  *event* is a string: ``'call'``,
+   ``'line'``, ``'return'``, ``'exception'``, ``'c_call'``, ``'c_return'``, or
+   ``'c_exception'``. *arg* depends on the event type.
+
+   The trace function is invoked (with *event* set to ``'call'``) whenever a new
+   local scope is entered; it should return a reference to a local trace
+   function to be used that scope, or ``None`` if the scope shouldn't be traced.
+
+   The local trace function should return a reference to itself (or to another
+   function for further tracing in that scope), or ``None`` to turn off tracing
+   in that scope.
+
+   The events have the following meaning:
+
+   ``'call'``
+      A function is called (or some other code block entered).  The
+      global trace function is called; *arg* is ``None``; the return value
+      specifies the local trace function.
+
+   ``'line'``
+      The interpreter is about to execute a new line of code or re-execute the
+      condition of a loop.  The local trace function is called; *arg* is
+      ``None``; the return value specifies the new local trace function.  See
+      :file:`Objects/lnotab_notes.txt` for a detailed explanation of how this
+      works.
+
+   ``'return'``
+      A function (or other code block) is about to return.  The local trace
+      function is called; *arg* is the value that will be returned.  The trace
+      function's return value is ignored.
+
+   ``'exception'``
+      An exception has occurred.  The local trace function is called; *arg* is a
+      tuple ``(exception, value, traceback)``; the return value specifies the
+      new local trace function.
+
+   ``'c_call'``
+      A C function is about to be called.  This may be an extension function or
+      a built-in.  *arg* is the C function object.
+
+   ``'c_return'``
+      A C function has returned. *arg* is ``None``.
+
+   ``'c_exception'``
+      A C function has thrown an exception.  *arg* is ``None``.
+
+   Note that as an exception is propagated down the chain of callers, an
+   ``'exception'`` event is generated at each level.
+
+   For more information on code and frame objects, refer to :ref:`types`.
+
+   .. impl-detail::
 
       The :func:`settrace` function is intended only for implementing debuggers,
-      profilers, coverage tools and the like. Its behavior is part of the
-      implementation platform, rather than part of the language definition, and thus
-      may not be available in all Python implementations.
+      profilers, coverage tools and the like.  Its behavior is part of the
+      implementation platform, rather than part of the language definition, and
+      thus may not be available in all Python implementations.
 
 
 .. function:: settscdump(on_flag)
@@ -733,6 +891,11 @@ always available.
    the output of this dump, read :file:`Python/ceval.c` in the Python sources.
 
    .. versionadded:: 2.4
+
+   .. impl-detail::
+
+      This function is intimately bound to CPython implementation details and
+      thus not likely to be implemented elsewhere.
 
 
 .. data:: stdin
@@ -750,7 +913,7 @@ always available.
    prompts of :func:`input` and :func:`raw_input`. The interpreter's own prompts
    and (almost all of) its error messages go to ``stderr``.  ``stdout`` and
    ``stderr`` needn't be built-in file objects: any object is acceptable as long
-   as it has a :meth:`write` method that takes a string argument.  (Changing these 
+   as it has a :meth:`write` method that takes a string argument.  (Changing these
    objects doesn't affect the standard I/O streams of processes executed by
    :func:`os.popen`, :func:`os.system` or the :func:`exec\*` family of functions in
    the :mod:`os` module.)
@@ -761,9 +924,14 @@ always available.
           __stderr__
 
    These objects contain the original values of ``stdin``, ``stderr`` and
-   ``stdout`` at the start of the program.  They are used during finalization, and
-   could be useful to restore the actual files to known working file objects in
-   case they have been overwritten with a broken object.
+   ``stdout`` at the start of the program.  They are used during finalization,
+   and could be useful to print to the actual standard stream no matter if the
+   ``sys.std*`` object has been redirected.
+
+   It can also be used to restore the actual files to known working file objects
+   in case they have been overwritten with a broken object.  However, the
+   preferred way to do this is to explicitly save the previous stream before
+   replacing it, and restore the saved object.
 
 
 .. data:: tracebacklimit
@@ -801,9 +969,13 @@ always available.
    *micro*, *releaselevel*, and *serial*.  All values except *releaselevel* are
    integers; the release level is ``'alpha'``, ``'beta'``, ``'candidate'``, or
    ``'final'``.  The ``version_info`` value corresponding to the Python version 2.0
-   is ``(2, 0, 0, 'final', 0)``.
+   is ``(2, 0, 0, 'final', 0)``.  The components can also be accessed by name,
+   so ``sys.version_info[0]`` is equivalent to ``sys.version_info.major``
+   and so on.
 
    .. versionadded:: 2.0
+   .. versionchanged:: 2.7
+      Added named component attributes
 
 
 .. data:: warnoptions
@@ -820,10 +992,3 @@ always available.
    first three characters of :const:`version`.  It is provided in the :mod:`sys`
    module for informational purposes; modifying this value has no effect on the
    registry keys used by Python. Availability: Windows.
-
-
-.. seealso::
-
-   Module :mod:`site`
-      This describes how to use .pth files to extend ``sys.path``.
-

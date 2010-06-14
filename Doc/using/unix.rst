@@ -19,7 +19,7 @@ Python comes preinstalled on most Linux distributions, and is available as a
 package on all others.  However there are certain features you might want to use
 that are not available on your distro's package.  You can easily compile the
 latest version of Python from source.
-	
+
 In the event that Python doesn't come preinstalled and isn't in the repositories as
 well, you can easily make packages for your own distro.  Have a look at the
 following links:
@@ -45,8 +45,8 @@ On FreeBSD and OpenBSD
 
 * OpenBSD users use::
 
-     pkg_add ftp://ftp.openbsd.org/pub/OpenBSD/4.2/packages/<insert your architecture here>/python-<version>.tgz 
-	
+     pkg_add ftp://ftp.openbsd.org/pub/OpenBSD/4.2/packages/<insert your architecture here>/python-<version>.tgz
+
   For example i386 users get the 2.5.1 version of Python using::
 
      pkg_add ftp://ftp.openbsd.org/pub/OpenBSD/4.2/packages/i386/python-2.5.1p2.tgz
@@ -87,7 +87,7 @@ source tree.
 
 Python-related paths and files
 ==============================
- 
+
 These are subject to difference depending on local installation conventions;
 :envvar:`prefix` (``${prefix}``) and :envvar:`exec_prefix` (``${exec_prefix}``)
 are installation-dependent and should be interpreted as for GNU software; they
@@ -112,7 +112,7 @@ For example, on most Linux systems, the default for both is :file:`/usr`.
 |                                               | by the user module; not used by default  |
 |                                               | or by most applications.                 |
 +-----------------------------------------------+------------------------------------------+
- 
+
 
 Miscellaneous
 =============
@@ -131,17 +131,17 @@ which searches for the Python interpreter in the whole :envvar:`PATH`.  However,
 some Unices may not have the :program:`env` command, so you may need to hardcode
 ``/usr/bin/python`` as the interpreter path.
 
-To use shell commands in your python scripts, look at the :mod:`subprocess` module.
+To use shell commands in your Python scripts, look at the :mod:`subprocess` module.
 
 
 Editors
 =======
 
 Vim and Emacs are excellent editors which support Python very well.  For more
-information on how to code in python in these editors, look at:
+information on how to code in Python in these editors, look at:
 
-http://www.vim.org/scripts/script.php?script_id=790
-http://sourceforge.net/projects/python-mode
+* http://www.vim.org/scripts/script.php?script_id=790
+* http://sourceforge.net/projects/python-mode
 
 Geany is an excellent IDE with support for a lot of languages. For more
 information, read: http://geany.uvena.de/

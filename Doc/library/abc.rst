@@ -43,15 +43,15 @@ This module provides the following class:
       Register *subclass* as a "virtual subclass" of this ABC. For
       example::
 
-	from abc import ABCMeta
+        from abc import ABCMeta
 
-	class MyABC:
-	    __metaclass__ = ABCMeta
+        class MyABC:
+            __metaclass__ = ABCMeta
 
-	MyABC.register(tuple)
+        MyABC.register(tuple)
 
-	assert issubclass(tuple, MyABC)
-	assert isinstance((), MyABC)
+        assert issubclass(tuple, MyABC)
+        assert isinstance((), MyABC)
 
    You can also override this method in an abstract base class:
 
@@ -130,11 +130,11 @@ It also provides the following decorators:
    A decorator indicating abstract methods.
 
    Using this decorator requires that the class's metaclass is :class:`ABCMeta` or
-   is derived from it. 
+   is derived from it.
    A class that has a metaclass derived from :class:`ABCMeta`
    cannot be instantiated unless all of its abstract methods and
    properties are overridden.
-   The abstract methods can be called using any of the the normal 'super' call
+   The abstract methods can be called using any of the normal 'super' call
    mechanisms.
 
    Dynamically adding abstract methods to a class, or attempting to modify the
@@ -153,7 +153,7 @@ It also provides the following decorators:
 
    .. note::
 
-      Unlike C++'s pure virtual functions, or Java abstract methods, these abstract
+      Unlike Java abstract methods, these abstract
       methods may have an implementation. This implementation can be
       called via the :func:`super` mechanism from the class that
       overrides it.  This could be useful as an end-point for a
@@ -161,12 +161,12 @@ It also provides the following decorators:
       multiple-inheritance.
 
 
-.. function:: abstractproperty(fget[, fset[, fdel[, doc]]])
+.. function:: abstractproperty([fget[, fset[, fdel[, doc]]]])
 
    A subclass of the built-in :func:`property`, indicating an abstract property.
 
    Using this function requires that the class's metaclass is :class:`ABCMeta` or
-   is derived from it. 
+   is derived from it.
    A class that has a metaclass derived from :class:`ABCMeta` cannot be
    instantiated unless all of its abstract methods and properties are overridden.
    The abstract properties can be called using any of the normal
@@ -188,6 +188,7 @@ It also provides the following decorators:
           def getx(self): ...
           def setx(self, value): ...
           x = abstractproperty(getx, setx)
+
 
 .. rubric:: Footnotes
 

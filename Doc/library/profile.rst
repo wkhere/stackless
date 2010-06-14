@@ -7,6 +7,8 @@ The Python Profilers
 
 .. sectionauthor:: James Roskind
 
+.. module:: profile
+   :synopsis: Python source profiler.
 
 .. index:: single: InfoSeek Corporation
 
@@ -51,17 +53,17 @@ examine the results of a profile operation.
 
 The Python standard library provides three different profilers:
 
-#. :mod:`cProfile` is recommended for most users; it's a C extension 
+#. :mod:`cProfile` is recommended for most users; it's a C extension
    with reasonable overhead
-   that makes it suitable for profiling long-running programs. 
+   that makes it suitable for profiling long-running programs.
    Based on :mod:`lsprof`,
-   contributed by Brett Rosen and Ted Czotter.  
+   contributed by Brett Rosen and Ted Czotter.
 
    .. versionadded:: 2.5
 
 #. :mod:`profile`, a pure Python module whose interface is imitated by
-   :mod:`cProfile`.  Adds significant overhead to profiled programs. 
-   If you're trying to extend 
+   :mod:`cProfile`.  Adds significant overhead to profiled programs.
+   If you're trying to extend
    the profiler in some way, the task might be easier with this module.
    Copyright © 1994, by InfoSeek Corporation.
 
@@ -72,7 +74,7 @@ The Python standard library provides three different profilers:
    the overhead of profiling, at the expense of longer data
    post-processing times.  It is no longer maintained and may be
    dropped in a future version of Python.
- 
+
 
    .. versionchanged:: 2.5
       The results should be more meaningful than in the past: the timing core
@@ -122,7 +124,7 @@ script.  For example::
 
    cProfile.py [-o output_file] [-s sort_order]
 
-:option:`-s` only applies to standard output (:option:`-o` is not supplied).
+``-s`` only applies to standard output (``-o`` is not supplied).
 Look in the :class:`Stats` documentation for valid sort values.
 
 When you wish to review the profile, you should use the methods in the
@@ -276,24 +278,24 @@ reading the source code for these modules.
    that the text string in the far right column was used to sort the output. The
    column headings include:
 
-   ncalls 
+   ncalls
       for the number of calls,
 
-   tottime 
+   tottime
       for the total time spent in the given function (and excluding time made in calls
       to sub-functions),
 
-   percall 
+   percall
       is the quotient of ``tottime`` divided by ``ncalls``
 
-   cumtime 
+   cumtime
       is the total time spent in this and all subfunctions (from invocation till
       exit). This figure is accurate *even* for recursive functions.
 
-   percall 
+   percall
       is the quotient of ``cumtime`` divided by primitive calls
 
-   filename:lineno(function) 
+   filename:lineno(function)
       provides the respective data of each function
 
    When there are two numbers in the first column (for example, ``43/3``), then the

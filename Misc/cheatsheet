@@ -481,7 +481,7 @@ s.istitle()       return True if string s is a titlecased string, False    (7)
 s.isupper()       return True if all characters in s are uppercase, False  (6)
                   otherwise.
 s.join(seq)       return a concatenation of the strings in the sequence
-                  seq, seperated by 's's.
+                  seq, separated by 's's.
 s.ljust(width)    return s left justified in a string of length width.    (1),
                                                                            (8)
 s.lower()         return a copy of s converted to lowercase.
@@ -1145,7 +1145,7 @@ Exception>
 Standard methods & operators redefinition in classes
 
 Standard methods & operators map to special '__methods__' and thus may be
- redefined (mostly in in user-defined classes), e.g.:
+ redefined (mostly in user-defined classes), e.g.:
     class x:
          def __init__(self, v): self.value = v
          def __add__(self, r): return self.value + r
@@ -1390,7 +1390,7 @@ platform.py)
 
                                Some os variables
      Variable                                 Meaning
-name                name of O/S-specific module (e.g. "posix", "mac", "nt")
+name                name of O/S-specific module (e.g. "posix", "nt")
 path                O/S-specific module for path manipulations.
                     On Unix, os.path.split() <=> posixpath.split()
 curdir              string used to represent current directory ('.')
@@ -1556,10 +1556,10 @@ secs)         monday), Julian day(1-366), daylight flag(-1,0 or 1))
 asctime(
 timeTuple),
 strftime(
-format,       return a formated string representing time.
+format,       return a formatted string representing time.
 timeTuple)
 mktime(tuple) inverse of localtime(). Return a float.
-strptime(     parse a formated string representing time, return tuple as in
+strptime(     parse a formatted string representing time, return tuple as in
 string[,      gmtime().
 format])
 sleep(secs)   Suspend execution for <secs> seconds. <secs> can be a float.

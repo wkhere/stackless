@@ -41,16 +41,13 @@ today_fmt = '%B %d, %Y'
 
 # List of files that shouldn't be included in the build.
 unused_docs = [
-    'whatsnew/2.0',
-    'whatsnew/2.1',
-    'whatsnew/2.2',
-    'whatsnew/2.3',
-    'whatsnew/2.4',
-    'whatsnew/2.5',
     'maclib/scrap',
     'library/xmllib',
     'library/xml.etree',
 ]
+
+# Ignore .rst in Sphinx its self.
+exclude_trees = ['tools/sphinx']
 
 # Relative filename of the reference count data file.
 refcount_file = 'data/refcounts.dat'
@@ -134,7 +131,7 @@ latex_documents = [
 ]
 # Collect all HOWTOs individually
 latex_documents.extend(('howto/' + fn[:-4], 'howto-' + fn[:-4] + '.tex',
-                        'HOWTO', _stdauthor, 'howto')
+                        '', _stdauthor, 'howto')
                        for fn in os.listdir('howto')
                        if fn.endswith('.rst') and fn != 'index.rst')
 
@@ -144,10 +141,15 @@ latex_preamble = r'''
   \strong{Python Software Foundation}\\
   Email: \email{docs@python.org}
 }
+\let\Verbatim=\OriginalVerbatim
+\let\endVerbatim=\endOriginalVerbatim
 '''
 
 # Documents to append as an appendix to all manuals.
 latex_appendices = ['glossary', 'about', 'license', 'copyright']
+
+# Get LaTeX to handle Unicode correctly
+latex_elements = {'inputenc': r'\usepackage[utf8x]{inputenc}'}
 
 # Options for the coverage checker
 # --------------------------------

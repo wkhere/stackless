@@ -121,7 +121,7 @@ The following classes are provided:
       HTTP cookie classes, principally useful for server-side code.  The
       :mod:`cookielib` and :mod:`Cookie` modules do not depend on each other.
 
-   http://wwwsearch.sf.net/ClientCookie/
+   http://wwwsearch.sourceforge.net/mechanize/
       Extensions to this module, including a class for reading Microsoft Internet
       Explorer cookies on Windows.
 
@@ -313,14 +313,18 @@ FileCookieJar subclasses and co-operation with web browsers
 The following :class:`CookieJar` subclasses are provided for reading and writing
 .  Further :class:`CookieJar` subclasses, including one that reads Microsoft
 Internet Explorer cookies, are available at
-http://wwwsearch.sf.net/ClientCookie/.
-
+http://wwwsearch.sourceforge.net/mechanize/ .
 
 .. class:: MozillaCookieJar(filename, delayload=None, policy=None)
 
    A :class:`FileCookieJar` that can load from and save cookies to disk in the
    Mozilla ``cookies.txt`` file format (which is also used by the Lynx and Netscape
    browsers).
+
+   .. note::
+
+      Version 3 of the Firefox web browser no longer writes cookies in the
+      ``cookies.txt`` file format.
 
    .. note::
 
@@ -728,7 +732,7 @@ accessed using the following methods:
 The :class:`Cookie` class also defines the following method:
 
 
-.. method:: Cookie.is_expired([now=:const:`None`])
+.. method:: Cookie.is_expired([now=None])
 
    True if cookie has passed the time at which the server requested it should
    expire.  If *now* is given (in seconds since the epoch), return whether the
@@ -764,7 +768,7 @@ returned::
    import urllib2
    from cookielib import CookieJar, DefaultCookiePolicy
    policy = DefaultCookiePolicy(
-       rfc2965=True, strict_ns_domain=Policy.DomainStrict,
+       rfc2965=True, strict_ns_domain=DefaultCookiePolicy.DomainStrict,
        blocked_domains=["ads.net", ".ads.net"])
    cj = CookieJar(policy)
    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))

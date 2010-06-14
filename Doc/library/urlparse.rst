@@ -36,7 +36,7 @@ following URL schemes: ``file``, ``ftp``, ``gopher``, ``hdl``, ``http``,
 The :mod:`urlparse` module defines the following functions:
 
 
-.. function:: urlparse(urlstring[, default_scheme[, allow_fragments]])
+.. function:: urlparse(urlstring[, scheme[, allow_fragments]])
 
    Parse a URL into six components, returning a 6-tuple.  This corresponds to the
    general structure of a URL: ``scheme://netloc/path;parameters?query#fragment``.
@@ -58,7 +58,7 @@ The :mod:`urlparse` module defines the following functions:
       >>> o.geturl()
       'http://www.cwi.nl:80/%7Eguido/Python.html'
 
-   If the *default_scheme* argument is specified, it gives the default addressing
+   If the *scheme* argument is specified, it gives the default addressing
    scheme, to be used only if the URL does not specify one.  The default value for
    this argument is the empty string.
 
@@ -101,6 +101,10 @@ The :mod:`urlparse` module defines the following functions:
    .. versionchanged:: 2.5
       Added attributes to return value.
 
+   .. versionchanged:: 2.7
+      Added IPv6 URL parsing capabilities.
+
+
 .. function:: parse_qs(qs[, keep_blank_values[, strict_parsing]])
 
    Parse a query string given as a string argument (data of type
@@ -120,6 +124,9 @@ The :mod:`urlparse` module defines the following functions:
 
    Use the :func:`urllib.urlencode` function to convert such dictionaries into
    query strings.
+
+   .. versionadded:: 2.6
+      Copied from the :mod:`cgi` module.
 
 
 .. function:: parse_qsl(qs[, keep_blank_values[, strict_parsing]])
@@ -141,6 +148,10 @@ The :mod:`urlparse` module defines the following functions:
    Use the :func:`urllib.urlencode` function to convert such lists of pairs into
    query strings.
 
+   .. versionadded:: 2.6
+      Copied from the :mod:`cgi` module.
+
+
 .. function:: urlunparse(parts)
 
    Construct a URL from a tuple as returned by ``urlparse()``. The *parts* argument
@@ -150,7 +161,7 @@ The :mod:`urlparse` module defines the following functions:
    equivalent).
 
 
-.. function:: urlsplit(urlstring[, default_scheme[, allow_fragments]])
+.. function:: urlsplit(urlstring[, scheme[, allow_fragments]])
 
    This is similar to :func:`urlparse`, but does not split the params from the URL.
    This should generally be used instead of :func:`urlparse` if the more recent URL
@@ -244,17 +255,29 @@ The :mod:`urlparse` module defines the following functions:
 
 .. seealso::
 
-   :rfc:`1738` - Uniform Resource Locators (URL)
-      This specifies the formal syntax and semantics of absolute URLs.
+   :rfc:`3986` - Uniform Resource Identifiers
+      This is the current standard (STD66). Any changes to urlparse module
+      should conform to this. Certain deviations could be observed, which are
+      mostly due backward compatiblity purposes and for certain de-facto
+      parsing requirements as commonly observed in major browsers.
+
+   :rfc:`2732` - Format for Literal IPv6 Addresses in URL's.
+      This specifies the parsing requirements of IPv6 URLs.
+
+   :rfc:`2396` - Uniform Resource Identifiers (URI): Generic Syntax
+      Document describing the generic syntactic requirements for both Uniform Resource
+      Names (URNs) and Uniform Resource Locators (URLs).
+
+   :rfc:`2368` - The mailto URL scheme.
+      Parsing requirements for mailto url schemes.
 
    :rfc:`1808` - Relative Uniform Resource Locators
       This Request For Comments includes the rules for joining an absolute and a
       relative URL, including a fair number of "Abnormal Examples" which govern the
       treatment of border cases.
 
-   :rfc:`2396` - Uniform Resource Identifiers (URI): Generic Syntax
-      Document describing the generic syntactic requirements for both Uniform Resource
-      Names (URNs) and Uniform Resource Locators (URLs).
+   :rfc:`1738` - Uniform Resource Locators (URL)
+      This specifies the formal syntax and semantics of absolute URLs.
 
 
 .. _urlparse-result-object:
@@ -290,7 +313,7 @@ described in those functions, as well as provide an additional method:
 
    .. versionadded:: 2.5
 
-The following classes provide the implementations of the parse results::
+The following classes provide the implementations of the parse results:
 
 
 .. class:: BaseResult

@@ -44,7 +44,7 @@ This implies inclusion of the following standard headers: ``<stdio.h>``,
 ``<string.h>``, ``<errno.h>``, ``<limits.h>``, and ``<stdlib.h>`` (if
 available).
 
-.. warning::
+.. note::
 
    Since Python may define some pre-processor definitions which affect the standard
    headers on some systems, you *must* include :file:`Python.h` before any standard
@@ -187,7 +187,7 @@ caller is said to receive a *new* reference.  When no ownership is transferred,
 the caller is said to *borrow* the reference. Nothing needs to be done for a
 borrowed reference.
 
-Conversely, when a calling function passes it a reference to an  object, there
+Conversely, when a calling function passes in a reference to an  object, there
 are two possibilities: the function *steals* a  reference to the object, or it
 does not.  *Stealing a reference* means that when you pass a reference to a
 function, that function assumes that it now owns that reference, and you are not
@@ -524,12 +524,12 @@ the table of loaded modules, and creates the fundamental modules
 :mod:`__builtin__`, :mod:`__main__`, :mod:`sys`, and :mod:`exceptions`.  It also
 initializes the module search path (``sys.path``).
 
-.. index:: single: PySys_SetArgv()
+.. index:: single: PySys_SetArgvEx()
 
 :cfunc:`Py_Initialize` does not set the "script argument list"  (``sys.argv``).
-If this variable is needed by Python code that  will be executed later, it must
-be set explicitly with a call to  ``PySys_SetArgv(argc, argv)`` subsequent to
-the call to :cfunc:`Py_Initialize`.
+If this variable is needed by Python code that will be executed later, it must
+be set explicitly with a call to  ``PySys_SetArgvEx(argc, argv, updatepath)``
+after the call to :cfunc:`Py_Initialize`.
 
 On most systems (in particular, on Unix and Windows, although the details are
 slightly different), :cfunc:`Py_Initialize` calculates the module search path

@@ -1,3 +1,5 @@
+.. _email-examples:
+
 :mod:`email`: Examples
 ----------------------
 
@@ -7,6 +9,12 @@ and send simple email messages, as well as more complex MIME messages.
 First, let's see how to create and send a simple text message:
 
 .. literalinclude:: ../includes/email-simple.py
+
+
+And parsing RFC822 headers can easily be done by the parse(filename) or
+parsestr(message_as_string) methods of the Parser() class:
+
+.. literalinclude:: ../includes/email-headers.py
 
 
 Here's an example of how to send a MIME message containing a bunch of family

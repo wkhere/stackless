@@ -1,5 +1,5 @@
 ****************************
-  What's New in Python 2.2  
+  What's New in Python 2.2
 ****************************
 
 :Author: A.M. Kuchling
@@ -30,7 +30,7 @@ understand the complete implementation and design rationale for a change, refer
 to the PEP for a particular new feature.
 
 
-.. seealso::
+.. see also, now defunct
 
    http://www.unixreview.com/documents/s=1356/urm0109h/0109h.htm
       "What's So Special About Python 2.2?" is also about the new 2.2 features, and
@@ -49,14 +49,14 @@ amazing new capabilities. Before beginning this, the longest and most
 complicated section of this article, I'll provide an overview of the changes and
 offer some comments.
 
-A long time ago I wrote a Web page (http://www.amk.ca/python/writing/warts.html)
-listing flaws in Python's design.  One of the most significant flaws was that
-it's impossible to subclass Python types implemented in C.  In particular, it's
-not possible to subclass built-in types, so you can't just subclass, say, lists
-in order to add a single useful method to them. The :mod:`UserList` module
-provides a class that supports all of the methods of lists and that can be
-subclassed further, but there's lots of C code that expects a regular Python
-list and won't accept a :class:`UserList` instance.
+A long time ago I wrote a Web page listing flaws in Python's design.  One of the
+most significant flaws was that it's impossible to subclass Python types
+implemented in C.  In particular, it's not possible to subclass built-in types,
+so you can't just subclass, say, lists in order to add a single useful method to
+them. The :mod:`UserList` module provides a class that supports all of the
+methods of lists and that can be subclassed further, but there's lots of C code
+that expects a regular Python list and won't accept a :class:`UserList`
+instance.
 
 Python 2.2 fixes this, and in the process adds some exciting new capabilities.
 A brief summary:
@@ -295,7 +295,7 @@ will be used in methods to call a method in the superclass; for example,
 
    class D (B,C):
        def save (self):
-   	# Call superclass .save()
+           # Call superclass .save()
            super(D, self).save()
            # Save D's private information here
            ...
@@ -473,7 +473,7 @@ there are no more values to be returned, calling :meth:`next` should raise the
    Traceback (most recent call last):
      File "<stdin>", line 1, in ?
    StopIteration
-   >>>      
+   >>>
 
 In 2.2, Python's :keyword:`for` statement no longer expects a sequence; it
 expects something for which :func:`iter` will return an iterator. For backward
@@ -909,7 +909,7 @@ To make the preceding explanation a bit clearer, here's an example::
    x = 1
    def f():
        # The next line is a syntax error
-       exec 'x=2'  
+       exec 'x=2'
        def g():
            return x
 
@@ -952,8 +952,8 @@ New and Improved Modules
      items = s.meerkat.getItems( {'channel': 4} )
 
      # 'items' is another list of dictionaries, like this:
-     # [{'link': 'http://freshmeat.net/releases/52719/', 
-     #   'description': 'A utility which converts HTML to XSL FO.', 
+     # [{'link': 'http://freshmeat.net/releases/52719/',
+     #   'description': 'A utility which converts HTML to XSL FO.',
      #   'title': 'html2fo 0.3 (Default)'}, ... ]
 
   The :mod:`SimpleXMLRPCServer` module makes it easy to create straightforward
@@ -1173,7 +1173,7 @@ Some of the more notable changes are:
      can uncomment them. Gestalt and Internet Config modules are enabled by
      default.
 
-* Keyword arguments passed to builtin functions that don't take them now cause a
+* Keyword arguments passed to built-in functions that don't take them now cause a
   :exc:`TypeError` exception to be raised, with the message "*function* takes no
   keyword arguments".
 

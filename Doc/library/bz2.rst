@@ -20,9 +20,10 @@ For other archive formats, see the :mod:`gzip`, :mod:`zipfile`, and
 Here is a summary of the features offered by the bz2 module:
 
 * :class:`BZ2File` class implements a complete file interface, including
-  :meth:`readline`, :meth:`readlines`, :meth:`writelines`, :meth:`seek`, etc;
+  :meth:`~BZ2File.readline`, :meth:`~BZ2File.readlines`,
+  :meth:`~BZ2File.writelines`, :meth:`~BZ2File.seek`, etc;
 
-* :class:`BZ2File` class implements emulated :meth:`seek` support;
+* :class:`BZ2File` class implements emulated :meth:`~BZ2File.seek` support;
 
 * :class:`BZ2File` class implements universal newline support;
 
@@ -60,6 +61,11 @@ Handling of compressed files is offered by the :class:`BZ2File` class.
    reading. Instances support iteration in the same way as normal :class:`file`
    instances.
 
+   :class:`BZ2File` supports the :keyword:`with` statement.
+
+   .. versionchanged:: 2.7
+      Support for the :keyword:`with` statement was added.
+
 
    .. method:: close()
 
@@ -93,7 +99,7 @@ Handling of compressed files is offered by the :class:`BZ2File` class.
       performance optimizations previously implemented in the :mod:`xreadlines`
       module.
 
-      .. deprecated:: 2.3 
+      .. deprecated:: 2.3
          This exists only for compatibility with the method by this name on
          :class:`file` objects, which is deprecated.  Use ``for line in file``
          instead.

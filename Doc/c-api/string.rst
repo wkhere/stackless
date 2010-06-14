@@ -9,8 +9,10 @@ These functions raise :exc:`TypeError` when expecting a string parameter and are
 called with a non-string parameter.
 
 .. note::
-   These functions have been renamed to PyBytes_* in Python 3.x. The PyBytes
-   names are also available in 2.6.
+
+   These functions have been renamed to PyBytes_* in Python 3.x. Unless
+   otherwise noted, the PyBytes functions available in 3.x are aliased to their
+   PyString_* equivalents to help porting.
 
 .. index:: object: string
 
@@ -58,6 +60,10 @@ called with a non-string parameter.
    *len* on success, and *NULL* on failure.  If *v* is *NULL*, the contents of the
    string are uninitialized.
 
+   .. versionchanged:: 2.5
+      This function used an :ctype:`int` type for *len*. This might require
+      changes in your code for properly supporting 64-bit systems.
+
 
 .. cfunction:: PyObject* PyString_FromFormat(const char *format, ...)
 
@@ -72,6 +78,8 @@ called with a non-string parameter.
    .. % The descriptions for %zd and %zu are wrong, but the truth is complicated
    .. % because not all compilers support the %z width modifier -- we fake it
    .. % when necessary via interpolating PY_FORMAT_SIZE_T.
+   .. % Similar comments apply to the %ll width modifier and
+   .. % PY_FORMAT_LONG_LONG.
    .. % %u, %lu, %zu should have "new in Python 2.5" blurbs.
 
    +-------------------+---------------+--------------------------------+
@@ -93,6 +101,12 @@ called with a non-string parameter.
    +-------------------+---------------+--------------------------------+
    | :attr:`%lu`       | unsigned long | Exactly equivalent to          |
    |                   |               | ``printf("%lu")``.             |
+   +-------------------+---------------+--------------------------------+
+   | :attr:`%lld`      | long long     | Exactly equivalent to          |
+   |                   |               | ``printf("%lld")``.            |
+   +-------------------+---------------+--------------------------------+
+   | :attr:`%llu`      | unsigned      | Exactly equivalent to          |
+   |                   | long long     | ``printf("%llu")``.            |
    +-------------------+---------------+--------------------------------+
    | :attr:`%zd`       | Py_ssize_t    | Exactly equivalent to          |
    |                   |               | ``printf("%zd")``.             |
@@ -121,6 +135,14 @@ called with a non-string parameter.
    An unrecognized format character causes all the rest of the format string to be
    copied as-is to the result string, and any extra arguments discarded.
 
+   .. note::
+
+      The `"%lld"` and `"%llu"` format specifiers are only available
+      when :const:`HAVE_LONG_LONG` is defined.
+
+   .. versionchanged:: 2.7
+      Support for `"%lld"` and `"%llu"` added.
+
 
 .. cfunction:: PyObject* PyString_FromFormatV(const char *format, va_list vargs)
 
@@ -132,10 +154,18 @@ called with a non-string parameter.
 
    Return the length of the string in string object *string*.
 
+   .. versionchanged:: 2.5
+      This function returned an :ctype:`int` type. This might require changes
+      in your code for properly supporting 64-bit systems.
+
 
 .. cfunction:: Py_ssize_t PyString_GET_SIZE(PyObject *string)
 
    Macro form of :cfunc:`PyString_Size` but without error checking.
+
+   .. versionchanged:: 2.5
+      This macro returned an :ctype:`int` type. This might require changes in
+      your code for properly supporting 64-bit systems.
 
 
 .. cfunction:: char* PyString_AsString(PyObject *string)
@@ -172,6 +202,10 @@ called with a non-string parameter.
    *string* and operates on that.  If *string* is not a string object at all,
    :cfunc:`PyString_AsStringAndSize` returns ``-1`` and raises :exc:`TypeError`.
 
+   .. versionchanged:: 2.5
+      This function used an :ctype:`int *` type for *length*. This might
+      require changes in your code for properly supporting 64-bit systems.
+
 
 .. cfunction:: void PyString_Concat(PyObject **string, PyObject *newpart)
 
@@ -200,6 +234,9 @@ called with a non-string parameter.
    fails, the original string object at *\*string* is deallocated, *\*string* is
    set to *NULL*, a memory exception is set, and ``-1`` is returned.
 
+   .. versionchanged:: 2.5
+      This function used an :ctype:`int` type for *newsize*. This might
+      require changes in your code for properly supporting 64-bit systems.
 
 .. cfunction:: PyObject* PyString_Format(PyObject *format, PyObject *args)
 
@@ -219,6 +256,10 @@ called with a non-string parameter.
    reference-count-neutral; you own the object after the call if and only if you
    owned it before the call.)
 
+   .. note::
+
+      This function is not available in 3.x and does not have a PyBytes alias.
+
 
 .. cfunction:: PyObject* PyString_InternFromString(const char *v)
 
@@ -226,6 +267,10 @@ called with a non-string parameter.
    :cfunc:`PyString_InternInPlace`, returning either a new string object that has
    been interned, or a new ("owned") reference to an earlier interned string object
    with the same value.
+
+   .. note::
+
+      This function is not available in 3.x and does not have a PyBytes alias.
 
 
 .. cfunction:: PyObject* PyString_Decode(const char *s, Py_ssize_t size, const char *encoding, const char *errors)
@@ -236,6 +281,14 @@ called with a non-string parameter.
    The codec to be used is looked up using the Python codec registry.  Return
    *NULL* if an exception was raised by the codec.
 
+   .. note::
+
+      This function is not available in 3.x and does not have a PyBytes alias.
+
+   .. versionchanged:: 2.5
+      This function used an :ctype:`int` type for *size*. This might require
+      changes in your code for properly supporting 64-bit systems.
+
 
 .. cfunction:: PyObject* PyString_AsDecodedObject(PyObject *str, const char *encoding, const char *errors)
 
@@ -244,6 +297,10 @@ called with a non-string parameter.
    meaning as the parameters of the same name in the string :meth:`encode` method.
    The codec to be used is looked up using the Python codec registry. Return *NULL*
    if an exception was raised by the codec.
+
+   .. note::
+
+      This function is not available in 3.x and does not have a PyBytes alias.
 
 
 .. cfunction:: PyObject* PyString_Encode(const char *s, Py_ssize_t size, const char *encoding, const char *errors)
@@ -254,6 +311,14 @@ called with a non-string parameter.
    :meth:`encode` method. The codec to be used is looked up using the Python codec
    registry.  Return *NULL* if an exception was raised by the codec.
 
+   .. note::
+
+      This function is not available in 3.x and does not have a PyBytes alias.
+
+   .. versionchanged:: 2.5
+      This function used an :ctype:`int` type for *size*. This might require
+      changes in your code for properly supporting 64-bit systems.
+
 
 .. cfunction:: PyObject* PyString_AsEncodedObject(PyObject *str, const char *encoding, const char *errors)
 
@@ -262,3 +327,7 @@ called with a non-string parameter.
    parameters of the same name in the string :meth:`encode` method. The codec to be
    used is looked up using the Python codec registry. Return *NULL* if an exception
    was raised by the codec.
+
+   .. note::
+
+      This function is not available in 3.x and does not have a PyBytes alias.
