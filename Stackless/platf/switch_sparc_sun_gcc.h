@@ -26,49 +26,49 @@
 static int
 slp_switch(void)
 {
-	register int *stackref, stsizediff;
+    register int *stackref, stsizediff;
 
-	/* Put the stack pointer into stackref */
+    /* Put the stack pointer into stackref */
 
-	/* Sparc special: at first, flush register windows
-	 */
-	__asm__ volatile (
-	    "ta %1\n\t"
-	    "mov %%sp, %0"
-	    : "=r" (stackref) :  "i" (ST_FLUSH_WINDOWS));
+    /* Sparc special: at first, flush register windows
+     */
+    __asm__ volatile (
+        "ta %1\n\t"
+        "mov %%sp, %0"
+        : "=r" (stackref) :  "i" (ST_FLUSH_WINDOWS));
 
-	{   /* You shalt put SLP_SAVE_STATE into a local block */
+    {   /* You shalt put SLP_SAVE_STATE into a local block */
 
-		SLP_SAVE_STATE(stackref, stsizediff);
+        SLP_SAVE_STATE(stackref, stsizediff);
 
-		/* Increment stack and frame pointer by stsizediff */
+        /* Increment stack and frame pointer by stsizediff */
 
-		/* Sparc special: at first load new return address.
-		   This cannot be done later, because the stack
-		   might be overwritten again just after SLP_RESTORE_STATE
-		   has finished. BTW: All other registers (l0-l7 and i0-i5)
-		   might be clobbered too. 
-		 */
-		__asm__ volatile (
-		    "ld [%0+60], %%i7\n\t"
-		    "add %1, %%sp, %%sp\n\t"
-		    "add %1, %%fp, %%fp"
-		    : : "r" (_cst->stack), "r" (stsizediff)
-		    : "%l0", "%l1", "%l2", "%l3", "%l4", "%l5", "%l6", "%l7",
-		      "%i0", "%i1", "%i2", "%i3", "%i4", "%i5");
+        /* Sparc special: at first load new return address.
+           This cannot be done later, because the stack
+           might be overwritten again just after SLP_RESTORE_STATE
+           has finished. BTW: All other registers (l0-l7 and i0-i5)
+           might be clobbered too.
+         */
+        __asm__ volatile (
+            "ld [%0+60], %%i7\n\t"
+            "add %1, %%sp, %%sp\n\t"
+            "add %1, %%fp, %%fp"
+            : : "r" (_cst->stack), "r" (stsizediff)
+            : "%l0", "%l1", "%l2", "%l3", "%l4", "%l5", "%l6", "%l7",
+              "%i0", "%i1", "%i2", "%i3", "%i4", "%i5");
 
-		SLP_RESTORE_STATE();
+        SLP_RESTORE_STATE();
 
-		/* Run far away as fast as possible, don't look back at the sins.
-		 * The LORD rained down burning sulfur on Sodom and Gomorra ...
-		 */
+        /* Run far away as fast as possible, don't look back at the sins.
+         * The LORD rained down burning sulfur on Sodom and Gomorra ...
+         */
 
-		/* Sparc special: Must make it *very* clear to the CPU that
-		   it shouldn't look back into the register windows
-		 */
-		__asm__ volatile ( "ta %0" : : "i" (ST_CLEAN_WINDOWS));
-		return 0;
-	} 
+        /* Sparc special: Must make it *very* clear to the CPU that
+           it shouldn't look back into the register windows
+         */
+        __asm__ volatile ( "ta %0" : : "i" (ST_CLEAN_WINDOWS));
+        return 0;
+    }
 }
 
 #endif

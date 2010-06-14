@@ -27,70 +27,70 @@ stringlib_expandtabs(PyObject *self, PyObject *args)
     int tabsize = 8;
 
     if (!PyArg_ParseTuple(args, "|i:expandtabs", &tabsize))
-	return NULL;
+    return NULL;
 
     /* First pass: determine size of output string */
     i = j = old_j = 0;
     e = STRINGLIB_STR(self) + STRINGLIB_LEN(self);
     for (p = STRINGLIB_STR(self); p < e; p++)
-        if (*p == '\t') {
-	    if (tabsize > 0) {
-		j += tabsize - (j % tabsize);
-                /* XXX: this depends on a signed integer overflow to < 0 */
-                /* C compilers, including gcc, do -NOT- guarantee this. */
-		if (old_j > j) {
-		    PyErr_SetString(PyExc_OverflowError,
-				    "result is too long");
-		    return NULL;
-		}
-		old_j = j;
-            }
-	}
-        else {
-            j++;
-            if (*p == '\n' || *p == '\r') {
-                i += j;
-                old_j = j = 0;
-                /* XXX: this depends on a signed integer overflow to < 0 */
-                /* C compilers, including gcc, do -NOT- guarantee this. */
-                if (i < 0) {
-                    PyErr_SetString(PyExc_OverflowError,
-                                    "result is too long");
-                    return NULL;
-                }
-            }
-        }
-
-    if ((i + j) < 0) {
+    if (*p == '\t') {
+        if (tabsize > 0) {
+        j += tabsize - (j % tabsize);
         /* XXX: this depends on a signed integer overflow to < 0 */
         /* C compilers, including gcc, do -NOT- guarantee this. */
-        PyErr_SetString(PyExc_OverflowError, "result is too long");
-        return NULL;
+        if (old_j > j) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "result is too long");
+            return NULL;
+        }
+        old_j = j;
+        }
+    }
+    else {
+        j++;
+        if (*p == '\n' || *p == '\r') {
+        i += j;
+        old_j = j = 0;
+        /* XXX: this depends on a signed integer overflow to < 0 */
+        /* C compilers, including gcc, do -NOT- guarantee this. */
+        if (i < 0) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "result is too long");
+            return NULL;
+        }
+        }
+    }
+
+    if ((i + j) < 0) {
+    /* XXX: this depends on a signed integer overflow to < 0 */
+    /* C compilers, including gcc, do -NOT- guarantee this. */
+    PyErr_SetString(PyExc_OverflowError, "result is too long");
+    return NULL;
     }
 
     /* Second pass: create output string and fill it */
     u = STRINGLIB_NEW(NULL, i + j);
     if (!u)
-        return NULL;
+    return NULL;
 
     j = 0;
     q = STRINGLIB_STR(u);
 
     for (p = STRINGLIB_STR(self); p < e; p++)
-        if (*p == '\t') {
-	    if (tabsize > 0) {
-		i = tabsize - (j % tabsize);
-		j += i;
-		while (i--)
-		    *q++ = ' ';
-	    }
-	}
-	else {
-            j++;
-	    *q++ = *p;
-            if (*p == '\n' || *p == '\r')
-                j = 0;
+    if (*p == '\t') {
+        if (tabsize > 0) {
+        i = tabsize - (j % tabsize);
+        j += i;
+        while (i--)
+            *q++ = ' ';
         }
+    }
+    else {
+        j++;
+        *q++ = *p;
+        if (*p == '\n' || *p == '\r')
+        j = 0;
+    }
 
     return u;
 }
@@ -101,32 +101,32 @@ pad(PyObject *self, Py_ssize_t left, Py_ssize_t right, char fill)
     PyObject *u;
 
     if (left < 0)
-        left = 0;
+    left = 0;
     if (right < 0)
-        right = 0;
+    right = 0;
 
     if (left == 0 && right == 0 && STRINGLIB_CHECK_EXACT(self)) {
 #if STRINGLIB_MUTABLE
-        /* We're defined as returning a copy;  If the object is mutable
-         * that means we must make an identical copy. */
-        return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
+    /* We're defined as returning a copy;  If the object is mutable
+     * that means we must make an identical copy. */
+    return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
 #else
-        Py_INCREF(self);
-        return (PyObject *)self;
+    Py_INCREF(self);
+    return (PyObject *)self;
 #endif /* STRINGLIB_MUTABLE */
     }
 
     u = STRINGLIB_NEW(NULL,
-				   left + STRINGLIB_LEN(self) + right);
+                                   left + STRINGLIB_LEN(self) + right);
     if (u) {
-        if (left)
-            memset(STRINGLIB_STR(u), fill, left);
-        Py_MEMCPY(STRINGLIB_STR(u) + left,
-	       STRINGLIB_STR(self),
-	       STRINGLIB_LEN(self));
-        if (right)
-            memset(STRINGLIB_STR(u) + left + STRINGLIB_LEN(self),
-		   fill, right);
+    if (left)
+        memset(STRINGLIB_STR(u), fill, left);
+    Py_MEMCPY(STRINGLIB_STR(u) + left,
+           STRINGLIB_STR(self),
+           STRINGLIB_LEN(self));
+    if (right)
+        memset(STRINGLIB_STR(u) + left + STRINGLIB_LEN(self),
+           fill, right);
     }
 
     return u;
@@ -145,16 +145,16 @@ stringlib_ljust(PyObject *self, PyObject *args)
     char fillchar = ' ';
 
     if (!PyArg_ParseTuple(args, "n|c:ljust", &width, &fillchar))
-        return NULL;
+    return NULL;
 
     if (STRINGLIB_LEN(self) >= width && STRINGLIB_CHECK_EXACT(self)) {
 #if STRINGLIB_MUTABLE
-        /* We're defined as returning a copy;  If the object is mutable
-         * that means we must make an identical copy. */
-        return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
+    /* We're defined as returning a copy;  If the object is mutable
+     * that means we must make an identical copy. */
+    return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
 #else
-        Py_INCREF(self);
-        return (PyObject*) self;
+    Py_INCREF(self);
+    return (PyObject*) self;
 #endif
     }
 
@@ -175,16 +175,16 @@ stringlib_rjust(PyObject *self, PyObject *args)
     char fillchar = ' ';
 
     if (!PyArg_ParseTuple(args, "n|c:rjust", &width, &fillchar))
-        return NULL;
+    return NULL;
 
     if (STRINGLIB_LEN(self) >= width && STRINGLIB_CHECK_EXACT(self)) {
 #if STRINGLIB_MUTABLE
-        /* We're defined as returning a copy;  If the object is mutable
-         * that means we must make an identical copy. */
-        return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
+    /* We're defined as returning a copy;  If the object is mutable
+     * that means we must make an identical copy. */
+    return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
 #else
-        Py_INCREF(self);
-        return (PyObject*) self;
+    Py_INCREF(self);
+    return (PyObject*) self;
 #endif
     }
 
@@ -206,16 +206,16 @@ stringlib_center(PyObject *self, PyObject *args)
     char fillchar = ' ';
 
     if (!PyArg_ParseTuple(args, "n|c:center", &width, &fillchar))
-        return NULL;
+    return NULL;
 
     if (STRINGLIB_LEN(self) >= width && STRINGLIB_CHECK_EXACT(self)) {
 #if STRINGLIB_MUTABLE
-        /* We're defined as returning a copy;  If the object is mutable
-         * that means we must make an identical copy. */
-        return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
+    /* We're defined as returning a copy;  If the object is mutable
+     * that means we must make an identical copy. */
+    return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
 #else
-        Py_INCREF(self);
-        return (PyObject*) self;
+    Py_INCREF(self);
+    return (PyObject*) self;
 #endif
     }
 
@@ -240,24 +240,24 @@ stringlib_zfill(PyObject *self, PyObject *args)
     Py_ssize_t width;
 
     if (!PyArg_ParseTuple(args, "n:zfill", &width))
-        return NULL;
+    return NULL;
 
     if (STRINGLIB_LEN(self) >= width) {
-        if (STRINGLIB_CHECK_EXACT(self)) {
+    if (STRINGLIB_CHECK_EXACT(self)) {
 #if STRINGLIB_MUTABLE
-            /* We're defined as returning a copy;  If the object is mutable
-             * that means we must make an identical copy. */
-            return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
+        /* We're defined as returning a copy;  If the object is mutable
+         * that means we must make an identical copy. */
+        return STRINGLIB_NEW(STRINGLIB_STR(self), STRINGLIB_LEN(self));
 #else
-            Py_INCREF(self);
-            return (PyObject*) self;
+        Py_INCREF(self);
+        return (PyObject*) self;
 #endif
-        }
-        else
-            return STRINGLIB_NEW(
-                STRINGLIB_STR(self),
-                STRINGLIB_LEN(self)
-            );
+    }
+    else
+        return STRINGLIB_NEW(
+        STRINGLIB_STR(self),
+        STRINGLIB_LEN(self)
+        );
     }
 
     fill = width - STRINGLIB_LEN(self);
@@ -265,30 +265,30 @@ stringlib_zfill(PyObject *self, PyObject *args)
     s = pad(self, fill, 0, '0');
 
     if (s == NULL)
-        return NULL;
+    return NULL;
 
     p = STRINGLIB_STR(s);
     if (p[fill] == '+' || p[fill] == '-') {
-        /* move sign to beginning of string */
-        p[0] = p[fill];
-        p[fill] = '0';
+    /* move sign to beginning of string */
+    p[0] = p[fill];
+    p[fill] = '0';
     }
 
     return (PyObject*) s;
 }
 
 
-#define _STRINGLIB_SPLIT_APPEND(data, left, right)		\
-	str = STRINGLIB_NEW((data) + (left),	                \
-					 (right) - (left));	\
-	if (str == NULL)					\
-		goto onError;					\
-	if (PyList_Append(list, str)) {				\
-		Py_DECREF(str);					\
-		goto onError;					\
-	}							\
-	else							\
-		Py_DECREF(str);
+#define _STRINGLIB_SPLIT_APPEND(data, left, right)              \
+    str = STRINGLIB_NEW((data) + (left),                        \
+                                     (right) - (left));         \
+    if (str == NULL)                                            \
+        goto onError;                                           \
+    if (PyList_Append(list, str)) {                             \
+        Py_DECREF(str);                                         \
+        goto onError;                                           \
+    }                                                           \
+    else                                                        \
+        Py_DECREF(str);
 
 PyDoc_STRVAR(splitlines__doc__,
 "B.splitlines([keepends]) -> list of lines\n\
@@ -309,7 +309,7 @@ stringlib_splitlines(PyObject *self, PyObject *args)
     char *data;
 
     if (!PyArg_ParseTuple(args, "|i:splitlines", &keepends))
-        return NULL;
+    return NULL;
 
     data = STRINGLIB_STR(self);
     len = STRINGLIB_LEN(self);
@@ -324,31 +324,31 @@ stringlib_splitlines(PyObject *self, PyObject *args)
 
     list = PyList_New(0);
     if (!list)
-        goto onError;
+    goto onError;
 
     for (i = j = 0; i < len; ) {
-	Py_ssize_t eol;
+    Py_ssize_t eol;
 
-	/* Find a line and append it */
-	while (i < len && data[i] != '\n' && data[i] != '\r')
-	    i++;
+    /* Find a line and append it */
+    while (i < len && data[i] != '\n' && data[i] != '\r')
+        i++;
 
-	/* Skip the line break reading CRLF as one line break */
-	eol = i;
-	if (i < len) {
-	    if (data[i] == '\r' && i + 1 < len &&
-		data[i+1] == '\n')
-		i += 2;
-	    else
-		i++;
-	    if (keepends)
-		eol = i;
-	}
-	_STRINGLIB_SPLIT_APPEND(data, j, eol);
-	j = i;
+    /* Skip the line break reading CRLF as one line break */
+    eol = i;
+    if (i < len) {
+        if (data[i] == '\r' && i + 1 < len &&
+        data[i+1] == '\n')
+        i += 2;
+        else
+        i++;
+        if (keepends)
+        eol = i;
+    }
+    _STRINGLIB_SPLIT_APPEND(data, j, eol);
+    j = i;
     }
     if (j < len) {
-	_STRINGLIB_SPLIT_APPEND(data, j, len);
+    _STRINGLIB_SPLIT_APPEND(data, j, len);
     }
 
     return list;

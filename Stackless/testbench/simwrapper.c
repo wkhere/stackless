@@ -16,8 +16,8 @@ int PySW_InitWrapper()
 {
   if( fs_wrapper_init )
   {
-	fs_wrapper_init = 0;
-	// Add pending call handler to allow returning from never-ending loops.
+    fs_wrapper_init = 0;
+    // Add pending call handler to allow returning from never-ending loops.
     Py_AddPendingCall(PendingCalls, NULL);
 
   }
@@ -49,8 +49,8 @@ int PySW_DeleteTasklet(PyObject *tasklet)
   PyTaskletObject *task = (PyTaskletObject *) tasklet;
   int ret = 0;
   if( tasklet ) {
-	if ( PyTasklet_Alive( task ))
-		ret = PyTasklet_Kill( task );
+    if ( PyTasklet_Alive( task ))
+        ret = PyTasklet_Kill( task );
     Py_DECREF( task );
   }
   return ret;
@@ -61,7 +61,7 @@ int PySW_IsTaskletRunning( PyObject *tasklet )
   PyTaskletObject *task = (PyTaskletObject *) tasklet;
   int ret = 0;
   if( tasklet ) {
-	ret = PyTasklet_IsCurrent( task );
+    ret = PyTasklet_IsCurrent( task );
   }
   return ret;
 }
@@ -89,14 +89,14 @@ int PySW_RunTasklet(PyObject *tasklet )
 {
   if( tasklet )
   {
-	int ret;
+    int ret;
     PyObject  *args = PyTuple_New(0);
-	PyTaskletObject *task = (PyTaskletObject *) tasklet;
-	
-	ret = PyTasklet_Setup(task, args, NULL );
-	if (ret) return ret;
-	ret = PyTasklet_Run(task);
-	return ret;
+    PyTaskletObject *task = (PyTaskletObject *) tasklet;
+
+    ret = PyTasklet_Setup(task, args, NULL );
+    if (ret) return ret;
+    ret = PyTasklet_Run(task);
+    return ret;
   }
 
   return -1;
@@ -104,17 +104,17 @@ int PySW_RunTasklet(PyObject *tasklet )
 
 int wrap(PyObject *ign)
 {
-	Py_XDECREF(ign);
-	return ign ? 0 : -1;
+    Py_XDECREF(ign);
+    return ign ? 0 : -1;
 }
 
 int PySW_SuspendTasklet()
 {
   PyTaskletObject *task = (PyTaskletObject* ) PyStackless_GetCurrent();
-  if( task )	
+  if( task )
   {
     Py_DECREF(task);
-	return wrap(PyStackless_Schedule(Py_None, 0));
+    return wrap(PyStackless_Schedule(Py_None, 0));
   }
   else
   {
@@ -124,15 +124,15 @@ int PySW_SuspendTasklet()
 
 int PySW_ContinueTasklet( PyObject *tasklet )
 {
-  if( tasklet )	
+  if( tasklet )
   {
-	int ret;
-	PyTaskletObject *task = (PyTaskletObject* ) tasklet;
+    int ret;
+    PyTaskletObject *task = (PyTaskletObject* ) tasklet;
 
-	ret = PyTasklet_Insert(task);
+    ret = PyTasklet_Insert(task);
     if (ret == 0)
-	    ret = wrap(PyStackless_Schedule(Py_None, 0));
-	return ret;
+        ret = wrap(PyStackless_Schedule(Py_None, 0));
+    return ret;
   }
   else
   {
@@ -142,9 +142,9 @@ int PySW_ContinueTasklet( PyObject *tasklet )
 
 int PySW_CleanupTasklet( PyObject *tasklet )
 {
-  if( tasklet && PyTasklet_Alive((PyTaskletObject *) tasklet))	
+  if( tasklet && PyTasklet_Alive((PyTaskletObject *) tasklet))
   {
-	return PyTasklet_Kill( (PyTaskletObject *) tasklet);
+    return PyTasklet_Kill( (PyTaskletObject *) tasklet);
   }
   else
   {

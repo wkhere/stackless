@@ -30,28 +30,28 @@
 static int
 slp_switch(void)
 {
-	register int *stackref, stsizediff;
+    register int *stackref, stsizediff;
 #if STACKLESS_FRHACK
-	__asm__ volatile ("" : : : "esi", "edi");
+    __asm__ volatile ("" : : : "esi", "edi");
 #else
-	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+    __asm__ volatile ("" : : : "ebx", "esi", "edi");
 #endif
-	__asm__ ("movl %%esp, %0" : "=g" (stackref));
-	{
- 		SLP_SAVE_STATE(stackref, stsizediff);
-		__asm__ volatile (
-		    "addl %0, %%esp\n"
-		    "addl %0, %%ebp\n"
-		    :
-		    : "r" (stsizediff)
-		    );
-		SLP_RESTORE_STATE();
-		return 0;
-	}
+    __asm__ ("movl %%esp, %0" : "=g" (stackref));
+    {
+        SLP_SAVE_STATE(stackref, stsizediff);
+        __asm__ volatile (
+            "addl %0, %%esp\n"
+            "addl %0, %%ebp\n"
+            :
+            : "r" (stsizediff)
+            );
+        SLP_RESTORE_STATE();
+        return 0;
+    }
 #if STACKLESS_FRHACK
-	__asm__ volatile ("" : : : "esi", "edi");
+    __asm__ volatile ("" : : : "esi", "edi");
 #else
-	__asm__ volatile ("" : : : "ebx", "esi", "edi");
+    __asm__ volatile ("" : : : "ebx", "esi", "edi");
 #endif
 }
 
@@ -62,7 +62,7 @@ slp_switch(void)
  * further self-processing support
  */
 
-/* 
+/*
  * if you want to add self-inspection tools, place them
  * here. See the x86_msvc for the necessary defines.
  * These features are highly experimental und not

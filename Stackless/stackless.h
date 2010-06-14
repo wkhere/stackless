@@ -38,29 +38,29 @@ extern "C" {
 
 #ifdef STACKLESS_OFF
 #undef STACKLESS
-	/* an option to switch it off */
+    /* an option to switch it off */
 #elif defined(MS_WIN32) && !defined(MS_WIN64) && defined(_M_IX86)
-	/* MS Visual Studio on X86 */
+    /* MS Visual Studio on X86 */
 #elif defined(_WIN64) && defined(_M_X64)
-	/* microsoft on 64 bit x64 thingies */
+    /* microsoft on 64 bit x64 thingies */
 #elif defined(__GNUC__) && defined(__i386__)
-	/* gcc on X86 */
+    /* gcc on X86 */
 #elif defined(__GNUC__) && defined(__amd64__)
-	/* gcc on AMD64 */
+    /* gcc on AMD64 */
 #elif defined(__GNUC__) && defined(__PPC__) && defined(__linux__)
-	/* gcc on PowerPC */
+    /* gcc on PowerPC */
 #elif defined(__GNUC__) && defined(__ppc__) && defined(__APPLE__)
-	/* Apple MacOS X on PowerPC */
+    /* Apple MacOS X on PowerPC */
 #elif defined(__GNUC__) && defined(sparc) && defined(sun)
-	/* SunOs on sparc */
+    /* SunOs on sparc */
 #elif defined(__GNUC__) && defined(__s390__) && defined(__linux__)
-	/* Linux/S390 */
+    /* Linux/S390 */
 #elif defined(__GNUC__) && defined(__s390x__) && defined(__linux__)
-	/* Linux/S390 zSeries */
+    /* Linux/S390 zSeries */
 #elif defined(__GNUC__) && defined(__mips__) && defined(__linux__)
-	/* MIPS */
+    /* MIPS */
 #else
-	/* no supported platform */
+    /* no supported platform */
 #undef STACKLESS
 #endif
 

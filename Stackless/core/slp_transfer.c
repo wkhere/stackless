@@ -25,21 +25,21 @@ static PyTaskletObject *_prev;
 #define __return(x) return (x)
 
 #define SLP_SAVE_STATE(stackref, stsizediff) \
-	intptr_t stsizeb; \
-	stackref += STACK_MAGIC; \
-	if (_cstprev != NULL) { \
-		if (slp_cstack_new(_cstprev, (intptr_t *)stackref, _prev) == NULL) __return(-1); \
-		stsizeb = slp_cstack_save(*_cstprev); \
-	} \
-	else \
-		stsizeb = (_cst->startaddr - (intptr_t *)stackref) * sizeof(intptr_t); \
-	if (_cst == NULL) __return(0); \
-	stsizediff = stsizeb - (_cst->ob_size * sizeof(intptr_t));
+    intptr_t stsizeb; \
+    stackref += STACK_MAGIC; \
+    if (_cstprev != NULL) { \
+        if (slp_cstack_new(_cstprev, (intptr_t *)stackref, _prev) == NULL) __return(-1); \
+        stsizeb = slp_cstack_save(*_cstprev); \
+    } \
+    else \
+        stsizeb = (_cst->startaddr - (intptr_t *)stackref) * sizeof(intptr_t); \
+    if (_cst == NULL) __return(0); \
+    stsizediff = stsizeb - (_cst->ob_size * sizeof(intptr_t));
 
 #define SLP_RESTORE_STATE() \
-	if (_cst != NULL) { \
-		slp_cstack_restore(_cst); \
-	}
+    if (_cst != NULL) { \
+        slp_cstack_restore(_cst); \
+    }
 
 /* This define is no longer needed now? */
 #define SLP_EVAL
@@ -63,17 +63,17 @@ static PyTaskletObject *_prev;
 #define __return(x) { exitcode = x; goto exit; }
 
 intptr_t slp_save_state(intptr_t *stack){
-	intptr_t exitcode;
-	intptr_t diff;
-	SLP_SAVE_STATE(stack, diff);
-	return diff;
+    intptr_t exitcode;
+    intptr_t diff;
+    SLP_SAVE_STATE(stack, diff);
+    return diff;
 exit:
-	/* hack: flag a problem by setting the value to odd */
-	return exitcode | 1;
+    /* hack: flag a problem by setting the value to odd */
+    return exitcode | 1;
 }
 
 void slp_restore_state(void){
-	SLP_RESTORE_STATE();
+    SLP_RESTORE_STATE();
 }
 
 extern int slp_switch(void);
@@ -82,81 +82,81 @@ extern int slp_switch(void);
 
 static int
 climb_stack_and_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
-			 PyTaskletObject *prev)
+                         PyTaskletObject *prev)
 {
-	/*
-	 * there are cases where we have been initialized
-	 * in some deep stack recursion, but later on we
-	 * need to switch from a higher stacklevel, and the
-	 * needed stack size becomes *negative* :-))
-	 */
-	PyThreadState *ts = PyThreadState_GET();
-	intptr_t probe;
-	ptrdiff_t needed = &probe - ts->st.cstack_base;
-	/* in rare cases, the need might have vanished due to the recursion */
-	intptr_t *goobledigoobs;
-	if (needed > 0) {
-		goobledigoobs = alloca(needed * sizeof(intptr_t));
-		if (goobledigoobs == NULL)
-			return -1;
-	}
-	return slp_transfer(cstprev, cst, prev);
+    /*
+     * there are cases where we have been initialized
+     * in some deep stack recursion, but later on we
+     * need to switch from a higher stacklevel, and the
+     * needed stack size becomes *negative* :-))
+     */
+    PyThreadState *ts = PyThreadState_GET();
+    intptr_t probe;
+    ptrdiff_t needed = &probe - ts->st.cstack_base;
+    /* in rare cases, the need might have vanished due to the recursion */
+    intptr_t *goobledigoobs;
+    if (needed > 0) {
+        goobledigoobs = alloca(needed * sizeof(intptr_t));
+        if (goobledigoobs == NULL)
+            return -1;
+    }
+    return slp_transfer(cstprev, cst, prev);
 }
 
 int
 slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
-	     PyTaskletObject *prev)
+             PyTaskletObject *prev)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	int error;
+    PyThreadState *ts = PyThreadState_GET();
+    int error;
 
-	/* since we change the stack we must assure that the protocol was met */
-	STACKLESS_ASSERT();
+    /* since we change the stack we must assure that the protocol was met */
+    STACKLESS_ASSERT();
 
-	if ((intptr_t *) &ts > ts->st.cstack_base)
-		return climb_stack_and_transfer(cstprev, cst, prev);
-	if (cst == NULL || cst->ob_size == 0)
-		cst = ts->st.initial_stub;
-	if (cst != NULL) {
-		if (cst->tstate != ts) {
-			PyErr_SetString(PyExc_SystemError,
-				"bad thread state in transfer");
-			return -1;
-		}
-		if (ts->st.cstack_base != cst->startaddr) {
-			PyErr_SetString(PyExc_SystemError,
-				"bad stack reference in transfer");
-			return -1;
-		}
-		/*
-		 * if stacks are same and refcount==1, it must be the same
-		 * task. In this case, we would destroy the target before
-		 * switching. Therefore, we simply don't switch, just save.
-		 */
-		if (cstprev && *cstprev == cst && cst->ob_refcnt == 1)
-			cst = NULL;
-	}
-	_cstprev = cstprev;
-	_cst = cst;
-	_prev = prev;
-	error = slp_switch();
-	if (_cst && !error) {
-		/* record the context of the target stack.  Can't do it before the switch because
-		 * when saving the stack, the serial number is taken from serial_last_jump
-		 */
-		ts->st.serial_last_jump = _cst->serial;
+    if ((intptr_t *) &ts > ts->st.cstack_base)
+        return climb_stack_and_transfer(cstprev, cst, prev);
+    if (cst == NULL || cst->ob_size == 0)
+        cst = ts->st.initial_stub;
+    if (cst != NULL) {
+        if (cst->tstate != ts) {
+            PyErr_SetString(PyExc_SystemError,
+                "bad thread state in transfer");
+            return -1;
+        }
+        if (ts->st.cstack_base != cst->startaddr) {
+            PyErr_SetString(PyExc_SystemError,
+                "bad stack reference in transfer");
+            return -1;
+        }
+        /*
+         * if stacks are same and refcount==1, it must be the same
+         * task. In this case, we would destroy the target before
+         * switching. Therefore, we simply don't switch, just save.
+         */
+        if (cstprev && *cstprev == cst && cst->ob_refcnt == 1)
+            cst = NULL;
+    }
+    _cstprev = cstprev;
+    _cst = cst;
+    _prev = prev;
+    error = slp_switch();
+    if (_cst && !error) {
+        /* record the context of the target stack.  Can't do it before the switch because
+         * when saving the stack, the serial number is taken from serial_last_jump
+         */
+        ts->st.serial_last_jump = _cst->serial;
 
-		/* release any objects that needed to wait until after the switch */
-		Py_CLEAR(ts->st.del_post_switch);
-	}
-	return error;
+        /* release any objects that needed to wait until after the switch */
+        Py_CLEAR(ts->st.del_post_switch);
+    }
+    return error;
 }
 
 #ifdef Py_DEBUG
 int
 slp_transfer_return(PyCStackObject *cst)
 {
-	return slp_transfer(NULL, cst, NULL);
+    return slp_transfer(NULL, cst, NULL);
 }
 #endif
 
@@ -167,23 +167,23 @@ slp_transfer_return(PyCStackObject *cst)
  */
 
 #define SLP_STACK_BEGIN(stackref, stsizediff) \
-	int stsizeb; \
-	\
-	stackref += STACK_MAGIC; \
-	if (_cstprev != NULL) { \
-		if (slp_cstack_new(_cstprev, (intptr_t*)stackref, _prev) == NULL) \
-			return -1; \
-		stsizeb = slp_cstack_save(*_cstprev); \
-	} \
-	else \
-		stsizeb = (_cst->startaddr - stackref) * sizeof(int*); \
-	if (_cst == NULL) return 0; \
-	stsizediff = stsizeb - (_cst->ob_size * sizeof(int*));
+    int stsizeb; \
+    \
+    stackref += STACK_MAGIC; \
+    if (_cstprev != NULL) { \
+        if (slp_cstack_new(_cstprev, (intptr_t*)stackref, _prev) == NULL) \
+            return -1; \
+        stsizeb = slp_cstack_save(*_cstprev); \
+    } \
+    else \
+        stsizeb = (_cst->startaddr - stackref) * sizeof(int*); \
+    if (_cst == NULL) return 0; \
+    stsizediff = stsizeb - (_cst->ob_size * sizeof(int*));
 
 #define SLP_STACK_END() \
-	if (_cst != NULL) { \
-		slp_cstack_restore(_cst); \
-	}
+    if (_cst != NULL) { \
+        slp_cstack_restore(_cst); \
+    }
 
 #if 0
 /* disabled by now. Also need support for x64 asm file... */
@@ -192,8 +192,8 @@ slp_transfer_return(PyCStackObject *cst)
 int
 slp_transfer_stack(PyCStackObject **cstprev, PyCStackObject *cst)
 {
-	/* this is defunct, no idea how it must be */
-	return slp_switch_stack();
+    /* this is defunct, no idea how it must be */
+    return slp_switch_stack();
 }
 #endif
 

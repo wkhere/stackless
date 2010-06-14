@@ -53,21 +53,21 @@
 static int
 slp_switch(void)
 {
-	register int *stackref, stsizediff;
-	__asm mov stackref, esp;
-	/* modify EBX, ESI and EDI in order to get them preserved */
-	__asm mov ebx, ebx;
-	__asm xchg esi, edi;
-	{
-	    SLP_SAVE_STATE(stackref, stsizediff);
-	    __asm {
-		mov     eax, stsizediff
-		add     esp, eax
-		add     ebp, eax
-	    }
-	    SLP_RESTORE_STATE();
-	    return 0;
-	}
+    register int *stackref, stsizediff;
+    __asm mov stackref, esp;
+    /* modify EBX, ESI and EDI in order to get them preserved */
+    __asm mov ebx, ebx;
+    __asm xchg esi, edi;
+    {
+        SLP_SAVE_STATE(stackref, stsizediff);
+        __asm {
+        mov     eax, stsizediff
+        add     esp, eax
+        add     ebp, eax
+        }
+        SLP_RESTORE_STATE();
+        return 0;
+    }
 #pragma warning(default:4731)
 }
 
@@ -89,6 +89,6 @@ static int IS_ON_STACK(void*p)
     int stackref;
     int stackbase = ((int)&stackref) & 0xfffff000;
     return (int)p >= stackbase && (int)p < stackbase + 0x00100000;
-} 
+}
 
 #endif

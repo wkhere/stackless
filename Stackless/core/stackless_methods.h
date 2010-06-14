@@ -14,20 +14,20 @@ typedef struct {
 #define MFLAG_OFS_IND(meth) MFLAG_OFS(meth) + MFLAG_IND
 
 static _stackless_method _stackless_methtable[] = {
-	/* from classobject.c */
-	{&PyInstance_Type,		MFLAG_OFS(tp_call)},
-	{&PyMethod_Type,		MFLAG_OFS(tp_call)},
-	/* from descrobject.c */
-	{&PyMethodDescr_Type,		MFLAG_OFS(tp_call)},
-	{&PyClassMethodDescr_Type,	MFLAG_OFS(tp_call)},
-	{&PyMethodWrapper_Type,		MFLAG_OFS(tp_call)},
-	/* from funcobject.c */
-	{&PyFunction_Type,		MFLAG_OFS(tp_call)},
-	/* from genobject.c */
-	{&PyGen_Type,			MFLAG_OFS(tp_iternext)},
-	/* from methodobject.c */
-	{&PyCFunction_Type,		MFLAG_OFS(tp_call)},
-	/* from channelobject.c */
-	{&PyChannel_TypePtr,		MFLAG_OFS_IND(tp_iternext)},
-	{0, 0} /* sentinel */
+    /* from classobject.c */
+    {&PyInstance_Type,                  MFLAG_OFS(tp_call)},
+    {&PyMethod_Type,                    MFLAG_OFS(tp_call)},
+    /* from descrobject.c */
+    {&PyMethodDescr_Type,               MFLAG_OFS(tp_call)},
+    {&PyClassMethodDescr_Type,          MFLAG_OFS(tp_call)},
+    {&PyMethodWrapper_Type,             MFLAG_OFS(tp_call)},
+    /* from funcobject.c */
+    {&PyFunction_Type,                  MFLAG_OFS(tp_call)},
+    /* from genobject.c */
+    {&PyGen_Type,                       MFLAG_OFS(tp_iternext)},
+    /* from methodobject.c */
+    {&PyCFunction_Type,                 MFLAG_OFS(tp_call)},
+    /* from channelobject.c */
+    {&PyChannel_TypePtr,                MFLAG_OFS_IND(tp_iternext)},
+    {0, 0} /* sentinel */
 };

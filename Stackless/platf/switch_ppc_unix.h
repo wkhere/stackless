@@ -40,23 +40,23 @@
 static int
 slp_switch(void)
 {
-	register int *stackref, stsizediff;
-	__asm__ volatile ("" : : : REGS_TO_SAVE);
-	__asm__ ("mr %0, 1" : "=g" (stackref) : );
-	{
-		SLP_SAVE_STATE(stackref, stsizediff);
-		__asm__ volatile (
-		    "mr 11, %0\n"
-		    "add 1, 1, 11\n"
-		    "add 30, 30, 11\n"
-		    : /* no outputs */
-		    : "g" (stsizediff)
-		    : "11"
-		    );
-		SLP_RESTORE_STATE();
-		return 0;
-	}
-	__asm__ volatile ("" : : : REGS_TO_SAVE);
+    register int *stackref, stsizediff;
+    __asm__ volatile ("" : : : REGS_TO_SAVE);
+    __asm__ ("mr %0, 1" : "=g" (stackref) : );
+    {
+        SLP_SAVE_STATE(stackref, stsizediff);
+        __asm__ volatile (
+            "mr 11, %0\n"
+            "add 1, 1, 11\n"
+            "add 30, 30, 11\n"
+            : /* no outputs */
+            : "g" (stsizediff)
+            : "11"
+            );
+        SLP_RESTORE_STATE();
+        return 0;
+    }
+    __asm__ volatile ("" : : : REGS_TO_SAVE);
 }
 
 #endif
@@ -65,7 +65,7 @@ slp_switch(void)
  * further self-processing support
  */
 
-/* 
+/*
  * if you want to add self-inspection tools, place them
  * here. See the x86_msvc for the necessary defines.
  * These features are highly experimental und not

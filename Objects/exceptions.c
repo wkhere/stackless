@@ -203,7 +203,7 @@ BaseException_setstate(PyObject *self, PyObject *state)
 static PyMethodDef BaseException_methods[] = {
    {"__reduce__", (PyCFunction)BaseException_reduce, METH_NOARGS },
    {"__setstate__", (PyCFunction)BaseException_setstate, METH_O },
-#ifdef Py_USING_UNICODE   
+#ifdef Py_USING_UNICODE
    {"__unicode__", (PyCFunction)BaseException_unicode, METH_NOARGS },
 #endif
    {NULL, NULL, 0, NULL},
@@ -222,7 +222,7 @@ BaseException_getitem(PyBaseExceptionObject *self, Py_ssize_t index)
 
 static PyObject *
 BaseException_getslice(PyBaseExceptionObject *self,
-			Py_ssize_t start, Py_ssize_t stop)
+                        Py_ssize_t start, Py_ssize_t stop)
 {
     if (PyErr_WarnPy3k("__getslice__ not supported for exception "
                        "classes in 3.x; use args attribute", 1) < 0)
@@ -301,37 +301,37 @@ BaseException_set_args(PyBaseExceptionObject *self, PyObject *val)
 static PyObject *
 BaseException_get_message(PyBaseExceptionObject *self)
 {
-	int ret;
-	ret = PyErr_WarnEx(PyExc_DeprecationWarning,
-				"BaseException.message has been deprecated as "
-				"of Python 2.6", 1);
-	if (ret < 0)
-		return NULL;
+        int ret;
+        ret = PyErr_WarnEx(PyExc_DeprecationWarning,
+                                "BaseException.message has been deprecated as "
+                                "of Python 2.6", 1);
+        if (ret < 0)
+                return NULL;
 
-	Py_INCREF(self->message);
-	return self->message;
+        Py_INCREF(self->message);
+        return self->message;
 }
 
 static int
 BaseException_set_message(PyBaseExceptionObject *self, PyObject *val)
 {
-	int ret;
-	ret = PyErr_WarnEx(PyExc_DeprecationWarning,
-				"BaseException.message has been deprecated as "
-				"of Python 2.6", 1);
-	if (ret < 0)
-		return -1;
-	Py_INCREF(val);
-	Py_DECREF(self->message);
-	self->message = val;
-	return 0;
+        int ret;
+        ret = PyErr_WarnEx(PyExc_DeprecationWarning,
+                                "BaseException.message has been deprecated as "
+                                "of Python 2.6", 1);
+        if (ret < 0)
+                return -1;
+        Py_INCREF(val);
+        Py_DECREF(self->message);
+        self->message = val;
+        return 0;
 }
 
 static PyGetSetDef BaseException_getset[] = {
     {"__dict__", (getter)BaseException_get_dict, (setter)BaseException_set_dict},
     {"args", (getter)BaseException_get_args, (setter)BaseException_set_args},
     {"message", (getter)BaseException_get_message,
-	    (setter)BaseException_set_message},
+            (setter)BaseException_set_message},
     {NULL},
 };
 
@@ -358,7 +358,7 @@ static PyTypeObject _PyExc_BaseException = {
     PyObject_GenericSetAttr,    /*tp_setattro*/
     0,                          /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
-    	Py_TPFLAGS_BASE_EXC_SUBCLASS,  /*tp_flags*/
+        Py_TPFLAGS_BASE_EXC_SUBCLASS,  /*tp_flags*/
     PyDoc_STR("Common base class for all exceptions"), /* tp_doc */
     (traverseproc)BaseException_traverse, /* tp_traverse */
     (inquiry)BaseException_clear, /* tp_clear */
@@ -1984,8 +1984,8 @@ static PyMethodDef functions[] = {
 /* crt variable checking in VisualStudio .NET 2005 */
 #include <crtdbg.h>
 
-static int	prevCrtReportMode;
-static _invalid_parameter_handler	prevCrtHandler;
+static int      prevCrtReportMode;
+static _invalid_parameter_handler       prevCrtHandler;
 
 /* Invalid parameter handler.  Sets a ValueError exception */
 static void
@@ -2145,25 +2145,25 @@ _PyExc_Init(void)
 
     PyExc_RecursionErrorInst = BaseException_new(&_PyExc_RuntimeError, NULL, NULL);
     if (!PyExc_RecursionErrorInst)
-	Py_FatalError("Cannot pre-allocate RuntimeError instance for "
-			"recursion errors");
+        Py_FatalError("Cannot pre-allocate RuntimeError instance for "
+                        "recursion errors");
     else {
-	PyBaseExceptionObject *err_inst =
-	    (PyBaseExceptionObject *)PyExc_RecursionErrorInst;
-	PyObject *args_tuple;
-	PyObject *exc_message;
-	exc_message = PyString_FromString("maximum recursion depth exceeded");
-	if (!exc_message)
-	    Py_FatalError("cannot allocate argument for RuntimeError "
-			    "pre-allocation");
-	args_tuple = PyTuple_Pack(1, exc_message);
-	if (!args_tuple)
-	    Py_FatalError("cannot allocate tuple for RuntimeError "
-			    "pre-allocation");
-	Py_DECREF(exc_message);
-	if (BaseException_init(err_inst, args_tuple, NULL))
-	    Py_FatalError("init of pre-allocated RuntimeError failed");
-	Py_DECREF(args_tuple);
+        PyBaseExceptionObject *err_inst =
+            (PyBaseExceptionObject *)PyExc_RecursionErrorInst;
+        PyObject *args_tuple;
+        PyObject *exc_message;
+        exc_message = PyString_FromString("maximum recursion depth exceeded");
+        if (!exc_message)
+            Py_FatalError("cannot allocate argument for RuntimeError "
+                            "pre-allocation");
+        args_tuple = PyTuple_Pack(1, exc_message);
+        if (!args_tuple)
+            Py_FatalError("cannot allocate tuple for RuntimeError "
+                            "pre-allocation");
+        Py_DECREF(exc_message);
+        if (BaseException_init(err_inst, args_tuple, NULL))
+            Py_FatalError("init of pre-allocated RuntimeError failed");
+        Py_DECREF(args_tuple);
     }
 
     Py_DECREF(bltinmod);

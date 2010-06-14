@@ -39,19 +39,19 @@ PyAPI_DATA(int) slp_try_stackless;
 PyAPI_DATA(PyCStackObject *) slp_cstack_chain;
 
 PyAPI_FUNC(PyCStackObject *) slp_cstack_new(PyCStackObject **cst,
-					    intptr_t *stackref,
-					    PyTaskletObject *task);
+                                            intptr_t *stackref,
+                                            PyTaskletObject *task);
 PyAPI_FUNC(size_t) slp_cstack_save(PyCStackObject *cstprev);
 PyAPI_FUNC(void) slp_cstack_restore(PyCStackObject *cst);
 
 PyAPI_FUNC(int) slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
-			     PyTaskletObject *prev);
+                             PyTaskletObject *prev);
 
 #ifdef Py_DEBUG
 PyAPI_FUNC(int) slp_transfer_return(PyCStackObject *cst);
 #else
 #define slp_transfer_return(cst) \
-		slp_transfer(NULL, (cst), NULL)
+                slp_transfer(NULL, (cst), NULL)
 #endif
 
 PyAPI_FUNC(int) _PyStackless_InitTypes(void);
@@ -72,8 +72,8 @@ PyAPI_FUNC(PyObject *) slp_eval_frame(struct _frame *f);
 
 /* the frame dispatcher */
 PyAPI_FUNC(PyObject *) slp_frame_dispatch(PyFrameObject *f,
-					  PyFrameObject *stopframe, int exc,
-					  PyObject *retval);
+                                          PyFrameObject *stopframe, int exc,
+                                          PyObject *retval);
 
 /* the frame dispatcher for toplevel tasklets */
 PyAPI_FUNC(PyObject *) slp_frame_dispatch_top(PyObject *retval);
@@ -87,17 +87,17 @@ PyAPI_FUNC(PyObject *) slp_eval_frame_newstack(struct _frame *f, int throwflag, 
 
 /* the new eval_frame loop with or without value or resuming an iterator */
 PyAPI_FUNC(PyObject *) PyEval_EvalFrame_value(struct _frame *f,  int throwflag,
-					      PyObject *retval);
+                                              PyObject *retval);
 PyAPI_FUNC(PyObject *) PyEval_EvalFrame_noval(struct _frame *f,  int throwflag,
-					      PyObject *retval);
+                                              PyObject *retval);
 PyAPI_FUNC(PyObject *) PyEval_EvalFrame_iter(struct _frame *f,  int throwflag,
-					     PyObject *retval);
+                                             PyObject *retval);
 
 /* rebirth of software stack avoidance */
 
 typedef struct {
-	PyObject_HEAD
-	PyObject *tempval;
+    PyObject_HEAD
+    PyObject *tempval;
 } PyUnwindObject;
 
 PyAPI_DATA(PyUnwindObject *) Py_UnwindToken;
@@ -125,28 +125,28 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 #ifdef Py_DEBUG
 
 #define STACKLESS_PACK(retval) \
-	(assert(Py_UnwindToken->tempval == NULL), \
-	 Py_UnwindToken->tempval = (retval), \
-	 (PyObject *) Py_UnwindToken)
+    (assert(Py_UnwindToken->tempval == NULL), \
+     Py_UnwindToken->tempval = (retval), \
+     (PyObject *) Py_UnwindToken)
 
 #define STACKLESS_UNPACK(retval) \
-	(assert(STACKLESS_UNWINDING(retval)), \
-	 retval = Py_UnwindToken->tempval, \
-	 Py_UnwindToken->tempval = NULL, retval)
+    (assert(STACKLESS_UNWINDING(retval)), \
+     retval = Py_UnwindToken->tempval, \
+     Py_UnwindToken->tempval = NULL, retval)
 
 #else
 
 #define STACKLESS_PACK(retval) \
-	(Py_UnwindToken->tempval = (retval), \
-	 (PyObject *) Py_UnwindToken)
+    (Py_UnwindToken->tempval = (retval), \
+     (PyObject *) Py_UnwindToken)
 
 #define STACKLESS_UNPACK(retval) \
-	(retval = Py_UnwindToken->tempval, retval)
+    (retval = Py_UnwindToken->tempval, retval)
 
 #endif
 
 #define STACKLESS_UNWINDING(obj) \
-	((PyObject *) (obj) == (PyObject *) Py_UnwindToken)
+    ((PyObject *) (obj) == (PyObject *) Py_UnwindToken)
 
 /* macros for setting/resetting the stackless flag */
 
@@ -154,40 +154,40 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
     (slp_enable_softswitch && !slp_in_psyco)
 
 #define STACKLESS_GETARG() int stackless = (stackless = slp_try_stackless, \
-			   slp_try_stackless = 0, stackless)
+                           slp_try_stackless = 0, stackless)
 
 #define STACKLESS_PROMOTE(func) \
-	(stackless ? slp_try_stackless = \
-	 (func)->ob_type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_CALL : 0)
+    (stackless ? slp_try_stackless = \
+     (func)->ob_type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_CALL : 0)
 
 #define STACKLESS_PROMOTE_FLAG(flag) \
-	(stackless ? slp_try_stackless = (flag) : 0)
+    (stackless ? slp_try_stackless = (flag) : 0)
 
 #define STACKLESS_PROMOTE_METHOD(obj, meth) \
-	(obj->ob_type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION ? \
-	slp_try_stackless = stackless & obj->ob_type->slpflags.meth : 0)
+    (obj->ob_type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION ? \
+    slp_try_stackless = stackless & obj->ob_type->slpflags.meth : 0)
 
 #define STACKLESS_PROMOTE_WRAPPER(wp) \
-	(slp_try_stackless = stackless & wp->descr->d_slpmask)
+    (slp_try_stackless = stackless & wp->descr->d_slpmask)
 
 #define STACKLESS_PROMOTE_ALL() (slp_try_stackless = stackless, NULL)
 
 #define STACKLESS_PROPOSE(func)                                     \
     {                                                               \
-        int stackless = STACKLESS_POSSIBLE();                       \
-        STACKLESS_PROMOTE(func);                                    \
+    int stackless = STACKLESS_POSSIBLE();                       \
+    STACKLESS_PROMOTE(func);                                    \
     }
 
 #define STACKLESS_PROPOSE_FLAG(flag)                                \
     {                                                               \
-        int stackless = STACKLESS_POSSIBLE();                       \
-	STACKLESS_PROMOTE_FLAG(flag);                               \
+    int stackless = STACKLESS_POSSIBLE();                       \
+    STACKLESS_PROMOTE_FLAG(flag);                               \
     }
 
 #define STACKLESS_PROPOSE_METHOD(obj, meth)                         \
     {                                                               \
-        int stackless = STACKLESS_POSSIBLE();                       \
-	STACKLESS_PROMOTE_METHOD(obj, meth);                        \
+    int stackless = STACKLESS_POSSIBLE();                       \
+    STACKLESS_PROMOTE_METHOD(obj, meth);                        \
     }
 
 #define STACKLESS_PROPOSE_ALL()                                     \
@@ -220,40 +220,40 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 
   GETARG()
 
-	move the slp_try_stackless flag into the local variable "stackless".
+    move the slp_try_stackless flag into the local variable "stackless".
 
   PROMOTE(func)
 
-	if stackless was set and the function's type has set
-	Py_TPFLAGS_HAVE_STACKLESS_CALL, then this flag will be
-	put back into slp_try_stackless, and we expect that the
-	function handles it correctly.
+    if stackless was set and the function's type has set
+    Py_TPFLAGS_HAVE_STACKLESS_CALL, then this flag will be
+    put back into slp_try_stackless, and we expect that the
+    function handles it correctly.
 
   PROMOTE_FLAG(flag)
 
-	is used for special cases, like PyCFunction objects. PyCFunction_Type
-	says that it supports a stackless call, but the final action depends
-	on the METH_STACKLESS flag in the object to be called. Therefore,
-	PyCFunction_Call uses PROMOTE_FLAG(flags & METH_STACKLESS) to
-	take care of PyCFunctions which don't care about it.
+    is used for special cases, like PyCFunction objects. PyCFunction_Type
+    says that it supports a stackless call, but the final action depends
+    on the METH_STACKLESS flag in the object to be called. Therefore,
+    PyCFunction_Call uses PROMOTE_FLAG(flags & METH_STACKLESS) to
+    take care of PyCFunctions which don't care about it.
 
-	Another example is the "next" method of iterators. To support this,
-	the wrapperobject's type has the Py_TPFLAGS_HAVE_STACKLESS_CALL
-	flag set, but wrapper_call then examines the wrapper descriptors
-	flags if PyWrapperFlag_STACKLESS is set. "next" has it set.
-	It also checks whether Py_TPFLAGS_HAVE_STACKLESS_CALL is set
-	for the iterator's type.
+    Another example is the "next" method of iterators. To support this,
+    the wrapperobject's type has the Py_TPFLAGS_HAVE_STACKLESS_CALL
+    flag set, but wrapper_call then examines the wrapper descriptors
+    flags if PyWrapperFlag_STACKLESS is set. "next" has it set.
+    It also checks whether Py_TPFLAGS_HAVE_STACKLESS_CALL is set
+    for the iterator's type.
 
   PROMOTE_ALL()
 
-	is used for cases where we know that the called function will take
-	care of our object, and we need no test. For example, PyObject_Call
-	uses PROMOTE, itself, so we don't need to check further.
+    is used for cases where we know that the called function will take
+    care of our object, and we need no test. For example, PyObject_Call
+    uses PROMOTE, itself, so we don't need to check further.
 
   ASSERT()
 
-	make sure that slp_try_stackless was cleared. This debug feature
-	tries to ensure that no unexpected nonrecursive call can happen.
+    make sure that slp_try_stackless was cleared. This debug feature
+    tries to ensure that no unexpected nonrecursive call can happen.
 
   Some functions which are known to be stackless by nature
   just use the PROPOSE macros. They do not care about prior state.
@@ -285,66 +285,66 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 
 #define SLP_CHAIN_INSERT(__objtype, __chain, __task, __next, __prev) \
 { \
-	__objtype *l, *r; \
-	assert((__task)->__next == NULL); \
-	assert((__task)->__prev == NULL); \
-	if (*(__chain) == NULL) { \
-		(__task)->__next = (__task)->__prev = (__task); \
-		*(__chain) = (__task); \
-	} \
-	else { \
-		/* insert at end */ \
-		r = *(__chain); \
-		l = r->__prev; \
-		l->__next = r->__prev = (__task); \
-		(__task)->__prev = l; \
-		(__task)->__next = r; \
-	} \
+    __objtype *l, *r; \
+    assert((__task)->__next == NULL); \
+    assert((__task)->__prev == NULL); \
+    if (*(__chain) == NULL) { \
+        (__task)->__next = (__task)->__prev = (__task); \
+        *(__chain) = (__task); \
+    } \
+    else { \
+        /* insert at end */ \
+        r = *(__chain); \
+        l = r->__prev; \
+        l->__next = r->__prev = (__task); \
+        (__task)->__prev = l; \
+        (__task)->__next = r; \
+    } \
 }
 
 #define SLP_CHAIN_REMOVE(__objtype, __chain, __task, __next, __prev) \
 { \
-	__objtype *l, *r; \
-	if (*(__chain) == NULL) { \
-		(__task) = NULL; \
-	} \
-	else { \
-		/* remove current */ \
-		(__task) = *(__chain); \
-		l = (__task)->__prev; \
-		r = (__task)->__next; \
-		l->__next = r; \
-		r->__prev = l; \
-		*(__chain) = r; \
-		if (*(__chain)==(__task)) \
-		    *(__chain) = NULL;  /* short circuit */ \
-		(__task)->__prev = NULL; \
-		(__task)->__next = NULL; \
-	} \
+    __objtype *l, *r; \
+    if (*(__chain) == NULL) { \
+        (__task) = NULL; \
+    } \
+    else { \
+        /* remove current */ \
+        (__task) = *(__chain); \
+        l = (__task)->__prev; \
+        r = (__task)->__next; \
+        l->__next = r; \
+        r->__prev = l; \
+        *(__chain) = r; \
+        if (*(__chain)==(__task)) \
+            *(__chain) = NULL;  /* short circuit */ \
+        (__task)->__prev = NULL; \
+        (__task)->__next = NULL; \
+    } \
 }
 
 /* these versions operate on an embedded head, which channels use now */
 
 #define SLP_HEADCHAIN_INSERT(__objtype, __chan, __task, __next, __prev) \
 { \
-	__objtype *__head = (__objtype *) __chan; \
-	assert((__task)->__next == NULL); \
-	assert((__task)->__prev == NULL); \
-	/* insert at end */ \
-	(__task)->__prev = (__head)->__prev; \
-	(__task)->__next = (__head); \
-	(__head)->__prev->next = (__task); \
-	(__head)->__prev = (__task); \
+    __objtype *__head = (__objtype *) __chan; \
+    assert((__task)->__next == NULL); \
+    assert((__task)->__prev == NULL); \
+    /* insert at end */ \
+    (__task)->__prev = (__head)->__prev; \
+    (__task)->__next = (__head); \
+    (__head)->__prev->next = (__task); \
+    (__head)->__prev = (__task); \
 }
 
 #define SLP_HEADCHAIN_REMOVE(__task, __next, __prev) \
 { \
-	assert((__task)->__next != NULL); \
-	assert((__task)->__prev != NULL); \
-	/* remove at front */ \
-	(__task)->__next->__prev = (__task)->prev; \
-	(__task)->__prev->__next = (__task)->next; \
-	(__task)->__next = (__task)->__prev = NULL; \
+    assert((__task)->__next != NULL); \
+    assert((__task)->__prev != NULL); \
+    /* remove at front */ \
+    (__task)->__next->__prev = (__task)->prev; \
+    (__task)->__prev->__next = (__task)->next; \
+    (__task)->__next = (__task)->__prev = NULL; \
 }
 
 /* operations on chains */
@@ -353,12 +353,12 @@ PyAPI_FUNC(void) slp_current_insert(PyTaskletObject *task);
 PyAPI_FUNC(void) slp_current_insert_after(PyTaskletObject *task);
 PyAPI_FUNC(PyTaskletObject *) slp_current_remove(void);
 PyAPI_FUNC(void) slp_channel_insert(PyChannelObject *channel,
-				    PyTaskletObject *task, int dir);
+                                    PyTaskletObject *task, int dir);
 PyAPI_FUNC(PyTaskletObject *) slp_channel_remove(PyChannelObject *channel,
-						 int dir);
+                                                 int dir);
 PyAPI_FUNC(PyTaskletObject *) slp_channel_remove_specific(
-				    PyChannelObject *channel,
-				    int dir, PyTaskletObject *task);
+                                    PyChannelObject *channel,
+                                    int dir, PyTaskletObject *task);
 PyAPI_FUNC(PyTaskletObject *) slp_channel_remove_slow(PyTaskletObject *task);
 
 /* recording the main thread state */
@@ -372,51 +372,51 @@ PyAPI_FUNC(int) slp_ensure_linkage(PyTaskletObject *task);
 /* tasklet/scheduling operations */
 
 PyAPI_FUNC(PyObject *) slp_tasklet_new(PyTypeObject *type, PyObject *args,
-				       PyObject *kwds);
+                                       PyObject *kwds);
 
 PyAPI_FUNC(PyObject *) slp_schedule_task(PyTaskletObject *prev,
-					 PyTaskletObject *next,
-					 int stackless);
+                                         PyTaskletObject *next,
+                                         int stackless);
 
 PyAPI_FUNC(int) initialize_main_and_current(void);
 
 /* setting the tasklet's tempval, optimized for no change */
 
 #define TASKLET_SETVAL(task, val) \
-	if ((task)->tempval != (PyObject *) val) { \
-		Py_INCREF(val); \
-		TASKLET_SETVAL_OWN(task, val); \
-	}
+    if ((task)->tempval != (PyObject *) val) { \
+        Py_INCREF(val); \
+        TASKLET_SETVAL_OWN(task, val); \
+    }
 
 /* ditto, without incref. Made no sense to optimize. */
 
 #define TASKLET_SETVAL_OWN(task, val) \
-	{ \
-		PyObject *hold = (task)->tempval; \
-		assert(val != NULL); \
-		(task)->tempval = (PyObject *) val; \
-		Py_DECREF(hold); \
-	}
+    { \
+        PyObject *hold = (task)->tempval; \
+        assert(val != NULL); \
+        (task)->tempval = (PyObject *) val; \
+        Py_DECREF(hold); \
+    }
 
 /* exchanging values with safety check */
 
 #define TASKLET_SWAPVAL(prev, next) \
-	{ \
-		PyObject *hold = (prev)->tempval; \
-		assert((prev)->tempval != NULL); \
-		assert((next)->tempval != NULL); \
-		(prev)->tempval = (next)->tempval; \
-		(next)->tempval = hold; \
-	}
+    { \
+        PyObject *hold = (prev)->tempval; \
+        assert((prev)->tempval != NULL); \
+        assert((next)->tempval != NULL); \
+        (prev)->tempval = (next)->tempval; \
+        (next)->tempval = hold; \
+    }
 
 /* Get the value and replace it with a None */
 
 #define TASKLET_CLAIMVAL(task, val) \
-	{ \
-		*(val) = (task)->tempval; \
-		(task)->tempval = Py_None; \
-		Py_INCREF(Py_None); \
-	}
+    { \
+        *(val) = (task)->tempval; \
+        (task)->tempval = Py_None; \
+        Py_INCREF(Py_None); \
+    }
 
 
 /* exception handling */
@@ -452,40 +452,40 @@ PyAPI_FUNC(PyObject *) slp_null_error(void);
 #define VALUE_ERROR(str, ret) return (slp_value_error(str), ret)
 
 PyAPI_FUNC(PyCFrameObject *) slp_cframe_new(PyFrame_ExecFunc *exec,
-					    unsigned int linked);
+                                            unsigned int linked);
 PyAPI_FUNC(PyCFrameObject *) slp_cframe_newfunc(PyObject *func,
-						PyObject *args,
-						PyObject *kwds,
-						unsigned int linked);
+                                                PyObject *args,
+                                                PyObject *kwds,
+                                                unsigned int linked);
 
 PyAPI_FUNC(PyFrameObject *) slp_get_frame(PyTaskletObject *task);
 PyAPI_FUNC(void) slp_check_pending_irq(void);
 PyAPI_FUNC(int) slp_return_wrapper(PyObject *retval);
 PyAPI_FUNC(int) slp_int_wrapper(PyObject *retval);
 PyAPI_FUNC(int) slp_current_wrapper(int(*func)(PyTaskletObject*),
-				    PyTaskletObject *task);
+                                    PyTaskletObject *task);
 PyAPI_FUNC(int) slp_resurrect_and_kill(PyObject *self,
-				       void(*killer)(PyObject *));
+                                       void(*killer)(PyObject *));
 
 /* stackless pickling support */
 
 PyAPI_FUNC(int) slp_safe_pickling(int(*save)(PyObject *, PyObject *, int),
-				  PyObject *self, PyObject *args,
-				  int pers_save);
+                                  PyObject *self, PyObject *args,
+                                  int pers_save);
 
 /* debugging/monitoring */
 
 typedef int (slp_schedule_hook_func) (PyTaskletObject *from,
-				       PyTaskletObject *to);
+                                       PyTaskletObject *to);
 PyAPI_DATA(slp_schedule_hook_func) *_slp_schedule_fasthook;
 PyAPI_DATA(PyObject* ) _slp_schedule_hook;
 int slp_schedule_callback(PyTaskletObject *prev, PyTaskletObject *next);
 
 /* macro for use when interrupting tasklets from watchdog */
 #define TASKLET_NESTING_OK(task) \
-	(ts->st.nesting_level == 0 || \
-	 (task)->flags.ignore_nesting || \
-	 (ts->st.runflags & PY_WATCHDOG_IGNORE_NESTING))
+    (ts->st.nesting_level == 0 || \
+     (task)->flags.ignore_nesting || \
+     (ts->st.runflags & PY_WATCHDOG_IGNORE_NESTING))
 
 
 #include "stackless_api.h"

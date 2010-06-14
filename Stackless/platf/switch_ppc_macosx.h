@@ -45,30 +45,30 @@
 static int
 slp_switch(void)
 {
-	static int x = 0;
-	register intptr_t *stackref;
-	register int stsizediff;
-	__asm__ volatile (
-	    "; asm block 1\n"
-	    : /* no outputs */
-	    : "r" (x)
-	    : REGS_TO_SAVE
-	);
-	__asm__ ("; asm block 2\n\tmr %0, r1" : "=g" (stackref) : );
-	{
-		SLP_SAVE_STATE(stackref, stsizediff);
-		__asm__ volatile (
-		    "; asm block 3\n"
-		    "\tmr r11, %0\n"
-		    "\tadd r1, r1, r11\n"
-		    "\tadd r30, r30, r11\n"
-		    : /* no outputs */
-		    : "g" (stsizediff)
-		    : "r11"
-		);
-		SLP_RESTORE_STATE();
-		return 0;
-	}
+    static int x = 0;
+    register intptr_t *stackref;
+    register int stsizediff;
+    __asm__ volatile (
+        "; asm block 1\n"
+        : /* no outputs */
+        : "r" (x)
+        : REGS_TO_SAVE
+    );
+    __asm__ ("; asm block 2\n\tmr %0, r1" : "=g" (stackref) : );
+    {
+        SLP_SAVE_STATE(stackref, stsizediff);
+        __asm__ volatile (
+            "; asm block 3\n"
+            "\tmr r11, %0\n"
+            "\tadd r1, r1, r11\n"
+            "\tadd r30, r30, r11\n"
+            : /* no outputs */
+            : "g" (stsizediff)
+            : "r11"
+        );
+        SLP_RESTORE_STATE();
+        return 0;
+    }
 }
 
 #endif
