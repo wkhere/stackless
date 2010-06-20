@@ -20,11 +20,15 @@
 #
 # $Id$
 
-import os, re
-try:
-    import cPickle
-    pickle = cPickle
-except ImportError:
+import os, re, sys
+
+if sys.version_info[0] < 3 :
+    try:
+        import cPickle
+        pickle = cPickle
+    except ImportError:
+        import pickle
+else :
     import pickle
 
 import unittest
@@ -341,7 +345,7 @@ class TableDBTestCase(unittest.TestCase):
         self.tdb.Insert(tabname, {'Type': 'Unknown', 'Access': '0'})
 
         def set_type(type):
-            if type == None:
+            if type is None:
                 return 'MP3'
             return type
 

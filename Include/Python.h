@@ -95,7 +95,7 @@
 #endif
 #include "rangeobject.h"
 #include "stringobject.h"
-/* #include "memoryobject.h" */
+#include "memoryobject.h"
 #include "bufferobject.h"
 #include "bytesobject.h"
 #include "bytearrayobject.h"
@@ -110,6 +110,7 @@
 #include "classobject.h"
 #include "fileobject.h"
 #include "cobject.h"
+#include "pycapsule.h"
 #include "traceback.h"
 #include "sliceobject.h"
 #include "cellobject.h"
@@ -137,8 +138,10 @@
 #include "compile.h"
 #include "eval.h"
 
+#include "pyctype.h"
 #include "pystrtod.h"
 #include "pystrcmp.h"
+#include "dtoa.h"
 
 /* _Py_Mangle is defined in compile.c */
 PyAPI_FUNC(PyObject*) _Py_Mangle(PyObject *p, PyObject *name);

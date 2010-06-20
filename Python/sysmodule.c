@@ -126,7 +126,7 @@ sys_displayhook(PyObject *self, PyObject *o)
 PyDoc_STRVAR(displayhook_doc,
 "displayhook(object) -> None\n"
 "\n"
-"Print an object to sys.stdout and also save it in __builtin__.\n"
+"Print an object to sys.stdout and also save it in __builtin__._\n"
 );
 
 static PyObject *
@@ -557,26 +557,65 @@ recursion from causing an overflow of the C stack and crashing Python."
 PyDoc_STRVAR(getwindowsversion_doc,
 "getwindowsversion()\n\
 \n\
-Return information about the running version of Windows.\n\
-The result is a tuple of (major, minor, build, platform, text)\n\
-All elements are numbers, except text which is a string.\n\
-Platform may be 0 for win32s, 1 for Windows 9x/ME, 2 for Windows NT/2000/XP\n\
-"
+Return information about the running version of Windows as a named tuple.\n\
+The members are named: major, minor, build, platform, service_pack,\n\
+service_pack_major, service_pack_minor, suite_mask, and product_type. For\n\
+backward compatibiliy, only the first 5 items are available by indexing.\n\
+All elements are numbers, except service_pack which is a string. Platform\n\
+may be 0 for win32s, 1 for Windows 9x/ME, 2 for Windows NT/2000/XP/Vista/7,\n\
+3 for Windows CE. Product_type may be 1 for a workstation, 2 for a domain\n\
+controller, 3 for a server."
 );
+
+static PyTypeObject WindowsVersionType = {0, 0, 0, 0, 0, 0};
+
+static PyStructSequence_Field windows_version_fields[] = {
+    {"major", "Major version number"},
+    {"minor", "Minor version number"},
+    {"build", "Build number"},
+    {"platform", "Operating system platform"},
+    {"service_pack", "Latest Service Pack installed on the system"},
+    {"service_pack_major", "Service Pack major version number"},
+    {"service_pack_minor", "Service Pack minor version number"},
+    {"suite_mask", "Bit mask identifying available product suites"},
+    {"product_type", "System product type"},
+    {0}
+};
+
+static PyStructSequence_Desc windows_version_desc = {
+    "sys.getwindowsversion",  /* name */
+    getwindowsversion_doc,    /* doc */
+    windows_version_fields,   /* fields */
+    5                         /* For backward compatibility,
+                                 only the first 5 items are accessible
+                                 via indexing, the rest are name only */
+};
 
 static PyObject *
 sys_getwindowsversion(PyObject *self)
 {
-    OSVERSIONINFO ver;
+    PyObject *version;
+    int pos = 0;
+    OSVERSIONINFOEX ver;
     ver.dwOSVersionInfoSize = sizeof(ver);
-    if (!GetVersionEx(&ver))
+    if (!GetVersionEx((OSVERSIONINFO*) &ver))
         return PyErr_SetFromWindowsErr(0);
-    return Py_BuildValue("HHHHs",
-                         ver.dwMajorVersion,
-                         ver.dwMinorVersion,
-                         ver.dwBuildNumber,
-                         ver.dwPlatformId,
-                         ver.szCSDVersion);
+
+    version = PyStructSequence_New(&WindowsVersionType);
+    if (version == NULL)
+        return NULL;
+
+    PyStructSequence_SET_ITEM(version, pos++, PyInt_FromLong(ver.dwMajorVersion));
+    PyStructSequence_SET_ITEM(version, pos++, PyInt_FromLong(ver.dwMinorVersion));
+    PyStructSequence_SET_ITEM(version, pos++, PyInt_FromLong(ver.dwBuildNumber));
+    PyStructSequence_SET_ITEM(version, pos++, PyInt_FromLong(ver.dwPlatformId));
+    PyStructSequence_SET_ITEM(version, pos++, PyString_FromString(ver.szCSDVersion));
+    PyStructSequence_SET_ITEM(version, pos++, PyInt_FromLong(ver.wServicePackMajor));
+    PyStructSequence_SET_ITEM(version, pos++, PyInt_FromLong(ver.wServicePackMinor));
+    PyStructSequence_SET_ITEM(version, pos++, PyInt_FromLong(ver.wSuiteMask));
+    PyStructSequence_SET_ITEM(version, pos++, PyInt_FromLong(ver.wProductType));
+
+    return version;
 }
 
 #endif /* MS_WINDOWS */
@@ -599,12 +638,14 @@ sys_setdlopenflags(PyObject *self, PyObject *args)
 PyDoc_STRVAR(setdlopenflags_doc,
 "setdlopenflags(n) -> None\n\
 \n\
-Set the flags that will be used for dlopen() calls. Among other\n\
-things, this will enable a lazy resolving of symbols when importing\n\
-a module, if called as sys.setdlopenflags(0)\n\
-To share symbols across extension modules, call as\n\
-sys.setdlopenflags(dl.RTLD_NOW|dl.RTLD_GLOBAL)"
-);
+Set the flags used by the interpreter for dlopen calls, such as when the\n\
+interpreter loads extension modules.  Among other things, this will enable\n\
+a lazy resolving of symbols when importing a module, if called as\n\
+sys.setdlopenflags(0).  To share symbols across extension modules, call as\n\
+sys.setdlopenflags(ctypes.RTLD_GLOBAL).  Symbolic names for the flag modules\n\
+can be either found in the ctypes module, or in the DLFCN module. If DLFCN\n\
+is not available, it can be generated from /usr/include/dlfcn.h using the\n\
+h2py script.");
 
 static PyObject *
 sys_getdlopenflags(PyObject *self, PyObject *args)
@@ -618,10 +659,10 @@ sys_getdlopenflags(PyObject *self, PyObject *args)
 PyDoc_STRVAR(getdlopenflags_doc,
 "getdlopenflags() -> int\n\
 \n\
-Return the current value of the flags that are used for dlopen()\n\
-calls. The flag constants are defined in the dl module."
-);
-#endif
+Return the current value of the flags that are used for dlopen calls.\n\
+The flag constants are defined in the ctypes and DLFCN modules.");
+
+#endif  /* HAVE_DLOPEN */
 
 #ifdef USE_MALLOPT
 /* Link with -lmalloc (or -lmpc) on an SGI */
@@ -643,20 +684,13 @@ static PyObject *
 sys_getsizeof(PyObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *res = NULL;
-    static PyObject *str__sizeof__, *gc_head_size = NULL;
+    static PyObject *str__sizeof__ = NULL, *gc_head_size = NULL;
     static char *kwlist[] = {"object", "default", 0};
     PyObject *o, *dflt = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O:getsizeof",
                                      kwlist, &o, &dflt))
         return NULL;
-
-    /* Initialize static variable needed by _PyType_Lookup */
-    if (str__sizeof__ == NULL) {
-        str__sizeof__ = PyString_InternFromString("__sizeof__");
-        if (str__sizeof__ == NULL)
-            return NULL;
-    }
 
     /* Initialize static variable for GC head size */
     if (gc_head_size == NULL) {
@@ -674,14 +708,18 @@ sys_getsizeof(PyObject *self, PyObject *args, PyObject *kwds)
         res = PyInt_FromSsize_t(PyInstance_Type.tp_basicsize);
     /* all other objects */
     else {
-        PyObject *method = _PyType_Lookup(Py_TYPE(o),
-                                          str__sizeof__);
-        if (method == NULL)
-            PyErr_Format(PyExc_TypeError,
-                         "Type %.100s doesn't define __sizeof__",
-                         Py_TYPE(o)->tp_name);
-        else
-            res = PyObject_CallFunctionObjArgs(method, o, NULL);
+        PyObject *method = _PyObject_LookupSpecial(o, "__sizeof__",
+                                                   &str__sizeof__);
+        if (method == NULL) {
+            if (!PyErr_Occurred())
+                PyErr_Format(PyExc_TypeError,
+                             "Type %.100s doesn't define __sizeof__",
+                             Py_TYPE(o)->tp_name);
+        }
+        else {
+            res = PyObject_CallFunctionObjArgs(method, NULL);
+            Py_DECREF(method);
+        }
     }
 
     /* Has a default value been given? */
@@ -806,7 +844,7 @@ static PyObject *
 sys_call_tracing(PyObject *self, PyObject *args)
 {
     PyObject *func, *funcargs;
-    if (!PyArg_UnpackTuple(args, "call_tracing", 2, 2, &func, &funcargs))
+    if (!PyArg_ParseTuple(args, "OO!:call_tracing", &func, &PyTuple_Type, &funcargs))
         return NULL;
     return _PyEval_CallTracing(func, funcargs);
 }
@@ -1047,18 +1085,21 @@ PyDoc_STR(
 "\n\
 Static objects:\n\
 \n\
+float_info -- a dict with information about the float inplementation.\n\
+long_info -- a struct sequence with information about the long implementation.\n\
 maxint -- the largest supported integer (the smallest is -maxint-1)\n\
 maxsize -- the largest supported length of containers.\n\
 maxunicode -- the largest supported character\n\
 builtin_module_names -- tuple of module names built into this interpreter\n\
 version -- the version of this interpreter as a string\n\
-version_info -- version information as a tuple\n\
+version_info -- version information as a named tuple\n\
 hexversion -- version information encoded as a single integer\n\
 copyright -- copyright notice pertaining to this interpreter\n\
 platform -- platform identifier\n\
 executable -- pathname of this Python interpreter\n\
 prefix -- prefix used to find the Python library\n\
 exec_prefix -- prefix used to find the machine-specific Python library\n\
+float_repr_style -- string indicating the style of repr() output for floats\n\
 "
 )
 #ifdef MS_WINDOWS
@@ -1120,17 +1161,18 @@ svnversion_init(void)
     const char *python, *br_start, *br_end, *br_end2, *svnversion;
     Py_ssize_t len;
     int istag;
+    int pythonlen;
 
     if (svn_initialized)
         return;
 
 #if defined(STACKLESS) || defined(STACKLESS_OFF)
     python = strstr(headurl, "/stackless/");
+    pythonlen = 11;
 #else
     python = strstr(headurl, "/python/");
+    pythonlen = 8;
 #endif
-    if (!python)
-        Py_FatalError("subversion keywords missing");
     if (!python) {
         /* XXX quick hack to get bzr working */
         *patchlevel_revision = '\0';
@@ -1141,7 +1183,7 @@ svnversion_init(void)
         /* Py_FatalError("subversion keywords missing"); */
     }
 
-    br_start = python + 11;
+    br_start = python + pythonlen;
     br_end = strchr(br_start, '/');
     assert(br_end);
 
@@ -1171,7 +1213,7 @@ svnversion_init(void)
 
 
     svnversion = _Py_svnversion();
-    if (strcmp(svnversion, "exported") != 0)
+    if (strcmp(svnversion, "Unversioned directory") != 0 && strcmp(svnversion, "exported") != 0)
         svn_revision = svnversion;
     else if (istag) {
         len = strlen(_patchlevel_revision);
@@ -1289,6 +1331,75 @@ make_flags(void)
     return seq;
 }
 
+PyDoc_STRVAR(version_info__doc__,
+"sys.version_info\n\
+\n\
+Version information as a named tuple.");
+
+static PyTypeObject VersionInfoType = {0, 0, 0, 0, 0, 0};
+
+static PyStructSequence_Field version_info_fields[] = {
+    {"major", "Major release number"},
+    {"minor", "Minor release number"},
+    {"micro", "Patch release number"},
+    {"releaselevel", "'alpha', 'beta', 'candidate', or 'release'"},
+    {"serial", "Serial release number"},
+    {0}
+};
+
+static PyStructSequence_Desc version_info_desc = {
+    "sys.version_info",     /* name */
+    version_info__doc__,    /* doc */
+    version_info_fields,    /* fields */
+    5
+};
+
+static PyObject *
+make_version_info(void)
+{
+    PyObject *version_info;
+    char *s;
+    int pos = 0;
+
+    version_info = PyStructSequence_New(&VersionInfoType);
+    if (version_info == NULL) {
+        return NULL;
+    }
+
+    /*
+     * These release level checks are mutually exclusive and cover
+     * the field, so don't get too fancy with the pre-processor!
+     */
+#if PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_ALPHA
+    s = "alpha";
+#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_BETA
+    s = "beta";
+#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_GAMMA
+    s = "candidate";
+#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_FINAL
+    s = "final";
+#endif
+
+#define SetIntItem(flag) \
+    PyStructSequence_SET_ITEM(version_info, pos++, PyInt_FromLong(flag))
+#define SetStrItem(flag) \
+    PyStructSequence_SET_ITEM(version_info, pos++, PyString_FromString(flag))
+
+    SetIntItem(PY_MAJOR_VERSION);
+    SetIntItem(PY_MINOR_VERSION);
+    SetIntItem(PY_MICRO_VERSION);
+    SetStrItem(s);
+    SetIntItem(PY_RELEASE_SERIAL);
+#undef SetIntItem
+#undef SetStrItem
+
+    if (PyErr_Occurred()) {
+        Py_CLEAR(version_info);
+        return NULL;
+    }
+    return version_info;
+}
+
 PyObject *
 _PySys_Init(void)
 {
@@ -1306,8 +1417,13 @@ _PySys_Init(void)
         PyDict_SetItemString(sysdict, key, v);          \
     Py_XDECREF(v)
 
+    /* Check that stdin is not a directory
+    Using shell redirection, you can redirect stdin to a directory,
+    crashing the Python interpreter. Catch this common mistake here
+    and output a useful error message. Note that under MS Windows,
+    the shell already prevents that. */
+#if !defined(MS_WINDOWS)
     {
-        /* XXX: does this work on Win/Win64? (see posix_fstat) */
         struct stat sb;
         if (fstat(fileno(stdin), &sb) == 0 &&
             S_ISDIR(sb.st_mode)) {
@@ -1317,6 +1433,7 @@ _PySys_Init(void)
             exit(EXIT_FAILURE);
         }
     }
+#endif
 
     /* Closing the standard FILE* if sys.std* goes aways causes problems
      * for embedded Python usages. Closing them when somebody explicitly
@@ -1358,25 +1475,6 @@ _PySys_Init(void)
                                       svn_revision));
     SET_SYS_FROM_STRING("dont_write_bytecode",
                          PyBool_FromLong(Py_DontWriteBytecodeFlag));
-    /*
-     * These release level checks are mutually exclusive and cover
-     * the field, so don't get too fancy with the pre-processor!
-     */
-#if PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_ALPHA
-    s = "alpha";
-#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_BETA
-    s = "beta";
-#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_GAMMA
-    s = "candidate";
-#elif PY_RELEASE_LEVEL == PY_RELEASE_LEVEL_FINAL
-    s = "final";
-#endif
-
-    SET_SYS_FROM_STRING("version_info",
-                        Py_BuildValue("iiisi", PY_MAJOR_VERSION,
-                                           PY_MINOR_VERSION,
-                                           PY_MICRO_VERSION, s,
-                                           PY_RELEASE_SERIAL));
     SET_SYS_FROM_STRING("api_version",
                         PyInt_FromLong(PYTHON_API_VERSION));
     SET_SYS_FROM_STRING("copyright",
@@ -1397,6 +1495,8 @@ _PySys_Init(void)
                         PyBool_FromLong(Py_Py3kWarningFlag));
     SET_SYS_FROM_STRING("float_info",
                         PyFloat_GetInfo());
+    SET_SYS_FROM_STRING("long_info",
+                        PyLong_GetInfo());
 #ifdef Py_USING_UNICODE
     SET_SYS_FROM_STRING("maxunicode",
                         PyInt_FromLong(PyUnicode_GetMax()));
@@ -1433,12 +1533,40 @@ _PySys_Init(void)
         PyDict_SetItemString(sysdict, "warnoptions", warnoptions);
     }
 
+    /* version_info */
+    if (VersionInfoType.tp_name == 0)
+        PyStructSequence_InitType(&VersionInfoType, &version_info_desc);
+    SET_SYS_FROM_STRING("version_info", make_version_info());
+    /* prevent user from creating new instances */
+    VersionInfoType.tp_init = NULL;
+    VersionInfoType.tp_new = NULL;
+
+    /* flags */
     if (FlagsType.tp_name == 0)
         PyStructSequence_InitType(&FlagsType, &flags_desc);
     SET_SYS_FROM_STRING("flags", make_flags());
     /* prevent user from creating new instances */
     FlagsType.tp_init = NULL;
     FlagsType.tp_new = NULL;
+
+
+#if defined(MS_WINDOWS)
+    /* getwindowsversion */
+    if (WindowsVersionType.tp_name == 0)
+        PyStructSequence_InitType(&WindowsVersionType, &windows_version_desc);
+    /* prevent user from creating new instances */
+    WindowsVersionType.tp_init = NULL;
+    WindowsVersionType.tp_new = NULL;
+#endif
+
+    /* float repr style: 0.03 (short) vs 0.029999999999999999 (legacy) */
+#ifndef PY_NO_SHORT_FLOAT_REPR
+    SET_SYS_FROM_STRING("float_repr_style",
+                        PyString_FromString("short"));
+#else
+    SET_SYS_FROM_STRING("float_repr_style",
+                        PyString_FromString("legacy"));
+#endif
 
 #undef SET_SYS_FROM_STRING
     if (PyErr_Occurred())
@@ -1532,11 +1660,11 @@ makeargvobject(int argc, char **argv)
 }
 
 void
-PySys_SetArgv(int argc, char **argv)
+PySys_SetArgvEx(int argc, char **argv, int updatepath)
 {
 #if defined(HAVE_REALPATH)
     char fullpath[MAXPATHLEN];
-#elif defined(MS_WINDOWS)
+#elif defined(MS_WINDOWS) && !defined(MS_WINCE)
     char fullpath[MAX_PATH];
 #endif
     PyObject *av = makeargvobject(argc, argv);
@@ -1545,7 +1673,7 @@ PySys_SetArgv(int argc, char **argv)
         Py_FatalError("no mem for sys.argv");
     if (PySys_SetObject("argv", av) != 0)
         Py_FatalError("can't assign sys.argv");
-    if (path != NULL) {
+    if (updatepath && path != NULL) {
         char *argv0 = argv[0];
         char *p = NULL;
         Py_ssize_t n = 0;
@@ -1581,7 +1709,10 @@ PySys_SetArgv(int argc, char **argv)
 #if SEP == '\\' /* Special case for MS filename syntax */
         if (argc > 0 && argv0 != NULL && strcmp(argv0, "-c") != 0) {
             char *q;
-#ifdef MS_WINDOWS
+#if defined(MS_WINDOWS) && !defined(MS_WINCE)
+            /* This code here replaces the first element in argv with the full
+            path that it represents. Under CE, there are no relative paths so
+            the argument must be the full path anyway. */
             char *ptemp;
             if (GetFullPathName(argv0,
                                sizeof(fullpath),
@@ -1630,6 +1761,12 @@ PySys_SetArgv(int argc, char **argv)
         Py_DECREF(a);
     }
     Py_DECREF(av);
+}
+
+void
+PySys_SetArgv(int argc, char **argv)
+{
+    PySys_SetArgvEx(argc, argv, 1);
 }
 
 

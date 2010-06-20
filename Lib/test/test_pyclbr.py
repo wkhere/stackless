@@ -2,7 +2,7 @@
    Test cases for pyclbr.py
    Nick Mathewson
 '''
-from test.test_support import run_unittest
+from test.test_support import run_unittest, import_module
 import sys
 from types import ClassType, FunctionType, MethodType, BuiltinFunctionType
 import pyclbr
@@ -11,8 +11,10 @@ from unittest import TestCase
 StaticMethodType = type(staticmethod(lambda: None))
 ClassMethodType = type(classmethod(lambda c: None))
 
-# This next line triggers an error on old versions of pyclbr.
+# Silence Py3k warning
+import_module('commands', deprecated=True)
 
+# This next line triggers an error on old versions of pyclbr.
 from commands import getstatus
 
 # Here we test the python class browser code.
@@ -35,21 +37,21 @@ class PyclbrTest(TestCase):
         ''' succeed iff hasattr(obj,attr) or attr in ignore. '''
         if attr in ignore: return
         if not hasattr(obj, attr): print "???", attr
-        self.failUnless(hasattr(obj, attr),
+        self.assertTrue(hasattr(obj, attr),
                         'expected hasattr(%r, %r)' % (obj, attr))
 
 
     def assertHaskey(self, obj, key, ignore):
-        ''' succeed iff obj.has_key(key) or key in ignore. '''
+        ''' succeed iff key in obj or key in ignore. '''
         if key in ignore: return
-        if not obj.has_key(key):
-            print >>sys.stderr, "***",key
-        self.failUnless(obj.has_key(key))
+        if key not in obj:
+            print >>sys.stderr, "***", key
+        self.assertIn(key, obj)
 
     def assertEqualsOrIgnored(self, a, b, ignore):
         ''' succeed iff a == b or a in ignore or b in ignore '''
         if a not in ignore and b not in ignore:
-            self.assertEquals(a, b)
+            self.assertEqual(a, b)
 
     def checkModule(self, moduleName, module=None, ignore=()):
         ''' succeed iff pyclbr.readmodule_ex(modulename) corresponds
@@ -92,12 +94,12 @@ class PyclbrTest(TestCase):
             self.assertHasattr(module, name, ignore)
             py_item = getattr(module, name)
             if isinstance(value, pyclbr.Function):
-                self.assert_(isinstance(py_item, (FunctionType, BuiltinFunctionType)))
+                self.assertIsInstance(py_item, (FunctionType, BuiltinFunctionType))
                 if py_item.__module__ != moduleName:
                     continue   # skip functions that came from somewhere else
                 self.assertEquals(py_item.__module__, value.module)
             else:
-                self.failUnless(isinstance(py_item, (ClassType, type)))
+                self.assertIsInstance(py_item, (ClassType, type))
                 if py_item.__module__ != moduleName:
                     continue   # skip classes that came from somewhere else
 
@@ -148,8 +150,10 @@ class PyclbrTest(TestCase):
 
     def test_easy(self):
         self.checkModule('pyclbr')
-        self.checkModule('doctest')
-        self.checkModule('rfc822')
+        self.checkModule('doctest', ignore=("DocTestCase",))
+        # Silence Py3k warning
+        rfc822 = import_module('rfc822', deprecated=True)
+        self.checkModule('rfc822', rfc822)
         self.checkModule('difflib')
 
     def test_decorators(self):

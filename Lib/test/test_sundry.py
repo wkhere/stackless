@@ -3,14 +3,12 @@
 from test import test_support
 import sys
 import unittest
-import warnings
 
 
 class TestUntestedModules(unittest.TestCase):
     def test_at_least_import_untested_modules(self):
-        with warnings.catch_warnings():
+        with test_support.check_warnings(quiet=True):
             import CGIHTTPServer
-            import aifc
             import audiodev
             import bdb
             import cgitb
@@ -24,7 +22,6 @@ class TestUntestedModules(unittest.TestCase):
             import distutils.filelist
             if sys.platform.startswith('win'):
                 import distutils.msvccompiler
-            import distutils.mwerkscompiler
             import distutils.text_file
             import distutils.unixccompiler
 

@@ -508,7 +508,7 @@ class Pickler:
         self.memoize(obj)
     dispatch[UnicodeType] = save_unicode
 
-    if StringType == UnicodeType:
+    if StringType is UnicodeType:
         # This is true for Jython
         def save_string(self, obj, pack=struct.pack):
             unicode = obj.isunicode()
@@ -779,30 +779,9 @@ class Pickler:
         write(GLOBAL + module + '\n' + name + '\n')
         self.memoize(obj)
 
-    def save_function(self, obj):
-        try:
-            return self.save_global(obj)
-        except PicklingError, e:
-            pass
-        # Check copy_reg.dispatch_table
-        reduce = dispatch_table.get(type(obj))
-        if reduce:
-            rv = reduce(obj)
-        else:
-            # Check for a __reduce_ex__ method, fall back to __reduce__
-            reduce = getattr(obj, "__reduce_ex__", None)
-            if reduce:
-                rv = reduce(self.proto)
-            else:
-                reduce = getattr(obj, "__reduce__", None)
-                if reduce:
-                    rv = reduce()
-                else:
-                    raise e
-        return self.save_reduce(obj=obj, *rv)
-
     dispatch[ClassType] = save_global
-    dispatch[FunctionType] = save_function
+    if "Stackless" not in sys.version:
+        dispatch[FunctionType] = save_global
     dispatch[BuiltinFunctionType] = save_global
     dispatch[TypeType] = save_global
 
@@ -830,7 +809,6 @@ def _keep_alive(x, memo):
 
 classmap = {} # called classmap for backwards compatibility
 
-# This is no longer used to find classes, but still for functions
 def whichmodule(func, funcname):
     """Figure out the module in which a function occurs.
 
@@ -1256,7 +1234,15 @@ class Unpickler:
             state, slotstate = state
         if state:
             try:
-                inst.__dict__.update(state)
+                d = inst.__dict__
+                try:
+                    for k, v in state.iteritems():
+                        d[intern(k)] = v
+                # keys in state don't have to be strings
+                # don't blow up, but don't go out of our way
+                except TypeError:
+                    d.update(state)
+
             except RuntimeError:
                 # XXX In restricted execution, the instance's __dict__
                 # is not accessible.  Use the old way of unpickling

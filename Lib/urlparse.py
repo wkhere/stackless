@@ -1,7 +1,31 @@
 """Parse (absolute and relative) URLs.
 
-See RFC 1808: "Relative Uniform Resource Locators", by R. Fielding,
-UC Irvine, June 1995.
+urlparse module is based upon the following RFC specifications.
+
+RFC 3986 (STD66): "Uniform Resource Identifiers" by T. Berners-Lee, R. Fielding
+and L.  Masinter, January 2005.
+
+RFC 2732 : "Format for Literal IPv6 Addresses in URL's by R.Hinden, B.Carpenter
+and L.Masinter, December 1999.
+
+RFC 2396:  "Uniform Resource Identifiers (URI)": Generic Syntax by T.
+Berners-Lee, R. Fielding, and L. Masinter, August 1998.
+
+RFC 2368: "The mailto URL scheme", by P.Hoffman , L Masinter, J. Zwinski, July 1998.
+
+RFC 1808: "Relative Uniform Resource Locators", by R. Fielding, UC Irvine, June
+1995.
+
+RFC 1738: "Uniform Resource Locators (URL)" by T. Berners-Lee, L. Masinter, M.
+McCahill, December 1994
+
+RFC 3986 is considered the current standard and any future changes to
+urlparse module should conform with it.  The urlparse module is
+currently not entirely compliant with this RFC due to defacto
+scenarios for parsing, and for backward compatibility purposes, some
+parsing quirks from older RFCs are retained. The testcases in
+test_urlparse.py provides a good indicator of parsing behavior.
+
 """
 
 __all__ = ["urlparse", "urlunparse", "urljoin", "urldefrag",
@@ -14,7 +38,7 @@ uses_relative = ['ftp', 'http', 'gopher', 'nntp', 'imap',
 uses_netloc = ['ftp', 'http', 'gopher', 'nntp', 'telnet',
                'imap', 'wais', 'file', 'mms', 'https', 'shttp',
                'snews', 'prospero', 'rtsp', 'rtspu', 'rsync', '',
-               'svn', 'svn+ssh', 'sftp']
+               'svn', 'svn+ssh', 'sftp','nfs','git', 'git+ssh']
 non_hierarchical = ['gopher', 'hdl', 'mailto', 'news',
                     'telnet', 'wais', 'imap', 'snews', 'sip', 'sips']
 uses_params = ['ftp', 'hdl', 'prospero', 'http', 'imap',
@@ -64,22 +88,24 @@ class ResultMixin(object):
 
     @property
     def hostname(self):
-        netloc = self.netloc
-        if "@" in netloc:
-            netloc = netloc.rsplit("@", 1)[1]
-        if ":" in netloc:
-            netloc = netloc.split(":", 1)[0]
-        return netloc.lower() or None
+        netloc = self.netloc.split('@')[-1]
+        if '[' in netloc and ']' in netloc:
+            return netloc.split(']')[0][1:].lower()
+        elif ':' in netloc:
+            return netloc.split(':')[0].lower()
+        elif netloc == '':
+            return None
+        else:
+            return netloc.lower()
 
     @property
     def port(self):
-        netloc = self.netloc
-        if "@" in netloc:
-            netloc = netloc.rsplit("@", 1)[1]
-        if ":" in netloc:
-            port = netloc.split(":", 1)[1]
+        netloc = self.netloc.split('@')[-1].split(']')[-1]
+        if ':' in netloc:
+            port = netloc.split(':')[1]
             return int(port, 10)
-        return None
+        else:
+            return None
 
 from collections import namedtuple
 
@@ -151,6 +177,9 @@ def urlsplit(url, scheme='', allow_fragments=True):
             url = url[i+1:]
             if url[:2] == '//':
                 netloc, url = _splitnetloc(url, 2)
+                if (('[' in netloc and ']' not in netloc) or
+                        (']' in netloc and '[' not in netloc)):
+                    raise ValueError("Invalid IPv6 URL")
             if allow_fragments and '#' in url:
                 url, fragment = url.split('#', 1)
             if '?' in url:
@@ -163,8 +192,12 @@ def urlsplit(url, scheme='', allow_fragments=True):
                 break
         else:
             scheme, url = url[:i].lower(), url[i+1:]
-    if scheme in uses_netloc and url[:2] == '//':
+
+    if url[:2] == '//':
         netloc, url = _splitnetloc(url, 2)
+        if (('[' in netloc and ']' not in netloc) or
+                (']' in netloc and '[' not in netloc)):
+            raise ValueError("Invalid IPv6 URL")
     if allow_fragments and scheme in uses_fragment and '#' in url:
         url, fragment = url.split('#', 1)
     if scheme in uses_query and '?' in url:
@@ -268,24 +301,29 @@ def urldefrag(url):
         return url, ''
 
 # unquote method for parse_qs and parse_qsl
-# Cannot use directly from urllib as it would create circular reference.
-# urllib uses urlparse methods ( urljoin)
+# Cannot use directly from urllib as it would create a circular reference
+# because urllib uses urlparse methods (urljoin).  If you update this function,
+# update it also in urllib.  This code duplication does not existin in Python3.
 
-_hextochr = dict(('%02x' % i, chr(i)) for i in range(256))
-_hextochr.update(('%02X' % i, chr(i)) for i in range(256))
+_hexdig = '0123456789ABCDEFabcdef'
+_hextochr = dict((a+b, chr(int(a+b,16)))
+                 for a in _hexdig for b in _hexdig)
 
 def unquote(s):
     """unquote('abc%20def') -> 'abc def'."""
     res = s.split('%')
-    for i in xrange(1, len(res)):
-        item = res[i]
+    # fastpath
+    if len(res) == 1:
+        return s
+    s = res[0]
+    for item in res[1:]:
         try:
-            res[i] = _hextochr[item[:2]] + item[2:]
+            s += _hextochr[item[:2]] + item[2:]
         except KeyError:
-            res[i] = '%' + item
+            s += '%' + item
         except UnicodeDecodeError:
-            res[i] = unichr(int(item[:2], 16)) + item[2:]
-    return "".join(res)
+            s += unichr(int(item[:2], 16)) + item[2:]
+    return s
 
 def parse_qs(qs, keep_blank_values=0, strict_parsing=0):
     """Parse a query given as a string argument.

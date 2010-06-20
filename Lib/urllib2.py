@@ -30,7 +30,9 @@ handler, the argument will be installed instead of the default.
 install_opener -- Installs a new opener as the default opener.
 
 objects of interest:
-OpenerDirector --
+
+OpenerDirector -- Sets up the User Agent as the Python-urllib client and manages
+the Handler classes, while dealing with requests and responses.
 
 Request -- An object that encapsulates the state of a request.  The
 state can be as simple as the URL.  It can also include extra HTTP
@@ -111,7 +113,7 @@ from urllib import (unwrap, unquote, splittype, splithost, quote,
      splitattr, ftpwrapper, splituser, splitpasswd, splitvalue)
 
 # support for FileHandler, proxies via environment variables
-from urllib import localhost, url2pathname, getproxies
+from urllib import localhost, url2pathname, getproxies, proxy_bypass
 
 # used in User-Agent header sent
 __version__ = sys.version[:3]
@@ -192,6 +194,7 @@ class Request:
         # self.__r_type is what's left after doing the splittype
         self.host = None
         self.port = None
+        self._tunnel_host = None
         self.data = data
         self.headers = {}
         for key, value in headers.items():
@@ -252,8 +255,13 @@ class Request:
         return self.__r_host
 
     def set_proxy(self, host, type):
-        self.host, self.type = host, type
-        self.__r_host = self.__original
+        if self.type == 'https' and not self._tunnel_host:
+            self._tunnel_host = self.host
+        else:
+            self.type = type
+            self.__r_host = self.__original
+
+        self.host = host
 
     def has_proxy(self):
         return self.__r_host == self.__original
@@ -434,14 +442,14 @@ def build_opener(*handlers):
     """Create an opener object from a list of handlers.
 
     The opener will use several default handlers, including support
-    for HTTP and FTP.
+    for HTTP, FTP and when applicable, HTTPS.
 
     If any of the handlers passed as arguments are subclasses of the
     default handlers, the default handlers will not be used.
     """
     import types
     def isclass(obj):
-        return isinstance(obj, types.ClassType) or hasattr(obj, "__bases__")
+        return isinstance(obj, (types.ClassType, type))
 
     opener = OpenerDirector()
     default_classes = [ProxyHandler, UnknownHandler, HTTPHandler,
@@ -594,7 +602,7 @@ class HTTPRedirectHandler(BaseHandler):
         fp.read()
         fp.close()
 
-        return self.parent.open(new)
+        return self.parent.open(new, timeout=req.timeout)
 
     http_error_301 = http_error_303 = http_error_307 = http_error_302
 
@@ -692,15 +700,21 @@ class ProxyHandler(BaseHandler):
     def proxy_open(self, req, proxy, type):
         orig_type = req.get_type()
         proxy_type, user, password, hostport = _parse_proxy(proxy)
+
         if proxy_type is None:
             proxy_type = orig_type
+
+        if req.host and proxy_bypass(req.host):
+            return None
+
         if user and password:
             user_pass = '%s:%s' % (unquote(user), unquote(password))
             creds = base64.b64encode(user_pass).strip()
             req.add_header('Proxy-authorization', 'Basic ' + creds)
         hostport = unquote(hostport)
         req.set_proxy(hostport, proxy_type)
-        if orig_type == proxy_type:
+
+        if orig_type == proxy_type or orig_type == 'https':
             # let other handlers take care of it
             return None
         else:
@@ -710,7 +724,7 @@ class ProxyHandler(BaseHandler):
             # {'http': 'ftp://proxy.example.com'}, we may end up turning
             # a request for http://acme.example.com/a into one for
             # ftp://proxy.example.com/a
-            return self.parent.open(req)
+            return self.parent.open(req, timeout=req.timeout)
 
 class HTTPPasswordMgr:
 
@@ -805,12 +819,21 @@ class AbstractBasicAuthHandler:
             password_mgr = HTTPPasswordMgr()
         self.passwd = password_mgr
         self.add_password = self.passwd.add_password
+        self.retried = 0
 
     def http_error_auth_reqed(self, authreq, host, req, headers):
         # host may be an authority (without userinfo) or a URL with an
         # authority
         # XXX could be multiple headers
         authreq = headers.get(authreq, None)
+
+        if self.retried > 5:
+            # retry sending the username:password 5 times before failing.
+            raise HTTPError(req.get_full_url(), 401, "basic auth failed",
+                            headers, None)
+        else:
+            self.retried += 1
+
         if authreq:
             mo = AbstractBasicAuthHandler.rx.search(authreq)
             if mo:
@@ -825,8 +848,8 @@ class AbstractBasicAuthHandler:
             auth = 'Basic %s' % base64.b64encode(raw).strip()
             if req.headers.get(self.auth_header, None) == auth:
                 return None
-            req.add_header(self.auth_header, auth)
-            return self.parent.open(req)
+            req.add_unredirected_header(self.auth_header, auth)
+            return self.parent.open(req, timeout=req.timeout)
         else:
             return None
 
@@ -887,6 +910,7 @@ class AbstractDigestAuthHandler:
         self.add_password = self.passwd.add_password
         self.retried = 0
         self.nonce_count = 0
+        self.last_nonce = None
 
     def reset_retry_count(self):
         self.retried = 0
@@ -917,7 +941,7 @@ class AbstractDigestAuthHandler:
             if req.headers.get(self.auth_header, None) == auth_val:
                 return None
             req.add_unredirected_header(self.auth_header, auth_val)
-            resp = self.parent.open(req)
+            resp = self.parent.open(req, timeout=req.timeout)
             return resp
 
     def get_cnonce(self, nonce):
@@ -961,7 +985,12 @@ class AbstractDigestAuthHandler:
                         # XXX selector: what about proxies and full urls
                         req.get_selector())
         if qop == 'auth':
-            self.nonce_count += 1
+            if nonce == self.last_nonce:
+                self.nonce_count += 1
+            else:
+                self.nonce_count = 1
+                self.last_nonce = nonce
+
             ncvalue = '%08x' % self.nonce_count
             cnonce = self.get_cnonce(nonce)
             noncebit = "%s:%s:%s:%s:%s" % (nonce, ncvalue, cnonce, qop, H(A2))
@@ -1098,9 +1127,23 @@ class AbstractHTTPHandler(BaseHandler):
         headers["Connection"] = "close"
         headers = dict(
             (name.title(), val) for name, val in headers.items())
+
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+
         try:
             h.request(req.get_method(), req.get_selector(), req.data, headers)
-            r = h.getresponse()
+            try:
+                r = h.getresponse(buffering=True)
+            except TypeError: #buffering kw not supported
+                r = h.getresponse()
         except socket.error, err: # XXX what error?
             raise URLError(err)
 
@@ -1230,8 +1273,9 @@ class FileHandler(BaseHandler):
     def get_names(self):
         if FileHandler.names is None:
             try:
-                FileHandler.names = (socket.gethostbyname('localhost'),
-                                    socket.gethostbyname(socket.gethostname()))
+                FileHandler.names = tuple(
+                    socket.gethostbyname_ex('localhost')[2] +
+                    socket.gethostbyname_ex(socket.gethostname())[2])
             except socket.gaierror:
                 FileHandler.names = (socket.gethostbyname('localhost'),)
         return FileHandler.names
@@ -1241,13 +1285,13 @@ class FileHandler(BaseHandler):
         import email.utils
         import mimetypes
         host = req.get_host()
-        file = req.get_selector()
-        localfile = url2pathname(file)
+        filename = req.get_selector()
+        localfile = url2pathname(filename)
         try:
             stats = os.stat(localfile)
             size = stats.st_size
             modified = email.utils.formatdate(stats.st_mtime, usegmt=True)
-            mtype = mimetypes.guess_type(file)[0]
+            mtype = mimetypes.guess_type(filename)[0]
             headers = mimetools.Message(StringIO(
                 'Content-type: %s\nContent-length: %d\nLast-modified: %s\n' %
                 (mtype or 'text/plain', size, modified)))
@@ -1255,8 +1299,11 @@ class FileHandler(BaseHandler):
                 host, port = splitport(host)
             if not host or \
                 (not port and socket.gethostbyname(host) in self.get_names()):
-                return addinfourl(open(localfile, 'rb'),
-                                  headers, 'file:'+file)
+                if host:
+                    origurl = 'file://' + host + filename
+                else:
+                    origurl = 'file://' + filename
+                return addinfourl(open(localfile, 'rb'), headers, origurl)
         except OSError, msg:
             # urllib2 users shouldn't expect OSErrors coming from urlopen()
             raise URLError(msg)

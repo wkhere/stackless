@@ -1,10 +1,14 @@
+from test.test_support import verbose, run_unittest, import_module
+
+#Skip these tests if either fcntl or termios is not available
+fcntl = import_module('fcntl')
+import_module('termios')
+
 import errno
-import fcntl
 import pty
 import os
 import sys
 import signal
-from test.test_support import verbose, TestSkipped, run_unittest
 import unittest
 
 TEST_STRING_1 = "I wish to buy a fish license.\n"
@@ -69,7 +73,7 @@ class PtyTest(unittest.TestCase):
             debug("Got slave_fd '%d'" % slave_fd)
         except OSError:
             # " An optional feature could not be imported " ... ?
-            raise TestSkipped, "Pseudo-terminals (seemingly) not functional."
+            raise unittest.SkipTest, "Pseudo-terminals (seemingly) not functional."
 
         self.assertTrue(os.isatty(slave_fd), 'slave_fd is not a tty')
 

@@ -1,24 +1,30 @@
-"""optparse - a powerful, extensible, and easy-to-use option parser.
+"""A powerful, extensible, and easy-to-use option parser.
 
 By Greg Ward <gward@python.net>
 
-Originally distributed as Optik; see http://optik.sourceforge.net/ .
-
-If you have problems with this module, please do not file bugs,
-patches, or feature requests with Python; instead, use Optik's
-SourceForge project page:
-  http://sourceforge.net/projects/optik
+Originally distributed as Optik.
 
 For support, use the optik-users@lists.sourceforge.net mailing list
 (http://lists.sourceforge.net/lists/listinfo/optik-users).
-"""
 
-# Python developers: please do not make changes to this file, since
-# it is automatically generated from the Optik source code.
+Simple usage example:
+
+   from optparse import OptionParser
+
+   parser = OptionParser()
+   parser.add_option("-f", "--file", dest="filename",
+                     help="write report to FILE", metavar="FILE")
+   parser.add_option("-q", "--quiet",
+                     action="store_false", dest="verbose", default=True,
+                     help="don't print status messages to stdout")
+
+   (options, args) = parser.parse_args()
+"""
 
 __version__ = "1.5.3"
 
 __all__ = ['Option',
+           'make_option',
            'SUPPRESS_HELP',
            'SUPPRESS_USAGE',
            'Values',
@@ -807,7 +813,7 @@ class Option:
             parser.print_version()
             parser.exit()
         else:
-            raise RuntimeError, "unknown action %r" % self.action
+            raise ValueError("unknown action %r" % self.action)
 
         return 1
 
@@ -1274,9 +1280,19 @@ class OptionParser (OptionContainer):
             self.usage = usage
 
     def enable_interspersed_args(self):
+        """Set parsing to not stop on the first non-option, allowing
+        interspersing switches with command arguments. This is the
+        default behavior. See also disable_interspersed_args() and the
+        class documentation description of the attribute
+        allow_interspersed_args."""
         self.allow_interspersed_args = True
 
     def disable_interspersed_args(self):
+        """Set parsing to stop on the first non-option. Use this if
+        you have a command processor which runs another command that
+        has options of its own and you want to make sure these options
+        don't get confused.
+        """
         self.allow_interspersed_args = False
 
     def set_process_default_values(self, process):
@@ -1572,7 +1588,7 @@ class OptionParser (OptionContainer):
         """print_usage(file : file = stdout)
 
         Print the usage message for the current program (self.usage) to
-        'file' (default stdout).  Any occurence of the string "%prog" in
+        'file' (default stdout).  Any occurrence of the string "%prog" in
         self.usage is replaced with the name of the current program
         (basename of sys.argv[0]).  Does nothing if self.usage is empty
         or not defined.
@@ -1590,7 +1606,7 @@ class OptionParser (OptionContainer):
         """print_version(file : file = stdout)
 
         Print the version message for this program (self.version) to
-        'file' (default stdout).  As with print_usage(), any occurence
+        'file' (default stdout).  As with print_usage(), any occurrence
         of "%prog" in self.version is replaced by the current program's
         name.  Does nothing if self.version is empty or undefined.
         """

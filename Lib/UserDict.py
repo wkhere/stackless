@@ -1,6 +1,6 @@
 """A more or less complete user-defined wrapper around dictionary objects."""
 
-class UserDict:
+class UserDict(object):
     def __init__(self, dict=None, **kwargs):
         self.data = {}
         if dict is not None:
@@ -13,6 +13,7 @@ class UserDict:
             return cmp(self.data, dict.data)
         else:
             return cmp(self.data, dict)
+    __hash__ = None # Avoid Py3k warning
     def __len__(self): return len(self.data)
     def __getitem__(self, key):
         if key in self.data:
@@ -97,7 +98,7 @@ class DictMixin:
             yield k
     def has_key(self, key):
         try:
-            value = self[key]
+            self[key]
         except KeyError:
             return False
         return True

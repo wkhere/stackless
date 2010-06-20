@@ -3,7 +3,6 @@ Test the API of the symtable module.
 """
 import symtable
 import unittest
-import warnings
 
 from test import test_support
 
@@ -44,9 +43,8 @@ def find_block(block, name):
 
 class SymtableTest(unittest.TestCase):
 
-    with warnings.catch_warnings():
-        # Ignore warnings about "from blank import *"
-        warnings.simplefilter("ignore", SyntaxWarning)
+    with test_support.check_warnings(
+            ("import \* only allowed at module level", SyntaxWarning)):
         top = symtable.symtable(TEST_CODE, "?", "exec")
     # These correspond to scopes in TEST_CODE
     Mine = find_block(top, "Mine")
@@ -54,22 +52,6 @@ class SymtableTest(unittest.TestCase):
     spam = find_block(top, "spam")
     internal = find_block(spam, "internal")
     foo = find_block(top, "foo")
-
-    def test_noops(self):
-        # Check methods that don't work. They should warn and return False.
-        def check(w, msg):
-            self.assertEqual(str(w.message), msg)
-        sym = self.top.lookup("glob")
-        with test_support.check_warnings() as w:
-            warnings.simplefilter("always", DeprecationWarning)
-            self.assertFalse(sym.is_vararg())
-            check(w, "is_vararg() is obsolete and will be removed")
-            w.reset()
-            self.assertFalse(sym.is_keywordarg())
-            check(w, "is_keywordarg() is obsolete and will be removed")
-            w.reset()
-            self.assertFalse(sym.is_in_tuple())
-            check(w, "is_in_tuple() is obsolete and will be removed")
 
     def test_type(self):
         self.assertEqual(self.top.get_type(), "module")
@@ -108,13 +90,15 @@ class SymtableTest(unittest.TestCase):
         func = self.spam
         self.assertEqual(func.get_parameters(), ("a", "b", "kw", "var"))
         self.assertEqual(func.get_locals(),
-                         ("a", "b", "bar", "internal", "kw", "var", "x"))
+                         ("a", "b", "internal", "kw", "var", "x"))
         self.assertEqual(func.get_globals(), ("bar", "glob"))
         self.assertEqual(self.internal.get_frees(), ("x",))
 
     def test_globals(self):
         self.assertTrue(self.spam.lookup("glob").is_global())
+        self.assertFalse(self.spam.lookup("glob").is_declared_global())
         self.assertTrue(self.spam.lookup("bar").is_global())
+        self.assertTrue(self.spam.lookup("bar").is_declared_global())
         self.assertFalse(self.internal.lookup("x").is_global())
         self.assertFalse(self.Mine.lookup("instance_var").is_global())
 
@@ -146,7 +130,7 @@ class SymtableTest(unittest.TestCase):
         self.assertTrue(self.top.lookup("namespace_test").is_namespace())
         self.assertFalse(self.spam.lookup("x").is_namespace())
 
-        self.assert_(self.top.lookup("spam").get_namespace() is self.spam)
+        self.assertTrue(self.top.lookup("spam").get_namespace() is self.spam)
         ns_test = self.top.lookup("namespace_test")
         self.assertEqual(len(ns_test.get_namespaces()), 2)
         self.assertRaises(ValueError, ns_test.get_namespace)

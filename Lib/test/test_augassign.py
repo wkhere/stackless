@@ -1,6 +1,6 @@
 # Augmented assignment test.
 
-from test.test_support import run_unittest
+from test.test_support import run_unittest, check_py3k_warnings
 import unittest
 
 
@@ -23,6 +23,9 @@ class AugAssignTest(unittest.TestCase):
         else:
             # new-style division (with -Qnew)
             self.assertEquals(x, 3.0)
+
+    def test_with_unpacking(self):
+        self.assertRaises(SyntaxError, compile, "x, b += 3", "<test>", "exec")
 
     def testInList(self):
         x = [2]
@@ -71,7 +74,7 @@ class AugAssignTest(unittest.TestCase):
         y[1:2] += [1]
 
         self.assertEquals(x, [1, 2, 1, 2, 3])
-        self.assert_(x is y)
+        self.assertTrue(x is y)
 
     def testCustomMethods1(self):
 
@@ -96,23 +99,23 @@ class AugAssignTest(unittest.TestCase):
         y = x
         x += 10
 
-        self.assert_(isinstance(x, aug_test))
-        self.assert_(y is not x)
+        self.assertIsInstance(x, aug_test)
+        self.assertTrue(y is not x)
         self.assertEquals(x.val, 11)
 
         x = aug_test2(2)
         y = x
         x += 10
 
-        self.assert_(y is x)
+        self.assertTrue(y is x)
         self.assertEquals(x.val, 12)
 
         x = aug_test3(3)
         y = x
         x += 10
 
-        self.assert_(isinstance(x, aug_test3))
-        self.assert_(y is not x)
+        self.assertIsInstance(x, aug_test3)
+        self.assertTrue(y is not x)
         self.assertEquals(x.val, 13)
 
 
@@ -321,7 +324,8 @@ __ilshift__ called
 '''.splitlines())
 
 def test_main():
-    run_unittest(AugAssignTest)
+    with check_py3k_warnings(("classic int division", DeprecationWarning)):
+        run_unittest(AugAssignTest)
 
 if __name__ == '__main__':
     test_main()

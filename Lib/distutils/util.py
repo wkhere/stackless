@@ -11,6 +11,7 @@ from distutils.errors import DistutilsPlatformError
 from distutils.dep_util import newer
 from distutils.spawn import spawn
 from distutils import log
+from distutils.errors import DistutilsByteCompileError
 
 def get_platform ():
     """Return a string that identifies the current platform.  This is used
@@ -100,7 +101,11 @@ def get_platform ():
         if not macver:
             macver = cfgvars.get('MACOSX_DEPLOYMENT_TARGET')
 
-        if not macver:
+        if 1:
+            # Always calculate the release of the running machine,
+            # needed to determine if we can build fat binaries or not.
+
+            macrelease = macver
             # Get the system version. Reading this plist is a documented
             # way to get the system version (see the documentation for
             # the Gestalt Manager)
@@ -116,16 +121,18 @@ def get_platform ():
                         r'<string>(.*?)</string>', f.read())
                 f.close()
                 if m is not None:
-                    macver = '.'.join(m.group(1).split('.')[:2])
+                    macrelease = '.'.join(m.group(1).split('.')[:2])
                 # else: fall back to the default behaviour
+
+        if not macver:
+            macver = macrelease
 
         if macver:
             from distutils.sysconfig import get_config_vars
             release = macver
             osname = "macosx"
 
-
-            if (release + '.') >= '10.4.' and \
+            if (macrelease + '.') >= '10.4.' and \
                     '-arch' in get_config_vars().get('CFLAGS', '').strip():
                 # The universal build will build fat binaries, but not on
                 # systems before 10.4
@@ -134,13 +141,42 @@ def get_platform ():
                 # 'universal' instead of 'fat'.
 
                 machine = 'fat'
+                cflags = get_config_vars().get('CFLAGS')
 
-                if '-arch x86_64' in get_config_vars().get('CFLAGS'):
+                archs = re.findall('-arch\s+(\S+)', cflags)
+                archs.sort()
+                archs = tuple(archs)
+
+                if len(archs) == 1:
+                    machine = archs[0]
+                elif archs == ('i386', 'ppc'):
+                    machine = 'fat'
+                elif archs == ('i386', 'x86_64'):
+                    machine = 'intel'
+                elif archs == ('i386', 'ppc', 'x86_64'):
+                    machine = 'fat3'
+                elif archs == ('ppc64', 'x86_64'):
+                    machine = 'fat64'
+                elif archs == ('i386', 'ppc', 'ppc64', 'x86_64'):
                     machine = 'universal'
+                else:
+                    raise ValueError(
+                       "Don't know machine value for archs=%r"%(archs,))
+
+            elif machine == 'i386':
+                # On OSX the machine type returned by uname is always the
+                # 32-bit variant, even if the executable architecture is
+                # the 64-bit variant
+                if sys.maxint >= 2**32:
+                    machine = 'x86_64'
 
             elif machine in ('PowerPC', 'Power_Macintosh'):
                 # Pick a sane name for the PPC architecture.
                 machine = 'ppc'
+
+                # See 'i386' case
+                if sys.maxint >= 2**32:
+                    machine = 'ppc64'
 
     return "%s-%s-%s" % (osname, release, machine)
 
@@ -170,7 +206,7 @@ def convert_path (pathname):
         paths.remove('.')
     if not paths:
         return os.curdir
-    return apply(os.path.join, paths)
+    return os.path.join(*paths)
 
 # convert_path ()
 
@@ -198,15 +234,6 @@ def change_root (new_root, pathname):
         if path[0] == os.sep:
             path = path[1:]
         return os.path.join(new_root, path)
-
-    elif os.name == 'mac':
-        if not os.path.isabs(pathname):
-            return os.path.join(new_root, pathname)
-        else:
-            # Chop off volume name from start of path
-            elements = string.split(pathname, ":", 1)
-            pathname = ":" + elements[1]
-            return os.path.join(new_root, pathname)
 
     else:
         raise DistutilsPlatformError, \
@@ -370,7 +397,7 @@ def execute (func, args, msg=None, verbose=0, dry_run=0):
 
     log.info(msg)
     if not dry_run:
-        apply(func, args)
+        func(*args)
 
 
 def strtobool (val):
@@ -422,6 +449,9 @@ def byte_compile (py_files,
     generated in indirect mode; unless you know what you're doing, leave
     it set to None.
     """
+    # nothing is done if sys.dont_write_bytecode is True
+    if sys.dont_write_bytecode:
+        raise DistutilsByteCompileError('byte-compiling is disabled.')
 
     # First, if the caller didn't force us into direct or indirect mode,
     # figure out which mode we should be in.  We take a conservative
@@ -534,6 +564,5 @@ def rfc822_escape (header):
     RFC-822 header, by ensuring there are 8 spaces space after each newline.
     """
     lines = string.split(header, '\n')
-    lines = map(string.strip, lines)
     header = string.join(lines, '\n' + 8*' ')
     return header

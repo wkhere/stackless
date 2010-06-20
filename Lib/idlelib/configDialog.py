@@ -13,12 +13,13 @@ from Tkinter import *
 import tkMessageBox, tkColorChooser, tkFont
 import string
 
-from configHandler import idleConf
-from dynOptionMenuWidget import DynOptionMenu
-from tabbedpages import TabbedPageSet
-from keybindingDialog import GetKeysDialog
-from configSectionNameDialog import GetCfgSectionNameDialog
-from configHelpSourceEdit import GetHelpSourceDialog
+from idlelib.configHandler import idleConf
+from idlelib.dynOptionMenuWidget import DynOptionMenu
+from idlelib.tabbedpages import TabbedPageSet
+from idlelib.keybindingDialog import GetKeysDialog
+from idlelib.configSectionNameDialog import GetCfgSectionNameDialog
+from idlelib.configHelpSourceEdit import GetHelpSourceDialog
+from idlelib import macosxSupport
 
 class ConfigDialog(Toplevel):
 
@@ -27,6 +28,7 @@ class ConfigDialog(Toplevel):
         self.wm_withdraw()
 
         self.configure(borderwidth=5)
+        self.title('IDLE Preferences')
         self.geometry("+%d+%d" % (parent.winfo_rootx()+20,
                 parent.winfo_rooty()+30))
         #Theme Elements. Each theme element key is its display name.
@@ -69,18 +71,25 @@ class ConfigDialog(Toplevel):
                 page_names=['Fonts/Tabs','Highlighting','Keys','General'])
         frameActionButtons = Frame(self,pady=2)
         #action buttons
+        if macosxSupport.runningAsOSXApp():
+            # Changing the default padding on OSX results in unreadable
+            # text in the buttons
+            paddingArgs={}
+        else:
+            paddingArgs={'padx':6, 'pady':3}
+
         self.buttonHelp = Button(frameActionButtons,text='Help',
                 command=self.Help,takefocus=FALSE,
-                padx=6,pady=3)
+                **paddingArgs)
         self.buttonOk = Button(frameActionButtons,text='Ok',
                 command=self.Ok,takefocus=FALSE,
-                padx=6,pady=3)
+                **paddingArgs)
         self.buttonApply = Button(frameActionButtons,text='Apply',
                 command=self.Apply,takefocus=FALSE,
-                padx=6,pady=3)
+                **paddingArgs)
         self.buttonCancel = Button(frameActionButtons,text='Cancel',
                 command=self.Cancel,takefocus=FALSE,
-                padx=6,pady=3)
+                **paddingArgs)
         self.CreatePageFontTab()
         self.CreatePageHighlight()
         self.CreatePageKeys()
@@ -553,7 +562,7 @@ class ConfigDialog(Toplevel):
 
     def AddChangedItem(self,type,section,item,value):
         value=str(value) #make sure we use a string
-        if not self.changedItems[type].has_key(section):
+        if section not in self.changedItems[type]:
             self.changedItems[type][section]={}
         self.changedItems[type][section][item]=value
 
@@ -700,7 +709,7 @@ class ConfigDialog(Toplevel):
             return
         #remove key set from config
         idleConf.userCfg['keys'].remove_section(keySetName)
-        if self.changedItems['keys'].has_key(keySetName):
+        if keySetName in self.changedItems['keys']:
             del(self.changedItems['keys'][keySetName])
         #write changes
         idleConf.userCfg['keys'].Save()
@@ -727,7 +736,7 @@ class ConfigDialog(Toplevel):
             return
         #remove theme from config
         idleConf.userCfg['highlight'].remove_section(themeName)
-        if self.changedItems['highlight'].has_key(themeName):
+        if themeName in self.changedItems['highlight']:
             del(self.changedItems['highlight'][themeName])
         #write changes
         idleConf.userCfg['highlight'].Save()
@@ -862,9 +871,9 @@ class ConfigDialog(Toplevel):
             #handle any unsaved changes to this theme
             if theme in self.changedItems['highlight'].keys():
                 themeDict=self.changedItems['highlight'][theme]
-                if themeDict.has_key(element+'-foreground'):
+                if element+'-foreground' in themeDict:
                     colours['foreground']=themeDict[element+'-foreground']
-                if themeDict.has_key(element+'-background'):
+                if element+'-background' in themeDict:
                     colours['background']=themeDict[element+'-background']
             self.textHighlightSample.tag_config(element, **colours)
         self.SetColourSample()
@@ -980,15 +989,10 @@ class ConfigDialog(Toplevel):
         self.SetThemeType()
         ##load theme element option menu
         themeNames=self.themeElements.keys()
-        themeNames.sort(self.__ThemeNameIndexCompare)
+        themeNames.sort(key=lambda x: self.themeElements[x][1])
         self.optMenuHighlightTarget.SetMenu(themeNames,themeNames[0])
         self.PaintThemeSample()
         self.SetHighlightTarget()
-
-    def __ThemeNameIndexCompare(self,a,b):
-        if self.themeElements[a][1]<self.themeElements[b][1]: return -1
-        elif self.themeElements[a][1]==self.themeElements[b][1]: return 0
-        else: return 1
 
     def LoadKeyCfg(self):
         ##current keys type radiobutton

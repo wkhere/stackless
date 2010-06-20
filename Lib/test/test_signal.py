@@ -1,6 +1,6 @@
 import unittest
 from test import test_support
-from contextlib import closing, nested
+from contextlib import closing
 import gc
 import pickle
 import select
@@ -10,7 +10,7 @@ import traceback
 import sys, os, time, errno
 
 if sys.platform[:3] in ('win', 'os2') or sys.platform == 'riscos':
-    raise test_support.TestSkipped("Can't test signal on %s" % \
+    raise unittest.SkipTest("Can't test signal on %s" % \
                                    sys.platform)
 
 
@@ -139,6 +139,10 @@ class InterProcessSignalTests(unittest.TestCase):
             self.fail("pause returned of its own accord, and the signal"
                       " didn't arrive after another second.")
 
+    # Issue 3864. Unknown if this affects earlier versions of freebsd also.
+    @unittest.skipIf(sys.platform=='freebsd6',
+        'inter process signals not reliable (do not mix well with threading) '
+        'on freebsd6')
     def test_main(self):
         # This function spawns a child process to insulate the main
         # test-running process from all the signals. It then
@@ -146,8 +150,8 @@ class InterProcessSignalTests(unittest.TestCase):
         # re-raises information about any exceptions the child
         # throws. The real work happens in self.run_test().
         os_done_r, os_done_w = os.pipe()
-        with nested(closing(os.fdopen(os_done_r)),
-                    closing(os.fdopen(os_done_w, 'w'))) as (done_r, done_w):
+        with closing(os.fdopen(os_done_r)) as done_r, \
+             closing(os.fdopen(os_done_w, 'w')) as done_w:
             child = os.fork()
             if child == 0:
                 # In the child process; run the test and report results
@@ -217,10 +221,10 @@ class WakeupSignalTests(unittest.TestCase):
         # before select is called
         time.sleep(self.TIMEOUT_FULL)
         mid_time = time.time()
-        self.assert_(mid_time - before_time < self.TIMEOUT_HALF)
+        self.assertTrue(mid_time - before_time < self.TIMEOUT_HALF)
         select.select([self.read], [], [], self.TIMEOUT_FULL)
         after_time = time.time()
-        self.assert_(after_time - mid_time < self.TIMEOUT_HALF)
+        self.assertTrue(after_time - mid_time < self.TIMEOUT_HALF)
 
     def test_wakeup_fd_during(self):
         import select
@@ -231,7 +235,7 @@ class WakeupSignalTests(unittest.TestCase):
         self.assertRaises(select.error, select.select,
             [self.read], [], [], self.TIMEOUT_FULL)
         after_time = time.time()
-        self.assert_(after_time - before_time < self.TIMEOUT_HALF)
+        self.assertTrue(after_time - before_time < self.TIMEOUT_HALF)
 
     def setUp(self):
         import fcntl
@@ -251,48 +255,105 @@ class WakeupSignalTests(unittest.TestCase):
 
 class SiginterruptTest(unittest.TestCase):
     signum = signal.SIGUSR1
-    def readpipe_interrupted(self, cb):
+
+    def setUp(self):
+        """Install a no-op signal handler that can be set to allow
+        interrupts or not, and arrange for the original signal handler to be
+        re-installed when the test is finished.
+        """
+        oldhandler = signal.signal(self.signum, lambda x,y: None)
+        self.addCleanup(signal.signal, self.signum, oldhandler)
+
+    def readpipe_interrupted(self):
+        """Perform a read during which a signal will arrive.  Return True if the
+        read is interrupted by the signal and raises an exception.  Return False
+        if it returns normally.
+        """
+        # Create a pipe that can be used for the read.  Also clean it up
+        # when the test is over, since nothing else will (but see below for
+        # the write end).
         r, w = os.pipe()
+        self.addCleanup(os.close, r)
+
+        # Create another process which can send a signal to this one to try
+        # to interrupt the read.
         ppid = os.getpid()
         pid = os.fork()
 
-        oldhandler = signal.signal(self.signum, lambda x,y: None)
-        cb()
-        if pid==0:
-            # child code: sleep, kill, sleep. and then exit,
-            # which closes the pipe from which the parent process reads
+        if pid == 0:
+            # Child code: sleep to give the parent enough time to enter the
+            # read() call (there's a race here, but it's really tricky to
+            # eliminate it); then signal the parent process.  Also, sleep
+            # again to make it likely that the signal is delivered to the
+            # parent process before the child exits.  If the child exits
+            # first, the write end of the pipe will be closed and the test
+            # is invalid.
             try:
                 time.sleep(0.2)
                 os.kill(ppid, self.signum)
                 time.sleep(0.2)
             finally:
+                # No matter what, just exit as fast as possible now.
                 exit_subprocess()
+        else:
+            # Parent code.
+            # Make sure the child is eventually reaped, else it'll be a
+            # zombie for the rest of the test suite run.
+            self.addCleanup(os.waitpid, pid, 0)
 
-        try:
+            # Close the write end of the pipe.  The child has a copy, so
+            # it's not really closed until the child exits.  We need it to
+            # close when the child exits so that in the non-interrupt case
+            # the read eventually completes, otherwise we could just close
+            # it *after* the test.
             os.close(w)
 
+            # Try the read and report whether it is interrupted or not to
+            # the caller.
             try:
-                d=os.read(r, 1)
+                d = os.read(r, 1)
                 return False
             except OSError, err:
                 if err.errno != errno.EINTR:
                     raise
                 return True
-        finally:
-            signal.signal(self.signum, oldhandler)
-            os.waitpid(pid, 0)
 
     def test_without_siginterrupt(self):
-        i=self.readpipe_interrupted(lambda: None)
-        self.assertEquals(i, True)
+        """If a signal handler is installed and siginterrupt is not called
+        at all, when that signal arrives, it interrupts a syscall that's in
+        progress.
+        """
+        i = self.readpipe_interrupted()
+        self.assertTrue(i)
+        # Arrival of the signal shouldn't have changed anything.
+        i = self.readpipe_interrupted()
+        self.assertTrue(i)
 
     def test_siginterrupt_on(self):
-        i=self.readpipe_interrupted(lambda: signal.siginterrupt(self.signum, 1))
-        self.assertEquals(i, True)
+        """If a signal handler is installed and siginterrupt is called with
+        a true value for the second argument, when that signal arrives, it
+        interrupts a syscall that's in progress.
+        """
+        signal.siginterrupt(self.signum, 1)
+        i = self.readpipe_interrupted()
+        self.assertTrue(i)
+        # Arrival of the signal shouldn't have changed anything.
+        i = self.readpipe_interrupted()
+        self.assertTrue(i)
 
     def test_siginterrupt_off(self):
-        i=self.readpipe_interrupted(lambda: signal.siginterrupt(self.signum, 0))
-        self.assertEquals(i, False)
+        """If a signal handler is installed and siginterrupt is called with
+        a false value for the second argument, when that signal arrives, it
+        does not interrupt a syscall that's in progress.
+        """
+        signal.siginterrupt(self.signum, 0)
+        i = self.readpipe_interrupted()
+        self.assertFalse(i)
+        # Arrival of the signal shouldn't have changed anything.
+        i = self.readpipe_interrupted()
+        self.assertFalse(i)
+
+
 
 class ItimerTest(unittest.TestCase):
     def setUp(self):
@@ -355,28 +416,46 @@ class ItimerTest(unittest.TestCase):
 
         self.assertEqual(self.hndl_called, True)
 
+    # Issue 3864. Unknown if this affects earlier versions of freebsd also.
+    @unittest.skipIf(sys.platform=='freebsd6',
+        'itimer not reliable (does not mix well with threading) on freebsd6')
     def test_itimer_virtual(self):
         self.itimer = signal.ITIMER_VIRTUAL
         signal.signal(signal.SIGVTALRM, self.sig_vtalrm)
         signal.setitimer(self.itimer, 0.3, 0.2)
 
-        for i in xrange(100000000):
+        start_time = time.time()
+        while time.time() - start_time < 60.0:
+            # use up some virtual time by doing real work
+            _ = pow(12345, 67890, 10000019)
             if signal.getitimer(self.itimer) == (0.0, 0.0):
                 break # sig_vtalrm handler stopped this itimer
+        else: # Issue 8424
+            self.skipTest("timeout: likely cause: machine too slow or load too "
+                          "high")
 
         # virtual itimer should be (0.0, 0.0) now
         self.assertEquals(signal.getitimer(self.itimer), (0.0, 0.0))
         # and the handler should have been called
         self.assertEquals(self.hndl_called, True)
 
+    # Issue 3864. Unknown if this affects earlier versions of freebsd also.
+    @unittest.skipIf(sys.platform=='freebsd6',
+        'itimer not reliable (does not mix well with threading) on freebsd6')
     def test_itimer_prof(self):
         self.itimer = signal.ITIMER_PROF
         signal.signal(signal.SIGPROF, self.sig_prof)
         signal.setitimer(self.itimer, 0.2, 0.2)
 
-        for i in xrange(100000000):
+        start_time = time.time()
+        while time.time() - start_time < 60.0:
+            # do some work
+            _ = pow(12345, 67890, 10000019)
             if signal.getitimer(self.itimer) == (0.0, 0.0):
                 break # sig_prof handler stopped this itimer
+        else: # Issue 8424
+            self.skipTest("timeout: likely cause: machine too slow or load too "
+                          "high")
 
         # profiling itimer should be (0.0, 0.0) now
         self.assertEquals(signal.getitimer(self.itimer), (0.0, 0.0))

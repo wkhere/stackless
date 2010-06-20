@@ -97,10 +97,6 @@ SOURCE=..\..\Modules\_bisectmodule.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\_bytesio.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Modules\cjkcodecs\_codecs_cn.c
 # End Source File
 # Begin Source File
@@ -137,10 +133,6 @@ SOURCE=..\..\Modules\_csv.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\_fileio.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Modules\_functoolsmodule.c
 # End Source File
 # Begin Source File
@@ -153,6 +145,10 @@ SOURCE=..\..\Modules\_hotshot.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\_iomodule.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Modules\_json.c
 # End Source File
 # Begin Source File
@@ -162,6 +158,10 @@ SOURCE=..\..\Modules\_localemodule.c
 # Begin Source File
 
 SOURCE=..\..\Modules\_lsprof.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_math.c
 # End Source File
 # Begin Source File
 
@@ -237,6 +237,10 @@ SOURCE=..\..\Objects\boolobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\bufferedio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\bufferobject.c
 # End Source File
 # Begin Source File
@@ -245,7 +249,15 @@ SOURCE=..\..\Objects\bytearrayobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\bytesio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\bytes_methods.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Objects\capsule.c
 # End Source File
 # Begin Source File
 
@@ -325,6 +337,10 @@ SOURCE=..\dl_nt.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Python\dtoa.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Python\dynload_win.c
 # End Source File
 # Begin Source File
@@ -342,6 +358,10 @@ SOURCE=..\..\Python\errors.c
 # Begin Source File
 
 SOURCE=..\..\Objects\exceptions.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\fileio.c
 # End Source File
 # Begin Source File
 
@@ -410,10 +430,6 @@ SOURCE=..\..\Python\getcopyright.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Python\getmtime.c
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\Python\getopt.c
 # End Source File
 # Begin Source File
@@ -443,6 +459,10 @@ SOURCE=..\..\Parser\grammar1.c
 # Begin Source File
 
 SOURCE=..\..\Modules\zlib\gzio.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\iobase.c
 # End Source File
 # Begin Source File
 
@@ -520,6 +540,10 @@ SOURCE=..\..\Modules\md5.c
 # Begin Source File
 
 SOURCE=..\..\Modules\md5module.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Objects\memoryobject.c
 # End Source File
 # Begin Source File
 
@@ -603,6 +627,10 @@ SOURCE=..\..\Python\pyarena.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Python\pyctype.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Python\pyfpe.c
 # End Source File
 # Begin Source File
@@ -667,6 +695,10 @@ SOURCE=..\..\Objects\sliceobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\stringio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\stringobject.c
 # End Source File
 # Begin Source File
@@ -692,6 +724,10 @@ SOURCE=..\..\Modules\symtablemodule.c
 # Begin Source File
 
 SOURCE=..\..\Python\sysmodule.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\textio.c
 # End Source File
 # Begin Source File
 
@@ -744,10 +780,6 @@ SOURCE=..\..\Objects\weakrefobject.c
 # Begin Source File
 
 SOURCE=..\..\Modules\xxsubtype.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\yuvconvert.c
 # End Source File
 # Begin Source File
 

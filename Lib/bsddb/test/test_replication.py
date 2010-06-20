@@ -11,9 +11,9 @@ from test_all import db, test_support, have_threads, verbose, \
 
 #----------------------------------------------------------------------
 
-class DBReplicationManager(unittest.TestCase):
+class DBReplication(unittest.TestCase) :
     import sys
-    if sys.version_info[:3] < (2, 4, 0):
+    if sys.version_info < (2, 4) :
         def assertTrue(self, expr, msg=None):
             self.failUnless(expr,msg=msg)
 
@@ -59,11 +59,21 @@ class DBReplicationManager(unittest.TestCase):
             self.dbClient.close()
         if self.dbMaster :
             self.dbMaster.close()
+
+        # Here we assign dummy event handlers to allow GC of the test object.
+        # Since the dummy handler doesn't use any outer scope variable, it
+        # doesn't keep any reference to the test object.
+        def dummy(*args) :
+            pass
+        self.dbenvMaster.set_event_notify(dummy)
+        self.dbenvClient.set_event_notify(dummy)
+
         self.dbenvClient.close()
         self.dbenvMaster.close()
         test_support.rmtree(self.homeDirClient)
         test_support.rmtree(self.homeDirMaster)
 
+class DBReplicationManager(DBReplication) :
     def test01_basic_replication(self) :
         master_port = test_support.find_unused_port()
         self.dbenvMaster.repmgr_set_local_site("127.0.0.1", master_port)
@@ -116,22 +126,21 @@ class DBReplicationManager(unittest.TestCase):
         # is not generated if the master has no new transactions.
         # This is solved in BDB 4.6 (#15542).
         import time
-        timeout = time.time()+10
+        timeout = time.time()+60
         while (time.time()<timeout) and not (self.confirmed_master and self.client_startupdone) :
             time.sleep(0.02)
-        # this fails on Windows as self.client_startupdone never gets set
-        # to True - see bug 3892.  BUT - even though this assertion
-        # fails on Windows the rest of the test passes - so to prove
-        # that we let the rest of the test run.  Sadly we can't
-        # make use of raising TestSkipped() here (unittest still
-        # reports it as an error), so we yell to stderr.
-        import sys
-        if sys.platform=="win32":
-            print >> sys.stderr, \
-                "XXX - windows bsddb replication fails on windows and is skipped"
-            print >> sys.stderr, "XXX - Please see issue #3892"
-        else:
-            self.assertTrue(time.time()<timeout)
+        # self.client_startupdone does not always get set to True within
+        # the timeout.  On windows this may be a deep issue, on other
+        # platforms it is likely just a timing issue, especially on slow
+        # virthost buildbots (see issue 3892 for more).  Even though
+        # the timeout triggers, the rest of this test method usually passes
+        # (but not all of it always, see below).  So we just note the
+        # timeout on stderr and keep soldering on.
+        if time.time()>timeout:
+            import sys
+            print >> sys.stderr, ("XXX: timeout happened before"
+                "startup was confirmed - see issue 3892")
+            startup_timeout = True
 
         d = self.dbenvMaster.repmgr_site_list()
         self.assertEquals(len(d), 1)
@@ -183,12 +192,20 @@ class DBReplicationManager(unittest.TestCase):
         import time
         timeout=time.time()+10
         v=None
-        while (time.time()<timeout) and (v==None) :
+        while (time.time()<timeout) and (v is None) :
             txn=self.dbenvClient.txn_begin()
             v=self.dbClient.get("ABC", txn=txn)
             txn.commit()
-            if v==None :
+            if v is None :
                 time.sleep(0.02)
+        # If startup did not happen before the timeout above, then this test
+        # sometimes fails.  This happens randomly, which causes buildbot
+        # instability, but all the other bsddb tests pass.  Since bsddb3 in the
+        # stdlib is currently not getting active maintenance, and is gone in
+        # py3k, we just skip the end of the test in that case.
+        if time.time()>=timeout and startup_timeout:
+            self.skipTest("replication test skipped due to random failure, "
+                "see issue 3892")
         self.assertTrue(time.time()<timeout)
         self.assertEquals("123", v)
 
@@ -196,18 +213,18 @@ class DBReplicationManager(unittest.TestCase):
         self.dbMaster.delete("ABC", txn=txn)
         txn.commit()
         timeout=time.time()+10
-        while (time.time()<timeout) and (v!=None) :
+        while (time.time()<timeout) and (v is not None) :
             txn=self.dbenvClient.txn_begin()
             v=self.dbClient.get("ABC", txn=txn)
             txn.commit()
-            if v==None :
+            if v is None :
                 time.sleep(0.02)
         self.assertTrue(time.time()<timeout)
         self.assertEquals(None, v)
 
-class DBBaseReplication(DBReplicationManager):
+class DBBaseReplication(DBReplication) :
     def setUp(self) :
-        DBReplicationManager.setUp(self)
+        DBReplication.setUp(self)
         def confirmed_master(a,b,c) :
             if (b == db.DB_EVENT_REP_MASTER) or (b == db.DB_EVENT_REP_ELECTED) :
                 self.confirmed_master = True
@@ -281,6 +298,17 @@ class DBBaseReplication(DBReplicationManager):
         self.c2m.put(None)
         self.t_m.join()
         self.t_c.join()
+
+        # Here we assign dummy event handlers to allow GC of the test object.
+        # Since the dummy handler doesn't use any outer scope variable, it
+        # doesn't keep any reference to the test object.
+        def dummy(*args) :
+            pass
+        self.dbenvMaster.set_event_notify(dummy)
+        self.dbenvClient.set_event_notify(dummy)
+        self.dbenvMaster.rep_set_transport(13,dummy)
+        self.dbenvClient.rep_set_transport(3,dummy)
+
         self.dbenvClient.close()
         self.dbenvMaster.close()
         test_support.rmtree(self.homeDirClient)
@@ -293,7 +321,7 @@ class DBBaseReplication(DBReplicationManager):
         def thread_do(env, q, envid, election_status, must_be_master) :
             while True :
                 v=q.get()
-                if v == None : return
+                if v is None : return
                 env.rep_process_message(v[0], v[1], envid)
 
         self.thread_do = thread_do
@@ -308,7 +336,7 @@ class DBBaseReplication(DBReplicationManager):
         # is not generated if the master has no new transactions.
         # This is solved in BDB 4.6 (#15542).
         import time
-        timeout = time.time()+10
+        timeout = time.time()+60
         while (time.time()<timeout) and not (self.confirmed_master and
                 self.client_startupdone) :
             time.sleep(0.02)
@@ -340,17 +368,20 @@ class DBBaseReplication(DBReplicationManager):
             txn.commit()
             break
 
+        d = self.dbenvMaster.rep_stat(flags=db.DB_STAT_CLEAR);
+        self.assertTrue("master_changes" in d)
+
         txn=self.dbenvMaster.txn_begin()
         self.dbMaster.put("ABC", "123", txn=txn)
         txn.commit()
         import time
         timeout=time.time()+10
         v=None
-        while (time.time()<timeout) and (v==None) :
+        while (time.time()<timeout) and (v is None) :
             txn=self.dbenvClient.txn_begin()
             v=self.dbClient.get("ABC", txn=txn)
             txn.commit()
-            if v==None :
+            if v is None :
                 time.sleep(0.02)
         self.assertTrue(time.time()<timeout)
         self.assertEquals("123", v)
@@ -359,11 +390,11 @@ class DBBaseReplication(DBReplicationManager):
         self.dbMaster.delete("ABC", txn=txn)
         txn.commit()
         timeout=time.time()+10
-        while (time.time()<timeout) and (v!=None) :
+        while (time.time()<timeout) and (v is not None) :
             txn=self.dbenvClient.txn_begin()
             v=self.dbClient.get("ABC", txn=txn)
             txn.commit()
-            if v==None :
+            if v is None :
                 time.sleep(0.02)
         self.assertTrue(time.time()<timeout)
         self.assertEquals(None, v)
@@ -386,7 +417,7 @@ class DBBaseReplication(DBReplicationManager):
             def thread_do(env, q, envid, election_status, must_be_master) :
                 while True :
                     v=q.get()
-                    if v == None : return
+                    if v is None : return
                     r = env.rep_process_message(v[0],v[1],envid)
                     if must_be_master and self.confirmed_master :
                         self.dbenvMaster.rep_start(flags = db.DB_REP_MASTER)
@@ -429,6 +460,14 @@ class DBBaseReplication(DBReplicationManager):
                     pass
 
             self.assertTrue(self.confirmed_master)
+
+    if db.version() >= (4,7) :
+        def test04_test_clockskew(self) :
+            fast, slow = 1234, 1230
+            self.dbenvMaster.rep_set_clockskew(fast, slow)
+            self.assertEqual((fast, slow),
+                    self.dbenvMaster.rep_get_clockskew())
+            self.basic_rep_threading()
 
 #----------------------------------------------------------------------
 

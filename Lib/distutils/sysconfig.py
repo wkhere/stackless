@@ -71,24 +71,23 @@ def get_python_inc(plat_specific=0, prefix=None):
     """
     if prefix is None:
         prefix = plat_specific and EXEC_PREFIX or PREFIX
+
     if os.name == "posix":
         if python_build:
-            base = os.path.dirname(os.path.abspath(sys.executable))
+            buildir = os.path.dirname(sys.executable)
             if plat_specific:
-                inc_dir = base
+                # python.h is located in the buildir
+                inc_dir = buildir
             else:
-                inc_dir = os.path.join(base, "Include")
-                if not os.path.exists(inc_dir):
-                    inc_dir = os.path.join(os.path.dirname(base), "Include")
+                # the source dir is relative to the buildir
+                srcdir = os.path.abspath(os.path.join(buildir,
+                                         get_config_var('srcdir')))
+                # Include is located in the srcdir
+                inc_dir = os.path.join(srcdir, "Include")
             return inc_dir
         return os.path.join(prefix, "include", "python" + get_python_version())
     elif os.name == "nt":
         return os.path.join(prefix, "include")
-    elif os.name == "mac":
-        if plat_specific:
-            return os.path.join(prefix, "Mac", "Include")
-        else:
-            return os.path.join(prefix, "Include")
     elif os.name == "os2":
         return os.path.join(prefix, "Include")
     else:
@@ -129,25 +128,13 @@ def get_python_lib(plat_specific=0, standard_lib=0, prefix=None):
             if get_python_version() < "2.2":
                 return prefix
             else:
-                return os.path.join(PREFIX, "Lib", "site-packages")
-
-    elif os.name == "mac":
-        if plat_specific:
-            if standard_lib:
-                return os.path.join(prefix, "Lib", "lib-dynload")
-            else:
-                return os.path.join(prefix, "Lib", "site-packages")
-        else:
-            if standard_lib:
-                return os.path.join(prefix, "Lib")
-            else:
                 return os.path.join(prefix, "Lib", "site-packages")
 
     elif os.name == "os2":
         if standard_lib:
-            return os.path.join(PREFIX, "Lib")
+            return os.path.join(prefix, "Lib")
         else:
-            return os.path.join(PREFIX, "Lib", "site-packages")
+            return os.path.join(prefix, "Lib", "site-packages")
 
     else:
         raise DistutilsPlatformError(
@@ -275,18 +262,25 @@ def parse_makefile(fn, g=None):
 
     while 1:
         line = fp.readline()
-        if line is None:                # eof
+        if line is None:  # eof
             break
         m = _variable_rx.match(line)
         if m:
             n, v = m.group(1, 2)
-            v = string.strip(v)
-            if "$" in v:
+            v = v.strip()
+            # `$$' is a literal `$' in make
+            tmpv = v.replace('$$', '')
+
+            if "$" in tmpv:
                 notdone[n] = v
             else:
-                try: v = int(v)
-                except ValueError: pass
-                done[n] = v
+                try:
+                    v = int(v)
+                except ValueError:
+                    # insert literal `$'
+                    done[n] = v.replace('$$', '$')
+                else:
+                    done[n] = v
 
     # do variable interpolation here
     while notdone:
@@ -314,7 +308,7 @@ def parse_makefile(fn, g=None):
                     else:
                         try: value = int(value)
                         except ValueError:
-                            done[name] = string.strip(value)
+                            done[name] = value.strip()
                         else:
                             done[name] = value
                         del notdone[name]
@@ -530,7 +524,7 @@ def get_config_vars(*args):
                 # are in CFLAGS or LDFLAGS and remove them if they are.
                 # This is needed when building extensions on a 10.3 system
                 # using a universal build of python.
-                for key in ('LDFLAGS', 'BASECFLAGS',
+                for key in ('LDFLAGS', 'BASECFLAGS', 'LDSHARED',
                         # a number of derived variables. These need to be
                         # patched up as well.
                         'CFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
@@ -549,7 +543,7 @@ def get_config_vars(*args):
 
                 if 'ARCHFLAGS' in os.environ:
                     arch = os.environ['ARCHFLAGS']
-                    for key in ('LDFLAGS', 'BASECFLAGS',
+                    for key in ('LDFLAGS', 'BASECFLAGS', 'LDSHARED',
                         # a number of derived variables. These need to be
                         # patched up as well.
                         'CFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
@@ -558,6 +552,29 @@ def get_config_vars(*args):
                         flags = re.sub('-arch\s+\w+\s', ' ', flags)
                         flags = flags + ' ' + arch
                         _config_vars[key] = flags
+
+                # If we're on OSX 10.5 or later and the user tries to
+                # compiles an extension using an SDK that is not present
+                # on the current machine it is better to not use an SDK
+                # than to fail.
+                #
+                # The major usecase for this is users using a Python.org
+                # binary installer  on OSX 10.6: that installer uses
+                # the 10.4u SDK, but that SDK is not installed by default
+                # when you install Xcode.
+                #
+                m = re.search('-isysroot\s+(\S+)', _config_vars['CFLAGS'])
+                if m is not None:
+                    sdk = m.group(1)
+                    if not os.path.exists(sdk):
+                        for key in ('LDFLAGS', 'BASECFLAGS', 'LDSHARED',
+                             # a number of derived variables. These need to be
+                             # patched up as well.
+                            'CFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
+
+                            flags = _config_vars[key]
+                            flags = re.sub('-isysroot\s+\S+(\s|$)', ' ', flags)
+                            _config_vars[key] = flags
 
     if args:
         vals = []

@@ -129,7 +129,9 @@ class StringTestCase(unittest.TestCase):
 
     def test_buffer(self):
         for s in ["", "Andrè Previn", "abc", " "*10000]:
-            b = buffer(s)
+            with test_support.check_py3k_warnings(("buffer.. not supported",
+                                                     DeprecationWarning)):
+                b = buffer(s)
             new = marshal.loads(marshal.dumps(b))
             self.assertEqual(s, new)
             marshal.dump(b, file(test_support.TESTFN, "wb"))
@@ -189,7 +191,7 @@ class ContainerTestCase(unittest.TestCase):
             t = constructor(self.d.keys())
             new = marshal.loads(marshal.dumps(t))
             self.assertEqual(t, new)
-            self.assert_(isinstance(new, constructor))
+            self.assertTrue(isinstance(new, constructor))
             self.assertNotEqual(id(t), id(new))
             marshal.dump(t, file(test_support.TESTFN, "wb"))
             new = marshal.load(file(test_support.TESTFN, "rb"))
@@ -261,6 +263,11 @@ class BugsTestCase(unittest.TestCase):
         size = int(1e6)
         testString = 'abc' * size
         marshal.dumps(testString)
+
+    def test_invalid_longs(self):
+        # Issue #7019: marshal.loads shouldn't produce unnormalized PyLongs
+        invalid_string = 'l\x02\x00\x00\x00\x00\x00\x00\x00'
+        self.assertRaises(ValueError, marshal.loads, invalid_string)
 
 
 def test_main():

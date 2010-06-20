@@ -111,7 +111,7 @@ The available exception and functions in this module are:
    regardless of platform.
 
 
-.. function:: decompress(string[, wbits[, bufsize[, offset]]])
+.. function:: decompress(string[, wbits[, bufsize]])
 
    Decompresses the data in *string*, returning a string containing the
    uncompressed data.  The *wbits* parameter controls the size of the window
@@ -133,15 +133,6 @@ The available exception and functions in this module are:
    more space is required, the buffer size will be increased as needed, so you
    don't have to get this value exactly right; tuning it will only save a few calls
    to :cfunc:`malloc`.  The default size is 16384.
-
-   *offset* is the initial position in *string* to start decompression.
-   When specified, it will cause the function's return value to be a (uncompressed, offset)
-   tuple, with the second part giving the position in the input string just after
-   any compressed data.  This is useful if *string* contains additional data after
-   any initial compressed part.
-
-.. versionchanged:: 2.7
-   Added the *offset* argument
 
 
 .. function:: decompressobj([wbits])

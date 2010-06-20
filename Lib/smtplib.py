@@ -334,7 +334,10 @@ class SMTP:
         if self.file is None:
             self.file = self.sock.makefile('rb')
         while 1:
-            line = self.file.readline()
+            try:
+                line = self.file.readline()
+            except socket.error:
+                line = ''
             if line == '':
                 self.close()
                 raise SMTPServerDisconnected("Connection unexpectedly closed")
@@ -751,9 +754,10 @@ if _have_ssl:
 
         def _get_socket(self, host, port, timeout):
             if self.debuglevel > 0: print>>stderr, 'connect:', (host, port)
-            self.sock = socket.create_connection((host, port), timeout)
-            self.sock = ssl.wrap_socket(self.sock, self.keyfile, self.certfile)
-            self.file = SSLFakeFile(self.sock)
+            new_socket = socket.create_connection((host, port), timeout)
+            new_socket = ssl.wrap_socket(new_socket, self.keyfile, self.certfile)
+            self.file = SSLFakeFile(new_socket)
+            return new_socket
 
     __all__.append("SMTP_SSL")
 

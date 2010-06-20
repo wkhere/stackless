@@ -138,7 +138,7 @@ class Process(object):
 
     @name.setter
     def name(self, name):
-        assert isinstance(name, str), 'name must be a string'
+        assert isinstance(name, basestring), 'name must be a string'
         self._name = name
 
     @property
@@ -179,7 +179,7 @@ class Process(object):
     @property
     def ident(self):
         '''
-        Return indentifier (PID) of process or `None` if it has yet to start
+        Return identifier (PID) of process or `None` if it has yet to start
         '''
         if self is _current_process:
             return os.getpid()
@@ -220,7 +220,8 @@ class Process(object):
             self._children = set()
             self._counter = itertools.count(1)
             try:
-                os.close(sys.stdin.fileno())
+                sys.stdin.close()
+                sys.stdin = open(os.devnull)
             except (OSError, ValueError):
                 pass
             _current_process = self

@@ -5,8 +5,8 @@ import tkMessageBox
 
 class FileList:
 
-    from EditorWindow import EditorWindow  # class variable, may be overridden
-                                           # e.g. by PyShellFileList
+    # N.B. this import overridden in PyShellFileList.
+    from idlelib.EditorWindow import EditorWindow
 
     def __init__(self, root):
         self.root = root
@@ -25,7 +25,7 @@ class FileList:
                 master=self.root)
             return None
         key = os.path.normcase(filename)
-        if self.dict.has_key(key):
+        if key in self.dict:
             edit = self.dict[key]
             edit.top.wakeup()
             return edit
@@ -79,7 +79,7 @@ class FileList:
         newkey = os.path.normcase(filename)
         if newkey == key:
             return
-        if self.dict.has_key(newkey):
+        if newkey in self.dict:
             conflict = self.dict[newkey]
             self.inversedict[conflict] = None
             tkMessageBox.showerror(
@@ -106,7 +106,7 @@ class FileList:
 
 
 def _test():
-    from EditorWindow import fixwordbreaks
+    from idlelib.EditorWindow import fixwordbreaks
     import sys
     root = Tk()
     fixwordbreaks(root)

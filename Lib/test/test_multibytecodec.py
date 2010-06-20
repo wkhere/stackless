@@ -5,7 +5,6 @@
 #
 
 from test import test_support
-from test import test_multibytecodec_support
 from test.test_support import TESTFN
 import unittest, StringIO, codecs, sys, os
 import _multibytecodec
@@ -108,6 +107,10 @@ class Test_IncrementalEncoder(unittest.TestCase):
         self.assertRaises(UnicodeEncodeError, encoder.encode, u'\u0123')
         self.assertEqual(encoder.encode(u'', True), '\xa9\xdc')
 
+    def test_issue5640(self):
+        encoder = codecs.getincrementalencoder('shift-jis')('backslashreplace')
+        self.assertEqual(encoder.encode(u'\xff'), b'\\xff')
+        self.assertEqual(encoder.encode(u'\n'), b'\n')
 
 class Test_IncrementalDecoder(unittest.TestCase):
 
@@ -222,10 +225,10 @@ class Test_ISO2022(unittest.TestCase):
         self.assertEqual(iso2022jp2.decode('iso2022-jp-2'), uni)
 
     def test_iso2022_jp_g0(self):
-        self.failIf('\x0e' in u'\N{SOFT HYPHEN}'.encode('iso-2022-jp-2'))
+        self.assertNotIn('\x0e', u'\N{SOFT HYPHEN}'.encode('iso-2022-jp-2'))
         for encoding in ('iso-2022-jp-2004', 'iso-2022-jp-3'):
             e = u'\u3406'.encode(encoding)
-            self.failIf(filter(lambda x: x >= '\x80', e))
+            self.assertFalse(filter(lambda x: x >= '\x80', e))
 
     def test_bug1572832(self):
         if sys.maxunicode >= 0x10000:

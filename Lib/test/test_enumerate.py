@@ -141,6 +141,12 @@ class TestReversed(unittest.TestCase):
         # don't allow keyword arguments
         self.assertRaises(TypeError, reversed, [], a=1)
 
+    def test_class_class(self):
+        class A:
+            def __reversed__(self):
+                return [2, 1]
+        self.assertEqual(list(reversed(A())), [2, 1])
+
     def test_xrange_optimization(self):
         x = xrange(1)
         self.assertEqual(type(reversed(x)), type(iter(x)))
@@ -198,31 +204,48 @@ class TestReversed(unittest.TestCase):
                 self.fail("non-callable __reversed__ didn't raise!")
         self.assertEqual(rc, sys.getrefcount(r))
 
+    def test_objmethods(self):
+        # Objects must have __len__() and __getitem__() implemented.
+        class NoLen(object):
+            def __getitem__(self): return 1
+        nl = NoLen()
+        self.assertRaises(TypeError, reversed, nl)
 
-class TestStart(EnumerateTestCase):
+        class NoGetItem(object):
+            def __len__(self): return 2
+        ngi = NoGetItem()
+        self.assertRaises(TypeError, reversed, ngi)
 
-    enum = lambda i: enumerate(i, start=11)
-    seq, res = 'abc', [(1, 'a'), (2, 'b'), (3, 'c')]
+
+class EnumerateStartTestCase(EnumerateTestCase):
+
+    def test_basicfunction(self):
+        e = self.enum(self.seq)
+        self.assertEqual(iter(e), e)
+        self.assertEqual(list(self.enum(self.seq)), self.res)
 
 
-class TestLongStart(EnumerateTestCase):
+class TestStart(EnumerateStartTestCase):
 
-    enum = lambda i: enumerate(i, start=sys.maxint+1)
+    enum = lambda self, i: enumerate(i, start=11)
+    seq, res = 'abc', [(11, 'a'), (12, 'b'), (13, 'c')]
+
+
+class TestLongStart(EnumerateStartTestCase):
+
+    enum = lambda self, i: enumerate(i, start=sys.maxint+1)
     seq, res = 'abc', [(sys.maxint+1,'a'), (sys.maxint+2,'b'),
                        (sys.maxint+3,'c')]
 
 
 def test_main(verbose=None):
-    testclasses = (EnumerateTestCase, SubclassTestCase, TestEmpty, TestBig,
-                   TestReversed)
-    test_support.run_unittest(*testclasses)
+    test_support.run_unittest(__name__)
 
     # verify reference counting
-    import sys
     if verbose and hasattr(sys, "gettotalrefcount"):
         counts = [None] * 5
         for i in xrange(len(counts)):
-            test_support.run_unittest(*testclasses)
+            test_support.run_unittest(__name__)
             counts[i] = sys.gettotalrefcount()
         print counts
 

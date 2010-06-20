@@ -7,12 +7,18 @@
 #include "intrcheck.h"
 
 #ifdef MS_WINDOWS
+#include <Windows.h>
+#ifdef HAVE_PROCESS_H
 #include <process.h>
 #endif
+#endif
 
+#ifdef HAVE_SIGNAL_H
 #include <signal.h>
-
+#endif
+#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#endif
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -107,7 +113,7 @@ timeval_from_double(double d, struct timeval *tv)
     tv->tv_usec = fmod(d, 1.0) * 1000000.0;
 }
 
-static inline double
+Py_LOCAL_INLINE(double)
 double_from_timeval(struct timeval *tv)
 {
     return tv->tv_sec + (double)(tv->tv_usec / 1000000.0);
@@ -192,7 +198,12 @@ signal_handler(int sig_num)
         return;
     }
 #endif
+#ifndef HAVE_SIGACTION
+    /* If the handler was not set up with sigaction, reinstall it.  See
+     * Python/pythonrun.c for the implementation of PyOS_setsig which
+     * makes this true.  See also issue8354. */
     PyOS_setsig(sig_num, signal_handler);
+#endif
 }
 
 
@@ -788,6 +799,18 @@ initsignal(void)
     PyDict_SetItemString(d, "ItimerError", ItimerError);
 #endif
 
+#ifdef CTRL_C_EVENT
+    x = PyInt_FromLong(CTRL_C_EVENT);
+    PyDict_SetItemString(d, "CTRL_C_EVENT", x);
+    Py_DECREF(x);
+#endif
+
+#ifdef CTRL_BREAK_EVENT
+    x = PyInt_FromLong(CTRL_BREAK_EVENT);
+    PyDict_SetItemString(d, "CTRL_BREAK_EVENT", x);
+    Py_DECREF(x);
+#endif
+
     if (!PyErr_Occurred())
         return;
 
@@ -840,7 +863,7 @@ PyErr_CheckSignals(void)
 #endif
 
     /*
-     * The is_stripped variable is meant to speed up the calls to
+     * The is_tripped variable is meant to speed up the calls to
      * PyErr_CheckSignals (both directly or via pending calls) when no
      * signal has arrived. This variable is set to 1 when a signal arrives
      * and it is set to 0 here, when we know some signals arrived. This way

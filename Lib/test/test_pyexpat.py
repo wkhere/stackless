@@ -4,7 +4,6 @@
 import StringIO, sys
 import unittest
 
-import pyexpat
 from xml.parsers import expat
 
 from test.test_support import sortdict, run_unittest
@@ -554,11 +553,29 @@ class ChardataBufferTest(unittest.TestCase):
 
         self.n=0
         parser.Parse(xml1, 0)
-        parser.buffer_size /= 2
+        parser.buffer_size //= 2
         self.assertEquals(parser.buffer_size, 1024)
         parser.Parse(xml2, 1)
         self.assertEquals(self.n, 4)
 
+class MalformedInputText(unittest.TestCase):
+    def test1(self):
+        xml = "\0\r\n"
+        parser = expat.ParserCreate()
+        try:
+            parser.Parse(xml, True)
+            self.fail()
+        except expat.ExpatError as e:
+            self.assertEquals(str(e), 'unclosed token: line 2, column 0')
+
+    def test2(self):
+        xml = "<?xml version\xc2\x85='1.0'?>\r\n"
+        parser = expat.ParserCreate()
+        try:
+            parser.Parse(xml, True)
+            self.fail()
+        except expat.ExpatError as e:
+            self.assertEquals(str(e), 'XML declaration not well-formed: line 1, column 14')
 
 def test_main():
     run_unittest(SetAttributeTest,
@@ -569,7 +586,8 @@ def test_main():
                  HandlerExceptionTest,
                  PositionTest,
                  sf1296433Test,
-                 ChardataBufferTest)
+                 ChardataBufferTest,
+                 MalformedInputText)
 
 if __name__ == "__main__":
     test_main()

@@ -1,4 +1,3 @@
-#!/usr/bin/env python2.5
 """Test suite for 2to3's parser and grammar files.
 
 This is the place to add tests for changes to 2to3's grammar, such as those
@@ -6,7 +5,8 @@ merging the grammars for Python 2 and 3. In addition to specific tests for
 parts of the grammar we've changed, we also make sure we can parse the
 test_grammar.py files from both Python 2 and Python 3.
 """
-# Author: Collin Winter
+
+from __future__ import with_statement
 
 # Testing imports
 from . import support
@@ -14,9 +14,10 @@ from .support import driver, test_dir
 
 # Python imports
 import os
-import os.path
+import sys
 
 # Local imports
+from lib2to3.pgen2 import tokenize
 from ..pgen2.parse import ParseError
 
 
@@ -148,14 +149,32 @@ class TestParserIdempotency(support.TestCase):
     """A cut-down version of pytree_idempotency.py."""
 
     def test_all_project_files(self):
+        if sys.platform.startswith("win"):
+            # XXX something with newlines goes wrong on Windows.
+            return
         for filepath in support.all_project_files():
-            print "Parsing %s..." % filepath
-            tree = driver.parse_file(filepath, debug=True)
-            if diff(filepath, tree):
+            with open(filepath, "rb") as fp:
+                encoding = tokenize.detect_encoding(fp.readline)[0]
+            self.assertTrue(encoding is not None,
+                            "can't detect encoding for %s" % filepath)
+            with open(filepath, "r") as fp:
+                source = fp.read()
+                source = source.decode(encoding)
+            tree = driver.parse_string(source)
+            new = unicode(tree)
+            if diff(filepath, new, encoding):
                 self.fail("Idempotency failed: %s" % filepath)
 
+    def test_extended_unpacking(self):
+        driver.parse_string("a, *b, c = x\n")
+        driver.parse_string("[*a, b] = x\n")
+        driver.parse_string("(z, *y, w) = m\n")
+        driver.parse_string("for *z, m in d: pass\n")
 
 class TestLiterals(GrammarTest):
+
+    def validate(self, s):
+        driver.parse_string(support.dedent(s) + "\n\n")
 
     def test_multiline_bytes_literals(self):
         s = """
@@ -185,18 +204,14 @@ class TestLiterals(GrammarTest):
         self.validate(s)
 
 
-def diff(fn, tree):
+def diff(fn, result, encoding):
     f = open("@", "w")
     try:
-        f.write(str(tree))
+        f.write(result.encode(encoding))
     finally:
         f.close()
     try:
-        return os.system("diff -u %s @" % fn)
+        fn = fn.replace('"', '\\"')
+        return os.system('diff -u "%s" @' % fn)
     finally:
         os.remove("@")
-
-
-if __name__ == "__main__":
-    import __main__
-    support.run_all_tests(__main__)

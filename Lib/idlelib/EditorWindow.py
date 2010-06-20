@@ -2,25 +2,36 @@ import sys
 import os
 import re
 import imp
-from itertools import count
 from Tkinter import *
 import tkSimpleDialog
 import tkMessageBox
-from MultiCall import MultiCallCreator
-
 import webbrowser
-import idlever
-import WindowList
-import SearchDialog
-import GrepDialog
-import ReplaceDialog
-import PyParse
-from configHandler import idleConf
-import aboutDialog, textView, configDialog
-import macosxSupport
+
+from idlelib.MultiCall import MultiCallCreator
+from idlelib import idlever
+from idlelib import WindowList
+from idlelib import SearchDialog
+from idlelib import GrepDialog
+from idlelib import ReplaceDialog
+from idlelib import PyParse
+from idlelib.configHandler import idleConf
+from idlelib import aboutDialog, textView, configDialog
+from idlelib import macosxSupport
 
 # The default tab setting for a Text widget, in average-width characters.
 TK_TABWIDTH_DEFAULT = 8
+
+def _sphinx_version():
+    "Format sys.version_info to produce the Sphinx version string used to install the chm docs"
+    major, minor, micro, level, serial = sys.version_info
+    release = '%s%s' % (major, minor)
+    if micro:
+        release += '%s' % (micro,)
+    if level == 'candidate':
+        release += 'rc%s' % (serial,)
+    elif level != 'final':
+        release += '%s%s' % (level[0], serial)
+    return release
 
 def _find_module(fullname, path=None):
     """Version of imp.find_module() that handles hierarchical module names"""
@@ -40,13 +51,13 @@ def _find_module(fullname, path=None):
     return file, filename, descr
 
 class EditorWindow(object):
-    from Percolator import Percolator
-    from ColorDelegator import ColorDelegator
-    from UndoDelegator import UndoDelegator
-    from IOBinding import IOBinding, filesystemencoding, encoding
-    import Bindings
+    from idlelib.Percolator import Percolator
+    from idlelib.ColorDelegator import ColorDelegator
+    from idlelib.UndoDelegator import UndoDelegator
+    from idlelib.IOBinding import IOBinding, filesystemencoding, encoding
+    from idlelib import Bindings
     from Tkinter import Toplevel
-    from MultiStatusBar import MultiStatusBar
+    from idlelib.MultiStatusBar import MultiStatusBar
 
     help_url = None
 
@@ -64,15 +75,13 @@ class EditorWindow(object):
                                            'Doc', 'index.html')
             elif sys.platform[:3] == 'win':
                 chmfile = os.path.join(sys.prefix, 'Doc',
-                                       'Python%d%d.chm' % sys.version_info[:2])
+                                       'Python%s.chm' % _sphinx_version())
                 if os.path.isfile(chmfile):
                     dochome = chmfile
-
             elif macosxSupport.runningAsOSXApp():
                 # documentation is stored inside the python framework
                 dochome = os.path.join(sys.prefix,
                         'Resources/English.lproj/Documentation/index.html')
-
             dochome = os.path.normpath(dochome)
             if os.path.isfile(dochome):
                 EditorWindow.help_url = dochome
@@ -80,7 +89,7 @@ class EditorWindow(object):
                     # Safari requires real file:-URLs
                     EditorWindow.help_url = 'file://' + EditorWindow.help_url
             else:
-                EditorWindow.help_url = "http://www.python.org/doc/current"
+                EditorWindow.help_url = "http://docs.python.org/%d.%d" % sys.version_info[:2]
         currentTheme=idleConf.CurrentTheme()
         self.flist = flist
         root = root or flist.root
@@ -105,10 +114,18 @@ class EditorWindow(object):
         self.text_frame = text_frame = Frame(top)
         self.vbar = vbar = Scrollbar(text_frame, name='vbar')
         self.width = idleConf.GetOption('main','EditorWindow','width')
-        self.text = text = MultiCallCreator(Text)(
-                text_frame, name='text', padx=5, wrap='none',
-                width=self.width,
-                height=idleConf.GetOption('main','EditorWindow','height') )
+        text_options = {
+                'name': 'text',
+                'padx': 5,
+                'wrap': 'none',
+                'width': self.width,
+                'height': idleConf.GetOption('main', 'EditorWindow', 'height')}
+        if TkVersion >= 8.5:
+            # Starting with tk 8.5 we have to set the new tabstyle option
+            # to 'wordprocessor' to achieve the same display of tabs as in
+            # older tk versions.
+            text_options['tabstyle'] = 'wordprocessor'
+        self.text = text = MultiCallCreator(Text)(text_frame, **text_options)
         self.top.focused_widget = self.text
 
         self.createmenubar()
@@ -368,7 +385,7 @@ class EditorWindow(object):
             menudict[name] = menu = Menu(mbar, name=name)
             mbar.add_cascade(label=label, menu=menu, underline=underline)
 
-        if sys.platform == 'darwin' and '.framework' in sys.executable:
+        if macosxSupport.runningAsOSXApp():
             # Insert the application menu
             menudict['application'] = menu = Menu(mbar, name='apple')
             mbar.add_cascade(label='IDLE', menu=menu)
@@ -563,11 +580,11 @@ class EditorWindow(object):
             return None
         head, tail = os.path.split(filename)
         base, ext = os.path.splitext(tail)
-        import ClassBrowser
+        from idlelib import ClassBrowser
         ClassBrowser.ClassBrowser(self.flist, base, [head])
 
     def open_path_browser(self, event=None):
-        import PathBrowser
+        from idlelib import PathBrowser
         PathBrowser.PathBrowser(self.flist)
 
     def gotoline(self, lineno):
@@ -688,8 +705,8 @@ class EditorWindow(object):
                     if accel:
                         itemName = menu.entrycget(index, 'label')
                         event = ''
-                        if menuEventDict.has_key(menubarItem):
-                            if menuEventDict[menubarItem].has_key(itemName):
+                        if menubarItem in menuEventDict:
+                            if itemName in menuEventDict[menubarItem]:
                                 event = menuEventDict[menubarItem][itemName]
                         if event:
                             accel = get_accelerator(keydefs, event)
@@ -761,8 +778,8 @@ class EditorWindow(object):
         for instance in self.top.instance_dict.keys():
             menu = instance.recent_files_menu
             menu.delete(1, END)  # clear, and rebuild:
-            for i, file in zip(count(), rf_list):
-                file_name = file[0:-1]  # zap \n
+            for i, file_name in enumerate(rf_list):
+                file_name = file_name.rstrip()  # zap \n
                 # make unicode string to display non-ASCII chars correctly
                 ufile_name = self._filename_to_unicode(file_name)
                 callback = instance.__recent_file_callback(file_name)
@@ -1177,7 +1194,7 @@ class EditorWindow(object):
             if not self.context_use_ps1:
                 for context in self.num_context_lines:
                     startat = max(lno - context, 1)
-                    startatindex = `startat` + ".0"
+                    startatindex = repr(startat) + ".0"
                     rawtext = text.get(startatindex, "insert")
                     y.set_str(rawtext)
                     bod = y.find_good_parse_start(

@@ -438,7 +438,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        /*
      Guess the size of object o using len(o) or o.__length_hint__().
      If neither of those return a non-negative value, then return the
-     default value.  This function never fails. All exceptions are cleared.
+     default value.  If one of the calls fails, this function returns -1.
        */
 
      PyAPI_FUNC(PyObject *) PyObject_GetItem(PyObject *o, PyObject *key);
@@ -636,7 +636,8 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
 #define PyIter_Check(obj) \
     (PyType_HasFeature((obj)->ob_type, Py_TPFLAGS_HAVE_ITER) && \
-     (obj)->ob_type->tp_iternext != NULL)
+     (obj)->ob_type->tp_iternext != NULL && \
+     (obj)->ob_type->tp_iternext != &_PyObject_NextNotImplemented)
 
      PyAPI_FUNC(PyObject *) PyIter_Next(PyObject *);
      /* Takes an iterator object and calls its tp_iternext slot,

@@ -6,8 +6,9 @@ import os
 import shutil
 import sys
 import test.test_support
+from test.test_support import captured_stdout
 import unittest
-
+from distutils.tests import support
 
 # setup script that uses __file__
 setup_using___file__ = """\
@@ -28,15 +29,20 @@ setup()
 """
 
 
-class CoreTestCase(unittest.TestCase):
+class CoreTestCase(support.EnvironGuard, unittest.TestCase):
 
     def setUp(self):
+        super(CoreTestCase, self).setUp()
         self.old_stdout = sys.stdout
         self.cleanup_testfn()
+        self.old_argv = sys.argv, sys.argv[:]
 
     def tearDown(self):
         sys.stdout = self.old_stdout
         self.cleanup_testfn()
+        sys.argv = self.old_argv[0]
+        sys.argv[:] = self.old_argv[1]
+        super(CoreTestCase, self).tearDown()
 
     def cleanup_testfn(self):
         path = test.test_support.TESTFN
@@ -57,7 +63,7 @@ class CoreTestCase(unittest.TestCase):
 
     def test_run_setup_uses_current_dir(self):
         # This tests that the setup script is run with the current directory
-        # as it's own current directory; this was temporarily broken by a
+        # as its own current directory; this was temporarily broken by a
         # previous patch when TESTFN did not use the current directory.
         sys.stdout = StringIO.StringIO()
         cwd = os.getcwd()
@@ -73,6 +79,23 @@ class CoreTestCase(unittest.TestCase):
             output = output[:-1]
         self.assertEqual(cwd, output)
 
+    def test_debug_mode(self):
+        # this covers the code called when DEBUG is set
+        sys.argv = ['setup.py', '--name']
+        with captured_stdout() as stdout:
+            distutils.core.setup(name='bar')
+        stdout.seek(0)
+        self.assertEquals(stdout.read(), 'bar\n')
+
+        distutils.core.DEBUG = True
+        try:
+            with captured_stdout() as stdout:
+                distutils.core.setup(name='bar')
+        finally:
+            distutils.core.DEBUG = False
+        stdout.seek(0)
+        wanted = "options (after parsing config files):\n"
+        self.assertEquals(stdout.readlines()[0], wanted)
 
 def test_suite():
     return unittest.makeSuite(CoreTestCase)

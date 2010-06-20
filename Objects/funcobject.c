@@ -499,13 +499,14 @@ function_call(PyObject *func, PyObject *arg, PyObject *kw)
     STACKLESS_GETARG();
     PyObject *result;
     PyObject *argdefs;
+    PyObject *kwtuple = NULL;
     PyObject **d, **k;
     Py_ssize_t nk, nd;
 
     argdefs = PyFunction_GET_DEFAULTS(func);
     if (argdefs != NULL && PyTuple_Check(argdefs)) {
         d = &PyTuple_GET_ITEM((PyTupleObject *)argdefs, 0);
-        nd = PyTuple_Size(argdefs);
+        nd = PyTuple_GET_SIZE(argdefs);
     }
     else {
         d = NULL;
@@ -515,16 +516,17 @@ function_call(PyObject *func, PyObject *arg, PyObject *kw)
     if (kw != NULL && PyDict_Check(kw)) {
         Py_ssize_t pos, i;
         nk = PyDict_Size(kw);
-        k = PyMem_NEW(PyObject *, 2*nk);
-        if (k == NULL) {
-            PyErr_NoMemory();
+        kwtuple = PyTuple_New(2*nk);
+        if (kwtuple == NULL)
             return NULL;
-        }
+        k = &PyTuple_GET_ITEM(kwtuple, 0);
         pos = i = 0;
-        while (PyDict_Next(kw, &pos, &k[i], &k[i+1]))
+        while (PyDict_Next(kw, &pos, &k[i], &k[i+1])) {
+            Py_INCREF(k[i]);
+            Py_INCREF(k[i+1]);
             i += 2;
+        }
         nk = i/2;
-        /* XXX This is broken if the caller deletes dict items! */
     }
     else {
         k = NULL;
@@ -535,13 +537,12 @@ function_call(PyObject *func, PyObject *arg, PyObject *kw)
     result = PyEval_EvalCodeEx(
         (PyCodeObject *)PyFunction_GET_CODE(func),
         PyFunction_GET_GLOBALS(func), (PyObject *)NULL,
-        &PyTuple_GET_ITEM(arg, 0), PyTuple_Size(arg),
+        &PyTuple_GET_ITEM(arg, 0), PyTuple_GET_SIZE(arg),
         k, nk, d, nd,
         PyFunction_GET_CLOSURE(func));
     STACKLESS_ASSERT();
 
-    if (k != NULL)
-        PyMem_DEL(k);
+    Py_XDECREF(kwtuple);
 
     return result;
 }
@@ -671,16 +672,15 @@ cm_init(PyObject *self, PyObject *args, PyObject *kwds)
         return -1;
     if (!_PyArg_NoKeywords("classmethod", kwds))
         return -1;
-    if (!PyCallable_Check(callable)) {
-        PyErr_Format(PyExc_TypeError, "'%s' object is not callable",
-             callable->ob_type->tp_name);
-        return -1;
-    }
-
     Py_INCREF(callable);
     cm->cm_callable = callable;
     return 0;
 }
+
+static PyMemberDef cm_memberlist[] = {
+    {"__func__", T_OBJECT, offsetof(classmethod, cm_callable), READONLY},
+    {NULL}  /* Sentinel */
+};
 
 PyDoc_STRVAR(classmethod_doc,
 "classmethod(function) -> method\n\
@@ -732,7 +732,7 @@ PyTypeObject PyClassMethod_Type = {
     0,                                          /* tp_iter */
     0,                                          /* tp_iternext */
     0,                                          /* tp_methods */
-    0,                                          /* tp_members */
+    cm_memberlist,              /* tp_members */
     0,                                          /* tp_getset */
     0,                                          /* tp_base */
     0,                                          /* tp_dict */
@@ -832,6 +832,11 @@ sm_init(PyObject *self, PyObject *args, PyObject *kwds)
     return 0;
 }
 
+static PyMemberDef sm_memberlist[] = {
+    {"__func__", T_OBJECT, offsetof(staticmethod, sm_callable), READONLY},
+    {NULL}  /* Sentinel */
+};
+
 PyDoc_STRVAR(staticmethod_doc,
 "staticmethod(function) -> method\n\
 \n\
@@ -879,7 +884,7 @@ PyTypeObject PyStaticMethod_Type = {
     0,                                          /* tp_iter */
     0,                                          /* tp_iternext */
     0,                                          /* tp_methods */
-    0,                                          /* tp_members */
+    sm_memberlist,              /* tp_members */
     0,                                          /* tp_getset */
     0,                                          /* tp_base */
     0,                                          /* tp_dict */

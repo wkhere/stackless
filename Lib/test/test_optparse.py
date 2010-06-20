@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 #
 # Test suite for Optik.  Supplied by Johannes Gijsbers
 # (taradino@softhome.net) -- translated from the original Optik
@@ -19,18 +17,12 @@ from StringIO import StringIO
 from test import test_support
 
 
-from optparse import make_option, Option, IndentedHelpFormatter, \
-     TitledHelpFormatter, OptionParser, OptionContainer, OptionGroup, \
-     SUPPRESS_HELP, SUPPRESS_USAGE, OptionError, OptionConflictError, \
+from optparse import make_option, Option, \
+     TitledHelpFormatter, OptionParser, OptionGroup, \
+     SUPPRESS_USAGE, OptionError, OptionConflictError, \
      BadOptionError, OptionValueError, Values
 from optparse import _match_abbrev
 from optparse import _parse_num
-
-# Do the right thing with boolean values for all known Python versions.
-try:
-    True, False
-except NameError:
-    (True, False) = (1, 0)
 
 retype = type(re.compile(''))
 
@@ -116,7 +108,7 @@ Args were %(args)s.""" % locals ())
         except expected_exception, err:
             actual_message = str(err)
             if isinstance(expected_message, retype):
-                self.assert_(expected_message.search(actual_message),
+                self.assertTrue(expected_message.search(actual_message),
                              """\
 expected exception message pattern:
 /%s/
@@ -175,7 +167,7 @@ and kwargs %(kwargs)r
                 sys.stdout = save_stdout
 
         except InterceptedError, err:
-            self.assert_(
+            self.assertTrue(
                 type(output) is types.StringType,
                 "expected output to be an ordinary string, not %r"
                 % type(output))
@@ -348,7 +340,7 @@ class TestOptionParser(BaseTest):
 
     def test_get_option(self):
         opt1 = self.parser.get_option("-v")
-        self.assert_(isinstance(opt1, Option))
+        self.assertIsInstance(opt1, Option)
         self.assertEqual(opt1._short_opts, ["-v", "-n"])
         self.assertEqual(opt1._long_opts, ["--verbose", "--noisy"])
         self.assertEqual(opt1.action, "store_true")
@@ -359,33 +351,33 @@ class TestOptionParser(BaseTest):
         opt2 = self.parser.get_option("--verbose")
         opt3 = self.parser.get_option("-n")
         opt4 = self.parser.get_option("--noisy")
-        self.assert_(opt1 is opt2 is opt3 is opt4)
+        self.assertTrue(opt1 is opt2 is opt3 is opt4)
 
     def test_has_option(self):
-        self.assert_(self.parser.has_option("-v"))
-        self.assert_(self.parser.has_option("--verbose"))
+        self.assertTrue(self.parser.has_option("-v"))
+        self.assertTrue(self.parser.has_option("--verbose"))
 
-    def assert_removed(self):
-        self.assert_(self.parser.get_option("-v") is None)
-        self.assert_(self.parser.get_option("--verbose") is None)
-        self.assert_(self.parser.get_option("-n") is None)
-        self.assert_(self.parser.get_option("--noisy") is None)
+    def assertTrueremoved(self):
+        self.assertTrue(self.parser.get_option("-v") is None)
+        self.assertTrue(self.parser.get_option("--verbose") is None)
+        self.assertTrue(self.parser.get_option("-n") is None)
+        self.assertTrue(self.parser.get_option("--noisy") is None)
 
-        self.failIf(self.parser.has_option("-v"))
-        self.failIf(self.parser.has_option("--verbose"))
-        self.failIf(self.parser.has_option("-n"))
-        self.failIf(self.parser.has_option("--noisy"))
+        self.assertFalse(self.parser.has_option("-v"))
+        self.assertFalse(self.parser.has_option("--verbose"))
+        self.assertFalse(self.parser.has_option("-n"))
+        self.assertFalse(self.parser.has_option("--noisy"))
 
-        self.assert_(self.parser.has_option("-q"))
-        self.assert_(self.parser.has_option("--silent"))
+        self.assertTrue(self.parser.has_option("-q"))
+        self.assertTrue(self.parser.has_option("--silent"))
 
     def test_remove_short_opt(self):
         self.parser.remove_option("-n")
-        self.assert_removed()
+        self.assertTrueremoved()
 
     def test_remove_long_opt(self):
         self.parser.remove_option("--verbose")
-        self.assert_removed()
+        self.assertTrueremoved()
 
     def test_remove_nonexistent(self):
         self.assertRaises(self.parser.remove_option, ('foo',), None,
@@ -459,7 +451,7 @@ def _check_duration(option, opt, value):
             return int(value)
         else:
             return int(value[:-1]) * _time_units[value[-1]]
-    except ValueError, IndexError:
+    except (ValueError, IndexError):
         raise OptionValueError(
             'option %s: invalid duration: %r' % (opt, value))
 
@@ -795,14 +787,14 @@ class TestBool(BaseTest):
                                              {'verbose': 0},
                                              [])
         if hasattr(__builtins__, 'False'):
-            self.failUnless(options.verbose is False)
+            self.assertTrue(options.verbose is False)
 
     def test_bool_true(self):
         (options, args) = self.assertParseOK(["-v"],
                                              {'verbose': 1},
                                              [])
         if hasattr(__builtins__, 'True'):
-            self.failUnless(options.verbose is True)
+            self.assertTrue(options.verbose is True)
 
     def test_bool_flicker_on_and_off(self):
         self.assertParseOK(["-qvq", "-q", "-v"],
@@ -1008,7 +1000,7 @@ class TestOptionGroup(BaseTest):
                                              description="Some more options")
         group.set_title("Bacon")
         group.add_option("--bacon", type="int")
-        self.assert_(self.parser.get_option_group("--bacon"), group)
+        self.assertTrue(self.parser.get_option_group("--bacon"), group)
 
 # -- Test extending and parser.parse_args() ----------------------------
 
@@ -1104,15 +1096,15 @@ class TestCallback(BaseTest):
         if opt == "-x":
             self.assertEqual(option._short_opts, ["-x"])
             self.assertEqual(option._long_opts, [])
-            self.assert_(parser_ is self.parser)
-            self.assert_(value is None)
+            self.assertTrue(parser_ is self.parser)
+            self.assertTrue(value is None)
             self.assertEqual(vars(parser_.values), {'filename': None})
 
             parser_.values.x = 42
         elif opt == "--file":
             self.assertEqual(option._short_opts, ["-f"])
             self.assertEqual(option._long_opts, ["--file"])
-            self.assert_(parser_ is self.parser)
+            self.assertTrue(parser_ is self.parser)
             self.assertEqual(value, "foo")
             self.assertEqual(vars(parser_.values), {'filename': None, 'x': 42})
 
@@ -1150,7 +1142,7 @@ class TestCallbackExtraArgs(BaseTest):
 
     def process_tuple(self, option, opt, value, parser_, len, type):
         self.assertEqual(len, 3)
-        self.assert_(type is int)
+        self.assertTrue(type is int)
 
         if opt == "-p":
             self.assertEqual(value, "1,2,3")
@@ -1241,8 +1233,7 @@ class TestCallbackVarArgs(BaseTest):
                                                option_list=options)
 
     def variable_args(self, option, opt, value, parser):
-        self.assert_(value is None)
-        done = 0
+        self.assertTrue(value is None)
         value = []
         rargs = parser.rargs
         while rargs:
@@ -1297,7 +1288,7 @@ class ConflictBase(BaseTest):
 
 class TestConflict(ConflictBase):
     """Use the default conflict resolution for Optik 1.2: error."""
-    def assert_conflict_error(self, func):
+    def assertTrueconflict_error(self, func):
         err = self.assertRaises(
             func, ("-v", "--version"), {'action' : "callback",
                                         'callback' : self.show_version,
@@ -1309,11 +1300,11 @@ class TestConflict(ConflictBase):
         self.assertEqual(err.option_id, "-v/--version")
 
     def test_conflict_error(self):
-        self.assert_conflict_error(self.parser.add_option)
+        self.assertTrueconflict_error(self.parser.add_option)
 
     def test_conflict_error_group(self):
         group = OptionGroup(self.parser, "Group 1")
-        self.assert_conflict_error(group.add_option)
+        self.assertTrueconflict_error(group.add_option)
 
     def test_no_such_conflict_handler(self):
         self.assertRaises(
@@ -1333,8 +1324,8 @@ class TestConflictResolve(ConflictBase):
         verbose_opt = self.parser.get_option("--verbose")
         version_opt = self.parser.get_option("--version")
 
-        self.assert_(v_opt is version_opt)
-        self.assert_(v_opt is not verbose_opt)
+        self.assertTrue(v_opt is version_opt)
+        self.assertTrue(v_opt is not verbose_opt)
         self.assertEqual(v_opt._long_opts, ["--version"])
         self.assertEqual(version_opt._short_opts, ["-v"])
         self.assertEqual(version_opt._long_opts, ["--version"])
@@ -1464,15 +1455,9 @@ class TestHelp(BaseTest):
         # we must restore its original value -- otherwise, this test
         # screws things up for other tests when it's part of the Python
         # test suite.
-        orig_columns = os.environ.get('COLUMNS')
-        os.environ['COLUMNS'] = str(columns)
-        try:
+        with test_support.EnvironmentVarGuard() as env:
+            env['COLUMNS'] = str(columns)
             return InterceptingOptionParser(option_list=options)
-        finally:
-            if orig_columns is None:
-                del os.environ['COLUMNS']
-            else:
-                os.environ['COLUMNS'] = orig_columns
 
     def assertHelpEquals(self, expected_output):
         if type(expected_output) is types.UnicodeType:
@@ -1499,16 +1484,10 @@ class TestHelp(BaseTest):
         self.assertHelpEquals(_expected_help_long_opts_first)
 
     def test_help_title_formatter(self):
-        save = os.environ.get("COLUMNS")
-        try:
-            os.environ["COLUMNS"] = "80"
+        with test_support.EnvironmentVarGuard() as env:
+            env["COLUMNS"] = "80"
             self.parser.formatter = TitledHelpFormatter()
             self.assertHelpEquals(_expected_help_title_formatter)
-        finally:
-            if save is not None:
-                os.environ["COLUMNS"] = save
-            else:
-                del os.environ["COLUMNS"]
 
     def test_wrap_columns(self):
         # Ensure that wrapping respects $COLUMNS environment variable.

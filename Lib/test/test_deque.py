@@ -1,11 +1,11 @@
 from collections import deque
 import unittest
 from test import test_support, seq_tests
-from weakref import proxy
+import gc
+import weakref
 import copy
 import cPickle as pickle
 import random
-import os
 
 BIG = 100000
 
@@ -49,7 +49,9 @@ class TestBasic(unittest.TestCase):
     def test_maxlen(self):
         self.assertRaises(ValueError, deque, 'abc', -1)
         self.assertRaises(ValueError, deque, 'abc', -2)
-        d = deque(range(10), maxlen=3)
+        it = iter(range(10))
+        d = deque(it, maxlen=3)
+        self.assertEqual(list(it), [])
         self.assertEqual(repr(d), 'deque([7, 8, 9], maxlen=3)')
         self.assertEqual(list(d), range(7, 10))
         self.assertEqual(d, deque(range(10), 3))
@@ -86,6 +88,55 @@ class TestBasic(unittest.TestCase):
             fo.close()
             test_support.unlink(test_support.TESTFN)
 
+    def test_maxlen_zero(self):
+        it = iter(range(100))
+        deque(it, maxlen=0)
+        self.assertEqual(list(it), [])
+
+        it = iter(range(100))
+        d = deque(maxlen=0)
+        d.extend(it)
+        self.assertEqual(list(it), [])
+
+        it = iter(range(100))
+        d = deque(maxlen=0)
+        d.extendleft(it)
+        self.assertEqual(list(it), [])
+
+    def test_maxlen_attribute(self):
+        self.assertEqual(deque().maxlen, None)
+        self.assertEqual(deque('abc').maxlen, None)
+        self.assertEqual(deque('abc', maxlen=4).maxlen, 4)
+        self.assertEqual(deque('abc', maxlen=2).maxlen, 2)
+        self.assertEqual(deque('abc', maxlen=0).maxlen, 0)
+        with self.assertRaises(AttributeError):
+            d = deque('abc')
+            d.maxlen = 10
+
+    def test_count(self):
+        for s in ('', 'abracadabra', 'simsalabim'*500+'abc'):
+            s = list(s)
+            d = deque(s)
+            for letter in 'abcdefghijklmnopqrstuvwxyz':
+                self.assertEqual(s.count(letter), d.count(letter), (s, d, letter))
+        self.assertRaises(TypeError, d.count)       # too few args
+        self.assertRaises(TypeError, d.count, 1, 2) # too many args
+        class BadCompare:
+            def __eq__(self, other):
+                raise ArithmeticError
+        d = deque([1, 2, BadCompare(), 3])
+        self.assertRaises(ArithmeticError, d.count, 2)
+        d = deque([1, 2, 3])
+        self.assertRaises(ArithmeticError, d.count, BadCompare())
+        class MutatingCompare:
+            def __eq__(self, other):
+                self.d.pop()
+                return True
+        m = MutatingCompare()
+        d = deque([1, 2, 3, m, 4, 5])
+        m.d = d
+        self.assertRaises(RuntimeError, d.count, 3)
+
     def test_comparisons(self):
         d = deque('xabc'); d.popleft()
         for e in [d, deque('abc'), deque('ab'), deque(), list(d)]:
@@ -108,12 +159,23 @@ class TestBasic(unittest.TestCase):
         self.assertRaises(TypeError, d.extend, 1)
         d.extend('bcd')
         self.assertEqual(list(d), list('abcd'))
+        d.extend(d)
+        self.assertEqual(list(d), list('abcdabcd'))
+
+    def test_iadd(self):
+        d = deque('a')
+        d += 'bcd'
+        self.assertEqual(list(d), list('abcd'))
+        d += d
+        self.assertEqual(list(d), list('abcdabcd'))
 
     def test_extendleft(self):
         d = deque('a')
         self.assertRaises(TypeError, d.extendleft, 1)
         d.extendleft('bcd')
         self.assertEqual(list(d), list(reversed('abcd')))
+        d.extendleft(d)
+        self.assertEqual(list(d), list('abcddcba'))
         d = deque()
         d.extendleft(range(1000))
         self.assertEqual(list(d), list(reversed(range(1000))))
@@ -160,10 +222,22 @@ class TestBasic(unittest.TestCase):
             self.assertEqual(len(d), n-i)
             j = random.randrange(-len(d), len(d))
             val = d[j]
-            self.assert_(val in d)
+            self.assertIn(val, d)
             del d[j]
-            self.assert_(val not in d)
+            self.assertNotIn(val, d)
         self.assertEqual(len(d), 0)
+
+    def test_reverse(self):
+        n = 500         # O(n**2) test, don't make this too big
+        data = [random.random() for i in range(n)]
+        for i in range(n):
+            d = deque(data[:i])
+            r = d.reverse()
+            self.assertEqual(list(d), list(reversed(data[:i])))
+            self.assert_(r is None)
+            d.reverse()
+            self.assertEqual(list(d), data[:i])
+        self.assertRaises(TypeError, d.reverse, 1)          # Arity is zero
 
     def test_rotate(self):
         s = tuple('abcde')
@@ -263,7 +337,7 @@ class TestBasic(unittest.TestCase):
         self.assertRaises(RuntimeError, d.remove, 'c')
         for x, y in zip(d, e):
             # verify that original order and values are retained.
-            self.assert_(x is y)
+            self.assertTrue(x is y)
 
         # Handle evil mutator
         for match in (True, False):
@@ -277,7 +351,7 @@ class TestBasic(unittest.TestCase):
         e = eval(repr(d))
         self.assertEqual(list(d), list(e))
         d.append(d)
-        self.assert_('...' in repr(d))
+        self.assertIn('...', repr(d))
 
     def test_print(self):
         d = deque(xrange(200))
@@ -373,7 +447,7 @@ class TestBasic(unittest.TestCase):
 
     def test_pickle(self):
         d = deque(xrange(200))
-        for i in (0, 1, 2):
+        for i in range(pickle.HIGHEST_PROTOCOL + 1):
             s = pickle.dumps(d, i)
             e = pickle.loads(s)
             self.assertNotEqual(id(d), id(e))
@@ -382,7 +456,7 @@ class TestBasic(unittest.TestCase):
 ##    def test_pickle_recursive(self):
 ##        d = deque('abc')
 ##        d.append(d)
-##        for i in (0, 1, 2):
+##        for i in range(pickle.HIGHEST_PROTOCOL + 1):
 ##            e = pickle.loads(pickle.dumps(d, i))
 ##            self.assertNotEqual(id(d), id(e))
 ##            self.assertEqual(id(e), id(e[-1]))
@@ -417,6 +491,22 @@ class TestBasic(unittest.TestCase):
         for i in xrange(100):
             d.append(1)
             gc.collect()
+
+    def test_container_iterator(self):
+        # Bug #3680: tp_traverse was not implemented for deque iterator objects
+        class C(object):
+            pass
+        for i in range(2):
+            obj = C()
+            ref = weakref.ref(obj)
+            if i == 0:
+                container = deque([obj, 1])
+            else:
+                container = reversed(deque([obj, 1]))
+            obj.x = iter(container)
+            del obj, container
+            gc.collect()
+            self.assertTrue(ref() is None, "Cycle was not collected")
 
 class TestVariousIteratorArgs(unittest.TestCase):
 
@@ -528,7 +618,7 @@ class TestSubclass(unittest.TestCase):
 
     def test_weakref(self):
         d = deque('gallahad')
-        p = proxy(d)
+        p = weakref.proxy(d)
         self.assertEqual(str(p), str(d))
         d = None
         self.assertRaises(ReferenceError, str, p)

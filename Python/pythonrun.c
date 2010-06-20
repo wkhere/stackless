@@ -17,10 +17,15 @@
 #include "ast.h"
 #include "eval.h"
 #include "marshal.h"
+#include "abstract.h"
 #include "core/stackless_impl.h"
 
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
+#endif
+
+#ifdef MS_WINDOWS
+#include "malloc.h" /* for alloca */
 #endif
 
 #ifdef HAVE_LANGINFO_H
@@ -58,6 +63,7 @@ static PyObject *run_pyc_file(FILE *, const char *, PyObject *, PyObject *,
                               PyCompilerFlags *);
 static void err_input(perrdetail *);
 static void initsigs(void);
+static void wait_for_thread_shutdown(void);
 static void call_sys_exitfunc(void);
 static void call_ll_exitfuncs(void);
 extern void _PyUnicode_Init(void);
@@ -186,6 +192,9 @@ Py_InitializeEx(int install_sigs)
     if (!_PyInt_Init())
         Py_FatalError("Py_Initialize: can't init ints");
 
+    if (!_PyLong_Init())
+        Py_FatalError("Py_Initialize: can't init longs");
+
     if (!PyByteArray_Init())
         Py_FatalError("Py_Initialize: can't init bytearray");
 
@@ -250,13 +259,14 @@ Py_InitializeEx(int install_sigs)
     _PyStackless_Init();
 #endif
     initmain(); /* Module __main__ */
-    if (!Py_NoSiteFlag)
-        initsite(); /* Module site */
 
     /* auto-thread-state API, if available */
 #ifdef WITH_THREAD
     _PyGILState_Init(interp, tstate);
 #endif /* WITH_THREAD */
+
+    if (!Py_NoSiteFlag)
+        initsite(); /* Module site */
 
     if ((p = Py_GETENV("PYTHONIOENCODING")) && *p != '\0') {
         p = icodeset = codeset = strdup(p);
@@ -286,8 +296,13 @@ Py_InitializeEx(int install_sigs)
                 loc_codeset = strdup(loc_codeset);
                 Py_DECREF(enc);
             } else {
-                loc_codeset = NULL;
-                PyErr_Clear();
+                if (PyErr_ExceptionMatches(PyExc_LookupError)) {
+                    PyErr_Clear();
+                    loc_codeset = NULL;
+                } else {
+                    PyErr_Print();
+                    exit(1);
+                }
             }
         } else
             loc_codeset = NULL;
@@ -393,6 +408,8 @@ Py_Finalize(void)
 
     if (!initialized)
         return;
+
+    wait_for_thread_shutdown();
 
     /* The interpreter is still entirely intact at this point, and the
      * exit funcs may be relying on that.  In particular, if some thread
@@ -701,7 +718,7 @@ initmain(void)
         if (bimod == NULL ||
             PyDict_SetItemString(d, "__builtins__", bimod) != 0)
             Py_FatalError("can't add __builtins__ to __main__");
-        Py_DECREF(bimod);
+        Py_XDECREF(bimod);
     }
 }
 
@@ -710,20 +727,12 @@ initmain(void)
 static void
 initsite(void)
 {
-    PyObject *m, *f;
+    PyObject *m;
     m = PyImport_ImportModule("site");
     if (m == NULL) {
-        f = PySys_GetObject("stderr");
-        if (Py_VerboseFlag) {
-            PyFile_WriteString(
-                "'import site' failed; traceback:\n", f);
-            PyErr_Print();
-        }
-        else {
-            PyFile_WriteString(
-              "'import site' failed; use -v for traceback\n", f);
-            PyErr_Clear();
-        }
+        PyErr_Print();
+        Py_Finalize();
+        exit(1);
     }
     else {
         Py_DECREF(m);
@@ -908,7 +917,7 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 {
     PyObject *m, *d, *v;
     const char *ext;
-    int set_file_name = 0, ret;
+    int set_file_name = 0, ret, len;
 
     m = PyImport_AddModule("__main__");
     if (m == NULL)
@@ -925,7 +934,8 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
         set_file_name = 1;
         Py_DECREF(f);
     }
-    ext = filename + strlen(filename) - 4;
+    len = strlen(filename);
+    ext = filename + len - (len > 4 ? 4 : 0);
     if (maybe_pyc_file(fp, filename, ext, closeit)) {
         /* Try to run a pyc file. First, re-open in binary */
         if (closeit)
@@ -1113,7 +1123,13 @@ handle_system_exit(void)
     if (PyInt_Check(value))
         exitcode = (int)PyInt_AsLong(value);
     else {
-        PyObject_Print(value, stderr, Py_PRINT_RAW);
+        PyObject *sys_stderr = PySys_GetObject("stderr");
+        if (sys_stderr != NULL && sys_stderr != Py_None) {
+            PyFile_WriteObject(value, sys_stderr, Py_PRINT_RAW);
+        } else {
+            PyObject_Print(value, stderr, Py_PRINT_RAW);
+            fflush(stderr);
+        }
         PySys_WriteStderr("\n");
         exitcode = 1;
     }
@@ -1566,6 +1582,8 @@ err_input(perrdetail *err)
     char *msg = NULL;
     errtype = PyExc_SyntaxError;
     switch (err->error) {
+    case E_ERROR:
+        return;
     case E_SYNTAX:
         errtype = PyExc_IndentationError;
         if (err->expected == INDENT)
@@ -1659,10 +1677,24 @@ void
 Py_FatalError(const char *msg)
 {
     fprintf(stderr, "Fatal Python error: %s\n", msg);
+    fflush(stderr); /* it helps in Windows debug build */
+
 #ifdef MS_WINDOWS
-    OutputDebugString("Fatal Python error: ");
-    OutputDebugString(msg);
-    OutputDebugString("\n");
+    {
+        size_t len = strlen(msg);
+        WCHAR* buffer;
+        size_t i;
+
+        /* Convert the message to wchar_t. This uses a simple one-to-one
+        conversion, assuming that the this error message actually uses ASCII
+        only. If this ceases to be true, we will have to convert. */
+        buffer = alloca( (len+1) * (sizeof *buffer));
+        for( i=0; i<=len; ++i)
+            buffer[i] = msg[i];
+        OutputDebugStringW(L"Fatal Python error: ");
+        OutputDebugStringW(buffer);
+        OutputDebugStringW(L"\n");
+    }
 #ifdef _DEBUG
     DebugBreak();
 #endif
@@ -1675,6 +1707,32 @@ Py_FatalError(const char *msg)
 #ifdef WITH_THREAD
 #include "pythread.h"
 #endif
+
+/* Wait until threading._shutdown completes, provided
+   the threading module was imported in the first place.
+   The shutdown routine will wait until all non-daemon
+   "threading" threads have completed. */
+static void
+wait_for_thread_shutdown(void)
+{
+#ifdef WITH_THREAD
+    PyObject *result;
+    PyThreadState *tstate = PyThreadState_GET();
+    PyObject *threading = PyMapping_GetItemString(tstate->interp->modules,
+                                                  "threading");
+    if (threading == NULL) {
+        /* threading not imported */
+        PyErr_Clear();
+        return;
+    }
+    result = PyObject_CallMethod(threading, "_shutdown", "");
+    if (result == NULL)
+        PyErr_WriteUnraisable(threading);
+    else
+        Py_DECREF(result);
+    Py_DECREF(threading);
+#endif
+}
 
 #define NEXITFUNCS 32
 static void (*exitfuncs[NEXITFUNCS])(void);
@@ -1787,7 +1845,7 @@ PyOS_CheckStack(void)
                     EXCEPTION_EXECUTE_HANDLER :
             EXCEPTION_CONTINUE_SEARCH) {
         int errcode = _resetstkoflw();
-        if (errcode)
+        if (errcode == 0)
         {
             Py_FatalError("Could not reset the stack!");
         }
@@ -1842,6 +1900,10 @@ PyOS_sighandler_t
 PyOS_setsig(int sig, PyOS_sighandler_t handler)
 {
 #ifdef HAVE_SIGACTION
+    /* Some code in Modules/signalmodule.c depends on sigaction() being
+     * used here if HAVE_SIGACTION is defined.  Fix that if this code
+     * changes to invalidate that assumption.
+     */
     struct sigaction context, ocontext;
     context.sa_handler = handler;
     sigemptyset(&context.sa_mask);

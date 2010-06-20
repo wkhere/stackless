@@ -36,7 +36,7 @@ PyDoc_STRVAR(MultibyteCodec_Decode__doc__,
 Decodes `string' using I, an MultibyteCodec instance. errors may be given\n\
 to set a different error handling scheme. Default is 'strict' meaning\n\
 that encoding errors raise a UnicodeDecodeError. Other possible values\n\
-are 'ignore' and 'replace' as well as any other name registerd with\n\
+are 'ignore' and 'replace' as well as any other name registered with\n\
 codecs.register_error that is able to handle UnicodeDecodeErrors.");
 
 static char *codeckwarglist[] = {"input", "errors", NULL};
@@ -498,7 +498,6 @@ multibytecodec_encode(MultibyteCodec *codec,
         outleft = (Py_ssize_t)(buf.outbuf_end - buf.outbuf);
         r = codec->encode(state, codec->config, &buf.inbuf, inleft,
                           &buf.outbuf, outleft, flags);
-        *data = buf.inbuf;
         if ((r == 0) || (r == MBERR_TOOFEW && !(flags & MBENC_FLUSH)))
             break;
         else if (multibytecodec_encerror(codec, state, &buf, errors,r))
@@ -528,6 +527,7 @@ multibytecodec_encode(MultibyteCodec *codec,
         if (_PyString_Resize(&buf.outobj, finalsize) == -1)
             goto errorexit;
 
+	*data = buf.inbuf;
     Py_XDECREF(buf.excobj);
     return buf.outobj;
 
@@ -1774,12 +1774,12 @@ __create_codec(PyObject *ignore, PyObject *arg)
     MultibyteCodecObject *self;
     MultibyteCodec *codec;
 
-    if (!PyCObject_Check(arg)) {
+    if (!PyCapsule_IsValid(arg, PyMultibyteCodec_CAPSULE_NAME)) {
         PyErr_SetString(PyExc_ValueError, "argument type invalid");
         return NULL;
     }
 
-    codec = PyCObject_AsVoidPtr(arg);
+    codec = PyCapsule_GetPointer(arg, PyMultibyteCodec_CAPSULE_NAME);
     if (codec->codecinit != NULL && codec->codecinit(codec->config) != 0)
         return NULL;
 

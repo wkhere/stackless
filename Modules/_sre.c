@@ -172,7 +172,7 @@ static unsigned int sre_lower_locale(unsigned int ch)
 
 #if defined(HAVE_UNICODE)
 
-#define SRE_UNI_IS_DIGIT(ch) Py_UNICODE_ISDIGIT((Py_UNICODE)(ch))
+#define SRE_UNI_IS_DIGIT(ch) Py_UNICODE_ISDECIMAL((Py_UNICODE)(ch))
 #define SRE_UNI_IS_SPACE(ch) Py_UNICODE_ISSPACE((Py_UNICODE)(ch))
 #define SRE_UNI_IS_LINEBREAK(ch) Py_UNICODE_ISLINEBREAK((Py_UNICODE)(ch))
 #define SRE_UNI_IS_ALNUM(ch) Py_UNICODE_ISALNUM((Py_UNICODE)(ch))
@@ -1686,7 +1686,7 @@ getstring(PyObject* string, Py_ssize_t* p_length, int* p_charsize)
     if (PyUnicode_Check(string)) {
         /* unicode strings doesn't always support the buffer interface */
         ptr = (void*) PyUnicode_AS_DATA(string);
-        bytes = PyUnicode_GET_DATA_SIZE(string);
+        /* bytes = PyUnicode_GET_DATA_SIZE(string); */
         size = PyUnicode_GET_SIZE(string);
         charsize = sizeof(Py_UNICODE);
 
@@ -2684,6 +2684,10 @@ _compile(PyObject* self_, PyObject* args)
     self = PyObject_NEW_VAR(PatternObject, &Pattern_Type, n);
     if (!self)
         return NULL;
+    self->weakreflist = NULL;
+    self->pattern = NULL;
+    self->groupindex = NULL;
+    self->indexgroup = NULL;
 
     self->codesize = n;
 
@@ -2700,7 +2704,7 @@ _compile(PyObject* self_, PyObject* args)
     }
 
     if (PyErr_Occurred()) {
-        PyObject_DEL(self);
+        Py_DECREF(self);
         return NULL;
     }
 
@@ -2963,13 +2967,13 @@ _validate_inner(SRE_CODE *code, SRE_CODE *end, Py_ssize_t groups)
                    <INFO> <1=skip> <2=flags> <3=min> <4=max>;
                    If SRE_INFO_PREFIX or SRE_INFO_CHARSET is in the flags,
                    more follows. */
-                SRE_CODE flags, min, max, i;
+                SRE_CODE flags, i;
                 SRE_CODE *newcode;
                 GET_SKIP;
                 newcode = code+skip-1;
                 GET_ARG; flags = arg;
-                GET_ARG; min = arg;
-                GET_ARG; max = arg;
+                GET_ARG; /* min */
+                GET_ARG; /* max */
                 /* Check that only valid flags are present */
                 if ((flags & ~(SRE_INFO_PREFIX |
                                SRE_INFO_LITERAL |
@@ -2985,9 +2989,9 @@ _validate_inner(SRE_CODE *code, SRE_CODE *end, Py_ssize_t groups)
                     FAIL;
                 /* Validate the prefix */
                 if (flags & SRE_INFO_PREFIX) {
-                    SRE_CODE prefix_len, prefix_skip;
+                    SRE_CODE prefix_len;
                     GET_ARG; prefix_len = arg;
-                    GET_ARG; prefix_skip = arg;
+                    GET_ARG; /* prefix skip */
                     /* Here comes the prefix string */
                     if (code+prefix_len < code || code+prefix_len > newcode)
                         FAIL;
@@ -3718,7 +3722,7 @@ static void
 scanner_dealloc(ScannerObject* self)
 {
     state_fini(&self->state);
-    Py_DECREF(self->pattern);
+    Py_XDECREF(self->pattern);
     PyObject_DEL(self);
 }
 
@@ -3840,10 +3844,11 @@ pattern_scanner(PatternObject* pattern, PyObject* args)
     self = PyObject_NEW(ScannerObject, &Scanner_Type);
     if (!self)
         return NULL;
+    self->pattern = NULL;
 
     string = state_init(&self->state, pattern, string, start, end);
     if (!string) {
-        PyObject_DEL(self);
+        Py_DECREF(self);
         return NULL;
     }
 
@@ -3871,8 +3876,9 @@ PyMODINIT_FUNC init_sre(void)
     PyObject* x;
 
     /* Patch object types */
-    Pattern_Type.ob_type = Match_Type.ob_type =
-        Scanner_Type.ob_type = &PyType_Type;
+    if (PyType_Ready(&Pattern_Type) || PyType_Ready(&Match_Type) ||
+        PyType_Ready(&Scanner_Type))
+        return;
 
     m = Py_InitModule("_" SRE_MODULE, _functions);
     if (m == NULL)

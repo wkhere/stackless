@@ -10,6 +10,7 @@
 #include "eval.h"
 
 #include <ctype.h>
+#include <float.h> /* for DBL_MANT_DIG and friends */
 
 #ifdef RISCOS
 #include "unixstuff.h"
@@ -226,7 +227,7 @@ static PyObject *
 builtin_callable(PyObject *self, PyObject *v)
 {
     if (PyErr_WarnPy3k("callable() not supported in 3.x; "
-                       "use hasattr(o, '__call__')", 1) < 0)
+                       "use isinstance(x, collections.Callable)", 1) < 0)
         return NULL;
     return PyBool_FromLong((long)PyCallable_Check(v));
 }
@@ -270,6 +271,8 @@ builtin_filter(PyObject *self, PyObject *args)
 
     /* Guess a result list size. */
     len = _PyObject_LengthHint(seq, 8);
+    if (len == -1)
+        goto Fail_it;
 
     /* Get a result list. */
     if (PyList_Check(seq) && seq->ob_refcnt == 1) {
@@ -465,6 +468,7 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
     int mode = -1;
     int dont_inherit = 0;
     int supplied_flags = 0;
+    int is_ast;
     PyCompilerFlags cf;
     PyObject *result = NULL, *cmd, *tmp = NULL;
     Py_ssize_t length;
@@ -504,7 +508,10 @@ builtin_compile(PyObject *self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    if (PyAST_Check(cmd)) {
+    is_ast = PyAST_Check(cmd);
+    if (is_ast == -1)
+        return NULL;
+    if (is_ast) {
         if (supplied_flags & PyCF_ONLY_AST) {
             Py_INCREF(cmd);
             result = cmd;
@@ -1492,7 +1499,7 @@ PyDoc_STRVAR(open_doc,
 "open(name[, mode[, buffering]]) -> file object\n\
 \n\
 Open a file using the file() type, returns a file object.  This is the\n\
-preferred way to open a file.");
+preferred way to open a file.  See file.__doc__ for further information.");
 
 
 static PyObject *
@@ -1563,13 +1570,39 @@ static PyObject *
 builtin_print(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwlist[] = {"sep", "end", "file", 0};
-    static PyObject *dummy_args;
+    static PyObject *dummy_args = NULL;
+    static PyObject *unicode_newline = NULL, *unicode_space = NULL;
+    static PyObject *str_newline = NULL, *str_space = NULL;
+    PyObject *newline, *space;
     PyObject *sep = NULL, *end = NULL, *file = NULL;
-    int i, err;
+    int i, err, use_unicode = 0;
 
     if (dummy_args == NULL) {
         if (!(dummy_args = PyTuple_New(0)))
             return NULL;
+    }
+    if (str_newline == NULL) {
+        str_newline = PyString_FromString("\n");
+        if (str_newline == NULL)
+            return NULL;
+        str_space = PyString_FromString(" ");
+        if (str_space == NULL) {
+            Py_CLEAR(str_newline);
+            return NULL;
+        }
+        unicode_newline = PyUnicode_FromString("\n");
+        if (unicode_newline == NULL) {
+            Py_CLEAR(str_newline);
+            Py_CLEAR(str_space);
+            return NULL;
+        }
+        unicode_space = PyUnicode_FromString(" ");
+        if (unicode_space == NULL) {
+            Py_CLEAR(str_newline);
+            Py_CLEAR(str_space);
+            Py_CLEAR(unicode_space);
+            return NULL;
+        }
     }
     if (!PyArg_ParseTupleAndKeywords(dummy_args, kwds, "|OOO:print",
                                      kwlist, &sep, &end, &file))
@@ -1580,26 +1613,56 @@ builtin_print(PyObject *self, PyObject *args, PyObject *kwds)
         if (file == Py_None)
             Py_RETURN_NONE;
     }
-
-    if (sep && sep != Py_None && !PyString_Check(sep) &&
-        !PyUnicode_Check(sep)) {
-        PyErr_Format(PyExc_TypeError,
-                     "sep must be None, str or unicode, not %.200s",
-                     sep->ob_type->tp_name);
-        return NULL;
+    if (sep == Py_None) {
+        sep = NULL;
     }
-    if (end && end != Py_None && !PyString_Check(end) &&
-        !PyUnicode_Check(end)) {
-        PyErr_Format(PyExc_TypeError,
-                     "end must be None, str or unicode, not %.200s",
-                     end->ob_type->tp_name);
-        return NULL;
+    else if (sep) {
+        if (PyUnicode_Check(sep)) {
+            use_unicode = 1;
+        }
+        else if (!PyString_Check(sep)) {
+            PyErr_Format(PyExc_TypeError,
+                         "sep must be None, str or unicode, not %.200s",
+                         sep->ob_type->tp_name);
+            return NULL;
+        }
+    }
+    if (end == Py_None)
+        end = NULL;
+    else if (end) {
+        if (PyUnicode_Check(end)) {
+            use_unicode = 1;
+        }
+        else if (!PyString_Check(end)) {
+            PyErr_Format(PyExc_TypeError,
+                         "end must be None, str or unicode, not %.200s",
+                         end->ob_type->tp_name);
+            return NULL;
+        }
+    }
+
+    if (!use_unicode) {
+        for (i = 0; i < PyTuple_Size(args); i++) {
+            if (PyUnicode_Check(PyTuple_GET_ITEM(args, i))) {
+                use_unicode = 1;
+                break;
+            }
+        }
+    }
+    if (use_unicode) {
+        newline = unicode_newline;
+        space = unicode_space;
+    }
+    else {
+        newline = str_newline;
+        space = str_space;
     }
 
     for (i = 0; i < PyTuple_Size(args); i++) {
         if (i > 0) {
-            if (sep == NULL || sep == Py_None)
-                err = PyFile_WriteString(" ", file);
+            if (sep == NULL)
+                err = PyFile_WriteObject(space, file,
+                                         Py_PRINT_RAW);
             else
                 err = PyFile_WriteObject(sep, file,
                                          Py_PRINT_RAW);
@@ -1612,8 +1675,8 @@ builtin_print(PyObject *self, PyObject *args, PyObject *kwds)
             return NULL;
     }
 
-    if (end == NULL || end == Py_None)
-        err = PyFile_WriteString("\n", file);
+    if (end == NULL)
+        err = PyFile_WriteObject(newline, file, Py_PRINT_RAW);
     else
         err = PyFile_WriteObject(end, file, Py_PRINT_RAW);
     if (err)
@@ -1692,19 +1755,58 @@ get_len_of_range_longs(PyObject *lo, PyObject *hi, PyObject *step)
     return -1;
 }
 
+/* Helper function for handle_range_longs.  If arg is int or long
+   object, returns it with incremented reference count.  If arg is
+   float, raises type error. As a last resort, creates a new int by
+   calling arg type's nb_int method if it is defined.  Returns NULL
+   and sets exception on error.
+
+   Returns a new reference to an int object. */
+static PyObject *
+get_range_long_argument(PyObject *arg, const char *name)
+{
+    PyObject *v;
+    PyNumberMethods *nb;
+    if (PyInt_Check(arg) || PyLong_Check(arg)) {
+        Py_INCREF(arg);
+        return arg;
+    }
+    if (PyFloat_Check(arg) ||
+        (nb = Py_TYPE(arg)->tp_as_number) == NULL ||
+        nb->nb_int == NULL) {
+        PyErr_Format(PyExc_TypeError,
+                     "range() integer %s argument expected, got %s.",
+                     name, arg->ob_type->tp_name);
+        return NULL;
+    }
+    v = nb->nb_int(arg);
+    if (v == NULL)
+        return NULL;
+    if (PyInt_Check(v) || PyLong_Check(v))
+        return v;
+    Py_DECREF(v);
+    PyErr_SetString(PyExc_TypeError,
+                    "__int__ should return int object");
+    return NULL;
+}
+
 /* An extension of builtin_range() that handles the case when PyLong
  * arguments are given. */
 static PyObject *
 handle_range_longs(PyObject *self, PyObject *args)
 {
-    PyObject *ilow;
+    PyObject *ilow = NULL;
     PyObject *ihigh = NULL;
     PyObject *istep = NULL;
+
+    PyObject *low = NULL;
+    PyObject *high = NULL;
+    PyObject *step = NULL;
 
     PyObject *curnum = NULL;
     PyObject *v = NULL;
     long bign;
-    int i, n;
+    Py_ssize_t i, n;
     int cmp_result;
 
     PyObject *zero = PyLong_FromLong(0);
@@ -1719,7 +1821,7 @@ handle_range_longs(PyObject *self, PyObject *args)
 
     /* Figure out which way we were called, supply defaults, and be
      * sure to incref everything so that the decrefs at the end
-     * are correct.
+     * are correct. NB: ilow, ihigh and istep are borrowed references.
      */
     assert(ilow != NULL);
     if (ihigh == NULL) {
@@ -1727,47 +1829,35 @@ handle_range_longs(PyObject *self, PyObject *args)
         ihigh = ilow;
         ilow = NULL;
     }
+
+    /* convert ihigh if necessary */
     assert(ihigh != NULL);
-    Py_INCREF(ihigh);
+    high = get_range_long_argument(ihigh, "end");
+    if (high == NULL)
+        goto Fail;
 
     /* ihigh correct now; do ilow */
-    if (ilow == NULL)
-        ilow = zero;
-    Py_INCREF(ilow);
-
-    /* ilow and ihigh correct now; do istep */
-    if (istep == NULL) {
-        istep = PyLong_FromLong(1L);
-        if (istep == NULL)
-            goto Fail;
+    if (ilow == NULL) {
+        Py_INCREF(zero);
+        low = zero;
     }
     else {
-        Py_INCREF(istep);
+        low = get_range_long_argument(ilow, "start");
+        if (low == NULL)
+            goto Fail;
     }
 
-    if (!PyInt_Check(ilow) && !PyLong_Check(ilow)) {
-        PyErr_Format(PyExc_TypeError,
-                     "range() integer start argument expected, got %s.",
-                     ilow->ob_type->tp_name);
+    /* ilow and ihigh correct now; do istep */
+    if (istep == NULL)
+        step = PyLong_FromLong(1);
+    else
+        step = get_range_long_argument(istep, "step");
+    if (step == NULL)
         goto Fail;
-    }
 
-    if (!PyInt_Check(ihigh) && !PyLong_Check(ihigh)) {
-        PyErr_Format(PyExc_TypeError,
-                     "range() integer end argument expected, got %s.",
-                     ihigh->ob_type->tp_name);
+    if (PyObject_Cmp(step, zero, &cmp_result) == -1)
         goto Fail;
-    }
 
-    if (!PyInt_Check(istep) && !PyLong_Check(istep)) {
-        PyErr_Format(PyExc_TypeError,
-                     "range() integer step argument expected, got %s.",
-                     istep->ob_type->tp_name);
-        goto Fail;
-    }
-
-    if (PyObject_Cmp(istep, zero, &cmp_result) == -1)
-        goto Fail;
     if (cmp_result == 0) {
         PyErr_SetString(PyExc_ValueError,
                         "range() step argument must not be zero");
@@ -1775,16 +1865,16 @@ handle_range_longs(PyObject *self, PyObject *args)
     }
 
     if (cmp_result > 0)
-        bign = get_len_of_range_longs(ilow, ihigh, istep);
+        bign = get_len_of_range_longs(low, high, step);
     else {
-        PyObject *neg_istep = PyNumber_Negative(istep);
-        if (neg_istep == NULL)
+        PyObject *neg_step = PyNumber_Negative(step);
+        if (neg_step == NULL)
             goto Fail;
-        bign = get_len_of_range_longs(ihigh, ilow, neg_istep);
-        Py_DECREF(neg_istep);
+        bign = get_len_of_range_longs(high, low, neg_step);
+        Py_DECREF(neg_step);
     }
 
-    n = (int)bign;
+    n = (Py_ssize_t)bign;
     if (bign < 0 || (long)n != bign) {
         PyErr_SetString(PyExc_OverflowError,
                         "range() result has too many items");
@@ -1795,7 +1885,7 @@ handle_range_longs(PyObject *self, PyObject *args)
     if (v == NULL)
         goto Fail;
 
-    curnum = ilow;
+    curnum = low;
     Py_INCREF(curnum);
 
     for (i = 0; i < n; i++) {
@@ -1806,24 +1896,24 @@ handle_range_longs(PyObject *self, PyObject *args)
 
         PyList_SET_ITEM(v, i, w);
 
-        tmp_num = PyNumber_Add(curnum, istep);
+        tmp_num = PyNumber_Add(curnum, step);
         if (tmp_num == NULL)
             goto Fail;
 
         Py_DECREF(curnum);
         curnum = tmp_num;
     }
-    Py_DECREF(ilow);
-    Py_DECREF(ihigh);
-    Py_DECREF(istep);
+    Py_DECREF(low);
+    Py_DECREF(high);
+    Py_DECREF(step);
     Py_DECREF(zero);
     Py_DECREF(curnum);
     return v;
 
   Fail:
-    Py_DECREF(ilow);
-    Py_DECREF(ihigh);
-    Py_XDECREF(istep);
+    Py_XDECREF(low);
+    Py_XDECREF(high);
+    Py_XDECREF(step);
     Py_DECREF(zero);
     Py_XDECREF(curnum);
     Py_XDECREF(v);
@@ -1864,7 +1954,7 @@ builtin_range(PyObject *self, PyObject *args)
 {
     long ilow = 0, ihigh = 0, istep = 1;
     long bign;
-    int i, n;
+    Py_ssize_t i, n;
 
     PyObject *v;
 
@@ -1893,7 +1983,7 @@ builtin_range(PyObject *self, PyObject *args)
         bign = get_len_of_range(ilow, ihigh, istep);
     else
         bign = get_len_of_range(ihigh, ilow, -istep);
-    n = (int)bign;
+    n = (Py_ssize_t)bign;
     if (bign < 0 || (long)n != bign) {
         PyErr_SetString(PyExc_OverflowError,
                         "range() result has too many items");
@@ -2071,32 +2161,47 @@ For most object types, eval(repr(object)) == object.");
 static PyObject *
 builtin_round(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    double number;
-    double f;
-    int ndigits = 0;
-    int i;
+    double x;
+    PyObject *o_ndigits = NULL;
+    Py_ssize_t ndigits;
     static char *kwlist[] = {"number", "ndigits", 0};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "d|i:round",
-        kwlist, &number, &ndigits))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "d|O:round",
+        kwlist, &x, &o_ndigits))
         return NULL;
-    f = 1.0;
-    i = abs(ndigits);
-    while  (--i >= 0)
-        f = f*10.0;
-    if (ndigits < 0)
-        number /= f;
+
+    if (o_ndigits == NULL) {
+        /* second argument defaults to 0 */
+        ndigits = 0;
+    }
+    else {
+        /* interpret 2nd argument as a Py_ssize_t; clip on overflow */
+        ndigits = PyNumber_AsSsize_t(o_ndigits, NULL);
+        if (ndigits == -1 && PyErr_Occurred())
+            return NULL;
+    }
+
+    /* nans, infinities and zeros round to themselves */
+    if (!Py_IS_FINITE(x) || x == 0.0)
+        return PyFloat_FromDouble(x);
+
+    /* Deal with extreme values for ndigits. For ndigits > NDIGITS_MAX, x
+       always rounds to itself.  For ndigits < NDIGITS_MIN, x always
+       rounds to +-0.0.  Here 0.30103 is an upper bound for log10(2). */
+#define NDIGITS_MAX ((int)((DBL_MANT_DIG-DBL_MIN_EXP) * 0.30103))
+#define NDIGITS_MIN (-(int)((DBL_MAX_EXP + 1) * 0.30103))
+    if (ndigits > NDIGITS_MAX)
+        /* return x */
+        return PyFloat_FromDouble(x);
+    else if (ndigits < NDIGITS_MIN)
+        /* return 0.0, but with sign of x */
+        return PyFloat_FromDouble(0.0*x);
     else
-        number *= f;
-    if (number >= 0.0)
-        number = floor(number + 0.5);
-    else
-        number = ceil(number - 0.5);
-    if (ndigits < 0)
-        number *= f;
-    else
-        number /= f;
-    return PyFloat_FromDouble(number);
+        /* finite x, and ndigits is not unreasonably large */
+        /* _Py_double_round is defined in floatobject.c */
+        return _Py_double_round(x, (int)ndigits);
+#undef NDIGITS_MAX
+#undef NDIGITS_MIN
 }
 
 PyDoc_STRVAR(round_doc,
@@ -2304,6 +2409,15 @@ builtin_sum(PyObject *self, PyObject *args)
             }
             break;
         }
+        /* It's tempting to use PyNumber_InPlaceAdd instead of
+           PyNumber_Add here, to avoid quadratic running time
+           when doing 'sum(list_of_lists, [])'.  However, this
+           would produce a change in behaviour: a snippet like
+
+             empty = []
+             sum([[x] for x in range(10)], empty)
+
+           would change the value of empty. */
         temp = PyNumber_Add(result, item);
         Py_DECREF(result);
         Py_DECREF(item);
@@ -2393,8 +2507,10 @@ builtin_zip(PyObject *self, PyObject *args)
     len = -1;           /* unknown */
     for (i = 0; i < itemsize; ++i) {
         PyObject *item = PyTuple_GET_ITEM(args, i);
-        Py_ssize_t thislen = _PyObject_LengthHint(item, -1);
+        Py_ssize_t thislen = _PyObject_LengthHint(item, -2);
         if (thislen < 0) {
+            if (thislen == -1)
+                return NULL;
             len = -1;
             break;
         }
@@ -2587,7 +2703,7 @@ _PyBuiltin_Init(void)
     SETBUILTIN("True",                  Py_True);
     SETBUILTIN("basestring",            &PyBaseString_Type);
     SETBUILTIN("bool",                  &PyBool_Type);
-    /*          SETBUILTIN("memoryview",        &PyMemoryView_Type); */
+    SETBUILTIN("memoryview",        &PyMemoryView_Type);
     SETBUILTIN("bytearray",             &PyByteArray_Type);
     SETBUILTIN("bytes",                 &PyString_Type);
     SETBUILTIN("buffer",                &PyBuffer_Type);

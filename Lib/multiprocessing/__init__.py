@@ -48,7 +48,7 @@ __all__ = [
     'allow_connection_pickling', 'BufferTooShort', 'TimeoutError',
     'Lock', 'RLock', 'Semaphore', 'BoundedSemaphore', 'Condition',
     'Event', 'Queue', 'JoinableQueue', 'Pool', 'Value', 'Array',
-    'RawValue', 'RawArray'
+    'RawValue', 'RawArray', 'SUBDEBUG', 'SUBWARNING',
     ]
 
 __author__ = 'R. Oudkerk (r.m.oudkerk@gmail.com)'
@@ -61,6 +61,7 @@ import os
 import sys
 
 from multiprocessing.process import Process, current_process, active_children
+from multiprocessing.util import SUBDEBUG, SUBWARNING
 
 #
 # Exceptions
@@ -113,7 +114,7 @@ def cpu_count():
             num = int(os.environ['NUMBER_OF_PROCESSORS'])
         except (ValueError, KeyError):
             num = 0
-    elif sys.platform == 'darwin':
+    elif 'bsd' in sys.platform or sys.platform == 'darwin':
         try:
             num = int(os.popen('sysctl -n hw.ncpu').read())
         except ValueError:
@@ -218,12 +219,12 @@ def JoinableQueue(maxsize=0):
     from multiprocessing.queues import JoinableQueue
     return JoinableQueue(maxsize)
 
-def Pool(processes=None, initializer=None, initargs=()):
+def Pool(processes=None, initializer=None, initargs=(), maxtasksperchild=None):
     '''
     Returns a process pool object
     '''
     from multiprocessing.pool import Pool
-    return Pool(processes, initializer, initargs)
+    return Pool(processes, initializer, initargs, maxtasksperchild)
 
 def RawValue(typecode_or_type, *args):
     '''

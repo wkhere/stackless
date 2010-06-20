@@ -92,11 +92,11 @@ def reindent(src, indent):
 
 def _template_func(setup, func):
     """Create a timer function. Used if the "statement" is a callable."""
-    def inner(_it, _timer):
+    def inner(_it, _timer, _func=func):
         setup()
         _t0 = _timer()
         for _i in _it:
-            func()
+            _func()
         _t1 = _timer()
         return _t1 - _t0
     return inner
@@ -126,7 +126,7 @@ class Timer:
             if isinstance(setup, basestring):
                 setup = reindent(setup, 4)
                 src = template % {'stmt': stmt, 'setup': setup}
-            elif callable(setup):
+            elif hasattr(setup, '__call__'):
                 src = template % {'stmt': stmt, 'setup': '_setup()'}
                 ns['_setup'] = setup
             else:
@@ -135,13 +135,13 @@ class Timer:
             code = compile(src, dummy_src_name, "exec")
             exec code in globals(), ns
             self.inner = ns["inner"]
-        elif callable(stmt):
+        elif hasattr(stmt, '__call__'):
             self.src = None
             if isinstance(setup, basestring):
                 _setup = setup
                 def setup():
                     exec _setup in globals(), ns
-            elif not callable(setup):
+            elif not hasattr(setup, '__call__'):
                 raise ValueError("setup is neither a string nor callable")
             self.inner = _template_func(setup, stmt)
         else:

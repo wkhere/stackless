@@ -159,12 +159,13 @@ enum_next(enumobject *en)
 }
 
 PyDoc_STRVAR(enum_doc,
-"enumerate(iterable) -> iterator for index, value of iterable\n"
+"enumerate(iterable[, start]) -> iterator for index, value of iterable\n"
 "\n"
-"Return an enumerate object.  iterable must be an other object that supports\n"
+"Return an enumerate object.  iterable must be another object that supports\n"
 "iteration.  The enumerate object yields pairs containing a count (from\n"
-"zero) and a value yielded by the iterable argument.  enumerate is useful\n"
-"for obtaining an indexed list: (0, seq[0]), (1, seq[1]), (2, seq[2]), ...");
+"start, which defaults to zero) and a value yielded by the iterable argument.\n"
+"enumerate is useful for obtaining an indexed list:\n"
+"    (0, seq[0]), (1, seq[1]), (2, seq[2]), ...");
 
 PyTypeObject PyEnum_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -222,7 +223,8 @@ static PyObject *
 reversed_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     Py_ssize_t n;
-    PyObject *seq;
+    PyObject *seq, *reversed_meth;
+    static PyObject *reversed_cache = NULL;
     reversedobject *ro;
 
     if (type == &PyReversed_Type && !_PyArg_NoKeywords("reversed()", kwds))
@@ -231,8 +233,26 @@ reversed_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!PyArg_UnpackTuple(args, "reversed", 1, 1, &seq) )
         return NULL;
 
-    if (PyObject_HasAttrString(seq, "__reversed__"))
-        return PyObject_CallMethod(seq, "__reversed__", NULL);
+    if (PyInstance_Check(seq)) {
+        reversed_meth = PyObject_GetAttrString(seq, "__reversed__");
+        if (reversed_meth == NULL) {
+            if (PyErr_ExceptionMatches(PyExc_AttributeError))
+                PyErr_Clear();
+            else
+                return NULL;
+        }
+    }
+    else {
+        reversed_meth = _PyObject_LookupSpecial(seq, "__reversed__",
+                                                &reversed_cache);
+        if (reversed_meth == NULL && PyErr_Occurred())
+            return NULL;
+    }
+    if (reversed_meth != NULL) {
+        PyObject *res = PyObject_CallFunctionObjArgs(reversed_meth, NULL);
+        Py_DECREF(reversed_meth);
+        return res;
+    }
 
     if (!PySequence_Check(seq)) {
         PyErr_SetString(PyExc_TypeError,

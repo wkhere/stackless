@@ -4,9 +4,11 @@ import subprocess
 import sys
 import signal
 import os
+import errno
 import tempfile
 import time
 import re
+import sysconfig
 
 mswindows = (sys.platform == "win32")
 
@@ -20,36 +22,39 @@ if mswindows:
 else:
     SETBINARY = ''
 
-# In a debug build, stuff like "[6580 refs]" is printed to stderr at
-# shutdown time.  That frustrates tests trying to check stderr produced
-# from a spawned Python process.
-def remove_stderr_debug_decorations(stderr):
-    return re.sub(r"\[\d+ refs\]\r?\n?$", "", stderr)
 
-class ProcessTestCase(unittest.TestCase):
+try:
+    mkstemp = tempfile.mkstemp
+except AttributeError:
+    # tempfile.mkstemp is not available
+    def mkstemp():
+        """Replacement for mkstemp, calling mktemp."""
+        fname = tempfile.mktemp()
+        return os.open(fname, os.O_RDWR|os.O_CREAT), fname
+
+
+class BaseTestCase(unittest.TestCase):
     def setUp(self):
         # Try to minimize the number of children we have so this test
         # doesn't crash on some buildbots (Alphas in particular).
-        if hasattr(test_support, "reap_children"):
-            test_support.reap_children()
+        test_support.reap_children()
 
     def tearDown(self):
-        # Try to minimize the number of children we have so this test
-        # doesn't crash on some buildbots (Alphas in particular).
-        if hasattr(test_support, "reap_children"):
-            test_support.reap_children()
+        for inst in subprocess._active:
+            inst.wait()
+        subprocess._cleanup()
+        self.assertFalse(subprocess._active, "subprocess._active not empty")
 
-    def mkstemp(self):
-        """wrapper for mkstemp, calling mktemp if mkstemp is not available"""
-        if hasattr(tempfile, "mkstemp"):
-            return tempfile.mkstemp()
-        else:
-            fname = tempfile.mktemp()
-            return os.open(fname, os.O_RDWR|os.O_CREAT), fname
+    def assertStderrEqual(self, stderr, expected, msg=None):
+        # In a debug build, stuff like "[6580 refs]" is printed to stderr at
+        # shutdown time.  That frustrates tests trying to check stderr produced
+        # from a spawned Python process.
+        actual = re.sub(r"\[\d+ refs\]\r?\n?$", "", stderr)
+        self.assertEqual(actual, expected, msg)
 
-    #
-    # Generic tests
-    #
+
+class ProcessTestCase(BaseTestCase):
+
     def test_call_seq(self):
         # call() function with sequence argument
         rc = subprocess.call([sys.executable, "-c",
@@ -64,22 +69,48 @@ class ProcessTestCase(unittest.TestCase):
 
     def test_check_call_nonzero(self):
         # check_call() function with non-zero return code
-        try:
+        with self.assertRaises(subprocess.CalledProcessError) as c:
             subprocess.check_call([sys.executable, "-c",
                                    "import sys; sys.exit(47)"])
-        except subprocess.CalledProcessError, e:
-            self.assertEqual(e.returncode, 47)
-        else:
-            self.fail("Expected CalledProcessError")
+        self.assertEqual(c.exception.returncode, 47)
+
+    def test_check_output(self):
+        # check_output() function with zero return code
+        output = subprocess.check_output(
+                [sys.executable, "-c", "print 'BDFL'"])
+        self.assertIn('BDFL', output)
+
+    def test_check_output_nonzero(self):
+        # check_call() function with non-zero return code
+        with self.assertRaises(subprocess.CalledProcessError) as c:
+            subprocess.check_output(
+                    [sys.executable, "-c", "import sys; sys.exit(5)"])
+        self.assertEqual(c.exception.returncode, 5)
+
+    def test_check_output_stderr(self):
+        # check_output() function stderr redirected to stdout
+        output = subprocess.check_output(
+                [sys.executable, "-c", "import sys; sys.stderr.write('BDFL')"],
+                stderr=subprocess.STDOUT)
+        self.assertIn('BDFL', output)
+
+    def test_check_output_stdout_arg(self):
+        # check_output() function stderr redirected to stdout
+        with self.assertRaises(ValueError) as c:
+            output = subprocess.check_output(
+                    [sys.executable, "-c", "print 'will not be run'"],
+                    stdout=sys.stdout)
+            self.fail("Expected ValueError when stdout arg supplied.")
+        self.assertIn('stdout', c.exception.args[0])
 
     def test_call_kwargs(self):
         # call() function with keyword args
         newenv = os.environ.copy()
         newenv["FRUIT"] = "banana"
         rc = subprocess.call([sys.executable, "-c",
-                          'import sys, os;' \
-                          'sys.exit(os.getenv("FRUIT")=="banana")'],
-                        env=newenv)
+                              'import sys, os;'
+                              'sys.exit(os.getenv("FRUIT")=="banana")'],
+                             env=newenv)
         self.assertEqual(rc, 1)
 
     def test_stdin_none(self):
@@ -106,9 +137,21 @@ class ProcessTestCase(unittest.TestCase):
         p.wait()
         self.assertEqual(p.stderr, None)
 
-    def test_executable(self):
-        p = subprocess.Popen(["somethingyoudonthave",
-                              "-c", "import sys; sys.exit(47)"],
+    def test_executable_with_cwd(self):
+        python_dir = os.path.dirname(os.path.realpath(sys.executable))
+        p = subprocess.Popen(["somethingyoudonthave", "-c",
+                              "import sys; sys.exit(47)"],
+                             executable=sys.executable, cwd=python_dir)
+        p.wait()
+        self.assertEqual(p.returncode, 47)
+
+    @unittest.skipIf(sysconfig.is_python_build(),
+                     "need an installed Python. See #7774")
+    def test_executable_without_cwd(self):
+        # For a normal installation, it should work without 'cwd'
+        # argument.  For test runs in the build directory, see #7774.
+        p = subprocess.Popen(["somethingyoudonthave", "-c",
+                              "import sys; sys.exit(47)"],
                              executable=sys.executable)
         p.wait()
         self.assertEqual(p.returncode, 47)
@@ -179,8 +222,7 @@ class ProcessTestCase(unittest.TestCase):
         p = subprocess.Popen([sys.executable, "-c",
                           'import sys; sys.stderr.write("strawberry")'],
                          stderr=subprocess.PIPE)
-        self.assertEqual(remove_stderr_debug_decorations(p.stderr.read()),
-                         "strawberry")
+        self.assertStderrEqual(p.stderr.read(), "strawberry")
 
     def test_stderr_filedes(self):
         # stderr is set to open file descriptor
@@ -191,8 +233,7 @@ class ProcessTestCase(unittest.TestCase):
                          stderr=d)
         p.wait()
         os.lseek(d, 0, 0)
-        self.assertEqual(remove_stderr_debug_decorations(os.read(d, 1024)),
-                         "strawberry")
+        self.assertStderrEqual(os.read(d, 1024), "strawberry")
 
     def test_stderr_fileobj(self):
         # stderr is set to open file object
@@ -202,43 +243,38 @@ class ProcessTestCase(unittest.TestCase):
                          stderr=tf)
         p.wait()
         tf.seek(0)
-        self.assertEqual(remove_stderr_debug_decorations(tf.read()),
-                         "strawberry")
+        self.assertStderrEqual(tf.read(), "strawberry")
 
     def test_stdout_stderr_pipe(self):
         # capture stdout and stderr to the same pipe
         p = subprocess.Popen([sys.executable, "-c",
-                          'import sys;' \
-                          'sys.stdout.write("apple");' \
-                          'sys.stdout.flush();' \
+                          'import sys;'
+                          'sys.stdout.write("apple");'
+                          'sys.stdout.flush();'
                           'sys.stderr.write("orange")'],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT)
-        output = p.stdout.read()
-        stripped = remove_stderr_debug_decorations(output)
-        self.assertEqual(stripped, "appleorange")
+        self.assertStderrEqual(p.stdout.read(), "appleorange")
 
     def test_stdout_stderr_file(self):
         # capture stdout and stderr to the same open file
         tf = tempfile.TemporaryFile()
         p = subprocess.Popen([sys.executable, "-c",
-                          'import sys;' \
-                          'sys.stdout.write("apple");' \
-                          'sys.stdout.flush();' \
+                          'import sys;'
+                          'sys.stdout.write("apple");'
+                          'sys.stdout.flush();'
                           'sys.stderr.write("orange")'],
                          stdout=tf,
                          stderr=tf)
         p.wait()
         tf.seek(0)
-        output = tf.read()
-        stripped = remove_stderr_debug_decorations(output)
-        self.assertEqual(stripped, "appleorange")
+        self.assertStderrEqual(tf.read(), "appleorange")
 
     def test_stdout_filedes_of_stdout(self):
         # stdout is set to 1 (#1531862).
         cmd = r"import sys, os; sys.exit(os.write(sys.stdout.fileno(), '.\n'))"
         rc = subprocess.call([sys.executable, "-c", cmd], stdout=1)
-        self.assertEquals(rc, 2)
+        self.assertEqual(rc, 2)
 
     def test_cwd(self):
         tmpdir = tempfile.gettempdir()
@@ -249,7 +285,7 @@ class ProcessTestCase(unittest.TestCase):
         tmpdir = os.getcwd()
         os.chdir(cwd)
         p = subprocess.Popen([sys.executable, "-c",
-                          'import sys,os;' \
+                          'import sys,os;'
                           'sys.stdout.write(os.getcwd())'],
                          stdout=subprocess.PIPE,
                          cwd=tmpdir)
@@ -260,7 +296,7 @@ class ProcessTestCase(unittest.TestCase):
         newenv = os.environ.copy()
         newenv["FRUIT"] = "orange"
         p = subprocess.Popen([sys.executable, "-c",
-                          'import sys,os;' \
+                          'import sys,os;'
                           'sys.stdout.write(os.getenv("FRUIT"))'],
                          stdout=subprocess.PIPE,
                          env=newenv)
@@ -268,7 +304,8 @@ class ProcessTestCase(unittest.TestCase):
 
     def test_communicate_stdin(self):
         p = subprocess.Popen([sys.executable, "-c",
-                              'import sys; sys.exit(sys.stdin.read() == "pear")'],
+                              'import sys;'
+                              'sys.exit(sys.stdin.read() == "pear")'],
                              stdin=subprocess.PIPE)
         p.communicate("pear")
         self.assertEqual(p.returncode, 1)
@@ -287,7 +324,7 @@ class ProcessTestCase(unittest.TestCase):
                              stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate()
         self.assertEqual(stdout, None)
-        self.assertEqual(remove_stderr_debug_decorations(stderr), "pineapple")
+        self.assertStderrEqual(stderr, "pineapple")
 
     def test_communicate(self):
         p = subprocess.Popen([sys.executable, "-c",
@@ -299,24 +336,24 @@ class ProcessTestCase(unittest.TestCase):
                          stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate("banana")
         self.assertEqual(stdout, "banana")
-        self.assertEqual(remove_stderr_debug_decorations(stderr),
-                         "pineapple")
+        self.assertStderrEqual(stderr, "pineapple")
 
     # This test is Linux specific for simplicity to at least have
     # some coverage.  It is not a platform specific bug.
-    if os.path.isdir('/proc/%d/fd' % os.getpid()):
-        # Test for the fd leak reported in http://bugs.python.org/issue2791.
-        def test_communicate_pipe_fd_leak(self):
-            fd_directory = '/proc/%d/fd' % os.getpid()
-            num_fds_before_popen = len(os.listdir(fd_directory))
-            p = subprocess.Popen([sys.executable, '-c', 'print()'],
-                                 stdout=subprocess.PIPE)
-            p.communicate()
-            num_fds_after_communicate = len(os.listdir(fd_directory))
-            del p
-            num_fds_after_destruction = len(os.listdir(fd_directory))
-            self.assertEqual(num_fds_before_popen, num_fds_after_destruction)
-            self.assertEqual(num_fds_before_popen, num_fds_after_communicate)
+    @unittest.skipUnless(os.path.isdir('/proc/%d/fd' % os.getpid()),
+                         "Linux specific")
+    # Test for the fd leak reported in http://bugs.python.org/issue2791.
+    def test_communicate_pipe_fd_leak(self):
+        fd_directory = '/proc/%d/fd' % os.getpid()
+        num_fds_before_popen = len(os.listdir(fd_directory))
+        p = subprocess.Popen([sys.executable, "-c", "print()"],
+                             stdout=subprocess.PIPE)
+        p.communicate()
+        num_fds_after_communicate = len(os.listdir(fd_directory))
+        del p
+        num_fds_after_destruction = len(os.listdir(fd_directory))
+        self.assertEqual(num_fds_before_popen, num_fds_after_destruction)
+        self.assertEqual(num_fds_before_popen, num_fds_after_communicate)
 
     def test_communicate_returns(self):
         # communicate() should return None if no redirection is active
@@ -339,8 +376,8 @@ class ProcessTestCase(unittest.TestCase):
         os.close(y)
         p = subprocess.Popen([sys.executable, "-c",
                           'import sys,os;'
-                          'sys.stdout.write(sys.stdin.read(47));' \
-                          'sys.stderr.write("xyz"*%d);' \
+                          'sys.stdout.write(sys.stdin.read(47));'
+                          'sys.stderr.write("xyz"*%d);'
                           'sys.stdout.write(sys.stdin.read())' % pipe_buf],
                          stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE,
@@ -352,7 +389,7 @@ class ProcessTestCase(unittest.TestCase):
     def test_writes_before_communicate(self):
         # stdin.write before communicate()
         p = subprocess.Popen([sys.executable, "-c",
-                          'import sys,os;' \
+                          'import sys,os;'
                           'sys.stdout.write(sys.stdin.read())'],
                          stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE,
@@ -360,7 +397,7 @@ class ProcessTestCase(unittest.TestCase):
         p.stdin.write("banana")
         (stdout, stderr) = p.communicate("split")
         self.assertEqual(stdout, "bananasplit")
-        self.assertEqual(remove_stderr_debug_decorations(stderr), "")
+        self.assertStderrEqual(stderr, "")
 
     def test_universal_newlines(self):
         p = subprocess.Popen([sys.executable, "-c",
@@ -412,7 +449,8 @@ class ProcessTestCase(unittest.TestCase):
                              "line1\nline2\nline3\nline4\nline5\nline6")
         else:
             # Interpreter without universal newline support
-            self.assertEqual(stdout, "line1\nline2\rline3\r\nline4\r\nline5\nline6")
+            self.assertEqual(stdout,
+                             "line1\nline2\rline3\r\nline4\r\nline5\nline6")
 
     def test_no_leaking(self):
         # Make sure we leak no resources
@@ -463,7 +501,7 @@ class ProcessTestCase(unittest.TestCase):
         # but, based on system scheduling we can't control, it's possible
         # poll() never returned None.  It "should be" very rare that it
         # didn't go around at least twice.
-        self.assert_(count >= 2)
+        self.assertGreaterEqual(count, 2)
         # Subsequent invocations should just return the returncode
         self.assertEqual(p.poll(), 0)
 
@@ -479,247 +517,319 @@ class ProcessTestCase(unittest.TestCase):
     def test_invalid_bufsize(self):
         # an invalid type of the bufsize argument should raise
         # TypeError.
-        try:
+        with self.assertRaises(TypeError):
             subprocess.Popen([sys.executable, "-c", "pass"], "orange")
-        except TypeError:
+
+    def test_leaking_fds_on_error(self):
+        # see bug #5179: Popen leaks file descriptors to PIPEs if
+        # the child fails to execute; this will eventually exhaust
+        # the maximum number of open fds. 1024 seems a very common
+        # value for that limit, but Windows has 2048, so we loop
+        # 1024 times (each call leaked two fds).
+        for i in range(1024):
+            # Windows raises IOError.  Others raise OSError.
+            with self.assertRaises(EnvironmentError) as c:
+                subprocess.Popen(['nonexisting_i_hope'],
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            if c.exception.errno != 2:  # ignore "no such file"
+                raise c.exception
+
+
+# context manager
+class _SuppressCoreFiles(object):
+    """Try to prevent core files from being created."""
+    old_limit = None
+
+    def __enter__(self):
+        """Try to save previous ulimit, then set it to (0, 0)."""
+        try:
+            import resource
+            self.old_limit = resource.getrlimit(resource.RLIMIT_CORE)
+            resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        except (ImportError, ValueError, resource.error):
             pass
-        else:
-            self.fail("Expected TypeError")
 
-    #
-    # POSIX tests
-    #
-    if not mswindows:
-        def test_exceptions(self):
-            # catched & re-raised exceptions
-            try:
-                p = subprocess.Popen([sys.executable, "-c", ""],
+    def __exit__(self, *args):
+        """Return core file behavior to default."""
+        if self.old_limit is None:
+            return
+        try:
+            import resource
+            resource.setrlimit(resource.RLIMIT_CORE, self.old_limit)
+        except (ImportError, ValueError, resource.error):
+            pass
+
+
+@unittest.skipIf(mswindows, "POSIX specific tests")
+class POSIXProcessTestCase(BaseTestCase):
+
+    def test_exceptions(self):
+        # caught & re-raised exceptions
+        with self.assertRaises(OSError) as c:
+            p = subprocess.Popen([sys.executable, "-c", ""],
                                  cwd="/this/path/does/not/exist")
-            except OSError, e:
-                # The attribute child_traceback should contain "os.chdir"
-                # somewhere.
-                self.assertNotEqual(e.child_traceback.find("os.chdir"), -1)
-            else:
-                self.fail("Expected OSError")
+        # The attribute child_traceback should contain "os.chdir" somewhere.
+        self.assertIn("os.chdir", c.exception.child_traceback)
 
-        def _suppress_core_files(self):
-            """Try to prevent core files from being created.
-            Returns previous ulimit if successful, else None.
-            """
-            try:
-                import resource
-                old_limit = resource.getrlimit(resource.RLIMIT_CORE)
-                resource.setrlimit(resource.RLIMIT_CORE, (0,0))
-                return old_limit
-            except (ImportError, ValueError, resource.error):
-                return None
-
-        def _unsuppress_core_files(self, old_limit):
-            """Return core file behavior to default."""
-            if old_limit is None:
-                return
-            try:
-                import resource
-                resource.setrlimit(resource.RLIMIT_CORE, old_limit)
-            except (ImportError, ValueError, resource.error):
-                return
-
-        def test_run_abort(self):
-            # returncode handles signal termination
-            old_limit = self._suppress_core_files()
-            try:
-                p = subprocess.Popen([sys.executable,
-                                      "-c", "import os; os.abort()"])
-            finally:
-                self._unsuppress_core_files(old_limit)
-            p.wait()
-            self.assertEqual(-p.returncode, signal.SIGABRT)
-
-        def test_preexec(self):
-            # preexec function
+    def test_run_abort(self):
+        # returncode handles signal termination
+        with _SuppressCoreFiles():
             p = subprocess.Popen([sys.executable, "-c",
-                              'import sys,os;' \
-                              'sys.stdout.write(os.getenv("FRUIT"))'],
+                                  "import os; os.abort()"])
+            p.wait()
+        self.assertEqual(-p.returncode, signal.SIGABRT)
+
+    def test_preexec(self):
+        # preexec function
+        p = subprocess.Popen([sys.executable, "-c",
+                              "import sys, os;"
+                              "sys.stdout.write(os.getenv('FRUIT'))"],
                              stdout=subprocess.PIPE,
                              preexec_fn=lambda: os.putenv("FRUIT", "apple"))
-            self.assertEqual(p.stdout.read(), "apple")
+        self.assertEqual(p.stdout.read(), "apple")
 
-        def test_args_string(self):
-            # args is a string
-            f, fname = self.mkstemp()
-            os.write(f, "#!/bin/sh\n")
-            os.write(f, "exec '%s' -c 'import sys; sys.exit(47)'\n" %
-                        sys.executable)
-            os.close(f)
-            os.chmod(fname, 0700)
-            p = subprocess.Popen(fname)
-            p.wait()
-            os.remove(fname)
-            self.assertEqual(p.returncode, 47)
+    def test_args_string(self):
+        # args is a string
+        f, fname = mkstemp()
+        os.write(f, "#!/bin/sh\n")
+        os.write(f, "exec '%s' -c 'import sys; sys.exit(47)'\n" %
+                    sys.executable)
+        os.close(f)
+        os.chmod(fname, 0o700)
+        p = subprocess.Popen(fname)
+        p.wait()
+        os.remove(fname)
+        self.assertEqual(p.returncode, 47)
 
-        def test_invalid_args(self):
-            # invalid arguments should raise ValueError
-            self.assertRaises(ValueError, subprocess.call,
-                              [sys.executable,
-                               "-c", "import sys; sys.exit(47)"],
-                              startupinfo=47)
-            self.assertRaises(ValueError, subprocess.call,
-                              [sys.executable,
-                               "-c", "import sys; sys.exit(47)"],
-                              creationflags=47)
+    def test_invalid_args(self):
+        # invalid arguments should raise ValueError
+        self.assertRaises(ValueError, subprocess.call,
+                          [sys.executable, "-c",
+                           "import sys; sys.exit(47)"],
+                          startupinfo=47)
+        self.assertRaises(ValueError, subprocess.call,
+                          [sys.executable, "-c",
+                           "import sys; sys.exit(47)"],
+                          creationflags=47)
 
-        def test_shell_sequence(self):
-            # Run command through the shell (sequence)
-            newenv = os.environ.copy()
-            newenv["FRUIT"] = "apple"
-            p = subprocess.Popen(["echo $FRUIT"], shell=1,
-                                 stdout=subprocess.PIPE,
-                                 env=newenv)
-            self.assertEqual(p.stdout.read().strip(), "apple")
+    def test_shell_sequence(self):
+        # Run command through the shell (sequence)
+        newenv = os.environ.copy()
+        newenv["FRUIT"] = "apple"
+        p = subprocess.Popen(["echo $FRUIT"], shell=1,
+                             stdout=subprocess.PIPE,
+                             env=newenv)
+        self.assertEqual(p.stdout.read().strip(), "apple")
 
-        def test_shell_string(self):
-            # Run command through the shell (string)
-            newenv = os.environ.copy()
-            newenv["FRUIT"] = "apple"
-            p = subprocess.Popen("echo $FRUIT", shell=1,
-                                 stdout=subprocess.PIPE,
-                                 env=newenv)
-            self.assertEqual(p.stdout.read().strip(), "apple")
+    def test_shell_string(self):
+        # Run command through the shell (string)
+        newenv = os.environ.copy()
+        newenv["FRUIT"] = "apple"
+        p = subprocess.Popen("echo $FRUIT", shell=1,
+                             stdout=subprocess.PIPE,
+                             env=newenv)
+        self.assertEqual(p.stdout.read().strip(), "apple")
 
-        def test_call_string(self):
-            # call() function with string argument on UNIX
-            f, fname = self.mkstemp()
-            os.write(f, "#!/bin/sh\n")
-            os.write(f, "exec '%s' -c 'import sys; sys.exit(47)'\n" %
-                        sys.executable)
-            os.close(f)
-            os.chmod(fname, 0700)
-            rc = subprocess.call(fname)
-            os.remove(fname)
-            self.assertEqual(rc, 47)
+    def test_call_string(self):
+        # call() function with string argument on UNIX
+        f, fname = mkstemp()
+        os.write(f, "#!/bin/sh\n")
+        os.write(f, "exec '%s' -c 'import sys; sys.exit(47)'\n" %
+                    sys.executable)
+        os.close(f)
+        os.chmod(fname, 0700)
+        rc = subprocess.call(fname)
+        os.remove(fname)
+        self.assertEqual(rc, 47)
 
-        def DISABLED_test_send_signal(self):
-            p = subprocess.Popen([sys.executable,
-                              "-c", "input()"])
+    def _kill_process(self, method, *args):
+        # Do not inherit file handles from the parent.
+        # It should fix failures on some platforms.
+        p = subprocess.Popen([sys.executable, "-c", "input()"], close_fds=True,
+                             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            self.assert_(p.poll() is None, p.poll())
-            p.send_signal(signal.SIGINT)
-            self.assertNotEqual(p.wait(), 0)
+        # Let the process initialize (Issue #3137)
+        time.sleep(0.1)
+        # The process should not terminate prematurely
+        self.assertIsNone(p.poll())
+        # Retry if the process do not receive the signal.
+        count, maxcount = 0, 3
+        while count < maxcount and p.poll() is None:
+            getattr(p, method)(*args)
+            time.sleep(0.1)
+            count += 1
 
-        def DISABLED_test_kill(self):
-            p = subprocess.Popen([sys.executable,
-                            "-c", "input()"])
+        self.assertIsNotNone(p.poll(), "the subprocess did not terminate")
+        if count > 1:
+            print >>sys.stderr, ("p.{}{} succeeded after "
+                                 "{} attempts".format(method, args, count))
+        return p
 
-            self.assert_(p.poll() is None, p.poll())
-            p.kill()
-            self.assertEqual(p.wait(), -signal.SIGKILL)
+    def test_send_signal(self):
+        p = self._kill_process('send_signal', signal.SIGINT)
+        _, stderr = p.communicate()
+        self.assertIn('KeyboardInterrupt', stderr)
+        self.assertNotEqual(p.wait(), 0)
 
-        def DISABLED_test_terminate(self):
-            p = subprocess.Popen([sys.executable,
-                            "-c", "input()"])
+    def test_kill(self):
+        p = self._kill_process('kill')
+        _, stderr = p.communicate()
+        self.assertStderrEqual(stderr, '')
+        self.assertEqual(p.wait(), -signal.SIGKILL)
 
-            self.assert_(p.poll() is None, p.poll())
-            p.terminate()
-            self.assertEqual(p.wait(), -signal.SIGTERM)
+    def test_terminate(self):
+        p = self._kill_process('terminate')
+        _, stderr = p.communicate()
+        self.assertStderrEqual(stderr, '')
+        self.assertEqual(p.wait(), -signal.SIGTERM)
 
-    #
-    # Windows tests
-    #
-    if mswindows:
-        def test_startupinfo(self):
-            # startupinfo argument
-            # We uses hardcoded constants, because we do not want to
-            # depend on win32all.
-            STARTF_USESHOWWINDOW = 1
-            SW_MAXIMIZE = 3
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags = STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = SW_MAXIMIZE
-            # Since Python is a console process, it won't be affected
-            # by wShowWindow, but the argument should be silently
-            # ignored
-            subprocess.call([sys.executable, "-c", "import sys; sys.exit(0)"],
+
+@unittest.skipUnless(mswindows, "Windows specific tests")
+class Win32ProcessTestCase(BaseTestCase):
+
+    def test_startupinfo(self):
+        # startupinfo argument
+        # We uses hardcoded constants, because we do not want to
+        # depend on win32all.
+        STARTF_USESHOWWINDOW = 1
+        SW_MAXIMIZE = 3
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags = STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = SW_MAXIMIZE
+        # Since Python is a console process, it won't be affected
+        # by wShowWindow, but the argument should be silently
+        # ignored
+        subprocess.call([sys.executable, "-c", "import sys; sys.exit(0)"],
                         startupinfo=startupinfo)
 
-        def test_creationflags(self):
-            # creationflags argument
-            CREATE_NEW_CONSOLE = 16
-            sys.stderr.write("    a DOS box should flash briefly ...\n")
-            subprocess.call(sys.executable +
-                                ' -c "import time; time.sleep(0.25)"',
-                            creationflags=CREATE_NEW_CONSOLE)
+    def test_creationflags(self):
+        # creationflags argument
+        CREATE_NEW_CONSOLE = 16
+        sys.stderr.write("    a DOS box should flash briefly ...\n")
+        subprocess.call(sys.executable +
+                        ' -c "import time; time.sleep(0.25)"',
+                        creationflags=CREATE_NEW_CONSOLE)
 
-        def test_invalid_args(self):
-            # invalid arguments should raise ValueError
-            self.assertRaises(ValueError, subprocess.call,
-                              [sys.executable,
-                               "-c", "import sys; sys.exit(47)"],
-                              preexec_fn=lambda: 1)
-            self.assertRaises(ValueError, subprocess.call,
-                              [sys.executable,
-                               "-c", "import sys; sys.exit(47)"],
-                              stdout=subprocess.PIPE,
+    def test_invalid_args(self):
+        # invalid arguments should raise ValueError
+        self.assertRaises(ValueError, subprocess.call,
+                          [sys.executable, "-c",
+                           "import sys; sys.exit(47)"],
+                          preexec_fn=lambda: 1)
+        self.assertRaises(ValueError, subprocess.call,
+                          [sys.executable, "-c",
+                           "import sys; sys.exit(47)"],
+                          stdout=subprocess.PIPE,
+                          close_fds=True)
+
+    def test_close_fds(self):
+        # close file descriptors
+        rc = subprocess.call([sys.executable, "-c",
+                              "import sys; sys.exit(47)"],
                               close_fds=True)
+        self.assertEqual(rc, 47)
 
-        def test_close_fds(self):
-            # close file descriptors
-            rc = subprocess.call([sys.executable, "-c",
-                                  "import sys; sys.exit(47)"],
-                                  close_fds=True)
-            self.assertEqual(rc, 47)
+    def test_shell_sequence(self):
+        # Run command through the shell (sequence)
+        newenv = os.environ.copy()
+        newenv["FRUIT"] = "physalis"
+        p = subprocess.Popen(["set"], shell=1,
+                             stdout=subprocess.PIPE,
+                             env=newenv)
+        self.assertIn("physalis", p.stdout.read())
 
-        def test_shell_sequence(self):
-            # Run command through the shell (sequence)
-            newenv = os.environ.copy()
-            newenv["FRUIT"] = "physalis"
-            p = subprocess.Popen(["set"], shell=1,
-                                 stdout=subprocess.PIPE,
-                                 env=newenv)
-            self.assertNotEqual(p.stdout.read().find("physalis"), -1)
+    def test_shell_string(self):
+        # Run command through the shell (string)
+        newenv = os.environ.copy()
+        newenv["FRUIT"] = "physalis"
+        p = subprocess.Popen("set", shell=1,
+                             stdout=subprocess.PIPE,
+                             env=newenv)
+        self.assertIn("physalis", p.stdout.read())
 
-        def test_shell_string(self):
-            # Run command through the shell (string)
-            newenv = os.environ.copy()
-            newenv["FRUIT"] = "physalis"
-            p = subprocess.Popen("set", shell=1,
-                                 stdout=subprocess.PIPE,
-                                 env=newenv)
-            self.assertNotEqual(p.stdout.read().find("physalis"), -1)
+    def test_call_string(self):
+        # call() function with string argument on Windows
+        rc = subprocess.call(sys.executable +
+                             ' -c "import sys; sys.exit(47)"')
+        self.assertEqual(rc, 47)
 
-        def test_call_string(self):
-            # call() function with string argument on Windows
-            rc = subprocess.call(sys.executable +
-                                 ' -c "import sys; sys.exit(47)"')
-            self.assertEqual(rc, 47)
+    def _kill_process(self, method, *args):
+        # Some win32 buildbot raises EOFError if stdin is inherited
+        p = subprocess.Popen([sys.executable, "-c", "input()"],
+                             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        def DISABLED_test_send_signal(self):
-            p = subprocess.Popen([sys.executable,
-                              "-c", "input()"])
+        # Let the process initialize (Issue #3137)
+        time.sleep(0.1)
+        # The process should not terminate prematurely
+        self.assertIsNone(p.poll())
+        # Retry if the process do not receive the signal.
+        count, maxcount = 0, 3
+        while count < maxcount and p.poll() is None:
+            getattr(p, method)(*args)
+            time.sleep(0.1)
+            count += 1
 
-            self.assert_(p.poll() is None, p.poll())
-            p.send_signal(signal.SIGTERM)
-            self.assertNotEqual(p.wait(), 0)
+        returncode = p.poll()
+        self.assertIsNotNone(returncode, "the subprocess did not terminate")
+        if count > 1:
+            print >>sys.stderr, ("p.{}{} succeeded after "
+                                 "{} attempts".format(method, args, count))
+        _, stderr = p.communicate()
+        self.assertStderrEqual(stderr, '')
+        self.assertEqual(p.wait(), returncode)
+        self.assertNotEqual(returncode, 0)
 
-        def DISABLED_test_kill(self):
-            p = subprocess.Popen([sys.executable,
-                            "-c", "input()"])
+    def test_send_signal(self):
+        self._kill_process('send_signal', signal.SIGTERM)
 
-            self.assert_(p.poll() is None, p.poll())
-            p.kill()
-            self.assertNotEqual(p.wait(), 0)
+    def test_kill(self):
+        self._kill_process('kill')
 
-        def DISABLED_test_terminate(self):
-            p = subprocess.Popen([sys.executable,
-                            "-c", "input()"])
+    def test_terminate(self):
+        self._kill_process('terminate')
 
-            self.assert_(p.poll() is None, p.poll())
-            p.terminate()
-            self.assertNotEqual(p.wait(), 0)
+
+@unittest.skipUnless(getattr(subprocess, '_has_poll', False),
+                     "poll system call not supported")
+class ProcessTestCaseNoPoll(ProcessTestCase):
+    def setUp(self):
+        subprocess._has_poll = False
+        ProcessTestCase.setUp(self)
+
+    def tearDown(self):
+        subprocess._has_poll = True
+        ProcessTestCase.tearDown(self)
+
+
+class HelperFunctionTests(unittest.TestCase):
+    @unittest.skipIf(mswindows, "errno and EINTR make no sense on windows")
+    def test_eintr_retry_call(self):
+        record_calls = []
+        def fake_os_func(*args):
+            record_calls.append(args)
+            if len(record_calls) == 2:
+                raise OSError(errno.EINTR, "fake interrupted system call")
+            return tuple(reversed(args))
+
+        self.assertEqual((999, 256),
+                         subprocess._eintr_retry_call(fake_os_func, 256, 999))
+        self.assertEqual([(256, 999)], record_calls)
+        # This time there will be an EINTR so it will loop once.
+        self.assertEqual((666,),
+                         subprocess._eintr_retry_call(fake_os_func, 666))
+        self.assertEqual([(256, 999), (666,), (666,)], record_calls)
+
 
 def test_main():
-    test_support.run_unittest(ProcessTestCase)
-    if hasattr(test_support, "reap_children"):
-        test_support.reap_children()
+    unit_tests = (ProcessTestCase,
+                  POSIXProcessTestCase,
+                  Win32ProcessTestCase,
+                  ProcessTestCaseNoPoll,
+                  HelperFunctionTests)
+
+    test_support.run_unittest(*unit_tests)
+    test_support.reap_children()
 
 if __name__ == "__main__":
     test_main()

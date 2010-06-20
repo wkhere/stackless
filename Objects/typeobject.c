@@ -587,14 +587,6 @@ type___instancecheck__(PyObject *type, PyObject *inst)
 
 
 static PyObject *
-type_get_instancecheck(PyObject *type, void *context)
-{
-    static PyMethodDef ml = {"__instancecheck__",
-                             type___instancecheck__, METH_O };
-    return PyCFunction_New(&ml, type);
-}
-
-static PyObject *
 type___subclasscheck__(PyObject *type, PyObject *inst)
 {
     switch (_PyObject_RealIsSubclass(inst, type)) {
@@ -607,13 +599,6 @@ type___subclasscheck__(PyObject *type, PyObject *inst)
     }
 }
 
-static PyObject *
-type_get_subclasscheck(PyObject *type, void *context)
-{
-    static PyMethodDef ml = {"__subclasscheck__",
-                             type___subclasscheck__, METH_O };
-    return PyCFunction_New(&ml, type);
-}
 
 static PyGetSetDef type_getsets[] = {
     {"__name__", (getter)type_name, (setter)type_set_name, NULL},
@@ -623,20 +608,9 @@ static PyGetSetDef type_getsets[] = {
      (setter)type_set_abstractmethods, NULL},
     {"__dict__",  (getter)type_dict,  NULL, NULL},
     {"__doc__", (getter)type_get_doc, NULL, NULL},
-    {"__instancecheck__", (getter)type_get_instancecheck, NULL, NULL},
-    {"__subclasscheck__", (getter)type_get_subclasscheck, NULL, NULL},
     {0}
 };
 
-static int
-type_compare(PyObject *v, PyObject *w)
-{
-    /* This is called with type objects only. So we
-       can just compare the addresses. */
-    Py_uintptr_t vv = (Py_uintptr_t)v;
-    Py_uintptr_t ww = (Py_uintptr_t)w;
-    return (vv < ww) ? -1 : (vv > ww) ? 1 : 0;
-}
 
 static PyObject*
 type_richcompare(PyObject *v, PyObject *w, int op)
@@ -646,7 +620,11 @@ type_richcompare(PyObject *v, PyObject *w, int op)
     int c;
 
     /* Make sure both arguments are types. */
-    if (!PyType_Check(v) || !PyType_Check(w)) {
+    if (!PyType_Check(v) || !PyType_Check(w) ||
+        /* If there is a __cmp__ method defined, let it be called instead
+           of our dumb function designed merely to warn.  See bug
+           #7491. */
+        Py_TYPE(v)->tp_compare || Py_TYPE(w)->tp_compare) {
         result = Py_NotImplemented;
         goto out;
     }
@@ -929,6 +907,9 @@ subtype_dealloc(PyObject *self)
             assert(base);
         }
 
+        /* Extract the type again; tp_del may have changed it */
+        type = Py_TYPE(self);
+
         /* Call the base tp_dealloc() */
         assert(basedealloc);
         basedealloc(self);
@@ -991,7 +972,7 @@ subtype_dealloc(PyObject *self)
 
     /*  Clear slots up to the nearest base with a different tp_dealloc */
     base = type;
-    while ((basedealloc = base->tp_dealloc) == subtype_dealloc) {
+    while (base->tp_dealloc == subtype_dealloc) {
         if (Py_SIZE(base))
             clear_slots(base, self);
         base = base->tp_base;
@@ -1009,6 +990,9 @@ subtype_dealloc(PyObject *self)
             }
         }
     }
+
+    /* Extract the type again; tp_del may have changed it */
+    type = Py_TYPE(self);
 
     /* Call the base tp_dealloc(); first retrack self if
      * basedealloc knows about gc.
@@ -1151,7 +1135,7 @@ PyType_IsSubtype(PyTypeObject *a, PyTypeObject *b)
         return 0;
     }
     else {
-        /* a is not completely initialized yet; follow tp_base */
+        /* a is not completely initilized yet; follow tp_base */
         do {
             if (a == b)
                 return 1;
@@ -1174,6 +1158,8 @@ PyType_IsSubtype(PyTypeObject *a, PyTypeObject *b)
      when the _PyType_Lookup() call fails;
 
    - lookup_method() always raises an exception upon errors.
+
+   - _PyObject_LookupSpecial() exported for the benefit of other places.
 */
 
 static PyObject *
@@ -1204,6 +1190,13 @@ lookup_method(PyObject *self, char *attrstr, PyObject **attrobj)
     if (res == NULL && !PyErr_Occurred())
         PyErr_SetObject(PyExc_AttributeError, *attrobj);
     return res;
+}
+
+PyObject *
+_PyObject_LookupSpecial(PyObject *self, char *attrstr, PyObject **attrobj)
+{
+    assert(!PyInstance_Check(self));
+    return lookup_maybe(self, attrstr, attrobj);
 }
 
 /* A variation of PyObject_CallMethod that uses lookup_method()
@@ -2311,6 +2304,8 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
         Py_TPFLAGS_BASETYPE;
     if (base->tp_flags & Py_TPFLAGS_HAVE_GC)
         type->tp_flags |= Py_TPFLAGS_HAVE_GC;
+    if (base->tp_flags & Py_TPFLAGS_HAVE_NEWBUFFER)
+        type->tp_flags |= Py_TPFLAGS_HAVE_NEWBUFFER;
 
     /* It's a new-style number unless it specifically inherits any
        old-style numeric behavior */
@@ -2686,6 +2681,10 @@ static PyMethodDef type_methods[] = {
      PyDoc_STR("mro() -> list\nreturn a type's method resolution order")},
     {"__subclasses__", (PyCFunction)type_subclasses, METH_NOARGS,
      PyDoc_STR("__subclasses__() -> list of immediate subclasses")},
+    {"__instancecheck__", type___instancecheck__, METH_O,
+     PyDoc_STR("__instancecheck__() -> check if an object is an instance")},
+    {"__subclasscheck__", type___subclasscheck__, METH_O,
+     PyDoc_STR("__subclasschck__ -> check if an class is a subclass")},
     {0}
 };
 
@@ -2766,7 +2765,7 @@ PyTypeObject PyType_Type = {
     0,                                          /* tp_print */
     0,                                          /* tp_getattr */
     0,                                          /* tp_setattr */
-    type_compare,                               /* tp_compare */
+    0,                                  /* tp_compare */
     (reprfunc)type_repr,                        /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
@@ -3453,30 +3452,46 @@ object_format(PyObject *self, PyObject *args)
     PyObject *format_spec;
     PyObject *self_as_str = NULL;
     PyObject *result = NULL;
-    PyObject *format_meth = NULL;
+    Py_ssize_t format_len;
 
     if (!PyArg_ParseTuple(args, "O:__format__", &format_spec))
         return NULL;
+#ifdef Py_USING_UNICODE
     if (PyUnicode_Check(format_spec)) {
+        format_len = PyUnicode_GET_SIZE(format_spec);
         self_as_str = PyObject_Unicode(self);
     } else if (PyString_Check(format_spec)) {
+#else
+    if (PyString_Check(format_spec)) {
+#endif
+        format_len = PyString_GET_SIZE(format_spec);
         self_as_str = PyObject_Str(self);
     } else {
-        PyErr_SetString(PyExc_TypeError, "argument to __format__ must be unicode or str");
+        PyErr_SetString(PyExc_TypeError,
+                 "argument to __format__ must be unicode or str");
         return NULL;
     }
 
     if (self_as_str != NULL) {
-        /* find the format function */
-        format_meth = PyObject_GetAttrString(self_as_str, "__format__");
-        if (format_meth != NULL) {
-               /* and call it */
-            result = PyObject_CallFunctionObjArgs(format_meth, format_spec, NULL);
+        /* Issue 7994: If we're converting to a string, we
+           should reject format specifications */
+        if (format_len > 0) {
+            if (PyErr_WarnEx(PyExc_PendingDeprecationWarning,
+             "object.__format__ with a non-empty format "
+             "string is deprecated", 1) < 0) {
+                goto done;
+            }
+            /* Eventually this will become an error:
+            PyErr_Format(PyExc_TypeError,
+               "non-empty format string passed to object.__format__");
+            goto done;
+            */
         }
+        result = PyObject_Format(self_as_str, format_spec);
     }
 
+done:
     Py_XDECREF(self_as_str);
-    Py_XDECREF(format_meth);
 
     return result;
 }
@@ -3631,6 +3646,8 @@ add_getset(PyTypeObject *type, PyGetSetDef *gsp)
     return 0;
 }
 
+#define BUFFER_FLAGS (Py_TPFLAGS_HAVE_GETCHARBUFFER | Py_TPFLAGS_HAVE_NEWBUFFER)
+
 static void
 inherit_special(PyTypeObject *type, PyTypeObject *base)
 {
@@ -3638,9 +3655,9 @@ inherit_special(PyTypeObject *type, PyTypeObject *base)
 
     /* Special flag magic */
     if (!type->tp_as_buffer && base->tp_as_buffer) {
-        type->tp_flags &= ~Py_TPFLAGS_HAVE_GETCHARBUFFER;
+        type->tp_flags &= ~BUFFER_FLAGS;
         type->tp_flags |=
-            base->tp_flags & Py_TPFLAGS_HAVE_GETCHARBUFFER;
+            base->tp_flags & BUFFER_FLAGS;
     }
     if (!type->tp_as_sequence && base->tp_as_sequence) {
         type->tp_flags &= ~Py_TPFLAGS_HAVE_SEQUENCE_IN;
@@ -3745,7 +3762,6 @@ overrides_name(PyTypeObject *type, char *name)
 }
 
 #define OVERRIDES_HASH(x)       overrides_name(x, "__hash__")
-#define OVERRIDES_CMP(x)        overrides_name(x, "__cmp__")
 #define OVERRIDES_EQ(x)         overrides_name(x, "__eq__")
 
 static void
@@ -3911,17 +3927,17 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
                 if (base->tp_hash &&
                                 (base->tp_hash != PyObject_HashNotImplemented) &&
                                 !OVERRIDES_HASH(type)) {
-                    if (OVERRIDES_CMP(type)) {
-                        PyErr_WarnPy3k("Overriding "
-                          "__cmp__ blocks inheritance "
-                          "of __hash__ in 3.x",
-                          1);
-                    }
                     if (OVERRIDES_EQ(type)) {
-                        PyErr_WarnPy3k("Overriding "
-                          "__eq__ blocks inheritance "
-                          "of __hash__ in 3.x",
-                          1);
+                        if (PyErr_WarnPy3k("Overriding "
+                                           "__eq__ blocks inheritance "
+                                           "of __hash__ in 3.x",
+                                           1) < 0)
+                            /* XXX This isn't right.  If the warning is turned
+                               into an exception, we should be communicating
+                               the error back to the caller, but figuring out
+                               how to clean up in that case is tricky.  See
+                               issue 8627 for more. */
+                            PyErr_Clear();
                     }
                 }
             }
@@ -5161,6 +5177,7 @@ slot_nb_nonzero(PyObject *self)
     PyObject *func, *args;
     static PyObject *nonzero_str, *len_str;
     int result = -1;
+    int using_len = 0;
 
     func = lookup_maybe(self, "__nonzero__", &nonzero_str);
     if (func == NULL) {
@@ -5169,6 +5186,7 @@ slot_nb_nonzero(PyObject *self)
         func = lookup_maybe(self, "__len__", &len_str);
         if (func == NULL)
             return PyErr_Occurred() ? -1 : 1;
+        using_len = 1;
     }
     args = PyTuple_New(0);
     if (args != NULL) {
@@ -5179,8 +5197,10 @@ slot_nb_nonzero(PyObject *self)
                 result = PyObject_IsTrue(temp);
             else {
                 PyErr_Format(PyExc_TypeError,
-                             "__nonzero__ should return "
+                             "%s should return "
                              "bool or int, returned %s",
+                             (using_len ? "__len__"
+                                        : "__nonzero__"),
                              temp->ob_type->tp_name);
                 result = -1;
             }
@@ -5478,6 +5498,24 @@ slot_tp_getattro(PyObject *self, PyObject *name)
 }
 
 static PyObject *
+call_attribute(PyObject *self, PyObject *attr, PyObject *name)
+{
+    PyObject *res, *descr = NULL;
+    descrgetfunc f = Py_TYPE(attr)->tp_descr_get;
+
+    if (f != NULL) {
+        descr = f(attr, self, (PyObject *)(Py_TYPE(self)));
+        if (descr == NULL)
+            return NULL;
+        else
+            attr = descr;
+    }
+    res = PyObject_CallFunctionObjArgs(attr, name, NULL);
+    Py_XDECREF(descr);
+    return res;
+}
+
+static PyObject *
 slot_tp_getattr_hook(PyObject *self, PyObject *name)
 {
     STACKLESS_GETARG(); /* partially supported */
@@ -5497,6 +5535,11 @@ slot_tp_getattr_hook(PyObject *self, PyObject *name)
         if (getattribute_str == NULL)
             return NULL;
     }
+    /* speed hack: we could use lookup_maybe, but that would resolve the
+       method fully for each attribute lookup for classes with
+       __getattr__, even when the attribute is present. So we use
+       _PyType_Lookup and create the method only when needed, with
+       call_attribute. */
     getattr = _PyType_Lookup(tp, getattr_str);
     STACKLESS_PROMOTE_ALL();
     if (getattr == NULL) {
@@ -5506,19 +5549,28 @@ slot_tp_getattr_hook(PyObject *self, PyObject *name)
         STACKLESS_ASSERT();
         return res;
     }
+    Py_INCREF(getattr);
+    /* speed hack: we could use lookup_maybe, but that would resolve the
+       method fully for each attribute lookup for classes with
+       __getattr__, even when self has the default __getattribute__
+       method. So we use _PyType_Lookup and create the method only when
+       needed, with call_attribute. */
     getattribute = _PyType_Lookup(tp, getattribute_str);
     if (getattribute == NULL ||
         (Py_TYPE(getattribute) == &PyWrapperDescr_Type &&
          ((PyWrapperDescrObject *)getattribute)->d_wrapped ==
          (void *)PyObject_GenericGetAttr))
         res = PyObject_GenericGetAttr(self, name);
-    else
-        res = PyObject_CallFunctionObjArgs(getattribute, self, name, NULL);
+    else {
+        Py_INCREF(getattribute);
+        res = call_attribute(self, getattribute, name);
+        Py_DECREF(getattribute);
+    }
     if (res == NULL && PyErr_ExceptionMatches(PyExc_AttributeError)) {
         PyErr_Clear();
-        STACKLESS_PROMOTE_ALL();
-        res = PyObject_CallFunctionObjArgs(getattr, self, name, NULL);
+        res = call_attribute(self, getattr, name);
     }
+    Py_DECREF(getattr);
     STACKLESS_ASSERT();
     return res;
 }
@@ -5896,7 +5948,6 @@ typedef struct wrapperbase slotdef;
 #define ETSLOT(NAME, SLOT, FUNCTION, WRAPPER, DOC) \
     {NAME, offsetof(PyHeapTypeObject, SLOT), (void *)(FUNCTION), WRAPPER, \
      PyDoc_STR(DOC)}
-
 #define SQSLOT(NAME, SLOT, FUNCTION, WRAPPER, DOC) \
     ETSLOT(NAME, as_sequence.SLOT, FUNCTION, WRAPPER, DOC)
 #define MPSLOT(NAME, SLOT, FUNCTION, WRAPPER, DOC) \
@@ -6222,8 +6273,12 @@ update_one_slot(PyTypeObject *type, slotdef *p)
     }
     do {
         descr = _PyType_Lookup(type, p->name_strobj);
-        if (descr == NULL)
+        if (descr == NULL) {
+            if (ptr == (void**)&type->tp_iternext) {
+                specific = _PyObject_NextNotImplemented;
+            }
             continue;
+        }
         if (Py_TYPE(descr) == &PyWrapperDescr_Type) {
             void **tptr = resolve_slotdups(type, p->name_strobj);
             if (tptr == NULL || tptr == ptr)
@@ -6242,7 +6297,7 @@ update_one_slot(PyTypeObject *type, slotdef *p)
         else if (Py_TYPE(descr) == &PyCFunction_Type &&
                  PyCFunction_GET_FUNCTION(descr) ==
                  (PyCFunction)tp_new_wrapper &&
-                 strcmp(p->name, "__new__") == 0)
+                 ptr == (void**)&type->tp_new)
         {
             /* The __new__ wrapper is not a wrapper descriptor,
                so must be special-cased differently.
@@ -6262,7 +6317,7 @@ update_one_slot(PyTypeObject *type, slotdef *p)
                point out a bug in this reasoning a beer. */
         }
         else if (descr == Py_None &&
-                 strcmp(p->name, "__hash__") == 0) {
+                 ptr == (void**)&type->tp_hash) {
             /* We specifically allow __hash__ to be set to None
                to prevent inheritance of the default
                implementation from object.__hash__ */

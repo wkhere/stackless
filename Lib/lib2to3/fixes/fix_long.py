@@ -2,34 +2,18 @@
 # Licensed to PSF under a Contributor Agreement.
 
 """Fixer that turns 'long' into 'int' everywhere.
-
-This also strips the trailing 'L' or 'l' from long loterals.
 """
 
 # Local imports
-from .. import pytree
-from .. import fixer_base
-from ..fixer_util import Name, Number
+from lib2to3 import fixer_base
+from lib2to3.fixer_util import is_probably_builtin
 
 
 class FixLong(fixer_base.BaseFix):
 
-    PATTERN = """
-    (long_type = 'long' | number = NUMBER)
-    """
-
-    static_long = Name("long")
-    static_int = Name("int")
+    PATTERN = "'long'"
 
     def transform(self, node, results):
-        long_type = results.get("long_type")
-        number = results.get("number")
-        new = None
-        if long_type:
-            assert node == self.static_long, node
-            new = self.static_int.clone()
-        if number and node.value[-1] in ("l", "L"):
-            new = Number(node.value[:-1])
-        if new is not None:
-            new.set_prefix(node.get_prefix())
-            return new
+        if is_probably_builtin(node):
+            node.value = u"int"
+            node.changed()

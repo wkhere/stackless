@@ -3,21 +3,21 @@ Test suite for SocketServer.py.
 """
 
 import contextlib
-import errno
 import imp
 import os
 import select
 import signal
 import socket
 import tempfile
-import threading
-import time
 import unittest
 import SocketServer
 
 import test.test_support
-from test.test_support import reap_children, verbose, TestSkipped
-from test.test_support import TESTFN as TEST_FILE
+from test.test_support import reap_children, reap_threads, verbose
+try:
+    import threading
+except ImportError:
+    threading = None
 
 test.test_support.requires("network")
 
@@ -61,6 +61,7 @@ def simple_subprocess(testcase):
     testcase.assertEquals(72 << 8, status)
 
 
+@unittest.skipUnless(threading, 'Threading required for this test.')
 class SocketServerTest(unittest.TestCase):
     """Test all socket servers."""
 
@@ -122,6 +123,8 @@ class SocketServerTest(unittest.TestCase):
         self.assertEquals(server.server_address, server.socket.getsockname())
         return server
 
+    @unittest.skipUnless(threading, 'Threading required for this test.')
+    @reap_threads
     def run_server(self, svrcls, hdlrbase, testfunc):
         server = self.make_server(self.pickaddr(svrcls.address_family),
                                   svrcls, hdlrbase)
@@ -243,11 +246,36 @@ class SocketServerTest(unittest.TestCase):
     #                             SocketServer.DatagramRequestHandler,
     #                             self.dgram_examine)
 
+    @reap_threads
+    def test_shutdown(self):
+        # Issue #2302: shutdown() should always succeed in making an
+        # other thread leave serve_forever().
+        class MyServer(SocketServer.TCPServer):
+            pass
+
+        class MyHandler(SocketServer.StreamRequestHandler):
+            pass
+
+        threads = []
+        for i in range(20):
+            s = MyServer((HOST, 0), MyHandler)
+            t = threading.Thread(
+                name='MyServer serving',
+                target=s.serve_forever,
+                kwargs={'poll_interval':0.01})
+            t.daemon = True  # In case this function raises.
+            threads.append((t, s))
+        for t, s in threads:
+            t.start()
+            s.shutdown()
+        for t, s in threads:
+            t.join()
+
 
 def test_main():
     if imp.lock_held():
         # If the import lock is held, the threads will hang
-        raise TestSkipped("can't run when import lock is held")
+        raise unittest.SkipTest("can't run when import lock is held")
 
     test.test_support.run_unittest(SocketServerTest)
 

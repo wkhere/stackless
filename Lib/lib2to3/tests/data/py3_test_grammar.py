@@ -485,6 +485,14 @@ class GrammarTests(unittest.TestCase):
         global a, b
         global one, two, three, four, five, six, seven, eight, nine, ten
 
+    def testNonlocal(self):
+        # 'nonlocal' NAME (',' NAME)*
+        x = 0
+        y = 0
+        def f():
+            nonlocal x
+            nonlocal x, y
+
     def testAssert(self):
         # assert_stmt: 'assert' test [',' test]
         assert 1
@@ -859,6 +867,26 @@ class GrammarTests(unittest.TestCase):
         # verify unpacking single element tuples in listcomp/genexp.
         self.assertEqual([x for x, in [(4,), (5,), (6,)]], [4, 5, 6])
         self.assertEqual(list(x for x, in [(7,), (8,), (9,)]), [7, 8, 9])
+
+    def test_with_statement(self):
+        class manager(object):
+            def __enter__(self):
+                return (1, 2)
+            def __exit__(self, *args):
+                pass
+
+        with manager():
+            pass
+        with manager() as x:
+            pass
+        with manager() as (x, y):
+            pass
+        with manager(), manager():
+            pass
+        with manager() as x, manager() as y:
+            pass
+        with manager() as x, manager():
+            pass
 
     def testIfElseExpr(self):
         # Test ifelse expressions in various cases

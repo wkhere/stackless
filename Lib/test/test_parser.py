@@ -25,6 +25,15 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
     def check_expr(self, s):
         self.roundtrip(parser.expr, s)
 
+    def test_flags_passed(self):
+        # The unicode literals flags has to be passed from the paser to AST
+        # generation.
+        suite = parser.suite("from __future__ import unicode_literals; x = ''")
+        code = suite.compile()
+        scope = {}
+        exec code in scope
+        self.assertIsInstance(scope["x"], unicode)
+
     def check_suite(self, s):
         self.roundtrip(parser.suite, s)
 
@@ -49,13 +58,37 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
 
     def test_expressions(self):
         self.check_expr("foo(1)")
+        self.check_expr("{1:1}")
+        self.check_expr("{1:1, 2:2, 3:3}")
+        self.check_expr("{1:1, 2:2, 3:3,}")
+        self.check_expr("{1}")
+        self.check_expr("{1, 2, 3}")
+        self.check_expr("{1, 2, 3,}")
+        self.check_expr("[]")
+        self.check_expr("[1]")
         self.check_expr("[1, 2, 3]")
+        self.check_expr("[1, 2, 3,]")
+        self.check_expr("()")
+        self.check_expr("(1,)")
+        self.check_expr("(1, 2, 3)")
+        self.check_expr("(1, 2, 3,)")
         self.check_expr("[x**3 for x in range(20)]")
         self.check_expr("[x**3 for x in range(20) if x % 3]")
         self.check_expr("[x**3 for x in range(20) if x % 2 if x % 3]")
+        self.check_expr("[x+y for x in range(30) for y in range(20) if x % 2 if y % 3]")
+        #self.check_expr("[x for x in lambda: True, lambda: False if x()]")
         self.check_expr("list(x**3 for x in range(20))")
         self.check_expr("list(x**3 for x in range(20) if x % 3)")
         self.check_expr("list(x**3 for x in range(20) if x % 2 if x % 3)")
+        self.check_expr("list(x+y for x in range(30) for y in range(20) if x % 2 if y % 3)")
+        self.check_expr("{x**3 for x in range(30)}")
+        self.check_expr("{x**3 for x in range(30) if x % 3}")
+        self.check_expr("{x**3 for x in range(30) if x % 2 if x % 3}")
+        self.check_expr("{x+y for x in range(30) for y in range(20) if x % 2 if y % 3}")
+        self.check_expr("{x**3: y**2 for x, y in zip(range(30), range(30))}")
+        self.check_expr("{x**3: y**2 for x, y in zip(range(30), range(30)) if x % 3}")
+        self.check_expr("{x**3: y**2 for x, y in zip(range(30), range(30)) if x % 3 if y % 3}")
+        self.check_expr("{x:y for x in range(30) for y in range(20) if x % 2 if y % 3}")
         self.check_expr("foo(*args)")
         self.check_expr("foo(*args, **kw)")
         self.check_expr("foo(**kw)")
@@ -84,6 +117,7 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         self.check_expr("lambda foo=bar, blaz=blat+2, **z: 0")
         self.check_expr("lambda foo=bar, blaz=blat+2, *y, **z: 0")
         self.check_expr("lambda x, *y, **z: 0")
+        self.check_expr("lambda x: 5 if x else 2")
         self.check_expr("(x for x in range(10))")
         self.check_expr("foo(x for x in range(10))")
 
@@ -170,6 +204,7 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
             "from sys.path import (dirname, basename as my_basename)")
         self.check_suite(
             "from sys.path import (dirname, basename as my_basename,)")
+        self.check_suite("from .bogus import x")
 
     def test_basic_import_statement(self):
         self.check_suite("import sys")
@@ -185,10 +220,25 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
     def test_assert(self):
         self.check_suite("assert alo < ahi and blo < bhi\n")
 
+    def test_with(self):
+        self.check_suite("with open('x'): pass\n")
+        self.check_suite("with open('x') as f: pass\n")
+        self.check_suite("with open('x') as f, open('y') as g: pass\n")
+
+    def test_try_stmt(self):
+        self.check_suite("try: pass\nexcept: pass\n")
+        self.check_suite("try: pass\nfinally: pass\n")
+        self.check_suite("try: pass\nexcept A: pass\nfinally: pass\n")
+        self.check_suite("try: pass\nexcept A: pass\nexcept: pass\n"
+                         "finally: pass\n")
+        self.check_suite("try: pass\nexcept: pass\nelse: pass\n")
+        self.check_suite("try: pass\nexcept: pass\nelse: pass\n"
+                         "finally: pass\n")
+
     def test_position(self):
         # An absolutely minimal test of position information.  Better
         # tests would be a big project.
-        code = "def f(x):\n    return x + 1\n"
+        code = "def f(x):\n    return x + 1"
         st1 = parser.suite(code)
         st2 = st1.totuple(line_info=1, col_info=1)
 

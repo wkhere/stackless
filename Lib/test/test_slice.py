@@ -71,7 +71,7 @@ class SliceTest(unittest.TestCase):
 
         obj = AnyClass()
         s = slice(obj)
-        self.assert_(s.stop is obj)
+        self.assertTrue(s.stop is obj)
 
     def test_indices(self):
         self.assertEqual(slice(None           ).indices(10), (0, 10,  1))
@@ -115,7 +115,8 @@ class SliceTest(unittest.TestCase):
                 tmp.append((i, j, k))
 
         x = X()
-        x[1:2] = 42
+        with test_support.check_py3k_warnings():
+            x[1:2] = 42
         self.assertEquals(tmp, [(1, 2, 42)])
 
     def test_pickle(self):

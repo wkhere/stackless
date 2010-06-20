@@ -14,24 +14,24 @@ from . import patcomp
 
 def KeywordArg(keyword, value):
     return Node(syms.argument,
-                [keyword, Leaf(token.EQUAL, '='), value])
+                [keyword, Leaf(token.EQUAL, u'='), value])
 
 def LParen():
-    return Leaf(token.LPAR, "(")
+    return Leaf(token.LPAR, u"(")
 
 def RParen():
-    return Leaf(token.RPAR, ")")
+    return Leaf(token.RPAR, u")")
 
 def Assign(target, source):
     """Build an assignment statement"""
     if not isinstance(target, list):
         target = [target]
     if not isinstance(source, list):
-        source.set_prefix(" ")
+        source.prefix = u" "
         source = [source]
 
     return Node(syms.atom,
-                target + [Leaf(token.EQUAL, "=", prefix=" ")] + source)
+                target + [Leaf(token.EQUAL, u"=", prefix=u" ")] + source)
 
 def Name(name, prefix=None):
     """Return a NAME leaf"""
@@ -43,11 +43,11 @@ def Attr(obj, attr):
 
 def Comma():
     """A comma leaf"""
-    return Leaf(token.COMMA, ",")
+    return Leaf(token.COMMA, u",")
 
 def Dot():
     """A period (.) leaf"""
-    return Leaf(token.DOT, ".")
+    return Leaf(token.DOT, u".")
 
 def ArgList(args, lparen=LParen(), rparen=RParen()):
     """A parenthesised argument list, used by Call()"""
@@ -60,25 +60,25 @@ def Call(func_name, args=None, prefix=None):
     """A function call"""
     node = Node(syms.power, [func_name, ArgList(args)])
     if prefix is not None:
-        node.set_prefix(prefix)
+        node.prefix = prefix
     return node
 
 def Newline():
     """A newline literal"""
-    return Leaf(token.NEWLINE, "\n")
+    return Leaf(token.NEWLINE, u"\n")
 
 def BlankLine():
     """A blank line"""
-    return Leaf(token.NEWLINE, "")
+    return Leaf(token.NEWLINE, u"")
 
 def Number(n, prefix=None):
     return Leaf(token.NUMBER, n, prefix=prefix)
 
 def Subscript(index_node):
     """A numeric or string subscript"""
-    return Node(syms.trailer, [Leaf(token.LBRACE, '['),
+    return Node(syms.trailer, [Leaf(token.LBRACE, u'['),
                                index_node,
-                               Leaf(token.RBRACE, ']')])
+                               Leaf(token.RBRACE, u']')])
 
 def String(string, prefix=None):
     """A string leaf"""
@@ -89,24 +89,24 @@ def ListComp(xp, fp, it, test=None):
 
     If test is None, the "if test" part is omitted.
     """
-    xp.set_prefix("")
-    fp.set_prefix(" ")
-    it.set_prefix(" ")
-    for_leaf = Leaf(token.NAME, "for")
-    for_leaf.set_prefix(" ")
-    in_leaf = Leaf(token.NAME, "in")
-    in_leaf.set_prefix(" ")
+    xp.prefix = u""
+    fp.prefix = u" "
+    it.prefix = u" "
+    for_leaf = Leaf(token.NAME, u"for")
+    for_leaf.prefix = u" "
+    in_leaf = Leaf(token.NAME, u"in")
+    in_leaf.prefix = u" "
     inner_args = [for_leaf, fp, in_leaf, it]
     if test:
-        test.set_prefix(" ")
-        if_leaf = Leaf(token.NAME, "if")
-        if_leaf.set_prefix(" ")
+        test.prefix = u" "
+        if_leaf = Leaf(token.NAME, u"if")
+        if_leaf.prefix = u" "
         inner_args.append(Node(syms.comp_if, [if_leaf, test]))
     inner = Node(syms.listmaker, [xp, Node(syms.comp_for, inner_args)])
     return Node(syms.atom,
-                       [Leaf(token.LBRACE, "["),
+                       [Leaf(token.LBRACE, u"["),
                         inner,
-                        Leaf(token.RBRACE, "]")])
+                        Leaf(token.RBRACE, u"]")])
 
 def FromImport(package_name, name_leafs):
     """ Return an import statement in the form:
@@ -120,9 +120,9 @@ def FromImport(package_name, name_leafs):
         # Pull the leaves out of their old tree
         leaf.remove()
 
-    children = [Leaf(token.NAME, 'from'),
-                Leaf(token.NAME, package_name, prefix=" "),
-                Leaf(token.NAME, 'import', prefix=" "),
+    children = [Leaf(token.NAME, u'from'),
+                Leaf(token.NAME, package_name, prefix=u" "),
+                Leaf(token.NAME, u'import', prefix=u" "),
                 Node(syms.import_as_names, name_leafs)]
     imp = Node(syms.import_from, children)
     return imp
@@ -141,8 +141,8 @@ def is_tuple(node):
             and isinstance(node.children[0], Leaf)
             and isinstance(node.children[1], Node)
             and isinstance(node.children[2], Leaf)
-            and node.children[0].value == "("
-            and node.children[2].value == ")")
+            and node.children[0].value == u"("
+            and node.children[2].value == u")")
 
 def is_list(node):
     """Does the node represent a list literal?"""
@@ -150,37 +150,16 @@ def is_list(node):
             and len(node.children) > 1
             and isinstance(node.children[0], Leaf)
             and isinstance(node.children[-1], Leaf)
-            and node.children[0].value == "["
-            and node.children[-1].value == "]")
+            and node.children[0].value == u"["
+            and node.children[-1].value == u"]")
 
-###########################################################
-### Common portability code. This allows fixers to do, eg,
-###  "from .util import set" and forget about it.
-###########################################################
-
-try:
-    any = any
-except NameError:
-    def any(l):
-        for o in l:
-            if o:
-                return True
-        return False
-
-try:
-    set = set
-except NameError:
-    from sets import Set as set
-
-try:
-    reversed = reversed
-except NameError:
-    def reversed(l):
-        return l[::-1]
 
 ###########################################################
 ### Misc
 ###########################################################
+
+def parenthesize(node):
+    return Node(syms.atom, [LParen(), node, RParen()])
 
 
 consuming_calls = set(["sorted", "list", "set", "any", "all", "tuple", "sum",
@@ -243,6 +222,29 @@ def in_special_context(node):
             return True
     return False
 
+def is_probably_builtin(node):
+    """
+    Check that something isn't an attribute or function name etc.
+    """
+    prev = node.prev_sibling
+    if prev is not None and prev.type == token.DOT:
+        # Attribute lookup.
+        return False
+    parent = node.parent
+    if parent.type in (syms.funcdef, syms.classdef):
+        return False
+    if parent.type == syms.expr_stmt and parent.children[0] is node:
+        # Assignment.
+        return False
+    if parent.type == syms.parameters or \
+            (parent.type == syms.typedargslist and (
+            (prev is not None and prev.type == token.COMMA) or
+            parent.children[0] is node
+            )):
+        # The name of an argument.
+        return False
+    return True
+
 ###########################################################
 ### The following functions are to find bindings in a suite
 ###########################################################
@@ -256,19 +258,71 @@ def make_suite(node):
     suite.parent = parent
     return suite
 
-def does_tree_import(package, name, node):
-    """ Returns true if name is imported from package at the
-        top level of the tree which node belongs to.
-        To cover the case of an import like 'import foo', use
-        Null for the package and 'foo' for the name. """
+def find_root(node):
+    """Find the top level namespace."""
     # Scamper up to the top level namespace
     while node.type != syms.file_input:
         assert node.parent, "Tree is insane! root found before "\
                            "file_input node was found."
         node = node.parent
+    return node
 
-    binding = find_binding(name, node, package)
+def does_tree_import(package, name, node):
+    """ Returns true if name is imported from package at the
+        top level of the tree which node belongs to.
+        To cover the case of an import like 'import foo', use
+        None for the package and 'foo' for the name. """
+    binding = find_binding(name, find_root(node), package)
     return bool(binding)
+
+def is_import(node):
+    """Returns true if the node is an import statement."""
+    return node.type in (syms.import_name, syms.import_from)
+
+def touch_import(package, name, node):
+    """ Works like `does_tree_import` but adds an import statement
+        if it was not imported. """
+    def is_import_stmt(node):
+        return node.type == syms.simple_stmt and node.children and \
+               is_import(node.children[0])
+
+    root = find_root(node)
+
+    if does_tree_import(package, name, root):
+        return
+
+    # figure out where to insert the new import.  First try to find
+    # the first import and then skip to the last one.
+    insert_pos = offset = 0
+    for idx, node in enumerate(root.children):
+        if not is_import_stmt(node):
+            continue
+        for offset, node2 in enumerate(root.children[idx:]):
+            if not is_import_stmt(node2):
+                break
+        insert_pos = idx + offset
+        break
+
+    # if there are no imports where we can insert, find the docstring.
+    # if that also fails, we stick to the beginning of the file
+    if insert_pos == 0:
+        for idx, node in enumerate(root.children):
+            if node.type == syms.simple_stmt and node.children and \
+               node.children[0].type == token.STRING:
+                insert_pos = idx + 1
+                break
+
+    if package is None:
+        import_ = Node(syms.import_name, [
+            Leaf(token.NAME, u'import'),
+            Leaf(token.NAME, name, prefix=u' ')
+        ])
+    else:
+        import_ = FromImport(package, [Leaf(token.NAME, name, prefix=u' ')])
+
+    children = [import_, Newline()]
+    root.insert_child(insert_pos, Node(syms.simple_stmt, children))
+
 
 _def_syms = set([syms.classdef, syms.funcdef])
 def find_binding(name, node, package=None):
@@ -309,7 +363,7 @@ def find_binding(name, node, package=None):
         if ret:
             if not package:
                 return ret
-            if ret.type in (syms.import_name, syms.import_from):
+            if is_import(ret):
                 return ret
     return None
 
@@ -350,7 +404,7 @@ def _is_import_binding(node, name, package=None):
         if package and unicode(node.children[1]).strip() != package:
             return None
         n = node.children[3]
-        if package and _find('as', n):
+        if package and _find(u'as', n):
             # See test_from_import_as for explanation
             return None
         elif n.type == syms.import_as_names and _find(name, n):

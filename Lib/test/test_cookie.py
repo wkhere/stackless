@@ -1,13 +1,9 @@
 # Simple test suite for Cookie.py
 
-from test.test_support import run_unittest, run_doctest
+from test.test_support import run_unittest, run_doctest, check_warnings
 import unittest
 import Cookie
 
-import warnings
-warnings.filterwarnings("ignore",
-                        ".* class is insecure.*",
-                        DeprecationWarning)
 
 class CookieTests(unittest.TestCase):
     # Currently this only tests SimpleCookie
@@ -51,17 +47,17 @@ class CookieTests(unittest.TestCase):
 
         self.assertEqual(C.output(['path']),
             'Set-Cookie: Customer="WILE_E_COYOTE"; Path=/acme')
-        self.assertEqual(C.js_output(), """
+        self.assertEqual(C.js_output(), r"""
         <script type="text/javascript">
         <!-- begin hiding
-        document.cookie = "Customer="WILE_E_COYOTE"; Path=/acme; Version=1";
+        document.cookie = "Customer=\"WILE_E_COYOTE\"; Path=/acme; Version=1";
         // end hiding -->
         </script>
         """)
-        self.assertEqual(C.js_output(['path']), """
+        self.assertEqual(C.js_output(['path']), r"""
         <script type="text/javascript">
         <!-- begin hiding
-        document.cookie = "Customer="WILE_E_COYOTE"; Path=/acme";
+        document.cookie = "Customer=\"WILE_E_COYOTE\"; Path=/acme";
         // end hiding -->
         </script>
         """)
@@ -76,7 +72,9 @@ class CookieTests(unittest.TestCase):
 
 def test_main():
     run_unittest(CookieTests)
-    run_doctest(Cookie)
+    with check_warnings(('.+Cookie class is insecure; do not use it',
+                         DeprecationWarning)):
+        run_doctest(Cookie)
 
 if __name__ == '__main__':
     test_main()

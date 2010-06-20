@@ -1,7 +1,7 @@
 import unittest
 from doctest import DocTestSuite
 from test import test_support
-import threading
+threading = test_support.import_module('threading')
 import weakref
 import gc
 
@@ -40,7 +40,7 @@ class ThreadingLocalTest(unittest.TestCase):
         local.someothervar = None
         gc.collect()
         deadlist = [weak for weak in weaklist if weak() is None]
-        self.assert_(len(deadlist) in (n-1, n), (n, len(deadlist)))
+        self.assertIn(len(deadlist), (n-1, n), (n, len(deadlist)))
 
     def test_derived(self):
         # Issue 3088: if there is a threads switch inside the __init__
@@ -66,6 +66,59 @@ class ThreadingLocalTest(unittest.TestCase):
 
         for t in threads:
             t.join()
+
+    def test_derived_cycle_dealloc(self):
+        # http://bugs.python.org/issue6990
+        class Local(threading.local):
+            pass
+        locals = None
+        passed = [False]
+        e1 = threading.Event()
+        e2 = threading.Event()
+
+        def f():
+            # 1) Involve Local in a cycle
+            cycle = [Local()]
+            cycle.append(cycle)
+            cycle[0].foo = 'bar'
+
+            # 2) GC the cycle (triggers threadmodule.c::local_clear
+            # before local_dealloc)
+            del cycle
+            gc.collect()
+            e1.set()
+            e2.wait()
+
+            # 4) New Locals should be empty
+            passed[0] = all(not hasattr(local, 'foo') for local in locals)
+
+        t = threading.Thread(target=f)
+        t.start()
+        e1.wait()
+
+        # 3) New Locals should recycle the original's address. Creating
+        # them in the thread overwrites the thread state and avoids the
+        # bug
+        locals = [Local() for i in range(10)]
+        e2.set()
+        t.join()
+
+        self.assertTrue(passed[0])
+
+    def test_arguments(self):
+        # Issue 1522237
+        from thread import _local as local
+        from _threading_local import local as py_local
+
+        for cls in (local, py_local):
+            class MyLocal(cls):
+                def __init__(self, *args, **kwargs):
+                    pass
+
+            MyLocal(a=1)
+            MyLocal(1)
+            self.assertRaises(TypeError, cls, a=1)
+            self.assertRaises(TypeError, cls, 1)
 
 
 def test_main():

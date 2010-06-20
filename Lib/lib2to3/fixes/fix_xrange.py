@@ -12,30 +12,44 @@ from .. import patcomp
 class FixXrange(fixer_base.BaseFix):
 
     PATTERN = """
-              power< (name='range'|name='xrange') trailer< '(' [any] ')' > any* >
+              power<
+                 (name='range'|name='xrange') trailer< '(' args=any ')' >
+              rest=any* >
               """
+
+    def start_tree(self, tree, filename):
+        super(FixXrange, self).start_tree(tree, filename)
+        self.transformed_xranges = set()
+
+    def finish_tree(self, tree, filename):
+        self.transformed_xranges = None
 
     def transform(self, node, results):
         name = results["name"]
-        if name.value == "xrange":
+        if name.value == u"xrange":
             return self.transform_xrange(node, results)
-        elif name.value == "range":
+        elif name.value == u"range":
             return self.transform_range(node, results)
         else:
             raise ValueError(repr(name))
 
     def transform_xrange(self, node, results):
         name = results["name"]
-        name.replace(Name("range", prefix=name.get_prefix()))
+        name.replace(Name(u"range", prefix=name.prefix))
+        # This prevents the new range call from being wrapped in a list later.
+        self.transformed_xranges.add(id(node))
 
     def transform_range(self, node, results):
-        if not self.in_special_context(node):
-            arg = node.clone()
-            arg.set_prefix("")
-            call = Call(Name("list"), [arg])
-            call.set_prefix(node.get_prefix())
-            return call
-        return node
+        if (id(node) not in self.transformed_xranges and
+            not self.in_special_context(node)):
+            range_call = Call(Name(u"range"), [results["args"].clone()])
+            # Encase the range call in list().
+            list_call = Call(Name(u"list"), [range_call],
+                             prefix=node.prefix)
+            # Put things that were after the range() call after the list call.
+            for n in results["rest"]:
+                list_call.append_child(n)
+            return list_call
 
     P1 = "power< func=NAME trailer< '(' node=any ')' > any* >"
     p1 = patcomp.compile_pattern(P1)

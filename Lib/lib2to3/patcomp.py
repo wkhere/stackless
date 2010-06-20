@@ -14,10 +14,7 @@ __author__ = "Guido van Rossum <guido@python.org>"
 import os
 
 # Fairly local imports
-from .pgen2 import driver
-from .pgen2 import literals
-from .pgen2 import token
-from .pgen2 import tokenize
+from .pgen2 import driver, literals, token, tokenize, parse, grammar
 
 # Really local imports
 from . import pytree
@@ -28,9 +25,13 @@ _PATTERN_GRAMMAR_FILE = os.path.join(os.path.dirname(__file__),
                                      "PatternGrammar.txt")
 
 
+class PatternSyntaxError(Exception):
+    pass
+
+
 def tokenize_wrapper(input):
     """Tokenizes a string suppressing significant whitespace."""
-    skip = (token.NEWLINE, token.INDENT, token.DEDENT)
+    skip = set((token.NEWLINE, token.INDENT, token.DEDENT))
     tokens = tokenize.generate_tokens(driver.generate_lines(input).next)
     for quintuple in tokens:
         type, value, start, end, line_text = quintuple
@@ -54,7 +55,10 @@ class PatternCompiler(object):
     def compile_pattern(self, input, debug=False):
         """Compiles a pattern string to a nested pytree.*Pattern object."""
         tokens = tokenize_wrapper(input)
-        root = self.driver.parse_tokens(tokens, debug=debug)
+        try:
+            root = self.driver.parse_tokens(tokens, debug=debug)
+        except parse.ParseError, e:
+            raise PatternSyntaxError(str(e))
         return self.compile_node(root)
 
     def compile_node(self, node):
@@ -133,13 +137,15 @@ class PatternCompiler(object):
         assert len(nodes) >= 1
         node = nodes[0]
         if node.type == token.STRING:
-            value = literals.evalString(node.value)
-            return pytree.LeafPattern(content=value)
+            value = unicode(literals.evalString(node.value))
+            return pytree.LeafPattern(_type_of_literal(value), value)
         elif node.type == token.NAME:
             value = node.value
             if value.isupper():
                 if value not in TOKEN_MAP:
-                    raise SyntaxError("Invalid token: %r" % value)
+                    raise PatternSyntaxError("Invalid token: %r" % value)
+                if nodes[1:]:
+                    raise PatternSyntaxError("Can't have details for token")
                 return pytree.LeafPattern(TOKEN_MAP[value])
             else:
                 if value == "any":
@@ -147,7 +153,7 @@ class PatternCompiler(object):
                 elif not value.startswith("_"):
                     type = getattr(self.pysyms, value, None)
                     if type is None:
-                        raise SyntaxError("Invalid symbol: %r" % value)
+                        raise PatternSyntaxError("Invalid symbol: %r" % value)
                 if nodes[1:]: # Details present
                     content = [self.compile_node(nodes[1].children[1])]
                 else:
@@ -171,6 +177,15 @@ TOKEN_MAP = {"NAME": token.NAME,
              "STRING": token.STRING,
              "NUMBER": token.NUMBER,
              "TOKEN": None}
+
+
+def _type_of_literal(value):
+    if value[0].isalpha():
+        return token.NAME
+    elif value in grammar.opmap:
+        return grammar.opmap[value]
+    else:
+        return None
 
 
 def pattern_convert(grammar, raw_node_info):

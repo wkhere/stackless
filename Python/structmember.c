@@ -170,7 +170,9 @@ PyMember_SetOne(char *addr, PyMemberDef *l, PyObject *v)
 {
     PyObject *oldv;
 
-    if ((l->flags & READONLY) || l->type == T_STRING)
+    addr += l->offset;
+
+    if ((l->flags & READONLY))
     {
         PyErr_SetString(PyExc_TypeError, "readonly attribute");
         return -1;
@@ -179,12 +181,20 @@ PyMember_SetOne(char *addr, PyMemberDef *l, PyObject *v)
         PyErr_SetString(PyExc_RuntimeError, "restricted attribute");
         return -1;
     }
-    if (v == NULL && l->type != T_OBJECT_EX && l->type != T_OBJECT) {
-        PyErr_SetString(PyExc_TypeError,
-                        "can't delete numeric/char attribute");
-        return -1;
+    if (v == NULL) {
+        if (l->type == T_OBJECT_EX) {
+            /* Check if the attribute is set. */
+            if (*(PyObject **)addr == NULL) {
+                PyErr_SetString(PyExc_AttributeError, l->name);
+                return -1;
+            }
+        }
+        else if (l->type != T_OBJECT) {
+            PyErr_SetString(PyExc_TypeError,
+                            "can't delete numeric/char attribute");
+            return -1;
+        }
     }
-    addr += l->offset;
     switch (l->type) {
     case T_BOOL:{
         if (!PyBool_Check(v)) {
@@ -247,12 +257,13 @@ PyMember_SetOne(char *addr, PyMemberDef *l, PyObject *v)
         }
     case T_UINT:{
         unsigned long ulong_val = PyLong_AsUnsignedLong(v);
-        if ((ulong_val == (unsigned int)-1) && PyErr_Occurred()) {
+        if ((ulong_val == (unsigned long)-1) && PyErr_Occurred()) {
             /* XXX: For compatibility, accept negative int values
                as well. */
             PyErr_Clear();
             ulong_val = PyLong_AsLong(v);
-            if ((ulong_val == (unsigned int)-1) && PyErr_Occurred())
+            if ((ulong_val == (unsigned long)-1) &&
+                PyErr_Occurred())
                 return -1;
             *(unsigned int *)addr = (unsigned int)ulong_val;
             WARN("Writing negative value into unsigned field");
@@ -276,7 +287,7 @@ PyMember_SetOne(char *addr, PyMemberDef *l, PyObject *v)
                as well. */
             PyErr_Clear();
             *(unsigned long*)addr = PyLong_AsLong(v);
-            if ((*(unsigned long*)addr == (unsigned int)-1)
+            if ((*(unsigned long*)addr == (unsigned long)-1)
                 && PyErr_Occurred())
                 return -1;
             WARN("Writing negative value into unsigned field");
@@ -318,6 +329,10 @@ PyMember_SetOne(char *addr, PyMemberDef *l, PyObject *v)
             return -1;
         }
         break;
+    case T_STRING:
+    case T_STRING_INPLACE:
+        PyErr_SetString(PyExc_TypeError, "readonly attribute");
+        return -1;
 #ifdef HAVE_LONG_LONG
     case T_LONGLONG:{
         PY_LONG_LONG value;

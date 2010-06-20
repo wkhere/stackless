@@ -9,8 +9,8 @@ import re
 import sys
 import types
 
-import CallTipWindow
-from HyperParser import HyperParser
+from idlelib import CallTipWindow
+from idlelib.HyperParser import HyperParser
 
 import __main__
 
@@ -51,7 +51,7 @@ class CallTips:
 
     def try_open_calltip_event(self, event):
         """Happens when it would be nice to open a CallTip, but not really
-        neccesary, for example after an opening bracket, so function calls
+        necessary, for example after an opening bracket, so function calls
         won't be made.
         """
         self.open_calltip(False)

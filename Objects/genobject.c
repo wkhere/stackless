@@ -279,11 +279,13 @@ failed_throw:
     return NULL;
 }
 
+
 static PyObject *
 gen_iternext(PyGenObject *gen)
 {
     return gen_send_ex(gen, NULL, 0);
 }
+
 
 static PyObject *
 gen_repr(PyGenObject *gen)
@@ -310,7 +312,7 @@ PyDoc_STRVAR(gen__name__doc__,
 "Return the name of the generator's associated code object.");
 
 static PyGetSetDef gen_getsetlist[] = {
-    {"__name__", (getter)gen_get_name, NULL, NULL, gen__name__doc__},
+    {"__name__", (getter)gen_get_name, NULL, gen__name__doc__},
     {NULL}
 };
 

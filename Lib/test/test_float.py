@@ -5,10 +5,90 @@ from test import test_support
 import math
 from math import isinf, isnan, copysign, ldexp
 import operator
-import random, fractions
+import random
+import fractions
+import sys
+import re
 
 INF = float("inf")
 NAN = float("nan")
+
+# decorator for skipping tests on non-IEEE 754 platforms
+requires_IEEE_754 = unittest.skipUnless(
+    float.__getformat__("double").startswith("IEEE"),
+    "test requires IEEE 754 doubles")
+
+#locate file with float format test values
+test_dir = os.path.dirname(__file__) or os.curdir
+format_testfile = os.path.join(test_dir, 'formatfloat_testcases.txt')
+
+finite_decimal_parser = re.compile(r"""    # A numeric string consists of:
+    (?P<sign>[-+])?          # an optional sign, followed by
+    (?=\d|\.\d)              # a number with at least one digit
+    (?P<int>\d*)             # having a (possibly empty) integer part
+    (?:\.(?P<frac>\d*))?     # followed by an optional fractional part
+    (?:E(?P<exp>[-+]?\d+))?  # and an optional exponent
+    \Z
+""", re.VERBOSE | re.IGNORECASE | re.UNICODE).match
+
+# Pure Python version of correctly rounded string->float conversion.
+# Avoids any use of floating-point by returning the result as a hex string.
+def strtod(s, mant_dig=53, min_exp = -1021, max_exp = 1024):
+    """Convert a finite decimal string to a hex string representing an
+    IEEE 754 binary64 float.  Return 'inf' or '-inf' on overflow.
+    This function makes no use of floating-point arithmetic at any
+    stage."""
+
+    # parse string into a pair of integers 'a' and 'b' such that
+    # abs(decimal value) = a/b, and a boolean 'negative'.
+    m = finite_decimal_parser(s)
+    if m is None:
+        raise ValueError('invalid numeric string')
+    fraction = m.group('frac') or ''
+    intpart = int(m.group('int') + fraction)
+    exp = int(m.group('exp') or '0') - len(fraction)
+    negative = m.group('sign') == '-'
+    a, b = intpart*10**max(exp, 0), 10**max(0, -exp)
+
+    # quick return for zeros
+    if not a:
+        return '-0x0.0p+0' if negative else '0x0.0p+0'
+
+    # compute exponent e for result; may be one too small in the case
+    # that the rounded value of a/b lies in a different binade from a/b
+    d = a.bit_length() - b.bit_length()
+    d += (a >> d if d >= 0 else a << -d) >= b
+    e = max(d, min_exp) - mant_dig
+
+    # approximate a/b by number of the form q * 2**e; adjust e if necessary
+    a, b = a << max(-e, 0), b << max(e, 0)
+    q, r = divmod(a, b)
+    if 2*r > b or 2*r == b and q & 1:
+        q += 1
+        if q.bit_length() == mant_dig+1:
+            q //= 2
+            e += 1
+
+    # double check that (q, e) has the right form
+    assert q.bit_length() <= mant_dig and e >= min_exp - mant_dig
+    assert q.bit_length() == mant_dig or e == min_exp - mant_dig
+
+    # check for overflow and underflow
+    if e + q.bit_length() > max_exp:
+        return '-inf' if negative else 'inf'
+    if not q:
+        return '-0x0.0p+0' if negative else '0x0.0p+0'
+
+    # for hex representation, shift so # bits after point is a multiple of 4
+    hexdigs = 1 + (mant_dig-2)//4
+    shift = 3 - (mant_dig-2)%4
+    q, e = q << shift, e - shift
+    return '{}0x{:x}.{:0{}x}p{:+d}'.format(
+        '-' if negative else '',
+        q // 16**hexdigs,
+        q % 16**hexdigs,
+        hexdigs,
+        e + 4*hexdigs)
 
 class GeneralFloatCases(unittest.TestCase):
 
@@ -24,11 +104,17 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(ValueError, float, "+-3.14")
         self.assertRaises(ValueError, float, "-+3.14")
         self.assertRaises(ValueError, float, "--3.14")
+        # check that we don't accept alternate exponent markers
+        self.assertRaises(ValueError, float, "-1.7d29")
+        self.assertRaises(ValueError, float, "3D-14")
         if test_support.have_unicode:
             self.assertEqual(float(unicode("  3.14  ")), 3.14)
             self.assertEqual(float(unicode("  \u0663.\u0661\u0664  ",'raw-unicode-escape')), 3.14)
-            # Implementation limitation in PyFloat_FromString()
-            self.assertRaises(ValueError, float, unicode("1"*10000))
+
+        # extra long strings should no longer be a problem
+        # (in 2.6, long unicode inputs to float raised ValueError)
+        float('.' + '1'*1000)
+        float(unicode('.' + '1'*1000))
 
     @test_support.run_with_locale('LC_NUMERIC', 'fr_FR', 'de_DE')
     def test_float_with_comma(self):
@@ -82,11 +168,23 @@ class GeneralFloatCases(unittest.TestCase):
             def __float__(self):
                 return 42
 
+        # Issue 5759: __float__ not called on str subclasses (though it is on
+        # unicode subclasses).
+        class FooStr(str):
+            def __float__(self):
+                return float(str(self)) + 1
+
+        class FooUnicode(unicode):
+            def __float__(self):
+                return float(unicode(self)) + 1
+
         self.assertAlmostEqual(float(Foo0()), 42.)
         self.assertAlmostEqual(float(Foo1()), 42.)
         self.assertAlmostEqual(float(Foo2()), 42.)
         self.assertAlmostEqual(float(Foo3(21)), 42.)
         self.assertRaises(TypeError, float, Foo4(42))
+        self.assertAlmostEqual(float(FooUnicode('8')), 9.)
+        self.assertAlmostEqual(float(FooStr('8')), 9.)
 
     def test_floatasratio(self):
         for f, ratio in [
@@ -121,6 +219,213 @@ class GeneralFloatCases(unittest.TestCase):
         self.assertRaises(OverflowError, float('-inf').as_integer_ratio)
         self.assertRaises(ValueError, float('nan').as_integer_ratio)
 
+    def assertEqualAndEqualSign(self, a, b):
+        # fail unless a == b and a and b have the same sign bit;
+        # the only difference from assertEqual is that this test
+        # distingishes -0.0 and 0.0.
+        self.assertEqual((a, copysign(1.0, a)), (b, copysign(1.0, b)))
+
+    @requires_IEEE_754
+    def test_float_pow(self):
+        # test builtin pow and ** operator for IEEE 754 special cases.
+        # Special cases taken from section F.9.4.4 of the C99 specification
+
+        for pow_op in pow, operator.pow:
+            # x**NAN is NAN for any x except 1
+            self.assertTrue(isnan(pow_op(-INF, NAN)))
+            self.assertTrue(isnan(pow_op(-2.0, NAN)))
+            self.assertTrue(isnan(pow_op(-1.0, NAN)))
+            self.assertTrue(isnan(pow_op(-0.5, NAN)))
+            self.assertTrue(isnan(pow_op(-0.0, NAN)))
+            self.assertTrue(isnan(pow_op(0.0, NAN)))
+            self.assertTrue(isnan(pow_op(0.5, NAN)))
+            self.assertTrue(isnan(pow_op(2.0, NAN)))
+            self.assertTrue(isnan(pow_op(INF, NAN)))
+            self.assertTrue(isnan(pow_op(NAN, NAN)))
+
+            # NAN**y is NAN for any y except +-0
+            self.assertTrue(isnan(pow_op(NAN, -INF)))
+            self.assertTrue(isnan(pow_op(NAN, -2.0)))
+            self.assertTrue(isnan(pow_op(NAN, -1.0)))
+            self.assertTrue(isnan(pow_op(NAN, -0.5)))
+            self.assertTrue(isnan(pow_op(NAN, 0.5)))
+            self.assertTrue(isnan(pow_op(NAN, 1.0)))
+            self.assertTrue(isnan(pow_op(NAN, 2.0)))
+            self.assertTrue(isnan(pow_op(NAN, INF)))
+
+            # (+-0)**y raises ZeroDivisionError for y a negative odd integer
+            self.assertRaises(ZeroDivisionError, pow_op, -0.0, -1.0)
+            self.assertRaises(ZeroDivisionError, pow_op, 0.0, -1.0)
+
+            # (+-0)**y raises ZeroDivisionError for y finite and negative
+            # but not an odd integer
+            self.assertRaises(ZeroDivisionError, pow_op, -0.0, -2.0)
+            self.assertRaises(ZeroDivisionError, pow_op, -0.0, -0.5)
+            self.assertRaises(ZeroDivisionError, pow_op, 0.0, -2.0)
+            self.assertRaises(ZeroDivisionError, pow_op, 0.0, -0.5)
+
+            # (+-0)**y is +-0 for y a positive odd integer
+            self.assertEqualAndEqualSign(pow_op(-0.0, 1.0), -0.0)
+            self.assertEqualAndEqualSign(pow_op(0.0, 1.0), 0.0)
+
+            # (+-0)**y is 0 for y finite and positive but not an odd integer
+            self.assertEqualAndEqualSign(pow_op(-0.0, 0.5), 0.0)
+            self.assertEqualAndEqualSign(pow_op(-0.0, 2.0), 0.0)
+            self.assertEqualAndEqualSign(pow_op(0.0, 0.5), 0.0)
+            self.assertEqualAndEqualSign(pow_op(0.0, 2.0), 0.0)
+
+            # (-1)**+-inf is 1
+            self.assertEqualAndEqualSign(pow_op(-1.0, -INF), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, INF), 1.0)
+
+            # 1**y is 1 for any y, even if y is an infinity or nan
+            self.assertEqualAndEqualSign(pow_op(1.0, -INF), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, -2.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, -1.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, -0.5), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, 0.5), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, 1.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, 2.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, INF), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, NAN), 1.0)
+
+            # x**+-0 is 1 for any x, even if x is a zero, infinity, or nan
+            self.assertEqualAndEqualSign(pow_op(-INF, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-2.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-0.5, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-0.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(0.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(0.5, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(INF, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(NAN, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-INF, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-2.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-0.5, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-0.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(0.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(0.5, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(INF, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(NAN, -0.0), 1.0)
+
+            # x**y raises ValueError for finite negative x and non-integral y
+            self.assertRaises(ValueError, pow_op, -2.0, -0.5)
+            self.assertRaises(ValueError, pow_op, -2.0, 0.5)
+            self.assertRaises(ValueError, pow_op, -1.0, -0.5)
+            self.assertRaises(ValueError, pow_op, -1.0, 0.5)
+            self.assertRaises(ValueError, pow_op, -0.5, -0.5)
+            self.assertRaises(ValueError, pow_op, -0.5, 0.5)
+
+            # x**-INF is INF for abs(x) < 1
+            self.assertEqualAndEqualSign(pow_op(-0.5, -INF), INF)
+            self.assertEqualAndEqualSign(pow_op(-0.0, -INF), INF)
+            self.assertEqualAndEqualSign(pow_op(0.0, -INF), INF)
+            self.assertEqualAndEqualSign(pow_op(0.5, -INF), INF)
+
+            # x**-INF is 0 for abs(x) > 1
+            self.assertEqualAndEqualSign(pow_op(-INF, -INF), 0.0)
+            self.assertEqualAndEqualSign(pow_op(-2.0, -INF), 0.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, -INF), 0.0)
+            self.assertEqualAndEqualSign(pow_op(INF, -INF), 0.0)
+
+            # x**INF is 0 for abs(x) < 1
+            self.assertEqualAndEqualSign(pow_op(-0.5, INF), 0.0)
+            self.assertEqualAndEqualSign(pow_op(-0.0, INF), 0.0)
+            self.assertEqualAndEqualSign(pow_op(0.0, INF), 0.0)
+            self.assertEqualAndEqualSign(pow_op(0.5, INF), 0.0)
+
+            # x**INF is INF for abs(x) > 1
+            self.assertEqualAndEqualSign(pow_op(-INF, INF), INF)
+            self.assertEqualAndEqualSign(pow_op(-2.0, INF), INF)
+            self.assertEqualAndEqualSign(pow_op(2.0, INF), INF)
+            self.assertEqualAndEqualSign(pow_op(INF, INF), INF)
+
+            # (-INF)**y is -0.0 for y a negative odd integer
+            self.assertEqualAndEqualSign(pow_op(-INF, -1.0), -0.0)
+
+            # (-INF)**y is 0.0 for y negative but not an odd integer
+            self.assertEqualAndEqualSign(pow_op(-INF, -0.5), 0.0)
+            self.assertEqualAndEqualSign(pow_op(-INF, -2.0), 0.0)
+
+            # (-INF)**y is -INF for y a positive odd integer
+            self.assertEqualAndEqualSign(pow_op(-INF, 1.0), -INF)
+
+            # (-INF)**y is INF for y positive but not an odd integer
+            self.assertEqualAndEqualSign(pow_op(-INF, 0.5), INF)
+            self.assertEqualAndEqualSign(pow_op(-INF, 2.0), INF)
+
+            # INF**y is INF for y positive
+            self.assertEqualAndEqualSign(pow_op(INF, 0.5), INF)
+            self.assertEqualAndEqualSign(pow_op(INF, 1.0), INF)
+            self.assertEqualAndEqualSign(pow_op(INF, 2.0), INF)
+
+            # INF**y is 0.0 for y negative
+            self.assertEqualAndEqualSign(pow_op(INF, -2.0), 0.0)
+            self.assertEqualAndEqualSign(pow_op(INF, -1.0), 0.0)
+            self.assertEqualAndEqualSign(pow_op(INF, -0.5), 0.0)
+
+            # basic checks not covered by the special cases above
+            self.assertEqualAndEqualSign(pow_op(-2.0, -2.0), 0.25)
+            self.assertEqualAndEqualSign(pow_op(-2.0, -1.0), -0.5)
+            self.assertEqualAndEqualSign(pow_op(-2.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-2.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-2.0, 1.0), -2.0)
+            self.assertEqualAndEqualSign(pow_op(-2.0, 2.0), 4.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, -2.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, -1.0), -1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, 1.0), -1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, 2.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, -2.0), 0.25)
+            self.assertEqualAndEqualSign(pow_op(2.0, -1.0), 0.5)
+            self.assertEqualAndEqualSign(pow_op(2.0, -0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, 0.0), 1.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, 1.0), 2.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, 2.0), 4.0)
+
+            # 1 ** large and -1 ** large; some libms apparently
+            # have problems with these
+            self.assertEqualAndEqualSign(pow_op(1.0, -1e100), 1.0)
+            self.assertEqualAndEqualSign(pow_op(1.0, 1e100), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, -1e100), 1.0)
+            self.assertEqualAndEqualSign(pow_op(-1.0, 1e100), 1.0)
+
+            # check sign for results that underflow to 0
+            self.assertEqualAndEqualSign(pow_op(-2.0, -2000.0), 0.0)
+            self.assertRaises(ValueError, pow_op, -2.0, -2000.5)
+            self.assertEqualAndEqualSign(pow_op(-2.0, -2001.0), -0.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, -2000.0), 0.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, -2000.5), 0.0)
+            self.assertEqualAndEqualSign(pow_op(2.0, -2001.0), 0.0)
+            self.assertEqualAndEqualSign(pow_op(-0.5, 2000.0), 0.0)
+            self.assertRaises(ValueError, pow_op, -0.5, 2000.5)
+            self.assertEqualAndEqualSign(pow_op(-0.5, 2001.0), -0.0)
+            self.assertEqualAndEqualSign(pow_op(0.5, 2000.0), 0.0)
+            self.assertEqualAndEqualSign(pow_op(0.5, 2000.5), 0.0)
+            self.assertEqualAndEqualSign(pow_op(0.5, 2001.0), 0.0)
+
+            # check we don't raise an exception for subnormal results,
+            # and validate signs.  Tests currently disabled, since
+            # they fail on systems where a subnormal result from pow
+            # is flushed to zero (e.g. Debian/ia64.)
+            #self.assertTrue(0.0 < pow_op(0.5, 1048) < 1e-315)
+            #self.assertTrue(0.0 < pow_op(-0.5, 1048) < 1e-315)
+            #self.assertTrue(0.0 < pow_op(0.5, 1047) < 1e-315)
+            #self.assertTrue(0.0 > pow_op(-0.5, 1047) > -1e-315)
+            #self.assertTrue(0.0 < pow_op(2.0, -1048) < 1e-315)
+            #self.assertTrue(0.0 < pow_op(-2.0, -1048) < 1e-315)
+            #self.assertTrue(0.0 < pow_op(2.0, -1047) < 1e-315)
+            #self.assertTrue(0.0 > pow_op(-2.0, -1047) > -1e-315)
+
+
 class FormatFunctionsTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -132,10 +437,10 @@ class FormatFunctionsTestCase(unittest.TestCase):
         float.__setformat__('float', self.save_formats['float'])
 
     def test_getformat(self):
-        self.assert_(float.__getformat__('double') in
-                     ['unknown', 'IEEE, big-endian', 'IEEE, little-endian'])
-        self.assert_(float.__getformat__('float') in
-                     ['unknown', 'IEEE, big-endian', 'IEEE, little-endian'])
+        self.assertIn(float.__getformat__('double'),
+                      ['unknown', 'IEEE, big-endian', 'IEEE, little-endian'])
+        self.assertIn(float.__getformat__('float'),
+                      ['unknown', 'IEEE, big-endian', 'IEEE, little-endian'])
         self.assertRaises(ValueError, float.__getformat__, 'chicken')
         self.assertRaises(TypeError, float.__getformat__, 1)
 
@@ -221,7 +526,6 @@ class IEEEFormatTestCase(unittest.TestCase):
 
     if float.__getformat__("double").startswith("IEEE"):
         def test_negative_zero(self):
-            import math
             def pos_pos():
                 return 0.0, math.atan2(0.0, -1)
             def pos_neg():
@@ -235,11 +539,87 @@ class IEEEFormatTestCase(unittest.TestCase):
 
     if float.__getformat__("double").startswith("IEEE"):
         def test_underflow_sign(self):
-            import math
             # check that -1e-1000 gives -0.0, not 0.0
             self.assertEquals(math.atan2(-1e-1000, -1), math.atan2(-0.0, -1))
             self.assertEquals(math.atan2(float('-1e-1000'), -1),
                               math.atan2(-0.0, -1))
+
+    def test_format(self):
+        # these should be rewritten to use both format(x, spec) and
+        # x.__format__(spec)
+
+        self.assertEqual(format(0.0, 'f'), '0.000000')
+
+        # the default is 'g', except for empty format spec
+        self.assertEqual(format(0.0, ''), '0.0')
+        self.assertEqual(format(0.01, ''), '0.01')
+        self.assertEqual(format(0.01, 'g'), '0.01')
+
+        # empty presentation type should format in the same way as str
+        # (issue 5920)
+        x = 100/7.
+        self.assertEqual(format(x, ''), str(x))
+        self.assertEqual(format(x, '-'), str(x))
+        self.assertEqual(format(x, '>'), str(x))
+        self.assertEqual(format(x, '2'), str(x))
+
+        self.assertEqual(format(1.0, 'f'), '1.000000')
+
+        self.assertEqual(format(-1.0, 'f'), '-1.000000')
+
+        self.assertEqual(format( 1.0, ' f'), ' 1.000000')
+        self.assertEqual(format(-1.0, ' f'), '-1.000000')
+        self.assertEqual(format( 1.0, '+f'), '+1.000000')
+        self.assertEqual(format(-1.0, '+f'), '-1.000000')
+
+        # % formatting
+        self.assertEqual(format(-1.0, '%'), '-100.000000%')
+
+        # conversion to string should fail
+        self.assertRaises(ValueError, format, 3.0, "s")
+
+        # other format specifiers shouldn't work on floats,
+        #  in particular int specifiers
+        for format_spec in ([chr(x) for x in range(ord('a'), ord('z')+1)] +
+                            [chr(x) for x in range(ord('A'), ord('Z')+1)]):
+            if not format_spec in 'eEfFgGn%':
+                self.assertRaises(ValueError, format, 0.0, format_spec)
+                self.assertRaises(ValueError, format, 1.0, format_spec)
+                self.assertRaises(ValueError, format, -1.0, format_spec)
+                self.assertRaises(ValueError, format, 1e100, format_spec)
+                self.assertRaises(ValueError, format, -1e100, format_spec)
+                self.assertRaises(ValueError, format, 1e-100, format_spec)
+                self.assertRaises(ValueError, format, -1e-100, format_spec)
+
+        # issue 3382: 'f' and 'F' with inf's and nan's
+        self.assertEqual('{0:f}'.format(INF), 'inf')
+        self.assertEqual('{0:F}'.format(INF), 'INF')
+        self.assertEqual('{0:f}'.format(-INF), '-inf')
+        self.assertEqual('{0:F}'.format(-INF), '-INF')
+        self.assertEqual('{0:f}'.format(NAN), 'nan')
+        self.assertEqual('{0:F}'.format(NAN), 'NAN')
+
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_format_testfile(self):
+        for line in open(format_testfile):
+            if line.startswith('--'):
+                continue
+            line = line.strip()
+            if not line:
+                continue
+
+            lhs, rhs = map(str.strip, line.split('->'))
+            fmt, arg = lhs.split()
+            arg = float(arg)
+            self.assertEqual(fmt % arg, rhs)
+            if not math.isnan(arg) and copysign(1.0, arg) > 0.0:
+                self.assertEqual(fmt % -arg, '-' + rhs)
+
+    def test_issue5864(self):
+        self.assertEquals(format(123.456, '.4'), '123.5')
+        self.assertEquals(format(1234.56, '.4'), '1.235e+03')
+        self.assertEquals(format(12345.6, '.4'), '1.235e+04')
 
 class ReprTestCase(unittest.TestCase):
     def test_repr(self):
@@ -253,16 +633,240 @@ class ReprTestCase(unittest.TestCase):
             self.assertEqual(v, eval(repr(v)))
         floats_file.close()
 
+    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+                         "applies only when using short float repr style")
+    def test_short_repr(self):
+        # test short float repr introduced in Python 3.1.  One aspect
+        # of this repr is that we get some degree of str -> float ->
+        # str roundtripping.  In particular, for any numeric string
+        # containing 15 or fewer significant digits, those exact same
+        # digits (modulo trailing zeros) should appear in the output.
+        # No more repr(0.03) -> "0.029999999999999999"!
+
+        test_strings = [
+            # output always includes *either* a decimal point and at
+            # least one digit after that point, or an exponent.
+            '0.0',
+            '1.0',
+            '0.01',
+            '0.02',
+            '0.03',
+            '0.04',
+            '0.05',
+            '1.23456789',
+            '10.0',
+            '100.0',
+            # values >= 1e16 get an exponent...
+            '1000000000000000.0',
+            '9999999999999990.0',
+            '1e+16',
+            '1e+17',
+            # ... and so do values < 1e-4
+            '0.001',
+            '0.001001',
+            '0.00010000000000001',
+            '0.0001',
+            '9.999999999999e-05',
+            '1e-05',
+            # values designed to provoke failure if the FPU rounding
+            # precision isn't set correctly
+            '8.72293771110361e+25',
+            '7.47005307342313e+26',
+            '2.86438000439698e+28',
+            '8.89142905246179e+28',
+            '3.08578087079232e+35',
+            ]
+
+        for s in test_strings:
+            negs = '-'+s
+            self.assertEqual(s, repr(float(s)))
+            self.assertEqual(negs, repr(float(negs)))
+
+@unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                     "test requires IEEE 754 doubles")
+class RoundTestCase(unittest.TestCase):
+    def test_second_argument_type(self):
+        # any type with an __index__ method should be permitted as
+        # a second argument
+        self.assertAlmostEqual(round(12.34, True), 12.3)
+
+        class MyIndex(object):
+            def __index__(self): return 4
+        self.assertAlmostEqual(round(-0.123456, MyIndex()), -0.1235)
+        # but floats should be illegal
+        self.assertRaises(TypeError, round, 3.14159, 2.0)
+
+    def test_inf_nan(self):
+        # rounding an infinity or nan returns the same number;
+        # (in py3k, rounding an infinity or nan raises an error,
+        #  since the result can't be represented as a long).
+        self.assertEqual(round(INF), INF)
+        self.assertEqual(round(-INF), -INF)
+        self.assertTrue(math.isnan(round(NAN)))
+        for n in range(-5, 5):
+            self.assertEqual(round(INF, n), INF)
+            self.assertEqual(round(-INF, n), -INF)
+            self.assertTrue(math.isnan(round(NAN, n)))
+
+        self.assertRaises(TypeError, round, INF, 0.0)
+        self.assertRaises(TypeError, round, -INF, 1.0)
+        self.assertRaises(TypeError, round, NAN, "ceci n'est pas un integer")
+        self.assertRaises(TypeError, round, -0.0, 1j)
+
+    def test_large_n(self):
+        for n in [324, 325, 400, 2**31-1, 2**31, 2**32, 2**100]:
+            self.assertEqual(round(123.456, n), 123.456)
+            self.assertEqual(round(-123.456, n), -123.456)
+            self.assertEqual(round(1e300, n), 1e300)
+            self.assertEqual(round(1e-320, n), 1e-320)
+        self.assertEqual(round(1e150, 300), 1e150)
+        self.assertEqual(round(1e300, 307), 1e300)
+        self.assertEqual(round(-3.1415, 308), -3.1415)
+        self.assertEqual(round(1e150, 309), 1e150)
+        self.assertEqual(round(1.4e-315, 315), 1e-315)
+
+    def test_small_n(self):
+        for n in [-308, -309, -400, 1-2**31, -2**31, -2**31-1, -2**100]:
+            self.assertEqual(round(123.456, n), 0.0)
+            self.assertEqual(round(-123.456, n), -0.0)
+            self.assertEqual(round(1e300, n), 0.0)
+            self.assertEqual(round(1e-320, n), 0.0)
+
+    def test_overflow(self):
+        self.assertRaises(OverflowError, round, 1.6e308, -308)
+        self.assertRaises(OverflowError, round, -1.7e308, -308)
+
+    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+                         "test applies only when using short float repr style")
+    def test_previous_round_bugs(self):
+        # particular cases that have occurred in bug reports
+        self.assertEqual(round(562949953421312.5, 1),
+                          562949953421312.5)
+        self.assertEqual(round(56294995342131.5, 3),
+                         56294995342131.5)
+
+    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+                         "test applies only when using short float repr style")
+    def test_halfway_cases(self):
+        # Halfway cases need special attention, since the current
+        # implementation has to deal with them specially.  Note that
+        # 2.x rounds halfway values up (i.e., away from zero) while
+        # 3.x does round-half-to-even.
+        self.assertAlmostEqual(round(0.125, 2), 0.13)
+        self.assertAlmostEqual(round(0.375, 2), 0.38)
+        self.assertAlmostEqual(round(0.625, 2), 0.63)
+        self.assertAlmostEqual(round(0.875, 2), 0.88)
+        self.assertAlmostEqual(round(-0.125, 2), -0.13)
+        self.assertAlmostEqual(round(-0.375, 2), -0.38)
+        self.assertAlmostEqual(round(-0.625, 2), -0.63)
+        self.assertAlmostEqual(round(-0.875, 2), -0.88)
+
+        self.assertAlmostEqual(round(0.25, 1), 0.3)
+        self.assertAlmostEqual(round(0.75, 1), 0.8)
+        self.assertAlmostEqual(round(-0.25, 1), -0.3)
+        self.assertAlmostEqual(round(-0.75, 1), -0.8)
+
+        self.assertEqual(round(-6.5, 0), -7.0)
+        self.assertEqual(round(-5.5, 0), -6.0)
+        self.assertEqual(round(-1.5, 0), -2.0)
+        self.assertEqual(round(-0.5, 0), -1.0)
+        self.assertEqual(round(0.5, 0), 1.0)
+        self.assertEqual(round(1.5, 0), 2.0)
+        self.assertEqual(round(2.5, 0), 3.0)
+        self.assertEqual(round(3.5, 0), 4.0)
+        self.assertEqual(round(4.5, 0), 5.0)
+        self.assertEqual(round(5.5, 0), 6.0)
+        self.assertEqual(round(6.5, 0), 7.0)
+
+        # same but without an explicit second argument; in 3.x these
+        # will give integers
+        self.assertEqual(round(-6.5), -7.0)
+        self.assertEqual(round(-5.5), -6.0)
+        self.assertEqual(round(-1.5), -2.0)
+        self.assertEqual(round(-0.5), -1.0)
+        self.assertEqual(round(0.5), 1.0)
+        self.assertEqual(round(1.5), 2.0)
+        self.assertEqual(round(2.5), 3.0)
+        self.assertEqual(round(3.5), 4.0)
+        self.assertEqual(round(4.5), 5.0)
+        self.assertEqual(round(5.5), 6.0)
+        self.assertEqual(round(6.5), 7.0)
+
+        self.assertEqual(round(-25.0, -1), -30.0)
+        self.assertEqual(round(-15.0, -1), -20.0)
+        self.assertEqual(round(-5.0, -1), -10.0)
+        self.assertEqual(round(5.0, -1), 10.0)
+        self.assertEqual(round(15.0, -1), 20.0)
+        self.assertEqual(round(25.0, -1), 30.0)
+        self.assertEqual(round(35.0, -1), 40.0)
+        self.assertEqual(round(45.0, -1), 50.0)
+        self.assertEqual(round(55.0, -1), 60.0)
+        self.assertEqual(round(65.0, -1), 70.0)
+        self.assertEqual(round(75.0, -1), 80.0)
+        self.assertEqual(round(85.0, -1), 90.0)
+        self.assertEqual(round(95.0, -1), 100.0)
+        self.assertEqual(round(12325.0, -1), 12330.0)
+
+        self.assertEqual(round(350.0, -2), 400.0)
+        self.assertEqual(round(450.0, -2), 500.0)
+
+        self.assertAlmostEqual(round(0.5e21, -21), 1e21)
+        self.assertAlmostEqual(round(1.5e21, -21), 2e21)
+        self.assertAlmostEqual(round(2.5e21, -21), 3e21)
+        self.assertAlmostEqual(round(5.5e21, -21), 6e21)
+        self.assertAlmostEqual(round(8.5e21, -21), 9e21)
+
+        self.assertAlmostEqual(round(-1.5e22, -22), -2e22)
+        self.assertAlmostEqual(round(-0.5e22, -22), -1e22)
+        self.assertAlmostEqual(round(0.5e22, -22), 1e22)
+        self.assertAlmostEqual(round(1.5e22, -22), 2e22)
+
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_format_specials(self):
+        # Test formatting of nans and infs.
+
+        def test(fmt, value, expected):
+            # Test with both % and format().
+            self.assertEqual(fmt % value, expected, fmt)
+            if not '#' in fmt:
+                # Until issue 7094 is implemented, format() for floats doesn't
+                #  support '#' formatting
+                fmt = fmt[1:] # strip off the %
+                self.assertEqual(format(value, fmt), expected, fmt)
+
+        for fmt in ['%e', '%f', '%g', '%.0e', '%.6f', '%.20g',
+                    '%#e', '%#f', '%#g', '%#.20e', '%#.15f', '%#.3g']:
+            pfmt = '%+' + fmt[1:]
+            sfmt = '% ' + fmt[1:]
+            test(fmt, INF, 'inf')
+            test(fmt, -INF, '-inf')
+            test(fmt, NAN, 'nan')
+            test(fmt, -NAN, 'nan')
+            # When asking for a sign, it's always provided. nans are
+            #  always positive.
+            test(pfmt, INF, '+inf')
+            test(pfmt, -INF, '-inf')
+            test(pfmt, NAN, '+nan')
+            test(pfmt, -NAN, '+nan')
+            # When using ' ' for a sign code, only infs can be negative.
+            #  Others have a space.
+            test(sfmt, INF, ' inf')
+            test(sfmt, -INF, '-inf')
+            test(sfmt, NAN, ' nan')
+            test(sfmt, -NAN, ' nan')
+
+
 # Beginning with Python 2.6 float has cross platform compatible
 # ways to create and represent inf and nan
 class InfNanTest(unittest.TestCase):
     def test_inf_from_str(self):
-        self.assert_(isinf(float("inf")))
-        self.assert_(isinf(float("+inf")))
-        self.assert_(isinf(float("-inf")))
-        self.assert_(isinf(float("infinity")))
-        self.assert_(isinf(float("+infinity")))
-        self.assert_(isinf(float("-infinity")))
+        self.assertTrue(isinf(float("inf")))
+        self.assertTrue(isinf(float("+inf")))
+        self.assertTrue(isinf(float("-inf")))
+        self.assertTrue(isinf(float("infinity")))
+        self.assertTrue(isinf(float("+infinity")))
+        self.assertTrue(isinf(float("-infinity")))
 
         self.assertEqual(repr(float("inf")), "inf")
         self.assertEqual(repr(float("+inf")), "inf")
@@ -304,9 +908,9 @@ class InfNanTest(unittest.TestCase):
         self.assertEqual(str(-1e300 * 1e300), "-inf")
 
     def test_nan_from_str(self):
-        self.assert_(isnan(float("nan")))
-        self.assert_(isnan(float("+nan")))
-        self.assert_(isnan(float("-nan")))
+        self.assertTrue(isnan(float("nan")))
+        self.assertTrue(isnan(float("+nan")))
+        self.assertTrue(isnan(float("-nan")))
 
         self.assertEqual(repr(float("nan")), "nan")
         self.assertEqual(repr(float("+nan")), "nan")
@@ -335,14 +939,23 @@ class InfNanTest(unittest.TestCase):
         self.assertEqual(str(-1e300 * 1e300 * 0), "nan")
 
     def notest_float_nan(self):
-        self.assert_(NAN.is_nan())
-        self.failIf(INF.is_nan())
-        self.failIf((0.).is_nan())
+        self.assertTrue(NAN.is_nan())
+        self.assertFalse(INF.is_nan())
+        self.assertFalse((0.).is_nan())
 
     def notest_float_inf(self):
-        self.assert_(INF.is_inf())
-        self.failIf(NAN.is_inf())
-        self.failIf((0.).is_inf())
+        self.assertTrue(INF.is_inf())
+        self.assertFalse(NAN.is_inf())
+        self.assertFalse((0.).is_inf())
+
+    def test_hash_inf(self):
+        # the actual values here should be regarded as an
+        # implementation detail, but they need to be
+        # identical to those used in the Decimal module.
+        self.assertEqual(hash(float('inf')), 314159)
+        self.assertEqual(hash(float('-inf')), -271828)
+        self.assertEqual(hash(float('nan')), 0)
+
 
 fromHex = float.fromhex
 toHex = float.hex
@@ -379,6 +992,11 @@ class HexFloatTestCase(unittest.TestCase):
             'snan',
             'NaNs',
             'nna',
+            'an',
+            'nf',
+            'nfinity',
+            'inity',
+            'iinity',
             '0xnan',
             '',
             ' ',
@@ -425,6 +1043,32 @@ class HexFloatTestCase(unittest.TestCase):
             else:
                 self.fail('Expected float.fromhex(%r) to raise ValueError; '
                           'got %r instead' % (x, result))
+
+
+    def test_whitespace(self):
+        value_pairs = [
+            ('inf', INF),
+            ('-Infinity', -INF),
+            ('nan', NAN),
+            ('1.0', 1.0),
+            ('-0x.2', -0.125),
+            ('-0.0', -0.0)
+            ]
+        whitespace = [
+            '',
+            ' ',
+            '\t',
+            '\n',
+            '\n \t',
+            '\f',
+            '\v',
+            '\r'
+            ]
+        for inp, expected in value_pairs:
+            for lead in whitespace:
+                for trail in whitespace:
+                    got = fromHex(lead + inp + trail)
+                    self.identical(got, expected)
 
 
     def test_from_hex(self):
@@ -734,6 +1378,38 @@ class HexFloatTestCase(unittest.TestCase):
             else:
                 self.identical(x, fromHex(toHex(x)))
 
+class StrtodTestCase(unittest.TestCase):
+    def check_string(self, s):
+        expected = strtod(s)
+        try:
+            fs = float(s)
+        except OverflowError:
+            got = '-inf' if s[0] == '-' else 'inf'
+        else:
+            got = fs.hex()
+        self.assertEqual(expected, got,
+                         "Incorrectly rounded str->float conversion for "
+                         "{}: expected {}, got {}".format(s, expected, got))
+
+    @unittest.skipUnless(getattr(sys, 'float_repr_style', '') == 'short',
+                         "applies only when using short float repr style")
+    def test_bug7632(self):
+        # check a few particular values that gave incorrectly rounded
+        # results with previous versions of dtoa.c
+        test_strings = [
+            '94393431193180696942841837085033647913224148539854e-358',
+            '12579816049008305546974391768996369464963024663104e-357',
+            '17489628565202117263145367596028389348922981857013e-357',
+            '18487398785991994634182916638542680759613590482273e-357',
+            '32002864200581033134358724675198044527469366773928e-358',
+            '73608278998966969345824653500136787876436005957953e-358',
+            '64774478836417299491718435234611299336288082136054e-358',
+            '13704940134126574534878641876947980878824688451169e-357',
+            '46697445774047060960624497964425416610480524760471e-358',
+            ]
+        for s in test_strings:
+            self.check_string(s)
+
 
 def test_main():
     test_support.run_unittest(
@@ -742,8 +1418,10 @@ def test_main():
         UnknownFormatTestCase,
         IEEEFormatTestCase,
         ReprTestCase,
+        RoundTestCase,
         InfNanTest,
         HexFloatTestCase,
+        StrtodTestCase,
         )
 
 if __name__ == '__main__':

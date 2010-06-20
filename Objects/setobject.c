@@ -810,7 +810,14 @@ static void
 setiter_dealloc(setiterobject *si)
 {
     Py_XDECREF(si->si_set);
-    PyObject_Del(si);
+    PyObject_GC_Del(si);
+}
+
+static int
+setiter_traverse(setiterobject *si, visitproc visit, void *arg)
+{
+    Py_VISIT(si->si_set);
+    return 0;
 }
 
 static PyObject *
@@ -892,9 +899,9 @@ static PyTypeObject PySetIter_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,                         /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     0,                                          /* tp_doc */
-    0,                                          /* tp_traverse */
+    (traverseproc)setiter_traverse,             /* tp_traverse */
     0,                                          /* tp_clear */
     0,                                          /* tp_richcompare */
     0,                                          /* tp_weaklistoffset */
@@ -907,7 +914,7 @@ static PyTypeObject PySetIter_Type = {
 static PyObject *
 set_iter(PySetObject *so)
 {
-    setiterobject *si = PyObject_New(setiterobject, &PySetIter_Type);
+    setiterobject *si = PyObject_GC_New(setiterobject, &PySetIter_Type);
     if (si == NULL)
         return NULL;
     Py_INCREF(so);
@@ -915,6 +922,7 @@ set_iter(PySetObject *so)
     si->si_used = so->used;
     si->si_pos = 0;
     si->len = so->used;
+    _PyObject_GC_TRACK(si);
     return (PyObject *)si;
 }
 
@@ -1179,7 +1187,7 @@ set_union(PySetObject *so, PyObject *args)
     for (i=0 ; i<PyTuple_GET_SIZE(args) ; i++) {
         other = PyTuple_GET_ITEM(args, i);
         if ((PyObject *)so == other)
-            return (PyObject *)result;
+            continue;
         if (set_update_internal(result, other) == -1) {
             Py_DECREF(result);
             return NULL;
@@ -1335,9 +1343,9 @@ set_intersection_multi(PySetObject *so, PyObject *args)
 }
 
 PyDoc_STRVAR(intersection_doc,
-"Return the intersection of two sets as a new set.\n\
+"Return the intersection of two or more sets as a new set.\n\
 \n\
-(i.e. all elements that are in both sets.)");
+(i.e. elements that are common to all of the sets.)");
 
 static PyObject *
 set_intersection_update(PySetObject *so, PyObject *other)
@@ -1983,6 +1991,8 @@ set_init(PySetObject *self, PyObject *args, PyObject *kwds)
 
     if (!PyAnySet_Check(self))
         return -1;
+    if (PySet_Check(self) && !_PyArg_NoKeywords("set()", kwds))
+        return -1;
     if (!PyArg_UnpackTuple(args, Py_TYPE(self)->tp_name, 0, 1, &iterable))
         return -1;
     set_clear_internal(self);
@@ -2098,7 +2108,8 @@ static PyNumberMethods set_as_number = {
 };
 
 PyDoc_STRVAR(set_doc,
-"set(iterable) --> set object\n\
+"set() -> new empty set object\n\
+set(iterable) -> new set object\n\
 \n\
 Build an unordered collection of unique elements.");
 
@@ -2196,7 +2207,8 @@ static PyNumberMethods frozenset_as_number = {
 };
 
 PyDoc_STRVAR(frozenset_doc,
-"frozenset(iterable) --> frozenset object\n\
+"frozenset() -> empty frozenset object\n\
+frozenset(iterable) -> frozenset object\n\
 \n\
 Build an immutable unordered collection of unique elements.");
 
@@ -2381,11 +2393,25 @@ test_c_api(PySetObject *so)
     Py_ssize_t i;
     PyObject *elem=NULL, *dup=NULL, *t, *f, *dup2, *x;
     PyObject *ob = (PyObject *)so;
+    PyObject *str;
 
-    /* Verify preconditions and exercise type/size checks */
+    /* Verify preconditions */
     assert(PyAnySet_Check(ob));
     assert(PyAnySet_CheckExact(ob));
     assert(!PyFrozenSet_CheckExact(ob));
+
+    /* so.clear(); so |= set("abc"); */
+    str = PyString_FromString("abc");
+    if (str == NULL)
+        return NULL;
+    set_clear_internal(so);
+    if (set_update_internal(so, str) == -1) {
+        Py_DECREF(str);
+        return NULL;
+    }
+    Py_DECREF(str);
+
+    /* Exercise type/size checks */
     assert(PySet_Size(ob) == 3);
     assert(PySet_GET_SIZE(ob) == 3);
 

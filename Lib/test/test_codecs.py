@@ -263,7 +263,7 @@ class UTF32Test(ReadTest):
         f.write(u"spam")
         d = s.getvalue()
         # check whether there is exactly one BOM in it
-        self.assert_(d == self.spamle or d == self.spambe)
+        self.assertTrue(d == self.spamle or d == self.spambe)
         # try to read it back
         s = StringIO.StringIO(d)
         f = reader(s)
@@ -305,9 +305,25 @@ class UTF32Test(ReadTest):
             ]
         )
 
+    def test_handlers(self):
+        self.assertEqual((u'\ufffd', 1),
+                         codecs.utf_32_decode('\x01', 'replace', True))
+        self.assertEqual((u'', 1),
+                         codecs.utf_32_decode('\x01', 'ignore', True))
+
     def test_errors(self):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_decode,
                           "\xff", "strict", True)
+
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded_le = '\xff\xfe\x00\x00' + '\x00\x00\x01\x00' * 1024
+        self.assertEqual(u'\U00010000' * 1024,
+                         codecs.utf_32_decode(encoded_le)[0])
+        encoded_be = '\x00\x00\xfe\xff' + '\x00\x01\x00\x00' * 1024
+        self.assertEqual(u'\U00010000' * 1024,
+                         codecs.utf_32_decode(encoded_be)[0])
 
 class UTF32LETest(ReadTest):
     encoding = "utf-32-le"
@@ -342,6 +358,13 @@ class UTF32LETest(ReadTest):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_le_decode,
                           "\xff", "strict", True)
 
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded = '\x00\x00\x01\x00' * 1024
+        self.assertEqual(u'\U00010000' * 1024,
+                         codecs.utf_32_le_decode(encoded)[0])
+
 class UTF32BETest(ReadTest):
     encoding = "utf-32-be"
 
@@ -375,6 +398,14 @@ class UTF32BETest(ReadTest):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_be_decode,
                           "\xff", "strict", True)
 
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded = '\x00\x01\x00\x00' * 1024
+        self.assertEqual(u'\U00010000' * 1024,
+                         codecs.utf_32_be_decode(encoded)[0])
+
+
 class UTF16Test(ReadTest):
     encoding = "utf-16"
 
@@ -390,7 +421,7 @@ class UTF16Test(ReadTest):
         f.write(u"spam")
         d = s.getvalue()
         # check whether there is exactly one BOM in it
-        self.assert_(d == self.spamle or d == self.spambe)
+        self.assertTrue(d == self.spamle or d == self.spambe)
         # try to read it back
         s = StringIO.StringIO(d)
         f = reader(s)
@@ -422,8 +453,29 @@ class UTF16Test(ReadTest):
             ]
         )
 
+    def test_handlers(self):
+        self.assertEqual((u'\ufffd', 1),
+                         codecs.utf_16_decode('\x01', 'replace', True))
+        self.assertEqual((u'', 1),
+                         codecs.utf_16_decode('\x01', 'ignore', True))
+
     def test_errors(self):
         self.assertRaises(UnicodeDecodeError, codecs.utf_16_decode, "\xff", "strict", True)
+
+    def test_bug691291(self):
+        # Files are always opened in binary mode, even if no binary mode was
+        # specified.  This means that no automatic conversion of '\n' is done
+        # on reading and writing.
+        s1 = u'Hello\r\nworld\r\n'
+
+        s = s1.encode(self.encoding)
+        try:
+            with open(test_support.TESTFN, 'wb') as fp:
+                fp.write(s)
+            with codecs.open(test_support.TESTFN, 'U', encoding=self.encoding) as reader:
+                self.assertEqual(reader.read(), s1)
+        finally:
+            test_support.unlink(test_support.TESTFN)
 
 class UTF16LETest(ReadTest):
     encoding = "utf-16-le"
@@ -802,6 +854,15 @@ class UnicodeInternalTest(unittest.TestCase):
                 "UnicodeInternalTest")
             self.assertEquals((u"ab", 12), ignored)
 
+    def test_encode_length(self):
+        # Issue 3739
+        encoder = codecs.getencoder("unicode_internal")
+        self.assertEquals(encoder(u"a")[1], 1)
+        self.assertEquals(encoder(u"\xe9\u0142")[1], 2)
+
+        encoder = codecs.getencoder("string-escape")
+        self.assertEquals(encoder(r'\x00')[1], 4)
+
 # From http://www.gnu.org/software/libidn/draft-josefsson-idn-test-vectors.html
 nameprep_tests = [
     # 3.1 Map to nothing.
@@ -1123,14 +1184,14 @@ class Str2StrTest(unittest.TestCase):
         reader = codecs.getreader("base64_codec")(StringIO.StringIO(sin))
         sout = reader.read()
         self.assertEqual(sout, "\x80")
-        self.assert_(isinstance(sout, str))
+        self.assertIsInstance(sout, str)
 
     def test_readline(self):
         sin = "\x80".encode("base64_codec")
         reader = codecs.getreader("base64_codec")(StringIO.StringIO(sin))
         sout = reader.readline()
         self.assertEqual(sout, "\x80")
-        self.assert_(isinstance(sout, str))
+        self.assertIsInstance(sout, str)
 
 all_unicode_encodings = [
     "ascii",
@@ -1154,6 +1215,7 @@ all_unicode_encodings = [
     "cp424",
     "cp437",
     "cp500",
+    "cp720",
     "cp737",
     "cp775",
     "cp850",
@@ -1161,6 +1223,7 @@ all_unicode_encodings = [
     "cp855",
     "cp856",
     "cp857",
+    "cp858",
     "cp860",
     "cp861",
     "cp862",
@@ -1292,8 +1355,7 @@ class BasicUnicodeTest(unittest.TestCase):
                 name = "latin_1"
             self.assertEqual(encoding.replace("_", "-"), name.replace("_", "-"))
             (bytes, size) = codecs.getencoder(encoding)(s)
-            if encoding != "unicode_internal":
-                self.assertEqual(size, len(s), "%r != %r (encoding=%r)" % (size, len(s), encoding))
+            self.assertEqual(size, len(s), "%r != %r (encoding=%r)" % (size, len(s), encoding))
             (chars, size) = codecs.getdecoder(encoding)(bytes)
             self.assertEqual(chars, s, "%r != %r (encoding=%r)" % (chars, s, encoding))
 
@@ -1461,6 +1523,62 @@ class WithStmtTest(unittest.TestCase):
             self.assertEquals(srw.read(), u"\xfc")
 
 
+class BomTest(unittest.TestCase):
+    def test_seek0(self):
+        data = u"1234567890"
+        tests = ("utf-16",
+                 "utf-16-le",
+                 "utf-16-be",
+                 "utf-32",
+                 "utf-32-le",
+                 "utf-32-be")
+        for encoding in tests:
+            # Check if the BOM is written only once
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data)
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+            # Check that the BOM is written after a seek(0)
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data[0])
+                self.assertNotEquals(f.tell(), 0)
+                f.seek(0)
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data)
+
+            # (StreamWriter) Check that the BOM is written after a seek(0)
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.writer.write(data[0])
+                self.assertNotEquals(f.writer.tell(), 0)
+                f.writer.seek(0)
+                f.writer.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data)
+
+            # Check that the BOM is not written after a seek() at a position
+            # different than the start
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data)
+                f.seek(f.tell())
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+            # (StreamWriter) Check that the BOM is not written after a seek()
+            # at a position different than the start
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.writer.write(data)
+                f.writer.seek(f.writer.tell())
+                f.writer.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+
 def test_main():
     test_support.run_unittest(
         UTF32Test,
@@ -1489,6 +1607,7 @@ def test_main():
         BasicStrTest,
         CharmapTest,
         WithStmtTest,
+        BomTest,
     )
 
 

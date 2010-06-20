@@ -82,7 +82,7 @@ insort_right(PyObject *self, PyObject *args, PyObject *kw)
     index = internal_bisect_right(list, item, lo, hi);
     if (index < 0)
         return NULL;
-    if (PyList_Check(list)) {
+    if (PyList_CheckExact(list)) {
         if (PyList_Insert(list, index, item) < 0)
             return NULL;
     } else {
@@ -183,7 +183,7 @@ insort_left(PyObject *self, PyObject *args, PyObject *kw)
     index = internal_bisect_left(list, item, lo, hi);
     if (index < 0)
         return NULL;
-    if (PyList_Check(list)) {
+    if (PyList_CheckExact(list)) {
         if (PyList_Insert(list, index, item) < 0)
             return NULL;
     } else {
@@ -237,7 +237,5 @@ common approach.\n");
 PyMODINIT_FUNC
 init_bisect(void)
 {
-    PyObject *m;
-
-    m = Py_InitModule3("_bisect", bisect_methods, module_doc);
+    Py_InitModule3("_bisect", bisect_methods, module_doc);
 }

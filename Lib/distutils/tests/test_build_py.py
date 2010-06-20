@@ -16,7 +16,7 @@ class BuildPyTestCase(support.TempdirManager,
                       support.LoggingSilencer,
                       unittest.TestCase):
 
-    def test_package_data(self):
+    def _setup_package_data(self):
         sources = self.mkdtemp()
         f = open(os.path.join(sources, "__init__.py"), "w")
         f.write("# Pretend this is a package.")
@@ -52,9 +52,18 @@ class BuildPyTestCase(support.TempdirManager,
         self.assertEqual(len(cmd.get_outputs()), 3)
         pkgdest = os.path.join(destination, "pkg")
         files = os.listdir(pkgdest)
-        self.assert_("__init__.py" in files)
-        self.assert_("__init__.pyc" in files)
-        self.assert_("README.txt" in files)
+        return files
+
+    def test_package_data(self):
+        files = self._setup_package_data()
+        self.assertTrue("__init__.py" in files)
+        self.assertTrue("README.txt" in files)
+
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "pyc files are not written with -O2 and above")
+    def test_package_data_pyc(self):
+        files = self._setup_package_data()
+        self.assertTrue("__init__.pyc" in files)
 
     def test_empty_package_dir (self):
         # See SF 1668596/1720897.
@@ -69,6 +78,7 @@ class BuildPyTestCase(support.TempdirManager,
         open(os.path.join(testdir, "testfile"), "w").close()
 
         os.chdir(sources)
+        old_stdout = sys.stdout
         sys.stdout = StringIO.StringIO()
 
         try:
@@ -87,7 +97,23 @@ class BuildPyTestCase(support.TempdirManager,
         finally:
             # Restore state.
             os.chdir(cwd)
-            sys.stdout = sys.__stdout__
+            sys.stdout = old_stdout
+
+    def test_dont_write_bytecode(self):
+        # makes sure byte_compile is not used
+        pkg_dir, dist = self.create_dist()
+        cmd = build_py(dist)
+        cmd.compile = 1
+        cmd.optimize = 1
+
+        old_dont_write_bytecode = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        try:
+            cmd.byte_compile([])
+        finally:
+            sys.dont_write_bytecode = old_dont_write_bytecode
+
+        self.assertTrue('byte-compiling is disabled' in self.logs[0][1])
 
 def test_suite():
     return unittest.makeSuite(BuildPyTestCase)

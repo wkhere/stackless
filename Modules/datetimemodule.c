@@ -32,6 +32,7 @@
 
 #define MINYEAR 1
 #define MAXYEAR 9999
+#define MAXORDINAL 3652059 /* date(9999,12,31).toordinal() */
 
 /* Nine decimal digits is easy to communicate, and leaves enough room
  * so that two delta days can be added w/o fear of overflowing a signed
@@ -482,7 +483,7 @@ normalize_d_s_us(int *d, int *s, int *us)
  * The input values must be such that the internals don't overflow.
  * The way this routine is used, we don't get close.
  */
-static void
+static int
 normalize_y_m_d(int *y, int *m, int *d)
 {
     int dim;            /* # of days in month */
@@ -536,11 +537,23 @@ normalize_y_m_d(int *y, int *m, int *d)
         else {
             int ordinal = ymd_to_ord(*y, *m, 1) +
                                       *d - 1;
-            ord_to_ymd(ordinal, y, m, d);
+            if (ordinal < 1 || ordinal > MAXORDINAL) {
+                goto error;
+            } else {
+                ord_to_ymd(ordinal, y, m, d);
+                return 0;
+            }
         }
     }
     assert(*m > 0);
     assert(*d > 0);
+    if (MINYEAR <= *y && *y <= MAXYEAR)
+        return 0;
+ error:
+    PyErr_SetString(PyExc_OverflowError,
+            "date value out of range");
+    return -1;
+
 }
 
 /* Fiddle out-of-bounds months and days so that the result makes some kind
@@ -550,17 +563,7 @@ normalize_y_m_d(int *y, int *m, int *d)
 static int
 normalize_date(int *year, int *month, int *day)
 {
-    int result;
-
-    normalize_y_m_d(year, month, day);
-    if (MINYEAR <= *year && *year <= MAXYEAR)
-        result = 0;
-    else {
-        PyErr_SetString(PyExc_OverflowError,
-                        "date value out of range");
-        result = -1;
-    }
-    return result;
+    return normalize_y_m_d(year, month, day);
 }
 
 /* Force all the datetime fields into range.  The parameters are both
@@ -1362,21 +1365,26 @@ isoformat_date(PyDateTime_Date *dt, char buffer[], int bufflen)
     x = PyOS_snprintf(buffer, bufflen,
                       "%04d-%02d-%02d",
                       GET_YEAR(dt), GET_MONTH(dt), GET_DAY(dt));
+    assert(bufflen >= x);
     return buffer + x;
 }
 
-static void
+static char *
 isoformat_time(PyDateTime_DateTime *dt, char buffer[], int bufflen)
 {
+    int x;
     int us = DATE_GET_MICROSECOND(dt);
 
-    PyOS_snprintf(buffer, bufflen,
-                  "%02d:%02d:%02d",     /* 8 characters */
-              DATE_GET_HOUR(dt),
-              DATE_GET_MINUTE(dt),
-              DATE_GET_SECOND(dt));
+    x = PyOS_snprintf(buffer, bufflen,
+                      "%02d:%02d:%02d",
+                      DATE_GET_HOUR(dt),
+                      DATE_GET_MINUTE(dt),
+                      DATE_GET_SECOND(dt));
+    assert(bufflen >= x);
     if (us)
-        PyOS_snprintf(buffer + 8, bufflen - 8, ".%06d", us);
+        x += PyOS_snprintf(buffer + x, bufflen - x, ".%06d", us);
+    assert(bufflen >= x);
+    return buffer + x;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1515,7 +1523,7 @@ delta_to_microseconds(PyDateTime_Delta *self)
         goto Done;
     Py_DECREF(x1);
     Py_DECREF(x2);
-    x1 = x2 = NULL;
+    x2 = NULL;
 
     /* x3 has days+seconds in seconds */
     x1 = PyNumber_Multiply(x3, us_per_second);          /* us */
@@ -2089,6 +2097,30 @@ delta_getstate(PyDateTime_Delta *self)
 }
 
 static PyObject *
+delta_total_seconds(PyObject *self)
+{
+    PyObject *total_seconds;
+    PyObject *total_microseconds;
+    PyObject *one_million;
+
+    total_microseconds = delta_to_microseconds((PyDateTime_Delta *)self);
+    if (total_microseconds == NULL)
+        return NULL;
+
+    one_million = PyLong_FromLong(1000000L);
+    if (one_million == NULL) {
+        Py_DECREF(total_microseconds);
+        return NULL;
+    }
+
+    total_seconds = PyNumber_TrueDivide(total_microseconds, one_million);
+
+    Py_DECREF(total_microseconds);
+    Py_DECREF(one_million);
+    return total_seconds;
+}
+
+static PyObject *
 delta_reduce(PyDateTime_Delta* self)
 {
     return Py_BuildValue("ON", Py_TYPE(self), delta_getstate(self));
@@ -2110,7 +2142,10 @@ static PyMemberDef delta_members[] = {
 };
 
 static PyMethodDef delta_methods[] = {
-    {"__reduce__", (PyCFunction)delta_reduce,     METH_NOARGS,
+    {"total_seconds", (PyCFunction)delta_total_seconds, METH_NOARGS,
+     PyDoc_STR("Total seconds in the duration.")},
+
+    {"__reduce__", (PyCFunction)delta_reduce, METH_NOARGS,
      PyDoc_STR("__reduce__() -> (cls, state)")},
 
     {NULL,      NULL},
@@ -2991,7 +3026,8 @@ static PyMethodDef tzinfo_methods[] = {
      PyDoc_STR("datetime -> DST offset in minutes east of UTC.")},
 
     {"fromutc",         (PyCFunction)tzinfo_fromutc,            METH_O,
-     PyDoc_STR("datetime in UTC -> datetime in local time.")},
+     PyDoc_STR("datetime -> timedelta showing offset from UTC, negative "
+           "values indicating West of UTC")},
 
     {"__reduce__",  (PyCFunction)tzinfo_reduce,             METH_NOARGS,
      PyDoc_STR("-> (cls, state)")},
@@ -3936,7 +3972,7 @@ datetime_strptime(PyObject *cls, PyObject *args)
             else
                 good_timetuple = 0;
             /* follow that up with a little dose of microseconds */
-            if (PyInt_Check(frac))
+            if (good_timetuple && PyInt_Check(frac))
                 ia[6] = PyInt_AsLong(frac);
             else
                 good_timetuple = 0;
@@ -4200,8 +4236,8 @@ datetime_isoformat(PyDateTime_DateTime *self, PyObject *args, PyObject *kw)
     cp = isoformat_date((PyDateTime_Date *)self, buffer, sizeof(buffer));
     assert(cp != NULL);
     *cp++ = sep;
-    isoformat_time(self, cp, sizeof(buffer) - (cp - buffer));
-    result = PyString_FromString(buffer);
+    cp = isoformat_time(self, cp, sizeof(buffer) - (cp - buffer));
+    result = PyString_FromStringAndSize(buffer, cp - buffer);
     if (result == NULL || ! HASTZINFO(self))
         return result;
 
@@ -4840,8 +4876,7 @@ initdatetime(void)
     Py_INCREF(&PyDateTime_TZInfoType);
     PyModule_AddObject(m, "tzinfo", (PyObject *) &PyDateTime_TZInfoType);
 
-    x = PyCObject_FromVoidPtrAndDesc(&CAPI, (void*) DATETIME_API_MAGIC,
-        NULL);
+    x = PyCapsule_New(&CAPI, PyDateTime_CAPSULE_NAME, NULL);
     if (x == NULL)
         return;
     PyModule_AddObject(m, "datetime_CAPI", x);

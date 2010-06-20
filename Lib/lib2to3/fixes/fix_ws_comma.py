@@ -17,8 +17,8 @@ class FixWsComma(fixer_base.BaseFix):
     any<(not(',') any)+ ',' ((not(',') any)+ ',')* [not(',') any]>
     """
 
-    COMMA = pytree.Leaf(token.COMMA, ",")
-    COLON = pytree.Leaf(token.COLON, ":")
+    COMMA = pytree.Leaf(token.COMMA, u",")
+    COLON = pytree.Leaf(token.COLON, u":")
     SEPS = (COMMA, COLON)
 
     def transform(self, node, results):
@@ -26,14 +26,14 @@ class FixWsComma(fixer_base.BaseFix):
         comma = False
         for child in new.children:
             if child in self.SEPS:
-                prefix = child.get_prefix()
-                if prefix.isspace() and "\n" not in prefix:
-                    child.set_prefix("")
+                prefix = child.prefix
+                if prefix.isspace() and u"\n" not in prefix:
+                    child.prefix = u""
                 comma = True
             else:
                 if comma:
-                    prefix = child.get_prefix()
+                    prefix = child.prefix
                     if not prefix:
-                        child.set_prefix(" ")
+                        child.prefix = u" "
                 comma = False
         return new

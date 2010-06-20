@@ -64,6 +64,10 @@ exec_tests = [
     "break",
     # Continue
     "continue",
+    # for statements with naked tuples (see http://bugs.python.org/issue6704)
+    "for a,b in c: pass",
+    "[(a,b) for a,b in c]",
+    "((a,b) for a,b in c)",
 ]
 
 # These are compiled through "single"
@@ -122,20 +126,20 @@ eval_tests = [
 
 class AST_Tests(unittest.TestCase):
 
-    def _assert_order(self, ast_node, parent_pos):
+    def _assertTrueorder(self, ast_node, parent_pos):
         if not isinstance(ast_node, ast.AST) or ast_node._fields is None:
             return
         if isinstance(ast_node, (ast.expr, ast.stmt, ast.excepthandler)):
             node_pos = (ast_node.lineno, ast_node.col_offset)
-            self.assert_(node_pos >= parent_pos)
+            self.assertTrue(node_pos >= parent_pos)
             parent_pos = (ast_node.lineno, ast_node.col_offset)
         for name in ast_node._fields:
             value = getattr(ast_node, name)
             if isinstance(value, list):
                 for child in value:
-                    self._assert_order(child, parent_pos)
+                    self._assertTrueorder(child, parent_pos)
             elif value is not None:
-                self._assert_order(value, parent_pos)
+                self._assertTrueorder(value, parent_pos)
 
     def test_snippets(self):
         for input, output, kind in ((exec_tests, exec_results, "exec"),
@@ -144,7 +148,26 @@ class AST_Tests(unittest.TestCase):
             for i, o in itertools.izip(input, output):
                 ast_tree = compile(i, "?", kind, ast.PyCF_ONLY_AST)
                 self.assertEquals(to_tuple(ast_tree), o)
-                self._assert_order(ast_tree, (0, 0))
+                self._assertTrueorder(ast_tree, (0, 0))
+
+    def test_slice(self):
+        slc = ast.parse("x[::]").body[0].value.slice
+        self.assertIsNone(slc.upper)
+        self.assertIsNone(slc.lower)
+        self.assertIsInstance(slc.step, ast.Name)
+        self.assertEqual(slc.step.id, "None")
+
+    def test_from_import(self):
+        im = ast.parse("from . import y").body[0]
+        self.assertIsNone(im.module)
+
+    def test_base_classes(self):
+        self.assertTrue(issubclass(ast.For, ast.stmt))
+        self.assertTrue(issubclass(ast.Name, ast.expr))
+        self.assertTrue(issubclass(ast.stmt, ast.AST))
+        self.assertTrue(issubclass(ast.expr, ast.AST))
+        self.assertTrue(issubclass(ast.comprehension, ast.AST))
+        self.assertTrue(issubclass(ast.Gt, ast.AST))
 
     def test_nodeclasses(self):
         x = ast.BinOp(1, 2, 3, lineno=0)
@@ -271,9 +294,17 @@ class ASTHelpers_Test(unittest.TestCase):
         self.assertEqual(ast.literal_eval('(True, False, None)'), (True, False, None))
         self.assertRaises(ValueError, ast.literal_eval, 'foo()')
 
+    def test_literal_eval_issue4907(self):
+        self.assertEqual(ast.literal_eval('2j'), 2j)
+        self.assertEqual(ast.literal_eval('10 + 2j'), 10 + 2j)
+        self.assertEqual(ast.literal_eval('1.5 - 2j'), 1.5 - 2j)
+        self.assertRaises(ValueError, ast.literal_eval, '2 + (3 + 4j)')
+
 
 def test_main():
-    test_support.run_unittest(AST_Tests, ASTHelpers_Test)
+    with test_support.check_py3k_warnings(("backquote not supported",
+                                             SyntaxWarning)):
+        test_support.run_unittest(AST_Tests, ASTHelpers_Test)
 
 def main():
     if __name__ != '__main__':
@@ -284,7 +315,7 @@ def main():
             print kind+"_results = ["
             for s in statements:
                 print repr(to_tuple(compile(s, "?", kind, 0x400)))+","
-                print "]"
+            print "]"
         print "main()"
         raise SystemExit
     test_main()
@@ -313,6 +344,9 @@ exec_results = [
 ('Module', [('Pass', (1, 0))]),
 ('Module', [('Break', (1, 0))]),
 ('Module', [('Continue', (1, 0))]),
+('Module', [('For', (1, 0), ('Tuple', (1, 4), [('Name', (1, 4), 'a', ('Store',)), ('Name', (1, 6), 'b', ('Store',))], ('Store',)), ('Name', (1, 11), 'c', ('Load',)), [('Pass', (1, 14))], [])]),
+('Module', [('Expr', (1, 0), ('ListComp', (1, 1), ('Tuple', (1, 2), [('Name', (1, 2), 'a', ('Load',)), ('Name', (1, 4), 'b', ('Load',))], ('Load',)), [('comprehension', ('Tuple', (1, 11), [('Name', (1, 11), 'a', ('Store',)), ('Name', (1, 13), 'b', ('Store',))], ('Store',)), ('Name', (1, 18), 'c', ('Load',)), [])]))]),
+('Module', [('Expr', (1, 0), ('GeneratorExp', (1, 1), ('Tuple', (1, 2), [('Name', (1, 2), 'a', ('Load',)), ('Name', (1, 4), 'b', ('Load',))], ('Load',)), [('comprehension', ('Tuple', (1, 11), [('Name', (1, 11), 'a', ('Store',)), ('Name', (1, 13), 'b', ('Store',))], ('Store',)), ('Name', (1, 18), 'c', ('Load',)), [])]))]),
 ]
 single_results = [
 ('Interactive', [('Expr', (1, 0), ('BinOp', (1, 0), ('Num', (1, 0), 1), ('Add',), ('Num', (1, 2), 2)))]),

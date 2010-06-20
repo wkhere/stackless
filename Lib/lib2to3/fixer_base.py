@@ -7,12 +7,6 @@
 import logging
 import itertools
 
-# Get a usable 'set' constructor
-try:
-    set
-except NameError:
-    from sets import Set as set
-
 # Local imports
 from .patcomp import PatternCompiler
 from . import pygram
@@ -39,6 +33,8 @@ class BaseFix(object):
     explicit = False # Is this ignored by refactor.py -f all?
     run_order = 5   # Fixers will be sorted by run order before execution
                     # Lower numbers will be run first.
+    _accept_type = None # [Advanced and not public] This tells RefactoringTool
+                        # which node type to accept when there's not a pattern.
 
     # Shortcut for access to Python grammar symbols
     syms = pygram.python_symbols
@@ -100,18 +96,14 @@ class BaseFix(object):
         """
         raise NotImplementedError()
 
-    def parenthesize(self, node):
-        """Wrapper around pygram.parenthesize()."""
-        return pygram.parenthesize(node)
-
-    def new_name(self, template="xxx_todo_changeme"):
+    def new_name(self, template=u"xxx_todo_changeme"):
         """Return a string suitable for use as an identifier
 
         The new name is guaranteed not to conflict with other identifiers.
         """
         name = template
         while name in self.used_names:
-            name = template + str(self.numbers.next())
+            name = template + unicode(self.numbers.next())
         self.used_names.add(name)
         return name
 
@@ -130,7 +122,7 @@ class BaseFix(object):
         """
         lineno = node.get_lineno()
         for_output = node.clone()
-        for_output.set_prefix("")
+        for_output.prefix = u""
         msg = "Line %d: could not convert: %s"
         self.log_message(msg % (lineno, for_output))
         if reason:

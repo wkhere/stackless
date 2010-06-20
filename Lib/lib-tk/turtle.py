@@ -1,8 +1,8 @@
 #
 # turtle.py: a Tkinter based turtle graphics module for Python
-# Version 1.0b1 - 31. 5. 2008
+# Version 1.0.1 - 24. 9. 2009
 #
-# Copyright (C) 2006 - 2008  Gregor Lingl
+# Copyright (C) 2006 - 2010  Gregor Lingl
 # email: glingl@aon.at
 #
 # This software is provided 'as-is', without any express or implied
@@ -38,7 +38,7 @@ pictures can easily be drawn.
 ----- turtle.py
 
 This module is an extended reimplementation of turtle.py from the
-Python standard distribution up to Python 2.5. (See: http:\\www.python.org)
+Python standard distribution up to Python 2.5. (See: http://www.python.org)
 
 It tries to keep the merits of turtle.py and to be (nearly) 100%
 compatible with it. This means in the first place to enable the
@@ -54,8 +54,8 @@ Roughly it has the following features added:
 
 - Different turtle shapes, gif-images as turtle shapes, user defined
   and user controllable turtle shapes, among them compound
-  (multicolored) shapes. Turtle shapes can be stgretched and tilted, which
-  makes turtles zu very versatile geometrical objects.
+  (multicolored) shapes. Turtle shapes can be stretched and tilted, which
+  makes turtles very versatile geometrical objects.
 
 - Fine control over turtle movement and screen updates via delay(),
   and enhanced tracer() and speed() methods.
@@ -64,7 +64,7 @@ Roughly it has the following features added:
   following the early Logo traditions. This reduces the boring work of
   typing long sequences of commands, which often occur in a natural way
   when kids try to program fancy pictures on their first encounter with
-  turtle graphcis.
+  turtle graphics.
 
 - Turtles now have an undo()-method with configurable undo-buffer.
 
@@ -91,12 +91,12 @@ Roughly it has the following features added:
 
 - If configured appropriately the module reads in docstrings from a docstring
   dictionary in some different language, supplied separately  and replaces
-  the english ones by those read in. There is a utility function
-  write_docstringdict() to write a dictionary with the original (english)
+  the English ones by those read in. There is a utility function
+  write_docstringdict() to write a dictionary with the original (English)
   docstrings to disc, so it can serve as a template for translations.
 
 Behind the scenes there are some features included with possible
-extensionsin in mind. These will be commented and documented elsewhere.
+extensions in in mind. These will be commented and documented elsewhere.
 
 """
 
@@ -299,7 +299,7 @@ class Vec2D(tuple):
 
 ##############################################################################
 ### From here up to line    : Tkinter - Interface for turtle.py            ###
-### May be replaced by an interface to some different graphcis-toolkit     ###
+### May be replaced by an interface to some different graphics toolkit     ###
 ##############################################################################
 
 ## helper functions for Scrolled Canvas, to forward Canvas-methods
@@ -335,10 +335,10 @@ def __forwardmethods(fromClass, toClass, toPart, exclude = ()):
         if ex[:1] == '_' or ex[-1:] == '_':
             del _dict[ex]
     for ex in exclude:
-        if _dict.has_key(ex):
+        if ex in _dict:
             del _dict[ex]
     for ex in __methods(fromClass):
-        if _dict.has_key(ex):
+        if ex in _dict:
             del _dict[ex]
 
     for method, func in _dict.items():
@@ -359,7 +359,7 @@ class ScrolledCanvas(TK.Frame):
     def __init__(self, master, width=500, height=350,
                                           canvwidth=600, canvheight=500):
         TK.Frame.__init__(self, master, width=width, height=height)
-        self._root = self.winfo_toplevel()
+        self._rootwindow = self.winfo_toplevel()
         self.width, self.height = width, height
         self.canvwidth, self.canvheight = canvwidth, canvheight
         self.bg = "white"
@@ -379,10 +379,10 @@ class ScrolledCanvas(TK.Frame):
         self.hscroll.grid(padx=1, in_ = self, pady=1, row=1,
                 column=0, rowspan=1, columnspan=1, sticky='news')
         self.reset()
-        self._root.bind('<Configure>', self.onResize)
+        self._rootwindow.bind('<Configure>', self.onResize)
 
     def reset(self, canvwidth=None, canvheight=None, bg = None):
-        """Ajust canvas and scrollbars according to given canvas size."""
+        """Adjust canvas and scrollbars according to given canvas size."""
         if canvwidth:
             self.canvwidth = canvwidth
         if canvheight:
@@ -777,13 +777,13 @@ class TurtleScreenBase(object):
             self.cv.coords(item, *newcoordlist)
 
     def _resize(self, canvwidth=None, canvheight=None, bg=None):
-        """Resize the canvas, the turtles are drawing on. Does
+        """Resize the canvas the turtles are drawing on. Does
         not alter the drawing window.
         """
         # needs amendment
         if not isinstance(self.cv, ScrolledCanvas):
             return self.canvwidth, self.canvheight
-        if canvwidth is None and canvheight is None and bg is None:
+        if canvwidth is canvheight is bg is None:
             return self.cv.canvwidth, self.cv.canvheight
         if canvwidth is not None:
             self.canvwidth = canvwidth
@@ -952,7 +952,7 @@ class TurtleScreen(TurtleScreenBase):
     def clear(self):
         """Delete all drawings and all turtles from the TurtleScreen.
 
-        Reset empty TurtleScreen to it's initial state: white background,
+        Reset empty TurtleScreen to its initial state: white background,
         no backgroundimage, no eventbindings and tracing on.
 
         No argument.
@@ -999,7 +999,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> mode()
         'logo'
         """
-        if mode == None:
+        if mode is None:
             return self._mode
         mode = mode.lower()
         if mode not in ["standard", "logo", "world"]:
@@ -1244,9 +1244,12 @@ class TurtleScreen(TurtleScreenBase):
     def update(self):
         """Perform a TurtleScreen update.
         """
+        tracing = self._tracing
+        self._tracing = True
         for t in self.turtles():
             t._update_data()
             t._drawturtle()
+        self._tracing = tracing
         self._update()
 
     def window_width(self):
@@ -1318,7 +1321,7 @@ class TurtleScreen(TurtleScreenBase):
         fun -- a function with no arguments
         key -- a string: key (e.g. "a") or key-symbol (e.g. "space")
 
-        In order ro be able to register key-events, TurtleScreen
+        In order to be able to register key-events, TurtleScreen
         must have focus. (See method listen.)
 
         Example (for a TurtleScreen instance named screen
@@ -1336,8 +1339,9 @@ class TurtleScreen(TurtleScreenBase):
         ### repeatedly pressing the up-arrow key,
         ### consequently drawing a hexagon
         """
-        if fun == None:
-            self._keys.remove(key)
+        if fun is None:
+            if key in self._keys:
+                self._keys.remove(key)
         elif key not in self._keys:
             self._keys.append(key)
         self._onkey(fun, key)
@@ -1400,7 +1404,7 @@ class TurtleScreen(TurtleScreenBase):
         self._bgpicname = picname
 
     def screensize(self, canvwidth=None, canvheight=None, bg=None):
-        """Resize the canvas, the turtles are drawing on.
+        """Resize the canvas the turtles are drawing on.
 
         Optional arguments:
         canvwidth -- positive integer, new width of canvas in pixels
@@ -1456,7 +1460,7 @@ class TNavigator(object):
     def _setmode(self, mode=None):
         """Set turtle-mode to 'standard', 'world' or 'logo'.
         """
-        if mode == None:
+        if mode is None:
             return self._mode
         if mode not in ["standard", "logo", "world"]:
             return
@@ -1693,8 +1697,8 @@ class TNavigator(object):
 
         No arguments.
 
-        Move turtle to the origin - coordinates (0,0) and set it's
-        heading to it's start-orientation (which depends on mode).
+        Move turtle to the origin - coordinates (0,0) and set its
+        heading to its start-orientation (which depends on mode).
 
         Example (for a Turtle instance named turtle):
         >>> turtle.home()
@@ -2266,7 +2270,7 @@ class TPen(object):
            "outline"    :   positive number
            "tilt"       :   number
 
-        This dicionary can be used as argument for a subsequent
+        This dictionary can be used as argument for a subsequent
         pen()-call to restore the former pen-state. Moreover one
         or more of these attributes can be provided as keyword-arguments.
         This can be used to set several pen attributes in one statement.
@@ -2414,7 +2418,7 @@ class _TurtleImage(object):
 class RawTurtle(TPen, TNavigator):
     """Animation part of the RawTurtle.
     Puts RawTurtle upon a TurtleScreen and provides tools for
-    it's animation.
+    its animation.
     """
     screens = []
 
@@ -2459,7 +2463,7 @@ class RawTurtle(TPen, TNavigator):
         self._update()
 
     def reset(self):
-        """Delete the turtle's drawings and restore it's default values.
+        """Delete the turtle's drawings and restore its default values.
 
         No argument.
 ,
@@ -2700,7 +2704,7 @@ class RawTurtle(TPen, TNavigator):
         >>> turtle.shapesize(5, 5, 12)
         >>> turtle.shapesize(outline=8)
         """
-        if stretch_wid is None and stretch_len is None and outline == None:
+        if stretch_wid is stretch_len is outline is None:
             stretch_wid, stretch_len = self._stretchfactor
             return stretch_wid, stretch_len, self._outlinewidth
         if stretch_wid is not None:
@@ -2749,7 +2753,7 @@ class RawTurtle(TPen, TNavigator):
 
         Return the current tilt-angle, i. e. the angle between the
         orientation of the turtleshape and the heading of the turtle
-        (it's direction of movement).
+        (its direction of movement).
 
         Examples (for a Turtle instance named turtle):
         >>> turtle.shape("circle")
@@ -2794,7 +2798,7 @@ class RawTurtle(TPen, TNavigator):
 
     def _drawturtle(self):
         """Manages the correct rendering of the turtle with respect to
-        it's shape, resizemode, strech and tilt etc."""
+        its shape, resizemode, stretch and tilt etc."""
         screen = self.screen
         shape = screen._shapes[self.turtle.shapeIndex]
         ttype = shape._type
@@ -2848,7 +2852,7 @@ class RawTurtle(TPen, TNavigator):
 ##############################  stamp stuff  ###############################
 
     def stamp(self):
-        """Stamp a copy of the turtleshape onto the canvas and return it's id.
+        """Stamp a copy of the turtleshape onto the canvas and return its id.
 
         No argument.
 
@@ -3574,8 +3578,8 @@ class _Screen(TurtleScreen):
             topbottom = _CFG["topbottom"]
             self._root.setupcanvas(width, height, canvwidth, canvheight)
             _Screen._canvas = self._root._getcanvas()
+            TurtleScreen.__init__(self, _Screen._canvas)
             self.setup(width, height, leftright, topbottom)
-        TurtleScreen.__init__(self, _Screen._canvas)
 
     def setup(self, width=_CFG["width"], height=_CFG["height"],
               startx=_CFG["leftright"], starty=_CFG["topbottom"]):
@@ -3615,6 +3619,7 @@ class _Screen(TurtleScreen):
         if starty is None:
             starty = (sh - height) / 2
         self._root.set_geometry(width, height, startx, starty)
+        self.update()
 
     def title(self, titlestring):
         """Set title of turtle-window

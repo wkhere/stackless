@@ -5,9 +5,19 @@ GUI application (as opposed to an X11 application).
 import sys
 import Tkinter
 
+
+_appbundle = None
+
 def runningAsOSXApp():
-    """ Returns True iff running from the IDLE.app bundle on OSX """
-    return (sys.platform == 'darwin' and 'IDLE.app' in sys.argv[0])
+    """
+    Returns True if Python is running from within an app on OSX.
+    If so, assume that Python was built with Aqua Tcl/Tk rather than
+    X11 Tcl/Tk.
+    """
+    global _appbundle
+    if _appbundle is None:
+        _appbundle = (sys.platform == 'darwin' and '.app' in sys.executable)
+    return _appbundle
 
 def addOpenEventSupport(root, flist):
     """
@@ -47,10 +57,10 @@ def overrideRootMenu(root, flist):
     # Due to a (mis-)feature of TkAqua the user will also see an empty Help
     # menu.
     from Tkinter import Menu, Text, Text
-    from EditorWindow import prepstr, get_accelerator
-    import Bindings
-    import WindowList
-    from MultiCall import MultiCallCreator
+    from idlelib.EditorWindow import prepstr, get_accelerator
+    from idlelib import Bindings
+    from idlelib import WindowList
+    from idlelib.MultiCall import MultiCallCreator
 
     menubar = Menu(root)
     root.configure(menu=menubar)
@@ -73,11 +83,12 @@ def overrideRootMenu(root, flist):
     menubar.add_cascade(label='IDLE', menu=menu)
 
     def about_dialog(event=None):
-        import aboutDialog
+        from idlelib import aboutDialog
         aboutDialog.AboutDialog(root, 'About IDLE')
 
     def config_dialog(event=None):
-        import configDialog
+        from idlelib import configDialog
+        root.instance_dict = flist.inversedict
         configDialog.ConfigDialog(root, 'Settings')
 
 
@@ -89,7 +100,9 @@ def overrideRootMenu(root, flist):
 
     ###check if Tk version >= 8.4.14; if so, use hard-coded showprefs binding
     tkversion = root.tk.eval('info patchlevel')
-    if tkversion >= '8.4.14':
+    # Note: we cannot check if the string tkversion >= '8.4.14', because
+    # the string '8.4.7' is greater than the string '8.4.14'.
+    if tuple(map(int, tkversion.split('.'))) >= (8, 4, 14):
         Bindings.menudefs[0] =  ('application', [
                 ('About IDLE', '<<about-idle>>'),
                 None,

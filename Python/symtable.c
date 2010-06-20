@@ -32,7 +32,6 @@ ste_new(struct symtable *st, identifier name, _Py_block_ty block,
         goto fail;
     ste->ste_table = st;
     ste->ste_id = k;
-    ste->ste_tmpname = 0;
 
     ste->ste_name = name;
     Py_INCREF(name);
@@ -60,7 +59,6 @@ ste_new(struct symtable *st, identifier name, _Py_block_ty block,
     ste->ste_varargs = 0;
     ste->ste_varkeywords = 0;
     ste->ste_opt_lineno = 0;
-    ste->ste_tmpname = 0;
     ste->ste_lineno = lineno;
 
     if (st->st_cur != NULL &&
@@ -168,6 +166,8 @@ static int symtable_exit_block(struct symtable *st, void *ast);
 static int symtable_visit_stmt(struct symtable *st, stmt_ty s);
 static int symtable_visit_expr(struct symtable *st, expr_ty s);
 static int symtable_visit_genexp(struct symtable *st, expr_ty s);
+static int symtable_visit_setcomp(struct symtable *st, expr_ty e);
+static int symtable_visit_dictcomp(struct symtable *st, expr_ty e);
 static int symtable_visit_arguments(struct symtable *st, arguments_ty);
 static int symtable_visit_excepthandler(struct symtable *st, excepthandler_ty);
 static int symtable_visit_alias(struct symtable *st, alias_ty);
@@ -179,7 +179,8 @@ static int symtable_visit_params_nested(struct symtable *st, asdl_seq *args);
 static int symtable_implicit_arg(struct symtable *st, int pos);
 
 
-static identifier top = NULL, lambda = NULL, genexpr = NULL;
+static identifier top = NULL, lambda = NULL, genexpr = NULL, setcomp = NULL,
+    dictcomp = NULL;
 
 #define GET_IDENTIFIER(VAR) \
     ((VAR) ? (VAR) : ((VAR) = PyString_InternFromString(# VAR)))
@@ -204,7 +205,6 @@ symtable_new(void)
     if ((st->st_symbols = PyDict_New()) == NULL)
         goto fail;
     st->st_cur = NULL;
-    st->st_tmpname = 0;
     st->st_private = NULL;
     return st;
  fail:
@@ -361,8 +361,9 @@ PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 
 /* Decide on scope of name, given flags.
 
-   The dicts passed in as arguments are modified as necessary.
-   ste is passed so that flags can be updated.
+   The namespace dictionaries may be modified to record information
+   about the new name.  For example, a new global will add an entry to
+   global.  A name that was global can be changed to local.
 */
 
 static int
@@ -415,7 +416,7 @@ analyze_name(PySTEntryObject *ste, PyObject *dict, PyObject *name, long flags,
        explicit?  It could also be global implicit.
      */
     else if (global && PyDict_GetItem(global, name)) {
-        SET_SCOPE(dict, name, GLOBAL_EXPLICIT);
+        SET_SCOPE(dict, name, GLOBAL_IMPLICIT);
         return 1;
     }
     else {
@@ -424,7 +425,10 @@ analyze_name(PySTEntryObject *ste, PyObject *dict, PyObject *name, long flags,
         SET_SCOPE(dict, name, GLOBAL_IMPLICIT);
         return 1;
     }
-    return 0; /* Can't get here */
+    /* Should never get here. */
+    PyErr_Format(PyExc_SystemError, "failed to set scope for %s",
+                 PyString_AS_STRING(name));
+    return 0;
 }
 
 #undef SET_SCOPE
@@ -491,7 +495,7 @@ check_unoptimized(const PySTEntryObject* ste) {
     case OPT_IMPORT_STAR:
         PyOS_snprintf(buf, sizeof(buf),
                       "import * is not allowed in function '%.100s' "
-                      "because it is %s",
+                      "because it %s",
                       PyString_AS_STRING(ste->ste_name), trailer);
         break;
     case OPT_BARE_EXEC:
@@ -588,43 +592,68 @@ update_symbols(PyObject *symbols, PyObject *scope,
 }
 
 /* Make final symbol table decisions for block of ste.
+
    Arguments:
    ste -- current symtable entry (input/output)
-   bound -- set of variables bound in enclosing scopes (input)
+   bound -- set of variables bound in enclosing scopes (input).  bound
+       is NULL for module blocks.
    free -- set of free variables in enclosed scopes (output)
    globals -- set of declared global variables in enclosing scopes (input)
+
+   The implementation uses two mutually recursive functions,
+   analyze_block() and analyze_child_block().  analyze_block() is
+   responsible for analyzing the individual names defined in a block.
+   analyze_child_block() prepares temporary namespace dictionaries
+   used to evaluated nested blocks.
+
+   The two functions exist because a child block should see the name
+   bindings of its enclosing blocks, but those bindings should not
+   propagate back to a parent block.
 */
+
+static int
+analyze_child_block(PySTEntryObject *entry, PyObject *bound, PyObject *free,
+                    PyObject *global, PyObject* child_free);
 
 static int
 analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
               PyObject *global)
 {
-    PyObject *name, *v, *local = NULL, *scope = NULL, *newbound = NULL;
-    PyObject *newglobal = NULL, *newfree = NULL;
+    PyObject *name, *v, *local = NULL, *scope = NULL;
+    PyObject *newbound = NULL, *newglobal = NULL;
+    PyObject *newfree = NULL, *allfree = NULL;
     int i, success = 0;
     Py_ssize_t pos = 0;
 
-    local = PyDict_New();
+    local = PyDict_New();  /* collect new names bound in block */
     if (!local)
         goto error;
-    scope = PyDict_New();
+    scope = PyDict_New(); /* collect scopes defined for each name */
     if (!scope)
         goto error;
+
+    /* Allocate new global and bound variable dictionaries.  These
+       dictionaries hold the names visible in nested blocks.  For
+       ClassBlocks, the bound and global names are initialized
+       before analyzing names, because class bindings aren't
+       visible in methods.  For other blocks, they are initialized
+       after names are analyzed.
+     */
+
+    /* TODO(jhylton): Package these dicts in a struct so that we
+       can write reasonable helper functions?
+    */
     newglobal = PyDict_New();
     if (!newglobal)
-        goto error;
-    newfree = PyDict_New();
-    if (!newfree)
         goto error;
     newbound = PyDict_New();
     if (!newbound)
         goto error;
+    newfree = PyDict_New();
+    if (!newfree)
+        goto error;
 
     if (ste->ste_type == ClassBlock) {
-        /* make a copy of globals before calling analyze_name(),
-           because global statements in the class have no effect
-           on nested functions.
-        */
         if (PyDict_Update(newglobal, global) < 0)
             goto error;
         if (bound)
@@ -632,12 +661,10 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
                 goto error;
     }
 
-    assert(PySTEntry_Check(ste));
-    assert(PyDict_Check(ste->ste_symbols));
     while (PyDict_Next(ste->ste_symbols, &pos, &name, &v)) {
         long flags = PyInt_AS_LONG(v);
-        if (!analyze_name(ste, scope, name, flags, bound, local, free,
-                          global))
+        if (!analyze_name(ste, scope, name, flags,
+                          bound, local, free, global))
             goto error;
     }
 
@@ -654,18 +681,29 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
             goto error;
     }
 
-    /* Recursively call analyze_block() on each child block */
+    /* Recursively call analyze_block() on each child block.
+
+       newbound, newglobal now contain the names visible in
+       nested blocks.  The free variables in the children will
+       be collected in allfree.
+    */
+    allfree = PyDict_New();
+    if (!allfree)
+        goto error;
     for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
         PyObject *c = PyList_GET_ITEM(ste->ste_children, i);
         PySTEntryObject* entry;
         assert(c && PySTEntry_Check(c));
         entry = (PySTEntryObject*)c;
-        if (!analyze_block(entry, newbound, newfree, newglobal))
+        if (!analyze_child_block(entry, newbound, newfree, newglobal,
+                                 allfree))
             goto error;
         if (entry->ste_free || entry->ste_child_free)
             ste->ste_child_free = 1;
     }
 
+    if (PyDict_Update(newfree, allfree) < 0)
+        goto error;
     if (ste->ste_type == FunctionBlock && !analyze_cells(scope, newfree))
         goto error;
     if (!update_symbols(ste->ste_symbols, scope, bound, newfree,
@@ -683,9 +721,54 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
     Py_XDECREF(newbound);
     Py_XDECREF(newglobal);
     Py_XDECREF(newfree);
+    Py_XDECREF(allfree);
     if (!success)
         assert(PyErr_Occurred());
     return success;
+}
+
+static int
+analyze_child_block(PySTEntryObject *entry, PyObject *bound, PyObject *free,
+                    PyObject *global, PyObject* child_free)
+{
+    PyObject *temp_bound = NULL, *temp_global = NULL, *temp_free = NULL;
+
+    /* Copy the bound and global dictionaries.
+
+       These dictionary are used by all blocks enclosed by the
+       current block.  The analyze_block() call modifies these
+       dictionaries.
+
+    */
+    temp_bound = PyDict_New();
+    if (!temp_bound)
+        goto error;
+    if (PyDict_Update(temp_bound, bound) < 0)
+        goto error;
+    temp_free = PyDict_New();
+    if (!temp_free)
+        goto error;
+    if (PyDict_Update(temp_free, free) < 0)
+        goto error;
+    temp_global = PyDict_New();
+    if (!temp_global)
+        goto error;
+    if (PyDict_Update(temp_global, global) < 0)
+        goto error;
+
+    if (!analyze_block(entry, temp_bound, temp_free, temp_global))
+        goto error;
+    if (PyDict_Update(child_free, temp_free) < 0)
+        goto error;
+    Py_DECREF(temp_bound);
+    Py_DECREF(temp_free);
+    Py_DECREF(temp_global);
+    return 1;
+ error:
+    Py_XDECREF(temp_bound);
+    Py_XDECREF(temp_free);
+    Py_XDECREF(temp_global);
+    return 0;
 }
 
 static int
@@ -912,23 +995,6 @@ error:
 }
 
 static int
-symtable_new_tmpname(struct symtable *st)
-{
-    char tmpname[256];
-    identifier tmp;
-
-    PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]",
-                  ++st->st_cur->ste_tmpname);
-    tmp = PyString_InternFromString(tmpname);
-    if (!tmp)
-        return 0;
-    if (!symtable_add_def(st, tmp, DEF_LOCAL))
-        return 0;
-    Py_DECREF(tmp);
-    return 1;
-}
-
-static int
 symtable_visit_stmt(struct symtable *st, stmt_ty s)
 {
     switch (s->kind) {
@@ -1101,12 +1167,8 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         /* nothing to do here */
         break;
     case With_kind:
-        if (!symtable_new_tmpname(st))
-            return 0;
         VISIT(st, expr, s->v.With.context_expr);
         if (s->v.With.optional_vars) {
-            if (!symtable_new_tmpname(st))
-                return 0;
             VISIT(st, expr, s->v.With.optional_vars);
         }
         VISIT_SEQ(st, stmt, s->v.With.body);
@@ -1130,14 +1192,12 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
         VISIT(st, expr, e->v.UnaryOp.operand);
         break;
     case Lambda_kind: {
-        if (!GET_IDENTIFIER(lambda) ||
-            !symtable_add_def(st, lambda, DEF_LOCAL))
+        if (!GET_IDENTIFIER(lambda))
             return 0;
         if (e->v.Lambda.args->defaults)
             VISIT_SEQ(st, expr, e->v.Lambda.args->defaults);
-        /* XXX how to get line numbers for expressions */
         if (!symtable_enter_block(st, lambda,
-                                  FunctionBlock, (void *)e, 0))
+                                  FunctionBlock, (void *)e, e->lineno))
             return 0;
         VISIT_IN_BLOCK(st, arguments, e->v.Lambda.args, (void*)e);
         VISIT_IN_BLOCK(st, expr, e->v.Lambda.body, (void*)e);
@@ -1154,14 +1214,23 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
         VISIT_SEQ(st, expr, e->v.Dict.keys);
         VISIT_SEQ(st, expr, e->v.Dict.values);
         break;
+    case Set_kind:
+        VISIT_SEQ(st, expr, e->v.Set.elts);
+        break;
     case ListComp_kind:
-        if (!symtable_new_tmpname(st))
-            return 0;
         VISIT(st, expr, e->v.ListComp.elt);
         VISIT_SEQ(st, comprehension, e->v.ListComp.generators);
         break;
     case GeneratorExp_kind:
         if (!symtable_visit_genexp(st, e))
+            return 0;
+        break;
+    case SetComp_kind:
+        if (!symtable_visit_setcomp(st, e))
+            return 0;
+        break;
+    case DictComp_kind:
+        if (!symtable_visit_dictcomp(st, e))
             return 0;
         break;
     case Yield_kind:
@@ -1326,7 +1395,7 @@ static int
 symtable_visit_alias(struct symtable *st, alias_ty a)
 {
     /* Compute store_name, the name actually bound by the import
-       operation.  It is diferent than a->name when a->name is a
+       operation.  It is different than a->name when a->name is a
        dotted package name (e.g. spam.eggs)
     */
     PyObject *store_name;
@@ -1405,27 +1474,80 @@ symtable_visit_slice(struct symtable *st, slice_ty s)
 }
 
 static int
-symtable_visit_genexp(struct symtable *st, expr_ty e)
+symtable_new_tmpname(struct symtable *st)
 {
+    char tmpname[256];
+    identifier tmp;
+
+    PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]",
+                  ++st->st_cur->ste_tmpname);
+    tmp = PyString_InternFromString(tmpname);
+    if (!tmp)
+        return 0;
+    if (!symtable_add_def(st, tmp, DEF_LOCAL))
+        return 0;
+    Py_DECREF(tmp);
+    return 1;
+}
+
+static int
+symtable_handle_comprehension(struct symtable *st, expr_ty e,
+                              identifier scope_name, asdl_seq *generators,
+                              expr_ty elt, expr_ty value)
+{
+    int is_generator = (e->kind == GeneratorExp_kind);
+    int needs_tmp = !is_generator;
     comprehension_ty outermost = ((comprehension_ty)
-                     (asdl_seq_GET(e->v.GeneratorExp.generators, 0)));
+                                    asdl_seq_GET(generators, 0));
     /* Outermost iterator is evaluated in current scope */
     VISIT(st, expr, outermost->iter);
-    /* Create generator scope for the rest */
-    if (!GET_IDENTIFIER(genexpr) ||
-        !symtable_enter_block(st, genexpr, FunctionBlock, (void *)e, 0)) {
+    /* Create comprehension scope for the rest */
+    if (!scope_name ||
+        !symtable_enter_block(st, scope_name, FunctionBlock, (void *)e, 0)) {
         return 0;
     }
-    st->st_cur->ste_generator = 1;
+    st->st_cur->ste_generator = is_generator;
     /* Outermost iter is received as an argument */
     if (!symtable_implicit_arg(st, 0)) {
+        symtable_exit_block(st, (void *)e);
+        return 0;
+    }
+    /* Allocate temporary name if needed */
+    if (needs_tmp && !symtable_new_tmpname(st)) {
         symtable_exit_block(st, (void *)e);
         return 0;
     }
     VISIT_IN_BLOCK(st, expr, outermost->target, (void*)e);
     VISIT_SEQ_IN_BLOCK(st, expr, outermost->ifs, (void*)e);
     VISIT_SEQ_TAIL_IN_BLOCK(st, comprehension,
-                            e->v.GeneratorExp.generators, 1, (void*)e);
-    VISIT_IN_BLOCK(st, expr, e->v.GeneratorExp.elt, (void*)e);
+                            generators, 1, (void*)e);
+    if (value)
+        VISIT_IN_BLOCK(st, expr, value, (void*)e);
+    VISIT_IN_BLOCK(st, expr, elt, (void*)e);
     return symtable_exit_block(st, (void *)e);
+}
+
+static int
+symtable_visit_genexp(struct symtable *st, expr_ty e)
+{
+    return symtable_handle_comprehension(st, e, GET_IDENTIFIER(genexpr),
+                                         e->v.GeneratorExp.generators,
+                                         e->v.GeneratorExp.elt, NULL);
+}
+
+static int
+symtable_visit_setcomp(struct symtable *st, expr_ty e)
+{
+    return symtable_handle_comprehension(st, e, GET_IDENTIFIER(setcomp),
+                                         e->v.SetComp.generators,
+                                         e->v.SetComp.elt, NULL);
+}
+
+static int
+symtable_visit_dictcomp(struct symtable *st, expr_ty e)
+{
+    return symtable_handle_comprehension(st, e, GET_IDENTIFIER(dictcomp),
+                                         e->v.DictComp.generators,
+                                         e->v.DictComp.key,
+                                         e->v.DictComp.value);
 }

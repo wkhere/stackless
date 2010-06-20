@@ -131,8 +131,12 @@ connection_sendbytes(ConnectionObject *self, PyObject *args)
 
     res = conn_send_string(self, buffer + offset, size);
 
-    if (res < 0)
-        return mp_SetError(PyExc_IOError, res);
+    if (res < 0) {
+        if (PyErr_Occurred())
+            return NULL;
+        else
+            return mp_SetError(PyExc_IOError, res);
+    }
 
     Py_RETURN_NONE;
 }
@@ -354,7 +358,7 @@ connection_poll(ConnectionObject *self, PyObject *args)
     }
 
     Py_BEGIN_ALLOW_THREADS
-    res = conn_poll(self, timeout);
+    res = conn_poll(self, timeout, _save);
     Py_END_ALLOW_THREADS
 
     switch (res) {

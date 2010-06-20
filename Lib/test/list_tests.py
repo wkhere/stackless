@@ -36,7 +36,7 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertEqual(str(a0), str(l0))
         self.assertEqual(repr(a0), repr(l0))
-        self.assertEqual(`a2`, `l2`)
+        self.assertEqual(repr(a2), repr(l2))
         self.assertEqual(str(a2), "[0, 1, 2]")
         self.assertEqual(repr(a2), "[0, 1, 2]")
 
@@ -57,13 +57,11 @@ class CommonTest(seq_tests.CommonTest):
         d.append(d)
         d.append(400)
         try:
-            fo = open(test_support.TESTFN, "wb")
-            print >> fo, d,
-            fo.close()
-            fo = open(test_support.TESTFN, "rb")
-            self.assertEqual(fo.read(), repr(d))
+            with open(test_support.TESTFN, "wb") as fo:
+                print >> fo, d,
+            with open(test_support.TESTFN, "rb") as fo:
+                self.assertEqual(fo.read(), repr(d))
         finally:
-            fo.close()
             os.remove(test_support.TESTFN)
 
     def test_set_subscript(self):
@@ -84,6 +82,8 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(StopIteration, r.next)
         self.assertEqual(list(reversed(self.type2test())),
                          self.type2test())
+        # Bug 3689: make sure list-reversed-iterator doesn't have __len__
+        self.assertRaises(TypeError, len, reversed([1,2,3]))
 
     def test_setitem(self):
         a = self.type2test([0, 1])
@@ -419,6 +419,11 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(TypeError, u.reverse, 42)
 
     def test_sort(self):
+        with test_support.check_py3k_warnings(
+                ("the cmp argument is not supported", DeprecationWarning)):
+            self._test_sort()
+
+    def _test_sort(self):
         u = self.type2test([1, 0])
         u.sort()
         self.assertEqual(u, [0, 1])
@@ -517,6 +522,9 @@ class CommonTest(seq_tests.CommonTest):
         a = self.type2test(range(10))
         a[::2] = tuple(range(5))
         self.assertEqual(a, self.type2test([0, 1, 1, 3, 2, 5, 3, 7, 4, 9]))
+        # test issue7788
+        a = self.type2test(range(10))
+        del a[9::1<<333]
 
     def test_constructor_exception_handling(self):
         # Bug #1242657

@@ -83,10 +83,11 @@ static char *usage_3 = "\
          can be supplied multiple times to increase verbosity\n\
 -V     : print the Python version number and exit (also --version)\n\
 -W arg : warning control; arg is action:message:category:module:lineno\n\
+         also PYTHONWARNINGS=arg\n\
 -x     : skip first line of source, allowing use of non-Unix forms of #!cmd\n\
 ";
 static char *usage_4 = "\
--3     : warn about Python 3.x incompatibilities\n\
+-3     : warn about Python 3.x incompatibilities that 2to3 cannot trivially fix\n\
 file   : program read from script file\n\
 -      : program read from stdin (default; interactive mode if a tty)\n\
 arg ...: arguments passed to program in sys.argv[1:]\n\n\
@@ -112,9 +113,9 @@ usage(int exitcode, char* program)
     if (exitcode)
         fprintf(f, "Try `python -h' for more information.\n");
     else {
-        fprintf(f, usage_1);
-        fprintf(f, usage_2);
-        fprintf(f, usage_3);
+        fputs(usage_1, f);
+        fputs(usage_2, f);
+        fputs(usage_3, f);
         fprintf(f, usage_4, DELIM);
         fprintf(f, usage_5, DELIM, PYTHONHOMEHELP);
     }
@@ -222,33 +223,6 @@ static int RunMainFromImporter(char *filename)
 }
 
 
-/* Wait until threading._shutdown completes, provided
-   the threading module was imported in the first place.
-   The shutdown routine will wait until all non-daemon
-   "threading" threads have completed. */
-#include "abstract.h"
-static void
-WaitForThreadShutdown(void)
-{
-#ifdef WITH_THREAD
-    PyObject *result;
-    PyThreadState *tstate = PyThreadState_GET();
-    PyObject *threading = PyMapping_GetItemString(tstate->interp->modules,
-                                                  "threading");
-    if (threading == NULL) {
-        /* threading not imported */
-        PyErr_Clear();
-        return;
-    }
-    result = PyObject_CallMethod(threading, "_shutdown", "");
-    if (result == NULL)
-        PyErr_WriteUnraisable(threading);
-    else
-        Py_DECREF(result);
-    Py_DECREF(threading);
-#endif
-}
-
 /* Main program */
 
 int
@@ -317,6 +291,8 @@ Py_Main(int argc, char **argv)
 
         case '3':
             Py_Py3kWarningFlag++;
+            if (!Py_DivisionWarningFlag)
+                Py_DivisionWarningFlag = 1;
             break;
 
         case 'Q':
@@ -430,6 +406,10 @@ Py_Main(int argc, char **argv)
         return 0;
     }
 
+    if (Py_Py3kWarningFlag && !Py_TabcheckFlag)
+        /* -3 implies -t (but not -tt) */
+        Py_TabcheckFlag = 1;
+
     if (!Py_InspectFlag &&
         (p = Py_GETENV("PYTHONINSPECT")) && *p != '\0')
         Py_InspectFlag = 1;
@@ -440,6 +420,21 @@ Py_Main(int argc, char **argv)
     if (!Py_NoUserSiteDirectory &&
         (p = Py_GETENV("PYTHONNOUSERSITE")) && *p != '\0')
         Py_NoUserSiteDirectory = 1;
+
+    if ((p = Py_GETENV("PYTHONWARNINGS")) && *p != '\0') {
+        char *buf, *warning;
+
+        buf = (char *)malloc(strlen(p) + 1);
+        if (buf == NULL)
+            Py_FatalError(
+               "not enough memory to copy PYTHONWARNINGS");
+        strcpy(buf, p);
+        for (warning = strtok(buf, ",");
+             warning != NULL;
+             warning = strtok(NULL, ","))
+            PySys_AddWarnOption(warning);
+        free(buf);
+    }
 
     if (command == NULL && module == NULL && _PyOS_optind < argc &&
         strcmp(argv[_PyOS_optind], "-") != 0)
@@ -525,7 +520,9 @@ Py_Main(int argc, char **argv)
 
     if (module != NULL) {
         /* Backup _PyOS_optind and force sys.argv[0] = '-c'
-           so that PySys_SetArgv correctly sets sys.path[0] to ''*/
+           so that PySys_SetArgv correctly sets sys.path[0] to ''
+           rather than looking for a file called "-m". See
+           tracker issue #8202 for details. */
         _PyOS_optind--;
         argv[_PyOS_optind] = "-c";
     }
@@ -594,10 +591,16 @@ Py_Main(int argc, char **argv)
         }
 
         if (sts==-1) {
-            sts = PyRun_AnyFileExFlags(
-                fp,
-                filename == NULL ? "<stdin>" : filename,
-                filename != NULL, &cf) != 0;
+            /* call pending calls like signal handlers (SIGINT) */
+            if (Py_MakePendingCalls() == -1) {
+                PyErr_Print();
+                sts = 1;
+            } else {
+                sts = PyRun_AnyFileExFlags(
+                    fp,
+                    filename == NULL ? "<stdin>" : filename,
+                    filename != NULL, &cf) != 0;
+            }
         }
 
     }
@@ -617,8 +620,6 @@ Py_Main(int argc, char **argv)
         /* XXX */
         sts = PyRun_AnyFileFlags(stdin, "<stdin>", &cf) != 0;
     }
-
-    WaitForThreadShutdown();
 
     Py_Finalize();
 #ifdef RISCOS

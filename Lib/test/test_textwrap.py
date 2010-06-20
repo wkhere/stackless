@@ -174,7 +174,7 @@ What a mess!
         text = ("Python 1.0.0 was released on 1994-01-26.  Python 1.0.1 was\n"
                 "released on 1994-02-15.")
 
-        self.check_wrap(text, 30, ['Python 1.0.0 was released on',
+        self.check_wrap(text, 35, ['Python 1.0.0 was released on',
                                    '1994-01-26.  Python 1.0.1 was',
                                    'released on 1994-02-15.'])
         self.check_wrap(text, 40, ['Python 1.0.0 was released on 1994-01-26.',
@@ -349,9 +349,18 @@ What a mess!
             self.check_wrap(text, 50, [u"Hello there, how are you today?"])
             self.check_wrap(text, 20, [u"Hello there, how are", "you today?"])
             olines = self.wrapper.wrap(text)
-            assert isinstance(olines, list) and isinstance(olines[0], unicode)
+            self.assertIsInstance(olines, list)
+            self.assertIsInstance(olines[0], unicode)
             otext = self.wrapper.fill(text)
-            assert isinstance(otext, unicode)
+            self.assertIsInstance(otext, unicode)
+
+        def test_no_split_at_umlaut(self):
+            text = u"Die Empf\xe4nger-Auswahl"
+            self.check_wrap(text, 13, [u"Die", u"Empf\xe4nger-", u"Auswahl"])
+
+        def test_umlaut_followed_by_dash(self):
+            text = u"aa \xe4\xe4-\xe4\xe4"
+            self.check_wrap(text, 7, [u"aa \xe4\xe4-", u"\xe4\xe4"])
 
     def test_split(self):
         # Ensure that the standard _split() method works as advertised

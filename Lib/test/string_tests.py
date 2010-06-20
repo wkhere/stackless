@@ -185,6 +185,9 @@ class CommonTest(unittest.TestCase):
         self.checkequal(-1, '', 'find', 'xx', 1, 1)
         self.checkequal(-1, '', 'find', 'xx', sys.maxint, 0)
 
+        # issue 7458
+        self.checkequal(-1, 'ab', 'find', 'xxx', sys.maxsize + 1, 0)
+
         # For a variety of combinations,
         #    verify that str.find() matches __contains__
         #    and that the found substring is really at that location
@@ -205,8 +208,7 @@ class CommonTest(unittest.TestCase):
                 loc = i.find(j)
                 r1 = (loc != -1)
                 r2 = j in i
-                if r1 != r2:
-                    self.assertEqual(r1, r2)
+                self.assertEqual(r1, r2)
                 if loc != -1:
                     self.assertEqual(i[loc:loc+len(j)], j)
 
@@ -229,6 +231,33 @@ class CommonTest(unittest.TestCase):
 
         self.checkraises(TypeError, 'hello', 'rfind')
         self.checkraises(TypeError, 'hello', 'rfind', 42)
+
+        # For a variety of combinations,
+        #    verify that str.rfind() matches __contains__
+        #    and that the found substring is really at that location
+        charset = ['', 'a', 'b', 'c']
+        digits = 5
+        base = len(charset)
+        teststrings = set()
+        for i in xrange(base ** digits):
+            entry = []
+            for j in xrange(digits):
+                i, m = divmod(i, base)
+                entry.append(charset[m])
+            teststrings.add(''.join(entry))
+        teststrings = list(teststrings)
+        for i in teststrings:
+            i = self.fixtype(i)
+            for j in teststrings:
+                loc = i.rfind(j)
+                r1 = (loc != -1)
+                r2 = j in i
+                self.assertEqual(r1, r2)
+                if loc != -1:
+                    self.assertEqual(i[loc:loc+len(j)], j)
+
+        # issue 7458
+        self.checkequal(-1, 'ab', 'rfind', 'xxx', sys.maxsize + 1, 0)
 
     def test_index(self):
         self.checkequal(0, 'abcdefghiabc', 'index', '')
@@ -686,8 +715,9 @@ class CommonTest(unittest.TestCase):
         EQ("bobobXbobob", "bobobobXbobobob", "replace", "bobob", "bob")
         EQ("BOBOBOB", "BOBOBOB", "replace", "bob", "bobby")
 
-        ba = buffer('a')
-        bb = buffer('b')
+        with test_support.check_py3k_warnings():
+            ba = buffer('a')
+            bb = buffer('b')
         EQ("bbc", "abc", "replace", ba, bb)
         EQ("aac", "abc", "replace", bb, ba)
 
@@ -942,15 +972,15 @@ class MixinStrUnicodeUserStringTest:
         self.checkraises(TypeError, 'hello', 'endswith', (42,))
 
     def test___contains__(self):
-        self.checkequal(True, '', '__contains__', '')         # vereq('' in '', True)
-        self.checkequal(True, 'abc', '__contains__', '')      # vereq('' in 'abc', True)
-        self.checkequal(False, 'abc', '__contains__', '\0')   # vereq('\0' in 'abc', False)
-        self.checkequal(True, '\0abc', '__contains__', '\0')  # vereq('\0' in '\0abc', True)
-        self.checkequal(True, 'abc\0', '__contains__', '\0')  # vereq('\0' in 'abc\0', True)
-        self.checkequal(True, '\0abc', '__contains__', 'a')   # vereq('a' in '\0abc', True)
-        self.checkequal(True, 'asdf', '__contains__', 'asdf') # vereq('asdf' in 'asdf', True)
-        self.checkequal(False, 'asd', '__contains__', 'asdf') # vereq('asdf' in 'asd', False)
-        self.checkequal(False, '', '__contains__', 'asdf')    # vereq('asdf' in '', False)
+        self.checkequal(True, '', '__contains__', '')
+        self.checkequal(True, 'abc', '__contains__', '')
+        self.checkequal(False, 'abc', '__contains__', '\0')
+        self.checkequal(True, '\0abc', '__contains__', '\0')
+        self.checkequal(True, 'abc\0', '__contains__', '\0')
+        self.checkequal(True, '\0abc', '__contains__', 'a')
+        self.checkequal(True, 'asdf', '__contains__', 'asdf')
+        self.checkequal(False, 'asd', '__contains__', 'asdf')
+        self.checkequal(False, '', '__contains__', 'asdf')
 
     def test_subscript(self):
         self.checkequal(u'a', 'abc', '__getitem__', 0)
@@ -1090,14 +1120,7 @@ class MixinStrUnicodeUserStringTest:
             value = 0.01
             for x in xrange(60):
                 value = value * 3.141592655 / 3.0 * 10.0
-                # The formatfloat() code in stringobject.c and
-                # unicodeobject.c uses a 120 byte buffer and switches from
-                # 'f' formatting to 'g' at precision 50, so we expect
-                # OverflowErrors for the ranges x < 50 and prec >= 67.
-                if x < 50 and prec >= 67:
-                    self.checkraises(OverflowError, format, "__mod__", value)
-                else:
-                    self.checkcall(format, "__mod__", value)
+                self.checkcall(format, "__mod__", value)
 
     def test_inplace_rewrites(self):
         # Check that strings don't copy and modify cached single-character strings

@@ -2,9 +2,12 @@ import os
 import unittest
 import random
 from test import test_support
-import thread
+thread = test_support.import_module('thread')
 import time
+import sys
+import weakref
 
+from test import lock_tests
 
 NUMTASKS = 10
 NUMTRIPS = 3
@@ -26,6 +29,7 @@ class BasicThreadTest(unittest.TestCase):
         self.done_mutex.acquire()
         self.running_mutex = thread.allocate_lock()
         self.random_mutex = thread.allocate_lock()
+        self.created = 0
         self.running = 0
         self.next_ident = 0
 
@@ -37,6 +41,7 @@ class ThreadRunningTests(BasicThreadTest):
             self.next_ident += 1
             verbose_print("creating task %s" % self.next_ident)
             thread.start_new_thread(self.task, (self.next_ident,))
+            self.created += 1
             self.running += 1
 
     def task(self, ident):
@@ -47,7 +52,7 @@ class ThreadRunningTests(BasicThreadTest):
         verbose_print("task %s done" % ident)
         with self.running_mutex:
             self.running -= 1
-            if self.running == 0:
+            if self.created == NUMTASKS and self.running == 0:
                 self.done_mutex.release()
 
     def test_starting_threads(self):
@@ -60,10 +65,10 @@ class ThreadRunningTests(BasicThreadTest):
 
     def test_stack_size(self):
         # Various stack size tests.
-        self.assertEquals(thread.stack_size(), 0, "intial stack size is not 0")
+        self.assertEqual(thread.stack_size(), 0, "initial stack size is not 0")
 
         thread.stack_size(0)
-        self.assertEquals(thread.stack_size(), 0, "stack_size not reset to default")
+        self.assertEqual(thread.stack_size(), 0, "stack_size not reset to default")
 
         if os.name not in ("nt", "os2", "posix"):
             return
@@ -83,12 +88,13 @@ class ThreadRunningTests(BasicThreadTest):
             fail_msg = "stack_size(%d) failed - should succeed"
             for tss in (262144, 0x100000, 0):
                 thread.stack_size(tss)
-                self.assertEquals(thread.stack_size(), tss, fail_msg % tss)
+                self.assertEqual(thread.stack_size(), tss, fail_msg % tss)
                 verbose_print("successfully set stack_size(%d)" % tss)
 
             for tss in (262144, 0x100000):
                 verbose_print("trying stack_size = (%d)" % tss)
                 self.next_ident = 0
+                self.created = 0
                 for i in range(NUMTASKS):
                     self.newtask()
 
@@ -97,6 +103,32 @@ class ThreadRunningTests(BasicThreadTest):
                 verbose_print("all tasks done")
 
             thread.stack_size(0)
+
+    def test__count(self):
+        # Test the _count() function.
+        orig = thread._count()
+        mut = thread.allocate_lock()
+        mut.acquire()
+        started = []
+        def task():
+            started.append(None)
+            mut.acquire()
+            mut.release()
+        thread.start_new_thread(task, ())
+        while not started:
+            time.sleep(0.01)
+        self.assertEqual(thread._count(), orig + 1)
+        # Allow the task to finish.
+        mut.release()
+        # The only reliable way to be sure that the thread ended from the
+        # interpreter's point of view is to wait for the function object to be
+        # destroyed.
+        done = []
+        wr = weakref.ref(task, lambda _: done.append(None))
+        del task
+        while not done:
+            time.sleep(0.01)
+        self.assertEqual(thread._count(), orig)
 
 
 class Barrier:
@@ -161,8 +193,50 @@ class BarrierTest(BasicThreadTest):
             self.done_mutex.release()
 
 
+class LockTests(lock_tests.LockTests):
+    locktype = thread.allocate_lock
+
+
+class TestForkInThread(unittest.TestCase):
+    def setUp(self):
+        self.read_fd, self.write_fd = os.pipe()
+
+    @unittest.skipIf(sys.platform.startswith('win'),
+                     "This test is only appropriate for POSIX-like systems.")
+    @test_support.reap_threads
+    def test_forkinthread(self):
+        def thread1():
+            try:
+                pid = os.fork() # fork in a thread
+            except RuntimeError:
+                sys.exit(0) # exit the child
+
+            if pid == 0: # child
+                os.close(self.read_fd)
+                os.write(self.write_fd, "OK")
+                sys.exit(0)
+            else: # parent
+                os.close(self.write_fd)
+
+        thread.start_new_thread(thread1, ())
+        self.assertEqual(os.read(self.read_fd, 2), "OK",
+                         "Unable to fork() in thread")
+
+    def tearDown(self):
+        try:
+            os.close(self.read_fd)
+        except OSError:
+            pass
+
+        try:
+            os.close(self.write_fd)
+        except OSError:
+            pass
+
+
 def test_main():
-    test_support.run_unittest(ThreadRunningTests, BarrierTest)
+    test_support.run_unittest(ThreadRunningTests, BarrierTest, LockTests,
+                              TestForkInThread)
 
 if __name__ == "__main__":
     test_main()

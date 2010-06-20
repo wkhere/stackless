@@ -406,6 +406,19 @@ try:
         if hasattr(lib, 'uuid_generate_time'):
             _uuid_generate_time = lib.uuid_generate_time
 
+    # The uuid_generate_* functions are broken on MacOS X 10.6, as noted
+    # in issue #8621 the function generates the same sequence of values
+    # in the parent process and all children created using fork (unless
+    # those children use exec as well).
+    #
+    # Assume that the uuid_generate functions are broken from 10.6 onward,
+    # the test can be adjusted when a later version is fixed.
+    import sys
+    if sys.platform == 'darwin':
+        import os
+        if int(os.uname()[2].split('.')[0]) >= 10:
+            _uuid_generate_random = _uuid_generate_time = None
+
     # On Windows prior to 2000, UuidCreate gives a UUID containing the
     # hardware address.  On Windows 2000 and later, UuidCreate makes a
     # random UUID and UuidCreateSequential gives a UUID containing the
@@ -479,8 +492,8 @@ def uuid1(node=None, clock_seq=None):
 
     # When the system provides a version-1 UUID generator, use it (but don't
     # use UuidCreate here because its UUIDs don't conform to RFC 4122).
-    _buffer = ctypes.create_string_buffer(16)
     if _uuid_generate_time and node is clock_seq is None:
+        _buffer = ctypes.create_string_buffer(16)
         _uuid_generate_time(_buffer)
         return UUID(bytes=_buffer.raw)
 
@@ -489,8 +502,8 @@ def uuid1(node=None, clock_seq=None):
     nanoseconds = int(time.time() * 1e9)
     # 0x01b21dd213814000 is the number of 100-ns intervals between the
     # UUID epoch 1582-10-15 00:00:00 and the Unix epoch 1970-01-01 00:00:00.
-    timestamp = int(nanoseconds/100) + 0x01b21dd213814000L
-    if timestamp <= _last_timestamp:
+    timestamp = int(nanoseconds//100) + 0x01b21dd213814000L
+    if _last_timestamp is not None and timestamp <= _last_timestamp:
         timestamp = _last_timestamp + 1
     _last_timestamp = timestamp
     if clock_seq is None:
@@ -516,8 +529,8 @@ def uuid4():
     """Generate a random UUID."""
 
     # When the system provides a version-4 UUID generator, use it.
-    _buffer = ctypes.create_string_buffer(16)
     if _uuid_generate_random:
+        _buffer = ctypes.create_string_buffer(16)
         _uuid_generate_random(_buffer)
         return UUID(bytes=_buffer.raw)
 

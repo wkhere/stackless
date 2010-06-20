@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 from test import test_support
-from test.test_support import TESTFN
+from test.test_support import TESTFN, import_module
 
 import unittest
 from cStringIO import StringIO
@@ -8,7 +8,12 @@ import os
 import subprocess
 import sys
 
-import bz2
+try:
+    import threading
+except ImportError:
+    threading = None
+
+bz2 = import_module('bz2')
 from bz2 import BZ2File, BZ2Compressor, BZ2Decompressor
 
 has_cmdline_bunzip2 = sys.platform not in ("win32", "os2emx", "riscos")
@@ -283,6 +288,46 @@ class BZ2FileTest(BaseTest):
         xlines = list(bz2f.xreadlines())
         bz2f.close()
         self.assertEqual(xlines, ['Test'])
+
+    def testContextProtocol(self):
+        # BZ2File supports the context management protocol
+        f = None
+        with BZ2File(self.filename, "wb") as f:
+            f.write(b"xxx")
+        f = BZ2File(self.filename, "rb")
+        f.close()
+        try:
+            with f:
+                pass
+        except ValueError:
+            pass
+        else:
+            self.fail("__enter__ on a closed file didn't raise an exception")
+        try:
+            with BZ2File(self.filename, "wb") as f:
+                1 // 0
+        except ZeroDivisionError:
+            pass
+        else:
+            self.fail("1 // 0 didn't raise an exception")
+
+    @unittest.skipUnless(threading, 'Threading required for this test.')
+    def testThreading(self):
+        # Using a BZ2File from several threads doesn't deadlock (issue #7205).
+        data = "1" * 2**20
+        nthreads = 10
+        f = bz2.BZ2File(self.filename, 'wb')
+        try:
+            def comp():
+                for i in range(5):
+                    f.write(data)
+            threads = [threading.Thread(target=comp) for i in range(nthreads)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        finally:
+            f.close()
 
 
 class BZ2CompressorTest(BaseTest):

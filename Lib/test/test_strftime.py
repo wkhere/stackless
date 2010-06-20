@@ -4,7 +4,6 @@ Unittest for time.strftime
 
 import calendar
 import sys
-import os
 import re
 from test import test_support
 import time
@@ -119,16 +118,15 @@ class StrftimeTest(unittest.TestCase):
             try:
                 result = time.strftime(e[0], now)
             except ValueError, error:
-                print "Standard '%s' format gaver error:" % (e[0], error)
-                continue
+                self.fail("strftime '%s' format gave error: %s" % (e[0], error))
             if re.match(escapestr(e[1], self.ampm), result):
                 continue
             if not result or result[0] == '%':
-                print "Does not support standard '%s' format (%s)" % \
-                       (e[0], e[2])
+                self.fail("strftime does not support standard '%s' format (%s)"
+                          % (e[0], e[2]))
             else:
-                print "Conflict for %s (%s):" % (e[0], e[2])
-                print "  Expected %s, but got %s" % (e[1], result)
+                self.fail("Conflict for %s (%s): expected %s, but got %s"
+                          % (e[0], e[2], e[1], result))
 
     def strftest2(self, now):
         nowsecs = str(long(now))[:-1]

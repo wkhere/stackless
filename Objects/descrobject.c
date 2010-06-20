@@ -846,7 +846,7 @@ proxy_richcompare(proxyobject *v, PyObject *w, int op)
     return PyObject_RichCompare(v->dict, w, op);
 }
 
-static PyTypeObject proxytype = {
+PyTypeObject PyDictProxy_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "dictproxy",                                /* tp_name */
     sizeof(proxyobject),                        /* tp_basicsize */
@@ -889,7 +889,7 @@ PyDictProxy_New(PyObject *dict)
 {
     proxyobject *pp;
 
-    pp = PyObject_GC_New(proxyobject, &proxytype);
+    pp = PyObject_GC_New(proxyobject, &PyDictProxy_Type);
     if (pp != NULL) {
         Py_INCREF(dict);
         pp->dict = dict;
@@ -1275,25 +1275,19 @@ property_copy(PyObject *old, PyObject *get, PyObject *set, PyObject *del,
     }
     if (doc == NULL || doc == Py_None) {
         Py_XDECREF(doc);
-        doc = pold->prop_doc ? pold->prop_doc : Py_None;
+        if (pold->getter_doc && get != Py_None) {
+            /* make _init use __doc__ from getter */
+            doc = Py_None;
+        }
+        else {
+            doc = pold->prop_doc ? pold->prop_doc : Py_None;
+        }
     }
 
     new =  PyObject_CallFunction(type, "OOOO", get, set, del, doc);
     Py_DECREF(type);
     if (new == NULL)
         return NULL;
-    pnew = (propertyobject *)new;
-
-    if (pold->getter_doc && get != Py_None) {
-        PyObject *get_doc = PyObject_GetAttrString(get, "__doc__");
-        if (get_doc != NULL) {
-            Py_XDECREF(pnew->prop_doc);
-            pnew->prop_doc = get_doc;  /* get_doc already INCREF'd by GetAttr */
-            pnew->getter_doc = 1;
-        } else {
-            PyErr_Clear();
-        }
-    }
     return new;
 }
 
@@ -1329,12 +1323,28 @@ property_init(PyObject *self, PyObject *args, PyObject *kwds)
     /* if no docstring given and the getter has one, use that one */
     if ((doc == NULL || doc == Py_None) && get != NULL) {
         PyObject *get_doc = PyObject_GetAttrString(get, "__doc__");
-        if (get_doc != NULL) {
-            Py_XDECREF(prop->prop_doc);
-            prop->prop_doc = get_doc;  /* get_doc already INCREF'd by GetAttr */
+        if (get_doc) {
+            if (Py_TYPE(self) == &PyProperty_Type) {
+                Py_XDECREF(prop->prop_doc);
+                prop->prop_doc = get_doc;
+            }
+            else {
+                /* If this is a property subclass, put __doc__
+                in dict of the subclass instance instead,
+                otherwise it gets shadowed by __doc__ in the
+                class's dict. */
+                int err = PyObject_SetAttrString(self, "__doc__", get_doc);
+                Py_DECREF(get_doc);
+                if (err < 0)
+                    return -1;
+            }
             prop->getter_doc = 1;
-        } else {
+        }
+        else if (PyErr_ExceptionMatches(PyExc_Exception)) {
             PyErr_Clear();
+        }
+        else {
+            return -1;
         }
     }
 

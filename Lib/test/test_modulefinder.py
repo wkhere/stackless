@@ -190,6 +190,19 @@ a/b/c/e.py
 a/b/c/f.py
 """]
 
+relative_import_test_3 = [
+    "a.module",
+    ["a", "a.module"],
+    ["a.bar"],
+    [],
+    """\
+a/__init__.py
+                                def foo(): pass
+a/module.py
+                                from . import foo
+                                from . import bar
+"""]
+
 def open_file(path):
     ##print "#", os.path.abspath(path)
     dirname = os.path.dirname(path)
@@ -227,12 +240,12 @@ class ModuleFinderTest(unittest.TestCase):
             more = list(found - modules)
             less = list(modules - found)
             # check if we found what we expected, not more, not less
-            self.failUnlessEqual((more, less), ([], []))
+            self.assertEqual((more, less), ([], []))
 
             # check for missing and maybe missing modules
             bad, maybe = mf.any_missing_maybe()
-            self.failUnlessEqual(bad, missing)
-            self.failUnlessEqual(maybe, maybe_missing)
+            self.assertEqual(bad, missing)
+            self.assertEqual(maybe, maybe_missing)
         finally:
             distutils.dir_util.remove_tree(TEST_DIR)
 
@@ -255,6 +268,9 @@ class ModuleFinderTest(unittest.TestCase):
 
         def test_relative_imports_2(self):
             self._do_test(relative_import_test_2)
+
+        def test_relative_imports_3(self):
+            self._do_test(relative_import_test_3)
 
 def test_main():
     distutils.log.set_threshold(distutils.log.WARN)

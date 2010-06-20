@@ -35,6 +35,7 @@ class HashEqualityTestCase(unittest.TestCase):
         self.same_hash(int(-2**63), long(-2**63), float(-2**63))
         self.same_hash(int(1-2**63), long(1-2**63))
         self.same_hash(int(2**63-1), long(2**63-1))
+        self.same_hash(long(2**63), float(2**63))
 
     def test_coerced_floats(self):
         self.same_hash(long(1.23e300), float(1.23e300))
@@ -104,16 +105,39 @@ class HashInheritanceTestCase(unittest.TestCase):
         objects = (self.default_expected +
                    self.fixed_expected)
         for obj in objects:
-            self.assert_(isinstance(obj, Hashable), repr(obj))
+            self.assertIsInstance(obj, Hashable)
 
     def test_not_hashable(self):
         for obj in self.error_expected:
-            self.assertFalse(isinstance(obj, Hashable), repr(obj))
+            self.assertNotIsInstance(obj, Hashable)
 
+
+# Issue #4701: Check that some builtin types are correctly hashable
+#  (This test only used to fail in Python 3.0, but has been included
+#   in 2.x along with the lazy call to PyType_Ready in PyObject_Hash)
+class DefaultIterSeq(object):
+    seq = range(10)
+    def __len__(self):
+        return len(self.seq)
+    def __getitem__(self, index):
+        return self.seq[index]
+
+class HashBuiltinsTestCase(unittest.TestCase):
+    hashes_to_check = [xrange(10),
+                       enumerate(xrange(10)),
+                       iter(DefaultIterSeq()),
+                       iter(lambda: 0, 0),
+                      ]
+
+    def test_hashes(self):
+        _default_hash = object.__hash__
+        for obj in self.hashes_to_check:
+            self.assertEqual(hash(obj), _default_hash(obj))
 
 def test_main():
     test_support.run_unittest(HashEqualityTestCase,
-                              HashInheritanceTestCase)
+                              HashInheritanceTestCase,
+                              HashBuiltinsTestCase)
 
 
 if __name__ == "__main__":

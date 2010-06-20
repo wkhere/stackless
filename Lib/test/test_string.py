@@ -105,6 +105,9 @@ class ModuleTest(unittest.TestCase):
         self.assertEqual(string.capwords('ABC DEF GHI'), 'Abc Def Ghi')
         self.assertEqual(string.capwords('ABC-DEF-GHI', '-'), 'Abc-Def-Ghi')
         self.assertEqual(string.capwords('ABC-def DEF-ghi GHI'), 'Abc-def Def-ghi Ghi')
+        self.assertEqual(string.capwords('   aBc  DeF   '), 'Abc Def')
+        self.assertEqual(string.capwords('\taBc\tDeF\t'), 'Abc Def')
+        self.assertEqual(string.capwords('\taBc\tDeF\t', '\t'), '\tAbc\tDef\t')
 
     def test_formatter(self):
         fmt = string.Formatter()
@@ -199,13 +202,13 @@ class ModuleTest(unittest.TestCase):
 class BytesAliasTest(unittest.TestCase):
 
     def test_builtin(self):
-        self.assert_(str is bytes)
+        self.assertTrue(str is bytes)
 
     def test_syntax(self):
         self.assertEqual(b"spam", "spam")
         self.assertEqual(br"egg\foo", "egg\\foo")
-        self.assert_(type(b""), str)
-        self.assert_(type(br""), str)
+        self.assertTrue(type(b""), str)
+        self.assertTrue(type(br""), str)
 
 def test_main():
     test_support.run_unittest(StringTest, ModuleTest, BytesAliasTest)

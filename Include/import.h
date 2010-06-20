@@ -27,6 +27,14 @@ PyAPI_FUNC(PyObject *) PyImport_ReloadModule(PyObject *m);
 PyAPI_FUNC(void) PyImport_Cleanup(void);
 PyAPI_FUNC(int) PyImport_ImportFrozenModule(char *);
 
+#ifdef WITH_THREAD
+PyAPI_FUNC(void) _PyImport_AcquireLock(void);
+PyAPI_FUNC(int) _PyImport_ReleaseLock(void);
+#else
+#define _PyImport_AcquireLock()
+#define _PyImport_ReleaseLock() 1
+#endif
+
 PyAPI_FUNC(struct filedescr *) _PyImport_FindModule(
 	const char *, PyObject *, char *, size_t, FILE **, PyObject **);
 PyAPI_FUNC(int) _PyImport_IsScript(struct filedescr *);
@@ -43,7 +51,7 @@ struct _inittab {
 PyAPI_DATA(PyTypeObject) PyNullImporter_Type;
 PyAPI_DATA(struct _inittab *) PyImport_Inittab;
 
-PyAPI_FUNC(int) PyImport_AppendInittab(char *name, void (*initfunc)(void));
+PyAPI_FUNC(int) PyImport_AppendInittab(const char *name, void (*initfunc)(void));
 PyAPI_FUNC(int) PyImport_ExtendInittab(struct _inittab *newtab);
 
 struct _frozen {

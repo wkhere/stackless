@@ -58,7 +58,11 @@ unpacker_coercions = {
 # Some python types we need in the packer:
 #
 AEDescType = AE.AEDescType
-FSSType = Carbon.File.FSSpecType
+try:
+    FSSType = Carbon.File.FSSpecType
+except AttributeError:
+    class FSSType:
+        pass
 FSRefType = Carbon.File.FSRefType
 AliasType = Carbon.File.AliasType
 
@@ -128,7 +132,7 @@ def unpack(desc, formodulename=""):
     """Unpack an AE descriptor to a python object"""
     t = desc.type
 
-    if unpacker_coercions.has_key(t):
+    if t in unpacker_coercions:
         desc = desc.AECoerceDesc(unpacker_coercions[t])
         t = desc.type # This is a guess by Jack....
 

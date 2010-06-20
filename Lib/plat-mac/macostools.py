@@ -10,6 +10,7 @@ warnpy3k("In 3.x, the macostools module is removed.", stacklevel=2)
 from Carbon import Res
 from Carbon import File, Files
 import os
+import errno
 import MacOS
 try:
     openrf = MacOS.openrf
@@ -62,7 +63,14 @@ def mkdirs(dst):
     if os.sep == ':' and not ':' in head:
         head = head + ':'
     mkdirs(head)
-    os.mkdir(dst, 0777)
+
+    try:
+        os.mkdir(dst, 0777)
+    except OSError, e:
+        # be happy if someone already created the path
+        if e.errno != errno.EEXIST:
+            raise
+
 
 def touched(dst):
     """Tell the finder a file has changed. No-op on MacOSX."""

@@ -7,15 +7,18 @@
 # Local imports
 from .fix_imports import alternates, FixImports
 from .. import fixer_base
-from ..fixer_util import Name, Comma, FromImport, Newline, attr_chain, any, set
+from ..fixer_util import Name, Comma, FromImport, Newline, attr_chain
 
 MAPPING = {'urllib':  [
                 ('urllib.request',
                     ['URLOpener', 'FancyURLOpener', 'urlretrieve',
-                     '_urlopener', 'urlcleanup']),
+                     '_urlopener', 'urlopen', 'urlcleanup',
+                     'pathname2url', 'url2pathname']),
                 ('urllib.parse',
                     ['quote', 'quote_plus', 'unquote', 'unquote_plus',
-                     'urlencode', 'pahtname2url', 'url2pathname']),
+                     'urlencode', 'splitattr', 'splithost', 'splitnport',
+                     'splitpasswd', 'splitport', 'splitquery', 'splittag',
+                     'splittype', 'splituser', 'splitvalue', ]),
                 ('urllib.error',
                     ['ContentTooShortError'])],
            'urllib2' : [
@@ -29,17 +32,17 @@ MAPPING = {'urllib':  [
                      'AbstractBasicAuthHandler',
                      'HTTPBasicAuthHandler', 'ProxyBasicAuthHandler',
                      'AbstractDigestAuthHandler',
-                     'HTTPDigestAuthHander', 'ProxyDigestAuthHandler',
+                     'HTTPDigestAuthHandler', 'ProxyDigestAuthHandler',
                      'HTTPHandler', 'HTTPSHandler', 'FileHandler',
                      'FTPHandler', 'CacheFTPHandler',
                      'UnknownHandler']),
                 ('urllib.error',
-                    ['URLError', 'HTTPError'])],
+                    ['URLError', 'HTTPError']),
+           ]
 }
 
-
-# def alternates(members):
-#     return "(" + "|".join(map(repr, members)) + ")"
+# Duplicate the url parsing functions for urllib2.
+MAPPING["urllib2"].append(MAPPING["urllib"][1])
 
 
 def build_pattern():
@@ -60,12 +63,15 @@ def build_pattern():
             yield """import_name< 'import'
                                   dotted_as_name< module_as=%r 'as' any > >
                   """ % old_module
-            yield """power< module_dot=%r trailer< '.' member=%s > any* >
+            # bare_with_attr has a special significance for FixImports.match().
+            yield """power< bare_with_attr=%r trailer< '.' member=%s > any* >
                   """ % (old_module, members)
 
 
 class FixUrllib(FixImports):
-    PATTERN = "|".join(build_pattern())
+
+    def build_pattern(self):
+        return "|".join(build_pattern())
 
     def transform_import(self, node, results):
         """Transform for the basic import case. Replaces the old
@@ -73,7 +79,7 @@ class FixUrllib(FixImports):
            replacements.
         """
         import_mod = results.get('module')
-        pref = import_mod.get_prefix()
+        pref = import_mod.prefix
 
         names = []
 
@@ -89,7 +95,7 @@ class FixUrllib(FixImports):
            module.
         """
         mod_member = results.get('mod_member')
-        pref = mod_member.get_prefix()
+        pref = mod_member.prefix
         member = results.get('member')
 
         # Simple case with only a single member being imported
@@ -145,19 +151,18 @@ class FixUrllib(FixImports):
 
     def transform_dot(self, node, results):
         """Transform for calls to module members in code."""
-        module_dot = results.get('module_dot')
+        module_dot = results.get('bare_with_attr')
         member = results.get('member')
-        # this may be a list of length one, or just a node
+        new_name = None
         if isinstance(member, list):
             member = member[0]
-        new_name = None
         for change in MAPPING[module_dot.value]:
             if member.value in change[1]:
                 new_name = change[0]
                 break
         if new_name:
             module_dot.replace(Name(new_name,
-                                    prefix=module_dot.get_prefix()))
+                                    prefix=module_dot.prefix))
         else:
             self.cannot_convert(node, 'This is an invalid module element')
 
@@ -166,7 +171,7 @@ class FixUrllib(FixImports):
             self.transform_import(node, results)
         elif results.get('mod_member'):
             self.transform_member(node, results)
-        elif results.get('module_dot'):
+        elif results.get('bare_with_attr'):
             self.transform_dot(node, results)
         # Renaming and star imports are not supported for these modules.
         elif results.get('module_star'):

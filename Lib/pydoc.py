@@ -55,6 +55,7 @@ Richard Chamberlain, for the first implementation of textdoc.
 import sys, imp, os, re, types, inspect, __builtin__, pkgutil
 from repr import Repr
 from string import expandtabs, find, join, lower, split, strip, rfind, rstrip
+from traceback import extract_tb
 try:
     from collections import deque
 except ImportError:
@@ -123,9 +124,7 @@ _re_stripid = re.compile(r' at 0x[0-9a-f]{6,16}(>+)$', re.IGNORECASE)
 def stripid(text):
     """Remove the hexadecimal id from a Python object representation."""
     # The behaviour of %p is implementation-dependent in terms of case.
-    if _re_stripid.search(repr(Exception)):
-        return _re_stripid.sub(r'\1', text)
-    return text
+    return _re_stripid.sub(r'\1', text)
 
 def _is_some_method(obj):
     return inspect.ismethod(obj) or inspect.ismethoddescriptor(obj)
@@ -299,9 +298,9 @@ def safeimport(path, forceload=0, cache={}):
         elif exc is SyntaxError:
             # A SyntaxError occurred before we could execute the module.
             raise ErrorDuringImport(value.filename, info)
-        elif exc is ImportError and \
-             split(lower(str(value)))[:2] == ['no', 'module']:
-            # The module was not found.
+        elif exc is ImportError and extract_tb(tb)[-1][2]=='safeimport':
+            # The import error occurred directly in this function,
+            # which means there is no such module in the path.
             return None
         else:
             # Some other error occurred during the importing process.
@@ -357,7 +356,8 @@ class Doc:
                                  'marshal', 'posix', 'signal', 'sys',
                                  'thread', 'zipimport') or
              (file.startswith(basedir) and
-              not file.startswith(os.path.join(basedir, 'site-packages'))))):
+              not file.startswith(os.path.join(basedir, 'site-packages')))) and
+            object.__name__ not in ('xml.etree', 'test.pydoc_mod')):
             if docloc.startswith("http://"):
                 docloc = "%s/%s" % (docloc.rstrip("/"), object.__name__)
             else:
@@ -422,7 +422,7 @@ class HTMLDoc(Doc):
     def page(self, title, contents):
         """Format an HTML page."""
         return '''
-<!doctype html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 <html><head><title>Python: %s</title>
 </head><body bgcolor="#f0f0f8">
 %s
@@ -1533,11 +1533,11 @@ class Helper:
     # These dictionaries map a topic name to either an alias, or a tuple
     # (label, seealso-items).  The "label" is the label of the corresponding
     # section in the .rst file under Doc/ and an index into the dictionary
-    # in pydoc_topics.py.
+    # in pydoc_data/topics.py.
     #
     # CAUTION: if you change one of these dictionaries, be sure to adapt the
     #          list of needed labels in Doc/tools/sphinxext/pyspecific.py and
-    #          regenerate the pydoc_topics.py file by running
+    #          regenerate the pydoc_data/topics.py file by running
     #              make pydoc-topics
     #          in Doc/ and copying the output file into the Lib/ directory.
 
@@ -1574,6 +1574,42 @@ class Helper:
         'with': ('with', 'CONTEXTMANAGERS EXCEPTIONS yield'),
         'yield': ('yield', ''),
     }
+    # Either add symbols to this dictionary or to the symbols dictionary
+    # directly: Whichever is easier. They are merged later.
+    _symbols_inverse = {
+        'STRINGS' : ("'", "'''", "r'", "u'", '"""', '"', 'r"', 'u"'),
+        'OPERATORS' : ('+', '-', '*', '**', '/', '//', '%', '<<', '>>', '&',
+                       '|', '^', '~', '<', '>', '<=', '>=', '==', '!=', '<>'),
+        'COMPARISON' : ('<', '>', '<=', '>=', '==', '!=', '<>'),
+        'UNARY' : ('-', '~'),
+        'AUGMENTEDASSIGNMENT' : ('+=', '-=', '*=', '/=', '%=', '&=', '|=',
+                                '^=', '<<=', '>>=', '**=', '//='),
+        'BITWISE' : ('<<', '>>', '&', '|', '^', '~'),
+        'COMPLEX' : ('j', 'J')
+    }
+    symbols = {
+        '%': 'OPERATORS FORMATTING',
+        '**': 'POWER',
+        ',': 'TUPLES LISTS FUNCTIONS',
+        '.': 'ATTRIBUTES FLOAT MODULES OBJECTS',
+        '...': 'ELLIPSIS',
+        ':': 'SLICINGS DICTIONARYLITERALS',
+        '@': 'def class',
+        '\\': 'STRINGS',
+        '_': 'PRIVATENAMES',
+        '__': 'PRIVATENAMES SPECIALMETHODS',
+        '`': 'BACKQUOTES',
+        '(': 'TUPLES FUNCTIONS CALLS',
+        ')': 'TUPLES FUNCTIONS CALLS',
+        '[': 'LISTS SUBSCRIPTS SLICINGS',
+        ']': 'LISTS SUBSCRIPTS SLICINGS'
+    }
+    for topic, symbols_ in _symbols_inverse.iteritems():
+        for symbol in symbols_:
+            topics = symbols.get(symbol, topic)
+            if topic not in topics:
+                topics = topics + ' ' + topic
+            symbols[symbol] = topics
 
     topics = {
         'TYPES': ('types', 'STRINGS UNICODE NUMBERS SEQUENCES MAPPINGS '
@@ -1715,12 +1751,15 @@ has the same effect as typing a particular string at the help> prompt.
 
     def help(self, request):
         if type(request) is type(''):
+            request = request.strip()
             if request == 'help': self.intro()
             elif request == 'keywords': self.listkeywords()
+            elif request == 'symbols': self.listsymbols()
             elif request == 'topics': self.listtopics()
             elif request == 'modules': self.listmodules()
             elif request[:8] == 'modules ':
                 self.listmodules(split(request)[1])
+            elif request in self.symbols: self.showsymbol(request)
             elif request in self.keywords: self.showtopic(request)
             elif request in self.topics: self.showtopic(request)
             elif request: doc(request, 'Help on %s:')
@@ -1766,6 +1805,14 @@ Here is a list of the Python keywords.  Enter any keyword to get more help.
 ''')
         self.list(self.keywords.keys())
 
+    def listsymbols(self):
+        self.output.write('''
+Here is a list of the punctuation symbols which Python assigns special meaning
+to. Enter any symbol to get more help.
+
+''')
+        self.list(self.symbols.keys())
+
     def listtopics(self):
         self.output.write('''
 Here is a list of available topics.  Enter any topic name to get more help.
@@ -1773,13 +1820,13 @@ Here is a list of available topics.  Enter any topic name to get more help.
 ''')
         self.list(self.topics.keys())
 
-    def showtopic(self, topic):
+    def showtopic(self, topic, more_xrefs=''):
         try:
-            import pydoc_topics
+            import pydoc_data.topics
         except ImportError:
             self.output.write('''
 Sorry, topic and keyword documentation is not available because the
-module "pydoc_topics" could not be found.
+module "pydoc_data.topics" could not be found.
 ''')
             return
         target = self.topics.get(topic, self.keywords.get(topic))
@@ -1787,21 +1834,28 @@ module "pydoc_topics" could not be found.
             self.output.write('no documentation found for %s\n' % repr(topic))
             return
         if type(target) is type(''):
-            return self.showtopic(target)
+            return self.showtopic(target, more_xrefs)
 
         label, xrefs = target
         try:
-            doc = pydoc_topics.topics[label]
+            doc = pydoc_data.topics.topics[label]
         except KeyError:
             self.output.write('no documentation found for %s\n' % repr(topic))
             return
         pager(strip(doc) + '\n')
+        if more_xrefs:
+            xrefs = (xrefs or '') + ' ' + more_xrefs
         if xrefs:
             import StringIO, formatter
             buffer = StringIO.StringIO()
             formatter.DumbWriter(buffer).send_flowing_data(
                 'Related help topics: ' + join(split(xrefs), ', ') + '\n')
             self.output.write('\n%s\n' % buffer.getvalue())
+
+    def showsymbol(self, symbol):
+        target = self.symbols[symbol]
+        topic, _, xrefs = target.partition(' ')
+        self.showtopic(topic, xrefs)
 
     def listmodules(self, key=''):
         if key:
@@ -1974,7 +2028,7 @@ pydoc</strong> by Ka-Ping Yee &lt;ping@lfw.org&gt;</font>'''
 
     class DocServer(BaseHTTPServer.HTTPServer):
         def __init__(self, port, callback):
-            host = (sys.platform == 'mac') and '127.0.0.1' or 'localhost'
+            host = 'localhost'
             self.address = ('', port)
             self.url = 'http://%s:%d/' % (host, port)
             self.callback = callback
@@ -2091,10 +2145,6 @@ def gui():
             except ImportError: # pre-webbrowser.py compatibility
                 if sys.platform == 'win32':
                     os.system('start "%s"' % url)
-                elif sys.platform == 'mac':
-                    try: import ic
-                    except ImportError: pass
-                    else: ic.launchurl(url)
                 else:
                     rc = os.system('netscape -remote "openURL(%s)" &' % url)
                     if rc: os.system('netscape "%s" &' % url)
@@ -2199,11 +2249,13 @@ def cli():
     import getopt
     class BadUsage: pass
 
-    # Scripts don't get the current directory in their path by default.
-    scriptdir = os.path.dirname(sys.argv[0])
-    if scriptdir in sys.path:
-        sys.path.remove(scriptdir)
-    sys.path.insert(0, '.')
+    # Scripts don't get the current directory in their path by default
+    # unless they are run with the '-m' switch
+    if '' not in sys.path:
+        scriptdir = os.path.dirname(sys.argv[0])
+        if scriptdir in sys.path:
+            sys.path.remove(scriptdir)
+        sys.path.insert(0, '.')
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'gk:p:w')

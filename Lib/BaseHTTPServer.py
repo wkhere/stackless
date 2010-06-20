@@ -309,18 +309,26 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
         commands such as GET and POST.
 
         """
-        self.raw_requestline = self.rfile.readline()
-        if not self.raw_requestline:
+        try:
+            self.raw_requestline = self.rfile.readline()
+            if not self.raw_requestline:
+                self.close_connection = 1
+                return
+            if not self.parse_request():
+                # An error code has been sent, just exit
+                return
+            mname = 'do_' + self.command
+            if not hasattr(self, mname):
+                self.send_error(501, "Unsupported method (%r)" % self.command)
+                return
+            method = getattr(self, mname)
+            method()
+            self.wfile.flush() #actually send the response if not already done.
+        except socket.timeout, e:
+            #a read or a write timed out.  Discard this connection
+            self.log_error("Request timed out: %r", e)
             self.close_connection = 1
             return
-        if not self.parse_request(): # An error code has been sent, just exit
-            return
-        mname = 'do_' + self.command
-        if not hasattr(self, mname):
-            self.send_error(501, "Unsupported method (%r)" % self.command)
-            return
-        method = getattr(self, mname)
-        method()
 
     def handle(self):
         """Handle multiple requests if necessary."""
@@ -535,7 +543,7 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
               'Request forbidden -- authorization will not help'),
         404: ('Not Found', 'Nothing matches the given URI'),
         405: ('Method Not Allowed',
-              'Specified method is invalid for this server.'),
+              'Specified method is invalid for this resource.'),
         406: ('Not Acceptable', 'URI not available in preferred format.'),
         407: ('Proxy Authentication Required', 'You must authenticate with '
               'this proxy before proceeding.'),

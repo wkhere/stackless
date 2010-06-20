@@ -28,6 +28,8 @@ class TestGenericStringIO(unittest.TestCase):
         eq(self._fp.read(10), self._line[:10])
         eq(self._fp.readline(), self._line[10:] + '\n')
         eq(len(self._fp.readlines(60)), 2)
+        self._fp.seek(0)
+        eq(self._fp.readline(-1), self._line + '\n')
 
     def test_writes(self):
         f = self.MODULE.StringIO()
@@ -85,7 +87,7 @@ class TestGenericStringIO(unittest.TestCase):
 
     def test_iterator(self):
         eq = self.assertEqual
-        unless = self.failUnless
+        unless = self.assertTrue
         eq(iter(self._fp), self._fp)
         # Does this object support the iteration protocol?
         unless(hasattr(self._fp, '__iter__'))
@@ -135,12 +137,10 @@ class TestBuffercStringIO(TestcStringIO):
 
 
 def test_main():
-    test_support.run_unittest(
-        TestStringIO,
-        TestcStringIO,
-        TestBufferStringIO,
-        TestBuffercStringIO
-    )
+    test_support.run_unittest(TestStringIO, TestcStringIO)
+    with test_support.check_py3k_warnings(("buffer.. not supported",
+                                             DeprecationWarning)):
+        test_support.run_unittest(TestBufferStringIO, TestBuffercStringIO)
 
 if __name__ == '__main__':
     test_main()

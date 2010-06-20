@@ -58,10 +58,6 @@ LOCALEDIR = os.path.join('xx', 'LC_MESSAGES')
 MOFILE = os.path.join(LOCALEDIR, 'gettext.mo')
 UMOFILE = os.path.join(LOCALEDIR, 'ugettext.mo')
 MMOFILE = os.path.join(LOCALEDIR, 'metadata.mo')
-try:
-    LANG = os.environ['LANGUAGE']
-except:
-    LANG = 'en'
 
 
 class GettextBaseTest(unittest.TestCase):
@@ -77,10 +73,12 @@ class GettextBaseTest(unittest.TestCase):
         fp = open(MMOFILE, 'wb')
         fp.write(base64.decodestring(MMO_DATA))
         fp.close()
-        os.environ['LANGUAGE'] = 'xx'
+        self.env = test_support.EnvironmentVarGuard()
+        self.env['LANGUAGE'] = 'xx'
 
     def tearDown(self):
-        os.environ['LANGUAGE'] = LANG
+        self.env.__exit__()
+        del self.env
         shutil.rmtree(os.path.split(LOCALEDIR)[0])
 
 
@@ -308,7 +306,7 @@ class UnicodeTranslationsTest(GettextBaseTest):
         self._ = self.t.ugettext
 
     def test_unicode_msgid(self):
-        unless = self.failUnless
+        unless = self.assertTrue
         unless(isinstance(self._(''), unicode))
         unless(isinstance(self._(u''), unicode))
 
