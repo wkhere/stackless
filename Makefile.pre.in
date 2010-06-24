@@ -262,6 +262,17 @@ PYTHON_OBJS=	\
 		Python/ast.o \
 		Python/bltinmodule.o \
 		Python/ceval.o \
+		Stackless/core/cframeobject.o \
+		Stackless/core/slp_transfer.o \
+		Stackless/core/stacklesseval.o \
+		Stackless/core/stackless_util.o \
+		Stackless/module/channelobject.o \
+		Stackless/module/flextype.o \
+		Stackless/module/scheduling.o \
+		Stackless/module/stacklessmodule.o \
+		Stackless/module/taskletobject.o \
+		Stackless/pickling/prickelpit.o \
+		Stackless/pickling/safe_pickle.o \
 		Python/compile.o \
 		Python/codecs.o \
 		Python/errors.o \
@@ -684,6 +695,25 @@ PYTHON_HEADERS= \
 		Include/unicodeobject.h \
 		Include/warnings.h \
 		Include/weakrefobject.h \
+		Stackless/stackless.h \
+		Stackless/stackless_api.h \
+		Stackless/stackless_version.h \
+		Stackless/core/cframeobject.h \
+		Stackless/core/stackless_impl.h \
+		Stackless/core/stackless_structs.h \
+		Stackless/core/stackless_tstate.h \
+		Stackless/module/channelobject.h \
+		Stackless/module/flextype.h \
+		Stackless/module/taskletobject.h \
+		Stackless/pickling/prickelpit.h \
+		Stackless/platf/slp_platformselect.h \
+		Stackless/platf/switch_ppc_macosx.h \
+		Stackless/platf/switch_ppc_unix.h \
+		Stackless/platf/switch_s390_unix.h \
+		Stackless/platf/switch_sparc_sun_gcc.h \
+		Stackless/platf/switch_arm32_gcc.h \
+		Stackless/platf/switch_x86_msvc.h \
+		Stackless/platf/switch_x86_unix.h \
 		pyconfig.h \
 		$(PARSER_HEADERS)
 
@@ -714,6 +744,9 @@ testall:	all platform
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
 		$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
+
+teststackless:	all platform
+		pushd Stackless/unittests; $(RUNSHARED) ../../$(BUILDPYTHON) -E -tt runAll.py; popd
 
 #  Run the unitests for both architectures in a Universal build on OSX
 #  Must be run on an Intel box.

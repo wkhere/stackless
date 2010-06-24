@@ -1,3 +1,11 @@
+This is the Stackless (http://www.stackless.com/)
+version of Python.  It will replace the non-stackless 
+Python of the same version.  Other than additional
+features it should be compatible with normal Python.
+
+Everything below this point is from the original 
+Python ReadMe.txt
+----------------------------
 This package will install Python $FULL_VERSION for Mac OS X
 $MACOSX_DEPLOYMENT_TARGET for the following 
 architecture(s): $ARCHITECTURES.

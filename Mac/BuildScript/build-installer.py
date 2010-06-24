@@ -765,7 +765,7 @@ def buildPython():
     os.environ['DYLD_LIBRARY_PATH'] = os.path.join(WORKDIR,
                                         'libraries', 'usr', 'local', 'lib')
     print "Running configure..."
-    runCommand("%s -C --enable-framework --enable-universalsdk=%s "
+    runCommand("%s -C --enable-framework --enable-stacklessfewerregisters --enable-universalsdk=%s "
                "--with-universal-archs=%s "
                "LDFLAGS='-g -L%s/libraries/usr/local/lib' "
                "OPT='-g -O3 -I%s/libraries/usr/local/include' 2>&1"%(
@@ -1024,7 +1024,7 @@ def buildInstaller():
 
     makeMpkgPlist(os.path.join(pkgroot, 'Info.plist'))
     pl = Plist(
-                IFPkgDescriptionTitle="Python",
+                IFPkgDescriptionTitle="Stackless Python",
                 IFPkgDescriptionVersion=getVersion(),
             )
 
@@ -1058,13 +1058,13 @@ def buildDMG():
         shutil.rmtree(outdir)
 
     imagepath = os.path.join(outdir,
-                    'python-%s-macosx%s'%(getFullVersion(),DEPTARGET))
+                    'stackless-%s-macosx%s'%(getFullVersion(),DEPTARGET))
     if INCLUDE_TIMESTAMP:
         imagepath = imagepath + '-%04d-%02d-%02d'%(time.localtime()[:3])
     imagepath = imagepath + '.dmg'
 
     os.mkdir(outdir)
-    volname='Python %s'%(getFullVersion())
+    volname='Stackless Python %s'%(getFullVersion())
     runCommand("hdiutil create -format UDRW -volname %s -srcfolder %s %s"%(
             shellQuote(volname),
             shellQuote(os.path.join(WORKDIR, 'installer')),
