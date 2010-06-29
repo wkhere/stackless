@@ -598,7 +598,8 @@ class SizeofTest(unittest.TestCase):
         import __builtin__
         check(__builtin__.file.closed, size(h + '2PP'))
         # wrapper_descriptor (descriptor object)
-        check(int.__add__, size(h + '2P2P'))
+        slpmask = "i" if haveStackless else ""
+        check(int.__add__, size(h + '2P2P'+slpmask))
         # dictproxy
         class C(object): pass
         check(C.__dict__, size(h + 'P'))

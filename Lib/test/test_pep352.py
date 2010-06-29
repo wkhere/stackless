@@ -45,6 +45,12 @@ class ExceptionClassTests(unittest.TestCase):
         exc_set = set(x for x in dir(exceptions) if not x.startswith('_'))
         inheritance_tree = open(os.path.join(os.path.split(__file__)[0],
                                                 'exception_hierarchy.txt'))
+        haveStackless = False
+        try:
+            import stackless
+            haveStackless = True
+        except ImportError:
+            pass
         try:
             superclass_name = inheritance_tree.readline().rstrip()
             try:
@@ -72,6 +78,8 @@ class ExceptionClassTests(unittest.TestCase):
                 try:
                     exc = getattr(__builtin__, exc_name)
                 except AttributeError:
+                    if exc_name == "TaskletExit" and not haveStackless:
+                        continue
                     self.fail("%s not a built-in exception" % exc_name)
                 if last_depth < depth:
                     superclasses.append((last_depth, last_exc))
