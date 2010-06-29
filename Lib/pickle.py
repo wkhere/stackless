@@ -779,8 +779,32 @@ class Pickler:
         write(GLOBAL + module + '\n' + name + '\n')
         self.memoize(obj)
 
+    def save_function(self, obj):
+        try:
+            return self.save_global(obj)
+        except PicklingError, e:
+            pass
+        # Check copy_reg.dispatch_table
+        reduce = dispatch_table.get(type(obj))
+        if reduce:
+            rv = reduce(obj)
+        else:
+            # Check for a __reduce_ex__ method, fall back to __reduce__
+            reduce = getattr(obj, "__reduce_ex__", None)
+            if reduce:
+                rv = reduce(self.proto)
+            else:
+                reduce = getattr(obj, "__reduce__", None)
+                if reduce:
+                    rv = reduce()
+                else:
+                    raise e
+        return self.save_reduce(obj=obj, *rv)
+
     dispatch[ClassType] = save_global
-    if "Stackless" not in sys.version:
+    if "Stackless" in sys.version:
+        dispatch[FunctionType] = save_function
+    else:
         dispatch[FunctionType] = save_global
     dispatch[BuiltinFunctionType] = save_global
     dispatch[TypeType] = save_global
