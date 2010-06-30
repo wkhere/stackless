@@ -63,7 +63,7 @@ CFLAGS=		$(BASECFLAGS) @CFLAGS@ $(OPT) $(EXTRA_CFLAGS)
 # Both CPPFLAGS and LDFLAGS need to contain the shell's value for setup.py to
 # be able to build extension modules using the directories specified in the
 # environment variables
-CPPFLAGS=	-I. -IInclude -I$(srcdir)/Include @CPPFLAGS@
+CPPFLAGS=	-I. -IInclude -I$(srcdir)/Include -I$(srcdir)/Stackless @CPPFLAGS@
 LDFLAGS=	@LDFLAGS@
 LDLAST=		@LDLAST@
 SGI_ABI=	@SGI_ABI@
@@ -74,6 +74,8 @@ ARFLAGS=	@ARFLAGS@
 CFLAGSFORSHARED=@CFLAGSFORSHARED@
 # C flags used for building the interpreter object files
 PY_CFLAGS=	$(CFLAGS) $(CPPFLAGS) $(CFLAGSFORSHARED) -DPy_BUILD_CORE
+# Special C flags for slp_transfer.c
+SLPFLAGS=	@SLPFLAGS@
 
 
 # Machine-dependent subdirectories
@@ -102,7 +104,12 @@ LIBDEST=	$(SCRIPTDIR)/python$(VERSION)
 INCLUDEPY=	$(INCLUDEDIR)/python$(VERSION)
 CONFINCLUDEPY=	$(CONFINCLUDEDIR)/python$(VERSION)
 LIBP=		$(LIBDIR)/python$(VERSION)
-
+STACKLESSINCLUDEDIRS=		\
+ 		core \
+ 		module \
+ 		pickling \
+ 		platf
+ 
 # Symbols used for using shared libraries
 SO=		@SO@
 LDSHARED=	@LDSHARED@
@@ -610,6 +617,11 @@ Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
 Python/formatter_string.o: $(srcdir)/Python/formatter_string.c \
 				$(STRINGLIB_HEADERS)
 
+Stackless/core/slp_transfer.o: $(srcdir)/Stackless/core/slp_transfer.c
+		$(CC) -c $(PY_CFLAGS) $(SLPFLAGS) -I$(DLINCLDIR) -o $@ $(srcdir)/Stackless/core/slp_transfer.c
+
+
+
 ############################################################################
 # Header files
 
@@ -999,10 +1011,23 @@ inclinstall:
 		else	true; \
 		fi; \
 	done
-	@for i in $(srcdir)/Include/*.h; \
+	@for i in $(srcdir)/Include/*.h $(srcdir)/Stackless/*.h; \
 	do \
 		echo $(INSTALL_DATA) $$i $(INCLUDEPY); \
 		$(INSTALL_DATA) $$i $(DESTDIR)$(INCLUDEPY); \
+	done
+	@for j in $(STACKLESSINCLUDEDIRS); \
+	do \
+		if test ! -d $(DESTDIR)$(INCLUDEPY)$$j; then \
+			echo "Creating directory $(DESTDIR)$(INCLUDEPY)/$$j"; \
+			$(INSTALL) -d -m $(DIRMODE) $(DESTDIR)$(INCLUDEPY)/$$j; \
+		else	true; \
+		fi; \
+		for i in $(srcdir)/Stackless/$$j/*.h; \
+		do \
+			echo $(INSTALL_DATA) $$i $(INCLUDEPY)/$$j; \
+			$(INSTALL_DATA) $$i $(DESTDIR)$(INCLUDEPY)/$$j; \
+		done \
 	done
 	$(INSTALL_DATA) pyconfig.h $(DESTDIR)$(CONFINCLUDEPY)/pyconfig.h
 
