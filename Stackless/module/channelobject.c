@@ -606,7 +606,7 @@ PyChannel_Receive_nr(PyChannelObject *self)
 	PyChannel_HeapType *t = (PyChannel_HeapType *) self->ob_type;
 	PyObject *ret;
 
-	;
+	STACKLESS_PROPOSE_ALL();
 	ret = t->receive(self);
 	STACKLESS_ASSERT();
 	return ret;
