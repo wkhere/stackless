@@ -562,11 +562,14 @@ next ? next->flags.blocked : 0)
 /* make sure that locks live longer than their threads */
 
 static void
-destruct_lock(PyThread_type_lock lock)
+destruct_lock(PyObject *capsule)
 {
-    PyThread_acquire_lock(lock, 0);
-    PyThread_release_lock(lock);
-    PyThread_free_lock(lock);
+    PyThread_type_lock lock = PyCapsule_GetPointer(capsule, 0);
+    if (lock) {
+        PyThread_acquire_lock(lock, 0);
+        PyThread_release_lock(lock);
+        PyThread_free_lock(lock);
+    }
 }
 
 static PyObject *
@@ -577,10 +580,10 @@ new_lock(void)
     lock = PyThread_allocate_lock();
     if (lock == NULL) return NULL;
 
-    return PyCObject_FromVoidPtr(lock, destruct_lock);
+    return PyCapsule_New(lock, 0, destruct_lock);
 }
 
-#define get_lock(obj) PyCObject_AsVoidPtr(obj)
+#define get_lock(obj) PyCapsule_GetPointer(obj, 0)
 
 #define acquire_lock(lock, flag) PyThread_acquire_lock(get_lock(lock), flag)
 #define release_lock(lock) PyThread_release_lock(get_lock(lock))
