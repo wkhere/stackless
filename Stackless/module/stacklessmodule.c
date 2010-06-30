@@ -45,7 +45,6 @@ PyStackless_Schedule(PyObject *retval, int remove)
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *prev = ts->st.current, *next = prev->next;
     PyObject *ret = NULL;
-    int switched;
 
     if (ts->st.main == NULL) return PyStackless_Schedule_M(retval, remove);
     /* make sure we hold a reference to the previous tasklet */
@@ -66,14 +65,7 @@ PyStackless_Schedule(PyObject *retval, int remove)
     assert(ts->st.del_post_switch == NULL);
     ts->st.del_post_switch = (PyObject*)prev;
 
-    ret = slp_schedule_task(prev, next, stackless, &switched);
-
-    /* however, if this was a no-op (e.g. prev==next, or an error occurred)
-     * we need to decref prev ourselves
-     */
-    if (!switched)
-        Py_CLEAR(ts->st.del_post_switch);
-    return ret;
+    return slp_schedule_task(prev, next, stackless);
 }
 
 PyObject *
@@ -234,7 +226,7 @@ interrupt_timeout_return(void)
     else
         current->flags.pending_irq = 0;
 
-    return slp_schedule_task(ts->st.current, ts->st.main, 1, 0);
+    return slp_schedule_task(ts->st.current, ts->st.main, 1);
 }
 
 static PyObject *
@@ -278,7 +270,7 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 
     /* now let them run until the end. */
     ts->st.runflags = flags;
-    retval = slp_schedule_task(ts->st.main, ts->st.current, 0, 0);
+    retval = slp_schedule_task(ts->st.main, ts->st.current, 0);
     ts->st.runflags = 0;
     ts->st.interrupt = NULL;
 

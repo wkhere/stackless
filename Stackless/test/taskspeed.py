@@ -171,7 +171,7 @@ if 0:
 niter = 10000000
 
 if stackless.debug:
-    niter = 200
+    niter = 20000
     
 if args_given:
     niter = args_given
@@ -213,13 +213,13 @@ for use_psyco in (False, True):
         
     enable_softswitch(0)
     res = []
-    #res.append(tester(f, niter, (schedule,),        "frame switches     "))
+    res.append(tester(f, niter, (schedule,),        "frame switches     "))
     enable_softswitch(1)
-    #res.append(tester(f, niter, (schedule,),        "frame softswitches "))
-    #res.append(tester(f, niter, (orig_getframe,),   "cfunction calls    "))
-    #res.append(tester(test_cframe_nr, niter, (),    "cframe softswitches"))
+    res.append(tester(f, niter, (schedule,),        "frame softswitches "))
+    res.append(tester(f, niter, (orig_getframe,),   "cfunction calls    "))
+    res.append(tester(test_cframe_nr, niter, (),    "cframe softswitches"))
     enable_softswitch(0)
-    #res.append(tester(chantest, niter, (),          "channel hard top   "))
+    res.append(tester(chantest, niter, (),          "channel hard top   "))
     res.append(tester(chantest, niter, (3,),        "channel hard nest 3"))
     enable_softswitch(1)
     res.append(tester(chantest, niter, (),          "channel soft       "))
