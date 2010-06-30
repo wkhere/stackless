@@ -4,13 +4,32 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.7 release candidate 2?
-=============================================
+What's New in Python 2.7?
+=========================
 
 *Release date: XXXX-XX-XX*
 
 Core and Builtins
 -----------------
+
+- Prevent assignment to set literals.
+
+Library
+-------
+
+- Issue #9075: In the ssl module, remove the setting of a ``debug`` flag
+  on an OpenSSL structure.
+
+
+What's New in Python 2.7 release candidate 2?
+=============================================
+
+*Release date: 2010-06-20*
+
+Core and Builtins
+-----------------
+
+- Issue #9058: Remove assertions about INT_MAX in UnicodeDecodeError.
 
 - Issue #8202: Previous change to ``sys.argv[0]`` handling for -m command line
   option reverted due to unintended side effects on handling of ``sys.path``.
@@ -23,8 +42,20 @@ Core and Builtins
 - In the unicode/str.format(), raise a ValueError when indexes to arguments are
   too large.
 
+Build
+-----
+
+- Issue #8854: Fix finding Visual Studio 2008 on Windows x64.
+
 Library
 -------
+
+- Issue #8959: fix regression caused by using unmodified libffi
+  library on Windows.  ctypes does now again check the stack before
+  and after calling foreign functions.
+
+- Issue #8720: fix regression caused by fix for #4050 by making getsourcefile
+  smart enough to find source files in the linecache.
 
 - Issue #8986: math.erfc was incorrectly raising OverflowError for
   values between -27.3 and -30.0 on some platforms.
@@ -946,8 +977,6 @@ Library
   file position when calling `truncate()`.  It would previously change the file
   position to the given argument, which goes against the tradition of
   ftruncate() and other truncation APIs.  Patch by Pascal Chambon.
-
-- UserDict is now a new-style class.
 
 - Issue #7610: Reworked implementation of the internal ``zipfile.ZipExtFile``
   class used to represent files stored inside an archive.  The new

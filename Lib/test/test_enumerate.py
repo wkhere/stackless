@@ -103,6 +103,7 @@ class EnumerateTestCase(unittest.TestCase):
         self.assertRaises(TypeError, self.enum, 'abc', 'a') # wrong type
         self.assertRaises(TypeError, self.enum, 'abc', 2, 3) # too many arguments
 
+    @test_support.cpython_only
     def test_tuple_reuse(self):
         # Tests an implementation detail where tuple is reused
         # whenever nothing else holds a reference to it
@@ -141,7 +142,7 @@ class TestReversed(unittest.TestCase):
         # don't allow keyword arguments
         self.assertRaises(TypeError, reversed, [], a=1)
 
-    def test_class_class(self):
+    def test_classic_class(self):
         class A:
             def __reversed__(self):
                 return [2, 1]
@@ -151,6 +152,7 @@ class TestReversed(unittest.TestCase):
         x = xrange(1)
         self.assertEqual(type(reversed(x)), type(iter(x)))
 
+    @test_support.cpython_only
     def test_len(self):
         # This is an implementation detail, not an interface requirement
         from test.test_iterlen import len
