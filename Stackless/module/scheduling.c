@@ -591,7 +591,7 @@ new_lock(void)
 #endif
 
 static PyObject *
-schedule_task_block(PyTaskletObject *prev, int stackless)
+schedule_task_block(PyTaskletObject *prev, int stackless, int *did_switch)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyObject *retval;
@@ -615,12 +615,12 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
              */
             if (PyBomb_Check(prev->tempval))
                 TASKLET_SETVAL(ts->st.main, prev->tempval);
-            return slp_schedule_task(prev, ts->st.main, stackless);
+            return slp_schedule_task(prev, ts->st.main, stackless, did_switch);
         }
         if (!(retval = make_deadlock_bomb()))
             return NULL;
         TASKLET_SETVAL_OWN(prev, retval);
-        return slp_schedule_task(prev, prev, stackless);
+        return slp_schedule_task(prev, prev, stackless, did_switch);
     }
 #ifdef WITH_THREAD
     if (ts->st.thread.self_lock == NULL) {
@@ -679,7 +679,7 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
     next = prev;
 #endif
     /* this must be after releasing the locks because of hard switching */
-    retval = slp_schedule_task(prev, next, stackless);
+    retval = slp_schedule_task(prev, next, stackless, did_switch);
     PR("schedule() is done");
     return retval;
 }
@@ -688,7 +688,8 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 
 static PyObject *schedule_task_unblock(PyTaskletObject *prev,
                                        PyTaskletObject *next,
-                                       int stackless)
+                                       int stackless,
+                                       int *did_switch)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyThreadState *nts = next->cstate->tstate;
@@ -724,7 +725,7 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
     Py_END_ALLOW_THREADS
 
     /* get myself ready */
-    retval = slp_schedule_task(prev, prev, stackless);
+    retval = slp_schedule_task(prev, prev, stackless, did_switch);
 
     /* see whether the other thread still exists and is really blocked */
     if (is_thread_alive(thread_id) && nts->st.thread.is_locked) {
@@ -804,21 +805,25 @@ static void slp_schedule_soft_irq(PyThreadState *ts, PyTaskletObject *prev,
 
 
 PyObject *
-slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
+slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless,
+                  int *did_switch)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyCStackObject **cstprev;
     PyObject *retval;
     int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
     int no_soft_irq;
+    
+    if (did_switch)
+        *did_switch = 0; /* only set this if an actual switch occurs */
 
     if (next == NULL) {
-        return schedule_task_block(prev, stackless);
+        return schedule_task_block(prev, stackless, did_switch);
     }
 #ifdef WITH_THREAD
     /* note that next->cstate is undefined if it is ourself */
     if (next->cstate != NULL && next->cstate->tstate != ts) {
-        return schedule_task_unblock(prev, next, stackless);
+        return schedule_task_unblock(prev, next, stackless, did_switch);
     }
 #endif
 
@@ -915,6 +920,8 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
     ts->recursion_depth = next->recursion_depth;
 
     ts->st.current = next;
+    if (did_switch)
+        *did_switch = 1;
 
     assert(next->cstate != NULL);
     if (next->cstate->nesting_level != 0) {
@@ -973,6 +980,8 @@ hard_switching:
         TASKLET_CLAIMVAL(prev, &retval);
         if (PyBomb_Check(retval))
             retval = slp_bomb_explode(retval);
+        if (did_switch)
+            *did_switch = 1;
         return retval;
     }
     else {
@@ -1066,9 +1075,13 @@ schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
     ts->st.del_post_switch = (PyObject *)prev;
 
     /* do a soft switch */
-    if (prev != next)
-        retval = slp_schedule_task(prev, next, 1);
-    else {
+    if (prev != next) {
+        int switched;
+        retval = slp_schedule_task(prev, next, 1, &switched);
+        if (!switched)
+            /* something happened, cancel prev's decref */
+            ts->st.del_post_switch  = 0;
+    } else {
         /* main is exiting */
         TASKLET_CLAIMVAL(prev, &retval);
         if (PyBomb_Check(retval))

@@ -481,7 +481,7 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
         }
     }
     ts->st.runflags |= runflags; /* extra info for slp_schedule_task */
-    retval = slp_schedule_task(source, target, stackless);
+    retval = slp_schedule_task(source, target, stackless, 0);
 
     if (interthread) {
         if (cando) {

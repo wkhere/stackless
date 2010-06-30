@@ -524,7 +524,7 @@ static TASKLET_RUN_HEAD(impl_tasklet_run)
     if (ts->st.main == NULL) return PyTasklet_Run_M(task);
     if (PyTasklet_Insert(task))
         return NULL;
-    return slp_schedule_task(ts->st.current, task, stackless);
+    return slp_schedule_task(ts->st.current, task, stackless, 0);
 }
 
 static TASKLET_RUN_HEAD(wrap_tasklet_run)
@@ -739,7 +739,7 @@ post_schedule_remove(PyFrameObject *f, int exc, PyObject *retval)
     slp_current_remove(); /* reference used in tempval */
     TASKLET_SETVAL_OWN(self, parent);
     TASKLET_SETVAL_OWN(parent, retval); /* consume it */
-    ret = slp_schedule_task(parent, self, 1);
+    ret = slp_schedule_task(parent, self, 1, 0);
     return ret;
 }
 
@@ -891,7 +891,7 @@ static TASKLET_RAISE_EXCEPTION_HEAD(impl_tasklet_raise_exception)
         TASKLET_CLAIMVAL(self, &bomb);
         return slp_bomb_explode(bomb);
     }
-    return slp_schedule_task(ts->st.current, self, stackless);
+    return slp_schedule_task(ts->st.current, self, stackless, 0);
 }
 
 
