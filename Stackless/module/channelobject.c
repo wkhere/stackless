@@ -49,14 +49,10 @@ channel_dealloc(PyObject *ob)
 static int
 channel_traverse(PyChannelObject *ch, visitproc visit, void *arg)
 {
-    int err;
     PyTaskletObject *p;
-
-#define VISIT(o) if (o) {if ((err = visit((PyObject *)(o), arg))) return err;}
     for (p = ch->head; p != (PyTaskletObject *) ch; p = p->next) {
-        VISIT(p);
+        Py_VISIT(p);
     }
-#undef VISIT
     return 0;
 }
 

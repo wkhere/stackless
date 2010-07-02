@@ -36,15 +36,9 @@ bomb_dealloc(PyBombObject *bomb)
 static int
 bomb_traverse(PyBombObject *bomb, visitproc visit, void *arg)
 {
-    int err;
-
-#define VISIT(o) if (o) {if ((err = visit((PyObject *)(o), arg))) return err;}
-
-    VISIT(bomb->curexc_type);
-    VISIT(bomb->curexc_value);
-    VISIT(bomb->curexc_traceback);
-
-#undef VISIT
+    Py_VISIT(bomb->curexc_type);
+    Py_VISIT(bomb->curexc_value);
+    Py_VISIT(bomb->curexc_traceback);
     return 0;
 }
 

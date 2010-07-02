@@ -54,15 +54,10 @@ cframe_dealloc(PyCFrameObject *cf)
 static int
 cframe_traverse(PyCFrameObject *cf, visitproc visit, void *arg)
 {
-    int err;
-
-#define VISIT(o) if (o) {if ((err = visit((PyObject *)(o), arg))) return err;}
-
-    VISIT(cf->f_back);
-    VISIT(cf->ob1);
-    VISIT(cf->ob2);
-    VISIT(cf->ob3);
-#undef VISIT
+    Py_VISIT(cf->f_back);
+    Py_VISIT(cf->ob1);
+    Py_VISIT(cf->ob2);
+    Py_VISIT(cf->ob3);
     return 0;
 }
 

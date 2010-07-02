@@ -47,17 +47,18 @@ slp_current_remove(void)
 static int
 tasklet_traverse(PyTaskletObject *t, visitproc visit, void *arg)
 {
-    int err;
     PyFrameObject *f;
+    PyThreadState *ts = PyThreadState_GET();
+    if (ts != t->cstate->tstate)
+        /* can't collect from this thread! */
+        PyObject_GC_Collectable((PyObject *)t, visit, arg, 0);
 
-#define VISIT(o) if (o) {if ((err = visit((PyObject *)(o), arg))) return err;}
     /* we own the "execute reference" of all the frames */
     for (f = t->f.frame; f != NULL; f = f->f_back) {
-        VISIT(f);
+        Py_VISIT(f);
     }
-    VISIT(t->tempval);
-    VISIT(t->cstate);
-#undef VISIT
+    Py_VISIT(t->tempval);
+    Py_VISIT(t->cstate);
     return 0;
 }
 
