@@ -7,7 +7,7 @@ Python News
 What's New in Python 2.7?
 =========================
 
-*Release date: XXXX-XX-XX*
+*Release date: 2010-07-03*
 
 Core and Builtins
 -----------------
@@ -16,6 +16,14 @@ Core and Builtins
 
 Library
 -------
+
+- Issue #9125: Add recognition of 'except ... as ...' syntax to parser module.
+
+Extension Modules
+-----------------
+
+- Issue #7673: Fix security vulnerability (CVE-2010-2089) in the audioop module,
+  ensure that the input string length is a multiple of the frame size.
 
 - Issue #9075: In the ssl module, remove the setting of a ``debug`` flag
   on an OpenSSL structure.
@@ -49,6 +57,9 @@ Build
 
 Library
 -------
+
+- Issue #6589: cleanup asyncore.socket_map in case smtpd.SMTPServer constructor
+  raises an exception.
 
 - Issue #8959: fix regression caused by using unmodified libffi
   library on Windows.  ctypes does now again check the stack before
