@@ -747,12 +747,10 @@ class SizeofTest(unittest.TestCase):
         #  PySequenceMethods + PyBufferProcs)
         if haveStackless:
             # The number of byte entries in the generated 'slp_methodflags'.
-            stacklessSize = 83
-            # Make it a multiple of two.
-            stacklessSize = stacklessSize + stacklessSize % 2
+            stacklessSize = ' 83c'
         else:
-            stacklessSize = 0
-        s = size(vh + 'P2P15Pl4PP9PP11PI') + size('41P 10P 3P 6P') + stacklessSize
+            stacklessSize = ''
+        s = size(vh + 'P2P15Pl4PP9PP11PI') + size('41P 10P 3P 6P' + stacklessSize)
         class newstyleclass(object):
             pass
         check(newstyleclass, s)
