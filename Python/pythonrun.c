@@ -246,6 +246,10 @@ Py_InitializeEx(int install_sigs)
     if (install_sigs)
         initsigs(); /* Signal handling stuff, including initintr() */
 
+#ifdef STACKLESS
+    _PyStackless_Init();
+#endif
+
     /* Initialize warnings. */
     _PyWarnings_Init();
     if (PySys_HasWarnOptions()) {
@@ -255,9 +259,6 @@ Py_InitializeEx(int install_sigs)
         Py_XDECREF(warnings_module);
     }
 
-#ifdef STACKLESS
-    _PyStackless_Init();
-#endif
     initmain(); /* Module __main__ */
 
     /* auto-thread-state API, if available */
