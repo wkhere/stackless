@@ -500,7 +500,7 @@ is_thread_runnable(PyThreadState *ts)
 #ifdef WITH_THREAD
     if (ts == PyThreadState_GET())
         return 0;
-    return !ts->st.thread.is_locked;
+    return !ts->st.thread.is_blocked;
 #endif
     return 0;
 }
@@ -539,18 +539,6 @@ is_thread_alive(long thread_id)
     return 0;
 }
 
-# if 0
-#define PR(s) printf("%d: %04x-%04x %04x-%04x %2d " s "\n", prev->cstate->tstate->thread_id, \
-    (int)prev & 0xffff, \
-(int)prev->cstate->tstate & 0xffff, (int)next & 0xffff, \
-    next ? (int)next->cstate->tstate & 0xffff : 0, \
-next ? next->flags.blocked : 0)
-
-# else
-#define PR(s)
-
-# endif
-
 #ifdef WITH_THREAD
 
 /* make sure that locks live longer than their threads */
@@ -582,6 +570,33 @@ new_lock(void)
 #define acquire_lock(lock, flag) PyThread_acquire_lock(get_lock(lock), flag)
 #define release_lock(lock) PyThread_release_lock(get_lock(lock))
 
+static int schedule_thread_block(PyThreadState *ts)
+{
+    assert(!ts->st.thread.is_blocked);
+    /* create on demand the lock we use to block */
+    if (ts->st.thread.block_lock == NULL) {
+        if (!(ts->st.thread.block_lock = new_lock()))
+            return -1;
+        acquire_lock(ts->st.thread.block_lock, 1);
+    }
+
+    /* block */
+    ts->st.thread.is_blocked = 1;
+    Py_BEGIN_ALLOW_THREADS
+    acquire_lock(ts->st.thread.block_lock, 1);
+    Py_END_ALLOW_THREADS
+
+    return 0;
+}
+
+static int schedule_thread_unblock(PyThreadState *nts)
+{
+    if (nts->st.thread.is_blocked) {
+        nts->st.thread.is_blocked = 0;
+        release_lock(nts->st.thread.block_lock);
+    }
+    return 0;
+}
 #endif
 
 static PyObject *
@@ -590,7 +605,6 @@ schedule_task_block(PyTaskletObject *prev, int stackless, int *did_switch)
     PyThreadState *ts = PyThreadState_GET();
     PyObject *retval;
     PyTaskletObject *next = NULL;
-    PyObject *self_lock, *unlocker_lock;
     int revive_main = 0;
 
 #ifdef WITH_THREAD
@@ -617,37 +631,44 @@ schedule_task_block(PyTaskletObject *prev, int stackless, int *did_switch)
         return slp_schedule_task(prev, prev, stackless, did_switch);
     }
 #ifdef WITH_THREAD
-    if (ts->st.thread.self_lock == NULL) {
-        if (!(ts->st.thread.self_lock = new_lock()))
-            return NULL;
-        acquire_lock(ts->st.thread.self_lock, 1);
-    }
+    if (schedule_thread_block(ts))
+        return NULL;
 
-    /* let somebody reactivate us */
-
-    ts->st.thread.is_locked = 1; /* flag as blocked and wait */
-
-    self_lock = ts->st.thread.self_lock;
-    Py_INCREF(self_lock);
-    Py_BEGIN_ALLOW_THREADS
-    PR("locker waiting for my lock");
-    acquire_lock(self_lock, 1);
-    PR("HAVE my lock");
-    Py_END_ALLOW_THREADS
-    Py_DECREF(self_lock);
-
-    if (ts->st.thread.unlock_target != NULL) {
-        next = (PyTaskletObject*)ts->st.thread.unlock_target;
-        ts->st.thread.unlock_target = NULL;
-    }
-    else
+    /* now we should have something in the runnable queue */
+    next = slp_current_remove();
+    if (!next) {
+        /* weird, but what the h */
         next = prev;
+        Py_INCREF(next);
+    }
+#else
+    next = prev;
+    Py_INCREF(next);
+#endif
+    /* this must be after releasing the locks because of hard switching */
+    retval = slp_schedule_task(prev, next, stackless, did_switch);
+    Py_DECREF(next);
+    return retval;
+}
 
-    /*
-     * get in shape. can't do this with schedule here because
-     * hard switching might not get us back, soon enough.
+#ifdef WITH_THREAD
+static PyObject *schedule_task_interthread(PyTaskletObject *prev,
+                                       PyTaskletObject *next,
+                                       int stackless,
+                                       int *did_switch)
+{
+    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *nts = next->cstate->tstate;
+    PyObject *retval;
+    long thread_id = nts->thread_id;
+
+    /* get myself ready, since the previous task is going to continue on the
+     * curren thread
      */
-    if (next->flags.blocked) {
+    retval = slp_schedule_task(prev, prev, stackless, did_switch);
+
+    /* put the next tasklet in the target thread's queue */
+   if (next->flags.blocked) {
         /* unblock from channel */
         slp_channel_remove_slow(next);
         slp_current_insert(next);
@@ -658,104 +679,8 @@ schedule_task_block(PyTaskletObject *prev, int stackless, int *did_switch)
         slp_current_insert(next);
     }
 
-    if (ts->st.thread.unlocker_lock != NULL) {
-        PR("releasing unlocker");
-        unlocker_lock = ts->st.thread.unlocker_lock;
-        ts->st.thread.unlocker_lock = NULL;
-        release_lock(unlocker_lock);
-        PR("released unlocker");
-        Py_DECREF(unlocker_lock);
-    }
-
-    ts->st.thread.is_locked = 0;
-#else
-    (void)unlocker_lock;
-    next = prev;
-#endif
-    /* this must be after releasing the locks because of hard switching */
-    retval = slp_schedule_task(prev, next, stackless, did_switch);
-    PR("schedule() is done");
-    return retval;
-}
-
-#ifdef WITH_THREAD
-
-static PyObject *schedule_task_unblock(PyTaskletObject *prev,
-                                       PyTaskletObject *next,
-                                       int stackless,
-                                       int *did_switch)
-{
-    PyThreadState *ts = PyThreadState_GET();
-    PyThreadState *nts = next->cstate->tstate;
-    PyObject *retval;
-    long thread_id = nts->thread_id;
-    PyObject *unlock_lock;
-
-    if (ts->st.thread.self_lock == NULL) {
-        if (!(ts->st.thread.self_lock = new_lock()))
-            return NULL;
-        /* Non-recursive lock, used for blocking myself on second aquire() */
-        acquire_lock(ts->st.thread.self_lock, 1);
-    }
-
-    /*
-     * make sure nobody else tries a transaction at the same time
-     * on this tasklet's thread state, because two tasklets of the
-     * same thread could be talking to different threads. They must
-     * be serviced in fifo order.
-     */
-
-    if (nts->st.thread.unlock_lock == NULL) {
-        if (!(nts->st.thread.unlock_lock = new_lock()))
-            return NULL;
-    }
-    unlock_lock = nts->st.thread.unlock_lock;
-    Py_INCREF(unlock_lock);
-
-    Py_BEGIN_ALLOW_THREADS
-    PR("unblocker waiting for unlocker lock");
-    acquire_lock(unlock_lock, 1);
-    PR("unblocker HAS unlocker lock");
-    Py_END_ALLOW_THREADS
-
-    /* get myself ready */
-    retval = slp_schedule_task(prev, prev, stackless, did_switch);
-
-    /* see whether the other thread still exists and is really blocked */
-    if (is_thread_alive(thread_id) && nts->st.thread.is_locked) {
-        /* tell the blocker what comes next */
-        nts->st.thread.unlock_target = (PyObject*)next;
-        nts->st.thread.unlocker_lock = ts->st.thread.self_lock;
-        /* give it an extra ref, in case I would die early */
-        Py_INCREF(nts->st.thread.unlocker_lock);
-
-        /* unblock it */
-        release_lock(nts->st.thread.self_lock);
-
-        /* wait for the transaction to finish */
-        Py_BEGIN_ALLOW_THREADS
-        PR("unblocker waiting for own lock");
-        acquire_lock(ts->st.thread.self_lock, 1);
-        PR("unblocker HAS own lock");
-        Py_END_ALLOW_THREADS
-    }
-    else {
-        PR("unlocker: other is NOT LOCKED or dead");
-        if (next->flags.blocked) {
-            /* unblock from channel */
-            slp_channel_remove_slow(next);
-            slp_current_insert(next);
-        }
-        else if (next->next == NULL) {
-            /* reactivate floating task */
-            Py_INCREF(next);
-            slp_current_insert(next);
-        }
-    }
-    PR("unblocker releasing unlocker lock");
-    release_lock(unlock_lock);
-    PR("unblocker RELEASED unlocker lock");
-    Py_DECREF(unlock_lock);
+    /* unblock the thread if required */
+    schedule_thread_unblock(nts);
 
     return retval;
 }
@@ -817,7 +742,7 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless,
 #ifdef WITH_THREAD
     /* note that next->cstate is undefined if it is ourself */
     if (next->cstate != NULL && next->cstate->tstate != ts) {
-        return schedule_task_unblock(prev, next, stackless, did_switch);
+        return schedule_task_interthread(prev, next, stackless, did_switch);
     }
 #endif
 
@@ -1128,7 +1053,7 @@ tasklet_end(PyObject *retval)
          * Because of soft switching, we may find ourself in the top level of a stack that was created
          * using another stub (another entry point into stackless).  If so, we need a final return to
          * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
-         * the original stub, so we take the stub from the cstate)
+         * the original stub, so we take the stub from the tstate)
          */
         if (ts->st.serial_last_jump != ts->st.initial_stub->serial)
             slp_transfer_return(ts->st.initial_stub);
