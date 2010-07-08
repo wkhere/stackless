@@ -173,7 +173,7 @@ class TestWatchdog(unittest.TestCase):
 
         scheduler.autoschedule()
         for ii in tasklets:
-            self.failIf(ii.alive) 
+            self.assertFalse(ii.alive) 
 
         return scheduler.get_schedule_count()
 
@@ -210,9 +210,9 @@ class TestWatchdog(unittest.TestCase):
             print
             print 20*"*", "runtask:", n1, "runtask2:", n2
         if not self.softSchedule:
-            self.failUnless(n1 > n2)
+            self.assertTrue(n1 > n2)
         else:
-            self.failUnless(n1 < n2)
+            self.assertTrue(n1 < n2)
 
 
     def test_exec_tasklet(self):
@@ -232,14 +232,14 @@ class TestWatchdog(unittest.TestCase):
         self.assertEquals(server.count, 60)
 
         # Kill server
-        self.failUnlessRaises(StopIteration, lambda:chan.send_exception(StopIteration))
+        self.assertRaises(StopIteration, lambda:chan.send_exception(StopIteration))
 
 
     def test_atomic(self):
         self.run_tasklets(runtask_atomic)
 
     def test_exception(self):
-        self.failUnlessRaises(UserWarning, lambda:self.run_tasklets(runtask_bad))
+        self.assertRaises(UserWarning, lambda:self.run_tasklets(runtask_bad))
 
     def get_pickled_tasklet(self):
         orig = stackless.tasklet(runtask_print)("pickleme")
@@ -255,7 +255,7 @@ class TestWatchdog(unittest.TestCase):
         if is_soft():
             stackless.run()
         else:
-            self.failUnlessRaises(RuntimeError, stackless.run)
+            self.assertRaises(RuntimeError, stackless.run)
 
         # Run on tasklet
         t = pickle.loads(self.get_pickled_tasklet())
@@ -263,7 +263,7 @@ class TestWatchdog(unittest.TestCase):
         if is_soft():
             t.run()
         else:
-            self.failUnlessRaises(RuntimeError, t.run)
+            self.assertRaises(RuntimeError, t.run)
             return # enough crap
 
         # Run on watchdog
@@ -328,7 +328,7 @@ class TestWatchdogSoft(TestWatchdog):
             for i in range(10):
                 stackless.run(50000, soft=True, totaltimeout=True, ignore_nesting=True)
                 #print "**", stackless.runcount
-                self.failUnless(stackless.runcount == 3 or stackless.runcount == 4)
+                self.assertTrue(stackless.runcount == 3 or stackless.runcount == 4)
         finally:
             for t in c:
                 t.kill()

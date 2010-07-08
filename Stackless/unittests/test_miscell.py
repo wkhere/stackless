@@ -40,18 +40,18 @@ class TestWatchdog(unittest.TestCase):
         self.assertEquals(t, res)
         self.assert_(t.alive)
         self.assert_(t.paused)
-        self.failIf(t.scheduled)
+        self.assertFalse(t.scheduled)
         self.assertEquals(t.recursion_depth, softSwitching and 1 or 2)
 
         # Push back onto queue
         t.insert()
-        self.failIf(t.paused)
+        self.assertFalse(t.paused)
         self.assert_(t.scheduled)
         
         # Run to completion
         stackless.run()
-        self.failIf(t.alive)
-        self.failIf(t.scheduled)
+        self.assertFalse(t.alive)
+        self.assertFalse(t.scheduled)
         self.assertEquals(t.recursion_depth, 0)
         
 
@@ -88,7 +88,7 @@ class TestWatchdog(unittest.TestCase):
         self.assertEquals(t, res)
         self.assert_(t.alive)
         self.assert_(t.paused)
-        self.failIf(t.scheduled)
+        self.assertFalse(t.scheduled)
         self.assertEquals(t.recursion_depth, softSwitching and 1 or 2)        
         
         # Now save & load
@@ -102,7 +102,7 @@ class TestWatchdog(unittest.TestCase):
         t.insert()
 
         self.assert_(t.alive)
-        self.failIf(t.paused)
+        self.assertFalse(t.paused)
         self.assert_(t.scheduled)
         self.assertEquals(t.recursion_depth, 1)
         
@@ -111,8 +111,8 @@ class TestWatchdog(unittest.TestCase):
             stackless.run()
         else:
             t.kill()
-        self.failIf(t.alive)
-        self.failIf(t.scheduled)
+        self.assertFalse(t.alive)
+        self.assertFalse(t.scheduled)
         self.assertEquals(t.recursion_depth, 0)
     
 #///////////////////////////////////////////////////////////////////////////////

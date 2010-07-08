@@ -27,7 +27,7 @@ class TestGarbageCollection(unittest.TestCase):
         except NameError:
             relevant = True
         if relevant and len(leakage):
-            self.failUnless(len(leakage) == 0, "Leaked %s" % repr(leakage))
+            self.assertTrue(len(leakage) == 0, "Leaked %s" % repr(leakage))
 
 if __name__ == '__main__':
     import sys
