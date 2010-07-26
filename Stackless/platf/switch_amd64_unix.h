@@ -2,6 +2,12 @@
  * this is the internal transfer function.
  *
  * HISTORY
+ * 26-Jul-10 Jeff Senn <senn at maya.com>
+ *      Got this to work (rather than crash consistently)
+ *      on OS-X 10.6 by adding more registers to save set.  
+ *      Not sure what is the minimal set of regs, nor if 
+ *      this is completely stable and works for all compiler 
+ *      variations.
  * 01-Apr-04  Hye-Shik Chang    <perky at FreeBSD.org>
  *      Ported from i386 to amd64.
  * 24-Nov-02  Christian Tismer  <tismer at tismer.com>
@@ -29,8 +35,8 @@
 /* the above works fine with gcc 2.96, but 2.95.3 wants this */
 #define STACK_MAGIC 0
 
-#define REGS_TO_SAVE "rdx", "rbx", "r12", "r13", "r14", "r15"
 
+#define REGS_TO_SAVE "rdx", "rbx", "r12", "r13", "r14", "r15", "r9", "r8", "rdi", "rsi", "rcx", "rbp"
 
 static int
 slp_switch(void)
