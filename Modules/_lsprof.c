@@ -3,6 +3,9 @@
 #include "frameobject.h"
 #include "structseq.h"
 #include "rotatingtree.h"
+#ifdef STACKLESS
+#include "stackless_api.h"
+#endif
 
 #if !defined(HAVE_LONG_LONG)
 #error "This module requires long longs!"
@@ -98,19 +101,34 @@ typedef struct _ProfilerEntry {
 typedef struct _ProfilerContext {
     PY_LONG_LONG t0;
     PY_LONG_LONG subt;
+    PY_LONG_LONG paused;
     struct _ProfilerContext *previous;
     ProfilerEntry *ctxEntry;
+    char is_recursion;
+    char is_subcall_recursion;
 } ProfilerContext;
+
+typedef struct _ProfilerStack {
+    rotating_node_t header;
+    ProfilerContext *currentProfilerContext;
+    PY_LONG_LONG t0;        /* When did stack become non-current? */
+} ProfilerStack;
 
 typedef struct {
     PyObject_HEAD
+    rotating_node_t *profilerStacks;
     rotating_node_t *profilerEntries;
-    ProfilerContext *currentProfilerContext;
+    ProfilerStack   *currentProfilerStack;
     ProfilerContext *freelistProfilerContext;
-    int flags;
     PyObject *externalTimer;
     double externalTimerUnit;
+    PY_LONG_LONG currentTime;
+    int flags;
+    int nProfilerStacks;
 } ProfilerObject;
+
+#define CURRENT_CONTEXT(pObj) \
+    ((pObj)->currentProfilerStack->currentProfilerContext)
 
 #define POF_ENABLED     0x001
 #define POF_SUBCALLS    0x002
@@ -303,26 +321,61 @@ static void clearEntries(ProfilerObject *pObj)
 {
     RotatingTree_Enum(pObj->profilerEntries, freeEntry, NULL);
     pObj->profilerEntries = EMPTY_ROTATING_TREE;
-    /* release the memory hold by the ProfilerContexts */
-    if (pObj->currentProfilerContext) {
-        free(pObj->currentProfilerContext);
-        pObj->currentProfilerContext = NULL;
-    }
+    /* release the memory hold by the free list of ProfilerContexts */
     while (pObj->freelistProfilerContext) {
         ProfilerContext *c = pObj->freelistProfilerContext;
         pObj->freelistProfilerContext = c->previous;
         free(c);
     }
-    pObj->freelistProfilerContext = NULL;
+}
+
+static void
+checkRecursion(ProfilerContext *self, int  nStacks, long recursionLevel, long subcallRecursionLevel)
+{
+    ProfilerEntry *entry = self->ctxEntry;
+    ProfilerContext *p;
+    self->is_recursion = self->is_subcall_recursion = 0;
+    if (subcallRecursionLevel > 1) {
+        ProfilerEntry *previous_entry;
+        if (nStacks <= 1) {
+            self->is_recursion = self->is_subcall_recursion = 1;
+            return;
+        }
+        /* possible subcall recursion (and hence recursion) on this stack. */
+        previous_entry = self->previous->ctxEntry;
+        for(p = self->previous; p; p = p->previous) {
+            if (p->ctxEntry == entry) {
+                self->is_recursion = 1;
+                if (p->previous && p->previous->ctxEntry == previous_entry) {
+                    self->is_subcall_recursion = 1;
+                    return;
+                }
+            }
+        }
+    }
+    else if (recursionLevel > 1) {
+        if (nStacks <= 1) {
+            self->is_recursion = 1;
+            return;
+        }
+        /* possible regular recurion on this stack.  Check it. */
+        for(p = self->previous; p; p = p->previous) {
+            if (p->ctxEntry == entry) {
+                self->is_recursion = 1;
+                return;
+            }
+        }
+    }
 }
 
 static void
 initContext(ProfilerObject *pObj, ProfilerContext *self, ProfilerEntry *entry)
 {
+    long subcallRecursionLevel = 0;
     self->ctxEntry = entry;
-    self->subt = 0;
-    self->previous = pObj->currentProfilerContext;
-    pObj->currentProfilerContext = self;
+    self->subt = self->paused = 0;
+    self->previous = CURRENT_CONTEXT(pObj);
+    CURRENT_CONTEXT(pObj) = self;
     ++entry->recursionLevel;
     if ((pObj->flags & POF_SUBCALLS) && self->previous) {
         /* find or create an entry for me in my caller's entry */
@@ -331,20 +384,29 @@ initContext(ProfilerObject *pObj, ProfilerContext *self, ProfilerEntry *entry)
         if (subentry == NULL)
             subentry = newSubEntry(pObj, caller, entry);
         if (subentry)
-            ++subentry->recursionLevel;
+            subcallRecursionLevel = ++subentry->recursionLevel;
     }
-    self->t0 = CALL_TIMER(pObj);
+    checkRecursion(self, pObj->nProfilerStacks, entry->recursionLevel,
+                   subcallRecursionLevel);
+    self->t0 = pObj->currentTime;
 }
 
 static void
 Stop(ProfilerObject *pObj, ProfilerContext *self, ProfilerEntry *entry)
 {
-    PY_LONG_LONG tt = CALL_TIMER(pObj) - self->t0;
-    PY_LONG_LONG it = tt - self->subt;
-    if (self->previous)
+    PY_LONG_LONG tt, it;
+
+    tt = pObj->currentTime - self->t0;
+    tt -= self->paused;
+    it = tt - self->subt;
+
+    if (self->previous) {
         self->previous->subt += tt;
-    pObj->currentProfilerContext = self->previous;
-    if (--entry->recursionLevel == 0)
+        self->previous->paused += self->paused;
+    }
+    CURRENT_CONTEXT(pObj) = self->previous;
+    --entry->recursionLevel;
+    if (!self->is_recursion)
         entry->tt += tt;
     else
         ++entry->recursivecallcount;
@@ -355,7 +417,8 @@ Stop(ProfilerObject *pObj, ProfilerContext *self, ProfilerEntry *entry)
         ProfilerEntry *caller = self->previous->ctxEntry;
         ProfilerSubEntry *subentry = getSubEntry(pObj, caller, entry);
         if (subentry) {
-            if (--subentry->recursionLevel == 0)
+            --subentry->recursionLevel;
+            if (!self->is_subcall_recursion)
                 subentry->tt += tt;
             else
                 ++subentry->recursivecallcount;
@@ -417,7 +480,7 @@ ptrace_leave_call(PyObject *self, void *key)
     ProfilerEntry *profEntry;
     ProfilerContext *pContext;
 
-    pContext = pObj->currentProfilerContext;
+    pContext = CURRENT_CONTEXT(pObj);
     if (pContext == NULL)
         return;
     profEntry = getEntry(pObj, key);
@@ -425,17 +488,72 @@ ptrace_leave_call(PyObject *self, void *key)
         Stop(pObj, pContext, profEntry);
     }
     else {
-        pObj->currentProfilerContext = pContext->previous;
+        CURRENT_CONTEXT(pObj) = pContext->previous;
     }
     /* put pContext into the free list */
     pContext->previous = pObj->freelistProfilerContext;
     pObj->freelistProfilerContext = pContext;
 }
 
+static void
+SelectStackByKey(ProfilerObject *pObj, void *key)
+{
+    ProfilerStack *old = pObj->currentProfilerStack;
+    ProfilerStack *stack;
+
+    if (old) {
+        if (old->header.key == key)
+            return;
+        old->t0 = pObj->currentTime;
+    }
+    stack = (ProfilerStack*)RotatingTree_Get(&pObj->profilerStacks, key);
+    if (stack) {
+        if (stack->currentProfilerContext)
+            stack->currentProfilerContext->paused += pObj->currentTime - stack->t0;
+    }
+    else {
+        stack = (ProfilerStack*) malloc(sizeof(ProfilerStack));
+        if (stack != NULL) {
+            stack->currentProfilerContext = NULL;
+            stack->header.key = key;
+            RotatingTree_Add(&pObj->profilerStacks, (rotating_node_t*)stack);
+            ++pObj->nProfilerStacks;
+        }
+    }
+    pObj->currentProfilerStack = stack;
+}
+
+static void
+SelectStack(ProfilerObject *pObj)
+{
+#ifdef STACKLESS
+    SelectStackByKey(pObj, PyStackless_GetCurrent());
+#else
+    PyThreadState *tstate = PyThreadState_GET();
+    SelectStackByKey(pObj, tstate);
+#endif
+}
+
 static int
 profiler_callback(PyObject *self, PyFrameObject *frame, int what,
                   PyObject *arg)
 {
+    ProfilerObject *pObj = (ProfilerObject*)self;
+    {
+        /* keep error state, see ptrace_enter_call above.
+         * We could keep this more focused, only really needed
+         * when calling a user time function, and initializing
+         * a user object
+         */
+        PyObject *et, *ev, *tb;
+        PyErr_Fetch(&et, &ev, &tb);
+        pObj->currentTime = CALL_TIMER(pObj);
+        SelectStack(pObj);
+        PyErr_Restore(et, ev, tb);
+    }
+    if (pObj->currentProfilerStack == NULL)
+        return 0;
+
     switch (what) {
 
     /* the 'frame' of a called function is about to start its execution */
@@ -708,17 +826,39 @@ profiler_enable(ProfilerObject *self, PyObject *args, PyObject *kwds)
 static void
 flush_unmatched(ProfilerObject *pObj)
 {
-    while (pObj->currentProfilerContext) {
-        ProfilerContext *pContext = pObj->currentProfilerContext;
+    if (!pObj->currentProfilerStack)
+        return;
+    while (CURRENT_CONTEXT(pObj)) {
+        ProfilerContext *pContext = CURRENT_CONTEXT(pObj);
         ProfilerEntry *profEntry= pContext->ctxEntry;
         if (profEntry)
             Stop(pObj, pContext, profEntry);
         else
-            pObj->currentProfilerContext = pContext->previous;
+            CURRENT_CONTEXT(pObj) = pContext->previous;
         if (pContext)
             free(pContext);
     }
 
+}
+
+static int
+flush_unmatched_enum(rotating_node_t *n, void *arg)
+{
+    ProfilerStack *t = (ProfilerStack*)n;
+    ProfilerObject *pObj = (ProfilerObject*)arg;
+    pObj->currentProfilerStack = t;
+    flush_unmatched(pObj);
+    free(t);
+    return 0;
+}
+
+static void
+flush_unmatched_allstacks(ProfilerObject *pObj)
+{
+    RotatingTree_Enum(pObj->profilerStacks, &flush_unmatched_enum, pObj);
+    pObj->profilerStacks = EMPTY_ROTATING_TREE;
+    pObj->currentProfilerStack = NULL;
+    pObj->nProfilerStacks = 0;
 }
 
 PyDoc_STRVAR(disable_doc, "\
@@ -732,6 +872,7 @@ profiler_disable(ProfilerObject *self, PyObject* noarg)
 {
     self->flags &= ~POF_ENABLED;
     PyEval_SetProfile(NULL, NULL);
+    SelectStack(self);
     flush_unmatched(self);
     if (pending_exception(self))
         return NULL;
@@ -748,6 +889,7 @@ Clear all profiling information collected so far.\n\
 static PyObject*
 profiler_clear(ProfilerObject *pObj, PyObject* noarg)
 {
+    flush_unmatched_allstacks(pObj);
     clearEntries(pObj);
     Py_INCREF(Py_None);
     return Py_None;
@@ -758,7 +900,7 @@ profiler_dealloc(ProfilerObject *op)
 {
     if (op->flags & POF_ENABLED)
         PyEval_SetProfile(NULL, NULL);
-    flush_unmatched(op);
+    flush_unmatched_allstacks(op);
     clearEntries(op);
     Py_XDECREF(op->externalTimer);
     Py_TYPE(op)->tp_free(op);
