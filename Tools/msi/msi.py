@@ -1,7 +1,7 @@
 # Python MSI Generator
 # (C) 2003 Martin v. Loewis
 # See "FOO" in comments refers to MSDN sections with the title FOO.
-import msilib, schema, sequence, os, glob, time, re, shutil
+import msilib, schema, sequence, os, glob, time, re, shutil, zipfile
 from msilib import Feature, CAB, Directory, Dialog, Binary, add_data
 import uisample
 from win32com.client import constants
@@ -28,6 +28,8 @@ have_tcl = True
 PCBUILD="PCbuild"
 # msvcrt version
 MSVCR = "90"
+# Make a zip file containing the PDB files for this build?
+pdbzip = True
 
 try:
     from config import *
@@ -409,7 +411,7 @@ def add_ui(db):
               ("VerdanaRed9", "Verdana", 9, 255, 0),
              ])
 
-    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x bad_coding|badsyntax|site-packages|py2_ "[TARGETDIR]Lib"'
+    compileargs = r'-Wi "[TARGETDIR]Lib\compileall.py" -f -x "bad_coding|badsyntax|site-packages|py2_|lib2to3\\tests" "[TARGETDIR]Lib"'
     lib2to3args = r'-c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"'
     # See "CustomAction Table"
     add_data(db, "CustomAction", [
@@ -1023,6 +1025,8 @@ def add_files(db):
             lib.glob("*.pem")
             lib.glob("*.pck")
             lib.add_file("zipdir.zip")
+        if dir=='tests' and parent.physical=='distutils':
+            lib.add_file("Setup.sample")
         if dir=='decimaltestdata':
             lib.glob("*.decTest")
         if dir=='output':
@@ -1134,7 +1138,7 @@ def add_files(db):
     # Add tools
     tools.set_current()
     tooldir = PyDirectory(db, cab, root, "Tools", "Tools", "TOOLS|Tools")
-    for f in ['i18n', 'pynche', 'Scripts', 'versioncheck', 'webchecker']:
+    for f in ['i18n', 'pynche', 'Scripts', 'webchecker']:
         lib = PyDirectory(db, cab, tooldir, f, f, "%s|%s" % (tooldir.make_short(f), f))
         lib.glob("*.py")
         lib.glob("*.pyw", exclude=['pydocgui.pyw'])
@@ -1311,6 +1315,16 @@ def add_registry(db):
               ])
     db.Commit()
 
+def build_pdbzip():
+    pdbexclude = ['kill_python.pdb', 'make_buildinfo.pdb',
+                  'make_versioninfo.pdb']
+    path = "python-%s%s-pdb.zip" % (full_current_version, msilib.arch_ext)
+    pdbzip = zipfile.ZipFile(path, 'w')
+    for f in glob.glob1(os.path.join(srcdir, PCBUILD), "*.pdb"):
+        if f not in pdbexclude and not f.endswith('_d.pdb'):
+            pdbzip.write(os.path.join(srcdir, PCBUILD, f), f)
+    pdbzip.close()
+
 db = build_database()
 try:
     add_features(db)
@@ -1321,3 +1335,6 @@ try:
     db.Commit()
 finally:
     del db
+
+if pdbzip:
+    build_pdbzip()

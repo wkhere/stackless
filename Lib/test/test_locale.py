@@ -8,7 +8,15 @@ enUS_locale = None
 
 def get_enUS_locale():
     global enUS_locale
-    if sys.platform.startswith("win"):
+    if sys.platform == 'darwin':
+        import os
+        tlocs = ("en_US.UTF-8", "en_US.ISO8859-1", "en_US")
+        if int(os.uname()[2].split('.')[0]) < 10:
+            # The locale test work fine on OSX 10.6, I (ronaldoussoren)
+            # haven't had time yet to verify if tests work on OSX 10.5
+            # (10.4 is known to be bad)
+            raise unittest.SkipTest("Locale support on MacOSX is minimal")
+    elif sys.platform.startswith("win"):
         tlocs = ("En", "English")
     else:
         tlocs = ("en_US.UTF-8", "en_US.ISO8859-1", "en_US.US-ASCII", "en_US")
@@ -228,6 +236,25 @@ class TestFormatPatternArg(unittest.TestCase):
         self.assertRaises(ValueError, locale.format, " %f", 'foo')
         self.assertRaises(ValueError, locale.format, "%fg", 'foo')
         self.assertRaises(ValueError, locale.format, "%^g", 'foo')
+        self.assertRaises(ValueError, locale.format, "%f%%", 'foo')
+
+
+class TestLocaleFormatString(unittest.TestCase):
+    """General tests on locale.format_string"""
+
+    def test_percent_escape(self):
+        self.assertEqual(locale.format_string('%f%%', 1.0), '%f%%' % 1.0)
+        self.assertEqual(locale.format_string('%d %f%%d', (1, 1.0)),
+            '%d %f%%d' % (1, 1.0))
+        self.assertEqual(locale.format_string('%(foo)s %%d', {'foo': 'bar'}),
+            ('%(foo)s %%d' % {'foo': 'bar'}))
+
+    def test_mapping(self):
+        self.assertEqual(locale.format_string('%(foo)s bing.', {'foo': 'bar'}),
+            ('%(foo)s bing.' % {'foo': 'bar'}))
+        self.assertEqual(locale.format_string('%(foo)s', {'foo': 'bar'}),
+            ('%(foo)s' % {'foo': 'bar'}))
+
 
 
 class TestNumberFormatting(BaseLocalizedTest, EnUSNumberFormatting):
@@ -325,13 +352,13 @@ class TestEnUSCollation(BaseLocalizedTest, TestCollation):
     locale_type = locale.LC_ALL
 
     def setUp(self):
-        BaseLocalizedTest.setUp(self)
         enc = codecs.lookup(locale.getpreferredencoding(False) or 'ascii').name
         if enc not in ('utf-8', 'iso8859-1', 'cp1252'):
             raise unittest.SkipTest('encoding not suitable')
         if enc != 'iso8859-1' and (sys.platform == 'darwin' or
                                    sys.platform.startswith('freebsd')):
             raise unittest.SkipTest('wcscoll/wcsxfrm have known bugs')
+        BaseLocalizedTest.setUp(self)
 
     def test_strcoll_with_diacritic(self):
         self.assertLess(locale.strcoll('à', 'b'), 0)
@@ -369,6 +396,7 @@ def test_main():
     tests = [
         TestMiscellaneous,
         TestFormatPatternArg,
+        TestLocaleFormatString,
         TestEnUSNumberFormatting,
         TestCNumberFormatting,
         TestFrFRNumberFormatting,

@@ -63,17 +63,18 @@ class BaseBytesTest(unittest.TestCase):
         b = self.type2test([Indexable(), Indexable(1), Indexable(254),
                             Indexable(255)])
         self.assertEqual(list(b), [0, 1, 254, 255])
-        self.assertRaises(ValueError, bytearray, [Indexable(-1)])
-        self.assertRaises(ValueError, bytearray, [Indexable(256)])
+        self.assertRaises(ValueError, self.type2test, [Indexable(-1)])
+        self.assertRaises(ValueError, self.type2test, [Indexable(256)])
 
     def test_from_ssize(self):
-        self.assertEqual(bytearray(0), b'')
-        self.assertEqual(bytearray(1), b'\x00')
-        self.assertEqual(bytearray(5), b'\x00\x00\x00\x00\x00')
-        self.assertRaises(ValueError, bytearray, -1)
+        self.assertEqual(self.type2test(0), b'')
+        self.assertEqual(self.type2test(1), b'\x00')
+        self.assertEqual(self.type2test(5), b'\x00\x00\x00\x00\x00')
+        self.assertRaises(ValueError, self.type2test, -1)
 
-        self.assertEqual(bytearray('0', 'ascii'), b'0')
-        self.assertEqual(bytearray(b'0'), b'0')
+        self.assertEqual(self.type2test('0', 'ascii'), b'0')
+        self.assertEqual(self.type2test(b'0'), b'0')
+        self.assertRaises(OverflowError, self.type2test, sys.maxsize + 1)
 
     def test_constructor_type_errors(self):
         self.assertRaises(TypeError, self.type2test, 0.0)
@@ -245,11 +246,11 @@ class BaseBytesTest(unittest.TestCase):
     def test_fromhex(self):
         self.assertRaises(TypeError, self.type2test.fromhex)
         self.assertRaises(TypeError, self.type2test.fromhex, 1)
-        self.assertEquals(self.type2test.fromhex(''), self.type2test())
+        self.assertEqual(self.type2test.fromhex(''), self.type2test())
         b = bytearray([0x1a, 0x2b, 0x30])
-        self.assertEquals(self.type2test.fromhex('1a2B30'), b)
-        self.assertEquals(self.type2test.fromhex('  1A 2B  30   '), b)
-        self.assertEquals(self.type2test.fromhex('0000'), b'\0\0')
+        self.assertEqual(self.type2test.fromhex('1a2B30'), b)
+        self.assertEqual(self.type2test.fromhex('  1A 2B  30   '), b)
+        self.assertEqual(self.type2test.fromhex('0000'), b'\0\0')
         self.assertRaises(TypeError, self.type2test.fromhex, b'1B')
         self.assertRaises(ValueError, self.type2test.fromhex, 'a')
         self.assertRaises(ValueError, self.type2test.fromhex, 'rt')
@@ -608,11 +609,11 @@ class ByteArrayTest(BaseBytesTest):
                     data.reverse()
                     L[start:stop:step] = data
                     b[start:stop:step] = data
-                    self.assertEquals(b, bytearray(L))
+                    self.assertEqual(b, bytearray(L))
 
                     del L[start:stop:step]
                     del b[start:stop:step]
-                    self.assertEquals(b, bytearray(L))
+                    self.assertEqual(b, bytearray(L))
 
     def test_setslice_trap(self):
         # This test verifies that we correctly handle assigning self
@@ -791,25 +792,25 @@ class ByteArrayTest(BaseBytesTest):
         resize(10)
         orig = b[:]
         self.assertRaises(BufferError, resize, 11)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, resize, 9)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, resize, 0)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         # Other operations implying resize
         self.assertRaises(BufferError, b.pop, 0)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         self.assertRaises(BufferError, b.remove, b[1])
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         def delitem():
             del b[1]
         self.assertRaises(BufferError, delitem)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
         # deleting a non-contiguous slice
         def delslice():
             b[1:-1:2] = b""
         self.assertRaises(BufferError, delslice)
-        self.assertEquals(b, orig)
+        self.assertEqual(b, orig)
 
     def test_empty_bytearray(self):
         # Issue #7561: operations on empty bytearrays could crash in many

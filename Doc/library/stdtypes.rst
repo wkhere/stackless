@@ -216,14 +216,15 @@ Numeric Types --- :class:`int`, :class:`float`, :class:`complex`
 There are three distinct numeric types: :dfn:`integers`, :dfn:`floating
 point numbers`, and :dfn:`complex numbers`.  In addition, Booleans are a
 subtype of integers.  Integers have unlimited precision.  Floating point
-numbers are implemented using :ctype:`double` in C---all bets on their
-precision are off unless you happen to know the machine you are working
-with. Complex numbers have a real and imaginary part, which are each
-implemented using :ctype:`double` in C.  To extract these parts from a
-complex number *z*, use ``z.real`` and ``z.imag``. (The standard library
-includes additional numeric types, :mod:`fractions` that hold rationals,
-and :mod:`decimal` that hold floating-point numbers with user-definable
-precision.)
+numbers are usually implemented using :ctype:`double` in C; information
+about the precision and internal representation of floating point
+numbers for the machine on which your program is running is available
+in :data:`sys.float_info`.  Complex numbers have a real and imaginary
+part, which are each a floating point number.  To extract these parts
+from a complex number *z*, use ``z.real`` and ``z.imag``. (The standard
+library includes additional numeric types, :mod:`fractions` that hold
+rationals, and :mod:`decimal` that hold floating-point numbers with
+user-definable precision.)
 
 .. index::
    pair: numeric; literals
@@ -451,7 +452,7 @@ Additional Methods on Integer Types
     Equivalent to::
 
         def bit_length(self):
-            s = bin(x)          # binary representation:  bin(-37) --> '-0b100101'
+            s = bin(self)       # binary representation:  bin(-37) --> '-0b100101'
             s = s.lstrip('-0b') # remove leading zeros and minus sign
             return len(s)       # len('100101') --> 6
 
@@ -465,10 +466,20 @@ The float type has some additional methods.
 
 .. method:: float.as_integer_ratio()
 
-    Return a pair of integers whose ratio is exactly equal to the
-    original float and with a positive denominator.  Raises
-    :exc:`OverflowError` on infinities and a :exc:`ValueError` on
-    NaNs.
+   Return a pair of integers whose ratio is exactly equal to the
+   original float and with a positive denominator.  Raises
+   :exc:`OverflowError` on infinities and a :exc:`ValueError` on
+   NaNs.
+
+.. method:: float.is_integer()
+
+   Return ``True`` if the float instance is finite with integral
+   value, and ``False`` otherwise::
+
+      >>> (-2.0).is_integer()
+      True
+      >>> (3.2).is_integer()
+      False
 
 Two methods support conversion to
 and from hexadecimal strings.  Since Python's floats are stored
@@ -700,6 +711,12 @@ are sequences of the same type; *n*, *i* and *j* are integers:
 +------------------+--------------------------------+----------+
 | ``max(s)``       | largest item of *s*            |          |
 +------------------+--------------------------------+----------+
+| ``s.index(i)``   | index of the first occurence   |          |
+|                  | of *i* in *s*                  |          |
++------------------+--------------------------------+----------+
+| ``s.count(i)``   | total number of occurences of  |          |
+|                  | *i* in *s*                     |          |
++------------------+--------------------------------+----------+
 
 Sequence types also support comparisons.  In particular, tuples and lists are
 compared lexicographically by comparing corresponding elements.  This means that
@@ -800,7 +817,8 @@ functions based on regular expressions.
 
 .. method:: str.capitalize()
 
-   Return a copy of the string with only its first character capitalized.
+   Return a copy of the string with its first character capitalized and the
+   rest lowercased.
 
 
 .. method:: str.center(width[, fillchar])
@@ -827,6 +845,9 @@ functions based on regular expressions.
    :func:`codecs.register_error`, see section :ref:`codec-base-classes`. For a
    list of possible encodings, see section :ref:`standard-encodings`.
 
+   .. versionchanged:: 3.1
+      Support for keyword arguments added.
+
 
 .. method:: str.endswith(suffix[, start[, end]])
 
@@ -847,10 +868,10 @@ functions based on regular expressions.
 
 .. method:: str.find(sub[, start[, end]])
 
-   Return the lowest index in the string where substring *sub* is found, such that
-   *sub* is contained in the range [*start*, *end*].  Optional arguments *start*
-   and *end* are interpreted as in slice notation.  Return ``-1`` if *sub* is not
-   found.
+   Return the lowest index in the string where substring *sub* is found, such
+   that *sub* is contained in the slice ``s[start:end]``.  Optional arguments
+   *start* and *end* are interpreted as in slice notation.  Return ``-1`` if
+   *sub* is not found.
 
 
 .. method:: str.format(*args, **kwargs)
@@ -1017,9 +1038,9 @@ functions based on regular expressions.
 
 .. method:: str.rfind(sub[, start[, end]])
 
-   Return the highest index in the string where substring *sub* is found, such that
-   *sub* is contained within s[start,end].  Optional arguments *start* and *end*
-   are interpreted as in slice notation.  Return ``-1`` on failure.
+   Return the highest index in the string where substring *sub* is found, such
+   that *sub* is contained within ``s[start:end]``.  Optional arguments *start*
+   and *end* are interpreted as in slice notation.  Return ``-1`` on failure.
 
 
 .. method:: str.rindex(sub[, start[, end]])
@@ -1243,9 +1264,8 @@ formats in the string *must* include a parenthesised mapping key into that
 dictionary inserted immediately after the ``'%'`` character. The mapping key
 selects the value to be formatted from the mapping.  For example:
 
-
-   >>> print('%(language)s has %(#)03d quote types.' % \
-   ...       {'language': "Python", "#": 2})
+   >>> print('%(language)s has %(number)03d quote types.' %
+   ...       {'language': "Python", "number": 2})
    Python has 002 quote types.
 
 In this case no ``*`` specifiers may occur in a format (since they require a
@@ -1407,6 +1427,22 @@ arbitrary object).
 Note that while lists allow their items to be of any type, bytearray object
 "items" are all integers in the range 0 <= x < 256.
 
+.. index::
+   triple: operations on; sequence; types
+   triple: operations on; list; type
+   pair: subscript; assignment
+   pair: slice; assignment
+   statement: del
+   single: append() (sequence method)
+   single: extend() (sequence method)
+   single: count() (sequence method)
+   single: index() (sequence method)
+   single: insert() (sequence method)
+   single: pop() (sequence method)
+   single: remove() (sequence method)
+   single: reverse() (sequence method)
+   single: sort() (sequence method)
+
 +------------------------------+--------------------------------+---------------------+
 | Operation                    | Result                         | Notes               |
 +==============================+================================+=====================+
@@ -1451,21 +1487,6 @@ Note that while lists allow their items to be of any type, bytearray object
 | ``s.sort([key[, reverse]])`` | sort the items of *s* in place | (6), (7), (8)       |
 +------------------------------+--------------------------------+---------------------+
 
-.. index::
-   triple: operations on; sequence; types
-   triple: operations on; list; type
-   pair: subscript; assignment
-   pair: slice; assignment
-   statement: del
-   single: append() (sequence method)
-   single: extend() (sequence method)
-   single: count() (sequence method)
-   single: index() (sequence method)
-   single: insert() (sequence method)
-   single: pop() (sequence method)
-   single: remove() (sequence method)
-   single: reverse() (sequence method)
-   single: sort() (sequence method)
 
 Notes:
 
@@ -1635,6 +1656,10 @@ and cannot be used as either a dictionary key or as an element of another set.
 The :class:`frozenset` type is immutable and :term:`hashable` --- its contents cannot be
 altered after it is created; it can therefore be used as a dictionary key or as
 an element of another set.
+
+Non-empty sets (not frozensets) can be created by placing a comma-separated list
+of elements within braces, for example: ``{'jack', 'sjoerd'}``, in addition to the
+:class:`set` constructor.
 
 The constructors for both classes work the same:
 
@@ -1851,12 +1876,12 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
    values are added as items to the dictionary.  If a key is specified both in
    the positional argument and as a keyword argument, the value associated with
    the keyword is retained in the dictionary.  For example, these all return a
-   dictionary equal to ``{"one": 2, "two": 3}``:
+   dictionary equal to ``{"one": 1, "two": 2}``:
 
-   * ``dict(one=2, two=3)``
-   * ``dict({'one': 2, 'two': 3})``
-   * ``dict(zip(('one', 'two'), (2, 3)))``
-   * ``dict([['two', 3], ['one', 2]])``
+   * ``dict(one=1, two=2)``
+   * ``dict({'one': 1, 'two': 2})``
+   * ``dict(zip(('one', 'two'), (1, 2)))``
+   * ``dict([['two', 2], ['one', 1]])``
 
    The first example only works for keys that are valid Python identifiers; the
    others work with any valid keys.
@@ -1903,7 +1928,7 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
    .. describe:: iter(d)
 
       Return an iterator over the keys of the dictionary.  This is a shortcut
-      for :meth:`iterkeys`.
+      for ``iter(d.keys())``.
 
    .. method:: clear()
 
@@ -1958,11 +1983,11 @@ pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
 
    .. method:: update([other])
 
-     Update the dictionary with the key/value pairs from *other*, overwriting
-     existing keys.  Return ``None``.
+      Update the dictionary with the key/value pairs from *other*, overwriting
+      existing keys.  Return ``None``.
 
       :meth:`update` accepts either another dictionary object or an iterable of
-      key/value pairs (as a tuple or other iterable of length two).  If keyword
+      key/value pairs (as tuples or other iterables of length two).  If keyword
       arguments are specified, the dictionary is then updated with those
       key/value pairs: ``d.update(red=1, blue=2)``.
 
@@ -2012,28 +2037,11 @@ support membership tests:
 
 
 Keys views are set-like since their entries are unique and hashable.  If all
-values are hashable, so that (key, value) pairs are unique and hashable, then
-the items view is also set-like.  (Values views are not treated as set-like
-since the entries are generally not unique.)  Then these set operations are
-available ("other" refers either to another view or a set):
-
-.. describe:: dictview & other
-
-   Return the intersection of the dictview and the other object as a new set.
-
-.. describe:: dictview | other
-
-   Return the union of the dictview and the other object as a new set.
-
-.. describe:: dictview - other
-
-   Return the difference between the dictview and the other object (all elements
-   in *dictview* that aren't in *other*) as a new set.
-
-.. describe:: dictview ^ other
-
-   Return the symmetric difference (all elements either in *dictview* or
-   *other*, but not in both) of the dictview and the other object as a new set.
+values are hashable, so that ``(key, value)`` pairs are unique and hashable,
+then the items view is also set-like.  (Values views are not treated as set-like
+since the entries are generally not unique.)  For set-like views, all of the
+operations defined for the abstract base class :class:`collections.Set` are
+available (for example, ``==``, ``<``, or ``^``).
 
 
 An example of dictionary view usage::
@@ -2064,6 +2072,8 @@ An example of dictionary view usage::
    >>> # set operations
    >>> keys & {'eggs', 'bacon', 'salad'}
    {'bacon'}
+   >>> keys ^ {'sausage', 'juice'}
+   {'juice', 'eggs', 'bacon', 'spam'}
 
 
 .. _typememoryview:
@@ -2081,10 +2091,19 @@ simple bytes or complex data structures.
    buffer protocol.  Builtin objects that support the buffer protocol include
    :class:`bytes` and :class:`bytearray`.
 
-   ``len(view)`` returns the total number of bytes in the memoryview, *view*.
+   A :class:`memoryview` has the notion of an *element*, which is the
+   atomic memory unit handled by the originating object *obj*.  For many
+   simple types such as :class:`bytes` and :class:`bytearray`, an element
+   is a single byte, but other types such as :class:`array.array` may have
+   bigger elements.
+
+   ``len(view)`` returns the total number of elements in the memoryview,
+   *view*.  The :class:`~memoryview.itemsize` attribute will give you the
+   number of bytes in a single element.
 
    A :class:`memoryview` supports slicing to expose its data.  Taking a single
-   index will return a single byte.  Full slicing will result in a subview::
+   index will return a single element as a :class:`bytes` object.  Full
+   slicing will result in a subview::
 
       >>> v = memoryview(b'abcefg')
       >>> v[1]
@@ -2095,11 +2114,8 @@ simple bytes or complex data structures.
       <memory at 0x77ab28>
       >>> bytes(v[1:4])
       b'bce'
-      >>> v[3:-1]
-      <memory at 0x744f18>
-      >>> bytes(v[4:-1])
 
-   If the object the memory view is over supports changing its data, the
+   If the object the memoryview is over supports changing its data, the
    memoryview supports slice assignment::
 
       >>> data = bytearray(b'abcefg')
@@ -2117,14 +2133,20 @@ simple bytes or complex data structures.
       File "<stdin>", line 1, in <module>
       ValueError: cannot modify size of memoryview object
 
-   Notice how the size of the memoryview object can not be changed.
-
+   Notice how the size of the memoryview object cannot be changed.
 
    :class:`memoryview` has two methods:
 
    .. method:: tobytes()
 
-      Return the data in the buffer as a bytestring.
+      Return the data in the buffer as a bytestring.  This is equivalent to
+      calling the :class:`bytes` constructor on the memoryview. ::
+
+         >>> m = memoryview(b"abc")
+         >>> m.tobytes()
+         b'abc'
+         >>> bytes(m)
+         b'abc'
 
    .. method:: tolist()
 
@@ -2142,7 +2164,15 @@ simple bytes or complex data structures.
 
    .. attribute:: itemsize
 
-      The size in bytes of each element of the memoryview.
+      The size in bytes of each element of the memoryview::
+
+         >>> m = memoryview(array.array('H', [1,2,3]))
+         >>> m.itemsize
+         2
+         >>> m[0]
+         b'\x01\x00'
+         >>> len(m[0]) == m.itemsize
+         True
 
    .. attribute:: shape
 
@@ -2188,9 +2218,9 @@ to be provided for a context manager object to define a runtime context:
    the identifier in the :keyword:`as` clause of :keyword:`with` statements using
    this context manager.
 
-   An example of a context manager that returns itself is a file object. File
-   objects return themselves from __enter__() to allow :func:`open` to be used as
-   the context expression in a :keyword:`with` statement.
+   An example of a context manager that returns itself is a :term:`file object`.
+   File objects return themselves from __enter__() to allow :func:`open` to be
+   used as the context expression in a :keyword:`with` statement.
 
    An example of a context manager that returns a related object is the one
    returned by :func:`decimal.localcontext`. These managers set the active

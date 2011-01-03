@@ -87,7 +87,6 @@ The :func:`range` Function
 If you do need to iterate over a sequence of numbers, the built-in function
 :func:`range` comes in handy.  It generates arithmetic progressions::
 
-
     >>> for i in range(5):
     ...     print(i)
     ...
@@ -97,9 +96,7 @@ If you do need to iterate over a sequence of numbers, the built-in function
     3
     4
 
-
-
-The given end point is never part of the generated list; ``range(10)`` generates
+The given end point is never part of the generated sequence; ``range(10)`` generates
 10 values, the legal indices for items of a sequence of length 10.  It
 is possible to let the range start at another number, or to specify a different
 increment (even negative; sometimes this is called the 'step')::
@@ -461,10 +458,12 @@ function like this::
    def cheeseshop(kind, *arguments, **keywords):
        print("-- Do you have any", kind, "?")
        print("-- I'm sorry, we're all out of", kind)
-       for arg in arguments: print(arg)
+       for arg in arguments:
+           print(arg)
        print("-" * 40)
        keys = sorted(keywords.keys())
-       for kw in keys: print(kw, ":", keywords[kw])
+       for kw in keys:
+           print(kw, ":", keywords[kw])
 
 It could be called like this::
 

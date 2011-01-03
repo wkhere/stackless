@@ -219,6 +219,10 @@ Functions, Constants, and Exceptions
 
    Selects SSL version 2 as the channel encryption protocol.
 
+   .. warning::
+
+      SSL version 2 is insecure.  Its use is highly discouraged.
+
 .. data:: PROTOCOL_SSLv23
 
    Selects SSL version 2 or 3 as the channel encryption protocol.  This is a
@@ -273,14 +277,6 @@ SSLSocket Objects
                     select.select([], [sock], [])
                 else:
                     raise
-
-.. method:: SSLSocket.unwrap()
-
-   Performs the SSL shutdown handshake, which removes the TLS layer from the
-   underlying socket, and returns the underlying socket object.  This can be
-   used to go from encrypted operation over a connection to unencrypted.  The
-   returned socket should always be used for further communication with the
-   other side of the connection, rather than the original socket
 
 .. method:: SSLSocket.getpeercert(binary_form=False)
 

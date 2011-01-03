@@ -809,8 +809,8 @@ oss_getattro(oss_audio_t *self, PyObject *nameobj)
     PyObject * rval = NULL;
 
     if (PyUnicode_Check(nameobj))
-	name = _PyUnicode_AsString(nameobj);
-    
+        name = _PyUnicode_AsString(nameobj);
+
     if (strcmp(name, "closed") == 0) {
         rval = (self->fd == -1) ? Py_True : Py_False;
         Py_INCREF(rval);
@@ -975,28 +975,34 @@ error1:
 
 
 static struct PyModuleDef ossaudiodevmodule = {
-	PyModuleDef_HEAD_INIT,
-	"ossaudiodev",
-	NULL,
-	-1,
-	ossaudiodev_methods,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+        PyModuleDef_HEAD_INIT,
+        "ossaudiodev",
+        NULL,
+        -1,
+        ossaudiodev_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
 };
 
-PyObject*
+PyMODINIT_FUNC
 PyInit_ossaudiodev(void)
 {
     PyObject *m;
 
+    if (PyType_Ready(&OSSAudioType) < 0)
+        return NULL;
+
+    if (PyType_Ready(&OSSMixerType) < 0)
+        return NULL;
+
     m = PyModule_Create(&ossaudiodevmodule);
     if (m == NULL)
-	return NULL;
+        return NULL;
 
     OSSAudioError = PyErr_NewException("ossaudiodev.OSSAudioError",
-				       NULL, NULL);
+                                       NULL, NULL);
     if (OSSAudioError) {
         /* Each call to PyModule_AddObject decrefs it; compensate: */
         Py_INCREF(OSSAudioError);

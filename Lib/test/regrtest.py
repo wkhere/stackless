@@ -115,8 +115,7 @@ resources to test.  Currently only the following are defined:
     decimal -   Test the decimal module against a large suite that
                 verifies compliance with standards.
 
-    compiler -  Allow test_tokenize to verify round-trip lexing on
-                every file in the test library.
+    cpu -       Used for certain CPU-heavy tests.
 
     subprocess  Run all tests for the subprocess module.
 
@@ -178,7 +177,7 @@ if sys.platform == 'darwin':
 from test import support
 
 RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network',
-                  'decimal', 'compiler', 'subprocess', 'urlfetch', 'gui')
+                  'decimal', 'cpu', 'subprocess', 'urlfetch', 'gui')
 
 
 def usage(msg):
@@ -214,6 +213,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
     directly to set the values that would normally be set by flags
     on the command line.
     """
+
+    replace_stdout()
 
     support.record_original_stdout(sys.stdout)
     try:
@@ -453,11 +454,6 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
             if module not in save_modules and module.startswith("test."):
                 support.unload(module)
 
-    # The lists won't be sorted if running with -r
-    good.sort()
-    bad.sort()
-    skipped.sort()
-
     if good and not quiet:
         if not bad and not skipped and len(good) > 1:
             print("All", end=' ')
@@ -560,6 +556,17 @@ def findtests(testdir=None, stdtests=STDTESTS, nottests=NOTTESTS):
                 tests.append(modname)
     tests.sort()
     return stdtests + tests
+
+def replace_stdout():
+    """Set stdout encoder error handler to backslashreplace (as stderr error
+    handler) to avoid UnicodeEncodeError when printing a traceback"""
+    if os.name == "nt":
+        # Replace sys.stdout breaks the stdout newlines on Windows: issue #8533
+        return
+    stdout = sys.stdout
+    sys.stdout = open(stdout.fileno(), 'w',
+        encoding=stdout.encoding,
+        errors="backslashreplace")
 
 def runtest(test, generate, verbose, quiet, test_times,
             testdir=None, huntrleaks=False, debug=False):
@@ -681,6 +688,10 @@ def runtest_inner(test, generate, verbose, quiet, test_times,
 def cleanup_test_droppings(testname, verbose):
     import shutil
     import stat
+    import gc
+
+    # First kill any dangling references to open files etc.
+    gc.collect()
 
     # Try to clean up junk commonly left behind.  While tests shouldn't leave
     # any files or directories behind, when a test fails that can be tedious
@@ -893,7 +904,8 @@ def printlist(x, width=70, indent=4):
 
     from textwrap import fill
     blanks = ' ' * indent
-    print(fill(' '.join(map(str, x)), width,
+    # Print the sorted list: 'x' may be a '--random' list or a set()
+    print(fill(' '.join(str(elt) for elt in sorted(x)), width,
                initial_indent=blanks, subsequent_indent=blanks))
 
 # Map sys.platform to a string containing the basenames of tests

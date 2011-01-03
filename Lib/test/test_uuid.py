@@ -1,5 +1,6 @@
 from unittest import TestCase
 from test import support
+import builtins
 import uuid
 
 def importable(name):
@@ -176,6 +177,11 @@ class TestUUID(TestCase):
             for u in equivalents:
                 for v in equivalents:
                     equal(u, v)
+
+            # Bug 7380: "bytes" and "bytes_le" should give the same type.
+            equal(type(u.bytes), builtins.bytes)
+            equal(type(u.bytes_le), builtins.bytes)
+
             ascending.append(u)
 
         # Test comparison of UUIDs.
@@ -286,14 +292,8 @@ class TestUUID(TestCase):
         badtype(lambda: setattr(u, 'node', 0))
 
     def check_node(self, node, source):
-        individual_group_bit = (node >> 40) & 1
-        universal_local_bit = (node >> 40) & 2
-        message = "%012x doesn't look like a real MAC address" % node
-        self.assertEqual(individual_group_bit, 0, message)
-        self.assertEqual(universal_local_bit, 0, message)
-        self.assertNotEqual(node, 0, message)
-        self.assertNotEqual(node, 0xffffffffffff, message)
-        self.assertTrue(0 <= node, message)
+        message = "%012x is not an RFC 4122 node ID" % node
+        self.assertTrue(0 < node, message)
         self.assertTrue(node < (1 << 48), message)
 
         TestUUID.source2node[source] = node
@@ -312,10 +312,6 @@ class TestUUID(TestCase):
 
     def test_ifconfig_getnode(self):
         import sys
-        print("""    WARNING: uuid._ifconfig_getnode is unreliable on many platforms.
-        It is disabled until the code and/or test can be fixed properly.""", file=sys.__stdout__)
-        return
-
         import os
         if os.name == 'posix':
             node = uuid._ifconfig_getnode()
@@ -335,18 +331,18 @@ class TestUUID(TestCase):
 
     def test_random_getnode(self):
         node = uuid._random_getnode()
-        self.assertTrue(0 <= node)
-        self.assertTrue(node < (1 <<48))
+        # Least significant bit of first octet must be set.
+        self.assertTrue(node & 0x010000000000)
+        self.assertTrue(node < (1 << 48))
 
     def test_unixdll_getnode(self):
         import sys
-        print("""    WARNING: uuid._unixdll_getnode is unreliable on many platforms.
-        It is disabled until the code and/or test can be fixed properly.""", file=sys.__stdout__)
-        return
-
         import os
         if importable('ctypes') and os.name == 'posix':
-            self.check_node(uuid._unixdll_getnode(), 'unixdll')
+            try: # Issues 1481, 3581: _uuid_generate_time() might be None.
+                self.check_node(uuid._unixdll_getnode(), 'unixdll')
+            except TypeError:
+                pass
 
     def test_windll_getnode(self):
         import os
@@ -355,10 +351,6 @@ class TestUUID(TestCase):
 
     def test_getnode(self):
         import sys
-        print("""    WARNING: uuid.getnode is unreliable on many platforms.
-        It is disabled until the code and/or test can be fixed properly.""", file=sys.__stdout__)
-        return
-
         node1 = uuid.getnode()
         self.check_node(node1, "getnode1")
 
@@ -464,6 +456,34 @@ class TestUUID(TestCase):
             equal(u.version, 5)
             equal(u, uuid.UUID(v))
             equal(str(u), v)
+
+    def testIssue8621(self):
+        import os
+        import sys
+        if os.name != 'posix':
+            return
+
+        # On at least some versions of OSX uuid.uuid4 generates
+        # the same sequence of UUIDs in the parent and any
+        # children started using fork.
+        fds = os.pipe()
+        pid = os.fork()
+        if pid == 0:
+            os.close(fds[0])
+            value = uuid.uuid4()
+            os.write(fds[1], value.hex.encode('latin1'))
+            os._exit(0)
+
+        else:
+            os.close(fds[1])
+            parent_value = uuid.uuid4().hex
+            os.waitpid(pid, 0)
+            child_value = os.read(fds[0], 100).decode('latin1')
+
+            self.assertNotEqual(parent_value, child_value)
+
+
+
 
 
 def test_main():

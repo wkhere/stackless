@@ -370,7 +370,7 @@ then
   # Furthermore, on Solaris 10, XPG6 requires the use of a C99
   # compiler
   case $ac_sys_system/$ac_sys_release in
-    SunOS/5.8|SunOS/5.9|SunOS/5.10)
+    SunOS/5.8|SunOS/5.9|SunOS/5.10|SunOS/5.11)
       AC_DEFINE(_XOPEN_SOURCE, 500, 
                 Define to the level of X/Open that your system supports)
       ;;
@@ -387,7 +387,7 @@ then
   # except for Solaris 10, where it must not be defined, 
   # as it implies XPG4.2
   case $ac_sys_system/$ac_sys_release in
-    SunOS/5.10)
+    SunOS/5.10|SunOS/5.11)
       ;;
     *)
       AC_DEFINE(_XOPEN_SOURCE_EXTENDED, 1,
@@ -452,7 +452,7 @@ AC_ARG_WITH(gcc,
 		without_gcc=$withval;;
 	esac], [
 	case $ac_sys_system in
-	AIX*)   CC=cc_r
+	AIX*)   CC=${CC:-xlc_r}
 		without_gcc=;;
 	*)	without_gcc=no;;
 	esac])
@@ -765,6 +765,10 @@ if test $enable_shared = "yes"; then
 	BLDLIBRARY='-L. -lpython$(VERSION)'
 	RUNSHARED='DYLD_LIBRARY_PATH=`pwd`:${DYLD_LIBRARY_PATH}'
 	;;
+    AIX*)
+	LDLIBRARY='libpython$(VERSION).so'
+	RUNSHARED=LIBPATH=`pwd`:${LIBPATH}
+	;;
 
   esac
 else # shared is disabled
@@ -849,7 +853,7 @@ fi],
 # tweak OPT based on compiler and platform, only if the user didn't set
 # it on the command line
 AC_SUBST(OPT)
-if test "${OPT-unset}" == "unset"
+if test "${OPT-unset}" = "unset"
 then
     case $GCC in
     yes)
@@ -895,19 +899,37 @@ AC_SUBST(UNIVERSAL_ARCH_FLAGS)
 # tweak BASECFLAGS based on compiler and platform
 case $GCC in
 yes)
-    # Python violates C99 rules, by casting between incompatible
-    # pointer types. GCC may generate bad code as a result of that,
-    # so use -fno-strict-aliasing if supported.
-    AC_MSG_CHECKING(whether $CC accepts -fno-strict-aliasing)
+    # Python doesn't violate C99 aliasing rules, but older versions of
+    # GCC produce warnings for legal Python code.  Enable
+    # -fno-strict-aliasing on versions of GCC that support but produce
+    # warnings.  See Issue3326
+    AC_MSG_CHECKING(whether $CC accepts and needs -fno-strict-aliasing)
      ac_save_cc="$CC"
      CC="$CC -fno-strict-aliasing"
-     AC_TRY_RUN([int main() { return 0; }],
-     ac_cv_no_strict_aliasing_ok=yes,
-     ac_cv_no_strict_aliasing_ok=no,
-     ac_cv_no_strict_aliasing_ok=no)
+     save_CFLAGS="$CFLAGS"
+     AC_CACHE_VAL(ac_cv_no_strict_aliasing,
+       AC_COMPILE_IFELSE(
+         [
+	   AC_LANG_PROGRAM([[]], [[]])
+	 ],[
+	   CC="$ac_save_cc -fstrict-aliasing"
+           CFLAGS="$CFLAGS -Werror -Wstrict-aliasing"
+           AC_COMPILE_IFELSE(
+	     [
+	       AC_LANG_PROGRAM([[void f(int **x) {}]],
+	         [[double *x; f((int **) &x);]])
+	     ],[
+	       ac_cv_no_strict_aliasing=no
+	     ],[
+               ac_cv_no_strict_aliasing=yes
+	     ])
+	 ],[
+	   ac_cv_no_strict_aliasing=no
+	 ]))
+     CFLAGS="$save_CFLAGS"
      CC="$ac_save_cc"
-    AC_MSG_RESULT($ac_cv_no_strict_aliasing_ok)
-    if test $ac_cv_no_strict_aliasing_ok = yes
+    AC_MSG_RESULT($ac_cv_no_strict_aliasing)
+    if test $ac_cv_no_strict_aliasing = yes
     then
       BASECFLAGS="$BASECFLAGS -fno-strict-aliasing"
     fi
@@ -930,6 +952,20 @@ yes)
 	Darwin*)
 	    # -Wno-long-double, -no-cpp-precomp, and -mno-fused-madd
 	    # used to be here, but non-Apple gcc doesn't accept them.
+            if test "${CC}" = gcc
+	    then
+		AC_MSG_CHECKING(which compiler should be used)
+		case "${UNIVERSALSDK}" in
+		*/MacOSX10.4u.sdk)
+			# Build using 10.4 SDK, force usage of gcc when the 
+			# compiler is gcc, otherwise the user will get very
+			# confusing error messages when building on OSX 10.6
+			CC=gcc-4.0
+			CPP=cpp-4.0
+			;;
+		esac
+		AC_MSG_RESULT($CC)
+	    fi
 
 
 	    if test "${enable_universalsdk}"; then
@@ -966,10 +1002,12 @@ yes)
 		 fi
 
 
-		BASECFLAGS="${UNIVERSAL_ARCH_FLAGS} -isysroot ${UNIVERSALSDK} ${BASECFLAGS}"
-		tgt=`sw_vers -productVersion | sed 's/\(10\.[[0-9]]*\).*/\1/'`
-		if test "${UNIVERSALSDK}" != "/" -a "${tgt}" '>' '10.4' ; then
-			CFLAGS="${UNIVERSAL_ARCH_FLAGS} -isysroot ${UNIVERSALSDK} ${CFLAGS}"
+		CFLAGS="${UNIVERSAL_ARCH_FLAGS} -isysroot ${UNIVERSALSDK} ${CFLAGS}"
+		if test "${UNIVERSALSDK}" != "/"
+		then
+			CFLAGS="-isysroot ${UNIVERSALSDK} ${CFLAGS}"
+			LDFLAGS="-isysroot ${UNIVERSALSDK} ${LDFLAGS}"
+			CPPFLAGSFLAGS="-isysroot ${UNIVERSALSDK} ${CPPFLAGS}"
 		fi
 	    fi
 
@@ -1324,7 +1362,14 @@ AC_MSG_RESULT($was_it_defined)
 
 # Check whether using makedev requires defining _OSF_SOURCE
 AC_MSG_CHECKING(for makedev)
-AC_TRY_LINK([#include <sys/types.h> ],
+AC_TRY_LINK([
+#if defined(MAJOR_IN_MKDEV)
+#include <sys/mkdev.h>
+#elif defined(MAJOR_IN_SYSMACROS)
+#include <sys/sysmacros.h>
+#else
+#include <sys/types.h>
+#endif ],
 	    [ makedev(0, 0) ],
 	    ac_cv_has_makedev=yes,
 	    ac_cv_has_makedev=no)
@@ -1445,6 +1490,9 @@ AC_CHECK_TYPES(uintptr_t,
    [AC_CHECK_SIZEOF(uintptr_t, 4)], 
    [], [#ifdef HAVE_STDINT_H
         #include <stdint.h>
+        #endif
+        #ifdef HAVE_INTTYPES_H
+        #include <inttypes.h>
         #endif])
 
 
@@ -1700,7 +1748,7 @@ if test -z "$LDSHARED"
 then
 	case $ac_sys_system/$ac_sys_release in
 	AIX*)
-		BLDSHARED="\$(srcdir)/Modules/ld_so_aix \$(CC) -bI:Modules/python.exp"
+		BLDSHARED="\$(srcdir)/Modules/ld_so_aix \$(CC) -bI:Modules/python.exp -L\$(srcdir)"
 		LDSHARED="\$(BINLIBDEST)/config/ld_so_aix \$(CC) -bI:\$(BINLIBDEST)/config/python.exp"
 		;;
 	IRIX/5*) LDSHARED="ld -shared";;
@@ -1766,7 +1814,7 @@ then
 	FreeBSD*)
 		if [[ "`$CC -dM -E - </dev/null | grep __ELF__`" != "" ]]
 		then
-			LDSHARED="$CC -shared ${LDFLAGS}"
+			LDSHARED='$(CC) -shared ${LDFLAGS}'
 		else
 			LDSHARED="ld -Bshareable ${LDFLAGS}"
 		fi;;
@@ -1965,7 +2013,9 @@ LIBS="$withval $LIBS"
 # Check for use of the system libffi library
 AC_MSG_CHECKING(for --with-system-ffi)
 AC_ARG_WITH(system_ffi,
-            AC_HELP_STRING(--with-system-ffi, build _ctypes module using an installed ffi library))
+            AC_HELP_STRING(--with-system-ffi, build _ctypes module using an installed ffi library),
+            [],
+            [with_system_ffi="no"])
 
 AC_MSG_RESULT($with_system_ffi)
 
@@ -2210,6 +2260,9 @@ if test "$posix_threads" = "yes"; then
       AIX/5) AC_DEFINE(HAVE_BROKEN_POSIX_SEMAPHORES, 1,
 		       Define if the Posix semaphores do not work on your system)
 		       ;;
+      AIX/6) AC_DEFINE(HAVE_BROKEN_POSIX_SEMAPHORES, 1,
+                      Define if the Posix semaphores do not work on your system)
+                      ;;
       esac
 
       AC_MSG_CHECKING(if PTHREAD_SCOPE_SYSTEM is supported)
@@ -2433,7 +2486,7 @@ then
 fi
 AC_MSG_RESULT($with_doc_strings)
 
-# Check for Python-specific malloc support
+# Check if eval loop should use timestamp counter profiling
 AC_MSG_CHECKING(for --with-tsc)
 AC_ARG_WITH(tsc,
 [  --with(out)-tsc         enable/disable timestamp counter profile], [
@@ -2615,15 +2668,24 @@ AC_TRY_COMPILE([
   AC_MSG_RESULT(no)
 )
 
-AC_MSG_CHECKING(for flock)
-AC_TRY_COMPILE([
-#include "confdefs.h" 
-#include <sys/file.h>
-], void* p = flock,
-  AC_DEFINE(HAVE_FLOCK, 1, Define if you have the 'flock' function.)
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-)
+AC_CACHE_CHECK([for flock declaration], [ac_cv_flock_decl],
+  [AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM(
+      [#include <sys/file.h>],
+      [void* p = flock]
+    )],
+    [ac_cv_flock_decl=yes],
+    [ac_cv_flock_decl=no]
+  )
+])
+if test "x${ac_cv_flock_decl}" = xyes; then
+  AC_CHECK_FUNCS(flock,,
+    AC_CHECK_LIB(bsd,flock,
+      [AC_DEFINE(HAVE_FLOCK)
+       AC_DEFINE(FLOCK_NEEDS_LIBBSD, 1, Define if flock needs to be linked with bsd library.)
+    ])
+  )
+fi
 
 AC_MSG_CHECKING(for getpagesize)
 AC_TRY_COMPILE([
@@ -4079,6 +4141,7 @@ esac
 
 # generate output files
 AC_CONFIG_FILES(Makefile.pre Modules/Setup.config Misc/python.pc)
+AC_CONFIG_FILES([Modules/ld_so_aix], [chmod +x Modules/ld_so_aix])
 AC_OUTPUT
 
 echo "creating Modules/Setup"

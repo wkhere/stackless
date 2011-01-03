@@ -347,7 +347,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
     rpcpid = None
 
     def spawn_subprocess(self):
-        if self.subprocess_arglist == None:
+        if self.subprocess_arglist is None:
             self.subprocess_arglist = self.build_subprocess_arglist()
         args = self.subprocess_arglist
         self.rpcpid = os.spawnv(os.P_NOWAIT, sys.executable, args)
@@ -548,7 +548,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
         This method is called from the subprocess, and by returning from this
         method we allow the subprocess to unblock.  After a bit the shell
         requests the subprocess to open the remote stack viewer which returns a
-        static object looking at the last exceptiopn.  It is queried through
+        static object looking at the last exception.  It is queried through
         the RPC mechanism.
 
         """

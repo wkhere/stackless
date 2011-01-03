@@ -752,7 +752,7 @@ class TurtleScreenBase(object):
         [(0.0, 9.9999999999999982), (0.0, -9.9999999999999982),
         (9.9999999999999982, 0.0)]
         >>> """
-        cl = list(self.cv.coords(item))
+        cl = self.cv.coords(item)
         pl = [(cl[i], -cl[i+1]) for i in range(0, len(cl), 2)]
         return  pl
 
@@ -778,7 +778,7 @@ class TurtleScreenBase(object):
         # needs amendment
         if not isinstance(self.cv, ScrolledCanvas):
             return self.canvwidth, self.canvheight
-        if canvwidth is None and canvheight is None and bg is None:
+        if canvwidth is canvheight is bg is None:
             return self.cv.canvwidth, self.cv.canvheight
         if canvwidth is not None:
             self.canvwidth = canvwidth
@@ -1046,7 +1046,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> mode()
         'logo'
         """
-        if mode == None:
+        if mode is None:
             return self._mode
         mode = mode.lower()
         if mode not in ["standard", "logo", "world"]:
@@ -1385,7 +1385,7 @@ class TurtleScreen(TurtleScreenBase):
         ### repeatedly pressing the up-arrow key,
         ### consequently drawing a hexagon
         """
-        if fun == None:
+        if fun is None:
             if key in self._keys:
                 self._keys.remove(key)
         elif key not in self._keys:
@@ -1418,7 +1418,7 @@ class TurtleScreen(TurtleScreenBase):
         ### or by keeping pressed the up-arrow key.
         ### consequently drawing a hexagon.
         """
-        if fun == None:
+        if fun is None:
             if key in self._keys:
                 self._keys.remove(key)
         elif key is not None and key not in self._keys:
@@ -1540,7 +1540,7 @@ class TNavigator(object):
     def _setmode(self, mode=None):
         """Set turtle-mode to 'standard', 'world' or 'logo'.
         """
-        if mode == None:
+        if mode is None:
             return self._mode
         if mode not in ["standard", "logo", "world"]:
             return
@@ -1575,7 +1575,10 @@ class TNavigator(object):
         >>> turtle.left(90)
         >>> turtle.heading()
         90
-        >>> turtle.degrees(400.0)  # angle measurement in gon
+
+        Change angle measurement unit to grad (also known as gon,
+        grade, or gradian and equals 1/100-th of the right angle.)
+        >>> turtle.degrees(400.0)
         >>> turtle.heading()
         100
 
@@ -2795,7 +2798,7 @@ class RawTurtle(TPen, TNavigator):
         >>> turtle.shapesize(5, 5, 12)
         >>> turtle.shapesize(outline=8)
         """
-        if stretch_wid is stretch_len is outline == None:
+        if stretch_wid is stretch_len is outline is None:
             stretch_wid, stretch_len = self._stretchfactor
             return stretch_wid, stretch_len, self._outlinewidth
         if stretch_wid == 0 or stretch_len == 0:

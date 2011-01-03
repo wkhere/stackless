@@ -174,6 +174,28 @@ class BuiltinTest(unittest.TestCase):
         a = {}
         a[0] = a
         self.assertEqual(ascii(a), '{0: {...}}')
+        # Advanced checks for unicode strings
+        def _check_uni(s):
+            self.assertEqual(ascii(s), repr(s))
+        _check_uni("'")
+        _check_uni('"')
+        _check_uni('"\'')
+        _check_uni('\0')
+        _check_uni('\r\n\t .')
+        # Unprintable non-ASCII characters
+        _check_uni('\x85')
+        _check_uni('\u1fff')
+        _check_uni('\U00012fff')
+        # Lone surrogates
+        _check_uni('\ud800')
+        _check_uni('\udfff')
+        # Issue #9804: surrogates should be joined even for printable
+        # wide characters (UCS-2 builds).
+        self.assertEqual(ascii('\U0001d121'), "'\\U0001d121'")
+        # All together
+        s = "'\0\"\n\r\t abcd\x85é\U00012fff\uD800\U0001D121xxx."
+        self.assertEqual(ascii(s),
+            r"""'\'\x00"\n\r\t abcd\x85\xe9\U00012fff\ud800\U0001d121xxx.'""")
 
     def test_neg(self):
         x = -sys.maxsize-1
@@ -495,6 +517,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, getattr, sys, 1, "foo")
         self.assertRaises(TypeError, getattr)
         self.assertRaises(AttributeError, getattr, sys, chr(sys.maxunicode))
+        # unicode surrogates are not encodable to the default encoding (utf8)
+        self.assertRaises(AttributeError, getattr, 1, "\uDAD1\uD51E")
 
     def test_hasattr(self):
         import sys
@@ -527,15 +551,15 @@ class BuiltinTest(unittest.TestCase):
         class X:
             def __hash__(self):
                 return 2**100
-        self.assertEquals(type(hash(X())), int)
+        self.assertEqual(type(hash(X())), int)
         class Y(object):
             def __hash__(self):
                 return 2**100
-        self.assertEquals(type(hash(Y())), int)
+        self.assertEqual(type(hash(Y())), int)
         class Z(int):
             def __hash__(self):
                 return self
-        self.assertEquals(hash(Z(42)), hash(42))
+        self.assertEqual(hash(Z(42)), hash(42))
 
     def test_hex(self):
         self.assertEqual(hex(16), '0x10')
@@ -767,7 +791,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(next(it), 1)
         self.assertRaises(StopIteration, next, it)
         self.assertRaises(StopIteration, next, it)
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
 
         class Iter(object):
             def __iter__(self):
@@ -776,7 +800,7 @@ class BuiltinTest(unittest.TestCase):
                 raise StopIteration
 
         it = iter(Iter())
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
         self.assertRaises(StopIteration, next, it)
 
         def gen():
@@ -784,9 +808,9 @@ class BuiltinTest(unittest.TestCase):
             return
 
         it = gen()
-        self.assertEquals(next(it), 1)
+        self.assertEqual(next(it), 1)
         self.assertRaises(StopIteration, next, it)
-        self.assertEquals(next(it, 42), 42)
+        self.assertEqual(next(it, 42), 42)
 
     def test_oct(self):
         self.assertEqual(oct(100), '0o144')
@@ -1219,6 +1243,7 @@ class BuiltinTest(unittest.TestCase):
         class G:
             pass
         self.assertRaises(TypeError, zip, a, G())
+        self.assertRaises(RuntimeError, zip, a, TestFailingIter())
 
         # Make sure zip doesn't try to allocate a billion elements for the
         # result list when one of its arguments doesn't say how long it is.

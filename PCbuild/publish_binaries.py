@@ -14,11 +14,14 @@ input("press enter to continue")
 """
 
 fileList = [
+    r"..\Lib\copyreg.py",
     r"..\Lib\distutils\command\build_ext.py",
     r"..\Lib\pickle.py",
     r"..\Lib\platform.py",
     r"..\Lib\test\exception_hierarchy.txt",
+    r"..\Lib\test\pickletester.py",
     r"..\Lib\test\test_pep352.py",
+    r"..\Lib\test\test_sys.py",
 ]
 
 for debug in ("", "_d"):

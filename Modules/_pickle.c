@@ -335,7 +335,7 @@ typedef struct PicklerObject {
                                    the name of globals for Python 2.x. */
     PyObject *fast_memo;
 #ifdef STACKLESS
-	PyObject *module_dict_ids;
+    PyObject *module_dict_ids;
 #endif
 } PicklerObject;
 
@@ -508,7 +508,7 @@ unpickler_read(UnpicklerObject *self, char **s, Py_ssize_t n)
     /* XXX: Should bytearray be supported too? */
     if (!PyBytes_Check(data)) {
         PyErr_SetString(PyExc_ValueError,
-                        "read() from the underlying stream did not"
+                        "read() from the underlying stream did not "
                         "return bytes");
         Py_DECREF(data);
         return -1;
@@ -541,7 +541,7 @@ unpickler_readline(UnpicklerObject *self, char **s)
     /* XXX: Should bytearray be supported too? */
     if (!PyBytes_Check(data)) {
         PyErr_SetString(PyExc_ValueError,
-                        "readline() from the underlying stream did not"
+                        "readline() from the underlying stream did not "
                         "return bytes");
         return -1;
     }
@@ -1238,7 +1238,9 @@ save_unicode(PicklerObject *self, PyObject *obj)
     if (self->bin) {
         char pdata[5];
 
-        encoded = PyUnicode_AsUTF8String(obj);
+        encoded = PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(obj),
+                                    PyUnicode_GET_SIZE(obj),
+                                    "surrogatepass");
         if (encoded == NULL)
             goto error;
 
@@ -2431,16 +2433,15 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
     }
     else if (type == &PyDict_Type) {
 #ifdef STACKLESS
-			PyObject *ret = PyStackless_Pickle_ModuleDict(
-					    (PyObject *) self, obj);
+        PyObject *ret = PyStackless_Pickle_ModuleDict((PyObject *) self, obj);
 
-			if (ret == NULL) return -1;
-			if (ret != Py_None) {
-				status = save_reduce(self, ret, obj);
-				Py_DECREF(ret);
-				goto done;
-			}
-			Py_DECREF(ret);
+        if (ret == NULL) return -1;
+        if (ret != Py_None) {
+            status = save_reduce(self, ret, obj);
+            Py_DECREF(ret);
+            goto done;
+        }
+        Py_DECREF(ret);
 #endif
         status = save_dict(self, obj);
         goto done;
@@ -2657,7 +2658,7 @@ Pickler_dealloc(PicklerObject *self)
     Py_XDECREF(self->arg);
     Py_XDECREF(self->fast_memo);
 #ifdef STACKLESS
-	Py_XDECREF(self->module_dict_ids);
+    Py_XDECREF(self->module_dict_ids);
 #endif
 
     PyMem_Free(self->write_buf);
@@ -2674,7 +2675,7 @@ Pickler_traverse(PicklerObject *self, visitproc visit, void *arg)
     Py_VISIT(self->arg);
     Py_VISIT(self->fast_memo);
 #ifdef STACKLESS
-	Py_VISIT(self->module_dict_ids);
+    Py_VISIT(self->module_dict_ids);
 #endif
     return 0;
 }
@@ -2688,7 +2689,7 @@ Pickler_clear(PicklerObject *self)
     Py_CLEAR(self->arg);
     Py_CLEAR(self->fast_memo);
 #ifdef STACKLESS
-	Py_CLEAR(self->module_dict_ids);
+    Py_CLEAR(self->module_dict_ids);
 #endif
 
     PyMem_Free(self->write_buf);
@@ -2762,7 +2763,7 @@ Pickler_init(PicklerObject *self, PyObject *args, PyObject *kwds)
     self->fast_memo = NULL;
     self->fix_imports = fix_imports && proto < 3;
 #ifdef STACKLESS
-	self->module_dict_ids = NULL;
+    self->module_dict_ids = NULL;
 #endif
 
     if (!PyObject_HasAttrString(file, "write")) {
@@ -2830,29 +2831,29 @@ Pickler_set_memo(PicklerObject *self, PyObject *value)
 static PyObject *
 Pickler_get_module_dict_ids(PicklerObject *p)
 {
-	if (p->module_dict_ids == NULL)
-		PyErr_SetString(PyExc_AttributeError, "module_dict_ids");
-	else
-		Py_INCREF(p->module_dict_ids);
-	return p->module_dict_ids;
+    if (p->module_dict_ids == NULL)
+        PyErr_SetString(PyExc_AttributeError, "module_dict_ids");
+    else
+        Py_INCREF(p->module_dict_ids);
+    return p->module_dict_ids;
 }
 
 static int
 Pickler_set_module_dict_ids(PicklerObject *p, PyObject *v)
 {
-	if (v == NULL) {
-		PyErr_SetString(PyExc_TypeError,
-				"attribute deletion is not supported");
-		return -1;
-	}
-	if (!PyDict_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "module-dict-ids must be a dictionary");
-		return -1;
-	}
-	Py_XDECREF(p->module_dict_ids);
-	Py_INCREF(v);
-	p->module_dict_ids = v;
-	return 0;
+    if (v == NULL) {
+        PyErr_SetString(PyExc_TypeError,
+                "attribute deletion is not supported");
+        return -1;
+    }
+    if (!PyDict_Check(v)) {
+        PyErr_SetString(PyExc_TypeError, "module-dict-ids must be a dictionary");
+        return -1;
+    }
+    Py_XDECREF(p->module_dict_ids);
+    Py_INCREF(v);
+    p->module_dict_ids = v;
+    return 0;
 }
 #endif
 
@@ -2903,7 +2904,7 @@ static PyGetSetDef Pickler_getsets[] = {
                       (setter)Pickler_set_persid},
 #ifdef STACKLESS
     {"module_dict_ids", (getter)Pickler_get_module_dict_ids,
-					  (setter)Pickler_set_module_dict_ids},
+                        (setter)Pickler_set_module_dict_ids},
 #endif
     {NULL}
 };
@@ -3426,7 +3427,7 @@ load_binunicode(UnpicklerObject *self)
     if (unpickler_read(self, &s, size) < 0)
         return -1;
 
-    str = PyUnicode_DecodeUTF8(s, size, NULL);
+    str = PyUnicode_DecodeUTF8(s, size, "surrogatepass");
     if (str == NULL)
         return -1;
 
@@ -3538,29 +3539,19 @@ load_dict(UnpicklerObject *self)
 static PyObject *
 instantiate(PyObject *cls, PyObject *args)
 {
-    PyObject *r = NULL;
-
-    /* XXX: The pickle.py module does not create instances this way when the
-       args tuple is empty. See Unpickler._instantiate(). */
-    if ((r = PyObject_CallObject(cls, args)))
-        return r;
-
-    /* XXX: Is this still nescessary? */
-    {
-        PyObject *tp, *v, *tb, *tmp_value;
-
-        PyErr_Fetch(&tp, &v, &tb);
-        tmp_value = v;
-        /* NULL occurs when there was a KeyboardInterrupt */
-        if (tmp_value == NULL)
-            tmp_value = Py_None;
-        if ((r = PyTuple_Pack(3, tmp_value, cls, args))) {
-            Py_XDECREF(v);
-            v = r;
-        }
-        PyErr_Restore(tp, v, tb);
+    PyObject *result = NULL;
+    /* Caller must assure args are a tuple.  Normally, args come from
+       Pdata_poptuple which packs objects from the top of the stack
+       into a newly created tuple. */
+    assert(PyTuple_Check(args));
+    if (Py_SIZE(args) > 0 || !PyType_Check(cls) ||
+        PyObject_HasAttrString(cls, "__getinitargs__")) {
+        result = PyObject_CallObject(cls, args);
     }
-    return NULL;
+    else {
+        result = PyObject_CallMethod(cls, "__new__", "O", cls);
+    }
+    return result;
 }
 
 static int
@@ -3619,7 +3610,7 @@ load_inst(UnpicklerObject *self)
         if (len < 2)
             return bad_readline();
         class_name = PyUnicode_DecodeASCII(s, len - 1, "strict");
-        if (class_name == NULL) {
+        if (class_name != NULL) {
             cls = find_class(self, module_name, class_name);
             Py_DECREF(class_name);
         }
@@ -4348,7 +4339,7 @@ load_reduce(UnpicklerObject *self)
         return -1;
     PDATA_POP(self->stack, callable);
     if (callable) {
-        obj = instantiate(callable, argtup);
+        obj = PyObject_CallObject(callable, argtup);
         Py_DECREF(callable);
     }
     Py_DECREF(argtup);

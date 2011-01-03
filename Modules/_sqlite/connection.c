@@ -941,7 +941,7 @@ static int pysqlite_connection_set_isolation_level(pysqlite_Connection* self, Py
 
         statement = _PyUnicode_AsStringAndSize(begin_statement, &size);
         if (!statement) {
-            Py_DECREF(statement);
+            Py_DECREF(begin_statement);
             return -1;
         }
         self->begin_statement = PyMem_Malloc(size + 2);
@@ -978,6 +978,12 @@ PyObject* pysqlite_connection_call(pysqlite_Connection* self, PyObject* args, Py
     if (!statement) {
         return NULL;
     }
+
+    statement->db = NULL;
+    statement->st = NULL;
+    statement->sql = NULL;
+    statement->in_use = 0;
+    statement->in_weakreflist = NULL;
 
     rc = pysqlite_statement_create(statement, self, sql);
 
@@ -1222,7 +1228,9 @@ pysqlite_connection_create_collation(pysqlite_Connection* self, PyObject* args)
     PyObject* uppercase_name = 0;
     PyObject* name;
     PyObject* retval;
-    char* chk;
+    Py_UNICODE* chk;
+    Py_ssize_t i, len;
+    char *uppercase_name_str;
     int rc;
 
     if (!pysqlite_check_thread(self) || !pysqlite_check_connection(self)) {
@@ -1238,18 +1246,23 @@ pysqlite_connection_create_collation(pysqlite_Connection* self, PyObject* args)
         goto finally;
     }
 
-    chk = _PyUnicode_AsString(uppercase_name);
-    while (*chk) {
+    len = PyUnicode_GET_SIZE(uppercase_name);
+    chk = PyUnicode_AS_UNICODE(uppercase_name);
+    for (i=0; i<len; i++, chk++) {
         if ((*chk >= '0' && *chk <= '9')
          || (*chk >= 'A' && *chk <= 'Z')
          || (*chk == '_'))
         {
-            chk++;
+            continue;
         } else {
             PyErr_SetString(pysqlite_ProgrammingError, "invalid character in collation name");
             goto finally;
         }
     }
+
+    uppercase_name_str = _PyUnicode_AsString(uppercase_name);
+    if (!uppercase_name_str)
+        goto finally;
 
     if (callable != Py_None && !PyCallable_Check(callable)) {
         PyErr_SetString(PyExc_TypeError, "parameter must be callable");
@@ -1263,7 +1276,7 @@ pysqlite_connection_create_collation(pysqlite_Connection* self, PyObject* args)
     }
 
     rc = sqlite3_create_collation(self->db,
-                                  _PyUnicode_AsString(uppercase_name),
+                                  uppercase_name_str,
                                   SQLITE_UTF8,
                                   (callable != Py_None) ? callable : NULL,
                                   (callable != Py_None) ? pysqlite_collation_callback : NULL);

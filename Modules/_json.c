@@ -430,8 +430,8 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
                 end += 6;
                 /* Decode 4 hex digits */
                 for (; next < end; next++) {
-                    c2 <<= 4;
                     Py_UNICODE digit = buf[next];
+                    c2 <<= 4;
                     switch (digit) {
                         case '0': case '1': case '2': case '3': case '4':
                         case '5': case '6': case '7': case '8': case '9':
@@ -484,7 +484,7 @@ bail:
 }
 
 PyDoc_STRVAR(pydoc_scanstring,
-    "scanstring(basestring, end, strict=True) -> (bytes, end)\n"
+    "scanstring(string, end, strict=True) -> (string, end)\n"
     "\n"
     "Scan the string s for a JSON string. End is the index of the\n"
     "character in s after the quote that started the JSON string.\n"
@@ -511,8 +511,8 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
         rval = scanstring_unicode(pystr, end, strict, &next_end);
     }
     else {
-        PyErr_Format(PyExc_TypeError, 
-                     "first argument must be a string or bytes, not %.80s",
+        PyErr_Format(PyExc_TypeError,
+                     "first argument must be a string, not %.80s",
                      Py_TYPE(pystr)->tp_name);
         return NULL;
     }
@@ -520,7 +520,7 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
 }
 
 PyDoc_STRVAR(pydoc_encode_basestring_ascii,
-    "encode_basestring_ascii(basestring) -> bytes\n"
+    "encode_basestring_ascii(string) -> string\n"
     "\n"
     "Return an ASCII-only JSON representation of a Python string"
 );
@@ -1394,7 +1394,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
 
     if (PyObject_IsTrue(s->sort_keys)) {
         if (code == NULL) {
-            code = Py_CompileString("sorted(d.items(), key=lambda kv: kv[0])", 
+            code = Py_CompileString("sorted(d.items(), key=lambda kv: kv[0])",
                                     "_json.c", Py_eval_input);
             if (code == NULL)
                 goto bail;
@@ -1409,14 +1409,14 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         }
         items = PyEval_EvalCode((PyCodeObject *)code, PyEval_GetGlobals(), mapping);
         Py_DECREF(mapping);
-	} else {
+        } else {
         items = PyMapping_Items(dct);
-	}
-	if (items == NULL)
+        }
+        if (items == NULL)
         goto bail;
     it = PyObject_GetIter(items);
-	Py_DECREF(items);
-	if (it == NULL)
+        Py_DECREF(items);
+        if (it == NULL)
         goto bail;
     skipkeys = PyObject_IsTrue(s->skipkeys);
     idx = 0;
@@ -1437,8 +1437,8 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
                 goto bail;
         }
         else if (key == Py_True || key == Py_False || key == Py_None) {
-			/* This must come before the PyLong_Check because 
-			   True and False are also 1 and 0.*/
+                        /* This must come before the PyLong_Check because
+                           True and False are also 1 and 0.*/
             kstr = _encoded_const(key);
             if (kstr == NULL)
                 goto bail;
@@ -1454,7 +1454,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         }
         else {
             /* TODO: include repr of key */
-            PyErr_SetString(PyExc_ValueError, "keys must be a string");
+            PyErr_SetString(PyExc_TypeError, "keys must be a string");
             goto bail;
         }
 
@@ -1704,15 +1704,15 @@ PyDoc_STRVAR(module_doc,
 "json speedups\n");
 
 static struct PyModuleDef jsonmodule = {
-	PyModuleDef_HEAD_INIT,
-	"_json",
-	module_doc,
-	-1,
-	speedups_methods,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+        PyModuleDef_HEAD_INIT,
+        "_json",
+        module_doc,
+        -1,
+        speedups_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
 };
 
 PyObject*

@@ -172,9 +172,6 @@ _strided_copy_nd(char *dest, char *src, int nd, Py_ssize_t *shape,
     return;
 }
 
-void _add_one_to_index_F(int nd, Py_ssize_t *index, Py_ssize_t *shape);
-void _add_one_to_index_C(int nd, Py_ssize_t *index, Py_ssize_t *shape);
-
 static int
 _indirect_copy_nd(char *dest, Py_buffer *view, char fort)
 {
@@ -182,7 +179,7 @@ _indirect_copy_nd(char *dest, Py_buffer *view, char fort)
     int k;
     Py_ssize_t elements;
     char *ptr;
-    void (*func)(int, Py_ssize_t *, Py_ssize_t *);
+    void (*func)(int, Py_ssize_t *, const Py_ssize_t *);
 
     if (view->ndim > PY_SSIZE_T_MAX / sizeof(Py_ssize_t)) {
         PyErr_NoMemory();
@@ -203,10 +200,10 @@ _indirect_copy_nd(char *dest, Py_buffer *view, char fort)
         elements *= view->shape[k];
     }
     if (fort == 'F') {
-        func = _add_one_to_index_F;
+        func = _Py_add_one_to_index_F;
     }
     else {
-        func = _add_one_to_index_C;
+        func = _Py_add_one_to_index_C;
     }
     while (elements--) {
         func(view->ndim, indices, view->shape);
@@ -624,7 +621,7 @@ memory_subscript(PyMemoryViewObject *self, PyObject *key)
 static int
 memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
 {
-    Py_ssize_t start, len, bytelen, i;
+    Py_ssize_t start, len, bytelen;
     Py_buffer srcview;
     Py_buffer *view = &(self->view);
     char *srcbuf, *destbuf;
@@ -632,6 +629,11 @@ memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
     if (view->readonly) {
         PyErr_SetString(PyExc_TypeError,
             "cannot modify read-only memory");
+        return -1;
+    }
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError,
+                        "cannot delete memory");
         return -1;
     }
     if (view->ndim != 1) {
@@ -694,16 +696,8 @@ memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
     if (destbuf + bytelen < srcbuf || srcbuf + bytelen < destbuf)
         /* No overlapping */
         memcpy(destbuf, srcbuf, bytelen);
-    else if (destbuf < srcbuf) {
-        /* Copy in ascending order */
-        for (i = 0; i < bytelen; i++)
-            destbuf[i] = srcbuf[i];
-    }
-    else {
-        /* Copy in descencing order */
-        for (i = bytelen - 1; i >= 0; i--)
-            destbuf[i] = srcbuf[i];
-    }
+    else
+        memmove(destbuf, srcbuf, bytelen);
 
     PyBuffer_Release(&srcview);
     return 0;

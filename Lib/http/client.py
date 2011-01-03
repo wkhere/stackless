@@ -487,6 +487,10 @@ class HTTPResponse(io.RawIOBase):
         if self.fp is None:
             return b""
 
+        if self._method == "HEAD":
+            self.close()
+            return b""
+
         if self.chunked:
             return self._read_chunked(amt)
 
@@ -598,7 +602,11 @@ class HTTPResponse(io.RawIOBase):
     def getheader(self, name, default=None):
         if self.headers is None:
             raise ResponseNotReady()
-        return ', '.join(self.headers.get_all(name, default))
+        headers = self.headers.get_all(name) or default
+        if isinstance(headers, str) or not hasattr(headers, '__iter__'):
+            return headers
+        else:
+            return ', '.join(headers)
 
     def getheaders(self):
         """Return list of (header, value) tuples."""
@@ -716,8 +724,8 @@ class HTTPConnection:
             self.__response = None
         self.__state = _CS_IDLE
 
-    def send(self, str):
-        """Send `str' to the server."""
+    def send(self, data):
+        """Send `data' to the server."""
         if self.sock is None:
             if self.auto_open:
                 self.connect()
@@ -730,14 +738,14 @@ class HTTPConnection:
         # NOTE: we DO propagate the error, though, because we cannot simply
         #       ignore the error... the caller will know if they can retry.
         if self.debuglevel > 0:
-            print("send:", repr(str))
+            print("send:", repr(data))
         blocksize = 8192
-        if hasattr(str, "read") :
+        if hasattr(data, "read") :
             if self.debuglevel > 0:
                 print("sendIng a read()able")
             encode = False
             try:
-                mode = str.mode
+                mode = data.mode
             except AttributeError:
                 # io.BytesIO and other file-like objects don't have a `mode`
                 # attribute.
@@ -748,14 +756,14 @@ class HTTPConnection:
                     if self.debuglevel > 0:
                         print("encoding file using iso-8859-1")
             while 1:
-                data = str.read(blocksize)
-                if not data:
+                datablock = data.read(blocksize)
+                if not datablock:
                     break
                 if encode:
-                    data = data.encode("iso-8859-1")
-                self.sock.sendall(data)
+                    datablock = datablock.encode("iso-8859-1")
+                self.sock.sendall(datablock)
         else:
-            self.sock.sendall(str)
+            self.sock.sendall(data)
 
     def _output(self, s):
         """Add a line of output to the current request buffer.
@@ -865,6 +873,13 @@ class HTTPConnection:
                         host_enc = self.host.encode("ascii")
                     except UnicodeEncodeError:
                         host_enc = self.host.encode("idna")
+
+                    # As per RFC 273, IPv6 address should be wrapped with []
+                    # when used as Host header
+
+                    if self.host.find(':') >= 0:
+                        host_enc = b'[' + host_enc + b']'
+
                     if self.port == self.default_port:
                         self.putheader('Host', host_enc)
                     else:
@@ -908,6 +923,8 @@ class HTTPConnection:
         for i, one_value in enumerate(values):
             if hasattr(one_value, 'encode'):
                 values[i] = one_value.encode('ascii')
+            elif isinstance(one_value, int):
+                values[i] = str(one_value).encode('ascii')
         value = b'\r\n\t'.join(values)
         header = header + b': ' + value
         self._output(header)

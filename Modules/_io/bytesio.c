@@ -169,6 +169,7 @@ PyDoc_STRVAR(flush_doc,
 static PyObject *
 bytesio_flush(bytesio *self)
 {
+    CHECK_CLOSED(self);
     Py_RETURN_NONE;
 }
 
@@ -390,15 +391,20 @@ static PyObject *
 bytesio_readinto(bytesio *self, PyObject *buffer)
 {
     void *raw_buffer;
-    Py_ssize_t len;
+    Py_ssize_t len, n;
 
     CHECK_CLOSED(self);
 
     if (PyObject_AsWriteBuffer(buffer, &raw_buffer, &len) == -1)
         return NULL;
 
-    if (self->pos + len > self->string_size)
-        len = self->string_size - self->pos;
+    /* adjust invalid sizes */
+    n = self->string_size - self->pos;
+    if (len > n) {
+        len = n;
+        if (len < 0)
+            len = 0;
+    }
 
     memcpy(raw_buffer, self->buf + self->pos, len);
     assert(self->pos + len < PY_SSIZE_T_MAX);
@@ -703,7 +709,7 @@ static struct PyMethodDef bytesio_methods[] = {
     {"readline",   (PyCFunction)bytesio_readline,   METH_VARARGS, readline_doc},
     {"readlines",  (PyCFunction)bytesio_readlines,  METH_VARARGS, readlines_doc},
     {"read",       (PyCFunction)bytesio_read,       METH_VARARGS, read_doc},
-    {"getvalue",   (PyCFunction)bytesio_getvalue,   METH_VARARGS, getval_doc},
+    {"getvalue",   (PyCFunction)bytesio_getvalue,   METH_NOARGS,  getval_doc},
     {"seek",       (PyCFunction)bytesio_seek,       METH_VARARGS, seek_doc},
     {"truncate",   (PyCFunction)bytesio_truncate,   METH_VARARGS, truncate_doc},
     {NULL, NULL}        /* sentinel */

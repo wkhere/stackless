@@ -176,6 +176,20 @@ class RegressionTests(unittest.TestCase):
         class MyStr(str): pass
         self.con.execute("select ?", (MyStr("abc"),))
 
+    def CheckConnectionCall(self):
+        """
+        Call a connection with a non-string SQL request: check error handling
+        of the statement constructor.
+        """
+        self.assertRaises(sqlite.Warning, self.con, 1)
+
+    def CheckCollation(self):
+        def collation_cb(a, b):
+            return 1
+        self.assertRaises(sqlite.ProgrammingError, self.con.create_collation,
+            # Lone surrogate cannot be encoded to the default encoding (utf8)
+            "\uDC80", collation_cb)
+
 def suite():
     regression_suite = unittest.makeSuite(RegressionTests, "Check")
     return unittest.TestSuite((regression_suite,))

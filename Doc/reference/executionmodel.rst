@@ -87,7 +87,7 @@ The following constructs bind names: formal parameters to functions,
 :keyword:`import` statements, class and function definitions (these bind the
 class or function name in the defining block), and targets that are identifiers
 if occurring in an assignment, :keyword:`for` loop header, or after
-:keyword:`as` in a :keyword:`with` statement or :keyword.`except` clause.
+:keyword:`as` in a :keyword:`with` statement or :keyword:`except` clause.
 The :keyword:`import` statement
 of the form ``from ... import *`` binds all names defined in the imported
 module, except those beginning with an underscore.  This form may only be used
@@ -120,7 +120,7 @@ namespace is searched.  The global statement must precede all uses of the name.
 
 .. index:: pair: restricted; execution
 
-The built-in namespace associated with the execution of a code block is actually
+The builtins namespace associated with the execution of a code block is actually
 found by looking up the name ``__builtins__`` in its global namespace; this
 should be a dictionary or a module (in the latter case the module's dictionary
 is used).  By default, when in the :mod:`__main__` module, ``__builtins__`` is
@@ -132,7 +132,7 @@ weak form of restricted execution.
 .. impl-detail::
 
    Users should not touch ``__builtins__``; it is strictly an implementation
-   detail.  Users wanting to override values in the built-in namespace should
+   detail.  Users wanting to override values in the builtins namespace should
    :keyword:`import` the :mod:`builtins` module and modify its
    attributes appropriately.
 

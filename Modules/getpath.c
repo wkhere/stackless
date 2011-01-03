@@ -89,6 +89,8 @@
  * directory).  This seems to make more sense given that currently the only
  * known use of sys.prefix and sys.exec_prefix is for the ILU installation
  * process to find the installed Python tree.
+ *
+ * NOTE: Windows MSVC builds use PC/getpathp.c instead!
  */
 
 #ifdef __cplusplus
@@ -134,7 +136,10 @@ static wchar_t lib_python[] = L"lib/python" VERSION;
 /* In principle, this should use HAVE__WSTAT, and _wstat
    should be detected by autoconf. However, no current
    POSIX system provides that function, so testing for
-   it is pointless. */
+   it is pointless.
+   Not sure whether the MS_WINDOWS guards are necessary:
+   perhaps for cygwin/mingw builds?
+*/
 #ifndef MS_WINDOWS
 static int
 _wstat(const wchar_t* path, struct stat *buf)
@@ -142,8 +147,8 @@ _wstat(const wchar_t* path, struct stat *buf)
     char fname[PATH_MAX];
     size_t res = wcstombs(fname, path, sizeof(fname));
     if (res == (size_t)-1) {
-	errno = EINVAL;
-	return -1;
+        errno = EINVAL;
+        return -1;
     }
     return stat(fname, buf);
 }
@@ -155,17 +160,17 @@ _wgetcwd(wchar_t *buf, size_t size)
 {
     char fname[PATH_MAX];
     if (getcwd(fname, PATH_MAX) == NULL)
-	return NULL;
+        return NULL;
     if (mbstowcs(buf, fname, size) >= size) {
-	errno = ERANGE;
-	return NULL;
+        errno = ERANGE;
+        return NULL;
     }
     return buf;
 }
 #endif
 
 #ifdef HAVE_READLINK
-int 
+int
 _Py_wreadlink(const wchar_t *path, wchar_t *buf, size_t bufsiz)
 {
     char cbuf[PATH_MAX];
@@ -173,24 +178,24 @@ _Py_wreadlink(const wchar_t *path, wchar_t *buf, size_t bufsiz)
     int res;
     size_t r1 = wcstombs(cpath, path, PATH_MAX);
     if (r1 == (size_t)-1 || r1 >= PATH_MAX) {
-	errno = EINVAL;
-	return -1;
+        errno = EINVAL;
+        return -1;
     }
     res = (int)readlink(cpath, cbuf, PATH_MAX);
     if (res == -1)
-	return -1;
+        return -1;
     if (res == PATH_MAX) {
-	errno = EINVAL;
-	return -1;
+        errno = EINVAL;
+        return -1;
     }
     cbuf[res] = '\0'; /* buf will be null terminated */
     r1 = mbstowcs(buf, cbuf, bufsiz);
     if (r1 == -1) {
-	errno = EINVAL;
-	return -1;
+        errno = EINVAL;
+        return -1;
     }
     return (int)r1;
-    
+
 }
 #endif
 
@@ -279,7 +284,7 @@ joinpath(wchar_t *buffer, wchar_t *stuff)
             buffer[n++] = SEP;
     }
     if (n > MAXPATHLEN)
-    	Py_FatalError("buffer overflow in getpath.c's joinpath()");
+        Py_FatalError("buffer overflow in getpath.c's joinpath()");
     k = wcslen(stuff);
     if (n + k > MAXPATHLEN)
         k = MAXPATHLEN - n;
@@ -295,7 +300,11 @@ copy_absolute(wchar_t *path, wchar_t *p)
     if (p[0] == SEP)
         wcscpy(path, p);
     else {
-        _wgetcwd(path, MAXPATHLEN);
+        if (!_wgetcwd(path, MAXPATHLEN)) {
+            /* unable to get the current directory */
+            wcscpy(path, p);
+            return;
+        }
         if (p[0] == '.' && p[1] == SEP)
             p += 2;
         joinpath(path, p);
@@ -457,25 +466,25 @@ calculate_path(void)
 #else
     unsigned long nsexeclength = MAXPATHLEN;
 #endif
-	char execpath[MAXPATHLEN+1];
+        char execpath[MAXPATHLEN+1];
 #endif
 
     if (_path) {
-	    size_t r = mbstowcs(wpath, _path, MAXPATHLEN+1);
-	    path = wpath;
-	    if (r == (size_t)-1 || r > MAXPATHLEN) {
-		    /* Could not convert PATH, or it's too long. */
-		    path = NULL;
-	    }
+        size_t r = mbstowcs(wpath, _path, MAXPATHLEN+1);
+        path = wpath;
+        if (r == (size_t)-1 || r > MAXPATHLEN) {
+            /* Could not convert PATH, or it's too long. */
+            path = NULL;
+        }
     }
 
-	/* If there is no slash in the argv0 path, then we have to
-	 * assume python is on the user's $PATH, since there's no
-	 * other way to find a directory to start the search from.  If
-	 * $PATH isn't exported, you lose.
-	 */
-	if (wcschr(prog, SEP))
-		wcsncpy(progpath, prog, MAXPATHLEN);
+    /* If there is no slash in the argv0 path, then we have to
+     * assume python is on the user's $PATH, since there's no
+     * other way to find a directory to start the search from.  If
+     * $PATH isn't exported, you lose.
+     */
+    if (wcschr(prog, SEP))
+        wcsncpy(progpath, prog, MAXPATHLEN);
 #ifdef __APPLE__
      /* On Mac OS X, if a script uses an interpreter of the form
       * "#!/opt/python2.3/bin/python", the kernel only passes "python"
@@ -487,52 +496,52 @@ calculate_path(void)
       * will fail if a relative path was used. but in that case,
       * absolutize() should help us out below
       */
-	else if(0 == _NSGetExecutablePath(execpath, &nsexeclength) && execpath[0] == SEP) {
-		size_t r = mbstowcs(progpath, execpath, MAXPATHLEN+1);
-		if (r == (size_t)-1 || r > MAXPATHLEN) {
-			/* Could not convert execpath, or it's too long. */
-			progpath[0] = '\0';
-		}
-	}
+    else if(0 == _NSGetExecutablePath(execpath, &nsexeclength) && execpath[0] == SEP) {
+        size_t r = mbstowcs(progpath, execpath, MAXPATHLEN+1);
+        if (r == (size_t)-1 || r > MAXPATHLEN) {
+            /* Could not convert execpath, or it's too long. */
+            progpath[0] = '\0';
+        }
+    }
 #endif /* __APPLE__ */
-	else if (path) {
-		while (1) {
-			wchar_t *delim = wcschr(path, DELIM);
+    else if (path) {
+        while (1) {
+            wchar_t *delim = wcschr(path, DELIM);
 
-			if (delim) {
-				size_t len = delim - path;
-				if (len > MAXPATHLEN)
-					len = MAXPATHLEN;
-				wcsncpy(progpath, path, len);
-				*(progpath + len) = '\0';
-			}
-			else
-				wcsncpy(progpath, path, MAXPATHLEN);
+            if (delim) {
+                size_t len = delim - path;
+                if (len > MAXPATHLEN)
+                    len = MAXPATHLEN;
+                wcsncpy(progpath, path, len);
+                *(progpath + len) = '\0';
+            }
+            else
+                wcsncpy(progpath, path, MAXPATHLEN);
 
-			joinpath(progpath, prog);
-			if (isxfile(progpath))
-				break;
+            joinpath(progpath, prog);
+            if (isxfile(progpath))
+                break;
 
-			if (!delim) {
-				progpath[0] = L'\0';
-				break;
-			}
-			path = delim + 1;
-		}
-	}
-	else
-		progpath[0] = '\0';
-	if (progpath[0] != SEP)
-		absolutize(progpath);
-	wcsncpy(argv0_path, progpath, MAXPATHLEN);
-	argv0_path[MAXPATHLEN] = '\0';
+            if (!delim) {
+                progpath[0] = L'\0';
+                break;
+            }
+            path = delim + 1;
+        }
+    }
+    else
+        progpath[0] = '\0';
+    if (progpath[0] != SEP && progpath[0] != '\0')
+        absolutize(progpath);
+    wcsncpy(argv0_path, progpath, MAXPATHLEN);
+    argv0_path[MAXPATHLEN] = '\0';
 
 #ifdef WITH_NEXT_FRAMEWORK
-	/* On Mac OS X we have a special case if we're running from a framework.
-	** This is because the python home should be set relative to the library,
-	** which is in the framework, not relative to the executable, which may
-	** be outside of the framework. Except when we're in the build directory...
-	*/
+    /* On Mac OS X we have a special case if we're running from a framework.
+    ** This is because the python home should be set relative to the library,
+    ** which is in the framework, not relative to the executable, which may
+    ** be outside of the framework. Except when we're in the build directory...
+    */
     pythonModule = NSModuleForSymbol(NSLookupAndBindSymbol("_Py_Initialize"));
     /* Use dylib functions to find out where the framework was loaded from */
     buf = (wchar_t *)NSLibraryNameForModule(pythonModule);
@@ -550,13 +559,13 @@ calculate_path(void)
         joinpath(argv0_path, lib_python);
         joinpath(argv0_path, LANDMARK);
         if (!ismodule(argv0_path)) {
-                /* We are in the build directory so use the name of the
-                   executable - we know that the absolute path is passed */
-                wcsncpy(argv0_path, prog, MAXPATHLEN);
+            /* We are in the build directory so use the name of the
+               executable - we know that the absolute path is passed */
+            wcsncpy(argv0_path, progpath, MAXPATHLEN);
         }
         else {
-                /* Use the location of the library as the progpath */
-                wcsncpy(argv0_path, buf, MAXPATHLEN);
+            /* Use the location of the library as the progpath */
+            wcsncpy(argv0_path, buf, MAXPATHLEN);
         }
     }
 #endif
@@ -604,7 +613,7 @@ calculate_path(void)
     else
         wcsncpy(zip_path, L"" PREFIX, MAXPATHLEN);
     joinpath(zip_path, L"lib/python00.zip");
-    bufsz = wcslen(zip_path);	/* Replace "00" with version */
+    bufsz = wcslen(zip_path);   /* Replace "00" with version */
     zip_path[bufsz - 6] = VERSION[0];
     zip_path[bufsz - 5] = VERSION[2];
 
@@ -626,12 +635,12 @@ calculate_path(void)
     bufsz = 0;
 
     if (_rtpypath) {
-	size_t s = mbstowcs(rtpypath, _rtpypath, sizeof(rtpypath)/sizeof(wchar_t));
-	if (s == (size_t)-1 || s >=sizeof(rtpypath))
-	    /* XXX deal with errors more gracefully */
-	    _rtpypath = NULL;
-	if (_rtpypath)
-	    bufsz += wcslen(rtpypath) + 1;
+        size_t s = mbstowcs(rtpypath, _rtpypath, sizeof(rtpypath)/sizeof(wchar_t));
+        if (s == (size_t)-1 || s >=sizeof(rtpypath))
+            /* XXX deal with errors more gracefully */
+            _rtpypath = NULL;
+        if (_rtpypath)
+            bufsz += wcslen(rtpypath) + 1;
     }
 
     prefixsz = wcslen(prefix) + 1;
@@ -718,10 +727,10 @@ calculate_path(void)
     if (pfound > 0) {
         reduce(prefix);
         reduce(prefix);
-	/* The prefix is the root directory, but reduce() chopped
-	 * off the "/". */
-	if (!prefix[0])
-		wcscpy(prefix, separator);
+        /* The prefix is the root directory, but reduce() chopped
+         * off the "/". */
+        if (!prefix[0])
+                wcscpy(prefix, separator);
     }
     else
         wcsncpy(prefix, L"" PREFIX, MAXPATHLEN);
@@ -730,8 +739,8 @@ calculate_path(void)
         reduce(exec_prefix);
         reduce(exec_prefix);
         reduce(exec_prefix);
-	if (!exec_prefix[0])
-		wcscpy(exec_prefix, separator);
+        if (!exec_prefix[0])
+                wcscpy(exec_prefix, separator);
     }
     else
         wcsncpy(exec_prefix, L"" EXEC_PREFIX, MAXPATHLEN);

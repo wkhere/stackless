@@ -8,21 +8,7 @@ import urllib.request
 import sys
 import os
 import email.message
-
-
-def _open_with_retry(func, host, *args, **kwargs):
-    # Connecting to remote hosts is flaky.  Make it more robust
-    # by retrying the connection several times.
-    last_exc = None
-    for i in range(3):
-        try:
-            return func(host, *args, **kwargs)
-        except IOError as err:
-            last_exc = err
-            continue
-        except:
-            raise
-    raise last_exc
+import time
 
 
 class URLTimeoutTest(unittest.TestCase):
@@ -36,7 +22,8 @@ class URLTimeoutTest(unittest.TestCase):
         socket.setdefaulttimeout(None)
 
     def testURLread(self):
-        f = _open_with_retry(urllib.request.urlopen, "http://www.python.org/")
+        with support.transient_internet("www.python.org"):
+            f = urllib.request.urlopen("http://www.python.org/")
         x = f.read()
 
 class urlopenNetworkTests(unittest.TestCase):
@@ -54,8 +41,10 @@ class urlopenNetworkTests(unittest.TestCase):
 
     """
 
-    def urlopen(self, *args):
-        return _open_with_retry(urllib.request.urlopen, *args)
+    def urlopen(self, *args, **kwargs):
+        resource = args[0]
+        with support.transient_internet(resource):
+            return urllib.request.urlopen(*args, **kwargs)
 
     def test_basic(self):
         # Simple test expected to pass.
@@ -118,7 +107,7 @@ class urlopenNetworkTests(unittest.TestCase):
             # test can't pass on Windows.
             return
         # Make sure fd returned by fileno is valid.
-        open_url = self.urlopen("http://www.python.org/")
+        open_url = self.urlopen("http://www.python.org/", timeout=None)
         fd = open_url.fileno()
         FILE = os.fdopen(fd, encoding='utf-8')
         try:
@@ -145,7 +134,9 @@ class urlretrieveNetworkTests(unittest.TestCase):
     """Tests urllib.request.urlretrieve using the network."""
 
     def urlretrieve(self, *args):
-        return _open_with_retry(urllib.request.urlretrieve, *args)
+        resource = args[0]
+        with support.transient_internet(resource):
+            return urllib.request.urlretrieve(*args)
 
     def test_basic(self):
         # Test basic functionality.
@@ -180,6 +171,16 @@ class urlretrieveNetworkTests(unittest.TestCase):
         self.assertTrue(isinstance(header, email.message.Message),
                      "header is not an instance of email.message.Message")
 
+    def test_data_header(self):
+        logo = "http://www.python.org/community/logos/python-logo-master-v3-TM.png"
+        file_location, fileheaders = self.urlretrieve(logo)
+        os.unlink(file_location)
+        datevalue = fileheaders.get('Date')
+        dateformat = '%a, %d %b %Y %H:%M:%S GMT'
+        try:
+            time.strptime(datevalue, dateformat)
+        except ValueError:
+            self.fail('Date value not in %r format', dateformat)
 
 
 def test_main():

@@ -5,6 +5,7 @@ from test import support
 # Skip these tests if there is no posix module.
 posix = support.import_module('posix')
 
+import sys
 import time
 import os
 import pwd
@@ -273,9 +274,57 @@ class PosixTester(unittest.TestCase):
                 os.chdir(curdir)
                 support.rmtree(base_path)
 
+    def test_getgroups(self):
+        with os.popen('id -G') as idg:
+            groups = idg.read().strip()
+
+        if not groups:
+            raise unittest.SkipTest("need working 'id -G'")
+
+        # 'id -G' and 'os.getgroups()' should return the same
+        # groups, ignoring order and duplicates.
+        self.assertEqual(
+                set([int(x) for x in groups.split()]),
+                set(posix.getgroups()))
+
+class PosixGroupsTester(unittest.TestCase):
+
+    def setUp(self):
+        if posix.getuid() != 0:
+            raise unittest.SkipTest("not enough privileges")
+        if not hasattr(posix, 'getgroups'):
+            raise unittest.SkipTest("need posix.getgroups")
+        if sys.platform == 'darwin':
+            raise unittest.SkipTest("getgroups(2) is broken on OSX")
+        self.saved_groups = posix.getgroups()
+
+    def tearDown(self):
+        if hasattr(posix, 'setgroups'):
+            posix.setgroups(self.saved_groups)
+        elif hasattr(posix, 'initgroups'):
+            name = pwd.getpwuid(posix.getuid()).pw_name
+            posix.initgroups(name, self.saved_groups[0])
+
+    @unittest.skipUnless(hasattr(posix, 'initgroups'),
+                         "test needs posix.initgroups()")
+    def test_initgroups(self):
+        # find missing group
+
+        g = max(self.saved_groups) + 1
+        name = pwd.getpwuid(posix.getuid()).pw_name
+        posix.initgroups(name, g)
+        self.assertIn(g, posix.getgroups())
+
+    @unittest.skipUnless(hasattr(posix, 'setgroups'),
+                         "test needs posix.setgroups()")
+    def test_setgroups(self):
+        for groups in [[0], list(range(16))]:
+            posix.setgroups(groups)
+            self.assertListEqual(groups, posix.getgroups())
+
 
 def test_main():
-    support.run_unittest(PosixTester)
+    support.run_unittest(PosixTester, PosixGroupsTester)
 
 if __name__ == '__main__':
     test_main()

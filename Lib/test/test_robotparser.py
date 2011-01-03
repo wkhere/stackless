@@ -1,6 +1,7 @@
 import io
 import unittest
 import urllib.robotparser
+from urllib.error import URLError
 from test import support
 
 class RobotTestCase(unittest.TestCase):
@@ -204,27 +205,54 @@ bad = ['/folder1/anotherfile.html']
 RobotTest(13, doc, good, bad, agent="googlebot")
 
 
+# 14. For issue #6325 (query string support)
+doc = """
+User-agent: *
+Disallow: /some/path?name=value
+"""
+
+good = ['/some/path']
+bad = ['/some/path?name=value']
+
+RobotTest(14, doc, good, bad)
+
+# 15. For issue #4108 (obey first * entry)
+doc = """
+User-agent: *
+Disallow: /some/path
+
+User-agent: *
+Disallow: /another/path
+"""
+
+good = ['/another/path']
+bad = ['/some/path']
+
+RobotTest(15, doc, good, bad)
+
 
 class NetworkTestCase(unittest.TestCase):
 
     def testPasswordProtectedSite(self):
-        if not support.is_resource_enabled('network'):
-            return
-        # whole site is password-protected.
-        url = 'http://mueblesmoraleda.com'
-        parser = urllib.robotparser.RobotFileParser()
-        parser.set_url(url)
-        parser.read()
-        self.assertEqual(parser.can_fetch("*", url+"/robots.txt"), False)
+        support.requires('network')
+        with support.transient_internet('mueblesmoraleda.com'):
+            url = 'http://mueblesmoraleda.com'
+            parser = urllib.robotparser.RobotFileParser()
+            parser.set_url(url)
+            try:
+                parser.read()
+            except URLError:
+                self.skipTest('%s is unavailable' % url)
+            self.assertEqual(parser.can_fetch("*", url+"/robots.txt"), False)
 
     def testPythonOrg(self):
-        if not support.is_resource_enabled('network'):
-            return
-        parser = urllib.robotparser.RobotFileParser(
-            "http://www.python.org/robots.txt")
-        parser.read()
-        self.assertTrue(parser.can_fetch("*",
-                                         "http://www.python.org/robots.txt"))
+        support.requires('network')
+        with support.transient_internet('www.python.org'):
+            parser = urllib.robotparser.RobotFileParser(
+                "http://www.python.org/robots.txt")
+            parser.read()
+            self.assertTrue(
+                parser.can_fetch("*", "http://www.python.org/robots.txt"))
 
 def test_main():
     support.run_unittest(NetworkTestCase)

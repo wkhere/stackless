@@ -105,10 +105,9 @@ A hash object has the following methods:
    equivalent to ``m.update(a+b)``.
 
    .. versionchanged:: 3.1
-
-      The Python GIL is released to allow other threads to run while
-      hash updates on data larger than 2048 bytes is taking place when
-      using hash algorithms supplied by OpenSSL.
+      The Python GIL is released to allow other threads to run while hash
+      updates on data larger than 2048 bytes is taking place when using hash
+      algorithms supplied by OpenSSL.
 
 
 .. method:: hash.digest()
@@ -142,7 +141,7 @@ A hash object has the following methods:
    http://csrc.nist.gov/publications/fips/fips180-2/fips180-2.pdf
       The FIPS 180-2 publication on Secure Hash Algorithms.
 
-   http://www.cryptography.com/cnews/hash.html
-      Hash Collision FAQ with information on which algorithms have known issues and
+   http://en.wikipedia.org/wiki/Cryptographic_hash_function#Cryptographic_hash_algorithms
+      Wikipedia article with information on which algorithms have known issues and
       what that means regarding their use.
 

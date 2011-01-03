@@ -23,6 +23,12 @@ into an object hierarchy.  Pickling (and unpickling) is alternatively known as
 "serialization", "marshalling," [#]_ or "flattening", however, to avoid
 confusion, the terms used here are "pickling" and "unpickling"..
 
+.. warning::
+
+   The :mod:`pickle` module is not intended to be secure against erroneous or
+   maliciously constructed data.  Never unpickle data received from an untrusted
+   or unauthenticated source.
+
 
 Relationship to other Python modules
 ------------------------------------
@@ -62,12 +68,6 @@ The :mod:`pickle` module differs from :mod:`marshal` several significant ways:
   serialization format in non-backwards compatible ways should the need arise.
   The :mod:`pickle` serialization format is guaranteed to be backwards compatible
   across Python releases.
-
-.. warning::
-
-   The :mod:`pickle` module is not intended to be secure against erroneous or
-   maliciously constructed data.  Never unpickle data received from an untrusted
-   or unauthenticated source.
 
 Note that serialization is a more primitive notion than persistence; although
 :mod:`pickle` reads and writes file objects, it does not handle the issue of
@@ -143,8 +143,8 @@ process more convenient:
 
 .. function:: dump(obj, file[, protocol, \*, fix_imports=True])
 
-   Write a pickled representation of *obj* to the open file object *file*.  This
-   is equivalent to ``Pickler(file, protocol).dump(obj)``.
+   Write a pickled representation of *obj* to the open :term:`file object` *file*.
+   This is equivalent to ``Pickler(file, protocol).dump(obj)``.
 
    The optional *protocol* argument tells the pickler to use the given protocol;
    supported protocols are 0, 1, 2, 3.  The default protocol is 3; a
@@ -155,8 +155,9 @@ process more convenient:
    Python needed to read the pickle produced.
 
    The *file* argument must have a write() method that accepts a single bytes
-   argument.  It can thus be a file object opened for binary writing, a
-   io.BytesIO instance, or any other custom object that meets this interface.
+   argument.  It can thus be an on-disk file opened for binary writing, a
+   :class:`io.BytesIO` instance, or any other custom object that meets this
+   interface.
 
    If *fix_imports* is True and *protocol* is less than 3, pickle will try to
    map the new Python 3.x names to the old module names used in Python 2.x,
@@ -181,8 +182,8 @@ process more convenient:
 
 .. function:: load(file, [\*, fix_imports=True, encoding="ASCII", errors="strict"])
 
-   Read a pickled object representation from the open file object *file* and
-   return the reconstituted object hierarchy specified therein.  This is
+   Read a pickled object representation from the open :term:`file object` *file*
+   and return the reconstituted object hierarchy specified therein.  This is
    equivalent to ``Unpickler(file).load()``.
 
    The protocol version of the pickle is detected automatically, so no protocol
@@ -191,12 +192,12 @@ process more convenient:
 
    The argument *file* must have two methods, a read() method that takes an
    integer argument, and a readline() method that requires no arguments.  Both
-   methods should return bytes.  Thus *file* can be a binary file object opened
-   for reading, a BytesIO object, or any other custom object that meets this
-   interface.
+   methods should return bytes.  Thus *file* can be an on-disk file opened
+   for binary reading, a :class:`io.BytesIO` object, or any other custom object
+   that meets this interface.
 
    Optional keyword arguments are *fix_imports*, *encoding* and *errors*,
-   which are used to control compatiblity support for pickle stream generated
+   which are used to control compatibility support for pickle stream generated
    by Python 2.x.  If *fix_imports* is True, pickle will try to map the old
    Python 2.x names to the new names used in Python 3.x.  The *encoding* and
    *errors* tell pickle how to decode 8-bit string instances pickled by Python
@@ -212,7 +213,7 @@ process more convenient:
    ignored.
 
    Optional keyword arguments are *fix_imports*, *encoding* and *errors*,
-   which are used to control compatiblity support for pickle stream generated
+   which are used to control compatibility support for pickle stream generated
    by Python 2.x.  If *fix_imports* is True, pickle will try to map the old
    Python 2.x names to the new names used in Python 3.x.  The *encoding* and
    *errors* tell pickle how to decode 8-bit string instances pickled by Python
@@ -260,8 +261,8 @@ The :mod:`pickle` module exports two classes, :class:`Pickler` and
    Python needed to read the pickle produced.
 
    The *file* argument must have a write() method that accepts a single bytes
-   argument.  It can thus be a file object opened for binary writing, a
-   io.BytesIO instance, or any other custom object that meets this interface.
+   argument.  It can thus be an on-disk file opened for binary writing, a
+   :class:`io.BytesIO` instance, or any other custom object that meets this interface.
 
    If *fix_imports* is True and *protocol* is less than 3, pickle will try to
    map the new Python 3.x names to the old module names used in Python 2.x,
@@ -304,12 +305,12 @@ The :mod:`pickle` module exports two classes, :class:`Pickler` and
 
    The argument *file* must have two methods, a read() method that takes an
    integer argument, and a readline() method that requires no arguments.  Both
-   methods should return bytes.  Thus *file* can be a binary file object opened
-   for reading, a BytesIO object, or any other custom object that meets this
-   interface.
+   methods should return bytes.  Thus *file* can be an on-disk file object opened
+   for binary reading, a :class:`io.BytesIO` object, or any other custom object
+   that meets this interface.
 
    Optional keyword arguments are *fix_imports*, *encoding* and *errors*,
-   which are used to control compatiblity support for pickle stream generated
+   which are used to control compatibility support for pickle stream generated
    by Python 2.x.  If *fix_imports* is True, pickle will try to map the old
    Python 2.x names to the new names used in Python 3.x.  The *encoding* and
    *errors* tell pickle how to decode 8-bit string instances pickled by Python
@@ -426,33 +427,38 @@ implementation of this behaviour::
        obj.__dict__.update(attributes)
        return obj
 
-.. index:: single: __getnewargs__() (copy protocol)
+Classes can alter the default behaviour by providing one or several special
+methods:
 
-Classes can alter the default behaviour by providing one or severals special
-methods.  In protocol 2 and newer, classes that implements the
-:meth:`__getnewargs__` method can dictate the values passed to the
-:meth:`__new__` method upon unpickling.  This is often needed for classes
-whose :meth:`__new__` method requires arguments.
+.. method:: object.__getnewargs__()
 
-.. index:: single: __getstate__() (copy protocol)
+   In protocol 2 and newer, classes that implements the :meth:`__getnewargs__`
+   method can dictate the values passed to the :meth:`__new__` method upon
+   unpickling.  This is often needed for classes whose :meth:`__new__` method
+   requires arguments.
 
-Classes can further influence how their instances are pickled; if the class
-defines the method :meth:`__getstate__`, it is called and the returned object is
-pickled as the contents for the instance, instead of the contents of the
-instance's dictionary.  If the :meth:`__getstate__` method is absent, the
-instance's :attr:`__dict__` is pickled as usual.
 
-.. index:: single: __setstate__() (copy protocol)
+.. method:: object.__getstate__()
 
-Upon unpickling, if the class defines :meth:`__setstate__`, it is called with
-the unpickled state.  In that case, there is no requirement for the state object
-to be a dictionary. Otherwise, the pickled state must be a dictionary and its
-items are assigned to the new instance's dictionary.
+   Classes can further influence how their instances are pickled; if the class
+   defines the method :meth:`__getstate__`, it is called and the returned object
+   is pickled as the contents for the instance, instead of the contents of the
+   instance's dictionary.  If the :meth:`__getstate__` method is absent, the
+   instance's :attr:`__dict__` is pickled as usual.
 
-.. note::
 
-   If :meth:`__getstate__` returns a false value, the :meth:`__setstate__`
-   method will not be called.
+.. method:: object.__setstate__(state)
+
+   Upon unpickling, if the class defines :meth:`__setstate__`, it is called with
+   the unpickled state.  In that case, there is no requirement for the state
+   object to be a dictionary.  Otherwise, the pickled state must be a dictionary
+   and its items are assigned to the new instance's dictionary.
+
+   .. note::
+
+      If :meth:`__getstate__` returns a false value, the :meth:`__setstate__`
+      method will not be called upon unpickling.
+
 
 Refer to the section :ref:`pickle-state` for more information about how to use
 the methods :meth:`__getstate__` and :meth:`__setstate__`.
@@ -461,14 +467,12 @@ the methods :meth:`__getstate__` and :meth:`__setstate__`.
 
    At unpickling time, some methods like :meth:`__getattr__`,
    :meth:`__getattribute__`, or :meth:`__setattr__` may be called upon the
-   instance.  In case those methods rely on some internal invariant being
-   true, the type should implement either :meth:`__getinitargs__` or
-   :meth:`__getnewargs__` to establish such an invariant; otherwise, neither
-   :meth:`__new__` nor :meth:`__init__` will be called.
+   instance.  In case those methods rely on some internal invariant being true,
+   the type should implement :meth:`__getnewargs__` to establish such an
+   invariant; otherwise, neither :meth:`__new__` nor :meth:`__init__` will be
+   called.
 
-.. index::
-   pair: copy; protocol
-   single: __reduce__() (copy protocol)
+.. index:: pair: copy; protocol
 
 As we shall see, pickle does not use directly the methods described above.  In
 fact, these methods are part of the copy protocol which implements the
@@ -479,58 +483,61 @@ objects. [#]_
 Although powerful, implementing :meth:`__reduce__` directly in your classes is
 error prone.  For this reason, class designers should use the high-level
 interface (i.e., :meth:`__getnewargs__`, :meth:`__getstate__` and
-:meth:`__setstate__`) whenever possible.  We will show, however, cases where using
-:meth:`__reduce__` is the only option or leads to more efficient pickling or
-both.
+:meth:`__setstate__`) whenever possible.  We will show, however, cases where
+using :meth:`__reduce__` is the only option or leads to more efficient pickling
+or both.
 
-The interface is currently defined as follows. The :meth:`__reduce__` method
-takes no argument and shall return either a string or preferably a tuple (the
-returned object is often referred to as the "reduce value").
+.. method:: object.__reduce__()
 
-If a string is returned, the string should be interpreted as the name of a
-global variable.  It should be the object's local name relative to its module;
-the pickle module searches the module namespace to determine the object's
-module.  This behaviour is typically useful for singletons.
+   The interface is currently defined as follows.  The :meth:`__reduce__` method
+   takes no argument and shall return either a string or preferably a tuple (the
+   returned object is often referred to as the "reduce value").
 
-When a tuple is returned, it must be between two and five items long.  Optional
-items can either be omitted, or ``None`` can be provided as their value.  The
-semantics of each item are in order:
+   If a string is returned, the string should be interpreted as the name of a
+   global variable.  It should be the object's local name relative to its
+   module; the pickle module searches the module namespace to determine the
+   object's module.  This behaviour is typically useful for singletons.
 
-.. XXX Mention __newobj__ special-case?
+   When a tuple is returned, it must be between two and five items long.
+   Optional items can either be omitted, or ``None`` can be provided as their
+   value.  The semantics of each item are in order:
 
-* A callable object that will be called to create the initial version of the
-  object.
+   .. XXX Mention __newobj__ special-case?
 
-* A tuple of arguments for the callable object. An empty tuple must be given if
-  the callable does not accept any argument.
+   * A callable object that will be called to create the initial version of the
+     object.
 
-* Optionally, the object's state, which will be passed to the object's
-  :meth:`__setstate__` method as previously described.  If the object has no
-  such method then, the value must be a dictionary and it will be added to the
-  object's :attr:`__dict__` attribute.
+   * A tuple of arguments for the callable object.  An empty tuple must be given
+     if the callable does not accept any argument.
 
-* Optionally, an iterator (and not a sequence) yielding successive items.  These
-  items will be appended to the object either using ``obj.append(item)`` or, in
-  batch, using ``obj.extend(list_of_items)``.  This is primarily used for list
-  subclasses, but may be used by other classes as long as they have
-  :meth:`append` and :meth:`extend` methods with the appropriate signature.
-  (Whether :meth:`append` or :meth:`extend` is used depends on which pickle
-  protocol version is used as well as the number of items to append, so both
-  must be supported.)
+   * Optionally, the object's state, which will be passed to the object's
+     :meth:`__setstate__` method as previously described.  If the object has no
+     such method then, the value must be a dictionary and it will be added to
+     the object's :attr:`__dict__` attribute.
 
-* Optionally, an iterator (not a sequence) yielding successive key-value pairs.
-  These items will be stored to the object using ``obj[key] = value``.  This is
-  primarily used for dictionary subclasses, but may be used by other classes as
-  long as they implement :meth:`__setitem__`.
+   * Optionally, an iterator (and not a sequence) yielding successive items.
+     These items will be appended to the object either using
+     ``obj.append(item)`` or, in batch, using ``obj.extend(list_of_items)``.
+     This is primarily used for list subclasses, but may be used by other
+     classes as long as they have :meth:`append` and :meth:`extend` methods with
+     the appropriate signature.  (Whether :meth:`append` or :meth:`extend` is
+     used depends on which pickle protocol version is used as well as the number
+     of items to append, so both must be supported.)
 
-.. index:: single: __reduce_ex__() (copy protocol)
+   * Optionally, an iterator (not a sequence) yielding successive key-value
+     pairs.  These items will be stored to the object using ``obj[key] =
+     value``.  This is primarily used for dictionary subclasses, but may be used
+     by other classes as long as they implement :meth:`__setitem__`.
 
-Alternatively, a :meth:`__reduce_ex__` method may be defined.  The only
-difference is this method should take a single integer argument, the protocol
-version.  When defined, pickle will prefer it over the :meth:`__reduce__`
-method.  In addition, :meth:`__reduce__` automatically becomes a synonym for the
-extended version.  The main use for this method is to provide
-backwards-compatible reduce values for older Python releases.
+
+.. method:: object.__reduce_ex__(protocol)
+
+   Alternatively, a :meth:`__reduce_ex__` method may be defined.  The only
+   difference is this method should take a single integer argument, the protocol
+   version.  When defined, pickle will prefer it over the :meth:`__reduce__`
+   method.  In addition, :meth:`__reduce__` automatically becomes a synonym for
+   the extended version.  The main use for this method is to provide
+   backwards-compatible reduce values for older Python releases.
 
 .. _pickle-persistent:
 

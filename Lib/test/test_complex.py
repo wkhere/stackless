@@ -404,8 +404,27 @@ class ComplexTest(unittest.TestCase):
         def test_plus_minus_0j(self):
             # test that -0j and 0j literals are not identified
             z1, z2 = 0j, -0j
-            self.assertEquals(atan2(z1.imag, -1.), atan2(0., -1.))
-            self.assertEquals(atan2(z2.imag, -1.), atan2(-0., -1.))
+            self.assertEqual(atan2(z1.imag, -1.), atan2(0., -1.))
+            self.assertEqual(atan2(z2.imag, -1.), atan2(-0., -1.))
+
+    @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
+                         "test requires IEEE 754 doubles")
+    def test_negated_imaginary_literal(self):
+        z0 = -0j
+        z1 = -7j
+        z2 = -1e1000j
+        # This behaviour is actually incorrect: the real part of a negated
+        # imaginary literal should be -0.0, not 0.0.  It's fixed in Python 3.2.
+        # However, the behaviour is already out in the wild in Python 2.x and
+        # Python <= 3.1.2, and it would be too disruptive to change it in a
+        # bugfix release, so we call it a 'feature' of Python 3.1, and test to
+        # ensure that the behaviour remains consistent across 3.1.x releases.
+        self.assertFloatsAreIdentical(z0.real, 0.0)
+        self.assertFloatsAreIdentical(z0.imag, -0.0)
+        self.assertFloatsAreIdentical(z1.real, 0.0)
+        self.assertFloatsAreIdentical(z1.imag, -7.0)
+        self.assertFloatsAreIdentical(z2.real, 0.0)
+        self.assertFloatsAreIdentical(z2.imag, -INF)
 
     @unittest.skipUnless(float.__getformat__("double").startswith("IEEE"),
                          "test requires IEEE 754 doubles")
@@ -461,6 +480,16 @@ class ComplexTest(unittest.TestCase):
         self.assertEqual(format(z, '-'), str(z))
         self.assertEqual(format(z, '<'), str(z))
         self.assertEqual(format(z, '10'), str(z))
+        z = complex(0.0, 3.0)
+        self.assertEqual(format(z, ''), str(z))
+        self.assertEqual(format(z, '-'), str(z))
+        self.assertEqual(format(z, '<'), str(z))
+        self.assertEqual(format(z, '2'), str(z))
+        z = complex(-0.0, 2.0)
+        self.assertEqual(format(z, ''), str(z))
+        self.assertEqual(format(z, '-'), str(z))
+        self.assertEqual(format(z, '<'), str(z))
+        self.assertEqual(format(z, '3'), str(z))
 
         self.assertEqual(format(1+3j, 'g'), '1+3j')
         self.assertEqual(format(3j, 'g'), '0+3j')

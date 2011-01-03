@@ -49,6 +49,7 @@ class TestJointOps(unittest.TestCase):
 
     def test_new_or_init(self):
         self.assertRaises(TypeError, self.thetype, [], 2)
+        self.assertRaises(TypeError, set().__init__, a=1)
 
     def test_uniquification(self):
         actual = sorted(self.s)
@@ -796,7 +797,7 @@ class TestBasicOps(unittest.TestCase):
         result = self.set ^ self.set
         self.assertEqual(result, empty_set)
 
-    def checkempty_symmetric_difference(self):
+    def test_empty_symmetric_difference(self):
         result = self.set ^ empty_set
         self.assertEqual(result, self.set)
 

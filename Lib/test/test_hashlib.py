@@ -96,7 +96,7 @@ class HashLibTestCase(unittest.TestCase):
     def test_case_md5_huge(self, size):
         if size == _4G + 5:
             try:
-                self.check('md5', 'A'*size, 'c9af2dff37468ce5dfee8f2cfc0a9c6d')
+                self.check('md5', b'A'*size, 'c9af2dff37468ce5dfee8f2cfc0a9c6d')
             except OverflowError:
                 pass # 32-bit arch
 
@@ -104,7 +104,7 @@ class HashLibTestCase(unittest.TestCase):
     def test_case_md5_uintmax(self, size):
         if size == _4G - 1:
             try:
-                self.check('md5', 'A'*size, '28138d306ff1b8281f1a9067e1a1a2b3')
+                self.check('md5', b'A'*size, '28138d306ff1b8281f1a9067e1a1a2b3')
             except OverflowError:
                 pass # 32-bit arch
 
@@ -224,10 +224,10 @@ class HashLibTestCase(unittest.TestCase):
         m.update(b'1')
         m.update(b'#' * gil_minsize)
         m.update(b'1')
-        self.assertEquals(m.hexdigest(), 'cb1e1a2cbc80be75e19935d621fb9b21')
+        self.assertEqual(m.hexdigest(), 'cb1e1a2cbc80be75e19935d621fb9b21')
 
         m = hashlib.md5(b'x' * gil_minsize)
-        self.assertEquals(m.hexdigest(), 'cfb767f225d58469c5de3632a8803958')
+        self.assertEqual(m.hexdigest(), 'cfb767f225d58469c5de3632a8803958')
 
     def test_threaded_hashing(self):
         if not threading:

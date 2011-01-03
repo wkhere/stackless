@@ -55,20 +55,20 @@ class TestsWithSourceFile(unittest.TestCase):
 
         directory = fp.getvalue()
         lines = directory.splitlines()
-        self.assertEquals(len(lines), 4) # Number of files + header
+        self.assertEqual(len(lines), 4) # Number of files + header
 
         self.assertTrue('File Name' in lines[0])
         self.assertTrue('Modified' in lines[0])
         self.assertTrue('Size' in lines[0])
 
         fn, date, time, size = lines[1].split()
-        self.assertEquals(fn, 'another.name')
+        self.assertEqual(fn, 'another.name')
         # XXX: timestamp is not tested
-        self.assertEquals(size, str(len(self.data)))
+        self.assertEqual(size, str(len(self.data)))
 
         # Check the namelist
         names = zipfp.namelist()
-        self.assertEquals(len(names), 3)
+        self.assertEqual(len(names), 3)
         self.assertTrue(TESTFN in names)
         self.assertTrue("another.name" in names)
         self.assertTrue("strfile" in names)
@@ -76,18 +76,18 @@ class TestsWithSourceFile(unittest.TestCase):
         # Check infolist
         infos = zipfp.infolist()
         names = [ i.filename for i in infos ]
-        self.assertEquals(len(names), 3)
+        self.assertEqual(len(names), 3)
         self.assertTrue(TESTFN in names)
         self.assertTrue("another.name" in names)
         self.assertTrue("strfile" in names)
         for i in infos:
-            self.assertEquals(i.file_size, len(self.data))
+            self.assertEqual(i.file_size, len(self.data))
 
         # check getinfo
         for nm in (TESTFN, "another.name", "strfile"):
             info = zipfp.getinfo(nm)
-            self.assertEquals(info.filename, nm)
-            self.assertEquals(info.file_size, len(self.data))
+            self.assertEqual(info.filename, nm)
+            self.assertEqual(info.file_size, len(self.data))
 
         # Check that testzip doesn't raise an exception
         zipfp.testzip()
@@ -445,20 +445,20 @@ class TestZip64InSmallFiles(unittest.TestCase):
 
         directory = fp.getvalue()
         lines = directory.splitlines()
-        self.assertEquals(len(lines), 4) # Number of files + header
+        self.assertEqual(len(lines), 4) # Number of files + header
 
         self.assertTrue('File Name' in lines[0])
         self.assertTrue('Modified' in lines[0])
         self.assertTrue('Size' in lines[0])
 
         fn, date, time, size = lines[1].split()
-        self.assertEquals(fn, 'another.name')
+        self.assertEqual(fn, 'another.name')
         # XXX: timestamp is not tested
-        self.assertEquals(size, str(len(self.data)))
+        self.assertEqual(size, str(len(self.data)))
 
         # Check the namelist
         names = zipfp.namelist()
-        self.assertEquals(len(names), 3)
+        self.assertEqual(len(names), 3)
         self.assertTrue(TESTFN in names)
         self.assertTrue("another.name" in names)
         self.assertTrue("strfile" in names)
@@ -466,18 +466,18 @@ class TestZip64InSmallFiles(unittest.TestCase):
         # Check infolist
         infos = zipfp.infolist()
         names = [ i.filename for i in infos ]
-        self.assertEquals(len(names), 3)
+        self.assertEqual(len(names), 3)
         self.assertTrue(TESTFN in names)
         self.assertTrue("another.name" in names)
         self.assertTrue("strfile" in names)
         for i in infos:
-            self.assertEquals(i.file_size, len(self.data))
+            self.assertEqual(i.file_size, len(self.data))
 
         # check getinfo
         for nm in (TESTFN, "another.name", "strfile"):
             info = zipfp.getinfo(nm)
-            self.assertEquals(info.filename, nm)
-            self.assertEquals(info.file_size, len(self.data))
+            self.assertEqual(info.filename, nm)
+            self.assertEqual(info.file_size, len(self.data))
 
         # Check that testzip doesn't raise an exception
         zipfp.testzip()
@@ -582,6 +582,27 @@ class PyZipFileTests(unittest.TestCase):
 
 
 class OtherTests(unittest.TestCase):
+    zips_with_bad_crc = {
+        zipfile.ZIP_STORED: (
+            b'PK\003\004\024\0\0\0\0\0 \213\212;:r'
+            b'\253\377\f\0\0\0\f\0\0\0\005\0\0\000af'
+            b'ilehello,AworldP'
+            b'K\001\002\024\003\024\0\0\0\0\0 \213\212;:'
+            b'r\253\377\f\0\0\0\f\0\0\0\005\0\0\0\0'
+            b'\0\0\0\0\0\0\0\200\001\0\0\0\000afi'
+            b'lePK\005\006\0\0\0\0\001\0\001\0003\000'
+            b'\0\0/\0\0\0\0\0'),
+        zipfile.ZIP_DEFLATED: (
+            b'PK\x03\x04\x14\x00\x00\x00\x08\x00n}\x0c=FA'
+            b'KE\x10\x00\x00\x00n\x00\x00\x00\x05\x00\x00\x00af'
+            b'ile\xcbH\xcd\xc9\xc9W(\xcf/\xcaI\xc9\xa0'
+            b'=\x13\x00PK\x01\x02\x14\x03\x14\x00\x00\x00\x08\x00n'
+            b'}\x0c=FAKE\x10\x00\x00\x00n\x00\x00\x00\x05'
+            b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x01\x00\x00\x00'
+            b'\x00afilePK\x05\x06\x00\x00\x00\x00\x01\x00'
+            b'\x01\x003\x00\x00\x003\x00\x00\x00\x00\x00'),
+    }
+
     def testUnicodeFilenames(self):
         zf = zipfile.ZipFile(TESTFN, "w")
         zf.writestr("foo.txt", "Test for unicode filename")
@@ -809,6 +830,103 @@ class OtherTests(unittest.TestCase):
         self.assertEqual(zipfr.comment, comment2)
         zipfr.close()
 
+    def check_testzip_with_bad_crc(self, compression):
+        """Tests that files with bad CRCs return their name from testzip."""
+        zipdata = self.zips_with_bad_crc[compression]
+
+        zipf = zipfile.ZipFile(io.BytesIO(zipdata), mode="r")
+        # testzip returns the name of the first corrupt file, or None
+        self.assertEqual('afile', zipf.testzip())
+        zipf.close()
+
+    def test_testzip_with_bad_crc_stored(self):
+        self.check_testzip_with_bad_crc(zipfile.ZIP_STORED)
+
+    if zlib:
+        def test_testzip_with_bad_crc_deflated(self):
+            self.check_testzip_with_bad_crc(zipfile.ZIP_DEFLATED)
+
+    def check_read_with_bad_crc(self, compression):
+        """Tests that files with bad CRCs raise a BadZipfile exception when read."""
+        zipdata = self.zips_with_bad_crc[compression]
+
+        # Using ZipFile.read()
+        zipf = zipfile.ZipFile(io.BytesIO(zipdata), mode="r")
+        self.assertRaises(zipfile.BadZipfile, zipf.read, 'afile')
+        zipf.close()
+
+        # Using ZipExtFile.read()
+        zipf = zipfile.ZipFile(io.BytesIO(zipdata), mode="r")
+        corrupt_file = zipf.open('afile', 'r')
+        self.assertRaises(zipfile.BadZipfile, corrupt_file.read)
+        corrupt_file.close()
+        zipf.close()
+
+        # Same with small reads (in order to exercise the buffering logic)
+        zipf = zipfile.ZipFile(io.BytesIO(zipdata), mode="r")
+        corrupt_file = zipf.open('afile', 'r')
+        corrupt_file.MIN_READ_SIZE = 2
+        with self.assertRaises(zipfile.BadZipfile):
+            while corrupt_file.read(2):
+                pass
+        corrupt_file.close()
+        zipf.close()
+
+    def test_read_with_bad_crc_stored(self):
+        self.check_read_with_bad_crc(zipfile.ZIP_STORED)
+
+    if zlib:
+        def test_read_with_bad_crc_deflated(self):
+            self.check_read_with_bad_crc(zipfile.ZIP_DEFLATED)
+
+    def check_read_return_size(self, compression):
+        # Issue #9837: ZipExtFile.read() shouldn't return more bytes
+        # than requested.
+        for test_size in (1, 4095, 4096, 4097, 16384):
+            file_size = test_size + 1
+            junk = b''.join(struct.pack('B', randint(0, 255))
+                            for x in range(file_size))
+            zipf = zipfile.ZipFile(io.BytesIO(), "w", compression)
+            try:
+                zipf.writestr('foo', junk)
+                fp = zipf.open('foo', 'r')
+                buf = fp.read(test_size)
+                self.assertEqual(len(buf), test_size)
+            finally:
+                zipf.close()
+
+    def test_read_return_size_stored(self):
+        self.check_read_return_size(zipfile.ZIP_STORED)
+
+    if zlib:
+        def test_read_return_size_deflated(self):
+            self.check_read_return_size(zipfile.ZIP_DEFLATED)
+
+    def test_empty_zipfile(self):
+        # Check that creating a file in 'w' or 'a' mode and closing without
+        # adding any files to the archives creates a valid empty ZIP file
+        zipf = zipfile.ZipFile(TESTFN, mode="w")
+        zipf.close()
+        try:
+            zipf = zipfile.ZipFile(TESTFN, mode="r")
+        except zipfile.BadZipFile:
+            self.fail("Unable to create empty ZIP file in 'w' mode")
+
+        zipf = zipfile.ZipFile(TESTFN, mode="a")
+        zipf.close()
+        try:
+            zipf = zipfile.ZipFile(TESTFN, mode="r")
+        except:
+            self.fail("Unable to create empty ZIP file in 'a' mode")
+
+    def test_open_empty_file(self):
+        # Issue 1710703: Check that opening a file with less than 22 bytes
+        # raises a BadZipfile exception (rather than the previously unhelpful
+        # IOError)
+        f = open(TESTFN, 'w')
+        f.close()
+        self.assertRaises(zipfile.BadZipfile, zipfile.ZipFile, TESTFN, 'r')
+
     def tearDown(self):
         support.unlink(TESTFN)
         support.unlink(TESTFN2)
@@ -869,9 +987,9 @@ class DecryptionTests(unittest.TestCase):
 
     def testGoodPassword(self):
         self.zip.setpassword(b"python")
-        self.assertEquals(self.zip.read("test.txt"), self.plain)
+        self.assertEqual(self.zip.read("test.txt"), self.plain)
         self.zip2.setpassword(b"12345")
-        self.assertEquals(self.zip2.read("zero"), self.plain2)
+        self.assertEqual(self.zip2.read("zero"), self.plain2)
 
 
 class TestsWithRandomBinaryFiles(unittest.TestCase):

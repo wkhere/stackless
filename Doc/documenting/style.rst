@@ -7,7 +7,7 @@ The Python documentation should follow the `Apple Publications Style Guide`_
 wherever possible. This particular style guide was selected mostly because it
 seems reasonable and is easy to get online.
 
-Topics which are not covered in the Apple's style guide will be discussed in
+Topics which are not covered in Apple's style guide will be discussed in
 this document.
 
 All reST files use an indentation of 3 spaces.  The maximum line length is 80
@@ -66,5 +66,5 @@ Unix
     1970s.
 
 
-.. _Apple Publications Style Guide: http://developer.apple.com/documentation/UserExperience/Conceptual/APStyleGuide/APSG_2008.pdf
+.. _Apple Publications Style Guide: http://developer.apple.com/mac/library/documentation/UserExperience/Conceptual/APStyleGuide/APSG_2009.pdf
 

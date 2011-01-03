@@ -75,6 +75,7 @@ class GettextBaseTest(unittest.TestCase):
         fp.close()
         self.env = support.EnvironmentVarGuard()
         self.env['LANGUAGE'] = 'xx'
+        gettext._translations.clear()
 
     def tearDown(self):
         self.env.__exit__()
@@ -333,6 +334,37 @@ class WeirdMetadataTest(GettextBaseTest):
         self.assertEqual(len(info), 9)
         self.assertEqual(info['last-translator'],
            'John Doe <jdoe@example.com>\nJane Foobar <jfoobar@example.com>')
+
+
+class DummyGNUTranslations(gettext.GNUTranslations):
+    def foo(self):
+        return 'foo'
+
+
+class GettextCacheTestCase(GettextBaseTest):
+    def test_cache(self):
+        self.localedir = os.curdir
+        self.mofile = MOFILE
+
+        self.assertEqual(len(gettext._translations), 0)
+
+        t = gettext.translation('gettext', self.localedir)
+
+        self.assertEqual(len(gettext._translations), 1)
+
+        t = gettext.translation('gettext', self.localedir,
+                                class_=DummyGNUTranslations)
+
+        self.assertEqual(len(gettext._translations), 2)
+        self.assertEqual(t.__class__, DummyGNUTranslations)
+
+        # Calling it again doesn't add to the cache
+
+        t = gettext.translation('gettext', self.localedir,
+                                class_=DummyGNUTranslations)
+
+        self.assertEqual(len(gettext._translations), 2)
+        self.assertEqual(t.__class__, DummyGNUTranslations)
 
 
 def test_main():

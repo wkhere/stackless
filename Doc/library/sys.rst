@@ -48,6 +48,13 @@ always available.
    ``modules.keys()`` only lists the imported modules.)
 
 
+.. function:: call_tracing(func, args)
+
+   Call ``func(*args)``, while tracing is enabled.  The tracing state is saved,
+   and restored afterwards.  This is intended to be called from a debugger from
+   a checkpoint, to recursively debug some other code.
+
+
 .. data:: copyright
 
    A string containing the copyright pertaining to the Python interpreter.
@@ -127,13 +134,12 @@ always available.
 
    .. index:: object: traceback
 
-   If no exception is being handled anywhere on the stack, a tuple containing three
-   ``None`` values is returned.  Otherwise, the values returned are ``(type, value,
-   traceback)``.  Their meaning is: *type* gets the exception type of the exception
-   being handled (a class object); *value* gets the exception parameter (its
-   :dfn:`associated value` or the second argument to :keyword:`raise`, which is
-   always a class instance if the exception type is a class object); *traceback*
-   gets a traceback object (see the Reference Manual) which encapsulates the call
+   If no exception is being handled anywhere on the stack, a tuple containing
+   three ``None`` values is returned.  Otherwise, the values returned are
+   ``(type, value, traceback)``.  Their meaning is: *type* gets the type of the
+   exception being handled (a subclass of :exc:`BaseException`); *value* gets
+   the exception instance (an instance of the exception type); *traceback* gets
+   a traceback object (see the Reference Manual) which encapsulates the call
    stack at the point where the exception originally occurred.
 
    .. warning::
@@ -174,19 +180,25 @@ always available.
 
    Exit from Python.  This is implemented by raising the :exc:`SystemExit`
    exception, so cleanup actions specified by finally clauses of :keyword:`try`
-   statements are honored, and it is possible to intercept the exit attempt at an
-   outer level.  The optional argument *arg* can be an integer giving the exit
-   status (defaulting to zero), or another type of object.  If it is an integer,
-   zero is considered "successful termination" and any nonzero value is considered
-   "abnormal termination" by shells and the like.  Most systems require it to be in
-   the range 0-127, and produce undefined results otherwise.  Some systems have a
-   convention for assigning specific meanings to specific exit codes, but these are
-   generally underdeveloped; Unix programs generally use 2 for command line syntax
-   errors and 1 for all other kind of errors.  If another type of object is passed,
-   ``None`` is equivalent to passing zero, and any other object is printed to
-   ``sys.stderr`` and results in an exit code of 1.  In particular,
-   ``sys.exit("some error message")`` is a quick way to exit a program when an
-   error occurs.
+   statements are honored, and it is possible to intercept the exit attempt at
+   an outer level.
+
+   The optional argument *arg* can be an integer giving the exit status
+   (defaulting to zero), or another type of object.  If it is an integer, zero
+   is considered "successful termination" and any nonzero value is considered
+   "abnormal termination" by shells and the like.  Most systems require it to be
+   in the range 0-127, and produce undefined results otherwise.  Some systems
+   have a convention for assigning specific meanings to specific exit codes, but
+   these are generally underdeveloped; Unix programs generally use 2 for command
+   line syntax errors and 1 for all other kind of errors.  If another type of
+   object is passed, ``None`` is equivalent to passing zero, and any other
+   object is printed to :data:`stderr` and results in an exit code of 1.  In
+   particular, ``sys.exit("some error message")`` is a quick way to exit a
+   program when an error occurs.
+
+   Since :func:`exit` ultimately "only" raises an exception, it will only exit
+   the process when called from the main thread, and the exception is not
+   intercepted.
 
 
 .. data:: flags
@@ -224,44 +236,65 @@ always available.
 .. data:: float_info
 
    A structseq holding information about the float type. It contains low level
-   information about the precision and internal representation. Please study
-   your system's :file:`float.h` for more information.
+   information about the precision and internal representation.  The values
+   correspond to the various floating-point constants defined in the standard
+   header file :file:`float.h` for the 'C' programming language; see section
+   5.2.4.2.2 of the 1999 ISO/IEC C standard [C99]_, 'Characteristics of
+   floating types', for details.
 
-   +---------------------+--------------------------------------------------+
-   | attribute           |  explanation                                     |
-   +=====================+==================================================+
-   | :const:`epsilon`    | Difference between 1 and the next representable  |
-   |                     | floating point number                            |
-   +---------------------+--------------------------------------------------+
-   | :const:`dig`        | digits (see :file:`float.h`)                     |
-   +---------------------+--------------------------------------------------+
-   | :const:`mant_dig`   | mantissa digits (see :file:`float.h`)            |
-   +---------------------+--------------------------------------------------+
-   | :const:`max`        | maximum representable finite float               |
-   +---------------------+--------------------------------------------------+
-   | :const:`max_exp`    | maximum int e such that radix**(e-1) is in the   |
-   |                     | range of finite representable floats             |
-   +---------------------+--------------------------------------------------+
-   | :const:`max_10_exp` | maximum int e such that 10**e is in the          |
-   |                     | range of finite representable floats             |
-   +---------------------+--------------------------------------------------+
-   | :const:`min`        | Minimum positive normalizer float                |
-   +---------------------+--------------------------------------------------+
-   | :const:`min_exp`    | minimum int e such that radix**(e-1) is a        |
-   |                     | normalized float                                 |
-   +---------------------+--------------------------------------------------+
-   | :const:`min_10_exp` | minimum int e such that 10**e is a normalized    |
-   |                     | float                                            |
-   +---------------------+--------------------------------------------------+
-   | :const:`radix`      | radix of exponent                                |
-   +---------------------+--------------------------------------------------+
-   | :const:`rounds`     | addition rounds (see :file:`float.h`)            |
-   +---------------------+--------------------------------------------------+
+   +---------------------+----------------+--------------------------------------------------+
+   | attribute           | float.h macro  | explanation                                      |
+   +=====================+================+==================================================+
+   | :const:`epsilon`    | DBL_EPSILON    | difference between 1 and the least value greater |
+   |                     |                | than 1 that is representable as a float          |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`dig`        | DBL_DIG        | maximum number of decimal digits that can be     |
+   |                     |                | faithfully represented in a float;  see below    |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`mant_dig`   | DBL_MANT_DIG   | float precision: the number of base-``radix``    |
+   |                     |                | digits in the significand of a float             |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max`        | DBL_MAX        | maximum representable finite float               |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max_exp`    | DBL_MAX_EXP    | maximum integer e such that ``radix**(e-1)`` is  |
+   |                     |                | a representable finite float                     |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max_10_exp` | DBL_MAX_10_EXP | maximum integer e such that ``10**e`` is in the  |
+   |                     |                | range of representable finite floats             |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min`        | DBL_MIN        | minimum positive normalized float                |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min_exp`    | DBL_MIN_EXP    | minimum integer e such that ``radix**(e-1)`` is  |
+   |                     |                | a normalized float                               |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min_10_exp` | DBL_MIN_10_EXP | minimum integer e such that ``10**e`` is a       |
+   |                     |                | normalized float                                 |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`radix`      | FLT_RADIX      | radix of exponent representation                 |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`rounds`     | FLT_ROUNDS     | constant representing rounding mode              |
+   |                     |                | used for arithmetic operations                   |
+   +---------------------+----------------+--------------------------------------------------+
 
-   .. note::
+   The attribute :attr:`sys.float_info.dig` needs further explanation.  If
+   ``s`` is any string representing a decimal number with at most
+   :attr:`sys.float_info.dig` significant digits, then converting ``s`` to a
+   float and back again will recover a string representing the same decimal
+   value::
 
-      The information in the table is simplified.
+      >>> import sys
+      >>> sys.float_info.dig
+      15
+      >>> s = '3.14159265358979'    # decimal string with 15 significant digits
+      >>> format(float(s), '.15g')  # convert to float and back -> same value
+      '3.14159265358979'
 
+   But for strings with more than :attr:`sys.float_info.dig` significant digits,
+   this isn't always true::
+
+      >>> s = '9876543211234567'    # 16 significant digits is too many!
+      >>> format(float(s), '.16g')  # conversion changes value
+      '9876543211234568'
 
 .. data:: float_repr_style
 
@@ -300,17 +333,19 @@ always available.
    file names, or ``None`` if the system default encoding is used. The result value
    depends on the operating system:
 
-   * On Windows 9x, the encoding is "mbcs".
-
-   * On Mac OS X, the encoding is "utf-8".
+   * On Mac OS X, the encoding is ``'utf-8'``.
 
    * On Unix, the encoding is the user's preference according to the result of
-     nl_langinfo(CODESET), or :const:`None` if the ``nl_langinfo(CODESET)`` failed.
+     nl_langinfo(CODESET), or ``None`` if the ``nl_langinfo(CODESET)``
+     failed.
 
    * On Windows NT+, file names are Unicode natively, so no conversion is
-     performed. :func:`getfilesystemencoding` still returns ``'mbcs'``, as this is
-     the encoding that applications should use when they explicitly want to convert
-     Unicode strings to byte strings that are equivalent when used as file names.
+     performed. :func:`getfilesystemencoding` still returns ``'mbcs'``, as
+     this is the encoding that applications should use when they explicitly
+     want to convert Unicode strings to byte strings that are equivalent when
+     used as file names.
+
+   * On Windows 9x, the encoding is ``'mbcs'``.
 
 
 .. function:: getrefcount(object)
@@ -336,7 +371,7 @@ always available.
    specific.
 
    If given, *default* will be returned if the object does not provide means to
-   retrieve the size.  Otherwise a `TypeError` will be raised.
+   retrieve the size.  Otherwise a :exc:`TypeError` will be raised.
 
    :func:`getsizeof` calls the object's ``__sizeof__`` method and adds an
    additional garbage collector overhead if the object is managed by the garbage
@@ -468,13 +503,11 @@ always available.
    Their intended use is to allow an interactive user to import a debugger module
    and engage in post-mortem debugging without having to re-execute the command
    that caused the error.  (Typical use is ``import pdb; pdb.pm()`` to enter the
-   post-mortem debugger; see chapter :ref:`debugger` for
+   post-mortem debugger; see :mod:`pdb` module for
    more information.)
 
    The meaning of the variables is the same as that of the return values from
-   :func:`exc_info` above.  (Since there is only one interactive thread,
-   thread-safety is not a concern for these variables, unlike for ``exc_type``
-   etc.)
+   :func:`exc_info` above.
 
 
 .. data:: maxsize
@@ -726,8 +759,9 @@ always available.
 
    ``'return'``
       A function (or other code block) is about to return.  The local trace
-      function is called; *arg* is the value that will be returned.  The trace
-      function's return value is ignored.
+      function is called; *arg* is the value that will be returned, or ``None``
+      if the event is caused by an exception being raised.  The trace function's
+      return value is ignored.
 
    ``'exception'``
       An exception has occurred.  The local trace function is called; *arg* is a
@@ -739,10 +773,10 @@ always available.
       a built-in.  *arg* is the C function object.
 
    ``'c_return'``
-      A C function has returned. *arg* is ``None``.
+      A C function has returned. *arg* is the C function object.
 
    ``'c_exception'``
-      A C function has thrown an exception.  *arg* is ``None``.
+      A C function has raised an exception.  *arg* is the C function object.
 
    Note that as an exception is propagated down the chain of callers, an
    ``'exception'`` event is generated at each level.
@@ -769,10 +803,10 @@ always available.
           stdout
           stderr
 
-   File objects corresponding to the interpreter's standard input, output and error
-   streams.  ``stdin`` is used for all interpreter input except for scripts but
-   including calls to :func:`input`.  ``stdout`` is used for
-   the output of :func:`print` and :term:`expression` statements and for the
+   :term:`File objects <file object>` corresponding to the interpreter's standard
+   input, output and error streams.  ``stdin`` is used for all interpreter input
+   except for scripts but including calls to :func:`input`.  ``stdout`` is used
+   for the output of :func:`print` and :term:`expression` statements and for the
    prompts of :func:`input`. The interpreter's own prompts
    and (almost all of) its error messages go to ``stderr``.  ``stdout`` and
    ``stderr`` needn't be built-in file objects: any object is acceptable as long
@@ -830,14 +864,10 @@ always available.
 .. data:: version
 
    A string containing the version number of the Python interpreter plus additional
-   information on the build number and compiler used. It has a value of the form
-   ``'version (#build_number, build_date, build_time) [compiler]'``.  The first
-   three characters are used to identify the version in the installation
-   directories (where appropriate on each platform).  An example::
-
-      >>> import sys
-      >>> sys.version
-      '1.5.2 (#0 Apr 13 1999, 10:51:12) [MSC 32 bit (Intel)]'
+   information on the build number and compiler used.  This string is displayed
+   when the interactive interpreter is started.  Do not extract version information
+   out of it, rather, use :data:`version_info` and the functions provided by the
+   :mod:`platform` module.
 
 
 .. data:: api_version
@@ -857,7 +887,7 @@ always available.
    and so on.
 
    .. versionchanged:: 3.1
-      Added named component attributes
+      Added named component attributes.
 
 .. data:: warnoptions
 
@@ -873,3 +903,8 @@ always available.
    first three characters of :const:`version`.  It is provided in the :mod:`sys`
    module for informational purposes; modifying this value has no effect on the
    registry keys used by Python. Availability: Windows.
+
+.. rubric:: Citations
+
+.. [C99] ISO/IEC 9899:1999.  "Programming languages -- C."  A public draft of this standard is available at http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf .
+

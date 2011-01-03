@@ -10,6 +10,17 @@ import sys
 import shutil
 from test import support
 
+# Detect whether we're on a Linux system that uses the (now outdated
+# and unmaintained) linuxthreads threading library.  There's an issue
+# when combining linuxthreads with a failed execv call: see
+# http://bugs.python.org/issue4970.
+if (hasattr(os, "confstr_names") and
+    "CS_GNU_LIBPTHREAD_VERSION" in os.confstr_names):
+    libpthread = os.confstr("CS_GNU_LIBPTHREAD_VERSION")
+    USING_LINUXTHREADS= libpthread.startswith("linuxthreads")
+else:
+    USING_LINUXTHREADS= False
+
 # Tests creating TESTFN
 class FileTests(unittest.TestCase):
     def setUp(self):
@@ -212,8 +223,8 @@ class StatAttributeTests(unittest.TestCase):
         result = os.stat(self.fname)
 
         # Make sure direct access works
-        self.assertEquals(result[stat.ST_SIZE], 3)
-        self.assertEquals(result.st_size, 3)
+        self.assertEqual(result[stat.ST_SIZE], 3)
+        self.assertEqual(result.st_size, 3)
 
         import sys
 
@@ -226,8 +237,8 @@ class StatAttributeTests(unittest.TestCase):
                     def trunc(x): return int(x)
                 else:
                     def trunc(x): return x
-                self.assertEquals(trunc(getattr(result, attr)),
-                                  result[getattr(stat, name)])
+                self.assertEqual(trunc(getattr(result, attr)),
+                                 result[getattr(stat, name)])
                 self.assertTrue(attr in members)
 
         try:
@@ -281,13 +292,13 @@ class StatAttributeTests(unittest.TestCase):
                 return
 
         # Make sure direct access works
-        self.assertEquals(result.f_bfree, result[3])
+        self.assertEqual(result.f_bfree, result[3])
 
         # Make sure all the attributes are there.
         members = ('bsize', 'frsize', 'blocks', 'bfree', 'bavail', 'files',
                     'ffree', 'favail', 'flag', 'namemax')
         for value, member in enumerate(members):
-            self.assertEquals(getattr(result, 'f_' + member), result[value])
+            self.assertEqual(getattr(result, 'f_' + member), result[value])
 
         # Make sure that assignment really fails
         try:
@@ -322,7 +333,7 @@ class StatAttributeTests(unittest.TestCase):
         # time stamps in stat, but not in utime.
         os.utime(support.TESTFN, (st.st_atime, int(st.st_mtime-delta)))
         st2 = os.stat(support.TESTFN)
-        self.assertEquals(st2.st_mtime, int(st.st_mtime-delta))
+        self.assertEqual(st2.st_mtime, int(st.st_mtime-delta))
 
     # Restrict test to Win32, since there is no guarantee other
     # systems support centiseconds
@@ -339,7 +350,7 @@ class StatAttributeTests(unittest.TestCase):
             def test_1565150(self):
                 t1 = 1159195039.25
                 os.utime(self.fname, (t1, t1))
-                self.assertEquals(os.stat(self.fname).st_mtime, t1)
+                self.assertEqual(os.stat(self.fname).st_mtime, t1)
 
         def test_1686475(self):
             # Verify that an open file can be stat'ed
@@ -377,24 +388,26 @@ class EnvironTests(mapping_tests.BasicTestMappingProtocol):
         os.environ.clear()
         if os.path.exists("/bin/sh"):
             os.environ.update(HELLO="World")
-            value = os.popen("/bin/sh -c 'echo $HELLO'").read().strip()
-            self.assertEquals(value, "World")
+            with os.popen("/bin/sh -c 'echo $HELLO'") as popen:
+                value = popen.read().strip()
+                self.assertEqual(value, "World")
 
     def test_os_popen_iter(self):
         if os.path.exists("/bin/sh"):
-            popen = os.popen("/bin/sh -c 'echo \"line1\nline2\nline3\"'")
-            it = iter(popen)
-            self.assertEquals(next(it), "line1\n")
-            self.assertEquals(next(it), "line2\n")
-            self.assertEquals(next(it), "line3\n")
-            self.assertRaises(StopIteration, next, it)
+            with os.popen(
+                "/bin/sh -c 'echo \"line1\nline2\nline3\"'") as popen:
+                it = iter(popen)
+                self.assertEqual(next(it), "line1\n")
+                self.assertEqual(next(it), "line2\n")
+                self.assertEqual(next(it), "line3\n")
+                self.assertRaises(StopIteration, next, it)
 
     # Verify environ keys and values from the OS are of the
     # correct str type.
     def test_keyvalue_types(self):
         for key, val in os.environ.items():
-            self.assertEquals(type(key), str)
-            self.assertEquals(type(val), str)
+            self.assertEqual(type(key), str)
+            self.assertEqual(type(val), str)
 
     def test_items(self):
         for key, value in self._reference().items():
@@ -566,8 +579,11 @@ class URandomTests(unittest.TestCase):
             pass
 
 class ExecTests(unittest.TestCase):
+    @unittest.skipIf(USING_LINUXTHREADS,
+                     "avoid triggering a linuxthreads bug: see issue #4970")
     def test_execvpe_with_bad_program(self):
-        self.assertRaises(OSError, os.execvpe, 'no such app-', ['no such app-'], None)
+        self.assertRaises(OSError, os.execvpe, 'no such app-',
+                          ['no such app-'], None)
 
     def test_execvpe_with_bad_arglist(self):
         self.assertRaises(ValueError, os.execvpe, 'notepad', [], None)
@@ -764,7 +780,7 @@ if sys.platform != 'win32':
         def test_listdir(self):
             expected = set(self.unicodefn)
             found = set(os.listdir(support.TESTFN))
-            self.assertEquals(found, expected)
+            self.assertEqual(found, expected)
 
         def test_open(self):
             for fn in self.unicodefn:

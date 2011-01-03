@@ -68,7 +68,6 @@ intrinsic to the Python language.
    bytes.rst
    bytearray.rst
    unicode.rst
-   buffer.rst
    tuple.rst
    list.rst
 
@@ -100,6 +99,7 @@ Other Objects
    iterator.rst
    descriptor.rst
    slice.rst
+   memoryview.rst
    weakref.rst
    capsule.rst
    cobject.rst

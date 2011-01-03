@@ -233,6 +233,14 @@ Supported operations:
 | ``abs(t)``                     | equivalent to +\ *t* when ``t.days >= 0``, and|
 |                                | to -*t* when ``t.days < 0``. (2)              |
 +--------------------------------+-----------------------------------------------+
+| ``str(t)``                     | Returns a string in the form                  |
+|                                | ``[D day[s], ][H]H:MM:SS[.UUUUUU]``, where D  |
+|                                | is negative for negative ``t``. (5)           |
++--------------------------------+-----------------------------------------------+
+| ``repr(t)``                    | Returns a string in the form                  |
+|                                | ``datetime.timedelta(D[, S[, U]])``, where D  |
+|                                | is negative for negative ``t``. (5)           |
++--------------------------------+-----------------------------------------------+
 
 Notes:
 
@@ -247,6 +255,16 @@ Notes:
 
 (4)
    -*timedelta.max* is not representable as a :class:`timedelta` object.
+
+(5)
+  String representations of :class:`timedelta` objects are normalized
+  similarly to their internal representation.  This leads to somewhat
+  unusual results for negative timedeltas.  For example:
+
+  >>> timedelta(hours=-5)
+  datetime.timedelta(-1, 68400)
+  >>> print(_)
+  -1 day, 19:00:00
 
 In addition to the operations listed above :class:`timedelta` objects support
 certain additions and subtractions with :class:`date` and :class:`datetime`
@@ -437,7 +455,9 @@ Instance methods:
    Return a :class:`time.struct_time` such as returned by :func:`time.localtime`.
    The hours, minutes and seconds are 0, and the DST flag is -1. ``d.timetuple()``
    is equivalent to ``time.struct_time((d.year, d.month, d.day, 0, 0, 0,
-   d.weekday(), d.toordinal() - date(d.year, 1, 1).toordinal() + 1, -1))``
+   d.weekday(), yday, -1))``, where ``yday = d.toordinal() - date(d.year, 1,
+   1).toordinal() + 1`` is the day number within the current year starting with
+   ``1`` for January 1st.
 
 
 .. method:: date.toordinal()
@@ -901,12 +921,13 @@ Instance methods:
 
    Return a :class:`time.struct_time` such as returned by :func:`time.localtime`.
    ``d.timetuple()`` is equivalent to ``time.struct_time((d.year, d.month, d.day,
-   d.hour, d.minute, d.second, d.weekday(), d.toordinal() - date(d.year, 1,
-   1).toordinal() + 1, dst))`` The :attr:`tm_isdst` flag of the result is set
-   according to the :meth:`dst` method:  :attr:`tzinfo` is ``None`` or :meth:`dst`
-   returns ``None``, :attr:`tm_isdst` is set to  ``-1``; else if :meth:`dst`
-   returns a non-zero value, :attr:`tm_isdst` is set to ``1``; else ``tm_isdst`` is
-   set to ``0``.
+   d.hour, d.minute, d.second, d.weekday(), yday, dst))``, where ``yday =
+   d.toordinal() - date(d.year, 1, 1).toordinal() + 1`` is the day number within
+   the current year starting with ``1`` for January 1st. The :attr:`tm_isdst` flag
+   of the result is set according to the :meth:`dst` method: :attr:`tzinfo` is
+   ``None`` or :meth:`dst` returns ``None``, :attr:`tm_isdst` is set to ``-1``;
+   else if :meth:`dst` returns a non-zero value, :attr:`tm_isdst` is set to ``1``;
+   else ``tm_isdst`` is set to ``0``.
 
 
 .. method:: datetime.utctimetuple()
@@ -1442,8 +1463,8 @@ Example :class:`tzinfo` classes:
 Note that there are unavoidable subtleties twice per year in a :class:`tzinfo`
 subclass accounting for both standard and daylight time, at the DST transition
 points.  For concreteness, consider US Eastern (UTC -0500), where EDT begins the
-minute after 1:59 (EST) on the first Sunday in April, and ends the minute after
-1:59 (EDT) on the last Sunday in October::
+minute after 1:59 (EST) on the second Sunday in March, and ends the minute after
+1:59 (EDT) on the first Sunday in November::
 
      UTC   3:MM  4:MM  5:MM  6:MM  7:MM  8:MM
      EST  22:MM 23:MM  0:MM  1:MM  2:MM  3:MM

@@ -24,7 +24,7 @@ The modern interface provides:
 
 .. function:: b64encode(s, altchars=None)
 
-   Encode a string use Base64.
+   Encode a byte string use Base64.
 
    *s* is the string to encode.  Optional *altchars* must be a string of at least
    length 2 (additional characters are ignored) which specifies an alternative
@@ -32,54 +32,54 @@ The modern interface provides:
    generate URL or filesystem safe Base64 strings.  The default is ``None``, for
    which the standard Base64 alphabet is used.
 
-   The encoded string is returned.
+   The encoded byte string is returned.
 
 
 .. function:: b64decode(s, altchars=None)
 
-   Decode a Base64 encoded string.
+   Decode a Base64 encoded byte string.
 
    *s* is the string to decode.  Optional *altchars* must be a string of at least
    length 2 (additional characters are ignored) which specifies the alternative
    alphabet used instead of the ``+`` and ``/`` characters.
 
-   The decoded string is returned.  A :exc:`TypeError` is raised if *s* were
+   The decoded byte string is returned.  A :exc:`TypeError` is raised if *s* were
    incorrectly padded or if there are non-alphabet characters present in the
    string.
 
 
 .. function:: standard_b64encode(s)
 
-   Encode string *s* using the standard Base64 alphabet.
+   Encode byte string *s* using the standard Base64 alphabet.
 
 
 .. function:: standard_b64decode(s)
 
-   Decode string *s* using the standard Base64 alphabet.
+   Decode byte string *s* using the standard Base64 alphabet.
 
 
 .. function:: urlsafe_b64encode(s)
 
-   Encode string *s* using a URL-safe alphabet, which substitutes ``-`` instead of
+   Encode byte string *s* using a URL-safe alphabet, which substitutes ``-`` instead of
    ``+`` and ``_`` instead of ``/`` in the standard Base64 alphabet.  The result
    can still contain ``=``.
 
 
 .. function:: urlsafe_b64decode(s)
 
-   Decode string *s* using a URL-safe alphabet, which substitutes ``-`` instead of
+   Decode byte string *s* using a URL-safe alphabet, which substitutes ``-`` instead of
    ``+`` and ``_`` instead of ``/`` in the standard Base64 alphabet.
 
 
 .. function:: b32encode(s)
 
-   Encode a string using Base32.  *s* is the string to encode.  The encoded string
+   Encode a byte string using Base32.  *s* is the string to encode.  The encoded string
    is returned.
 
 
 .. function:: b32decode(s, casefold=False, map01=None)
 
-   Decode a Base32 encoded string.
+   Decode a Base32 encoded byte string.
 
    *s* is the string to decode.  Optional *casefold* is a flag specifying whether a
    lowercase alphabet is acceptable as input.  For security purposes, the default
@@ -92,27 +92,27 @@ The modern interface provides:
    digit 0 is always mapped to the letter O).  For security purposes the default is
    ``None``, so that 0 and 1 are not allowed in the input.
 
-   The decoded string is returned.  A :exc:`TypeError` is raised if *s* were
+   The decoded byte string is returned.  A :exc:`TypeError` is raised if *s* were
    incorrectly padded or if there are non-alphabet characters present in the
    string.
 
 
 .. function:: b16encode(s)
 
-   Encode a string using Base16.
+   Encode a byte string using Base16.
 
-   *s* is the string to encode.  The encoded string is returned.
+   *s* is the string to encode.  The encoded byte string is returned.
 
 
 .. function:: b16decode(s, casefold=False)
 
-   Decode a Base16 encoded string.
+   Decode a Base16 encoded byte string.
 
    *s* is the string to decode.  Optional *casefold* is a flag specifying whether a
    lowercase alphabet is acceptable as input.  For security purposes, the default
    is ``False``.
 
-   The decoded string is returned.  A :exc:`TypeError` is raised if *s* were
+   The decoded byte string is returned.  A :exc:`TypeError` is raised if *s* were
    incorrectly padded or if there are non-alphabet characters present in the
    string.
 
@@ -122,9 +122,9 @@ The legacy interface:
 .. function:: decode(input, output)
 
    Decode the contents of the binary *input* file and write the resulting binary
-   data to the *output* file. *input* and *output* must either be file objects
-   or objects that mimic the file object interface working with bytes
-   objects. *input* will be read until ``input.read()`` returns an empty string.
+   data to the *output* file. *input* and *output* must be :term:`file objects
+   <file object>`. *input* will be read until ``input.read()`` returns an empty
+   bytes object.
 
 
 .. function:: decodebytes(s)
@@ -138,11 +138,10 @@ The legacy interface:
 .. function:: encode(input, output)
 
    Encode the contents of the binary *input* file and write the resulting base64
-   encoded data to the *output* file. *input* and *output* must either be file
-   objects or objects that mimic the file object interface working with bytes
-   objects. *input* will be read until ``input.read()`` returns an empty string.
-   :func:`encode` returns the encoded data plus a trailing newline character
-   (``b'\n'``).
+   encoded data to the *output* file. *input* and *output* must be :term:`file
+   objects <file object>`. *input* will be read until ``input.read()`` returns
+   an empty bytes object. :func:`encode` returns the encoded data plus a trailing
+   newline character (``b'\n'``).
 
 
 .. function:: encodebytes(s)
@@ -158,12 +157,12 @@ The legacy interface:
 An example usage of the module:
 
    >>> import base64
-   >>> encoded = base64.b64encode('data to be encoded')
+   >>> encoded = base64.b64encode(b'data to be encoded')
    >>> encoded
    b'ZGF0YSB0byBiZSBlbmNvZGVk'
    >>> data = base64.b64decode(encoded)
    >>> data
-   'data to be encoded'
+   b'data to be encoded'
 
 
 .. seealso::

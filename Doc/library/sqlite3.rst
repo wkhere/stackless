@@ -136,7 +136,7 @@ Module functions and constants
    first blank for the column name: the column name would simply be "x".
 
 
-.. function:: connect(database[, timeout, isolation_level, detect_types, factory])
+.. function:: connect(database[, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements])
 
    Opens a connection to the SQLite database file *database*. You can use
    ``":memory:"`` to open a database connection to a database that resides in RAM
@@ -234,7 +234,6 @@ Connection Objects
    supplied, this must be a custom cursor class that extends
    :class:`sqlite3.Cursor`.
 
-
 .. method:: Connection.commit()
 
    This method commits the current transaction. If you don't call this method,
@@ -256,23 +255,22 @@ Connection Objects
 .. method:: Connection.execute(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's
-   :meth:`execute<Cursor.execute>` method with the parameters given.
+   calling the cursor method, then calls the cursor's :meth:`execute
+   <Cursor.execute>` method with the parameters given.
 
 
 .. method:: Connection.executemany(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's
-   :meth:`executemany<Cursor.executemany>` method with the parameters given.
+   calling the cursor method, then calls the cursor's :meth:`executemany
+   <Cursor.executemany>` method with the parameters given.
 
 
 .. method:: Connection.executescript(sql_script)
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's
-   :meth:`executescript<Cursor.executescript>` method with the parameters
-   given.
+   calling the cursor method, then calls the cursor's :meth:`executescript
+   <Cursor.executescript>` method with the parameters given.
 
 
 .. method:: Connection.create_function(name, num_params, func)
@@ -436,7 +434,7 @@ Cursor Objects
 
 .. class:: Cursor
 
-   A SQLite database cursor has the following attributes and methods:
+   A :class:`Cursor` instance has the following attributes and methods.
 
 .. method:: Cursor.execute(sql, [parameters])
 
@@ -683,7 +681,7 @@ Letting your object adapt itself
 This is a good approach if you write the class yourself. Let's suppose you have
 a class like this::
 
-   class Point(object):
+   class Point:
        def __init__(self, x, y):
            self.x, self.y = x, y
 
@@ -840,3 +838,17 @@ exception, the transaction is rolled back; otherwise, the transaction is
 committed:
 
 .. literalinclude:: ../includes/sqlite3/ctx_manager.py
+
+
+Common issues
+-------------
+
+Multithreading
+^^^^^^^^^^^^^^
+
+Older SQLite versions had issues with sharing connections between threads.
+That's why the Python module disallows sharing connections and cursors between
+threads. If you still try to do so, you will get an exception at runtime.
+
+The only exception is calling the :meth:`~Connection.interrupt` method, which
+only makes sense to call from a different thread.

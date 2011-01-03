@@ -19,7 +19,7 @@ Glossary
 
    2to3
       A tool that tries to convert Python 2.x code to Python 3.x code by
-      handling most of the incompatibilites which can be detected by parsing the
+      handling most of the incompatibilities which can be detected by parsing the
       source and traversing the parse tree.
 
       2to3 is available in the standard library as :mod:`lib2to3`; a standalone
@@ -62,6 +62,9 @@ Glossary
       second time (recompilation from source to bytecode can be avoided).  This
       "intermediate language" is said to run on a :term:`virtual machine`
       that executes the machine code corresponding to each bytecode.
+
+      A list of bytecode instructions can be found in the documentation for
+      :ref:`the dis module <bytecodes>`.
 
    class
       A template for creating user-defined objects. Class definitions
@@ -134,10 +137,9 @@ Glossary
       For more information about descriptors' methods, see :ref:`descriptors`.
 
    dictionary
-      An associative array, where arbitrary keys are mapped to values.  The use
-      of :class:`dict` closely resembles that for :class:`list`, but the keys can
-      be any object with a :meth:`__hash__` function, not just integers.
-      Called a hash in Perl.
+      An associative array, where arbitrary keys are mapped to values.  The keys
+      can be any object with :meth:`__hash__` function and :meth:`__eq__`
+      methods. Called a hash in Perl.
 
    docstring
       A string literal which appears as the first expression in a class,
@@ -148,15 +150,15 @@ Glossary
       object.
 
    duck-typing
-      A pythonic programming style which determines an object's type by inspection
-      of its method or attribute signature rather than by explicit relationship
-      to some type object ("If it looks like a duck and quacks like a duck, it
+      A programming style which does not look at an object's type to determine
+      if it has the right interface; instead, the method or attribute is simply
+      called or used ("If it looks like a duck and quacks like a duck, it
       must be a duck.")  By emphasizing interfaces rather than specific types,
       well-designed code improves its flexibility by allowing polymorphic
       substitution.  Duck-typing avoids tests using :func:`type` or
-      :func:`isinstance`. (Note, however, that duck-typing can be complemented
-      with abstract base classes.) Instead, it typically employs :func:`hasattr`
-      tests or :term:`EAFP` programming.
+      :func:`isinstance`.  (Note, however, that duck-typing can be complemented
+      with :term:`abstract base class`\ es.)  Instead, it typically employs
+      :func:`hasattr` tests or :term:`EAFP` programming.
 
    EAFP
       Easier to ask for forgiveness than permission.  This common Python coding
@@ -179,6 +181,23 @@ Glossary
       A module written in C or C++, using Python's C API to interact with the core and
       with user code.
 
+   file object
+      An object exposing a file-oriented API (with methods such as
+      :meth:`read()` or :meth:`write()`) to an underlying resource.
+      Depending on the way it was created, a file object can mediate access
+      to a real on-disk file or to another other type of storage or
+      communication device (for example standard input/output, in-memory
+      buffers, sockets, pipes, etc.).  File objects are also called
+      :dfn:`file-like objects` or :dfn:`streams`.
+
+      There are actually three categories of file objects: raw binary
+      files, buffered binary files and text files.  Their interfaces are
+      defined in the :mod:`io` module.  The canonical way to create a
+      file object is by using the :func:`open` function.
+
+   file-like object
+      A synonym for :term:`file object`.
+
    finder
       An object that tries to find the :term:`loader` for a module. It must
       implement a method named :meth:`find_module`. See :pep:`302` for
@@ -186,9 +205,11 @@ Glossary
       :term:`abstract base class`.
 
    floor division
-      Mathematical division discarding any remainder.  The floor division
-      operator is ``//``.  For example, the expression ``11//4`` evaluates to
-      ``2`` in contrast to the ``2.75`` returned by float true division.
+      Mathematical division that rounds down to nearest integer.  The floor
+      division operator is ``//``.  For example, the expression ``11 // 4``
+      evaluates to ``2`` in contrast to the ``2.75`` returned by float true
+      division.  Note that ``(-11) // 4`` is ``-3`` because that is ``-2.75``
+      rounded *downward*. See :pep:`238`.
 
    function
       A series of statements which returns some value to a caller. It can also
@@ -196,7 +217,7 @@ Glossary
       the body. See also :term:`argument` and :term:`method`.
 
    __future__
-      A pseudo module which programmers can use to enable new language features
+      A pseudo-module which programmers can use to enable new language features
       which are not compatible with the current interpreter.
 
       By importing the :mod:`__future__` module and evaluating its variables,
@@ -214,13 +235,13 @@ Glossary
 
    generator
       A function which returns an iterator.  It looks like a normal function
-      except that values are returned to the caller using a :keyword:`yield`
-      statement instead of a :keyword:`return` statement.  Generator functions
-      often contain one or more :keyword:`for` or :keyword:`while` loops which
-      :keyword:`yield` elements back to the caller.  The function execution is
-      stopped at the :keyword:`yield` keyword (returning the result) and is
-      resumed there when the next element is requested by calling the
-      :meth:`__next__` method of the returned iterator.
+      except that it contains :keyword:`yield` statements for producing a series
+      a values usable in a for-loop or that can be retrieved one at a time with
+      the :func:`next` function. Each :keyword:`yield` temporarily suspends
+      processing, remembering the location execution state (including local
+      variables and pending try-statements).  When the generator resumes, it
+      picks-up where it left-off (in contrast to functions which start fresh on
+      every invocation.
 
       .. index:: single: generator expression
 
@@ -265,9 +286,7 @@ Glossary
    IDLE
       An Integrated Development Environment for Python.  IDLE is a basic editor
       and interpreter environment which ships with the standard distribution of
-      Python.  Good for beginners, it also serves as clear example code for
-      those wanting to implement a moderately sophisticated, multi-platform GUI
-      application.
+      Python.
 
    immutable
       An object with a fixed value.  Immutable objects include numbers, strings and
@@ -315,7 +334,7 @@ Glossary
 
    iterator
       An object representing a stream of data.  Repeated calls to the iterator's
-      :meth:`__next__` (or passing it to the builtin function)  :func:`next`
+      :meth:`__next__` (or passing it to the built-in function :func:`next`)
       method return successive items in the stream.  When no more data are
       available a :exc:`StopIteration` exception is raised instead.  At this
       point, the iterator object is exhausted and any further calls to its
@@ -330,6 +349,26 @@ Glossary
       in the previous iteration pass, making it appear like an empty container.
 
       More information can be found in :ref:`typeiter`.
+
+   key function
+      A key function or collation function is a callable that returns a value
+      used for sorting or ordering.  For example, :func:`locale.strxfrm` is
+      used to produce a sort key that is aware of locale specific sort
+      conventions.
+
+      A number of tools in Python accept key functions to control how elements
+      are ordered or grouped.  They include :func:`min`, :func:`max`,
+      :func:`sorted`, :meth:`list.sort`, :func:`heapq.nsmallest`,
+      :func:`heapq.nlargest`, and :func:`itertools.groupby`.
+
+      There are several ways to create a key function.  For example. the
+      :meth:`str.lower` method can serve as a key function for case insensitive
+      sorts.  Alternatively, an ad-hoc key function can be built from a
+      :keyword:`lambda` expression such as ``lambda r: (r[0], r[2])``.  Also,
+      the :mod:`operator` module provides three key function constuctors:
+      :func:`~operator.attrgetter`, :func:`~operator.itemgetter`, and
+      :func:`~operator.methodcaller`.  See the :ref:`Sorting HOW TO
+      <sortinghowto>` for examples of how to create and use key functions.
 
    keyword argument
       Arguments which are preceded with a ``variable_name=`` in the call.
@@ -355,7 +394,7 @@ Glossary
 
    list comprehension
       A compact way to process all or part of the elements in a sequence and
-      return a list with the results.  ``result = ["0x%02x" % x for x in
+      return a list with the results.  ``result = ['{:#04x}'.format(x) for x in
       range(256) if x % 2 == 0]`` generates a list of strings containing
       even hex numbers (0x..) in the range from 0 to 255. The :keyword:`if`
       clause is optional.  If omitted, all elements in ``range(256)`` are
@@ -369,7 +408,8 @@ Glossary
 
    mapping
       A container object (such as :class:`dict`) which supports arbitrary key
-      lookups using the special method :meth:`__getitem__`.
+      lookups using the special method :meth:`__getitem__`.  Mappings also
+      support :meth:`__len__`, :meth:`__iter__`, and :meth:`__contains__`.
 
    metaclass
       The class of a class.  Class definitions create a class name, a class
@@ -422,10 +462,11 @@ Glossary
    nested scope
       The ability to refer to a variable in an enclosing definition.  For
       instance, a function defined inside another function can refer to
-      variables in the outer function.  Note that nested scopes work only for
-      reference and not for assignment which will always write to the innermost
-      scope.  In contrast, local variables both read and write in the innermost
-      scope.  Likewise, global variables read and write to the global namespace.
+      variables in the outer function.  Note that nested scopes by default work
+      only for reference and not for assignment.  Local variables both read and
+      write in the innermost scope.  Likewise, global variables read and write
+      to the global namespace.  The :keyword:`nonlocal` allows writing to outer
+      scopes.
 
    new-style class
       Old name for the flavor of classes now used for all class objects.  In
@@ -471,7 +512,7 @@ Glossary
       object drops to zero, it is deallocated.  Reference counting is
       generally not visible to Python code, but it is a key element of the
       :term:`CPython` implementation.  The :mod:`sys` module defines a
-      :func:`getrefcount` function that programmers can call to return the
+      :func:`~sys.getrefcount` function that programmers can call to return the
       reference count for a particular object.
 
    __slots__

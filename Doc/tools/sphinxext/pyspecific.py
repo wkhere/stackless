@@ -5,7 +5,7 @@
 
     Sphinx extension with Python doc-specific markup.
 
-    :copyright: 2008, 2009 by Georg Brandl.
+    :copyright: 2008, 2009, 2010 by Georg Brandl.
     :license: Python license.
 """
 
@@ -78,18 +78,18 @@ pydoc_topic_labels = [
     'assert', 'assignment', 'atom-identifiers', 'atom-literals',
     'attribute-access', 'attribute-references', 'augassign', 'binary',
     'bitwise', 'bltin-code-objects', 'bltin-ellipsis-object',
-    'bltin-file-objects', 'bltin-null-object', 'bltin-type-objects', 'booleans',
+    'bltin-null-object', 'bltin-type-objects', 'booleans',
     'break', 'callable-types', 'calls', 'class', 'comparisons', 'compound',
     'context-managers', 'continue', 'conversions', 'customization', 'debugger',
     'del', 'dict', 'dynamic-features', 'else', 'exceptions', 'execmodel',
     'exprlists', 'floating', 'for', 'formatstrings', 'function', 'global',
     'id-classes', 'identifiers', 'if', 'imaginary', 'import', 'in', 'integers',
-    'lambda', 'lists', 'naming', 'numbers', 'numeric-types', 'objects',
-    'operator-summary', 'pass', 'power', 'raise', 'return', 'sequence-types',
-    'shifting', 'slicings', 'specialattrs', 'specialnames', 'string-methods',
-    'strings', 'subscriptions', 'truth', 'try', 'types', 'typesfunctions',
-    'typesmapping', 'typesmethods', 'typesmodules', 'typesseq',
-    'typesseq-mutable', 'unary', 'while', 'with', 'yield'
+    'lambda', 'lists', 'naming', 'nonlocal', 'numbers', 'numeric-types',
+    'objects', 'operator-summary', 'pass', 'power', 'raise', 'return',
+    'sequence-types', 'shifting', 'slicings', 'specialattrs', 'specialnames',
+    'string-methods', 'strings', 'subscriptions', 'truth', 'try', 'types',
+    'typesfunctions', 'typesmapping', 'typesmethods', 'typesmodules',
+    'typesseq', 'typesseq-mutable', 'unary', 'while', 'with', 'yield'
 ]
 
 from os import path
@@ -149,7 +149,7 @@ import suspicious
 import re
 from sphinx import addnodes
 
-opcode_sig_re = re.compile(r'(\w+(?:\+\d)?)\s*\((.*)\)')
+opcode_sig_re = re.compile(r'(\w+(?:\+\d)?)(?:\s*\((.*)\))?')
 
 def parse_opcode_signature(env, sig, signode):
     """Transform an opcode signature into RST nodes."""
@@ -158,9 +158,10 @@ def parse_opcode_signature(env, sig, signode):
         raise ValueError
     opname, arglist = m.groups()
     signode += addnodes.desc_name(opname, opname)
-    paramlist = addnodes.desc_parameterlist()
-    signode += paramlist
-    paramlist += addnodes.desc_parameter(arglist, arglist)
+    if arglist is not None:
+        paramlist = addnodes.desc_parameterlist()
+        signode += paramlist
+        paramlist += addnodes.desc_parameter(arglist, arglist)
     return opname.strip()
 
 

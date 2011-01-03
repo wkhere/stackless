@@ -2,8 +2,8 @@
 
 .. _bufferobjects:
 
-Buffer Objects
---------------
+Buffer Protocol
+---------------
 
 .. sectionauthor:: Greg Stein <gstein@lyra.org>
 .. sectionauthor:: Benjamin Peterson
@@ -17,29 +17,56 @@ functions can be used by an object to expose its data in a raw, byte-oriented
 format. Clients of the object can use the buffer interface to access the
 object data directly, without needing to copy it first.
 
-Two examples of objects that support the buffer interface are bytes and
-arrays. The bytes object exposes the character contents in the buffer
-interface's byte-oriented form. An array can also expose its contents, but it
-should be noted that array elements may be multi-byte values.
+Examples of objects that support the buffer interface are :class:`bytes`,
+:class:`bytearray` and :class:`array.array`. The bytes and bytearray objects
+exposes their bytes contents in the buffer interface's byte-oriented form.
+An :class:`array.array` can also expose its contents, but it should be noted
+that array elements may be multi-byte values.
 
-An example user of the buffer interface is the file object's :meth:`write`
-method. Any object that can export a series of bytes through the buffer
-interface can be written to a file. There are a number of format codes to
-:cfunc:`PyArg_ParseTuple` that operate against an object's buffer interface,
-returning data from the target object.
+An example consumer of the buffer interface is the :meth:`~io.BufferedIOBase.write`
+method of file objects: any object that can export a series of bytes through
+the buffer interface can be written to a file.  While :meth:`write` only
+needs read-only access to the internal contents of the object passed to it,
+other methods such as :meth:`~io.BufferedIOBase.readinto` need write access
+to the contents of their argument.  The buffer interface allows objects to
+selectively allow or reject exporting of read-write and read-only buffers.
+
+There are two ways for a consumer of the buffer interface to acquire a buffer
+over a target object:
+
+* call :cfunc:`PyObject_GetBuffer` with the right parameters;
+
+* call :cfunc:`PyArg_ParseTuple` (or one of its siblings) with one of the
+  ``y*``, ``w*`` or ``s*`` :ref:`format codes <arg-parsing>`.
+
+In both cases, :cfunc:`PyBuffer_Release` must be called when the buffer
+isn't needed anymore.  Failure to do so could lead to various issues such as
+resource leaks.
+
 
 .. index:: single: PyBufferProcs
 
-More information on the buffer interface is provided in the section
-:ref:`buffer-structs`, under the description for :ctype:`PyBufferProcs`.
+How the buffer interface is exposed by a type object is described in the
+section :ref:`buffer-structs`, under the description for :ctype:`PyBufferProcs`.
 
-Buffer objects are useful as a way to expose the data from another object's
-buffer interface to the Python programmer.  They can also be used as a zero-copy
-slicing mechanism.  Using their ability to reference a block of memory, it is
-possible to expose any data to the Python programmer quite easily.  The memory
-could be a large, constant array in a C extension, it could be a raw block of
-memory for manipulation before passing to an operating system library, or it
-could be used to pass around structured data in its native, in-memory format.
+
+The buffer structure
+====================
+
+Buffer structures (or simply "buffers") are useful as a way to expose the
+binary data from another object to the Python programmer.  They can also be
+used as a zero-copy slicing mechanism.  Using their ability to reference a
+block of memory, it is possible to expose any data to the Python programmer
+quite easily.  The memory could be a large, constant array in a C extension,
+it could be a raw block of memory for manipulation before passing to an
+operating system library, or it could be used to pass around structured data
+in its native, in-memory format.
+
+Contrary to most data types exposed by the Python interpreter, buffers
+are not :ctype:`PyObject` pointers but rather simple C structures.  This
+allows them to be created and copied very simply.  When a generic wrapper
+around a buffer is needed, a :ref:`memoryview <memoryview-objects>` object
+can be created.
 
 
 .. ctype:: Py_buffer
@@ -127,24 +154,29 @@ could be used to pass around structured data in its native, in-memory format.
       value.
 
 
-Buffer related functions
+Buffer-related functions
 ========================
 
 
 .. cfunction:: int PyObject_CheckBuffer(PyObject *obj)
 
-   Return 1 if *obj* supports the buffer interface otherwise 0.
+   Return 1 if *obj* supports the buffer interface otherwise 0.  When 1 is
+   returned, it doesn't guarantee that :cfunc:`PyObject_GetBuffer` will
+   succeed.
 
 
 .. cfunction:: int PyObject_GetBuffer(PyObject *obj, Py_buffer *view, int flags)
 
-      Export *obj* into a :ctype:`Py_buffer`, *view*.  These arguments must
-      never be *NULL*.  The *flags* argument is a bit field indicating what
-      kind of buffer the caller is prepared to deal with and therefore what
-      kind of buffer the exporter is allowed to return.  The buffer interface
-      allows for complicated memory sharing possibilities, but some caller may
-      not be able to handle all the complexity but may want to see if the
-      exporter will let them take a simpler view to its memory.
+      Export a view over some internal data from the target object *obj*.
+      *obj* must not be NULL, and *view* must point to an existing
+      :ctype:`Py_buffer` structure allocated by the caller (most uses of
+      this function will simply declare a local variable of type
+      :ctype:`Py_buffer`).  The *flags* argument is a bit field indicating
+      what kind of buffer is requested.  The buffer interface allows
+      for complicated memory layout possibilities; however, some callers
+      won't want to handle all the complexity and instead request a simple
+      view of the target object (using :cmacro:`PyBUF_SIMPLE` for a read-only
+      view and :cmacro:`PyBUF_WRITABLE` for a read-write view).
 
       Some exporters may not be able to share memory in every possible way and
       may need to raise errors to signal to some consumers that something is
@@ -154,105 +186,108 @@ Buffer related functions
       :cdata:`Py_buffer` structure is filled in with non-default values and/or
       raise an error if the object can't support a simpler view of its memory.
 
-      0 is returned on success and -1 on error.
+      On success, 0 is returned and the *view* structure is filled with useful
+      values.  On error, -1 is returned and an exception is raised; the *view*
+      is left in an undefined state.
 
-      The following table gives possible values to the *flags* arguments.
+      The following are the possible values to the *flags* arguments.
 
-      +------------------------------+---------------------------------------------------+
-      | Flag                         | Description                                       |
-      +==============================+===================================================+
-      | :cmacro:`PyBUF_SIMPLE`       | This is the default flag state.  The returned     |
-      |                              | buffer may or may not have writable memory.  The  |
-      |                              | format of the data will be assumed to be unsigned |
-      |                              | bytes.  This is a "stand-alone" flag constant. It |
-      |                              | never needs to be '|'d to the others. The exporter|
-      |                              | will raise an error if it cannot provide such a   |
-      |                              | contiguous buffer of bytes.                       |
-      |                              |                                                   |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_WRITABLE`     | The returned buffer must be writable.  If it is   |
-      |                              | not writable, then raise an error.                |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_STRIDES`      | This implies :cmacro:`PyBUF_ND`. The returned     |
-      |                              | buffer must provide strides information (i.e. the |
-      |                              | strides cannot be NULL). This would be used when  |
-      |                              | the consumer can handle strided, discontiguous    |
-      |                              | arrays.  Handling strides automatically assumes   |
-      |                              | you can handle shape.  The exporter can raise an  |
-      |                              | error if a strided representation of the data is  |
-      |                              | not possible (i.e. without the suboffsets).       |
-      |                              |                                                   |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_ND`           | The returned buffer must provide shape            |
-      |                              | information. The memory will be assumed C-style   |
-      |                              | contiguous (last dimension varies the             |
-      |                              | fastest). The exporter may raise an error if it   |
-      |                              | cannot provide this kind of contiguous buffer. If |
-      |                              | this is not given then shape will be *NULL*.      |
-      |                              |                                                   |
-      |                              |                                                   |
-      |                              |                                                   |
-      +------------------------------+---------------------------------------------------+
-      |:cmacro:`PyBUF_C_CONTIGUOUS`  | These flags indicate that the contiguity returned |
-      |:cmacro:`PyBUF_F_CONTIGUOUS`  | buffer must be respectively, C-contiguous (last   |
-      |:cmacro:`PyBUF_ANY_CONTIGUOUS`| dimension varies the fastest), Fortran contiguous |
-      |                              | (first dimension varies the fastest) or either    |
-      |                              | one.  All of these flags imply                    |
-      |                              | :cmacro:`PyBUF_STRIDES` and guarantee that the    |
-      |                              | strides buffer info structure will be filled in   |
-      |                              | correctly.                                        |
-      |                              |                                                   |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_INDIRECT`     | This flag indicates the returned buffer must have |
-      |                              | suboffsets information (which can be NULL if no   |
-      |                              | suboffsets are needed).  This can be used when    |
-      |                              | the consumer can handle indirect array            |
-      |                              | referencing implied by these suboffsets. This     |
-      |                              | implies :cmacro:`PyBUF_STRIDES`.                  |
-      |                              |                                                   |
-      |                              |                                                   |
-      |                              |                                                   |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_FORMAT`       | The returned buffer must have true format         |
-      |                              | information if this flag is provided. This would  |
-      |                              | be used when the consumer is going to be checking |
-      |                              | for what 'kind' of data is actually stored. An    |
-      |                              | exporter should always be able to provide this    |
-      |                              | information if requested. If format is not        |
-      |                              | explicitly requested then the format must be      |
-      |                              | returned as *NULL* (which means ``'B'``, or       |
-      |                              | unsigned bytes)                                   |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_STRIDED`      | This is equivalent to ``(PyBUF_STRIDES |          |
-      |                              | PyBUF_WRITABLE)``.                                |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_STRIDED_RO`   | This is equivalent to ``(PyBUF_STRIDES)``.        |
-      |                              |                                                   |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_RECORDS`      | This is equivalent to ``(PyBUF_STRIDES |          |
-      |                              | PyBUF_FORMAT | PyBUF_WRITABLE)``.                 |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_RECORDS_RO`   | This is equivalent to ``(PyBUF_STRIDES |          |
-      |                              | PyBUF_FORMAT)``.                                  |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_FULL`         | This is equivalent to ``(PyBUF_INDIRECT |         |
-      |                              | PyBUF_FORMAT | PyBUF_WRITABLE)``.                 |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_FULL_RO`      | This is equivalent to ``(PyBUF_INDIRECT |         |
-      |                              | PyBUF_FORMAT)``.                                  |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_CONTIG`       | This is equivalent to ``(PyBUF_ND |               |
-      |                              | PyBUF_WRITABLE)``.                                |
-      +------------------------------+---------------------------------------------------+
-      | :cmacro:`PyBUF_CONTIG_RO`    | This is equivalent to ``(PyBUF_ND)``.             |
-      |                              |                                                   |
-      +------------------------------+---------------------------------------------------+
+      .. cmacro:: PyBUF_SIMPLE
+
+         This is the default flag.  The returned buffer exposes a read-only
+         memory area.  The format of data is assumed to be raw unsigned bytes,
+         without any particular structure.  This is a "stand-alone" flag
+         constant.  It never needs to be '|'d to the others.  The exporter will
+         raise an error if it cannot provide such a contiguous buffer of bytes.
+
+      .. cmacro:: PyBUF_WRITABLE
+
+         Like :cmacro:`PyBUF_SIMPLE`, but the returned buffer is writable.  If
+         the exporter doesn't support writable buffers, an error is raised.
+
+      .. cmacro:: PyBUF_STRIDES
+
+         This implies :cmacro:`PyBUF_ND`.  The returned buffer must provide
+         strides information (i.e. the strides cannot be NULL).  This would be
+         used when the consumer can handle strided, discontiguous arrays.
+         Handling strides automatically assumes you can handle shape.  The
+         exporter can raise an error if a strided representation of the data is
+         not possible (i.e. without the suboffsets).
+
+      .. cmacro:: PyBUF_ND
+
+         The returned buffer must provide shape information.  The memory will be
+         assumed C-style contiguous (last dimension varies the fastest).  The
+         exporter may raise an error if it cannot provide this kind of
+         contiguous buffer.  If this is not given then shape will be *NULL*.
+
+      .. cmacro:: PyBUF_C_CONTIGUOUS
+
+      .. cmacro:: PyBUF_F_CONTIGUOUS
+
+      .. cmacro:: PyBUF_ANY_CONTIGUOUS
+
+         These flags indicate that the contiguity returned buffer must be
+         respectively, C-contiguous (last dimension varies the fastest), Fortran
+         contiguous (first dimension varies the fastest) or either one.  All of
+         these flags imply :cmacro:`PyBUF_STRIDES` and guarantee that the
+         strides buffer info structure will be filled in correctly.
+
+      .. cmacro:: PyBUF_INDIRECT
+
+         This flag indicates the returned buffer must have suboffsets
+         information (which can be NULL if no suboffsets are needed).  This can
+         be used when the consumer can handle indirect array referencing implied
+         by these suboffsets. This implies :cmacro:`PyBUF_STRIDES`.
+
+      .. cmacro:: PyBUF_FORMAT
+
+         The returned buffer must have true format information if this flag is
+         provided.  This would be used when the consumer is going to be checking
+         for what 'kind' of data is actually stored.  An exporter should always
+         be able to provide this information if requested.  If format is not
+         explicitly requested then the format must be returned as *NULL* (which
+         means ``'B'``, or unsigned bytes).
+
+      .. cmacro:: PyBUF_STRIDED
+
+         This is equivalent to ``(PyBUF_STRIDES | PyBUF_WRITABLE)``.
+
+      .. cmacro:: PyBUF_STRIDED_RO
+
+         This is equivalent to ``(PyBUF_STRIDES)``.
+
+      .. cmacro:: PyBUF_RECORDS
+
+         This is equivalent to ``(PyBUF_STRIDES | PyBUF_FORMAT |
+         PyBUF_WRITABLE)``.
+
+      .. cmacro:: PyBUF_RECORDS_RO
+
+         This is equivalent to ``(PyBUF_STRIDES | PyBUF_FORMAT)``.
+
+      .. cmacro:: PyBUF_FULL
+
+         This is equivalent to ``(PyBUF_INDIRECT | PyBUF_FORMAT |
+         PyBUF_WRITABLE)``.
+
+      .. cmacro:: PyBUF_FULL_RO
+
+         This is equivalent to ``(PyBUF_INDIRECT | PyBUF_FORMAT)``.
+
+      .. cmacro:: PyBUF_CONTIG
+
+         This is equivalent to ``(PyBUF_ND | PyBUF_WRITABLE)``.
+
+      .. cmacro:: PyBUF_CONTIG_RO
+
+         This is equivalent to ``(PyBUF_ND)``.
 
 
-.. cfunction:: void PyBuffer_Release(PyObject *obj, Py_buffer *view)
+.. cfunction:: void PyBuffer_Release(Py_buffer *view)
 
-   Release the buffer *view* over *obj*.  This should be called when the buffer
-   is no longer being used as it may free memory from it.
+   Release the buffer *view*.  This should be called when the buffer is no
+   longer being used as it may free memory from it.
 
 
 .. cfunction:: Py_ssize_t PyBuffer_SizeFromFormat(const char *)
@@ -289,32 +324,9 @@ Buffer related functions
    given shape with the given number of bytes per element.
 
 
-.. cfunction:: int PyBuffer_FillInfo(Py_buffer *view, void *buf, Py_ssize_t len, int readonly, int infoflags)
+.. cfunction:: int PyBuffer_FillInfo(Py_buffer *view, PyObject *obj, void *buf, Py_ssize_t len, int readonly, int infoflags)
 
    Fill in a buffer-info structure, *view*, correctly for an exporter that can
    only share a contiguous chunk of memory of "unsigned bytes" of the given
    length.  Return 0 on success and -1 (with raising an error) on error.
 
-
-.. index::
-   object: memoryview
-
-
-MemoryView objects
-==================
-
-A memoryview object exposes the C level buffer interface to Python.
-
-
-.. cfunction:: PyObject* PyMemoryView_FromObject(PyObject *obj)
-
-   Return a memoryview object from an object that defines the buffer interface.
-
-
-.. cfunction:: PyObject * PyMemoryView_GetContiguous(PyObject *obj,  int buffertype, char order)
-
-   Return a memoryview object to a contiguous chunk of memory (in either
-   'C' or 'F'ortran order) from an object that defines the buffer
-   interface. If memory is contiguous, the memoryview object points to the
-   original memory. Otherwise copy is made and the memoryview points to a
-   new bytes object.

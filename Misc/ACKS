@@ -1,4 +1,5 @@
-
+Acknowledgements
+----------------
 
 This list is not complete and not in any useful order, but I would
 like to thank everybody who contributed in any way, with code, hints,
@@ -7,11 +8,13 @@ Without you, I would've stopped working on Python long ago!
 
 	--Guido
 
-PS: In the standard Python distribution, this file is encoded in UTF-8.
+PS: In the standard Python distribution, this file is encoded in UTF-8
+and the list is in rough alphabetical order by last names.
 
 David Abrahams
 Jim Ahlstrom
 Farhan Ahmad
+Yaniv Aknin
 Jyrki Alakuijala
 Billy G. Allie
 Kevin Altis
@@ -26,7 +29,7 @@ Jason Asbahr
 David Ascher
 Chris AtLee
 John Aycock
-Jan-Hein B"uhrman
+Jan-Hein Bührman
 Donovan Baarda
 Attila Babo
 Alfonso Baciero
@@ -55,10 +58,12 @@ David Beazley
 Robin Becker
 Neal Becker
 Bill Bedford
+Stefan Behnel
 Reimer Behrends
 Ben Bell
 Thomas Bellman
-Alexander Belopolsky
+Alexander “Саша” Belopolsky
+Eli Bendersky
 Andrew Bennetts
 Andy Bensky
 Michel Van den Bergh
@@ -80,6 +85,7 @@ Finn Bock
 Paul Boddie
 Matthew Boedicker
 David Bolen
+Forest Bond
 Gregory Bond
 Jurjen Bos
 Peter Bosch
@@ -115,6 +121,7 @@ Tony Campbell
 Brett Cannon
 Mike Carlton
 Terry Carroll
+Lorenzo M. Catucci
 Donn Cave
 Per Cederqvist
 Octavian Cerna
@@ -135,11 +142,13 @@ Tom Christiansen
 Vadim Chugunov
 David Cinege
 Mike Clarkson
+Andrew Clegg
 Brad Clements
 Steve Clift
 Nick Coghlan
 Josh Cogliati
 Dave Cole
+Terrence Cole
 Benjamin Collar
 Jeffery Collins
 Paul Colomiets
@@ -154,10 +163,12 @@ David Cournapeau
 Steve Cousins
 Alex Coventry
 Matthew Dixon Cowles
+Ryan Coyner
 Christopher A. Craig
 Laura Creighton
 Simon Cross
 Drew Csillag
+Joaquin Cuenca Abela
 John Cugini
 Tom Culliton
 Lisandro Dalcin
@@ -174,6 +185,8 @@ Arnaud Delobelle
 Erik Demaine
 Roger Dev
 Raghuram Devarakonda
+Catherine Devlin
+Scott Dial
 Toby Dickenson
 Mark Dickinson
 Jack Diederich
@@ -186,6 +199,7 @@ Ismail Donmez
 Dima Dorfman
 Cesar Douady
 Dean Draayer
+Fred L. Drake, Jr.
 Derk Drukker
 John DuBois
 Paul Dubois
@@ -224,11 +238,13 @@ Greg Ewing
 Martijn Faassen
 Andreas Faerber
 Bill Fancher
+Troy J. Farrell
 Mark Favas
 Niels Ferguson
 Sebastian Fernandez
 Vincent Fiack
 Tomer Filiba
+Jeffrey Finkelstein
 Russell Finn
 Nils Fischbeck
 Frederik Fix
@@ -248,6 +264,7 @@ Peter Funk
 Geoff Furnish
 Ulisses Furquim
 Hagen Fürstenau
+Hallvard B Furuseth
 Achim Gaedke
 Martin von Gagern
 Lele Gaifax
@@ -325,6 +342,7 @@ Joerg-Cyril Hoehle
 Gregor Hoffleit
 Chris Hoffman
 Albert Hofkamp
+Tomas Hoger
 Jonathan Hogg
 Gerrit Holl
 Shane Holloway
@@ -337,6 +355,7 @@ Michiel de Hoon
 Brian Hooper
 Randall Hopper
 Nadav Horesh
+Jan Hosang
 Ken Howard
 Brad Howes
 Chih-Hao Huang
@@ -347,6 +366,7 @@ Greg Humphreys
 Eric Huss
 Jeremy Hylton
 Gerhard Häring
+Fredrik Håård
 Mihai Ibanescu
 Lars Immisch
 Meador Inge
@@ -359,6 +379,7 @@ Ben Jackson
 David Jacobs
 Kevin Jacobs
 Kjetil Jacobsen
+Bertrand Janin
 Geert Jansen
 Jack Jansen
 Bill Janssen
@@ -369,6 +390,7 @@ Orjan Johansen
 Fredrik Johansson
 Gregory K. Johnson
 Simon Johnston
+Thomas Jollans
 Evan Jones
 Jeremy Jones
 Richard Jones
@@ -376,7 +398,6 @@ Irmen de Jong
 Lucas de Jonge
 John Jorgensen
 Jens B. Jorgensen
-Fred L. Drake, Jr.
 Andreas Jung
 Tattoo Mabonzo K.
 Bob Kahn
@@ -387,13 +408,16 @@ Jacob Kaplan-Moss
 Lou Kates
 Hiroaki Kawai
 Sebastien Keim
+Ryan Kelly
 Robert Kern
 Randall Kern
 Magnus Kessler
 Lawrence Kesteloot
 Vivek Khera
+Akira Kitada
 Mads Kiilerich
 Taek Joo Kim
+W. Trevor King
 Paul Kippes
 Steve Kirsch
 Sebastian Kirsche
@@ -413,9 +437,12 @@ Holger Krekel
 Michael Kremer
 Fabian Kreutz
 Hannu Krosing
+Andrej Krpic
+Ivan Krstić
 Andrew Kuchling
 Vladimir Kushnir
 Cameron Laird
+Łukasz Langa
 Tino Lange
 Andrew Langmead
 Detlef Lannert
@@ -425,6 +452,7 @@ Ben Laurie
 Simon Law
 Chris Lawrence
 Brian Leair
+James Lee
 John J. Lee
 Inyeol Lee
 Thomas Lee
@@ -444,8 +472,9 @@ Robert van Liere
 Ross Light
 Shawn Ligocki
 Martin Ligr
+Grant Limberg
 Christopher Lindblad
-Bjorn Lindqvist
+Björn Lindqvist
 Per Lindqvist
 Eric Lindvall
 Gregor Lingl
@@ -469,7 +498,7 @@ Nick Maclaren
 Don MacMillen
 Steve Majewski
 Grzegorz Makarewicz
-Dave Malcolm
+David Malcolm
 Ken Manheimer
 Vladimir Marangozov
 David Marek
@@ -502,9 +531,10 @@ Trent Mick
 Aristotelis Mikropoulos
 Damien Miller
 Chad Miller
+Jason V. Miller
 Jay T. Miller
 Roman Milner
-Andrii V. Mishkovskyi 
+Andrii V. Mishkovskyi
 Dustin J. Mitchell
 Dom Mitchell
 Doug Moen
@@ -548,6 +578,7 @@ Grant Olson
 Piet van Oostrum
 Jason Orendorff
 Douglas Orr
+Michele Orrù
 Denis S. Otkidach
 Michael Otteneder
 R. M. Oudkerk
@@ -602,6 +633,7 @@ Anders Qvist
 Burton Radons
 Brodie Rao
 Antti Rasinen
+Sridhar Ratnakumar
 Eric Raymond
 Edward K. Ream
 Chris Rebert
@@ -647,11 +679,13 @@ Jeff Rush
 Sam Rushing
 Mark Russell
 Nick Russo
+Sébastien Sablé
 Hajime Saitou
 George Sakkis
 Rich Salz
 Kevin Samborn
 Ilya Sandler
+Mark Sapiro
 Ty Sarna
 Ben Sayer
 Michael Scharf
@@ -680,6 +714,7 @@ Denis Severson
 Ian Seyer
 Ha Shao
 Bruce Sherwood
+Alexander Shigin
 Pete Shinners
 Michael Shiplett
 John W. Shipman
@@ -728,6 +763,7 @@ Kalle Svensson
 Andrew Svetlov
 Paul Swartz
 Thenault Sylvain
+Péter Szabó
 Arfrever Frehtes Taifersar Arahesis
 Geoff Talvola
 Musashi Tamura
@@ -761,6 +797,7 @@ Roger Upole
 Michael Urman
 Hector Urtubia
 Andi Vajda
+Kyle VanderBeek
 Atul Varma
 Dmitry Vasiliev
 Alexandre Vassalotti
@@ -801,6 +838,7 @@ Felix Wiemann
 Gerry Wiener
 Frank Wierzbicki
 Bryce "Zooko" Wilcox-O'Hearn
+Jason Williams
 John Williams
 Sue Williams
 Gerald S. Williams
@@ -824,6 +862,7 @@ Gordon Worley
 Thomas Wouters
 Heiko Wundram
 Doug Wyatt
+Hirokazu Yamamoto
 Ka-Ping Yee
 Bob Yodlowski
 Danny Yoo
@@ -836,5 +875,6 @@ Artur Zaprzala
 Mike Zarnstorff
 Siebren van der Zee
 Uwe Zessin
+Kai Zhu
 Tarek Ziadé
 Peter Åstrand

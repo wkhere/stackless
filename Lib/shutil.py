@@ -9,6 +9,7 @@ import sys
 import stat
 from os.path import abspath
 import fnmatch
+import errno
 
 __all__ = ["copyfileobj","copyfile","copymode","copystat","copy","copy2",
            "copytree","move","rmtree","Error", "SpecialFileError"]
@@ -50,8 +51,6 @@ def copyfile(src, dst):
     if _samefile(src, dst):
         raise Error("`%s` and `%s` are the same file" % (src, dst))
 
-    fsrc = None
-    fdst = None
     for fn in [src, dst]:
         try:
             st = os.stat(fn)
@@ -62,15 +61,10 @@ def copyfile(src, dst):
             # XXX What about other special files? (sockets, devices...)
             if stat.S_ISFIFO(st.st_mode):
                 raise SpecialFileError("`%s` is a named pipe" % fn)
-    try:
-        fsrc = open(src, 'rb')
-        fdst = open(dst, 'wb')
-        copyfileobj(fsrc, fdst)
-    finally:
-        if fdst:
-            fdst.close()
-        if fsrc:
-            fsrc.close()
+
+    with open(src, 'rb') as fsrc:
+        with open(dst, 'wb') as fdst:
+            copyfileobj(fsrc, fdst)
 
 def copymode(src, dst):
     """Copy mode bits from src to dst"""
@@ -88,8 +82,11 @@ def copystat(src, dst):
     if hasattr(os, 'chmod'):
         os.chmod(dst, mode)
     if hasattr(os, 'chflags') and hasattr(st, 'st_flags'):
-        os.chflags(dst, st.st_flags)
-
+        try:
+            os.chflags(dst, st.st_flags)
+        except OSError as why:
+            if not hasattr(errno, 'EOPNOTSUPP') or why.errno != errno.EOPNOTSUPP:
+                raise
 
 def copy(src, dst):
     """Copy data and mode bits ("cp src dst").

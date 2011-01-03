@@ -17,19 +17,21 @@ import unittest
 import importlib
 import collections
 
-__all__ = ["Error", "TestFailed", "ResourceDenied", "import_module",
-           "verbose", "use_resources", "max_memuse", "record_original_stdout",
-           "get_original_stdout", "unload", "unlink", "rmtree", "forget",
-           "is_resource_enabled", "requires", "find_unused_port", "bind_port",
-           "fcmp", "is_jython", "TESTFN", "HOST", "FUZZ", "findfile", "verify",
-           "vereq", "sortdict", "check_syntax_error", "open_urlresource",
-           "check_warnings", "CleanImport", "EnvironmentVarGuard",
-           "TransientResource", "captured_output", "captured_stdout",
-           "time_out", "socket_peer_reset", "ioerror_peer_reset",
-           "run_with_locale",
-           "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
-           "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
-           "reap_children", "cpython_only", "check_impl_detail", "get_attribute"]
+__all__ = [
+    "Error", "TestFailed", "ResourceDenied", "import_module",
+    "verbose", "use_resources", "max_memuse", "record_original_stdout",
+    "get_original_stdout", "unload", "unlink", "rmtree", "forget",
+    "is_resource_enabled", "requires", "find_unused_port", "bind_port",
+    "fcmp", "is_jython", "TESTFN", "HOST", "FUZZ", "findfile", "verify",
+    "vereq", "sortdict", "check_syntax_error", "open_urlresource",
+    "check_warnings", "CleanImport", "EnvironmentVarGuard",
+    "TransientResource", "captured_output", "captured_stdout",
+    "time_out", "socket_peer_reset", "ioerror_peer_reset",
+    "run_with_locale", "transient_internet",
+    "set_memlimit", "bigmemtest", "bigaddrspacetest", "BasicTestRunner",
+    "run_unittest", "run_doctest", "threading_setup", "threading_cleanup",
+    "reap_children", "cpython_only", "check_impl_detail", "get_attribute",
+    ]
 
 class Error(Exception):
     """Base class for regression test exceptions."""
@@ -98,7 +100,7 @@ def _save_and_block_module(name, orig_modules):
         orig_modules[name] = sys.modules[name]
     except KeyError:
         saved = False
-    sys.modules[name] = 0
+    sys.modules[name] = None
     return saved
 
 
@@ -341,29 +343,34 @@ else:
     # file system encoding, but *not* with the default (ascii) encoding
     TESTFN_UNICODE = "@test-\xe0\xf2"
     TESTFN_ENCODING = sys.getfilesystemencoding()
-    # TESTFN_UNICODE_UNENCODEABLE is a filename that should *not* be
+    # TESTFN_UNENCODABLE is a filename that should *not* be
     # able to be encoded by *either* the default or filesystem encoding.
     # This test really only makes sense on Windows NT platforms
     # which have special Unicode support in posixmodule.
     if (not hasattr(sys, "getwindowsversion") or
             sys.getwindowsversion()[3] < 2): #  0=win32s or 1=9x/ME
-        TESTFN_UNICODE_UNENCODEABLE = None
+        TESTFN_UNENCODABLE = None
     else:
-        # Japanese characters (I think - from bug 846133)
-        TESTFN_UNICODE_UNENCODEABLE = "@test-\u5171\u6709\u3055\u308c\u308b"
+        # Different kinds of characters from various languages to minimize the
+        # probability that the whole name is encodable to MBCS (issue #9819)
+        TESTFN_UNENCODABLE = TESTFN + "-\u5171\u0141\u2661\u0363\uDC80"
         try:
             # XXX - Note - should be using TESTFN_ENCODING here - but for
             # Windows, "mbcs" currently always operates as if in
             # errors=ignore' mode - hence we get '?' characters rather than
             # the exception.  'Latin1' operates as we expect - ie, fails.
             # See [ 850997 ] mbcs encoding ignores errors
-            TESTFN_UNICODE_UNENCODEABLE.encode("Latin1")
+            TESTFN_UNENCODABLE.encode("Latin1")
         except UnicodeEncodeError:
             pass
         else:
             print('WARNING: The filename %r CAN be encoded by the filesystem.  '
                   'Unicode filename tests may not be effective'
-                  % TESTFN_UNICODE_UNENCODEABLE)
+                  % TESTFN_UNENCODABLE)
+
+if os.path.isdir(TESTFN):
+    # a test failed (eg. test_os) without removing TESTFN directory
+    shutil.rmtree(TESTFN)
 
 # Make sure we can write to TESTFN, try in /tmp if we can't
 fp = None
@@ -383,12 +390,14 @@ if fp is not None:
     unlink(TESTFN)
 del fp
 
-def findfile(file, here=__file__):
+def findfile(file, here=__file__, subdir=None):
     """Try to find a file on sys.path and the working directory.  If it is not
     found the argument passed to the function is returned (this does not
     necessarily signal failure; could still be the legitimate path)."""
     if os.path.isabs(file):
         return file
+    if subdir is not None:
+        file = os.path.join(subdir, file)
     path = sys.path
     path = [os.path.dirname(here)] + path
     for dn in path:
@@ -598,12 +607,72 @@ class TransientResource(object):
             else:
                 raise ResourceDenied("an optional resource is not available")
 
-
 # Context managers that raise ResourceDenied when various issues
 # with the Internet connection manifest themselves as exceptions.
+# XXX deprecate these and use transient_internet() instead
 time_out = TransientResource(IOError, errno=errno.ETIMEDOUT)
 socket_peer_reset = TransientResource(socket.error, errno=errno.ECONNRESET)
 ioerror_peer_reset = TransientResource(IOError, errno=errno.ECONNRESET)
+
+
+@contextlib.contextmanager
+def transient_internet(resource_name, *, timeout=30.0, errnos=()):
+    """Return a context manager that raises ResourceDenied when various issues
+    with the Internet connection manifest themselves as exceptions."""
+    default_errnos = [
+        ('ECONNREFUSED', 111),
+        ('ECONNRESET', 104),
+        ('ENETUNREACH', 101),
+        ('ETIMEDOUT', 110),
+    ]
+    default_gai_errnos = [
+        ('EAI_NONAME', -2),
+        ('EAI_NODATA', -5),
+    ]
+
+    denied = ResourceDenied("Resource '%s' is not available" % resource_name)
+    captured_errnos = errnos
+    gai_errnos = []
+    if not captured_errnos:
+        captured_errnos = [getattr(errno, name, num)
+                           for (name, num) in default_errnos]
+        gai_errnos = [getattr(socket, name, num)
+                      for (name, num) in default_gai_errnos]
+
+    def filter_error(err):
+        n = getattr(err, 'errno', None)
+        if (isinstance(err, socket.timeout) or
+            (isinstance(err, socket.gaierror) and n in gai_errnos) or
+            n in captured_errnos):
+            if not verbose:
+                sys.stderr.write(denied.args[0] + "\n")
+            raise denied from err
+
+    old_timeout = socket.getdefaulttimeout()
+    try:
+        if timeout is not None:
+            socket.setdefaulttimeout(timeout)
+        yield
+    except IOError as err:
+        # urllib can wrap original socket errors multiple times (!), we must
+        # unwrap to get at the original error.
+        while True:
+            a = err.args
+            if len(a) >= 1 and isinstance(a[0], IOError):
+                err = a[0]
+            # The error can also be wrapped as args[1]:
+            #    except socket.error as msg:
+            #        raise IOError('socket error', msg).with_traceback(sys.exc_info()[2])
+            elif len(a) >= 2 and isinstance(a[1], IOError):
+                err = a[1]
+            else:
+                break
+        filter_error(err)
+        raise
+    # XXX should we catch generic exceptions and look for their
+    # __cause__ or __context__?
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 
 @contextlib.contextmanager
@@ -804,7 +873,7 @@ def _id(obj):
     return obj
 
 def requires_resource(resource):
-    if resource_is_enabled(resource):
+    if is_resource_enabled(resource):
         return _id
     else:
         return unittest.skip("resource {0!r} is not enabled".format(resource))

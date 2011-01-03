@@ -48,13 +48,13 @@ The module provides the following classes:
 .. class:: HTTPSConnection(host, port=None, key_file=None, cert_file=None, strict=None[, timeout])
 
    A subclass of :class:`HTTPConnection` that uses SSL for communication with
-   secure servers.  Default port is ``443``. *key_file* is the name of a PEM
-   formatted file that contains your private key. *cert_file* is a PEM formatted
-   certificate chain file.
+   secure servers.  Default port is ``443``.  *key_file* is the name of a PEM
+   formatted file that contains your private key, and *cert_file* is a PEM
+   formatted certificate chain file; both can be used for authenticating
+   yourself against the server.
 
-   .. note::
-
-      This does not do any certificate verification.
+   .. warning::
+      This does not do any verification of the server's certificate.
 
 
 .. class:: HTTPResponse(sock, debuglevel=0, strict=0, method=None, url=None)
@@ -359,7 +359,7 @@ HTTPConnection Objects
    object.  The Content-Length header is set to the length of the
    string.
 
-   The *body* may also be an open file object, in which case the
+   The *body* may also be an open :term:`file object`, in which case the
    contents of the file is sent; this file object should support
    ``fileno()`` and ``read()`` methods. The header Content-Length is
    automatically set to the length of the file as reported by
@@ -448,14 +448,19 @@ statement.
 
 .. method:: HTTPResponse.getheader(name, default=None)
 
-   Get the contents of the header *name*, or *default* if there is no matching
-   header.
+   Return the value of the header *name*, or *default* if there is no header
+   matching *name*.  If there is more than one  header with the name *name*,
+   return all of the values joined by ', '.  If 'default' is any iterable other
+   than a single string, its elements are similarly returned joined by commas.
 
 
 .. method:: HTTPResponse.getheaders()
 
    Return a list of (header, value) tuples.
 
+.. method:: HTTPResponse.fileno()
+
+   Return the ``fileno`` of the underlying socket.
 
 .. attribute:: HTTPResponse.msg
 
@@ -481,7 +486,7 @@ statement.
 
 .. attribute:: HTTPResponse.debuglevel
 
-   A debugging hook.  If `debuglevel` is greater than zero, messages
+   A debugging hook.  If :attr:`debuglevel` is greater than zero, messages
    will be printed to stdout as the response is read and parsed.
 
 
@@ -503,6 +508,22 @@ Here is an example session that uses the ``GET`` method::
    404 Not Found
    >>> data2 = r2.read()
    >>> conn.close()
+
+Here is an example session that uses ``HEAD`` method. Note that ``HEAD`` method
+never returns any data. ::
+
+
+   >>> import http.client
+   >>> conn = http.client.HTTPConnection("www.python.org")
+   >>> conn.request("HEAD","/index.html")
+   >>> res = conn.getresponse()
+   >>> print(res.status, res.reason)
+   200 OK
+   >>> data = res.read()
+   >>> print(len(data))
+   0
+   >>> data == b''
+   True
 
 Here is an example session that shows how to ``POST`` requests::
 

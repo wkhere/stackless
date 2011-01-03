@@ -9,10 +9,9 @@ like the GNU programs :program:`gzip` and :program:`gunzip` would.
 
 The data compression is provided by the :mod:`zlib` module.
 
-The :mod:`gzip` module provides the :class:`GzipFile` class which is modeled
-after Python's File Object. The :class:`GzipFile` class reads and writes
-:program:`gzip`\ -format files, automatically compressing or decompressing the
-data so that it looks like an ordinary file object.
+The :mod:`gzip` module provides the :class:`GzipFile` class. The :class:`GzipFile`
+class reads and writes :program:`gzip`\ -format files, automatically compressing
+or decompressing the data so that it looks like an ordinary :term:`file object`.
 
 Note that additional file formats which can be decompressed by the
 :program:`gzip` and :program:`gunzip` programs, such  as those produced by
@@ -27,7 +26,7 @@ The module defines the following items:
 .. class:: GzipFile(filename=None, mode=None, compresslevel=9, fileobj=None, mtime=None)
 
    Constructor for the :class:`GzipFile` class, which simulates most of the methods
-   of a file object, with the exception of the :meth:`readinto` and
+   of a :term:`file object`, with the exception of the :meth:`readinto` and
    :meth:`truncate` methods.  At least one of *fileobj* and *filename* must be
    given a non-trivial value.
 
@@ -88,26 +87,22 @@ Examples of usage
 Example of how to read a compressed file::
 
    import gzip
-   f = gzip.open('/home/joe/file.txt.gz', 'rb')
-   file_content = f.read()
-   f.close()
+   with gzip.open('/home/joe/file.txt.gz', 'rb') as f:
+       file_content = f.read()
 
 Example of how to create a compressed GZIP file::
 
    import gzip
-   content = "Lots of content here"
-   f = gzip.open('/home/joe/file.txt.gz', 'wb')
-   f.write(content)
-   f.close()
+   content = b"Lots of content here"
+   with gzip.open('/home/joe/file.txt.gz', 'wb') as f:
+       f.write(content)
 
 Example of how to GZIP compress an existing file::
 
    import gzip
-   f_in = open('/home/joe/file.txt', 'rb')
-   f_out = gzip.open('/home/joe/file.txt.gz', 'wb')
-   f_out.writelines(f_in)
-   f_out.close()
-   f_in.close()
+   with open('/home/joe/file.txt', 'rb') as f_in:
+       with gzip.open('/home/joe/file.txt.gz', 'wb') as f_out:
+           f_out.writelines(f_in)
 
 
 .. seealso::

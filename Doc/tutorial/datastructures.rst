@@ -137,21 +137,25 @@ Using Lists as Queues
 
 .. sectionauthor:: Ka-Ping Yee <ping@lfw.org>
 
+It is also possible to use a list as a queue, where the first element added is
+the first element retrieved ("first-in, first-out"); however, lists are not
+efficient for this purpose.  While appends and pops from the end of list are
+fast, doing inserts or pops from the beginning of a list is slow (because all
+of the other elements have to be shifted by one).
 
-You can also use a list conveniently as a queue, where the first element added
-is the first element retrieved ("first-in, first-out").  To add an item to the
-back of the queue, use :meth:`append`.  To retrieve an item from the front of
-the queue, use :meth:`pop` with ``0`` as the index.  For example::
+To implement a queue, use :class:`collections.deque` which was designed to
+have fast appends and pops from both ends.  For example::
 
-   >>> queue = ["Eric", "John", "Michael"]
+   >>> from collections import deque
+   >>> queue = deque(["Eric", "John", "Michael"])
    >>> queue.append("Terry")           # Terry arrives
    >>> queue.append("Graham")          # Graham arrives
-   >>> queue.pop(0)
+   >>> queue.popleft()                 # The first to arrive now leaves
    'Eric'
-   >>> queue.pop(0)
+   >>> queue.popleft()                 # The second to arrive now leaves
    'John'
-   >>> queue
-   ['Michael', 'Terry', 'Graham']
+   >>> queue                           # Remaining queue in order of arrival
+   deque(['Michael', 'Terry', 'Graham'])
 
 
 .. _tut-listcomps:
@@ -367,25 +371,18 @@ with no duplicate elements.  Basic uses include membership testing and
 eliminating duplicate entries.  Set objects also support mathematical operations
 like union, intersection, difference, and symmetric difference.
 
-Curly braces or the :func:`set` function can be use to create sets. Note: To
+Curly braces or the :func:`set` function can be used to create sets.  Note: To
 create an empty set you have to use ``set()``, not ``{}``; the latter creates an
 empty dictionary, a data structure that we discuss in the next section.
 
 Here is a brief demonstration::
 
    >>> basket = {'apple', 'orange', 'apple', 'pear', 'orange', 'banana'}
-   >>> print(basket)
+   >>> print(basket)                      # show that duplicates have been removed
    {'orange', 'banana', 'pear', 'apple'}
-   >>> fruit = ['apple', 'orange', 'apple', 'pear', 'orange', 'banana']
-   >>> fruit = set(basket)               # create a set without duplicates
-   >>> fruit
-   {'orange', 'pear', 'apple', 'banana'}
-   >>> fruit = {'orange', 'apple'}       # {} syntax is equivalent to [] for lists
-   >>> fruit
-   {'orange', 'apple'}
-   >>> 'orange' in fruit                 # fast membership testing
+   >>> 'orange' in basket                 # fast membership testing
    True
-   >>> 'crabgrass' in fruit
+   >>> 'crabgrass' in basket
    False
 
    >>> # Demonstrate set operations on unique letters from two words

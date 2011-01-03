@@ -182,6 +182,17 @@ class BaseTest(unittest.TestCase):
                 f.close()
             support.unlink(support.TESTFN)
 
+    def test_fromfile_ioerror(self):
+        # Issue #5395: Check if fromfile raises a proper IOError
+        # instead of EOFError.
+        a = array.array(self.typecode)
+        f = open(support.TESTFN, 'wb')
+        try:
+            self.assertRaises(IOError, a.fromfile, f, len(self.example))
+        finally:
+            f.close()
+            support.unlink(support.TESTFN)
+
     def test_tofromlist(self):
         a = array.array(self.typecode, 2*self.example)
         b = array.array(self.typecode)
@@ -590,11 +601,11 @@ class BaseTest(unittest.TestCase):
                     data.reverse()
                     L[start:stop:step] = data
                     a[start:stop:step] = array.array(self.typecode, data)
-                    self.assertEquals(a, array.array(self.typecode, L))
+                    self.assertEqual(a, array.array(self.typecode, L))
 
                     del L[start:stop:step]
                     del a[start:stop:step]
-                    self.assertEquals(a, array.array(self.typecode, L))
+                    self.assertEqual(a, array.array(self.typecode, L))
 
     def test_index(self):
         example = 2*self.example

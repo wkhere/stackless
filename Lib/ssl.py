@@ -81,6 +81,7 @@ from socket import dup as _dup
 from socket import socket, AF_INET, SOCK_STREAM
 import base64        # for DER-to-PEM translation
 import traceback
+import errno
 
 class SSLSocket(socket):
 
@@ -95,30 +96,35 @@ class SSLSocket(socket):
                  family=AF_INET, type=SOCK_STREAM, proto=0, fileno=None,
                  suppress_ragged_eofs=True):
 
+        connected = False
         if sock is not None:
             socket.__init__(self,
                             family=sock.family,
                             type=sock.type,
                             proto=sock.proto,
                             fileno=_dup(sock.fileno()))
+            self.settimeout(sock.gettimeout())
+            # see if it's connected
+            try:
+                sock.getpeername()
+            except socket_error as e:
+                if e.errno != errno.ENOTCONN:
+                    raise
+            else:
+                connected = True
             sock.close()
         elif fileno is not None:
             socket.__init__(self, fileno=fileno)
         else:
             socket.__init__(self, family=family, type=type, proto=proto)
 
-        self._closed = False
-
         if certfile and not keyfile:
             keyfile = certfile
-        # see if it's connected
-        try:
-            socket.getpeername(self)
-        except socket_error:
-            # no, no connection yet
-            self._sslobj = None
-        else:
-            # yes, create the SSL object
+
+        self._closed = False
+        self._sslobj = None
+        if connected:
+            # create the SSL object
             try:
                 self._sslobj = _ssl.sslwrap(self, server_side,
                                             keyfile, certfile,
@@ -156,14 +162,14 @@ class SSLSocket(socket):
 
         self._checkClosed()
         try:
-            if buffer:
-                v = self._sslobj.read(buffer, len)
+            if buffer is not None:
+                v = self._sslobj.read(len, buffer)
             else:
                 v = self._sslobj.read(len or 1024)
             return v
         except SSLError as x:
             if x.args[0] == SSL_ERROR_EOF and self.suppress_ragged_eofs:
-                if buffer:
+                if buffer is not None:
                     return 0
                 else:
                     return b''
@@ -215,13 +221,15 @@ class SSLSocket(socket):
         else:
             return socket.send(self, data, flags)
 
-    def sendto(self, data, addr, flags=0):
+    def sendto(self, data, flags_or_addr, addr=None):
         self._checkClosed()
         if self._sslobj:
             raise ValueError("sendto not allowed on instances of %s" %
                              self.__class__)
+        elif addr is None:
+            return socket.sendto(self, data, flags_or_addr)
         else:
-            return socket.sendto(self, data, addr, flags)
+            return socket.sendto(self, data, flags_or_addr, addr)
 
     def sendall(self, data, flags=0):
         self._checkClosed()
@@ -240,16 +248,9 @@ class SSLSocket(socket):
         if self._sslobj:
             if flags != 0:
                 raise ValueError(
-                  "non-zero flags not allowed in calls to recv_into() on %s" %
-                  self.__class__)
-            while True:
-                try:
-                    return self.read(buflen)
-                except SSLError as x:
-                    if x.args[0] == SSL_ERROR_WANT_READ:
-                        continue
-                    else:
-                        raise x
+                    "non-zero flags not allowed in calls to recv() on %s" %
+                    self.__class__)
+            return self.read(buflen)
         else:
             return socket.recv(self, buflen, flags)
 
@@ -264,25 +265,17 @@ class SSLSocket(socket):
                 raise ValueError(
                   "non-zero flags not allowed in calls to recv_into() on %s" %
                   self.__class__)
-            while True:
-                try:
-                    v = self.read(nbytes, buffer)
-                    return v
-                except SSLError as x:
-                    if x.args[0] == SSL_ERROR_WANT_READ:
-                        continue
-                    else:
-                        raise x
+            return self.read(nbytes, buffer)
         else:
             return socket.recv_into(self, buffer, nbytes, flags)
 
-    def recvfrom(self, addr, buflen=1024, flags=0):
+    def recvfrom(self, buflen=1024, flags=0):
         self._checkClosed()
         if self._sslobj:
             raise ValueError("recvfrom not allowed on instances of %s" %
                              self.__class__)
         else:
-            return socket.recvfrom(self, addr, buflen, flags)
+            return socket.recvfrom(self, buflen, flags)
 
     def recvfrom_into(self, buffer, nbytes=None, flags=0):
         self._checkClosed()

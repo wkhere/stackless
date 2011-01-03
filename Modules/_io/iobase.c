@@ -183,11 +183,7 @@ iobase_close(PyObject *self, PyObject *args)
     res = PyObject_CallMethodObjArgs(self, _PyIO_str_flush, NULL);
     PyObject_SetAttrString(self, "__IOBase_closed", Py_True);
     if (res == NULL) {
-        /* If flush() fails, just give up */
-        if (PyErr_ExceptionMatches(PyExc_IOError))
-            PyErr_Clear();
-        else
-            return NULL;
+        return NULL;
     }
     Py_XDECREF(res);
     Py_RETURN_NONE;
@@ -780,9 +776,9 @@ rawiobase_read(PyObject *self, PyObject *args)
         return NULL;
 
     res = PyObject_CallMethodObjArgs(self, _PyIO_str_readinto, b, NULL);
-    if (res == NULL) {
+    if (res == NULL || res == Py_None) {
         Py_DECREF(b);
-        return NULL;
+        return res;
     }
 
     n = PyNumber_AsSsize_t(res, PyExc_ValueError);

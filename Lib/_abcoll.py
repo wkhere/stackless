@@ -18,11 +18,6 @@ __all__ = ["Hashable", "Iterable", "Iterator",
            "MappingView", "KeysView", "ItemsView", "ValuesView",
            "Sequence", "MutableSequence",
            "ByteString",
-           "bytearray_iterator", "bytes_iterator", "dict_itemiterator",
-           "dict_items", "dict_keyiterator", "dict_keys", "dict_proxy",
-           "dict_valueiterator", "dict_values", "list_iterator",
-           "list_reverseiterator", "range_iterator", "set_iterator",
-           "str_iterator", "tuple_iterator", "zip_iterator",
            ]
 
 
@@ -326,18 +321,24 @@ class MutableSet(Set):
         return self
 
     def __ixor__(self, it: Iterable):
-        if not isinstance(it, Set):
-            it = self._from_iterable(it)
-        for value in it:
-            if value in self:
-                self.discard(value)
-            else:
-                self.add(value)
+        if it is self:
+            self.clear()
+        else:
+            if not isinstance(it, Set):
+                it = self._from_iterable(it)
+            for value in it:
+                if value in self:
+                    self.discard(value)
+                else:
+                    self.add(value)
         return self
 
     def __isub__(self, it: Iterable):
-        for value in it:
-            self.discard(value)
+        if it is self:
+            self.clear()
+        else:
+            for value in it:
+                self.discard(value)
         return self
 
 MutableSet.register(set)
@@ -376,8 +377,9 @@ class Mapping(Sized, Iterable, Container):
         return ValuesView(self)
 
     def __eq__(self, other):
-        return isinstance(other, Mapping) and \
-               dict(self.items()) == dict(other.items())
+        if not isinstance(other, Mapping):
+            return NotImplemented
+        return dict(self.items()) == dict(other.items())
 
     def __ne__(self, other):
         return not (self == other)
@@ -397,6 +399,10 @@ class MappingView(Sized):
 
 class KeysView(MappingView, Set):
 
+    @classmethod
+    def _from_iterable(self, it):
+        return set(it)
+
     def __contains__(self, key):
         return key in self._mapping
 
@@ -408,6 +414,10 @@ KeysView.register(dict_keys)
 
 
 class ItemsView(MappingView, Set):
+
+    @classmethod
+    def _from_iterable(self, it):
+        return set(it)
 
     def __contains__(self, item):
         key, value = item
@@ -479,7 +489,15 @@ class MutableMapping(Mapping):
         except KeyError:
             pass
 
-    def update(self, other=(), **kwds):
+    def update(*args, **kwds):
+        if len(args) > 2:
+            raise TypeError("update() takes at most 2 positional "
+                            "arguments ({} given)".format(len(args)))
+        elif not args:
+            raise TypeError("update() takes at least 1 argument (0 given)")
+        self = args[0]
+        other = args[1] if len(args) >= 2 else ()
+
         if isinstance(other, Mapping):
             for key in other:
                 self[key] = other[key]

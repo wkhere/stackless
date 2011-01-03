@@ -74,7 +74,7 @@ shortly how it ends up being called)::
        if (!PyArg_ParseTuple(args, "s", &command))
            return NULL;
        sts = system(command);
-       return Py_BuildValue("i", sts);
+       return PyLong_FromLong(sts);
    }
 
 There is a straightforward translation from the argument list in Python (for
@@ -219,8 +219,27 @@ needed to ensure that it will not be discarded, causing :cdata:`SpamError` to
 become a dangling pointer. Should it become a dangling pointer, C code which
 raises the exception could cause a core dump or other unintended side effects.
 
-We discuss the use of PyMODINIT_FUNC as a function return type later in this
+We discuss the use of ``PyMODINIT_FUNC`` as a function return type later in this
 sample.
+
+The :exc:`spam.error` exception can be raised in your extension module using a
+call to :cfunc:`PyErr_SetString` as shown below::
+
+   static PyObject *
+   spam_system(PyObject *self, PyObject *args)
+   {
+       const char *command;
+       int sts;
+
+       if (!PyArg_ParseTuple(args, "s", &command))
+           return NULL;
+       sts = system(command);
+       if (sts < 0) {
+           PyErr_SetString(SpamError, "System command failed");
+           return NULL;
+       }
+       return PyLong_FromLong(sts);
+   }
 
 
 .. _backtoexample:
@@ -247,13 +266,10 @@ the string we just got from :cfunc:`PyArg_ParseTuple`::
 
    sts = system(command);
 
-Our :func:`spam.system` function must return the value of :cdata:`sts` as a
-Python object.  This is done using the function :cfunc:`Py_BuildValue`, which is
-something like the inverse of :cfunc:`PyArg_ParseTuple`: it takes a format
-string and an arbitrary number of C values, and returns a new Python object.
-More info on :cfunc:`Py_BuildValue` is given later. ::
+Our :func:`spam.system` function must return the value of :c:data:`sts` as a
+Python object.  This is done using the function :cfunc:`PyLong_FromLong`. ::
 
-   return Py_BuildValue("i", sts);
+   return PyLong_FromLong(sts);
 
 In this case, it will return an integer object.  (Yes, even integers are objects
 on the heap in Python!)
@@ -1174,7 +1190,7 @@ The function :cfunc:`spam_system` is modified in a trivial way::
        if (!PyArg_ParseTuple(args, "s", &command))
            return NULL;
        sts = PySpam_System(command);
-       return Py_BuildValue("i", sts);
+       return PyLong_FromLong(sts);
    }
 
 In the beginning of the module, right after the line ::

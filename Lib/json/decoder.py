@@ -263,9 +263,9 @@ class JSONDecoder(object):
     +---------------+-------------------+
     | array         | list              |
     +---------------+-------------------+
-    | string        | unicode           |
+    | string        | str               |
     +---------------+-------------------+
-    | number (int)  | int, long         |
+    | number (int)  | int               |
     +---------------+-------------------+
     | number (real) | float             |
     +---------------+-------------------+
@@ -289,6 +289,15 @@ class JSONDecoder(object):
         place of the given ``dict``.  This can be used to provide custom
         deserializations (e.g. to support JSON-RPC class hinting).
 
+        ``object_pairs_hook``, if specified will be called with the result of
+        every JSON object decoded with an ordered list of pairs.  The return
+        value of ``object_pairs_hook`` will be used instead of the ``dict``.
+        This feature can be used to implement custom decoders that rely on the
+        order that the key and value pairs are decoded (for example,
+        collections.OrderedDict will remember the order of insertion). If
+        ``object_hook`` is also defined, the ``object_pairs_hook`` takes
+        priority.
+
         ``parse_float``, if specified, will be called with the string
         of every JSON float to be decoded. By default this is equivalent to
         float(num_str). This can be used to use another datatype or parser
@@ -304,6 +313,11 @@ class JSONDecoder(object):
         This can be used to raise an exception if invalid JSON numbers
         are encountered.
 
+        If ``strict`` is false (true is the default), then control
+        characters will be allowed inside strings.  Control characters in
+        this context are those with character codes in the 0-31 range,
+        including ``'\\t'`` (tab), ``'\\n'``, ``'\\r'`` and ``'\\0'``.
+
         """
         self.object_hook = object_hook
         self.parse_float = parse_float or float
@@ -318,8 +332,8 @@ class JSONDecoder(object):
 
 
     def decode(self, s, _w=WHITESPACE.match):
-        """Return the Python representation of ``s`` (a ``str`` or ``unicode``
-        instance containing a JSON document)
+        """Return the Python representation of ``s`` (a ``str`` instance
+        containing a JSON document).
 
         """
         obj, end = self.raw_decode(s, idx=_w(s, 0).end())
@@ -329,8 +343,8 @@ class JSONDecoder(object):
         return obj
 
     def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` or ``unicode``
-        beginning with a JSON document) and return a 2-tuple of the Python
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
         representation and the index in ``s`` where the document ended.
 
         This can be used to decode a JSON document from a string that may

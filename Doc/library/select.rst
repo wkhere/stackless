@@ -42,14 +42,14 @@ The module defines the following:
 
 .. function:: kqueue()
 
-   (Only supported on BSD.)  Returns a kernel queue object object; see section
+   (Only supported on BSD.)  Returns a kernel queue object; see section
    :ref:`kqueue-objects` below for the methods supported by kqueue objects.
 
 
 .. function:: kevent(ident, filter=KQ_FILTER_READ, flags=KQ_EV_ADD, fflags=0, data=0, udata=0)
 
-   (Only supported on BSD.)  Returns a kernel event object object; see section
-   :ref:`kevent-objects` below for the methods supported by kqueue objects.
+   (Only supported on BSD.)  Returns a kernel event object; see section
+   :ref:`kevent-objects` below for the methods supported by kevent objects.
 
 
 .. function:: select(rlist, wlist, xlist[, timeout])
@@ -79,11 +79,12 @@ The module defines the following:
       single: socket() (in module socket)
       single: popen() (in module os)
 
-   Among the acceptable object types in the sequences are Python file objects (e.g.
-   ``sys.stdin``, or objects returned by :func:`open` or :func:`os.popen`), socket
-   objects returned by :func:`socket.socket`.  You may also define a :dfn:`wrapper`
-   class yourself, as long as it has an appropriate :meth:`fileno` method (that
-   really returns a file descriptor, not just a random integer).
+   Among the acceptable object types in the sequences are Python :term:`file
+   objects <file object>` (e.g. ``sys.stdin``, or objects returned by
+   :func:`open` or :func:`os.popen`), socket objects returned by
+   :func:`socket.socket`.  You may also define a :dfn:`wrapper` class yourself,
+   as long as it has an appropriate :meth:`fileno` method (that really returns
+   a file descriptor, not just a random integer).
 
    .. note::
 

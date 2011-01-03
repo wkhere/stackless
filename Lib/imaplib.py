@@ -22,7 +22,7 @@ Public functions:       Internaldate2tuple
 
 __version__ = "2.58"
 
-import binascii, random, re, socket, subprocess, sys, time
+import binascii, errno, random, re, socket, subprocess, sys, time
 
 __all__ = ["IMAP4", "IMAP4_stream", "Internaldate2tuple",
            "Int2AP", "ParseFlags", "Time2Internaldate"]
@@ -147,8 +147,6 @@ class IMAP4:
     class abort(error): pass        # Service errors - close and retry
     class readonly(abort): pass     # Mailbox status changed to READ-ONLY
 
-    mustquote = re.compile(br"[^\w!#$%&'*+,.:;<=>?^`|~-]", re.ASCII)
-
     def __init__(self, host = '', port = IMAP4_PORT):
         self.debug = Debug
         self.state = 'LOGOUT'
@@ -262,7 +260,14 @@ class IMAP4:
     def shutdown(self):
         """Close I/O established in "open"."""
         self.file.close()
-        self.sock.close()
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except socket.error as e:
+            # The server might already have closed the connection
+            if e.errno != errno.ENOTCONN:
+                raise
+        finally:
+            self.sock.close()
 
 
     def socket(self):
@@ -765,7 +770,7 @@ class IMAP4:
                               ', '.join(Commands[command])))
         name = 'UID'
         typ, dat = self._simple_command(name, command, *args)
-        if command in ('SEARCH', 'SORT'):
+        if command in ('SEARCH', 'SORT', 'THREAD'):
             name = command
         else:
             name = 'FETCH'
@@ -819,7 +824,7 @@ class IMAP4:
     def _check_bye(self):
         bye = self.untagged_responses.get('BYE')
         if bye:
-            raise self.abort(bye[-1])
+            raise self.abort(bye[-1].decode('ascii', 'replace'))
 
 
     def _command(self, name, *args):
@@ -846,7 +851,6 @@ class IMAP4:
             if arg is None: continue
             if isinstance(arg, str):
                 arg = bytes(arg, "ASCII")
-            #data = data + b' ' + self._checkquote(arg)
             data = data + b' ' + arg
 
         literal = self.literal
@@ -901,14 +905,17 @@ class IMAP4:
 
 
     def _command_complete(self, name, tag):
-        self._check_bye()
+        # BYE is expected after LOGOUT
+        if name != 'LOGOUT':
+            self._check_bye()
         try:
             typ, data = self._get_tagged_response(tag)
         except self.abort as val:
             raise self.abort('command: %s => %s' % (name, val))
         except self.error as val:
             raise self.error('command: %s => %s' % (name, val))
-        self._check_bye()
+        if name != 'LOGOUT':
+            self._check_bye()
         if typ == 'BAD':
             raise self.error('%s command error: %s %s' % (name, typ, data))
         return typ, data
@@ -1055,24 +1062,12 @@ class IMAP4:
         return tag
 
 
-    def _checkquote(self, arg):
-
-        # Must quote command args if non-alphanumeric chars present,
-        # and not already quoted.
-
-        if len(arg) >= 2 and (arg[0],arg[-1]) in (('(',')'),('"','"')):
-            return arg
-        if arg and self.mustquote.search(arg) is None:
-            return arg
-        return self._quote(arg)
-
-
     def _quote(self, arg):
 
-        arg = arg.replace(b'\\', b'\\\\')
-        arg = arg.replace(b'"', b'\\"')
+        arg = arg.replace('\\', '\\\\')
+        arg = arg.replace('"', '\\"')
 
-        return b'"' + arg + b'"'
+        return '"' + arg + '"'
 
 
     def _simple_command(self, name, *args):

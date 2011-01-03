@@ -753,7 +753,7 @@ class MinidomTest(unittest.TestCase):
     def check_clone_pi(self, deep, testName):
         doc = parseString("<?target data?><doc/>")
         pi = doc.firstChild
-        self.assertEquals(pi.nodeType, Node.PROCESSING_INSTRUCTION_NODE)
+        self.assertEqual(pi.nodeType, Node.PROCESSING_INSTRUCTION_NODE)
         clone = pi.cloneNode(deep)
         self.confirm(clone.target == pi.target
                 and clone.data == pi.data)
@@ -1223,7 +1223,7 @@ class MinidomTest(unittest.TestCase):
         doc = parseString("<doc>a</doc>")
         elem = doc.documentElement
         text = elem.childNodes[0]
-        self.assertEquals(text.nodeType, Node.TEXT_NODE)
+        self.assertEqual(text.nodeType, Node.TEXT_NODE)
 
         self.checkWholeText(text, "a")
         elem.appendChild(doc.createTextNode("b"))
@@ -1478,6 +1478,13 @@ class MinidomTest(unittest.TestCase):
         doc = create_doc_without_doctype()
         doc.appendChild(doc.createComment("foo--bar"))
         self.assertRaises(ValueError, doc.toxml)
+
+    def testEmptyXMLNSValue(self):
+        doc = parseString("<element xmlns=''>\n"
+                          "<foo/>\n</element>")
+        doc2 = parseString(doc.toxml())
+        self.confirm(doc2.namespaceURI == xml.dom.EMPTY_NAMESPACE)
+
 
 def test_main():
     run_unittest(MinidomTest)

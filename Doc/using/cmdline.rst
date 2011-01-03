@@ -58,7 +58,7 @@ source.
 
 .. cmdoption:: -c <command>
 
-   Execute the Python code in *command*.  *command* can be one ore more
+   Execute the Python code in *command*.  *command* can be one or more
    statements separated by newlines, with significant leading whitespace as in
    normal module code.
 
@@ -232,8 +232,9 @@ Miscellaneous options
 
 .. cmdoption:: -u
 
-   Force stdin, stdout and stderr to be totally unbuffered.  On systems where it
-   matters, also put stdin, stdout and stderr in binary mode.
+   Force the binary layer of the stdin, stdout and stderr streams (which is
+   available as their ``buffer`` attribute) to be unbuffered.  The text I/O
+   layer will still be line-buffered.
 
    See also :envvar:`PYTHONUNBUFFERED`.
 

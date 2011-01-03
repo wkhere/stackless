@@ -344,7 +344,7 @@ All of this makes generator functions quite similar to coroutines; they yield
 multiple times, they have more than one entry point and their execution can be
 suspended.  The only difference is that a generator function cannot control
 where should the execution continue after it yields; the control is always
-transfered to the generator's caller.
+transferred to the generator's caller.
 
 The :keyword:`yield` statement is allowed in the :keyword:`try` clause of a
 :keyword:`try` ...  :keyword:`finally` construct.  If the generator is not
@@ -518,11 +518,18 @@ whose value is one of the keys of the mapping, and the subscription selects the
 value in the mapping that corresponds to that key.  (The expression list is a
 tuple except if it has exactly one item.)
 
-If the primary is a sequence, the expression (list) must evaluate to an integer.
-If this value is negative, the length of the sequence is added to it (so that,
-e.g., ``x[-1]`` selects the last item of ``x``.)  The resulting value must be a
-nonnegative integer less than the number of items in the sequence, and the
-subscription selects the item whose index is that value (counting from zero).
+If the primary is a sequence, the expression (list) must evaluate to an integer
+or a slice (as discussed in the following section).
+
+The formal syntax makes no special provision for negative indices in
+sequences; however, built-in sequences all provide a :meth:`__getitem__`
+method that interprets negative indices by adding the length of the sequence
+to the index (so that ``x[-1]`` selects the last item of ``x``).  The
+resulting value must be a nonnegative integer less than the number of items in
+the sequence, and the subscription selects the item whose index is that value
+(counting from zero). Since the support for negative indices and slicing
+occurs in the object's :meth:`__getitem__` method, subclasses overriding
+this method will need to explicitly add that support.
 
 .. index::
    single: character
@@ -1026,9 +1033,9 @@ Comparison of objects of the same type depends on the type:
   ``x <= y``.  If the corresponding element does not exist, the shorter
   sequence is ordered first (for example, ``[1,2] < [1,2,3]``).
 
-* Mappings (dictionaries) compare equal if and only if their sorted ``(key,
-  value)`` lists compare equal. [#]_ Outcomes other than equality are resolved
-  consistently, but are not otherwise defined. [#]_
+* Mappings (dictionaries) compare equal if and only if they have the same
+  ``(key, value)`` pairs. Order comparisons ``('<', '<=', '>=', '>')``
+  raise :exc:`TypeError`.
 
 * Sets and frozensets define comparison operators to mean subset and superset
   tests.  Those relations do not define total orderings (the two sets ``{1,2}``
@@ -1051,7 +1058,7 @@ and therefore not exactly equal to ``Decimal('1.1')`` which is.  When
 cross-type comparison is not supported, the comparison method returns
 ``NotImplemented``.  This can create the illusion of non-transitivity between
 supported cross-type comparisons and unsupported comparisons.  For example,
-``Decimal(2) == 2`` and `2 == float(2)`` but ``Decimal(2) != float(2)``.
+``Decimal(2) == 2`` and ``2 == float(2)`` but ``Decimal(2) != float(2)``.
 
 .. _membership-test-details:
 
@@ -1061,7 +1068,7 @@ in s`` returns the negation of ``x in s``.  All built-in sequences and set types
 support this as well as dictionary, for which :keyword:`in` tests whether a the
 dictionary has a given key. For container types such as list, tuple, set,
 frozenset, dict, or collections.deque, the expression ``x in y`` is equivalent
-to ``any(x is e or x == e for val e in y)``.
+to ``any(x is e or x == e for e in y)``.
 
 For the string and bytes types, ``x in y`` is true if and only if *x* is a
 substring of *y*.  An equivalent test is ``y.find(x) != -1``.  Empty strings are
@@ -1113,12 +1120,7 @@ Boolean operations
    pair: Conditional; expression
    pair: Boolean; operation
 
-Boolean operations have the lowest priority of all Python operations:
-
 .. productionlist::
-   expression: `conditional_expression` | `lambda_form`
-   expression_nocond: `or_test` | `lambda_form_nocond`
-   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
    or_test: `and_test` | `or_test` "or" `and_test`
    and_test: `not_test` | `and_test` "and" `not_test`
    not_test: `comparison` | "not" `not_test`
@@ -1134,10 +1136,6 @@ truth value by providing a :meth:`__bool__` method.
 
 The operator :keyword:`not` yields ``True`` if its argument is false, ``False``
 otherwise.
-
-The expression ``x if C else y`` first evaluates *C* (*not* *x*); if *C* is
-true, *x* is evaluated and its value is returned; otherwise, *y* is evaluated
-and its value is returned.
 
 .. index:: operator: and
 
@@ -1156,6 +1154,30 @@ replaced by a default value if it is empty, the expression ``s or 'foo'`` yields
 the desired value.  Because :keyword:`not` has to invent a value anyway, it does
 not bother to return a value of the same type as its argument, so e.g., ``not
 'foo'`` yields ``False``, not ``''``.)
+
+
+Conditional Expressions
+=======================
+
+.. versionadded:: 2.5
+
+.. index::
+   pair: conditional; expression
+   pair: ternary; operator
+
+.. productionlist::
+   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
+   expression: `conditional_expression` | `lambda_form`
+   expression_nocond: `or_test` | `lambda_form_nocond`
+
+Conditional expressions (sometimes called a "ternary operator") have the lowest
+priority of all Python operations.
+
+The expression ``x if C else y`` first evaluates the condition, *C* (*not* *x*);
+if *C* is true, *x* is evaluated and its value is returned; otherwise, *y* is
+evaluated and its value is returned.
+
+See :pep:`308` for more details about conditional expressions.
 
 
 .. _lambdas:
@@ -1252,6 +1274,8 @@ groups from right to left).
 +===============================================+=====================================+
 | :keyword:`lambda`                             | Lambda expression                   |
 +-----------------------------------------------+-------------------------------------+
+| :keyword:`if` -- :keyword:`else`              | Conditional expression              |
++-----------------------------------------------+-------------------------------------+
 | :keyword:`or`                                 | Boolean OR                          |
 +-----------------------------------------------+-------------------------------------+
 | :keyword:`and`                                | Boolean AND                         |
@@ -1273,6 +1297,7 @@ groups from right to left).
 | ``+``, ``-``                                  | Addition and subtraction            |
 +-----------------------------------------------+-------------------------------------+
 | ``*``, ``/``, ``//``, ``%``                   | Multiplication, division, remainder |
+|                                               | [#]_                                |
 +-----------------------------------------------+-------------------------------------+
 | ``+x``, ``-x``, ``~x``                        | Positive, negative, bitwise NOT     |
 +-----------------------------------------------+-------------------------------------+
@@ -1310,19 +1335,12 @@ groups from right to left).
    strings in a human recognizable way, compare using
    :func:`unicodedata.normalize`.
 
-.. [#] The implementation computes this efficiently, without constructing lists
-   or sorting.
-
-.. [#] Earlier versions of Python used lexicographic comparison of the sorted (key,
-   value) lists, but this was very expensive for the common case of comparing
-   for equality.  An even earlier version of Python compared dictionaries by
-   identity only, but this caused surprises because people expected to be able
-   to test a dictionary for emptiness by comparing it to ``{}``.
-
 .. [#] Due to automatic garbage-collection, free lists, and the dynamic nature of
    descriptors, you may notice seemingly unusual behaviour in certain uses of
    the :keyword:`is` operator, like those involving comparisons between instance
    methods, or constants.  Check their documentation for more info.
+
+.. [#] The ``%`` is also used for string formatting; the same precedence applies.
 
 .. [#] The power operator ``**`` binds less tightly than an arithmetic or
    bitwise unary operator on its right, that is, ``2**-1`` is ``0.5``.

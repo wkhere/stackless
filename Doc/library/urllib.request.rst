@@ -11,6 +11,7 @@ The :mod:`urllib.request` module defines functions and classes which help in
 opening URLs (mostly HTTP) in a complex world --- basic and digest
 authentication, redirections, cookies and more.
 
+
 The :mod:`urllib.request` module defines the following functions:
 
 
@@ -18,6 +19,9 @@ The :mod:`urllib.request` module defines the following functions:
 
    Open the URL *url*, which can be either a string or a
    :class:`Request` object.
+
+   .. warning::
+      HTTPS requests do not do any verification of the server's certificate.
 
    *data* may be a string specifying additional data to send to the
    server, or ``None`` if no such data is needed.  Currently HTTP
@@ -31,7 +35,7 @@ The :mod:`urllib.request` module defines the following functions:
    The optional *timeout* parameter specifies a timeout in seconds for
    blocking operations like the connection attempt (if not specified,
    the global default timeout setting will be used).  This actually
-   only works for HTTP, HTTPS, FTP and FTPS connections.
+   only works for HTTP, HTTPS and FTP connections.
 
    This function returns a file-like object with two additional methods from
    the :mod:`urllib.response` module
@@ -40,8 +44,8 @@ The :mod:`urllib.request` module defines the following functions:
      commonly used to determine if a redirect was followed
 
    * :meth:`info` --- return the meta-information of the page, such as headers,
-     in the form of an :class:`http.client.HTTPMessage` instance (see `Quick
-     Reference to HTTP Headers <http://www.cs.tut.fi/~jkorpela/http.html>`_)
+     in the form of an :func:`email.message_from_string` instance (see
+     `Quick Reference to HTTP Headers <http://www.cs.tut.fi/~jkorpela/http.html>`_)
 
    Raises :exc:`URLError` on errors.
 
@@ -126,26 +130,6 @@ The :mod:`urllib.request` module defines the following functions:
    of the data it has downloaded, and just returns it.  In this case you just have
    to assume that the download was successful.
 
-
-.. data:: _urlopener
-
-   The public functions :func:`urlopen` and :func:`urlretrieve` create an instance
-   of the :class:`FancyURLopener` class and use it to perform their requested
-   actions.  To override this functionality, programmers can create a subclass of
-   :class:`URLopener` or :class:`FancyURLopener`, then assign an instance of that
-   class to the ``urllib._urlopener`` variable before calling the desired function.
-   For example, applications may want to specify a different
-   :mailheader:`User-Agent` header than :class:`URLopener` defines.  This can be
-   accomplished with the following code::
-
-      import urllib.request
-
-      class AppURLopener(urllib.request.FancyURLopener):
-          version = "App/1.7"
-
-      urllib._urlopener = AppURLopener()
-
-
 .. function:: urlcleanup()
 
    Clear the cache that may have been built up by previous calls to
@@ -160,7 +144,7 @@ The :mod:`urllib.request` module defines the following functions:
 
 .. function:: url2pathname(path)
 
-   Convert the path component *path* from an encoded URL to the local syntax for a
+   Convert the path component *path* from a percent-encoded URL to the local syntax for a
    path.  This does not accept a complete URL.  This function uses :func:`unquote`
    to decode *path*.
 
@@ -624,8 +608,8 @@ OpenerDirector Objects
    method on the currently installed global :class:`OpenerDirector`).  The
    optional *timeout* parameter specifies a timeout in seconds for blocking
    operations like the connection attempt (if not specified, the global default
-   timeout setting will be usedi). The timeout feature actually works only for
-   HTTP, HTTPS, FTP and FTPS connections).
+   timeout setting will be used). The timeout feature actually works only for
+   HTTP, HTTPS and FTP connections).
 
 
 .. method:: OpenerDirector.error(proto, *args)
@@ -658,7 +642,8 @@ sorting the handler instances.
    :meth:`unknown_open`.
 
    Note that the implementation of these methods may involve calls of the parent
-   :class:`OpenerDirector` instance's :meth:`.open` and :meth:`.error` methods.
+   :class:`OpenerDirector` instance's :meth:`~OpenerDirector.open` and
+   :meth:`~OpenerDirector.error` methods.
 
 #. Every handler with a method named like :meth:`protocol_response` has that
    method called to post-process the response.
@@ -1072,24 +1057,47 @@ HTTPErrorProcessor Objects
 Examples
 --------
 
-This example gets the python.org main page and displays the first 100 bytes of
-it::
+This example gets the python.org main page and displays the first 300 bytes of
+it. ::
 
    >>> import urllib.request
    >>> f = urllib.request.urlopen('http://www.python.org/')
-   >>> print(f.read(100))
-   <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-   <?xml-stylesheet href="./css/ht2html
+   >>> print(f.read(300))
+   b'<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">\n\n\n<html
+   xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n\n<head>\n
+   <meta http-equiv="content-type" content="text/html; charset=utf-8" />\n
+   <title>Python Programming '
 
-Here we are sending a data-stream to the stdin of a CGI and reading the data it
-returns to us. Note that this example will only work when the Python
-installation supports SSL. ::
+Note that urlopen returns a bytes object.  This is because there is no way
+for urlopen to automatically determine the encoding of the byte stream
+it receives from the http server. In general, a program will decode
+the returned bytes object to string once it determines or guesses
+the appropriate encoding.
+
+The following W3C document, http://www.w3.org/International/O-charset  , lists
+the various ways in which a (X)HTML or a XML document could have specified its
+encoding information.
+
+As python.org website uses *utf-8* encoding as specified in it's meta tag, we
+will use same for decoding the bytes object. ::
+
+   >>> import urllib.request
+   >>> f = urllib.request.urlopen('http://www.python.org/')
+   >>> print(f.read(100).decode('utf-8'))
+   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtm
+
+
+In the following example, we are sending a data-stream to the stdin of a CGI
+and reading the data it returns to us. Note that this example will only work
+when the Python installation supports SSL. ::
 
    >>> import urllib.request
    >>> req = urllib.request.Request(url='https://localhost/cgi-bin/test.cgi',
    ...                       data='This data is passed to stdin of the CGI')
    >>> f = urllib.request.urlopen(req)
-   >>> print(f.read())
+   >>> print(f.read().decode('utf-8'))
    Got Data: "This data is passed to stdin of the CGI"
 
 The code for the sample CGI used in the above example is::
@@ -1161,7 +1169,7 @@ containing parameters::
    >>> import urllib.parse
    >>> params = urllib.parse.urlencode({'spam': 1, 'eggs': 2, 'bacon': 0})
    >>> f = urllib.request.urlopen("http://www.musi-cal.com/cgi-bin/query?%s" % params)
-   >>> print(f.read())
+   >>> print(f.read().decode('utf-8'))
 
 The following example uses the ``POST`` method instead::
 
@@ -1169,7 +1177,7 @@ The following example uses the ``POST`` method instead::
    >>> import urllib.parse
    >>> params = urllib.parse.urlencode({'spam': 1, 'eggs': 2, 'bacon': 0})
    >>> f = urllib.request.urlopen("http://www.musi-cal.com/cgi-bin/query", params)
-   >>> print(f.read())
+   >>> print(f.read().decode('utf-8'))
 
 The following example uses an explicitly specified HTTP proxy, overriding
 environment settings::
@@ -1178,14 +1186,14 @@ environment settings::
    >>> proxies = {'http': 'http://proxy.example.com:8080/'}
    >>> opener = urllib.request.FancyURLopener(proxies)
    >>> f = opener.open("http://www.python.org")
-   >>> f.read()
+   >>> f.read().decode('utf-8')
 
 The following example uses no proxies at all, overriding environment settings::
 
    >>> import urllib.request
    >>> opener = urllib.request.FancyURLopener({})
    >>> f = opener.open("http://www.python.org/")
-   >>> f.read()
+   >>> f.read().decode('utf-8')
 
 
 :mod:`urllib.request` Restrictions
@@ -1249,7 +1257,7 @@ The following example uses no proxies at all, overriding environment settings::
 
 The :mod:`urllib.response` module defines functions and classes which define a
 minimal file like interface, including ``read()`` and ``readline()``. The
-typical response object is an addinfourl instance, which defines and ``info()``
+typical response object is an addinfourl instance, which defines an ``info()``
 method and that returns headers and a ``geturl()`` method that returns the url.
 Functions defined by this module are used internally by the
 :mod:`urllib.request` module.

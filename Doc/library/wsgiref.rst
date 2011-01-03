@@ -187,9 +187,7 @@ manipulation of WSGI response headers using a mapping-like interface.
 .. class:: Headers(headers)
 
    Create a mapping-like object wrapping *headers*, which must be a list of header
-   name/value tuples as described in :pep:`333`.  Any changes made to the new
-   :class:`Headers` object will directly update the *headers* list it was created
-   with.
+   name/value tuples as described in :pep:`333`.
 
    :class:`Headers` objects support typical mapping operations including
    :meth:`__getitem__`, :meth:`get`, :meth:`__setitem__`, :meth:`setdefault`,
@@ -710,7 +708,7 @@ This is a working "Hello World" WSGI application::
    # use a function (note that you're not limited to a function, you can
    # use a class for example). The first argument passed to the function
    # is a dictionary containing CGI-style envrironment variables and the
-   # second variable is the callable object (see PEP333)
+   # second variable is the callable object (see PEP 333).
    def hello_world_app(environ, start_response):
        status = b'200 OK' # HTTP Status
        headers = [(b'Content-type', b'text/plain; charset=utf-8')] # HTTP Headers

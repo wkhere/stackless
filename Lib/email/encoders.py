@@ -29,7 +29,7 @@ def encode_base64(msg):
     Also, add an appropriate Content-Transfer-Encoding header.
     """
     orig = msg.get_payload()
-    encdata = _bencode(orig)
+    encdata = str(_bencode(orig), 'ascii')
     msg.set_payload(encdata)
     msg['Content-Transfer-Encoding'] = 'base64'
 
@@ -62,7 +62,7 @@ def encode_7or8bit(msg):
         # iso-2022-* is non-ASCII but still 7-bit
         charset = msg.get_charset()
         output_cset = charset and charset.output_charset
-        if output_cset and output_cset.lower().startswith('iso-2202-'):
+        if output_cset and output_cset.lower().startswith('iso-2022-'):
             msg['Content-Transfer-Encoding'] = '7bit'
         else:
             msg['Content-Transfer-Encoding'] = '8bit'

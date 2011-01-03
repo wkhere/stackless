@@ -14,6 +14,10 @@ The first three of these functions described, :cfunc:`PyArg_ParseTuple`,
 strings* which are used to tell the function about the expected arguments.  The
 format strings use the same syntax for each of these functions.
 
+-----------------
+Parsing arguments
+-----------------
+
 A format string consists of zero or more "format units."  A format unit
 describes one Python object; it is usually a single character or a parenthesized
 sequence of format units.  With a few exceptions, a format unit that is not a
@@ -23,97 +27,157 @@ unit; the entry in (round) parentheses is the Python object type that matches
 the format unit; and the entry in [square] brackets is the type of the C
 variable(s) whose address should be passed.
 
-``s`` (string or Unicode object) [const char \*]
-   Convert a Python string or Unicode object to a C pointer to a character string.
-   You must not provide storage for the string itself; a pointer to an existing
-   string is stored into the character pointer variable whose address you pass.
-   The C string is NUL-terminated.  The Python string must not contain embedded NUL
-   bytes; if it does, a :exc:`TypeError` exception is raised. Unicode objects are
-   converted to C strings using the default encoding.  If this conversion fails, a
+Strings and buffers
+-------------------
+
+These formats do not expect you to provide raw storage for the returned string
+or bytes.  Also, you won't have to release any memory yourself, except with
+the ``es``, ``es#``, ``et`` and ``et#`` formats.
+
+However, when a :ctype:`Py_buffer` structure gets filled, the underlying
+buffer is locked so that the caller can subsequently use the buffer even
+inside a :ctype:`Py_BEGIN_ALLOW_THREADS` block without the risk of mutable data
+being resized or destroyed.  As a result, **you have to call**
+:cfunc:`PyBuffer_Release` after you have finished processing the data (or
+in any early abort case).
+
+Unless otherwise stated, buffers are not NUL-terminated.
+
+.. note::
+   For all ``#`` variants of formats (``s#``, ``y#``, etc.), the type of
+   the length argument (int or :ctype:`Py_ssize_t`) is controlled by
+   defining the macro :cmacro:`PY_SSIZE_T_CLEAN` before including
+   :file:`Python.h`.  If the macro was defined, length is a
+   :ctype:`Py_ssize_t` rather than an :ctype:`int`. This behavior will change
+   in a future Python version to only support :ctype:`Py_ssize_t` and
+   drop :ctype:`int` support. It is best to always define :cmacro:`PY_SSIZE_T_CLEAN`.
+
+
+``s`` (:class:`str`) [const char \*]
+   Convert a Unicode object to a C pointer to a character string.
+   A pointer to an existing string is stored in the character pointer
+   variable whose address you pass.  The C string is NUL-terminated.
+   The Python string must not contain embedded NUL bytes; if it does,
+   a :exc:`TypeError` exception is raised. Unicode objects are converted
+   to C strings using ``'utf-8'`` encoding. If this conversion fails, a
    :exc:`UnicodeError` is raised.
 
-   Starting with Python 2.5 the type of the length argument can be
-   controlled by defining the macro :cmacro:`PY_SSIZE_T_CLEAN` before
-   including :file:`Python.h`.  If the macro is defined, length is a
-   :ctype:`Py_ssize_t` rather than an int.
+   .. note::
+      This format does not accept bytes-like objects.  If you want to accept
+      filesystem paths and convert them to C character strings, it is
+      preferable to use the ``O&`` format with :cfunc:`PyUnicode_FSConverter`
+      as *converter*.
 
-``s*`` (string, Unicode, or any buffer compatible object) [Py_buffer]
-   This is similar to ``s``, but the code fills a :ctype:`Py_buffer` structure
-   provided by the caller.  In this case the Python string may contain embedded
-   null bytes.  Unicode objects pass back a pointer to the default encoded
-   string version of the object if such a conversion is possible.  The
-   underlying buffer is locked, so that the caller can subsequently use the
-   buffer even inside a ``Py_BEGIN_ALLOW_THREADS`` block.  **The caller is
-   responsible** for calling ``PyBuffer_Release`` with the structure after it
-   has processed the data.
+``s*`` (:class:`str`, :class:`bytes`, :class:`bytearray` or buffer compatible object) [Py_buffer]
+   This format accepts Unicode objects as well as objects supporting the
+   buffer protocol.
+   It fills a :ctype:`Py_buffer` structure provided by the caller.
+   In this case the resulting C string may contain embedded NUL bytes.
+   Unicode objects are converted to C strings using ``'utf-8'`` encoding.
 
-``s#`` (string, Unicode or any read buffer compatible object) [const char \*, int or :ctype:`Py_ssize_t`]
-   This variant on ``s`` stores into two C variables, the first one a pointer to
-   a character string, the second one its length.  In this case the Python
-   string may contain embedded null bytes.  Unicode objects pass back a pointer
-   to the default encoded string version of the object if such a conversion is
-   possible.  All other read-buffer compatible objects pass back a reference to
-   the raw internal data representation.  Since this format doesn't allow
-   writable buffer compatible objects like byte arrays, ``s*`` is to be
-   preferred.
+``s#`` (:class:`str`, :class:`bytes` or read-only buffer compatible object) [const char \*, int or :ctype:`Py_ssize_t`]
+   Like ``s*``, except that it doesn't accept mutable buffer-like objects
+   such as :class:`bytearray`.  The result is stored into two C variables,
+   the first one a pointer to a C string, the second one its length.
+   The string may contain embedded null bytes. Unicode objects are converted
+   to C strings using ``'utf-8'`` encoding.
 
-   The type of the length argument (int or :ctype:`Py_ssize_t`) is controlled by
-   defining the macro :cmacro:`PY_SSIZE_T_CLEAN` before including
-   :file:`Python.h`.  If the macro was defined, length is a :ctype:`Py_ssize_t`
-   rather than an int.  This behavior will change in a future Python version to
-   only support :ctype:`Py_ssize_t` and drop int support.  It is best to always
-   define :cmacro:`PY_SSIZE_T_CLEAN`.
-
-``y`` (bytes object) [const char \*]
-   This variant on ``s`` converts a Python bytes or bytearray object to a C
-   pointer to a character string.  The bytes object must not contain embedded
-   NUL bytes; if it does, a :exc:`TypeError` exception is raised.
-
-``y*`` (bytes object) [Py_buffer \*]
-   This is to ``s*`` as ``y`` is to ``s``.
-
-``y#`` (bytes object) [const char \*, int]
-   This variant on ``s#`` stores into two C variables, the first one a pointer
-   to a character string, the second one its length.  This only accepts bytes
-   objects, no byte arrays.
-
-``z`` (string or ``None``) [const char \*]
+``z`` (:class:`str` or ``None``) [const char \*]
    Like ``s``, but the Python object may also be ``None``, in which case the C
    pointer is set to *NULL*.
 
-``z*`` (string or ``None`` or any buffer compatible object) [Py_buffer]
-   This is to ``s*`` as ``z`` is to ``s``.
+``z*`` (:class:`str`, :class:`bytes`, :class:`bytearray`, buffer compatible object or ``None``) [Py_buffer]
+   Like ``s*``, but the Python object may also be ``None``, in which case the
+   ``buf`` member of the :ctype:`Py_buffer` structure is set to *NULL*.
 
-``z#`` (string or ``None`` or any read buffer compatible object) [const char \*, int]
-   This is to ``s#`` as ``z`` is to ``s``.
+``z#`` (:class:`str`, :class:`bytes`, read-only buffer compatible object or ``None``) [const char \*, int]
+   Like ``s#``, but the Python object may also be ``None``, in which case the C
+   pointer is set to *NULL*.
 
-``u`` (Unicode object) [Py_UNICODE \*]
+``y`` (:class:`bytes`) [const char \*]
+   This format converts a bytes-like object to a C pointer to a character
+   string; it does not accept Unicode objects.  The bytes buffer must not
+   contain embedded NUL bytes; if it does, a :exc:`TypeError`
+   exception is raised.
+
+``y*`` (:class:`bytes`, :class:`bytearray` or buffer compatible object) [Py_buffer]
+   This variant on ``s*`` doesn't accept Unicode objects, only objects
+   supporting the buffer protocol.  **This is the recommended way to accept
+   binary data.**
+
+``y#`` (:class:`bytes`) [const char \*, int]
+   This variant on ``s#`` doesn't accept Unicode objects, only bytes-like
+   objects.
+
+``S`` (:class:`bytes`) [PyBytesObject \*]
+   Requires that the Python object is a :class:`bytes` object, without
+   attempting any conversion.  Raises :exc:`TypeError` if the object is not
+   a bytes object.  The C variable may also be declared as :ctype:`PyObject\*`.
+
+``Y`` (:class:`bytearray`) [PyByteArrayObject \*]
+   Requires that the Python object is a :class:`bytearray` object, without
+   attempting any conversion.  Raises :exc:`TypeError` if the object is not
+   a :class:`bytearray` object. The C variable may also be declared as :ctype:`PyObject\*`.
+
+``u`` (:class:`str`) [Py_UNICODE \*]
    Convert a Python Unicode object to a C pointer to a NUL-terminated buffer of
-   16-bit Unicode (UTF-16) data.  As with ``s``, there is no need to provide
-   storage for the Unicode data buffer; a pointer to the existing Unicode data is
-   stored into the :ctype:`Py_UNICODE` pointer variable whose address you pass.
+   Unicode characters.  You must pass the address of a :ctype:`Py_UNICODE`
+   pointer variable, which will be filled with the pointer to an existing
+   Unicode buffer.  Please note that the width of a :ctype:`Py_UNICODE`
+   character depends on compilation options (it is either 16 or 32 bits).
 
-``u#`` (Unicode object) [Py_UNICODE \*, int]
+   .. note::
+      Since ``u`` doesn't give you back the length of the string, and it
+      may contain embedded NUL characters, it is recommended to use ``u#``
+      or ``U`` instead.
+
+``u#`` (:class:`str`) [Py_UNICODE \*, int]
    This variant on ``u`` stores into two C variables, the first one a pointer to a
-   Unicode data buffer, the second one its length. Non-Unicode objects are handled
-   by interpreting their read-buffer pointer as pointer to a :ctype:`Py_UNICODE`
-   array.
+   Unicode data buffer, the second one its length.
 
-``Z`` (Unicode or ``None``) [Py_UNICODE \*]
-   Like ``s``, but the Python object may also be ``None``, in which case the C
-   pointer is set to *NULL*.
+``Z`` (:class:`str` or ``None``) [Py_UNICODE \*]
+   Like ``u``, but the Python object may also be ``None``, in which case the
+   :ctype:`Py_UNICODE` pointer is set to *NULL*.
 
-``Z#`` (Unicode or ``None``) [Py_UNICODE \*, int]
-   This is to ``u#`` as ``Z`` is to ``u``.
+``Z#`` (:class:`str` or ``None``) [Py_UNICODE \*, int]
+   Like ``u#``, but the Python object may also be ``None``, in which case the
+   :ctype:`Py_UNICODE` pointer is set to *NULL*.
 
-``es`` (string, Unicode object or character buffer compatible object) [const char \*encoding, char \*\*buffer]
-   This variant on ``s`` is used for encoding Unicode and objects convertible to
-   Unicode into a character buffer. It only works for encoded data without embedded
-   NUL bytes.
+``U`` (:class:`str`) [PyUnicodeObject \*]
+   Requires that the Python object is a Unicode object, without attempting
+   any conversion.  Raises :exc:`TypeError` if the object is not a Unicode
+   object.  The C variable may also be declared as :ctype:`PyObject\*`.
+
+``t#`` (:class:`bytes`, :class:`bytearray` or read-only character buffer) [char \*, int]
+   Like ``s#``, but accepts any object which implements the read-only buffer
+   interface.  The :ctype:`char\*` variable is set to point to the first byte of
+   the buffer, and the :ctype:`int` is set to the length of the buffer.  Only
+   single-segment buffer objects are accepted; :exc:`TypeError` is raised for all
+   others.
+
+``w`` (:class:`bytearray` or read-write character buffer) [char \*]
+   Similar to ``y``, but accepts any object which implements the read-write buffer
+   interface.  The caller must determine the length of the buffer by other means,
+   or use ``w#`` instead.  Only single-segment buffer objects are accepted;
+   :exc:`TypeError` is raised for all others.
+
+``w*`` (:class:`bytearray` or read-write byte-oriented buffer) [Py_buffer]
+   This is to ``w`` what ``y*`` is to ``y``.
+
+``w#`` (:class:`bytearray` or read-write character buffer) [char \*, int]
+   Like ``y#``, but accepts any object which implements the read-write buffer
+   interface.  The :ctype:`char \*` variable is set to point to the first byte
+   of the buffer, and the :ctype:`int` is set to the length of the buffer.
+   Only single-segment buffer objects are accepted; :exc:`TypeError` is raised
+   for all others.
+
+``es`` (:class:`str`) [const char \*encoding, char \*\*buffer]
+   This variant on ``s`` is used for encoding Unicode into a character buffer.
+   It only works for encoded data without embedded NUL bytes.
 
    This format requires two arguments.  The first is only used as input, and
    must be a :ctype:`const char\*` which points to the name of an encoding as a
-   NUL-terminated string, or *NULL*, in which case the default encoding is used.
+   NUL-terminated string, or *NULL*, in which case ``'utf-8'`` encoding is used.
    An exception is raised if the named encoding is not known to Python.  The
    second argument must be a :ctype:`char\*\*`; the value of the pointer it
    references will be set to a buffer with the contents of the argument text.
@@ -124,19 +188,19 @@ variable(s) whose address should be passed.
    allocated storage.  The caller is responsible for calling :cfunc:`PyMem_Free` to
    free the allocated buffer after use.
 
-``et`` (string, Unicode object or character buffer compatible object) [const char \*encoding, char \*\*buffer]
-   Same as ``es`` except that 8-bit string objects are passed through without
-   recoding them.  Instead, the implementation assumes that the string object uses
+``et`` (:class:`str`, :class:`bytes` or :class:`bytearray`) [const char \*encoding, char \*\*buffer]
+   Same as ``es`` except that byte string objects are passed through without
+   recoding them.  Instead, the implementation assumes that the byte string object uses
    the encoding passed in as parameter.
 
-``es#`` (string, Unicode object or character buffer compatible object) [const char \*encoding, char \*\*buffer, int \*buffer_length]
-   This variant on ``s#`` is used for encoding Unicode and objects convertible to
-   Unicode into a character buffer.  Unlike the ``es`` format, this variant allows
-   input data which contains NUL characters.
+``es#`` (:class:`str`) [const char \*encoding, char \*\*buffer, int \*buffer_length]
+   This variant on ``s#`` is used for encoding Unicode into a character buffer.
+   Unlike the ``es`` format, this variant allows input data which contains NUL
+   characters.
 
    It requires three arguments.  The first is only used as input, and must be a
    :ctype:`const char\*` which points to the name of an encoding as a
-   NUL-terminated string, or *NULL*, in which case the default encoding is used.
+   NUL-terminated string, or *NULL*, in which case ``'utf-8'`` encoding is used.
    An exception is raised if the named encoding is not known to Python.  The
    second argument must be a :ctype:`char\*\*`; the value of the pointer it
    references will be set to a buffer with the contents of the argument text.
@@ -160,69 +224,75 @@ variable(s) whose address should be passed.
    In both cases, *\*buffer_length* is set to the length of the encoded data
    without the trailing NUL byte.
 
-``et#`` (string, Unicode object or character buffer compatible object) [const char \*encoding, char \*\*buffer, int \*buffer_length]
-   Same as ``es#`` except that string objects are passed through without recoding
-   them. Instead, the implementation assumes that the string object uses the
+``et#`` (:class:`str`, :class:`bytes` or :class:`bytearray`) [const char \*encoding, char \*\*buffer, int \*buffer_length]
+   Same as ``es#`` except that byte string objects are passed through without recoding
+   them. Instead, the implementation assumes that the byte string object uses the
    encoding passed in as parameter.
 
-``b`` (integer) [unsigned char]
+Numbers
+-------
+
+``b`` (:class:`int`) [unsigned char]
    Convert a nonnegative Python integer to an unsigned tiny int, stored in a C
    :ctype:`unsigned char`.
 
-``B`` (integer) [unsigned char]
+``B`` (:class:`int`) [unsigned char]
    Convert a Python integer to a tiny int without overflow checking, stored in a C
    :ctype:`unsigned char`.
 
-``h`` (integer) [short int]
+``h`` (:class:`int`) [short int]
    Convert a Python integer to a C :ctype:`short int`.
 
-``H`` (integer) [unsigned short int]
+``H`` (:class:`int`) [unsigned short int]
    Convert a Python integer to a C :ctype:`unsigned short int`, without overflow
    checking.
 
-``i`` (integer) [int]
+``i`` (:class:`int`) [int]
    Convert a Python integer to a plain C :ctype:`int`.
 
-``I`` (integer) [unsigned int]
+``I`` (:class:`int`) [unsigned int]
    Convert a Python integer to a C :ctype:`unsigned int`, without overflow
    checking.
 
-``l`` (integer) [long int]
+``l`` (:class:`int`) [long int]
    Convert a Python integer to a C :ctype:`long int`.
 
-``k`` (integer) [unsigned long]
+``k`` (:class:`int`) [unsigned long]
    Convert a Python integer to a C :ctype:`unsigned long` without
    overflow checking.
 
-``L`` (integer) [PY_LONG_LONG]
+``L`` (:class:`int`) [PY_LONG_LONG]
    Convert a Python integer to a C :ctype:`long long`.  This format is only
    available on platforms that support :ctype:`long long` (or :ctype:`_int64` on
    Windows).
 
-``K`` (integer) [unsigned PY_LONG_LONG]
+``K`` (:class:`int`) [unsigned PY_LONG_LONG]
    Convert a Python integer to a C :ctype:`unsigned long long`
    without overflow checking.  This format is only available on platforms that
    support :ctype:`unsigned long long` (or :ctype:`unsigned _int64` on Windows).
 
-``n`` (integer) [Py_ssize_t]
+``n`` (:class:`int`) [Py_ssize_t]
    Convert a Python integer to a C :ctype:`Py_ssize_t`.
 
-``c`` (string of length 1) [char]
-   Convert a Python character, represented as a byte string of length 1, to a C
-   :ctype:`char`.
+``c`` (:class:`bytes` of length 1) [char]
+   Convert a Python byte, represented as a :class:`bytes` object of length 1,
+   to a C :ctype:`char`.
 
-``C`` (string of length 1) [int]
-   Convert a Python character, represented as a unicode string of length 1, to a
-   C :ctype:`int`.
+``C`` (:class:`str` of length 1) [int]
+   Convert a Python character, represented as a :class:`str` object of
+   length 1, to a C :ctype:`int`.
 
-``f`` (float) [float]
+``f`` (:class:`float`) [float]
    Convert a Python floating point number to a C :ctype:`float`.
 
-``d`` (float) [double]
+``d`` (:class:`float`) [double]
    Convert a Python floating point number to a C :ctype:`double`.
 
-``D`` (complex) [Py_complex]
+``D`` (:class:`complex`) [Py_complex]
    Convert a Python complex number to a C :ctype:`Py_complex` structure.
+
+Other objects
+-------------
 
 ``O`` (object) [PyObject \*]
    Store a Python object (without any conversion) in a C object pointer.  The C
@@ -250,48 +320,16 @@ variable(s) whose address should be passed.
    the conversion has failed.  When the conversion fails, the *converter* function
    should raise an exception and leave the content of *address* unmodified.
 
-   If the *converter* returns Py_CLEANUP_SUPPORTED, it may get called a second time
-   if the argument parsing eventually fails, giving the converter a chance to release
-   any memory that it had already allocated. In this second call, the *object* parameter
-   will be NULL; *address* will have the same value as in the original call.
+   If the *converter* returns ``Py_CLEANUP_SUPPORTED``, it may get called a
+   second time if the argument parsing eventually fails, giving the converter a
+   chance to release any memory that it had already allocated. In this second
+   call, the *object* parameter will be NULL; *address* will have the same value
+   as in the original call.
 
    .. versionchanged:: 3.1
-      Py_CLEANUP_SUPPORTED was added.
+      ``Py_CLEANUP_SUPPORTED`` was added.
 
-``S`` (string) [PyStringObject \*]
-   Like ``O`` but requires that the Python object is a string object.  Raises
-   :exc:`TypeError` if the object is not a string object.  The C variable may also
-   be declared as :ctype:`PyObject\*`.
-
-``U`` (Unicode string) [PyUnicodeObject \*]
-   Like ``O`` but requires that the Python object is a Unicode object.  Raises
-   :exc:`TypeError` if the object is not a Unicode object.  The C variable may also
-   be declared as :ctype:`PyObject\*`.
-
-``t#`` (read-only character buffer) [char \*, int]
-   Like ``s#``, but accepts any object which implements the read-only buffer
-   interface.  The :ctype:`char\*` variable is set to point to the first byte of
-   the buffer, and the :ctype:`int` is set to the length of the buffer.  Only
-   single-segment buffer objects are accepted; :exc:`TypeError` is raised for all
-   others.
-
-``w`` (read-write character buffer) [char \*]
-   Similar to ``s``, but accepts any object which implements the read-write buffer
-   interface.  The caller must determine the length of the buffer by other means,
-   or use ``w#`` instead.  Only single-segment buffer objects are accepted;
-   :exc:`TypeError` is raised for all others.
-
-``w*`` (read-write byte-oriented buffer) [Py_buffer]
-   This is to ``w`` what ``s*`` is to ``s``.
-
-``w#`` (read-write character buffer) [char \*, int]
-   Like ``s#``, but accepts any object which implements the read-write buffer
-   interface.  The :ctype:`char \*` variable is set to point to the first byte
-   of the buffer, and the :ctype:`int` is set to the length of the buffer.
-   Only single-segment buffer objects are accepted; :exc:`TypeError` is raised
-   for all others.
-
-``(items)`` (tuple) [*matching-items*]
+``(items)`` (:class:`tuple`) [*matching-items*]
    The object must be a Python sequence whose length is the number of format units
    in *items*.  The C arguments must correspond to the individual format units in
    *items*.  Format units for sequences may be nested.
@@ -339,6 +377,8 @@ false and raise an appropriate exception. When the
 of the format units, the variables at the addresses corresponding to that
 and the following format units are left untouched.
 
+API Functions
+-------------
 
 .. cfunction:: int PyArg_ParseTuple(PyObject *args, const char *format, ...)
 
@@ -415,6 +455,10 @@ and the following format units are left untouched.
       PyArg_ParseTuple(args, "O|O:ref", &object, &callback)
 
 
+---------------
+Building values
+---------------
+
 .. cfunction:: PyObject* Py_BuildValue(const char *format, ...)
 
    Create a new value based on a format string similar to those accepted by the
@@ -444,95 +488,98 @@ and the following format units are left untouched.
    not within format units such as ``s#``).  This can be used to make long format
    strings a tad more readable.
 
-   ``s`` (string) [char \*]
-      Convert a null-terminated C string to a Python object.  If the C string pointer
-      is *NULL*, ``None`` is used.
+   ``s`` (:class:`str` or ``None``) [char \*]
+      Convert a null-terminated C string to a Python :class:`str` object using ``'utf-8'``
+      encoding. If the C string pointer is *NULL*, ``None`` is used.
 
-   ``s#`` (string) [char \*, int]
-      Convert a C string and its length to a Python object.  If the C string pointer
-      is *NULL*, the length is ignored and ``None`` is returned.
+   ``s#`` (:class:`str` or ``None``) [char \*, int]
+      Convert a C string and its length to a Python :class:`str` object using ``'utf-8'``
+      encoding. If the C string pointer is *NULL*, the length is ignored and
+      ``None`` is returned.
 
-   ``y`` (bytes) [char \*]
+   ``y`` (:class:`bytes`) [char \*]
       This converts a C string to a Python :func:`bytes` object.  If the C
       string pointer is *NULL*, ``None`` is returned.
 
-   ``y#`` (bytes) [char \*, int]
+   ``y#`` (:class:`bytes`) [char \*, int]
       This converts a C string and its lengths to a Python object.  If the C
       string pointer is *NULL*, ``None`` is returned.
 
-   ``z`` (string or ``None``) [char \*]
+   ``z`` (:class:`str` or ``None``) [char \*]
       Same as ``s``.
 
-   ``z#`` (string or ``None``) [char \*, int]
+   ``z#`` (:class:`str` or ``None``) [char \*, int]
       Same as ``s#``.
 
-   ``u`` (Unicode string) [Py_UNICODE \*]
+   ``u`` (:class:`str`) [Py_UNICODE \*]
       Convert a null-terminated buffer of Unicode (UCS-2 or UCS-4) data to a Python
       Unicode object.  If the Unicode buffer pointer is *NULL*, ``None`` is returned.
 
-   ``u#`` (Unicode string) [Py_UNICODE \*, int]
+   ``u#`` (:class:`str`) [Py_UNICODE \*, int]
       Convert a Unicode (UCS-2 or UCS-4) data buffer and its length to a Python
       Unicode object.   If the Unicode buffer pointer is *NULL*, the length is ignored
       and ``None`` is returned.
 
-   ``U`` (string) [char \*]
+   ``U`` (:class:`str` or ``None``) [char \*]
       Convert a null-terminated C string to a Python unicode object. If the C string
       pointer is *NULL*, ``None`` is used.
 
-   ``U#`` (string) [char \*, int]
+   ``U#`` (:class:`str` or ``None``) [char \*, int]
       Convert a C string and its length to a Python unicode object. If the C string
       pointer is *NULL*, the length is ignored and ``None`` is returned.
 
-   ``i`` (integer) [int]
+   ``i`` (:class:`int`) [int]
       Convert a plain C :ctype:`int` to a Python integer object.
 
-   ``b`` (integer) [char]
+   ``b`` (:class:`int`) [char]
       Convert a plain C :ctype:`char` to a Python integer object.
 
-   ``h`` (integer) [short int]
+   ``h`` (:class:`int`) [short int]
       Convert a plain C :ctype:`short int` to a Python integer object.
 
-   ``l`` (integer) [long int]
+   ``l`` (:class:`int`) [long int]
       Convert a C :ctype:`long int` to a Python integer object.
 
-   ``B`` (integer) [unsigned char]
+   ``B`` (:class:`int`) [unsigned char]
       Convert a C :ctype:`unsigned char` to a Python integer object.
 
-   ``H`` (integer) [unsigned short int]
+   ``H`` (:class:`int`) [unsigned short int]
       Convert a C :ctype:`unsigned short int` to a Python integer object.
 
-   ``I`` (integer) [unsigned int]
+   ``I`` (:class:`int`) [unsigned int]
       Convert a C :ctype:`unsigned int` to a Python integer object.
 
-   ``k`` (integer) [unsigned long]
+   ``k`` (:class:`int`) [unsigned long]
       Convert a C :ctype:`unsigned long` to a Python integer object.
 
-   ``L`` (long) [PY_LONG_LONG]
+   ``L`` (:class:`int`) [PY_LONG_LONG]
       Convert a C :ctype:`long long` to a Python integer object. Only available
-      on platforms that support :ctype:`long long`.
+      on platforms that support :ctype:`long long` (or :ctype:`_int64` on
+      Windows).
 
-   ``K`` (long) [unsigned PY_LONG_LONG]
+   ``K`` (:class:`int`) [unsigned PY_LONG_LONG]
       Convert a C :ctype:`unsigned long long` to a Python integer object. Only
-      available on platforms that support :ctype:`unsigned long long`.
+      available on platforms that support :ctype:`unsigned long long` (or
+      :ctype:`unsigned _int64` on Windows).
 
-   ``n`` (int) [Py_ssize_t]
+   ``n`` (:class:`int`) [Py_ssize_t]
       Convert a C :ctype:`Py_ssize_t` to a Python integer.
 
-   ``c`` (string of length 1) [char]
-      Convert a C :ctype:`int` representing a byte to a Python byte string of
+   ``c`` (:class:`bytes` of length 1) [char]
+      Convert a C :ctype:`int` representing a byte to a Python :class:`bytes` object of
       length 1.
 
-   ``C`` (string of length 1) [int]
-      Convert a C :ctype:`int` representing a character to Python unicode
-      string of length 1.
+   ``C`` (:class:`str` of length 1) [int]
+      Convert a C :ctype:`int` representing a character to Python :class:`str`
+      object of length 1.
 
-   ``d`` (float) [double]
+   ``d`` (:class:`float`) [double]
       Convert a C :ctype:`double` to a Python floating point number.
 
-   ``f`` (float) [float]
-      Same as ``d``.
+   ``f`` (:class:`float`) [float]
+      Convert a C :ctype:`float` to a Python floating point number.
 
-   ``D`` (complex) [Py_complex \*]
+   ``D`` (:class:`complex`) [Py_complex \*]
       Convert a C :ctype:`Py_complex` structure to a Python complex number.
 
    ``O`` (object) [PyObject \*]
@@ -557,13 +604,13 @@ and the following format units are left untouched.
       \*`) as its argument and should return a "new" Python object, or *NULL* if an
       error occurred.
 
-   ``(items)`` (tuple) [*matching-items*]
+   ``(items)`` (:class:`tuple`) [*matching-items*]
       Convert a sequence of C values to a Python tuple with the same number of items.
 
-   ``[items]`` (list) [*matching-items*]
+   ``[items]`` (:class:`list`) [*matching-items*]
       Convert a sequence of C values to a Python list with the same number of items.
 
-   ``{items}`` (dictionary) [*matching-items*]
+   ``{items}`` (:class:`dict`) [*matching-items*]
       Convert a sequence of C values to a Python dictionary.  Each pair of consecutive
       C values adds one item to the dictionary, serving as key and value,
       respectively.

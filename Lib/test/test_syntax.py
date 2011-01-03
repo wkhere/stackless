@@ -476,6 +476,24 @@ Traceback (most recent call last):
    ...
 SyntaxError: keyword argument repeated
 
+Corner-cases that used to fail to raise the correct error:
+
+    >>> def f(*, x=lambda *:0): pass
+    Traceback (most recent call last):
+    SyntaxError: named arguments must follow bare *
+
+    >>> def f(*args:(lambda *:0)): pass
+    Traceback (most recent call last):
+    SyntaxError: named arguments must follow bare *
+
+    >>> def f(**kwargs:(lambda *:0)): pass
+    Traceback (most recent call last):
+    SyntaxError: named arguments must follow bare *
+
+    >>> with (lambda *:0): pass
+    Traceback (most recent call last):
+    SyntaxError: named arguments must follow bare *
+
 """
 
 import re

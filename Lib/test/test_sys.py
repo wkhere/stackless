@@ -79,13 +79,14 @@ class SysModuleTest(unittest.TestCase):
     # Python/pythonrun.c::PyErr_PrintEx() is tricky.
 
     def test_exit(self):
+
         self.assertRaises(TypeError, sys.exit, 42, 42)
 
         # call without argument
         try:
             sys.exit(0)
         except SystemExit as exc:
-            self.assertEquals(exc.code, 0)
+            self.assertEqual(exc.code, 0)
         except:
             self.fail("wrong exception")
         else:
@@ -96,7 +97,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit(42)
         except SystemExit as exc:
-            self.assertEquals(exc.code, 42)
+            self.assertEqual(exc.code, 42)
         except:
             self.fail("wrong exception")
         else:
@@ -106,7 +107,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit((42,))
         except SystemExit as exc:
-            self.assertEquals(exc.code, 42)
+            self.assertEqual(exc.code, 42)
         except:
             self.fail("wrong exception")
         else:
@@ -116,7 +117,7 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit("exit")
         except SystemExit as exc:
-            self.assertEquals(exc.code, "exit")
+            self.assertEqual(exc.code, "exit")
         except:
             self.fail("wrong exception")
         else:
@@ -126,32 +127,51 @@ class SysModuleTest(unittest.TestCase):
         try:
             sys.exit((17, 23))
         except SystemExit as exc:
-            self.assertEquals(exc.code, (17, 23))
+            self.assertEqual(exc.code, (17, 23))
         except:
             self.fail("wrong exception")
         else:
             self.fail("no exception")
 
         # test that the exit machinery handles SystemExits properly
-        import subprocess
         rc = subprocess.call([sys.executable, "-c",
                               "raise SystemExit(47)"])
         self.assertEqual(rc, 47)
+
+        def check_exit_message(code, expected):
+            process = subprocess.Popen([sys.executable, "-c", code],
+                                       stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+            self.assertEqual(process.returncode, 1)
+            self.assertTrue(stderr.startswith(expected),
+                "%s doesn't start with %s" % (ascii(stderr), ascii(expected)))
+
+        # test that stderr buffer if flushed before the exit message is written
+        # into stderr
+        check_exit_message(
+            r'import sys; sys.stderr.write("unflushed,"); sys.exit("message")',
+            b"unflushed,message")
+
+        # test that the exit message is written with backslashreplace error
+        # handler to stderr
+        check_exit_message(
+            r'import sys; sys.exit("surrogates:\uDCFF")',
+            b"surrogates:\\udcff")
 
     def test_getdefaultencoding(self):
         self.assertRaises(TypeError, sys.getdefaultencoding, 42)
         # can't check more than the type, as the user might have changed it
         self.assertTrue(isinstance(sys.getdefaultencoding(), str))
 
-    # testing sys.settrace() is done in test_trace.py
-    # testing sys.setprofile() is done in test_profile.py
+    # testing sys.settrace() is done in test_sys_settrace.py
+    # testing sys.setprofile() is done in test_sys_setprofile.py
 
     def test_setcheckinterval(self):
         self.assertRaises(TypeError, sys.setcheckinterval)
         orig = sys.getcheckinterval()
         for n in 0, 100, 120, orig: # orig last to restore starting state
             sys.setcheckinterval(n)
-            self.assertEquals(sys.getcheckinterval(), n)
+            self.assertEqual(sys.getcheckinterval(), n)
 
     def test_recursionlimit(self):
         self.assertRaises(TypeError, sys.getrecursionlimit, 42)
@@ -403,6 +423,23 @@ class SysModuleTest(unittest.TestCase):
 
         self.assertRaises(TypeError, sys.intern, S("abc"))
 
+    def test_main_invalid_unicode(self):
+        import locale
+        non_decodable = b"\xff"
+        encoding = locale.getpreferredencoding()
+        try:
+            non_decodable.decode(encoding)
+        except UnicodeDecodeError:
+            pass
+        else:
+            self.skipTest('%r is decodable with encoding %s'
+                % (non_decodable, encoding))
+        code = b'print("' + non_decodable + b'")'
+        p = subprocess.Popen([sys.executable, "-c", code], stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        self.assertEqual(p.returncode, 1)
+        self.assertTrue(b"UnicodeEncodeError:" in stderr,
+            "%r not in %s" % (b"UnicodeEncodeError:", ascii(stderr)))
 
     def test_sys_flags(self):
         self.assertTrue(sys.flags)
@@ -420,7 +457,6 @@ class SysModuleTest(unittest.TestCase):
         sys._clear_type_cache()
 
     def test_ioencoding(self):
-        import subprocess,os
         env = dict(os.environ)
 
         # Test character: cent sign, encoded as 0x4A (ASCII J) in CP424,
@@ -437,6 +473,23 @@ class SysModuleTest(unittest.TestCase):
                              stdout = subprocess.PIPE, env=env)
         out = p.stdout.read().strip()
         self.assertEqual(out, b'?')
+
+    def test_executable(self):
+        # Issue #7774: Ensure that sys.executable is an empty string if argv[0]
+        # has been set to an non existent program name and Python is unable to
+        # retrieve the real program name
+
+        # For a normal installation, it should work without 'cwd'
+        # argument. For test runs in the build directory, see #7774.
+        python_dir = os.path.dirname(os.path.realpath(sys.executable))
+        p = subprocess.Popen(
+            ["nonexistent", "-c",
+             'import sys; print(sys.executable.encode("ascii", "backslashreplace"))'],
+            executable=sys.executable, stdout=subprocess.PIPE, cwd=python_dir)
+        stdout = p.communicate()[0]
+        executable = stdout.strip().decode("ASCII")
+        p.wait()
+        self.assertIn(executable, ["b''", repr(sys.executable.encode("ascii", "backslashreplace"))])
 
 
 class SizeofTest(unittest.TestCase):
@@ -757,11 +810,47 @@ class SizeofTest(unittest.TestCase):
         # sys.flags
         check(sys.flags, size(vh) + self.P * len(sys.flags))
 
+    def test_getfilesystemencoding(self):
+        import codecs
+
+        def check_fsencoding(fs_encoding):
+            if sys.platform == 'darwin':
+                self.assertEqual(fs_encoding, 'utf-8')
+            elif fs_encoding is None:
+                return
+            codecs.lookup(fs_encoding)
+
+        fs_encoding = sys.getfilesystemencoding()
+        check_fsencoding(fs_encoding)
+
+        # Even in C locale
+        try:
+            sys.executable.encode('ascii')
+        except UnicodeEncodeError:
+            # Python doesn't start with ASCII locale if its path is not ASCII,
+            # see issue #8611
+            pass
+        else:
+            env = os.environ.copy()
+            env['LANG'] = 'C'
+            output = subprocess.check_output(
+                [sys.executable, "-c",
+                 "import sys; print(sys.getfilesystemencoding())"],
+                env=env)
+            fs_encoding = output.rstrip().decode('ascii')
+            check_fsencoding(fs_encoding)
+
     def test_setfilesystemencoding(self):
         old = sys.getfilesystemencoding()
-        sys.setfilesystemencoding("iso-8859-1")
-        self.assertEqual(sys.getfilesystemencoding(), "iso-8859-1")
-        sys.setfilesystemencoding(old)
+        try:
+            sys.setfilesystemencoding("iso-8859-1")
+            self.assertEqual(sys.getfilesystemencoding(), "iso-8859-1")
+        finally:
+            sys.setfilesystemencoding(old)
+        try:
+            self.assertRaises(LookupError, sys.setfilesystemencoding, "xxx")
+        finally:
+            sys.setfilesystemencoding(old)
 
 def test_main():
     test.support.run_unittest(SysModuleTest, SizeofTest)

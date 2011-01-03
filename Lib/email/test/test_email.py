@@ -43,13 +43,13 @@ EMPTYSTRING = ''
 SPACE = ' '
 
 
-
+
 def openfile(filename, *args, **kws):
     path = os.path.join(os.path.dirname(landmark), 'data', filename)
     return open(path, *args, **kws)
 
 
-
+
 # Base test class
 class TestEmailBase(unittest.TestCase):
     def ndiffAssertEqual(self, first, second):
@@ -67,7 +67,7 @@ class TestEmailBase(unittest.TestCase):
             return email.message_from_file(fp)
 
 
-
+
 # Test various aspects of the Message class's API
 class TestMessageAPI(TestEmailBase):
     def test_get_all(self):
@@ -318,6 +318,14 @@ class TestMessageAPI(TestEmailBase):
         self.assertEqual(msg.get_param('name', unquote=False),
                          '"Jim&amp;&amp;Jill"')
 
+    def test_get_param_with_quotes(self):
+        msg = email.message_from_string(
+            'Content-Type: foo; bar*0="baz\\"foobar"; bar*1="\\"baz"')
+        self.assertEqual(msg.get_param('bar'), 'baz"foobar"baz')
+        msg = email.message_from_string(
+            "Content-Type: foo; bar*0=\"baz\\\"foobar\"; bar*1=\"\\\"baz\"")
+        self.assertEqual(msg.get_param('bar'), 'baz"foobar"baz')
+
     def test_field_containment(self):
         unless = self.assertTrue
         msg = email.message_from_string('Header: exists')
@@ -497,7 +505,7 @@ class TestMessageAPI(TestEmailBase):
                          bytes(x, 'raw-unicode-escape'))
 
 
-
+
 # Test the email.encoders module
 class TestEncoders(unittest.TestCase):
     def test_encode_empty_payload(self):
@@ -508,23 +516,25 @@ class TestEncoders(unittest.TestCase):
 
     def test_default_cte(self):
         eq = self.assertEqual
+        # 7bit data and the default us-ascii _charset
         msg = MIMEText('hello world')
         eq(msg['content-transfer-encoding'], '7bit')
-
-    def test_default_cte(self):
-        eq = self.assertEqual
-        # With no explicit _charset its us-ascii, and all are 7-bit
-        msg = MIMEText('hello world')
-        eq(msg['content-transfer-encoding'], '7bit')
-        # Similar, but with 8-bit data
+        # Similar, but with 8bit data
         msg = MIMEText('hello \xf8 world')
         eq(msg['content-transfer-encoding'], '8bit')
         # And now with a different charset
         msg = MIMEText('hello \xf8 world', _charset='iso-8859-1')
         eq(msg['content-transfer-encoding'], 'quoted-printable')
 
+    def test_encode7or8bit(self):
+        # Make sure a charset whose input character set is 8bit but
+        # whose output character set is 7bit gets a transfer-encoding
+        # of 7bit.
+        eq = self.assertEqual
+        msg = MIMEText('文', _charset='euc-jp')
+        eq(msg['content-transfer-encoding'], '7bit')
 
-
+
 # Test long header wrapping
 class TestLongHeaders(TestEmailBase):
     def test_split_long_continuation(self):
@@ -903,7 +913,7 @@ List: List-Unsubscribe: <http://lists.sourceforge.net/lists/listinfo/spamassassi
 """)
 
 
-
+
 # Test mangling of "From " lines in the body of a message
 class TestFromMangling(unittest.TestCase):
     def setUp(self):
@@ -937,7 +947,7 @@ Blah blah blah
 """)
 
 
-
+
 # Test the basic MIMEAudio class
 class TestMIMEAudio(unittest.TestCase):
     def setUp(self):
@@ -956,7 +966,8 @@ class TestMIMEAudio(unittest.TestCase):
 
     def test_encoding(self):
         payload = self._au.get_payload()
-        self.assertEqual(base64.decodebytes(payload), self._audiodata)
+        self.assertEqual(base64.decodebytes(bytes(payload, 'ascii')),
+                self._audiodata)
 
     def test_checkSetMinor(self):
         au = MIMEAudio(self._audiodata, 'fish')
@@ -983,7 +994,7 @@ class TestMIMEAudio(unittest.TestCase):
                                   header='foobar') is missing)
 
 
-
+
 # Test the basic MIMEImage class
 class TestMIMEImage(unittest.TestCase):
     def setUp(self):
@@ -996,7 +1007,8 @@ class TestMIMEImage(unittest.TestCase):
 
     def test_encoding(self):
         payload = self._im.get_payload()
-        self.assertEqual(base64.decodebytes(payload), self._imgdata)
+        self.assertEqual(base64.decodebytes(bytes(payload, 'ascii')),
+                self._imgdata)
 
     def test_checkSetMinor(self):
         im = MIMEImage(self._imgdata, 'fish')
@@ -1023,7 +1035,7 @@ class TestMIMEImage(unittest.TestCase):
                                   header='foobar') is missing)
 
 
-
+
 # Test the basic MIMEApplication class
 class TestMIMEApplication(unittest.TestCase):
     def test_headers(self):
@@ -1036,11 +1048,11 @@ class TestMIMEApplication(unittest.TestCase):
         eq = self.assertEqual
         bytes = b'\xfa\xfb\xfc\xfd\xfe\xff'
         msg = MIMEApplication(bytes)
-        eq(msg.get_payload(), b'+vv8/f7/')
+        eq(msg.get_payload(), '+vv8/f7/')
         eq(msg.get_payload(decode=True), bytes)
 
 
-
+
 # Test the basic MIMEText class
 class TestMIMEText(unittest.TestCase):
     def setUp(self):
@@ -1066,8 +1078,35 @@ class TestMIMEText(unittest.TestCase):
         eq(msg.get_charset().input_charset, 'us-ascii')
         eq(msg['content-type'], 'text/plain; charset="us-ascii"')
 
+    def test_7bit_input(self):
+        eq = self.assertEqual
+        msg = MIMEText('hello there', _charset='us-ascii')
+        eq(msg.get_charset().input_charset, 'us-ascii')
+        eq(msg['content-type'], 'text/plain; charset="us-ascii"')
 
-
+    def test_7bit_input_no_charset(self):
+        eq = self.assertEqual
+        msg = MIMEText('hello there')
+        eq(msg.get_charset(), 'us-ascii')
+        eq(msg['content-type'], 'text/plain; charset="us-ascii"')
+        self.assertTrue('hello there' in msg.as_string())
+
+    def test_utf8_input(self):
+        teststr = '\u043a\u0438\u0440\u0438\u043b\u0438\u0446\u0430'
+        eq = self.assertEqual
+        msg = MIMEText(teststr, _charset='utf-8')
+        eq(msg.get_charset().output_charset, 'utf-8')
+        eq(msg['content-type'], 'text/plain; charset="utf-8"')
+        eq(msg.get_payload(decode=True), teststr.encode('utf-8'))
+
+    @unittest.skip("can't fix because of backward compat in email5, "
+        "will fix in email6")
+    def test_utf8_input_no_charset(self):
+        teststr = '\u043a\u0438\u0440\u0438\u043b\u0438\u0446\u0430'
+        self.assertRaises(UnicodeEncodeError, MIMEText, teststr)
+
+
+
 # Test complicated multipart/* messages
 class TestMultipart(TestEmailBase):
     def setUp(self):
@@ -1439,10 +1478,10 @@ Content-Transfer-Encoding: base64
 
 YXNkZg==
 --===============0012394164==--""")
-        self.assertEquals(m.get_payload(0).get_payload(), 'YXNkZg==')
+        self.assertEqual(m.get_payload(0).get_payload(), 'YXNkZg==')
 
 
-
+
 # Test some badly formatted messages
 class TestNonConformant(TestEmailBase):
     def test_parse_missing_minor_type(self):
@@ -1556,7 +1595,7 @@ counter to RFC 2822, there's no separating newline here
         eq(msg.defects[0].line, ' Line 1\n')
 
 
-
+
 # Test RFC 2047 header encoding and decoding
 class TestRFC2047(TestEmailBase):
     def test_rfc2047_multiline(self):
@@ -1606,8 +1645,23 @@ Re: =?mac-iceland?q?r=8Aksm=9Arg=8Cs?= baz foo bar =?mac-iceland?q?r=8Aksm?=
                               (b'rg', None), (b'\xe5', 'iso-8859-1'),
                               (b'sbord', None)])
 
+    def test_rfc2047_B_bad_padding(self):
+        s = '=?iso-8859-1?B?%s?='
+        data = [                                # only test complete bytes
+            ('dm==', b'v'), ('dm=', b'v'), ('dm', b'v'),
+            ('dmk=', b'vi'), ('dmk', b'vi')
+          ]
+        for q, a in data:
+            dh = decode_header(s % q)
+            self.assertEqual(dh, [(a, 'iso-8859-1')])
 
-
+    def test_rfc2047_Q_invalid_digits(self):
+        # issue 10004.
+        s = '=?iso-8659-1?Q?andr=e9=zz?='
+        self.assertEqual(decode_header(s),
+                        [(b'andr\xe9=zz', 'iso-8659-1')])
+
+
 # Test the MIMEMessage class
 class TestMIMEMessage(TestEmailBase):
     def setUp(self):
@@ -1908,7 +1962,7 @@ message 2
         msg = MIMEMultipart()
         self.assertTrue(msg.is_multipart())
 
-
+
 # A general test of parser->model->generator idempotency.  IOW, read a message
 # in, parse it into a message object tree, then without touching the tree,
 # regenerate the plain text.  The original text and the transformed text
@@ -1929,7 +1983,7 @@ class TestIdempotent(TestEmailBase):
         eq(text, s.getvalue())
 
     def test_parse_text_message(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         msg, text = self._msgobj('msg_01.txt')
         eq(msg.get_content_type(), 'text/plain')
         eq(msg.get_content_maintype(), 'text')
@@ -1941,7 +1995,7 @@ class TestIdempotent(TestEmailBase):
         self._idempotent(msg, text)
 
     def test_parse_untyped_message(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         msg, text = self._msgobj('msg_03.txt')
         eq(msg.get_content_type(), 'text/plain')
         eq(msg.get_params(), None)
@@ -2013,7 +2067,7 @@ class TestIdempotent(TestEmailBase):
         self._idempotent(msg, text)
 
     def test_content_type(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         unless = self.assertTrue
         # Get a message object and reset the seek pointer for other tests
         msg, text = self._msgobj('msg_05.txt')
@@ -2045,7 +2099,7 @@ class TestIdempotent(TestEmailBase):
         eq(msg4.get_payload(), 'Yadda yadda yadda\n')
 
     def test_parser(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         unless = self.assertTrue
         msg, text = self._msgobj('msg_06.txt')
         # Check some of the outer headers
@@ -2062,7 +2116,7 @@ class TestIdempotent(TestEmailBase):
         eq(msg1.get_payload(), '\n')
 
 
-
+
 # Test various other bits of the package's functionality
 class TestMiscellaneous(TestEmailBase):
     def test_message_from_string(self):
@@ -2182,6 +2236,19 @@ class TestMiscellaneous(TestEmailBase):
         eq(time.localtime(t)[:6], timetup[:6])
         eq(int(time.strftime('%Y', timetup[:9])), 2003)
 
+    def test_parsedate_y2k(self):
+        """Test for parsing a date with a two-digit year.
+
+        Parsing a date with a two-digit year should return the correct
+        four-digit year. RFC822 allows two-digit years, but RFC2822 (which
+        obsoletes RFC822) requires four-digit years.
+
+        """
+        self.assertEqual(utils.parsedate_tz('25 Feb 03 13:47:26 -0800'),
+                         utils.parsedate_tz('25 Feb 2003 13:47:26 -0800'))
+        self.assertEqual(utils.parsedate_tz('25 Feb 71 13:47:26 -0800'),
+                         utils.parsedate_tz('25 Feb 1971 13:47:26 -0800'))
+
     def test_parseaddr_empty(self):
         self.assertEqual(utils.parseaddr('<>'), ('', ''))
         self.assertEqual(utils.formataddr(utils.parseaddr('<>')), '')
@@ -2215,6 +2282,24 @@ class TestMiscellaneous(TestEmailBase):
         self.assertEqual(utils.parseaddr(y), (a, b))
         # formataddr() quotes the name if there's a dot in it
         self.assertEqual(utils.formataddr((a, b)), y)
+
+    def test_parseaddr_preserves_quoted_pairs_in_addresses(self):
+        # issue 10005.  Note that in the third test the second pair of
+        # backslashes is not actually a quoted pair because it is not inside a
+        # comment or quoted string: the address being parsed has a quoted
+        # string containing a quoted backslash, followed by 'example' and two
+        # backslashes, followed by another quoted string containing a space and
+        # the word 'example'.  parseaddr copies those two backslashes
+        # literally.  Per rfc5322 this is not technically correct since a \ may
+        # not appear in an address outside of a quoted string.  It is probably
+        # a sensible Postel interpretation, though.
+        eq = self.assertEqual
+        eq(utils.parseaddr('""example" example"@example.com'),
+          ('', '""example" example"@example.com'))
+        eq(utils.parseaddr('"\\"example\\" example"@example.com'),
+          ('', '"\\"example\\" example"@example.com'))
+        eq(utils.parseaddr('"\\\\"example\\\\" example"@example.com'),
+          ('', '"\\\\"example\\\\" example"@example.com'))
 
     def test_multiline_from_comment(self):
         x = """\
@@ -2355,7 +2440,7 @@ multipart/report
 """)
 
 
-
+
 # Test the iterator/generators
 class TestIterators(TestEmailBase):
     def test_body_line_iterator(self):
@@ -2411,8 +2496,41 @@ Do you like this message?
 -Me
 """)
 
+    def test_pushCR_LF(self):
+        '''FeedParser BufferedSubFile.push() assumed it received complete
+           line endings.  A CR ending one push() followed by a LF starting
+           the next push() added an empty line.
+        '''
+        imt = [
+            ("a\r \n",  2),
+            ("b",       0),
+            ("c\n",     1),
+            ("",        0),
+            ("d\r\n",   1),
+            ("e\r",     0),
+            ("\nf",     1),
+            ("\r\n",    1),
+          ]
+        from email.feedparser import BufferedSubFile, NeedMoreData
+        bsf = BufferedSubFile()
+        om = []
+        nt = 0
+        for il, n in imt:
+            bsf.push(il)
+            nt += n
+            n1 = 0
+            while True:
+                ol = bsf.readline()
+                if ol == NeedMoreData:
+                    break
+                om.append(ol)
+                n1 += 1
+            self.assertTrue(n == n1)
+        self.assertTrue(len(om) == nt)
+        self.assertTrue(''.join([il for il, n in imt]) == ''.join(om))
 
-
+
+
 class TestParsers(TestEmailBase):
     def test_header_parser(self):
         eq = self.assertEqual
@@ -2545,8 +2663,26 @@ Here's the message body
         eq(headers, ['A', 'B', 'CC'])
         eq(msg.get_payload(), 'body')
 
+    def test_CRLFLF_at_end_of_part(self):
+        # issue 5610: feedparser should not eat two chars from body part ending
+        # with "\r\n\n".
+        m = (
+            "From: foo@bar.com\n"
+            "To: baz\n"
+            "Mime-Version: 1.0\n"
+            "Content-Type: multipart/mixed; boundary=BOUNDARY\n"
+            "\n"
+            "--BOUNDARY\n"
+            "Content-Type: text/plain\n"
+            "\n"
+            "body ending with CRLF newline\r\n"
+            "\n"
+            "--BOUNDARY--\n"
+          )
+        msg = email.message_from_string(m)
+        self.assertTrue(msg.get_payload(0).get_payload().endswith('\r\n'))
 
-
+
 class TestBase64(unittest.TestCase):
     def test_len(self):
         eq = self.assertEqual
@@ -2599,7 +2735,7 @@ eHh4eCB4eHh4IA==\r
         eq(he('hello\nworld'), '=?iso-8859-1?b?aGVsbG8Kd29ybGQ=?=')
 
 
-
+
 class TestQuopri(unittest.TestCase):
     def setUp(self):
         # Set of characters (as byte integers) that don't need to be encoded
@@ -2718,7 +2854,7 @@ one line
 two line""")
 
 
-
+
 # Test the Charset class
 class TestCharset(unittest.TestCase):
     def tearDown(self):
@@ -2776,7 +2912,7 @@ class TestCharset(unittest.TestCase):
         self.assertRaises(errors.CharsetError, Charset, 'asc\xffii')
 
 
-
+
 # Test multilingual MIME headers.
 class TestHeader(TestEmailBase):
     def test_simple(self):
@@ -3082,11 +3218,11 @@ A very long line that must get split to something other than at the
 
     def test_broken_base64_header(self):
         raises = self.assertRaises
-        s = 'Subject: =?EUC-KR?B?CSixpLDtKSC/7Liuvsax4iC6uLmwMcijIKHaILzSwd/H0SC8+LCjwLsgv7W/+Mj3IQ?='
+        s = 'Subject: =?EUC-KR?B?CSixpLDtKSC/7Liuvsax4iC6uLmwMcijIKHaILzSwd/H0SC8+LCjwLsgv7W/+Mj3I ?='
         raises(errors.HeaderParseError, decode_header, s)
 
 
-
+
 # Test RFC 2231 header parameters (en/de)coding
 class TestRFC2231(TestEmailBase):
     def test_get_param(self):
@@ -3398,7 +3534,7 @@ Content-Type: application/x-foo;
         eq(s, 'My Document For You')
 
 
-
+
 # Tests to ensure that signed parts of an email are completely preserved, as
 # required by RFC1847 section 2.1.  Note that these are incomplete, because the
 # email package does not currently always preserve the body.  See issue 1670765.
@@ -3436,7 +3572,7 @@ class TestSigned(TestEmailBase):
         self._signed_parts_eq(original, result)
 
 
-
+
 def _testclasses():
     mod = sys.modules[__name__]
     return [getattr(mod, name) for name in dir(mod) if name.startswith('Test')]
@@ -3454,6 +3590,6 @@ def test_main():
         run_unittest(testclass)
 
 
-
+
 if __name__ == '__main__':
     unittest.main(defaultTest='suite')

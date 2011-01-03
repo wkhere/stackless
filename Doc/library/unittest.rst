@@ -504,7 +504,7 @@ The following decorators implement test skipping and expected failures:
 
 .. function:: skipUnless(condition, reason)
 
-   Skip the decoratored test unless *condition* is true.
+   Skip the decorated test unless *condition* is true.
 
 .. function:: expectedFailure
 
@@ -589,8 +589,10 @@ Test cases
 
    .. method:: skipTest(reason)
 
-      Calling this during the a test method or :meth:`setUp` skips the current
+      Calling this during a test method or :meth:`setUp` skips the current
       test.  See :ref:`unittest-skipping` for more information.
+
+      .. versionadded:: 3.1
 
 
    .. method:: debug()
@@ -650,8 +652,8 @@ Test cases
          :meth:`failIfEqual`.
 
 
-   .. method:: assertAlmostEqual(first, second, *, places=7, msg=None)
-               failUnlessAlmostEqual(first, second, *, places=7, msg=None)
+   .. method:: assertAlmostEqual(first, second, places=7, msg=None)
+               failUnlessAlmostEqual(first, second, places=7, msg=None)
 
       Test that *first* and *second* are approximately equal by computing the
       difference, rounding to the given number of decimal *places* (default 7),
@@ -666,8 +668,8 @@ Test cases
          :meth:`failUnlessAlmostEqual`.
 
 
-   .. method:: assertNotAlmostEqual(first, second, *, places=7, msg=None)
-               failIfAlmostEqual(first, second, *, places=7, msg=None)
+   .. method:: assertNotAlmostEqual(first, second, places=7, msg=None)
+               failIfAlmostEqual(first, second, places=7, msg=None)
 
       Test that *first* and *second* are not approximately equal by computing
       the difference, rounding to the given number of decimal *places* (default
@@ -993,12 +995,12 @@ Test cases
       If :meth:`setUp` fails, meaning that :meth:`tearDown` is not called,
       then any cleanup functions added will still be called.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
 
 
    .. method:: doCleanups()
 
-      This method is called uncoditionally after :meth:`tearDown`, or
+      This method is called unconditionally after :meth:`tearDown`, or
       after :meth:`setUp` if :meth:`setUp` raises an exception.
 
       It is responsible for calling all the cleanup functions added by
@@ -1009,7 +1011,7 @@ Test cases
       :meth:`doCleanups` pops methods off the stack of cleanup
       functions one at a time, so it can be called at any time.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
 
 
 .. class:: FunctionTestCase(testFunc, setUp=None, tearDown=None, description=None)
@@ -1088,7 +1090,7 @@ Grouping tests
       (for example when counting tests or comparing for equality)
       so the tests returned must be the same for repeated iterations.
 
-      .. versionchanged:: 2.7
+      .. versionchanged:: 3.2
          In earlier versions the :class:`TestSuite` accessed tests directly rather
          than through iteration, so overriding :meth:`__iter__` wasn't sufficient
          for providing tests.
@@ -1239,8 +1241,8 @@ Loading and running tests
 
    .. attribute:: expectedFailures
 
-      A list contaning 2-tuples of :class:`TestCase` instances and strings
-      holding formatted tracebacks.  Each tuple represents a expected failures
+      A list containing 2-tuples of :class:`TestCase` instances and strings
+      holding formatted tracebacks.  Each tuple represents an expected failure
       of the test case.
 
    .. attribute:: unexpectedSuccesses
@@ -1302,14 +1304,14 @@ Loading and running tests
 
       Called once before any tests are executed.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
 
 
    .. method:: stopTestRun(test)
 
       Called once before any tests are executed.
 
-      .. versionadded:: 2.7
+      .. versionadded:: 3.2
 
 
    .. method:: addError(test, err)
@@ -1411,5 +1413,5 @@ Loading and running tests
    Calling ``main`` actually returns an instance of the ``TestProgram`` class.
    This stores the result of the tests run as the ``result`` attribute.
 
-   .. versionchanged:: 2.7
+   .. versionchanged:: 3.1
       The ``exit`` parameter was added.

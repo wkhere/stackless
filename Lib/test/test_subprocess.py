@@ -28,7 +28,7 @@ def remove_stderr_debug_decorations(stderr):
     return re.sub("\[\d+ refs\]\r?\n?$", "", stderr.decode()).encode()
     #return re.sub(r"\[\d+ refs\]\r?\n?$", "", stderr)
 
-class ProcessTestCase(unittest.TestCase):
+class BaseTestCase(unittest.TestCase):
     def setUp(self):
         # Try to minimize the number of children we have so this test
         # doesn't crash on some buildbots (Alphas in particular).
@@ -41,14 +41,15 @@ class ProcessTestCase(unittest.TestCase):
         if hasattr(support, "reap_children"):
             support.reap_children()
 
-    def mkstemp(self):
+    def mkstemp(self, *args, **kwargs):
         """wrapper for mkstemp, calling mktemp if mkstemp is not available"""
         if hasattr(tempfile, "mkstemp"):
-            return tempfile.mkstemp()
+            return tempfile.mkstemp(*args, **kwargs)
         else:
-            fname = tempfile.mktemp()
+            fname = tempfile.mktemp(*args, **kwargs)
             return os.open(fname, os.O_RDWR|os.O_CREAT), fname
 
+class ProcessTestCase(BaseTestCase):
     #
     # Generic tests
     #
@@ -275,7 +276,7 @@ class ProcessTestCase(unittest.TestCase):
         # stdout is set to 1 (#1531862).
         cmd = r"import sys, os; sys.exit(os.write(sys.stdout.fileno(), b'.\n'))"
         rc = subprocess.call([sys.executable, "-c", cmd], stdout=1)
-        self.assertEquals(rc, 2)
+        self.assertEqual(rc, 2)
 
     def test_cwd(self):
         tmpdir = tempfile.gettempdir()
@@ -444,21 +445,40 @@ class ProcessTestCase(unittest.TestCase):
 
     def test_no_leaking(self):
         # Make sure we leak no resources
-        if (not hasattr(support, "is_resource_enabled") or
-            support.is_resource_enabled("subprocess") and not mswindows):
+        if not mswindows:
             max_handles = 1026 # too much for most UNIX systems
         else:
-            max_handles = 65
-        for i in range(max_handles):
-            p = subprocess.Popen([sys.executable, "-c",
-                                  "import sys;"
-                                  "sys.stdout.write(sys.stdin.read())"],
-                                 stdin=subprocess.PIPE,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-            data = p.communicate(b"lime")[0]
-            self.assertEqual(data, b"lime")
-
+            max_handles = 2050 # too much for (at least some) Windows setups
+        handles = []
+        try:
+            for i in range(max_handles):
+                try:
+                    handles.append(os.open(support.TESTFN,
+                                           os.O_WRONLY | os.O_CREAT))
+                except OSError as e:
+                    if e.errno != errno.EMFILE:
+                        raise
+                    break
+            else:
+                self.skipTest("failed to reach the file descriptor limit "
+                    "(tried %d)" % max_handles)
+            # Close a couple of them (should be enough for a subprocess)
+            for i in range(10):
+                os.close(handles.pop())
+            # Loop creating some subprocesses. If one of them leaks some fds,
+            # the next loop iteration will fail by reaching the max fd limit.
+            for i in range(15):
+                p = subprocess.Popen([sys.executable, "-c",
+                                      "import sys;"
+                                      "sys.stdout.write(sys.stdin.read())"],
+                                     stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE)
+                data = p.communicate(b"lime")[0]
+                self.assertEqual(data, b"lime")
+        finally:
+            for h in handles:
+                os.close(h)
 
     def test_list2cmdline(self):
         self.assertEqual(subprocess.list2cmdline(['a b c', 'd', 'e']),
@@ -477,8 +497,6 @@ class ProcessTestCase(unittest.TestCase):
                          '"a\\\\b\\ c" d e')
         self.assertEqual(subprocess.list2cmdline(['ab', '']),
                          'ab ""')
-        self.assertEqual(subprocess.list2cmdline(['echo', 'foo|bar']),
-                         'echo "foo|bar"')
 
 
     def test_poll(self):
@@ -536,8 +554,39 @@ class ProcessTestCase(unittest.TestCase):
                                  stderr=subprocess.PIPE)
             # Windows raises IOError
             except (IOError, OSError) as err:
-                if err.errno != 2:  # ignore "no such file"
+                if err.errno != errno.ENOENT:  # ignore "no such file"
                     raise
+
+    def test_issue8780(self):
+        # Ensure that stdout is inherited from the parent
+        # if stdout=PIPE is not used
+        code = ';'.join((
+            'import subprocess, sys',
+            'retcode = subprocess.call('
+                "[sys.executable, '-c', 'print(\"Hello World!\")'])",
+            'assert retcode == 0'))
+        output = subprocess.check_output([sys.executable, '-c', code])
+        self.assertTrue(output.startswith(b'Hello World!'), ascii(output))
+
+    def test_handles_closed_on_exception(self):
+        # If CreateProcess exits with an error, ensure the
+        # duplicate output handles are released
+        ifhandle, ifname = self.mkstemp()
+        ofhandle, ofname = self.mkstemp()
+        efhandle, efname = self.mkstemp()
+        try:
+            subprocess.Popen (["*"], stdin=ifhandle, stdout=ofhandle,
+              stderr=efhandle)
+        except OSError:
+            os.close(ifhandle)
+            os.remove(ifname)
+            os.close(ofhandle)
+            os.remove(ofname)
+            os.close(efhandle)
+            os.remove(efname)
+        self.assertFalse(os.path.exists(ifname))
+        self.assertFalse(os.path.exists(ofname))
+        self.assertFalse(os.path.exists(efname))
 
     #
     # POSIX tests
@@ -559,6 +608,21 @@ class ProcessTestCase(unittest.TestCase):
             """Try to prevent core files from being created.
             Returns previous ulimit if successful, else None.
             """
+            if sys.platform == 'darwin':
+                # Check if the 'Crash Reporter' on OSX was configured
+                # in 'Developer' mode and warn that it will get triggered
+                # when it is.
+                #
+                # This assumes that this context manager is used in tests
+                # that might trigger the next manager.
+                value = subprocess.Popen(['/usr/bin/defaults', 'read',
+                    'com.apple.CrashReporter', 'DialogType'],
+                    stdout=subprocess.PIPE).communicate()[0]
+                if value.strip() == b'developer':
+                    print("this tests triggers the Crash Reporter, "
+                          "that is intentional", end='')
+                    sys.stdout.flush()
+
             try:
                 import resource
                 old_limit = resource.getrlimit(resource.RLIMIT_CORE)
@@ -566,6 +630,8 @@ class ProcessTestCase(unittest.TestCase):
                 return old_limit
             except (ImportError, ValueError, resource.error):
                 return None
+
+
 
         def _unsuppress_core_files(self, old_limit):
             """Return core file behavior to default."""
@@ -654,6 +720,25 @@ class ProcessTestCase(unittest.TestCase):
             os.remove(fname)
             self.assertEqual(rc, 47)
 
+        def test_specific_shell(self):
+            # Issue #9265: Incorrect name passed as arg[0].
+            shells = []
+            for prefix in ['/bin', '/usr/bin/', '/usr/local/bin']:
+                for name in ['bash', 'ksh']:
+                    sh = os.path.join(prefix, name)
+                    if os.path.isfile(sh):
+                        shells.append(sh)
+            if not shells: # Will probably work for any shell but csh.
+                self.skipTest("bash or ksh required for this test")
+            sh = '/bin/sh'
+            if os.path.isfile(sh) and not os.path.islink(sh):
+                # Test will fail if /bin/sh is a symlink to csh.
+                shells.append(sh)
+            for sh in shells:
+                p = subprocess.Popen("echo $0", executable=sh, shell=True,
+                                     stdout=subprocess.PIPE)
+                self.assertEqual(p.stdout.read().strip(), bytes(sh, 'ascii'))
+
         def DISABLED_test_send_signal(self):
             p = subprocess.Popen([sys.executable,
                               "-c", "input()"])
@@ -677,6 +762,36 @@ class ProcessTestCase(unittest.TestCase):
             self.assertTrue(p.poll() is None, p.poll())
             p.terminate()
             self.assertEqual(p.wait(), -signal.SIGTERM)
+
+        def test_undecodable_env(self):
+            for key, value in (('test', 'abc\uDCFF'), ('test\uDCFF', '42')):
+                value_repr = ascii(value).encode("ascii")
+
+                # test str with surrogates
+                script = "import os; print(ascii(os.getenv(%s)))" % repr(key)
+                env = os.environ.copy()
+                env[key] = value
+                # Force surrogate-escaping of \xFF in the child process;
+                # otherwise it can be decoded as-is if the default locale
+                # is latin-1.
+                env['PYTHONFSENCODING'] = 'ascii'
+                stdout = subprocess.check_output(
+                    [sys.executable, "-c", script],
+                    env=env)
+                stdout = stdout.rstrip(b'\n\r')
+                self.assertEqual(stdout, value_repr)
+
+                # test bytes
+                key = key.encode("ascii", "surrogateescape")
+                value = value.encode("ascii", "surrogateescape")
+                script = "import os; print(ascii(os.getenv(%s)))" % repr(key)
+                env = os.environ.copy()
+                env[key] = value
+                stdout = subprocess.check_output(
+                    [sys.executable, "-c", script],
+                    env=env)
+                stdout = stdout.rstrip(b'\n\r')
+                self.assertEqual(stdout, value_repr)
 
     #
     # Windows tests
@@ -772,6 +887,7 @@ class ProcessTestCase(unittest.TestCase):
             p.terminate()
             self.assertNotEqual(p.wait(), 0)
 
+
 class CommandTests(unittest.TestCase):
 # The module says:
 #   "NB This only works (and is only relevant) for UNIX."
@@ -781,9 +897,9 @@ class CommandTests(unittest.TestCase):
     if os.name == 'posix':
 
         def test_getoutput(self):
-            self.assertEquals(subprocess.getoutput('echo xyzzy'), 'xyzzy')
-            self.assertEquals(subprocess.getstatusoutput('echo xyzzy'),
-                              (0, 'xyzzy'))
+            self.assertEqual(subprocess.getoutput('echo xyzzy'), 'xyzzy')
+            self.assertEqual(subprocess.getstatusoutput('echo xyzzy'),
+                             (0, 'xyzzy'))
 
             # we use mkdtemp in the next line to create an empty directory
             # under our exclusive control; from that, we can invent a pathname
@@ -794,13 +910,58 @@ class CommandTests(unittest.TestCase):
                 name = os.path.join(dir, "foo")
 
                 status, output = subprocess.getstatusoutput('cat ' + name)
-                self.assertNotEquals(status, 0)
+                self.assertNotEqual(status, 0)
             finally:
                 if dir is not None:
                     os.rmdir(dir)
 
 
 unit_tests = [ProcessTestCase, CommandTests]
+
+if mswindows:
+    class CommandsWithSpaces (BaseTestCase):
+
+        def setUp(self):
+            super().setUp()
+            f, fname = self.mkstemp(".py", "te st")
+            self.fname = fname.lower ()
+            os.write(f, b"import sys;"
+                        b"sys.stdout.write('%d %s' % (len(sys.argv), [a.lower () for a in sys.argv]))"
+            )
+            os.close(f)
+
+        def tearDown(self):
+            os.remove(self.fname)
+            super().tearDown()
+
+        def with_spaces(self, *args, **kwargs):
+            kwargs['stdout'] = subprocess.PIPE
+            p = subprocess.Popen(*args, **kwargs)
+            self.assertEqual(
+              p.stdout.read ().decode("mbcs"),
+              "2 [%r, 'ab cd']" % self.fname
+            )
+
+        def test_shell_string_with_spaces(self):
+            # call() function with string argument with spaces on Windows
+            self.with_spaces('"%s" "%s" "%s"' % (sys.executable, self.fname,
+                                             "ab cd"), shell=1)
+
+        def test_shell_sequence_with_spaces(self):
+            # call() function with sequence argument with spaces on Windows
+            self.with_spaces([sys.executable, self.fname, "ab cd"], shell=1)
+
+        def test_noshell_string_with_spaces(self):
+            # call() function with string argument with spaces on Windows
+            self.with_spaces('"%s" "%s" "%s"' % (sys.executable, self.fname,
+                                 "ab cd"))
+
+        def test_noshell_sequence_with_spaces(self):
+            # call() function with sequence argument with spaces on Windows
+            self.with_spaces([sys.executable, self.fname, "ab cd"])
+
+    unit_tests.append(CommandsWithSpaces)
+
 
 if getattr(subprocess, '_has_poll', False):
     class ProcessTestCaseNoPoll(ProcessTestCase):

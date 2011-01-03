@@ -158,7 +158,13 @@ def _EndRecData64(fpin, offset, endrec):
     """
     Read the ZIP64 end-of-archive records and use that to update endrec
     """
-    fpin.seek(offset - sizeEndCentDir64Locator, 2)
+    try:
+        fpin.seek(offset - sizeEndCentDir64Locator, 2)
+    except IOError:
+        # If the seek fails, the file is not large enough to contain a ZIP64
+        # end-of-archive record, so just return the end record we were given.
+        return endrec
+
     data = fpin.read(sizeEndCentDir64Locator)
     sig, diskno, reloff, disks = struct.unpack(structEndArchive64Locator, data)
     if sig != stringEndArchive64Locator:
@@ -472,6 +478,12 @@ class ZipExtFile:
         if self.compress_type == ZIP_DEFLATED:
             self.dc = zlib.decompressobj(-15)
 
+        if hasattr(zipinfo, 'CRC'):
+            self._expected_crc = zipinfo.CRC
+            self._running_crc = crc32(b'') & 0xffffffff
+        else:
+            self._expected_crc = None
+
     def set_univ_newlines(self, univ_newlines):
         self.univ_newlines = univ_newlines
 
@@ -565,6 +577,16 @@ class ZipExtFile:
             result.append(line)
         return result
 
+    def _update_crc(self, newdata, eof):
+        # Update the CRC using the given data.
+        if self._expected_crc is None:
+            # No need to compute the CRC if we don't have a reference value
+            return
+        self._running_crc = crc32(newdata, self._running_crc) & 0xffffffff
+        # Check the CRC if we're at the end of the file
+        if eof and self._running_crc != self._expected_crc:
+            raise BadZipfile("Bad CRC-32 for file %r" % self.name)
+
     def read(self, size = None):
         # act like file obj and return empty string if size is 0
         if size == 0:
@@ -628,8 +650,10 @@ class ZipExtFile:
                         # prevent decompressor from being used again
                         self.dc = None
 
+                self._update_crc(newdata, eof=(
+                    self.compress_size == self.bytes_read and
+                    len(self.rawbuffer) == 0))
                 self.readbuffer += newdata
-
 
         # return what the user asked for
         if size is None or len(self.readbuffer) <= size:
@@ -705,14 +729,22 @@ class ZipFile:
         if key == 'r':
             self._GetContents()
         elif key == 'w':
-            pass
+            # set the modified flag so central directory gets written
+            # even if no files are added to the archive
+            self._didModify = True
         elif key == 'a':
-            try:                        # See if file is a zip file
+            try:
+                # See if file is a zip file
                 self._RealGetContents()
                 # seek to start of directory and overwrite
                 self.fp.seek(self.start_dir, 0)
-            except BadZipfile:          # file is not a zip file, just append
+            except BadZipfile:
+                # file is not a zip file, just append
                 self.fp.seek(0, 2)
+
+                # set the modified flag so central directory gets written
+                # even if no files are added to the archive
+                self._didModify = True
         else:
             if not self._filePassed:
                 self.fp.close()
@@ -733,7 +765,10 @@ class ZipFile:
     def _RealGetContents(self):
         """Read in the table of contents for the ZIP file."""
         fp = self.fp
-        endrec = _EndRecData(fp)
+        try:
+            endrec = _EndRecData(fp)
+        except IOError:
+            raise BadZipfile("File is not a zip file")
         if not endrec:
             raise BadZipfile("File is not a zip file")
         if self.debug > 1:
@@ -1382,7 +1417,9 @@ def main(args = None):
             print(USAGE)
             sys.exit(1)
         zf = ZipFile(args[1], 'r')
-        zf.testzip()
+        badfile = zf.testzip()
+        if badfile:
+            print("The following enclosed file is corrupted: {!r}".format(badfile))
         print("Done testing")
 
     elif args[0] == '-e':

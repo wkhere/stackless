@@ -123,23 +123,23 @@ class InstallTestCase(support.TempdirManager,
 
         # two elements
         cmd.handle_extra_path()
-        self.assertEquals(cmd.extra_path, ['path', 'dirs'])
-        self.assertEquals(cmd.extra_dirs, 'dirs')
-        self.assertEquals(cmd.path_file, 'path')
+        self.assertEqual(cmd.extra_path, ['path', 'dirs'])
+        self.assertEqual(cmd.extra_dirs, 'dirs')
+        self.assertEqual(cmd.path_file, 'path')
 
         # one element
         cmd.extra_path = ['path']
         cmd.handle_extra_path()
-        self.assertEquals(cmd.extra_path, ['path'])
-        self.assertEquals(cmd.extra_dirs, 'path')
-        self.assertEquals(cmd.path_file, 'path')
+        self.assertEqual(cmd.extra_path, ['path'])
+        self.assertEqual(cmd.extra_dirs, 'path')
+        self.assertEqual(cmd.path_file, 'path')
 
         # none
         dist.extra_path = cmd.extra_path = None
         cmd.handle_extra_path()
-        self.assertEquals(cmd.extra_path, None)
-        self.assertEquals(cmd.extra_dirs, '')
-        self.assertEquals(cmd.path_file, None)
+        self.assertEqual(cmd.extra_path, None)
+        self.assertEqual(cmd.extra_dirs, '')
+        self.assertEqual(cmd.path_file, None)
 
         # three elements (no way !)
         cmd.extra_path = 'path,dirs,again'
@@ -182,8 +182,11 @@ class InstallTestCase(support.TempdirManager,
 
         # let's check the RECORD file was created with one
         # line (the egg info file)
-        with open(cmd.record) as f:
-            self.assertEquals(len(f.readlines()), 1)
+        f = open(cmd.record)
+        try:
+            self.assertEqual(len(f.readlines()), 1)
+        finally:
+            f.close()
 
     def test_debug_mode(self):
         # this covers the code called when DEBUG is set

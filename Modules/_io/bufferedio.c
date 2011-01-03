@@ -438,11 +438,7 @@ buffered_close(buffered *self, PyObject *args)
     res = PyObject_CallMethodObjArgs((PyObject *)self, _PyIO_str_flush, NULL);
     ENTER_BUFFERED(self)
     if (res == NULL) {
-        /* If flush() fails, just give up */
-        if (PyErr_ExceptionMatches(PyExc_IOError))
-            PyErr_Clear();
-        else
-            goto end;
+        goto end;
     }
     Py_XDECREF(res);
 
@@ -636,6 +632,8 @@ _buffered_init(buffered *self)
         return -1;
     }
 #ifdef WITH_THREAD
+    if (self->lock)
+        PyThread_free_lock(self->lock);
     self->lock = PyThread_allocate_lock();
     if (self->lock == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "can't allocate read lock");
@@ -1381,7 +1379,10 @@ _bufferedreader_read_generic(buffered *self, Py_ssize_t n)
     self->pos = 0;
     self->raw_pos = 0;
     self->read_end = 0;
-    while (self->read_end < self->buffer_size) {
+    /* NOTE: when the read is satisfied, we avoid issuing any additional
+       reads, which could block indefinitely (e.g. on a socket).
+       See issue #9550. */
+    while (remaining > 0 && self->read_end < self->buffer_size) {
         Py_ssize_t r = _bufferedreader_fill_buffer(self);
         if (r == -1)
             goto error;
@@ -1660,6 +1661,11 @@ _bufferedwriter_flush_unlocked(buffered *self, int restore_pos)
         self->write_pos += n;
         self->raw_pos = self->write_pos;
         written += Py_SAFE_DOWNCAST(n, Py_off_t, Py_ssize_t);
+        /* Partial writes can return successfully when interrupted by a
+           signal (see write(2)).  We must run signal handlers before
+           blocking another time, possibly indefinitely. */
+        if (PyErr_CheckSignals() < 0)
+            goto error;
     }
 
     if (restore_pos) {
@@ -1796,6 +1802,11 @@ bufferedwriter_write(buffered *self, PyObject *args)
         }
         written += n;
         remaining -= n;
+        /* Partial writes can return successfully when interrupted by a
+           signal (see write(2)).  We must run signal handlers before
+           blocking another time, possibly indefinitely. */
+        if (PyErr_CheckSignals() < 0)
+            goto error;
     }
     if (self->readable)
         _bufferedreader_reset_buf(self);

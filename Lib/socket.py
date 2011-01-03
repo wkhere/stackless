@@ -121,7 +121,7 @@ class socket(_socket.socket):
         return socket(self.family, self.type, self.proto, fileno=fd), addr
 
     def makefile(self, mode="r", buffering=None, *,
-                 encoding=None, newline=None):
+                 encoding=None, errors=None, newline=None):
         """makefile(...) -> an I/O stream connected to the socket
 
         The arguments are as for io.open() after the filename,
@@ -159,7 +159,7 @@ class socket(_socket.socket):
             buffer = io.BufferedWriter(raw, buffering)
         if binary:
             return buffer
-        text = io.TextIOWrapper(buffer, encoding, newline)
+        text = io.TextIOWrapper(buffer, encoding, errors, newline)
         text.mode = mode
         return text
 
@@ -195,6 +195,13 @@ class SocketIO(io.RawIOBase):
     the raw I/O interface on top of a socket object.
     """
 
+    # One might wonder why not let FileIO do the job instead.  There are two
+    # main reasons why FileIO is not adapted:
+    # - it wouldn't work under Windows (where you can't used read() and
+    #   write() on a socket handle)
+    # - it wouldn't work with socket timeouts (FileIO would ignore the
+    #   timeout and consider the socket non-blocking)
+
     # XXX More docs
 
     def __init__(self, sock, mode):
@@ -209,22 +216,40 @@ class SocketIO(io.RawIOBase):
         self._writing = "w" in mode
 
     def readinto(self, b):
+        """Read up to len(b) bytes into the writable buffer *b* and return
+        the number of bytes read.  If the socket is non-blocking and no bytes
+        are available, None is returned.
+
+        If *b* is non-empty, a 0 return value indicates that the connection
+        was shutdown at the other end.
+        """
         self._checkClosed()
         self._checkReadable()
         return self._sock.recv_into(b)
 
     def write(self, b):
+        """Write the given bytes or bytearray object *b* to the socket
+        and return the number of bytes written.  This can be less than
+        len(b) if not all data could be written.  If the socket is
+        non-blocking and no bytes could be written None is returned.
+        """
         self._checkClosed()
         self._checkWritable()
         return self._sock.send(b)
 
     def readable(self):
+        """True if the SocketIO is open for reading.
+        """
         return self._reading and not self.closed
 
     def writable(self):
+        """True if the SocketIO is open for writing.
+        """
         return self._writing and not self.closed
 
     def fileno(self):
+        """Return the file descriptor of the underlying socket.
+        """
         self._checkClosed()
         return self._sock.fileno()
 
@@ -237,6 +262,9 @@ class SocketIO(io.RawIOBase):
         return self._mode
 
     def close(self):
+        """Close the SocketIO object.  This doesn't close the underlying
+        socket, except if all references to it have disappeared.
+        """
         if self.closed:
             return
         io.RawIOBase.close(self)
@@ -287,8 +315,8 @@ def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT):
     is used.
     """
 
-    msg = "getaddrinfo returns an empty list"
     host, port = address
+    err = None
     for res in getaddrinfo(host, port, 0, SOCK_STREAM):
         af, socktype, proto, canonname, sa = res
         sock = None
@@ -299,9 +327,12 @@ def create_connection(address, timeout=_GLOBAL_DEFAULT_TIMEOUT):
             sock.connect(sa)
             return sock
 
-        except error as err:
-            msg = err
+        except error as _:
+            err = _
             if sock is not None:
                 sock.close()
 
-    raise error(msg)
+    if err is not None:
+        raise err
+    else:
+        raise error("getaddrinfo returns an empty list")

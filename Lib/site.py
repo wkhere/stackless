@@ -67,7 +67,11 @@ USER_BASE = None
 
 
 def makepath(*paths):
-    dir = os.path.abspath(os.path.join(*paths))
+    dir = os.path.join(*paths)
+    try:
+        dir = os.path.abspath(dir)
+    except OSError:
+        pass
     return dir, os.path.normcase(dir)
 
 
@@ -78,8 +82,8 @@ def abs__file__():
             continue   # don't mess with a PEP 302-supplied __file__
         try:
             m.__file__ = os.path.abspath(m.__file__)
-        except AttributeError:
-            continue
+        except (AttributeError, OSError):
+            pass
 
 
 def removeduppaths():
@@ -474,11 +478,12 @@ def execsitecustomize():
         pass
     except Exception as err:
         if os.environ.get("PYTHONVERBOSE"):
-            raise
-        sys.stderr.write(
-            "Error in sitecustomize; set PYTHONVERBOSE for traceback:\n"
-            "%s: %s\n" %
-            (err.__class__.__name__, err))
+            sys.excepthook(*sys.exc_info())
+        else:
+            sys.stderr.write(
+                "Error in sitecustomize; set PYTHONVERBOSE for traceback:\n"
+                "%s: %s\n" %
+                (err.__class__.__name__, err))
 
 
 def execusercustomize():
@@ -487,6 +492,14 @@ def execusercustomize():
         import usercustomize
     except ImportError:
         pass
+    except Exception as err:
+        if os.environ.get("PYTHONVERBOSE"):
+            sys.excepthook(*sys.exc_info())
+        else:
+            sys.stderr.write(
+                "Error in usercustomize; set PYTHONVERBOSE for traceback:\n"
+                "%s: %s\n" %
+                (err.__class__.__name__, err))
 
 
 def main():

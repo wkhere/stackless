@@ -18,7 +18,7 @@ All integers are implemented as "long" integer objects of arbitrary size.
 .. cvar:: PyTypeObject PyLong_Type
 
    This instance of :ctype:`PyTypeObject` represents the Python integer type.
-   This is the same object as ``int``.
+   This is the same object as :class:`int` in the Python layer.
 
 
 .. cfunction:: int PyLong_Check(PyObject *p)
@@ -165,6 +165,7 @@ All integers are implemented as "long" integer objects of arbitrary size.
    cannot be represented as a :ctype:`long long`, an
    :exc:`OverflowError` is raised and ``-1`` is returned.
 
+
 .. cfunction:: unsigned PY_LONG_LONG PyLong_AsUnsignedLongLong(PyObject *pylong)
 
    .. index::
@@ -176,8 +177,8 @@ All integers are implemented as "long" integer objects of arbitrary size.
    returned.
 
    .. versionchanged:: 3.1
-      A negative *pylong* now raises :exc:`OverflowError`, not
-      :exc:`TypeError`.
+      A negative *pylong* now raises :exc:`OverflowError`, not :exc:`TypeError`.
+
 
 .. cfunction:: unsigned long PyLong_AsUnsignedLongMask(PyObject *io)
 

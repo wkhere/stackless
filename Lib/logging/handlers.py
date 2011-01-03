@@ -202,7 +202,11 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
 
         self.extMatch = re.compile(self.extMatch, re.ASCII)
         self.interval = self.interval * interval # multiply by units requested
-        self.rolloverAt = self.computeRollover(int(time.time()))
+        if os.path.exists(filename):
+            t = os.stat(filename)[ST_MTIME]
+        else:
+            t = int(time.time())
+        self.rolloverAt = self.computeRollover(t)
 
     def computeRollover(self, currentTime):
         """
@@ -774,6 +778,9 @@ class SysLogHandler(logging.Handler):
             self.encodePriority(self.facility,
                                 self.mapPriority(record.levelname)),
                                 msg)
+        msg = msg.encode('utf-8')
+        if codecs:
+            msg = codecs.BOM_UTF8 + msg
         try:
             if self.unixsocket:
                 try:
@@ -1005,7 +1012,7 @@ class HTTPHandler(logging.Handler):
         """
         Emit a record.
 
-        Send the record to the Web server as an URL-encoded dictionary
+        Send the record to the Web server as a percent-encoded dictionary
         """
         try:
             import http.client, urllib.parse

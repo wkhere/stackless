@@ -506,7 +506,7 @@ class _Pickler:
 
     def save_str(self, obj, pack=struct.pack):
         if self.bin:
-            encoded = obj.encode('utf-8')
+            encoded = obj.encode('utf-8', 'surrogatepass')
             n = len(encoded)
             self.write(BINUNICODE + pack("<i", n) + encoded)
         else:
@@ -1001,7 +1001,7 @@ class _Unpickler:
 
     def load_binunicode(self):
         len = mloads(b'i' + self.read(4))
-        self.append(str(self.read(len), 'utf-8'))
+        self.append(str(self.read(len), 'utf-8', 'surrogatepass'))
     dispatch[BINUNICODE[0]] = load_binunicode
 
     def load_short_binstring(self):
@@ -1069,19 +1069,15 @@ class _Unpickler:
     def _instantiate(self, klass, k):
         args = tuple(self.stack[k+1:])
         del self.stack[k:]
-        instantiated = False
-        if (not args and
-                isinstance(klass, type) and
-                not hasattr(klass, "__getinitargs__")):
-            value = _EmptyClass()
-            value.__class__ = klass
-            instantiated = True
-        if not instantiated:
+        if (args or not isinstance(klass, type) or
+            hasattr(klass, "__getinitargs__")):
             try:
                 value = klass(*args)
             except TypeError as err:
                 raise TypeError("in constructor for %s: %s" %
                                 (klass.__name__, str(err)), sys.exc_info()[2])
+        else:
+            value = klass.__new__(klass)
         self.append(value)
 
     def load_inst(self):
@@ -1273,11 +1269,6 @@ class _Unpickler:
         value = self.stack.pop()
         raise _Stop(value)
     dispatch[STOP[0]] = load_stop
-
-# Helper class for load_inst/load_obj
-
-class _EmptyClass:
-    pass
 
 # Encode/decode longs in linear time.
 

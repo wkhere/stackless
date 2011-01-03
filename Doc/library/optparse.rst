@@ -762,7 +762,8 @@ The first step in using :mod:`optparse` is to create an OptionParser instance.
       The string to use when expanding ``"%prog"`` in ``usage`` and ``version``
       instead of ``os.path.basename(sys.argv[0])``.
 
-
+   ``epilog`` (default: ``None``)
+      A paragraph of help text to print after the option help.
 
 .. _optparse-populating-parser:
 
@@ -1205,7 +1206,7 @@ error message.
 :func:`float` and :func:`complex`, with similar error-handling.
 
 ``"choice"`` options are a subtype of ``"string"`` options.  The
-:attr:`~Option.choices`` option attribute (a sequence of strings) defines the
+:attr:`~Option.choices` option attribute (a sequence of strings) defines the
 set of allowed option arguments.  :func:`optparse.check_choice` compares
 user-supplied option arguments against this master list and raises
 :exc:`OptionValueError` if an invalid string is given.
@@ -1227,8 +1228,9 @@ where the input parameters are
    the list of arguments to process (default: ``sys.argv[1:]``)
 
 ``values``
-   object to store option arguments in (default: a new instance of
-   :class:`optparse.Values`)
+   a :class:`optparse.Values` object to store option arguments in (default: a
+   new instance of :class:`Values`) -- if you give an existing object, the
+   option defaults will not be initialized on it
 
 and the return values are
 

@@ -3,7 +3,7 @@
 See http://www.zope.org/Members/fdrake/DateTimeWiki/TestCases
 """
 
-import os
+import sys
 import pickle
 import unittest
 
@@ -199,6 +199,7 @@ class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
         c = td(0, 0, 1000) # One millisecond
         eq(a+b+c, td(7, 60, 1000))
         eq(a-b, td(6, 24*3600 - 60))
+        eq(b.__rsub__(a), td(6, 24*3600 - 60))
         eq(-a, td(-7))
         eq(+a, td(7))
         eq(-b, td(-1, 24*3600 - 60))
@@ -253,6 +254,7 @@ class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
         for zero in 0, 0:
             self.assertRaises(TypeError, lambda: zero // a)
             self.assertRaises(ZeroDivisionError, lambda: a // zero)
+        self.assertRaises(TypeError, lambda: a / '')
 
     def test_basic_attributes(self):
         days, seconds, us = 1, 7, 31
@@ -360,10 +362,20 @@ class TestTimeDelta(HarmlessMixedComparison, unittest.TestCase):
                    microseconds=999999)),
            "999999999 days, 23:59:59.999999")
 
+    def test_repr(self):
+        name = 'datetime.' + self.theclass.__name__
+        self.assertEqual(repr(self.theclass(1)),
+                         "%s(1)" % name)
+        self.assertEqual(repr(self.theclass(10, 2)),
+                         "%s(10, 2)" % name)
+        self.assertEqual(repr(self.theclass(-10, 2, 400000)),
+                         "%s(-10, 2, 400000)" % name)
+
     def test_roundtrip(self):
         for td in (timedelta(days=999999999, hours=23, minutes=59,
                              seconds=59, microseconds=999999),
                    timedelta(days=-999999999),
+                   timedelta(days=-999999999, seconds=1),
                    timedelta(days=1, seconds=2, microseconds=3)):
 
             # Verify td -> string -> td identity.
@@ -700,15 +712,16 @@ class TestDate(HarmlessMixedComparison, unittest.TestCase):
     def test_overflow(self):
         tiny = self.theclass.resolution
 
-        dt = self.theclass.min + tiny
-        dt -= tiny  # no problem
-        self.assertRaises(OverflowError, dt.__sub__, tiny)
-        self.assertRaises(OverflowError, dt.__add__, -tiny)
+        for delta in [tiny, timedelta(1), timedelta(2)]:
+            dt = self.theclass.min + delta
+            dt -= delta  # no problem
+            self.assertRaises(OverflowError, dt.__sub__, delta)
+            self.assertRaises(OverflowError, dt.__add__, -delta)
 
-        dt = self.theclass.max - tiny
-        dt += tiny  # no problem
-        self.assertRaises(OverflowError, dt.__add__, tiny)
-        self.assertRaises(OverflowError, dt.__sub__, -tiny)
+            dt = self.theclass.max - delta
+            dt += delta  # no problem
+            self.assertRaises(OverflowError, dt.__add__, delta)
+            self.assertRaises(OverflowError, dt.__sub__, -delta)
 
     def test_fromtimestamp(self):
         import time
@@ -1472,8 +1485,8 @@ class TestDateTime(TestDate):
     def test_microsecond_rounding(self):
         # Test whether fromtimestamp "rounds up" floats that are less
         # than one microsecond smaller than an integer.
-        self.assertEquals(self.theclass.fromtimestamp(0.9999999),
-                          self.theclass.fromtimestamp(1))
+        self.assertEqual(self.theclass.fromtimestamp(0.9999999),
+                         self.theclass.fromtimestamp(1))
 
     def test_insane_fromtimestamp(self):
         # It's possible that some platform maps time_t to double,
@@ -1492,21 +1505,16 @@ class TestDateTime(TestDate):
         for insane in -1e200, 1e200:
             self.assertRaises(ValueError, self.theclass.utcfromtimestamp,
                               insane)
-
+    @unittest.skipIf(sys.platform == "win32", "Windows doesn't accept negative timestamps")
     def test_negative_float_fromtimestamp(self):
-        # Windows doesn't accept negative timestamps
-        if os.name == "nt":
-            return
         # The result is tz-dependent; at least test that this doesn't
         # fail (like it did before bug 1646728 was fixed).
         self.theclass.fromtimestamp(-1.05)
 
+    @unittest.skipIf(sys.platform == "win32", "Windows doesn't accept negative timestamps")
     def test_negative_float_utcfromtimestamp(self):
-        # Windows doesn't accept negative timestamps
-        if os.name == "nt":
-            return
         d = self.theclass.utcfromtimestamp(-1.05)
-        self.assertEquals(d, self.theclass(1969, 12, 31, 23, 59, 58, 950000))
+        self.assertEqual(d, self.theclass(1969, 12, 31, 23, 59, 58, 950000))
 
     def test_utcnow(self):
         import time
@@ -2730,7 +2738,7 @@ class TestDateTimeTZ(TestDateTime, TZInfoBase, unittest.TestCase):
 
     def test_utctimetuple(self):
         class DST(tzinfo):
-            def __init__(self, dstvalue):
+            def __init__(self, dstvalue=0):
                 if isinstance(dstvalue, int):
                     dstvalue = timedelta(minutes=dstvalue)
                 self.dstvalue = dstvalue
@@ -2764,6 +2772,25 @@ class TestDateTimeTZ(TestDateTime, TZInfoBase, unittest.TestCase):
             self.assertEqual(d.toordinal() - date(1, 1, 1).toordinal() + 1,
                              t.tm_yday)
             self.assertEqual(0, t.tm_isdst)
+        # For naive datetime, utctimetuple == timetuple except for isdst
+        d = cls(1, 2, 3, 10, 20, 30, 40)
+        t = d.utctimetuple()
+        self.assertEqual(t[:-1], d.timetuple()[:-1])
+        self.assertEqual(0, t.tm_isdst)
+        # Same if utcoffset is None
+        class NOFS(DST):
+            def utcoffset(self, dt):
+                return None
+        d = cls(1, 2, 3, 10, 20, 30, 40, tzinfo=NOFS())
+        t = d.utctimetuple()
+        self.assertEqual(t[:-1], d.timetuple()[:-1])
+        self.assertEqual(0, t.tm_isdst)
+        # Check that bad tzinfo is detected
+        class BOFS(DST):
+            def utcoffset(self, dt):
+                return "EST"
+        d = cls(1, 2, 3, 10, 20, 30, 40, tzinfo=BOFS())
+        self.assertRaises(TypeError, d.utctimetuple)
 
         # At the edges, UTC adjustment can normalize into years out-of-range
         # for a datetime object.  Ensure that a correct timetuple is
@@ -3234,6 +3261,19 @@ class TestTimezoneConversions(unittest.TestCase):
         class notok(ok):
             def dst(self, dt): return None
         self.assertRaises(ValueError, now.astimezone, notok())
+
+        # Sometimes blow up. In the following, tzinfo.dst()
+        # implementation may return None or not Nonedepending on
+        # whether DST is assumed to be in effect.  In this situation,
+        # a ValueError should be raised by astimezone().
+        class tricky_notok(ok):
+            def dst(self, dt):
+                if dt.year == 2000:
+                    return None
+                else:
+                    return 10*HOUR
+        dt = self.theclass(2001, 1, 1).replace(tzinfo=utc_real)
+        self.assertRaises(ValueError, dt.astimezone, tricky_notok())
 
     def test_fromutc(self):
         self.assertRaises(TypeError, Eastern.fromutc)   # not enough args

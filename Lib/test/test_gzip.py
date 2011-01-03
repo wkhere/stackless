@@ -51,6 +51,28 @@ class TestGzip(unittest.TestCase):
         f = gzip.GzipFile(self.filename, 'r') ; d = f.read() ; f.close()
         self.assertEqual(d, data1*50)
 
+    def test_io_on_closed_object(self):
+        # Test that I/O operations on closed GzipFile objects raise a
+        # ValueError, just like the corresponding functions on file objects.
+
+        # Write to a file, open it for reading, then close it.
+        self.test_write()
+        f = gzip.GzipFile(self.filename, 'r')
+        f.close()
+        with self.assertRaises(ValueError):
+            f.read(1)
+        with self.assertRaises(ValueError):
+            f.seek(0)
+        with self.assertRaises(ValueError):
+            f.tell()
+        # Open the file for writing, then close it.
+        f = gzip.GzipFile(self.filename, 'w')
+        f.close()
+        with self.assertRaises(ValueError):
+            f.write(b'')
+        with self.assertRaises(ValueError):
+            f.flush()
+
     def test_append(self):
         self.test_write()
         # Append to the previous file
@@ -79,7 +101,7 @@ class TestGzip(unittest.TestCase):
             contents += ztxt
             if not ztxt: break
         zgfile.close()
-        self.assertEquals(contents, b'a'*201)
+        self.assertEqual(contents, b'a'*201)
 
 
     def test_readline(self):
@@ -138,7 +160,7 @@ class TestGzip(unittest.TestCase):
         f.seek(10, whence=1)
         y = f.read(10)
         f.close()
-        self.assertEquals(y, data1[20:30])
+        self.assertEqual(y, data1[20:30])
 
     def test_seek_write(self):
         # Try seek, write test

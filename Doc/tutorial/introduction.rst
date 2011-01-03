@@ -1,4 +1,4 @@
-.. _tut-informal:
+﻿.. _tut-informal:
 
 **********************************
 An Informal Introduction to Python
@@ -194,8 +194,8 @@ The interpreter prints the result of string operations in the same way as they
 are typed for input: inside quotes, and with quotes and other funny characters
 escaped by backslashes, to show the precise value.  The string is enclosed in
 double quotes if the string contains a single quote and no double quotes, else
-it's enclosed in single quotes.  Once again, the :func:`print` function
-produces the more readable output.
+it's enclosed in single quotes.  The :func:`print` function produces a more
+readable output for such input strings.
 
 String literals can span multiple lines in several ways.  Continuation lines can
 be used, with a backslash as the last character on the line indicating that the
@@ -208,7 +208,7 @@ next line is a logical continuation of the line::
 
    print(hello)
 
-Note that newlines still need to be embedded in the string using ``\n``; the
+Note that newlines still need to be embedded in the string using ``\n`` -- the
 newline following the trailing backslash is discarded.  This example would print
 the following:
 
@@ -220,9 +220,10 @@ the following:
 
 Or, strings can be surrounded in a pair of matching triple-quotes: ``"""`` or
 ``'''``.  End of lines do not need to be escaped when using triple-quotes, but
-they will be included in the string. ::
+they will be included in the string.  So the following uses one escape to
+avoid an unwanted initial blank line.  ::
 
-   print("""
+   print("""\
    Usage: thingy [OPTIONS]
         -h                        Display this usage message
         -H hostname               Hostname to connect to
@@ -610,7 +611,7 @@ This example introduces several new features.
 
      >>> a, b = 0, 1
      >>> while b < 1000:
-     ...     print(b, end=' ')
+     ...     print(b, end=',')
      ...     a, b = b, a+b
      ...
-     1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987
+     1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,

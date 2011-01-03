@@ -270,7 +270,7 @@ BaseException_set_context(PyObject *self, PyObject *arg) {
     } else {
         /* PyException_SetContext steals this reference */
         Py_INCREF(arg);
-    } 
+    }
     PyException_SetContext(self, arg);
     return 0;
 }
@@ -296,7 +296,7 @@ BaseException_set_cause(PyObject *self, PyObject *arg) {
     } else {
         /* PyException_SetCause steals this reference */
         Py_INCREF(arg);
-    } 
+    }
     PyException_SetCause(self, arg);
     return 0;
 }
@@ -379,7 +379,7 @@ static PyTypeObject _PyExc_BaseException = {
     PyObject_GenericSetAttr,    /*tp_setattro*/
     0,                          /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
-    	Py_TPFLAGS_BASE_EXC_SUBCLASS,  /*tp_flags*/
+        Py_TPFLAGS_BASE_EXC_SUBCLASS,  /*tp_flags*/
     PyDoc_STR("Common base class for all exceptions"), /* tp_doc */
     (traverseproc)BaseException_traverse, /* tp_traverse */
     (inquiry)BaseException_clear, /* tp_clear */
@@ -480,6 +480,7 @@ SimpleExtendsException(PyExc_Exception, StopIteration,
  */
 SimpleExtendsException(PyExc_BaseException, GeneratorExit,
                        "Request that a generator exit.");
+
 
 /*
  *    SystemExit extends BaseException
@@ -998,7 +999,7 @@ SyntaxError_str(PySyntaxErrorObject *self)
        lineno here */
 
     if (self->filename && PyUnicode_Check(self->filename)) {
-	    filename = _PyUnicode_AsString(self->filename);
+            filename = _PyUnicode_AsString(self->filename);
     }
     have_lineno = (self->lineno != NULL) && PyLong_CheckExact(self->lineno);
 
@@ -1009,7 +1010,7 @@ SyntaxError_str(PySyntaxErrorObject *self)
         return PyUnicode_FromFormat("%S (%s, line %ld)",
                    self->msg ? self->msg : Py_None,
                    my_basename(filename),
-		   PyLong_AsLongAndOverflow(self->lineno, &overflow));
+                   PyLong_AsLongAndOverflow(self->lineno, &overflow));
     else if (filename)
         return PyUnicode_FromFormat("%S (%s)",
                    self->msg ? self->msg : Py_None,
@@ -1616,9 +1617,6 @@ PyUnicodeDecodeError_Create(
     const char *encoding, const char *object, Py_ssize_t length,
     Py_ssize_t start, Py_ssize_t end, const char *reason)
 {
-    assert(length < INT_MAX);
-    assert(start < INT_MAX);
-    assert(end < INT_MAX);
     return PyObject_CallFunction(PyExc_UnicodeDecodeError, "Uy#nnU",
                                  encoding, object, length, start, end, reason);
 }
@@ -1774,7 +1772,91 @@ SimpleExtendsException(PyExc_Exception, ReferenceError,
 /*
  *    MemoryError extends Exception
  */
-SimpleExtendsException(PyExc_Exception, MemoryError, "Out of memory.");
+
+#define MEMERRORS_SAVE 16
+static PyBaseExceptionObject *memerrors_freelist = NULL;
+static int memerrors_numfree = 0;
+
+static PyObject *
+MemoryError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    PyBaseExceptionObject *self;
+
+    if (type != (PyTypeObject *) PyExc_MemoryError)
+        return BaseException_new(type, args, kwds);
+    if (memerrors_freelist == NULL)
+        return BaseException_new(type, args, kwds);
+    /* Fetch object from freelist and revive it */
+    self = memerrors_freelist;
+    self->args = PyTuple_New(0);
+    /* This shouldn't happen since the empty tuple is persistent */
+    if (self->args == NULL)
+        return NULL;
+    memerrors_freelist = (PyBaseExceptionObject *) self->dict;
+    memerrors_numfree--;
+    self->dict = NULL;
+    _Py_NewReference((PyObject *)self);
+    _PyObject_GC_TRACK(self);
+    return (PyObject *)self;
+}
+
+static void
+MemoryError_dealloc(PyBaseExceptionObject *self)
+{
+    _PyObject_GC_UNTRACK(self);
+    BaseException_clear(self);
+    if (memerrors_numfree >= MEMERRORS_SAVE)
+        Py_TYPE(self)->tp_free((PyObject *)self);
+    else {
+        self->dict = (PyObject *) memerrors_freelist;
+        memerrors_freelist = self;
+        memerrors_numfree++;
+    }
+}
+
+static void
+preallocate_memerrors(void)
+{
+    /* We create enough MemoryErrors and then decref them, which will fill
+       up the freelist. */
+    int i;
+    PyObject *errors[MEMERRORS_SAVE];
+    for (i = 0; i < MEMERRORS_SAVE; i++) {
+        errors[i] = MemoryError_new((PyTypeObject *) PyExc_MemoryError,
+                                    NULL, NULL);
+        if (!errors[i])
+            Py_FatalError("Could not preallocate MemoryError object");
+    }
+    for (i = 0; i < MEMERRORS_SAVE; i++) {
+        Py_DECREF(errors[i]);
+    }
+}
+
+static void
+free_preallocated_memerrors(void)
+{
+    while (memerrors_freelist != NULL) {
+        PyObject *self = (PyObject *) memerrors_freelist;
+        memerrors_freelist = (PyBaseExceptionObject *) memerrors_freelist->dict;
+        Py_TYPE(self)->tp_free((PyObject *)self);
+    }
+}
+
+
+static PyTypeObject _PyExc_MemoryError = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "MemoryError",
+    sizeof(PyBaseExceptionObject),
+    0, (destructor)MemoryError_dealloc, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    PyDoc_STR("Out of memory."), (traverseproc)BaseException_traverse,
+    (inquiry)BaseException_clear, 0, 0, 0, 0, 0, 0, 0, &_PyExc_Exception,
+    0, 0, 0, offsetof(PyBaseExceptionObject, dict),
+    (initproc)BaseException_init, 0, MemoryError_new
+};
+PyObject *PyExc_MemoryError = (PyObject *) &_PyExc_MemoryError;
+
 
 /*
  *    BufferError extends Exception
@@ -1857,11 +1939,6 @@ SimpleExtendsException(PyExc_Warning, BytesWarning,
     "related to conversion from str or comparing to str.");
 
 
-
-/* Pre-computed MemoryError instance.  Best to create this as early as
- * possible and not wait until a MemoryError is actually raised!
- */
-PyObject *PyExc_MemoryErrorInst=NULL;
 
 /* Pre-computed RuntimeError instance for when recursion depth is reached.
    Meant to be used when normalizing the exception for exceeding the recursion
@@ -2005,31 +2082,29 @@ _PyExc_Init(void)
     POST_INIT(UnicodeWarning)
     POST_INIT(BytesWarning)
 
-    PyExc_MemoryErrorInst = BaseException_new(&_PyExc_MemoryError, NULL, NULL);
-    if (!PyExc_MemoryErrorInst)
-        Py_FatalError("Cannot pre-allocate MemoryError instance");
+    preallocate_memerrors();
 
     PyExc_RecursionErrorInst = BaseException_new(&_PyExc_RuntimeError, NULL, NULL);
     if (!PyExc_RecursionErrorInst)
-	Py_FatalError("Cannot pre-allocate RuntimeError instance for "
-			"recursion errors");
+        Py_FatalError("Cannot pre-allocate RuntimeError instance for "
+                        "recursion errors");
     else {
-	PyBaseExceptionObject *err_inst =
-	    (PyBaseExceptionObject *)PyExc_RecursionErrorInst;
-	PyObject *args_tuple;
-	PyObject *exc_message;
-	exc_message = PyUnicode_FromString("maximum recursion depth exceeded");
-	if (!exc_message)
-	    Py_FatalError("cannot allocate argument for RuntimeError "
-			    "pre-allocation");
-	args_tuple = PyTuple_Pack(1, exc_message);
-	if (!args_tuple)
-	    Py_FatalError("cannot allocate tuple for RuntimeError "
-			    "pre-allocation");
-	Py_DECREF(exc_message);
-	if (BaseException_init(err_inst, args_tuple, NULL))
-	    Py_FatalError("init of pre-allocated RuntimeError failed");
-	Py_DECREF(args_tuple);
+        PyBaseExceptionObject *err_inst =
+            (PyBaseExceptionObject *)PyExc_RecursionErrorInst;
+        PyObject *args_tuple;
+        PyObject *exc_message;
+        exc_message = PyUnicode_FromString("maximum recursion depth exceeded");
+        if (!exc_message)
+            Py_FatalError("cannot allocate argument for RuntimeError "
+                            "pre-allocation");
+        args_tuple = PyTuple_Pack(1, exc_message);
+        if (!args_tuple)
+            Py_FatalError("cannot allocate tuple for RuntimeError "
+                            "pre-allocation");
+        Py_DECREF(exc_message);
+        if (BaseException_init(err_inst, args_tuple, NULL))
+            Py_FatalError("init of pre-allocated RuntimeError failed");
+        Py_DECREF(args_tuple);
     }
 
     Py_DECREF(bltinmod);
@@ -2038,6 +2113,6 @@ _PyExc_Init(void)
 void
 _PyExc_Fini(void)
 {
-    Py_XDECREF(PyExc_MemoryErrorInst);
-    PyExc_MemoryErrorInst = NULL;
+    Py_CLEAR(PyExc_RecursionErrorInst);
+    free_preallocated_memerrors();
 }

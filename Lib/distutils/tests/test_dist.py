@@ -80,29 +80,29 @@ class DistributionTestCase(support.LoggingSilencer,
 
     def test_command_packages_configfile(self):
         sys.argv.append("build")
+        self.addCleanup(os.unlink, TESTFN)
         f = open(TESTFN, "w")
         try:
             print("[global]", file=f)
             print("command_packages = foo.bar, splat", file=f)
-            f.close()
-            d = self.create_distribution([TESTFN])
-            self.assertEqual(d.get_command_packages(),
-                             ["distutils.command", "foo.bar", "splat"])
-
-            # ensure command line overrides config:
-            sys.argv[1:] = ["--command-packages", "spork", "build"]
-            d = self.create_distribution([TESTFN])
-            self.assertEqual(d.get_command_packages(),
-                             ["distutils.command", "spork"])
-
-            # Setting --command-packages to '' should cause the default to
-            # be used even if a config file specified something else:
-            sys.argv[1:] = ["--command-packages", "", "build"]
-            d = self.create_distribution([TESTFN])
-            self.assertEqual(d.get_command_packages(), ["distutils.command"])
-
         finally:
-            os.unlink(TESTFN)
+            f.close()
+
+        d = self.create_distribution([TESTFN])
+        self.assertEqual(d.get_command_packages(),
+                         ["distutils.command", "foo.bar", "splat"])
+
+        # ensure command line overrides config:
+        sys.argv[1:] = ["--command-packages", "spork", "build"]
+        d = self.create_distribution([TESTFN])
+        self.assertEqual(d.get_command_packages(),
+                         ["distutils.command", "spork"])
+
+        # Setting --command-packages to '' should cause the default to
+        # be used even if a config file specified something else:
+        sys.argv[1:] = ["--command-packages", "", "build"]
+        d = self.create_distribution([TESTFN])
+        self.assertEqual(d.get_command_packages(), ["distutils.command"])
 
     def test_empty_options(self):
         # an empty options dictionary should not stay in the
@@ -125,7 +125,7 @@ class DistributionTestCase(support.LoggingSilencer,
         finally:
             warnings.warn = old_warn
 
-        self.assertEquals(len(warns), 0)
+        self.assertEqual(len(warns), 0)
 
     def test_finalize_options(self):
 
@@ -136,20 +136,20 @@ class DistributionTestCase(support.LoggingSilencer,
         dist.finalize_options()
 
         # finalize_option splits platforms and keywords
-        self.assertEquals(dist.metadata.platforms, ['one', 'two'])
-        self.assertEquals(dist.metadata.keywords, ['one', 'two'])
+        self.assertEqual(dist.metadata.platforms, ['one', 'two'])
+        self.assertEqual(dist.metadata.keywords, ['one', 'two'])
 
     def test_get_command_packages(self):
         dist = Distribution()
-        self.assertEquals(dist.command_packages, None)
+        self.assertEqual(dist.command_packages, None)
         cmds = dist.get_command_packages()
-        self.assertEquals(cmds, ['distutils.command'])
-        self.assertEquals(dist.command_packages,
-                          ['distutils.command'])
+        self.assertEqual(cmds, ['distutils.command'])
+        self.assertEqual(dist.command_packages,
+                         ['distutils.command'])
 
         dist.command_packages = 'one,two'
         cmds = dist.get_command_packages()
-        self.assertEquals(cmds, ['distutils.command', 'one', 'two'])
+        self.assertEqual(cmds, ['distutils.command', 'one', 'two'])
 
 
     def test_announce(self):
@@ -261,8 +261,10 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
         temp_dir = self.mkdtemp()
         user_filename = os.path.join(temp_dir, user_filename)
         f = open(user_filename, 'w')
-        f.write('.')
-        f.close()
+        try:
+            f.write('.')
+        finally:
+            f.close()
 
         try:
             dist = Distribution()
@@ -286,8 +288,8 @@ class MetadataTestCase(support.TempdirManager, support.EnvironGuard,
     def test_fix_help_options(self):
         help_tuples = [('a', 'b', 'c', 'd'), (1, 2, 3, 4)]
         fancy_options = fix_help_options(help_tuples)
-        self.assertEquals(fancy_options[0], ('a', 'b', 'c'))
-        self.assertEquals(fancy_options[1], (1, 2, 3))
+        self.assertEqual(fancy_options[0], ('a', 'b', 'c'))
+        self.assertEqual(fancy_options[1], (1, 2, 3))
 
     def test_show_help(self):
         # smoke test, just makes sure some help is displayed

@@ -279,7 +279,7 @@ class ThreadTests(unittest.TestCase):
         # Issue1733757
         # Avoid a deadlock when sys.settrace steps into threading._shutdown
         import subprocess
-        rc = subprocess.call([sys.executable, "-c", """if 1:
+        p = subprocess.Popen([sys.executable, "-c", """if 1:
             import sys, threading
 
             # A deadlock-killer, to prevent the
@@ -299,9 +299,14 @@ class ThreadTests(unittest.TestCase):
                 return func
 
             sys.settrace(func)
-            """])
+            """],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        rc = p.returncode
         self.assertFalse(rc == 2, "interpreted was blocked")
-        self.assertTrue(rc == 0, "Unexpected error")
+        self.assertTrue(rc == 0,
+                        "Unexpected error: " + ascii(stderr))
 
     def test_join_nondaemon_on_shutdown(self):
         # Issue 1722344
@@ -366,17 +371,17 @@ class ThreadTests(unittest.TestCase):
         weak_cyclic_object = weakref.ref(cyclic_object)
         cyclic_object.thread.join()
         del cyclic_object
-        self.assertEquals(None, weak_cyclic_object(),
-                          msg=('%d references still around' %
-                               sys.getrefcount(weak_cyclic_object())))
+        self.assertEqual(None, weak_cyclic_object(),
+                         msg=('%d references still around' %
+                              sys.getrefcount(weak_cyclic_object())))
 
         raising_cyclic_object = RunSelfFunction(should_raise=True)
         weak_raising_cyclic_object = weakref.ref(raising_cyclic_object)
         raising_cyclic_object.thread.join()
         del raising_cyclic_object
-        self.assertEquals(None, weak_raising_cyclic_object(),
-                          msg=('%d references still around' %
-                               sys.getrefcount(weak_raising_cyclic_object())))
+        self.assertEqual(None, weak_raising_cyclic_object(),
+                         msg=('%d references still around' %
+                              sys.getrefcount(weak_raising_cyclic_object())))
 
     def test_old_threading_api(self):
         # Just a quick sanity check to make sure the old method names are
@@ -411,6 +416,7 @@ class ThreadJoinOnShutdown(unittest.TestCase):
         p = subprocess.Popen([sys.executable, "-c", script], stdout=subprocess.PIPE)
         rc = p.wait()
         data = p.stdout.read().decode().replace('\r', '')
+        p.stdout.close()
         self.assertEqual(data, "end of main\nend of thread\n")
         self.assertFalse(rc == 2, "interpreter was blocked")
         self.assertTrue(rc == 0, "Unexpected error")
@@ -454,7 +460,8 @@ class ThreadJoinOnShutdown(unittest.TestCase):
             return
         # Skip platforms with known problems forking from a worker thread.
         # See http://bugs.python.org/issue3863.
-        if sys.platform in ('freebsd4', 'freebsd5', 'freebsd6', 'os2emx'):
+        if sys.platform in ('freebsd4', 'freebsd5', 'freebsd6', 'netbsd5',
+                           'os2emx'):
             print('Skipping test_3_join_in_forked_from_thread'
                   ' due to known OS bugs on', sys.platform, file=sys.stderr)
             return

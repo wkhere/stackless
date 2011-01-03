@@ -8,6 +8,10 @@ Python on Windows FAQ
 
 .. contents::
 
+.. XXX need review for Python 3.
+   XXX need review for Windows Vista/Seven?
+
+
 How do I run a Python program under Windows?
 --------------------------------------------
 
@@ -67,7 +71,7 @@ Python statements or expressions interactively and have them executed or
 evaluated while you wait.  This is one of Python's strongest features.  Check it
 by entering a few expressions of your choice and seeing the results::
 
-    >>> print "Hello"
+    >>> print("Hello")
     Hello
     >>> "Hello" * 3
     HelloHelloHello
@@ -286,20 +290,18 @@ Embedding the Python interpreter in a Windows app can be summarized as follows:
 
 1. Do _not_ build Python into your .exe file directly.  On Windows, Python must
    be a DLL to handle importing modules that are themselves DLL's.  (This is the
-   first key undocumented fact.) Instead, link to :file:`python{NN}.dll`; it is
-   typically installed in ``C:\Windows\System``.  NN is the Python version, a
+   first key undocumented fact.)  Instead, link to :file:`python{NN}.dll`; it is
+   typically installed in ``C:\Windows\System``.  *NN* is the Python version, a
    number such as "23" for Python 2.3.
 
-   You can link to Python statically or dynamically.  Linking statically means
-   linking against :file:`python{NN}.lib`, while dynamically linking means
-   linking against :file:`python{NN}.dll`.  The drawback to dynamic linking is
-   that your app won't run if :file:`python{NN}.dll` does not exist on your
-   system.  (General note: :file:`python{NN}.lib` is the so-called "import lib"
-   corresponding to :file:`python.dll`.  It merely defines symbols for the
-   linker.)
+   You can link to Python in two different ways.  Load-time linking means
+   linking against :file:`python{NN}.lib`, while run-time linking means linking
+   against :file:`python{NN}.dll`.  (General note: :file:`python{NN}.lib` is the
+   so-called "import lib" corresponding to :file:`python{NN}.dll`.  It merely
+   defines symbols for the linker.)
 
-   Linking dynamically greatly simplifies link options; everything happens at
-   run time.  Your code must load :file:`python{NN}.dll` using the Windows
+   Run-time linking greatly simplifies link options; everything happens at run
+   time.  Your code must load :file:`python{NN}.dll` using the Windows
    ``LoadLibraryEx()`` routine.  The code must also use access routines and data
    in :file:`python{NN}.dll` (that is, Python's C API's) using pointers obtained
    by the Windows ``GetProcAddress()`` routine.  Macros can make using these
@@ -307,6 +309,8 @@ Embedding the Python interpreter in a Windows app can be summarized as follows:
 
    Borland note: convert :file:`python{NN}.lib` to OMF format using Coff2Omf.exe
    first.
+
+   .. XXX what about static linking?
 
 2. If you use SWIG, it is easy to create a Python "extension module" that will
    make the app's data and methods available to Python.  SWIG will handle just
@@ -441,13 +445,15 @@ present, and ``getch()`` which gets one character without echoing it.
 How do I emulate os.kill() in Windows?
 --------------------------------------
 
-Use win32api::
+To terminate a process, you can use ctypes::
+
+   import ctypes
 
    def kill(pid):
        """kill function for Win32"""
-       import win32api
-       handle = win32api.OpenProcess(1, 0, pid)
-       return (0 != win32api.TerminateProcess(handle, 0))
+       kernel32 = ctypes.windll.kernel32
+       handle = kernel32.OpenProcess(1, 0, pid)
+       return (0 != kernel32.TerminateProcess(handle, 0))
 
 
 Why does os.path.isdir() fail on NT shared directories?
@@ -507,7 +513,7 @@ Example::
 
    import win32pipe
    f = win32pipe.popen('dir /c c:\\')
-   print f.readlines()
+   print(f.readlines())
    f.close()
 
 
@@ -587,7 +593,7 @@ Warning about CTL3D32 version from installer
 
 The Python installer issues a warning like this::
 
-   This version uses ``CTL3D32.DLL`` which is not the correct version.
+   This version uses CTL3D32.DLL which is not the correct version.
    This version is used for windows NT applications only.
 
 Tim Peters:

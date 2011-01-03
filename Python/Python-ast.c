@@ -3378,9 +3378,9 @@ failed:
 int
 obj2ast_mod(PyObject* obj, mod_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
+        PyObject *tmp = NULL;
 
         if (obj == Py_None) {
                 *out = NULL;
@@ -3518,20 +3518,17 @@ obj2ast_mod(PyObject* obj, mod_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of mod, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of mod, but got %R", obj);
+        failed:
         return 1;
 }
 
 int
 obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
+        PyObject *tmp = NULL;
         int lineno;
         int col_offset;
 
@@ -4717,20 +4714,17 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of stmt, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of stmt, but got %R", obj);
+        failed:
         return 1;
 }
 
 int
 obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
+        PyObject *tmp = NULL;
         int lineno;
         int col_offset;
 
@@ -5835,18 +5829,14 @@ obj2ast_expr(PyObject* obj, expr_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of expr, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of expr, but got %R", obj);
+        failed:
         return 1;
 }
 
 int
 obj2ast_expr_context(PyObject* obj, expr_context_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
         isinstance = PyObject_IsInstance(obj, (PyObject *)Load_type);
@@ -5898,20 +5888,16 @@ obj2ast_expr_context(PyObject* obj, expr_context_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of expr_context, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of expr_context, but got %R", obj);
         return 1;
 }
 
 int
 obj2ast_slice(PyObject* obj, slice_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
+        PyObject *tmp = NULL;
 
         if (obj == Py_None) {
                 *out = NULL;
@@ -6023,18 +6009,14 @@ obj2ast_slice(PyObject* obj, slice_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of slice, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of slice, but got %R", obj);
+        failed:
         return 1;
 }
 
 int
 obj2ast_boolop(PyObject* obj, boolop_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
         isinstance = PyObject_IsInstance(obj, (PyObject *)And_type);
@@ -6054,18 +6036,13 @@ obj2ast_boolop(PyObject* obj, boolop_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of boolop, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of boolop, but got %R", obj);
         return 1;
 }
 
 int
 obj2ast_operator(PyObject* obj, operator_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
         isinstance = PyObject_IsInstance(obj, (PyObject *)Add_type);
@@ -6165,18 +6142,13 @@ obj2ast_operator(PyObject* obj, operator_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of operator, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of operator, but got %R", obj);
         return 1;
 }
 
 int
 obj2ast_unaryop(PyObject* obj, unaryop_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
         isinstance = PyObject_IsInstance(obj, (PyObject *)Invert_type);
@@ -6212,18 +6184,13 @@ obj2ast_unaryop(PyObject* obj, unaryop_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of unaryop, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of unaryop, but got %R", obj);
         return 1;
 }
 
 int
 obj2ast_cmpop(PyObject* obj, cmpop_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
         isinstance = PyObject_IsInstance(obj, (PyObject *)Eq_type);
@@ -6307,11 +6274,7 @@ obj2ast_cmpop(PyObject* obj, cmpop_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of cmpop, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of cmpop, but got %R", obj);
         return 1;
 }
 
@@ -6382,9 +6345,9 @@ failed:
 int
 obj2ast_excepthandler(PyObject* obj, excepthandler_ty* out, PyArena* arena)
 {
-        PyObject* tmp = NULL;
         int isinstance;
 
+        PyObject *tmp = NULL;
         int lineno;
         int col_offset;
 
@@ -6478,11 +6441,8 @@ obj2ast_excepthandler(PyObject* obj, excepthandler_ty* out, PyArena* arena)
                 return 0;
         }
 
-        tmp = PyObject_Repr(obj);
-        if (tmp == NULL) goto failed;
-        PyErr_Format(PyExc_TypeError, "expected some sort of excepthandler, but got %.400s", PyBytes_AS_STRING(tmp));
-failed:
-        Py_XDECREF(tmp);
+        PyErr_Format(PyExc_TypeError, "expected some sort of excepthandler, but got %R", obj);
+        failed:
         return 1;
 }
 

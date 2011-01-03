@@ -498,7 +498,7 @@ self.assertTrue(X.passed)
                 def f(self):
                     return x
 
-            self.assertEquals(x, 12) # Used to raise UnboundLocalError
+            self.assertEqual(x, 12) # Used to raise UnboundLocalError
         finally:
             sys.settrace(None)
 
@@ -692,6 +692,14 @@ result2 = h()
         g = f(1)
         h = g()
         self.assertEqual(h(), 3)
+
+    def testTopIsNotSignificant(self):
+        # See #9997.
+        def top(a):
+            pass
+        def b():
+            global a
+
 
 
 def test_main():

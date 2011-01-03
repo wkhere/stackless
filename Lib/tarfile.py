@@ -349,7 +349,7 @@ class _LowLevelFile:
         }[mode]
         if hasattr(os, "O_BINARY"):
             mode |= os.O_BINARY
-        self.fd = os.open(name, mode)
+        self.fd = os.open(name, mode, 0o666)
 
     def close(self):
         os.close(self.fd)
@@ -923,8 +923,8 @@ class TarInfo(object):
         self.chksum = 0         # header checksum
         self.type = REGTYPE     # member type
         self.linkname = ""      # link name
-        self.uname = "root"     # user name
-        self.gname = "root"     # group name
+        self.uname = ""         # user name
+        self.gname = ""         # group name
         self.devmajor = 0       # device major number
         self.devminor = 0       # device minor number
 
@@ -1102,8 +1102,8 @@ class TarInfo(object):
             info.get("type", REGTYPE),
             stn(info.get("linkname", ""), 100, encoding, errors),
             info.get("magic", POSIX_MAGIC),
-            stn(info.get("uname", "root"), 32, encoding, errors),
-            stn(info.get("gname", "root"), 32, encoding, errors),
+            stn(info.get("uname", ""), 32, encoding, errors),
+            stn(info.get("gname", ""), 32, encoding, errors),
             itn(info.get("devmajor", 0), 8, format),
             itn(info.get("devminor", 0), 8, format),
             stn(info.get("prefix", ""), 155, encoding, errors)
@@ -1857,7 +1857,7 @@ class TarFile(object):
         tarinfo.mode = stmd
         tarinfo.uid = statres.st_uid
         tarinfo.gid = statres.st_gid
-        if stat.S_ISREG(stmd):
+        if type == REGTYPE:
             tarinfo.size = statres.st_size
         else:
             tarinfo.size = 0

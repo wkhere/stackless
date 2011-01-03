@@ -10,6 +10,7 @@ from http import server
 
 import os
 import sys
+import re
 import base64
 import shutil
 import urllib.parse
@@ -18,6 +19,8 @@ import tempfile
 import threading
 
 import unittest
+
+from io import BytesIO
 from test import support
 
 class NoLogRequestHandler:
@@ -29,19 +32,35 @@ class NoLogRequestHandler:
         return ''
 
 
+class SocketlessRequestHandler(BaseHTTPRequestHandler):
+    def __init__(self):
+        self.get_called = False
+        self.protocol_version = "HTTP/1.1"
+
+    def do_GET(self):
+        self.get_called = True
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b'<html><body>Data</body></html>\r\n')
+
+    def log_message(self, format, *args):
+        pass
+
+
 class TestServerThread(threading.Thread):
     def __init__(self, test_object, request_handler):
         threading.Thread.__init__(self)
         self.request_handler = request_handler
         self.test_object = test_object
-        self.test_object.lock.acquire()
 
     def run(self):
         self.server = HTTPServer(('', 0), self.request_handler)
         self.test_object.PORT = self.server.socket.getsockname()[1]
-        self.test_object.lock.release()
+        self.test_object.server_started.set()
+        self.test_object = None
         try:
-            self.server.serve_forever()
+            self.server.serve_forever(0.05)
         finally:
             self.server.server_close()
 
@@ -51,19 +70,73 @@ class TestServerThread(threading.Thread):
 
 class BaseTestCase(unittest.TestCase):
     def setUp(self):
-        self.lock = threading.Lock()
+        self.server_started = threading.Event()
         self.thread = TestServerThread(self, self.request_handler)
         self.thread.start()
-        self.lock.acquire()
+        self.server_started.wait()
 
     def tearDown(self):
-        self.lock.release()
         self.thread.stop()
 
     def request(self, uri, method='GET', body=None, headers={}):
         self.connection = http.client.HTTPConnection('localhost', self.PORT)
         self.connection.request(method, uri, body, headers)
         return self.connection.getresponse()
+
+class BaseHTTPRequestHandlerTestCase(unittest.TestCase):
+    """Test the functionaility of the BaseHTTPServer."""
+
+    HTTPResponseMatch = re.compile(b'HTTP/1.[0-9]+ 200 OK')
+
+    def setUp (self):
+        self.handler = SocketlessRequestHandler()
+
+    def send_typical_request(self, message):
+        input = BytesIO(message)
+        output = BytesIO()
+        self.handler.rfile = input
+        self.handler.wfile = output
+        self.handler.handle_one_request()
+        output.seek(0)
+        return output.readlines()
+
+    def verify_get_called(self):
+        self.assertTrue(self.handler.get_called)
+
+    def verify_expected_headers(self, headers):
+        for fieldName in b'Server: ', b'Date: ', b'Content-Type: ':
+            self.assertEqual(sum(h.startswith(fieldName) for h in headers), 1)
+
+    def verify_http_server_response(self, response):
+        match = self.HTTPResponseMatch.search(response)
+        self.assertTrue(match is not None)
+
+    def test_http_1_1(self):
+        result = self.send_typical_request(b'GET / HTTP/1.1\r\n\r\n')
+        self.verify_http_server_response(result[0])
+        self.verify_expected_headers(result[1:-1])
+        self.verify_get_called()
+        self.assertEqual(result[-1], b'<html><body>Data</body></html>\r\n')
+
+    def test_http_1_0(self):
+        result = self.send_typical_request(b'GET / HTTP/1.0\r\n\r\n')
+        self.verify_http_server_response(result[0])
+        self.verify_expected_headers(result[1:-1])
+        self.verify_get_called()
+        self.assertEqual(result[-1], b'<html><body>Data</body></html>\r\n')
+
+    def test_http_0_9(self):
+        result = self.send_typical_request(b'GET / HTTP/0.9\r\n\r\n')
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], b'<html><body>Data</body></html>\r\n')
+        self.verify_get_called()
+
+    def test_with_continue_1_0(self):
+        result = self.send_typical_request(b'GET / HTTP/1.0\r\nExpect: 100-continue\r\n\r\n')
+        self.verify_http_server_response(result[0])
+        self.verify_expected_headers(result[1:-1])
+        self.verify_get_called()
+        self.assertEqual(result[-1], b'<html><body>Data</body></html>\r\n')
 
 
 class BaseHTTPServerTestCase(BaseTestCase):
@@ -100,42 +173,42 @@ class BaseHTTPServerTestCase(BaseTestCase):
     def test_command(self):
         self.con.request('GET', '/')
         res = self.con.getresponse()
-        self.assertEquals(res.status, 501)
+        self.assertEqual(res.status, 501)
 
     def test_request_line_trimming(self):
         self.con._http_vsn_str = 'HTTP/1.1\n'
         self.con.putrequest('GET', '/')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 501)
+        self.assertEqual(res.status, 501)
 
     def test_version_bogus(self):
         self.con._http_vsn_str = 'FUBAR'
         self.con.putrequest('GET', '/')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 400)
+        self.assertEqual(res.status, 400)
 
     def test_version_digits(self):
         self.con._http_vsn_str = 'HTTP/9.9.9'
         self.con.putrequest('GET', '/')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 400)
+        self.assertEqual(res.status, 400)
 
     def test_version_none_get(self):
         self.con._http_vsn_str = ''
         self.con.putrequest('GET', '/')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 501)
+        self.assertEqual(res.status, 501)
 
     def test_version_none(self):
         self.con._http_vsn_str = ''
         self.con.putrequest('PUT', '/')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 400)
+        self.assertEqual(res.status, 400)
 
     def test_version_invalid(self):
         self.con._http_vsn = 99
@@ -143,21 +216,21 @@ class BaseHTTPServerTestCase(BaseTestCase):
         self.con.putrequest('GET', '/')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 505)
+        self.assertEqual(res.status, 505)
 
     def test_send_blank(self):
         self.con._http_vsn_str = ''
         self.con.putrequest('', '')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 400)
+        self.assertEqual(res.status, 400)
 
     def test_header_close(self):
         self.con.putrequest('GET', '/')
         self.con.putheader('Connection', 'close')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 501)
+        self.assertEqual(res.status, 501)
 
     def test_head_keep_alive(self):
         self.con._http_vsn_str = 'HTTP/1.1'
@@ -165,28 +238,28 @@ class BaseHTTPServerTestCase(BaseTestCase):
         self.con.putheader('Connection', 'keep-alive')
         self.con.endheaders()
         res = self.con.getresponse()
-        self.assertEquals(res.status, 501)
+        self.assertEqual(res.status, 501)
 
     def test_handler(self):
         self.con.request('TEST', '/')
         res = self.con.getresponse()
-        self.assertEquals(res.status, 204)
+        self.assertEqual(res.status, 204)
 
     def test_return_header_keep_alive(self):
         self.con.request('KEEP', '/')
         res = self.con.getresponse()
-        self.assertEquals(res.getheader('Connection'), 'keep-alive')
+        self.assertEqual(res.getheader('Connection'), 'keep-alive')
         self.con.request('TEST', '/')
 
     def test_internal_key_error(self):
         self.con.request('KEYERROR', '/')
         res = self.con.getresponse()
-        self.assertEquals(res.status, 999)
+        self.assertEqual(res.status, 999)
 
     def test_return_custom_status(self):
         self.con.request('CUSTOM', '/')
         res = self.con.getresponse()
-        self.assertEquals(res.status, 999)
+        self.assertEqual(res.status, 999)
 
 
 class SimpleHTTPServerTestCase(BaseTestCase):
@@ -218,7 +291,7 @@ class SimpleHTTPServerTestCase(BaseTestCase):
     def check_status_and_reason(self, response, status, data=None):
         body = response.read()
         self.assertTrue(response)
-        self.assertEquals(response.status, status)
+        self.assertEqual(response.status, status)
         self.assertTrue(response.reason != None)
         if data:
             self.assertEqual(data, body)
@@ -294,14 +367,22 @@ class CGIHTTPServerTestCase(BaseTestCase):
         self.cgi_dir = os.path.join(self.parent_dir, 'cgi-bin')
         os.mkdir(self.cgi_dir)
 
+        # The shebang line should be pure ASCII: use symlink if possible.
+        # See issue #7668.
+        if hasattr(os, 'symlink'):
+            self.pythonexe = os.path.join(self.parent_dir, 'python')
+            os.symlink(sys.executable, self.pythonexe)
+        else:
+            self.pythonexe = sys.executable
+
         self.file1_path = os.path.join(self.cgi_dir, 'file1.py')
         with open(self.file1_path, 'w') as file1:
-            file1.write(cgi_file1 % sys.executable)
+            file1.write(cgi_file1 % self.pythonexe)
         os.chmod(self.file1_path, 0o777)
 
         self.file2_path = os.path.join(self.cgi_dir, 'file2.py')
         with open(self.file2_path, 'w') as file2:
-            file2.write(cgi_file2 % sys.executable)
+            file2.write(cgi_file2 % self.pythonexe)
         os.chmod(self.file2_path, 0o777)
 
         self.cwd = os.getcwd()
@@ -310,6 +391,8 @@ class CGIHTTPServerTestCase(BaseTestCase):
     def tearDown(self):
         try:
             os.chdir(self.cwd)
+            if self.pythonexe != sys.executable:
+                os.remove(self.pythonexe)
             os.remove(self.file1_path)
             os.remove(self.file2_path)
             os.rmdir(self.cgi_dir)
@@ -352,13 +435,13 @@ class CGIHTTPServerTestCase(BaseTestCase):
                                   server._url_collapse_path_split, path)
             else:
                 actual = server._url_collapse_path_split(path)
-                self.assertEquals(expected, actual,
-                                  msg='path = %r\nGot:    %r\nWanted: %r' % (
-                                  path, actual, expected))
+                self.assertEqual(expected, actual,
+                                 msg='path = %r\nGot:    %r\nWanted: %r' % (
+                                 path, actual, expected))
 
     def test_headers_and_content(self):
         res = self.request('/cgi-bin/file1.py')
-        self.assertEquals((b'Hello World\n', 'text/html', 200), \
+        self.assertEqual((b'Hello World\n', 'text/html', 200), \
              (res.read(), res.getheader('Content-type'), res.status))
 
     def test_post(self):
@@ -367,31 +450,39 @@ class CGIHTTPServerTestCase(BaseTestCase):
         headers = {'Content-type' : 'application/x-www-form-urlencoded'}
         res = self.request('/cgi-bin/file2.py', 'POST', params, headers)
 
-        self.assertEquals(res.read(), b'1, python, 123456\n')
+        self.assertEqual(res.read(), b'1, python, 123456\n')
 
     def test_invaliduri(self):
         res = self.request('/cgi-bin/invalid')
         res.read()
-        self.assertEquals(res.status, 404)
+        self.assertEqual(res.status, 404)
 
     def test_authorization(self):
         headers = {b'Authorization' : b'Basic ' +
                    base64.b64encode(b'username:pass')}
         res = self.request('/cgi-bin/file1.py', 'GET', headers=headers)
-        self.assertEquals((b'Hello World\n', 'text/html', 200), \
+        self.assertEqual((b'Hello World\n', 'text/html', 200), \
              (res.read(), res.getheader('Content-type'), res.status))
 
     def test_no_leading_slash(self):
         # http://bugs.python.org/issue2254
         res = self.request('cgi-bin/file1.py')
-        self.assertEquals((b'Hello World\n', 'text/html', 200),
+        self.assertEqual((b'Hello World\n', 'text/html', 200),
              (res.read(), res.getheader('Content-type'), res.status))
 
+    def test_os_environ_is_not_altered(self):
+        signature = "Test CGI Server"
+        os.environ['SERVER_SOFTWARE'] = signature
+        res = self.request('/cgi-bin/file1.py')
+        self.assertEqual((b'Hello World\n', 'text/html', 200),
+                (res.read(), res.getheader('Content-type'), res.status))
+        self.assertEqual(os.environ['SERVER_SOFTWARE'], signature)
 
 def test_main(verbose=None):
     try:
         cwd = os.getcwd()
-        support.run_unittest(BaseHTTPServerTestCase,
+        support.run_unittest(BaseHTTPRequestHandlerTestCase,
+                             BaseHTTPServerTestCase,
                              SimpleHTTPServerTestCase,
                              CGIHTTPServerTestCase
                              )

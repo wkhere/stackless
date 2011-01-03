@@ -236,7 +236,7 @@ This version of the module has a number of changes.
 
 We've added an extra include::
 
-   #include "structmember.h"
+   #include <structmember.h>
 
 This include provides declarations that we use to handle attributes, as
 described a bit later.
@@ -430,7 +430,7 @@ and put the definitions in the :attr:`tp_members` slot::
    Noddy_members,             /* tp_members */
 
 Each member definition has a member name, type, offset, access flags and
-documentation string. See the "Generic Attribute Management" section below for
+documentation string. See the :ref:`Generic-Attribute-Management` section below for
 details.
 
 A disadvantage of this approach is that it doesn't provide a way to restrict the
@@ -1078,6 +1078,8 @@ disappeared starting with Python 2.2, though there are many examples which have
 not been updated to use some of the new generic mechanism that is available.
 
 
+.. _generic-attribute-management:
+
 Generic Attribute Management
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1247,7 +1249,7 @@ This function is called with two Python objects and the operator as arguments,
 where the operator is one of ``Py_EQ``, ``Py_NE``, ``Py_LE``, ``Py_GT``,
 ``Py_LT`` or ``Py_GT``.  It should compare the two objects with respect to the
 specified operator and return ``Py_True`` or ``Py_False`` if the comparison is
-successfull, ``Py_NotImplemented`` to indicate that comparison is not
+successful, ``Py_NotImplemented`` to indicate that comparison is not
 implemented and the other object's comparison method should be tried, or *NULL*
 if an exception was set.
 

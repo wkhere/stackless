@@ -75,6 +75,24 @@ This module defines one class called :class:`Popen`:
 
       Popen(['/bin/sh', '-c', args[0], args[1], ...])
 
+   .. warning::
+
+      Executing shell commands that incorporate unsanitized input from an
+      untrusted source makes a program vulnerable to `shell injection
+      <http://en.wikipedia.org/wiki/Shell_injection#Shell_injection>`_,
+      a serious security flaw which can result in arbitrary command execution.
+      For this reason, the use of *shell=True* is **strongly discouraged** in cases
+      where the command string is constructed from external input::
+
+         >>> from subprocess import call
+         >>> filename = input("What file would you like to display?\n")
+         What file would you like to display?
+         non_existent; rm -rf / #
+         >>> call("cat " + filename, shell=True) # Uh-oh. This will end badly...
+
+      *shell=False* does not suffer from this vulnerability; the above Note may be
+      helpful in getting code using *shell=False* to work.
+
    On Windows: the :class:`Popen` class uses CreateProcess() to execute the child
    program, which operates on strings.  If *args* is a sequence, it will be
    converted to a string using the :meth:`list2cmdline` method.  Please note that
@@ -87,6 +105,12 @@ This module defines one class called :class:`Popen`:
    buffered, any other positive value means use a buffer of (approximately) that
    size.  A negative *bufsize* means to use the system default, which usually means
    fully buffered.  The default value for *bufsize* is :const:`0` (unbuffered).
+
+   .. note::
+
+      If you experience performance issues, it is recommended that you try to
+      enable buffering by setting *bufsize* to either -1 or a large enough
+      positive value (such as 4096).
 
    The *executable* argument specifies the program to execute. It is very seldom
    needed: Usually, the program to execute is defined by the *args* argument. If
@@ -101,9 +125,9 @@ This module defines one class called :class:`Popen`:
    *stdin*, *stdout* and *stderr* specify the executed programs' standard input,
    standard output and standard error file handles, respectively.  Valid values
    are :data:`PIPE`, an existing file descriptor (a positive integer), an
-   existing file object, and ``None``.  :data:`PIPE` indicates that a new pipe
-   to the child should be created.  With ``None``, no redirection will occur;
-   the child's file handles will be inherited from the parent.  Additionally,
+   existing :term:`file object`, and ``None``.  :data:`PIPE` indicates that a
+   new pipe to the child should be created.  With ``None``, no redirection will
+   occur; the child's file handles will be inherited from the parent.  Additionally,
    *stderr* can be :data:`STDOUT`, which indicates that the stderr data from the
    applications should be captured into the same file handle as for stdout.
 
@@ -130,10 +154,9 @@ This module defines one class called :class:`Popen`:
 
    .. note::
 
-      If specified, *env* must provide any variables required
-      for the program to execute.  On Windows, in order to run a
-      `side-by-side assembly`_ the specified *env* **must** include a valid
-      :envvar:`SystemRoot`.
+      If specified, *env* must provide any variables required for the program to
+      execute.  On Windows, in order to run a `side-by-side assembly`_ the
+      specified *env* **must** include a valid :envvar:`SystemRoot`.
 
    .. _side-by-side assembly: http://en.wikipedia.org/wiki/Side-by-Side_Assembly
 
@@ -182,7 +205,7 @@ This module also defines four shortcut functions:
 
    The arguments are the same as for the Popen constructor.  Example::
 
-      retcode = call(["ls", "-l"])
+      >>> retcode = subprocess.call(["ls", "-l"])
 
    .. warning::
 
@@ -200,7 +223,8 @@ This module also defines four shortcut functions:
 
    The arguments are the same as for the Popen constructor.  Example::
 
-      check_call(["ls", "-l"])
+      >>> subprocess.check_call(["ls", "-l"])
+      0
 
    .. warning::
 
@@ -219,20 +243,21 @@ This module also defines four shortcut functions:
    The arguments are the same as for the :class:`Popen` constructor.  Example::
 
       >>> subprocess.check_output(["ls", "-l", "/dev/null"])
-      'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
+      b'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
 
    The stdout argument is not allowed as it is used internally.
    To capture standard error in the result, use ``stderr=subprocess.STDOUT``::
 
       >>> subprocess.check_output(
-              ["/bin/sh", "-c", "ls non_existent_file ; exit 0"],
-              stderr=subprocess.STDOUT)
-      'ls: non_existent_file: No such file or directory\n'
+      ...     ["/bin/sh", "-c", "ls non_existent_file; exit 0"],
+      ...     stderr=subprocess.STDOUT)
+      b'ls: non_existent_file: No such file or directory\n'
 
    .. versionadded:: 3.1
 
 
 .. function:: getstatusoutput(cmd)
+
    Return ``(status, output)`` of executing *cmd* in a shell.
 
    Execute the string *cmd* in a shell with :func:`os.popen` and return a 2-tuple
@@ -241,7 +266,6 @@ This module also defines four shortcut functions:
    stripped from the output.  The exit status for the command can be interpreted
    according to the rules for the C function :cfunc:`wait`.  Example::
 
-      >>> import subprocess
       >>> subprocess.getstatusoutput('ls /bin/ls')
       (0, '/bin/ls')
       >>> subprocess.getstatusoutput('cat /bin/junk')
@@ -253,12 +277,12 @@ This module also defines four shortcut functions:
 
 
 .. function:: getoutput(cmd)
+
    Return output (stdout and stderr) of executing *cmd* in a shell.
 
    Like :func:`getstatusoutput`, except the exit status is ignored and the return
    value is a string containing the command's output.  Example::
 
-      >>> import subprocess
       >>> subprocess.getoutput('ls /bin/ls')
       '/bin/ls'
 
@@ -271,7 +295,7 @@ Exceptions
 Exceptions raised in the child process, before the new program has started to
 execute, will be re-raised in the parent.  Additionally, the exception object
 will have one extra attribute called :attr:`child_traceback`, which is a string
-containing traceback information from the childs point of view.
+containing traceback information from the child's point of view.
 
 The most common exception raised is :exc:`OSError`.  This occurs, for example,
 when trying to execute a non-existent file.  Applications should prepare for
@@ -371,26 +395,29 @@ The following attributes are also available:
 
 .. attribute:: Popen.stdin
 
-   If the *stdin* argument was :data:`PIPE`, this attribute is a file object
-   that provides input to the child process.  Otherwise, it is ``None``.
+   If the *stdin* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides input to the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stdout
 
-   If the *stdout* argument was :data:`PIPE`, this attribute is a file object
-   that provides output from the child process.  Otherwise, it is ``None``.
+   If the *stdout* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides output from the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stderr
 
-   If the *stderr* argument was :data:`PIPE`, this attribute is a file object
-   that provides error output from the child process.  Otherwise, it is
+   If the *stderr* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides error output from the child process.  Otherwise, it is
    ``None``.
 
 
 .. attribute:: Popen.pid
 
    The process ID of the child process.
+
+   Note that if you set the *shell* argument to ``True``, this is the process ID
+   of the spawned shell.
 
 
 .. attribute:: Popen.returncode
@@ -534,7 +561,7 @@ Return code handling translates as follows::
    pipe = os.popen(cmd, 'w')
    ...
    rc = pipe.close()
-   if  rc != None and rc % 256:
+   if rc is not None and rc >> 8:
        print("There were some errors")
    ==>
    process = Popen(cmd, 'w', stdin=PIPE)

@@ -89,7 +89,7 @@ process.
 Since some print statements can be parsed as function calls or statements, 2to3
 cannot always read files containing the print function.  When 2to3 detects the
 presence of the ``from __future__ import print_function`` compiler directive, it
-modifies its internal grammar to interpert :func:`print` as a function.  This
+modifies its internal grammar to interpret :func:`print` as a function.  This
 change can also be enabled manually with the :option:`-p` flag.  Use
 :option:`-p` to run fixers on code that already has had its print statements
 converted.
@@ -129,9 +129,11 @@ and off individually.  They are described here in more detail.
 
    Fixes dictionary iteration methods.  :meth:`dict.iteritems` is converted to
    :meth:`dict.items`, :meth:`dict.iterkeys` to :meth:`dict.keys`, and
-   :meth:`dict.itervalues` to :meth:`dict.values`.  It also wraps existing
-   usages of :meth:`dict.items`, :meth:`dict.keys`, and :meth:`dict.values` in a
-   call to :class:`list`.
+   :meth:`dict.itervalues` to :meth:`dict.values`.  Similarly,
+   :meth:`dict.viewitems`, :meth:`dict.viewkeys` and :meth:`dict.viewvalues` are
+   converted respectively to :meth:`dict.items`, :meth:`dict.keys` and
+   :meth:`dict.values`.  It also wraps existing usages of :meth:`dict.items`,
+   :meth:`dict.keys`, and :meth:`dict.values` in a call to :class:`list`.
 
 .. 2to3fixer:: except
 
@@ -145,6 +147,11 @@ and off individually.  They are described here in more detail.
 
    Removes usage of :func:`execfile`.  The argument to :func:`execfile` is
    wrapped in calls to :func:`open`, :func:`compile`, and :func:`exec`.
+
+.. 2to3fixer:: exitfunc
+
+   Changes assignment of :attr:`sys.exitfunc` to use of the :mod:`atexit`
+   module.
 
 .. 2to3fixer:: filter
 
@@ -269,7 +276,7 @@ and off individually.  They are described here in more detail.
 
    Converts the :keyword:`print` statement to the :func:`print` function.
 
-.. 2to3fixer:: raises
+.. 2to3fixer:: raise
 
    Converts ``raise E, V`` to ``raise E(V)``, and ``raise E, V, T`` to ``raise
    E(V).with_traceback(T)``.  If ``E`` is a tuple, the translation will be

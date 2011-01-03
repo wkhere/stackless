@@ -654,6 +654,13 @@ Modules
    Special read-only attribute: :attr:`__dict__` is the module's namespace as a
    dictionary object.
 
+   .. impl-detail::
+
+      Because of the way CPython clears module dictionaries, the module
+      dictionary will be cleared when the module falls out of scope even if the
+      dictionary still has live references.  To avoid this, copy the dictionary
+      or keep the module around while using its dictionary directly.
+
    .. index::
       single: __name__ (module attribute)
       single: __doc__ (module attribute)
@@ -781,9 +788,9 @@ I/O objects (also known as file objects)
       single: stdout (in module sys)
       single: stderr (in module sys)
 
-   A file object represents an open file.  Various shortcuts are available
-   to create file objects: the :func:`open` built-in function, and also
-   :func:`os.popen`, :func:`os.fdopen`, and the :meth:`makefile` method
+   A :term:`file object` represents an open file.  Various shortcuts are
+   available to create file objects: the :func:`open` built-in function, and
+   also :func:`os.popen`, :func:`os.fdopen`, and the :meth:`makefile` method
    of socket objects (and perhaps by other functions or methods provided
    by extension modules).
 
@@ -816,6 +823,22 @@ Internal types
       objects, code objects are immutable and contain no references (directly or
       indirectly) to mutable objects.
 
+      .. index::
+         single: co_argcount (code object attribute)
+         single: co_code (code object attribute)
+         single: co_consts (code object attribute)
+         single: co_filename (code object attribute)
+         single: co_firstlineno (code object attribute)
+         single: co_flags (code object attribute)
+         single: co_lnotab (code object attribute)
+         single: co_name (code object attribute)
+         single: co_names (code object attribute)
+         single: co_nlocals (code object attribute)
+         single: co_stacksize (code object attribute)
+         single: co_varnames (code object attribute)
+         single: co_cellvars (code object attribute)
+         single: co_freevars (code object attribute)
+
       Special read-only attributes: :attr:`co_name` gives the function name;
       :attr:`co_argcount` is the number of positional arguments (including arguments
       with default values); :attr:`co_nlocals` is the number of local variables used
@@ -832,22 +855,6 @@ Internal types
       line numbers (for details see the source code of the interpreter);
       :attr:`co_stacksize` is the required stack size (including local variables);
       :attr:`co_flags` is an integer encoding a number of flags for the interpreter.
-
-      .. index::
-         single: co_argcount (code object attribute)
-         single: co_code (code object attribute)
-         single: co_consts (code object attribute)
-         single: co_filename (code object attribute)
-         single: co_firstlineno (code object attribute)
-         single: co_flags (code object attribute)
-         single: co_lnotab (code object attribute)
-         single: co_name (code object attribute)
-         single: co_names (code object attribute)
-         single: co_nlocals (code object attribute)
-         single: co_stacksize (code object attribute)
-         single: co_varnames (code object attribute)
-         single: co_cellvars (code object attribute)
-         single: co_freevars (code object attribute)
 
       .. index:: object: generator
 
@@ -1588,6 +1595,46 @@ the new type and it saves the ordered dictionary keys in an attribute
 called *members*.
 
 
+Customizing instance and subclass checks
+----------------------------------------
+
+The following methods are used to override the default behavior of the
+:func:`isinstance` and :func:`issubclass` built-in functions.
+
+In particular, the metaclass :class:`abc.ABCMeta` implements these methods in
+order to allow the addition of Abstract Base Classes (ABCs) as "virtual base
+classes" to any class or type (including built-in types), including other
+ABCs.
+
+.. method:: class.__instancecheck__(self, instance)
+
+   Return true if *instance* should be considered a (direct or indirect)
+   instance of *class*. If defined, called to implement ``isinstance(instance,
+   class)``.
+
+
+.. method:: class.__subclasscheck__(self, subclass)
+
+   Return true if *subclass* should be considered a (direct or indirect)
+   subclass of *class*.  If defined, called to implement ``issubclass(subclass,
+   class)``.
+
+
+Note that these methods are looked up on the type (metaclass) of a class.  They
+cannot be defined as class methods in the actual class.  This is consistent with
+the lookup of special methods that are called on instances, only in this
+case the instance is itself a class.
+
+.. seealso::
+
+   :pep:`3119` - Introducing Abstract Base Classes
+      Includes the specification for customizing :func:`isinstance` and
+      :func:`issubclass` behavior through :meth:`__instancecheck__` and
+      :meth:`__subclasscheck__`, with motivation for this functionality in the
+      context of adding Abstract Base Classes (see the :mod:`abc` module) to the
+      language.
+
+
 .. _callable-types:
 
 Emulating callable objects
@@ -1941,7 +1988,7 @@ to work correctly if defined on an object's type, not in the object's instance
 dictionary.  That behaviour is the reason why the following code raises an
 exception::
 
-   >>> class C(object):
+   >>> class C:
    ...     pass
    ...
    >>> c = C()

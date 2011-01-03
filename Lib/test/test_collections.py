@@ -1,6 +1,6 @@
 """Unit tests for collections.py."""
 
-import unittest, doctest
+import unittest, doctest, operator
 import inspect
 from test import support
 from collections import namedtuple, Counter, OrderedDict
@@ -13,7 +13,7 @@ import re
 from collections import Hashable, Iterable, Iterator
 from collections import Sized, Container, Callable
 from collections import Set, MutableSet
-from collections import Mapping, MutableMapping
+from collections import Mapping, MutableMapping, KeysView, ItemsView, UserDict
 from collections import Sequence, MutableSequence
 from collections import ByteString
 
@@ -230,6 +230,37 @@ class ABCTestCase(unittest.TestCase):
             self.assertRaises(TypeError, C, name)
 
 
+    def validate_comparison(self, instance):
+        ops = ['lt', 'gt', 'le', 'ge', 'ne', 'or', 'and', 'xor', 'sub']
+        operators = {}
+        for op in ops:
+            name = '__' + op + '__'
+            operators[name] = getattr(operator, name)
+
+        class Other:
+            def __init__(self):
+                self.right_side = False
+            def __eq__(self, other):
+                self.right_side = True
+                return True
+            __lt__ = __eq__
+            __gt__ = __eq__
+            __le__ = __eq__
+            __ge__ = __eq__
+            __ne__ = __eq__
+            __ror__ = __eq__
+            __rand__ = __eq__
+            __rxor__ = __eq__
+            __rsub__ = __eq__
+
+        for name, op in operators.items():
+            if not hasattr(instance, name):
+                continue
+            other = Other()
+            op(instance, other)
+            self.assertTrue(other.right_side,'Right side not called for %s.%s'
+                            % (type(instance), name))
+
 class TestOneTrickPonyABCs(ABCTestCase):
 
     def test_Hashable(self):
@@ -398,6 +429,14 @@ class TestCollectionABCs(ABCTestCase):
             self.assertTrue(isinstance(sample(), Set))
             self.assertTrue(issubclass(sample, Set))
         self.validate_abstract_methods(Set, '__contains__', '__iter__', '__len__')
+        class MySet(Set):
+            def __contains__(self, x):
+                return False
+            def __len__(self):
+                return 0
+            def __iter__(self):
+                return iter([])
+        self.validate_comparison(MySet())
 
     def test_hash_Set(self):
         class OneTwoThreeSet(Set):
@@ -455,12 +494,35 @@ class TestCollectionABCs(ABCTestCase):
         s = MySet([5,43,2,1])
         self.assertEqual(s.pop(), 1)
 
+    def test_issue8750(self):
+        empty = WithSet()
+        full = WithSet(range(10))
+        s = WithSet(full)
+        s -= s
+        self.assertEqual(s, empty)
+        s = WithSet(full)
+        s ^= s
+        self.assertEqual(s, empty)
+        s = WithSet(full)
+        s &= s
+        self.assertEqual(s, full)
+        s |= s
+        self.assertEqual(s, full)
+
     def test_Mapping(self):
         for sample in [dict]:
             self.assertTrue(isinstance(sample(), Mapping))
             self.assertTrue(issubclass(sample, Mapping))
         self.validate_abstract_methods(Mapping, '__contains__', '__iter__', '__len__',
             '__getitem__')
+        class MyMapping(collections.Mapping):
+            def __len__(self):
+                return 0
+            def __getitem__(self, i):
+                raise IndexError
+            def __iter__(self):
+                return iter(())
+        self.validate_comparison(MyMapping())
 
     def test_MutableMapping(self):
         for sample in [dict]:
@@ -468,6 +530,31 @@ class TestCollectionABCs(ABCTestCase):
             self.assertTrue(issubclass(sample, MutableMapping))
         self.validate_abstract_methods(MutableMapping, '__contains__', '__iter__', '__len__',
             '__getitem__', '__setitem__', '__delitem__')
+
+    def test_MutableMapping_subclass(self):
+        # Test issue 9214
+        mymap = UserDict()
+        mymap['red'] = 5
+        self.assertTrue(isinstance(mymap.keys(), Set))
+        self.assertTrue(isinstance(mymap.keys(), KeysView))
+        self.assertTrue(isinstance(mymap.items(), Set))
+        self.assertTrue(isinstance(mymap.items(), ItemsView))
+
+        mymap = UserDict()
+        mymap['red'] = 5
+        z = mymap.keys() | {'orange'}
+        self.assertEqual(type(z), set)
+        list(z)
+        mymap['blue'] = 7               # Shouldn't affect 'z'
+        self.assertEqual(sorted(z), ['orange', 'red'])
+
+        mymap = UserDict()
+        mymap['red'] = 5
+        z = mymap.items() | {('orange', 3)}
+        self.assertEqual(type(z), set)
+        list(z)
+        mymap['blue'] = 7               # Shouldn't affect 'z'
+        self.assertEqual(sorted(z), [('orange', 3), ('red', 5)])
 
     def test_Sequence(self):
         for sample in [tuple, list, bytes, str]:
@@ -582,9 +669,9 @@ class TestCounter(unittest.TestCase):
                     ]):
             msg = (i, dup, words)
             self.assertTrue(dup is not words)
-            self.assertEquals(dup, words)
-            self.assertEquals(len(dup), len(words))
-            self.assertEquals(type(dup), type(words))
+            self.assertEqual(dup, words)
+            self.assertEqual(len(dup), len(words))
+            self.assertEqual(type(dup), type(words))
 
     def test_conversions(self):
         # Convert to: set, list, dict
@@ -677,6 +764,19 @@ class TestOrderedDict(unittest.TestCase):
         od = OrderedDict()
         od.update([('a', 1), ('b', 2), ('c', 9), ('d', 4)], c=3, e=5)
         self.assertEqual(list(od.items()), pairs)                                   # mixed input
+
+        # Issue 9137: Named argument called 'other' or 'self'
+        # shouldn't be treated specially.
+        od = OrderedDict()
+        od.update(self=23)
+        self.assertEqual(list(od.items()), [('self', 23)])
+        od = OrderedDict()
+        od.update(other={})
+        self.assertEqual(list(od.items()), [('other', {})])
+        od = OrderedDict()
+        od.update(red=5, blue=6, other=7, self=8)
+        self.assertEqual(sorted(list(od.items())),
+                         [('blue', 6), ('other', 7), ('red', 5), ('self', 8)])
 
         # Make sure that direct calls to update do not clear previous contents
         # add that updates items are not moved to the end
@@ -779,10 +879,10 @@ class TestOrderedDict(unittest.TestCase):
                     OrderedDict(od),
                     ]):
             self.assertTrue(dup is not od)
-            self.assertEquals(dup, od)
-            self.assertEquals(list(dup.items()), list(od.items()))
-            self.assertEquals(len(dup), len(od))
-            self.assertEquals(type(dup), type(od))
+            self.assertEqual(dup, od)
+            self.assertEqual(list(dup.items()), list(od.items()))
+            self.assertEqual(len(dup), len(od))
+            self.assertEqual(type(dup), type(od))
 
     def test_yaml_linkage(self):
         # Verify that __reduce__ is setup in a way that supports PyYAML's dump() feature.
@@ -807,6 +907,13 @@ class TestOrderedDict(unittest.TestCase):
             "OrderedDict([('c', 1), ('b', 2), ('a', 3), ('d', 4), ('e', 5), ('f', 6)])")
         self.assertEqual(eval(repr(od)), od)
         self.assertEqual(repr(OrderedDict()), "OrderedDict()")
+
+    def test_repr_recursive(self):
+        # See issue #9826
+        od = OrderedDict.fromkeys('abc')
+        od['x'] = od
+        self.assertEqual(repr(od),
+            "OrderedDict([('a', None), ('b', None), ('c', None), ('x', ...)])")
 
     def test_setdefault(self):
         pairs = [('c', 1), ('b', 2), ('a', 3), ('d', 4), ('e', 5), ('f', 6)]

@@ -67,7 +67,7 @@ class Math:
         elif method == 'add':
             return params[0] + params[1]
         else:
-            raise 'bad method'
+            raise ValueError('bad method')
 
 server = SimpleXMLRPCServer(("localhost", 8000))
 server.register_introspection_functions()
@@ -469,7 +469,9 @@ class SimpleXMLRPCRequestHandler(BaseHTTPRequestHandler):
             if hasattr(self.server, '_send_traceback_header') and \
                     self.server._send_traceback_header:
                 self.send_header("X-exception", str(e))
-                self.send_header("X-traceback", traceback.format_exc())
+                trace = traceback.format_exc()
+                trace = str(trace.encode('ASCII', 'backslashreplace'), 'ASCII')
+                self.send_header("X-traceback", trace)
 
             self.end_headers()
         else:

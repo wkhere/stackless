@@ -51,7 +51,7 @@ import socket
 import sys
 import time
 import os
-from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, \
+from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, EINVAL, \
      ENOTCONN, ESHUTDOWN, EINTR, EISCONN, EBADF, ECONNABORTED, errorcode
 
 try:
@@ -60,10 +60,12 @@ except NameError:
     socket_map = {}
 
 def _strerror(err):
-    res = os.strerror(err)
-    if res == 'Unknown error':
-        res = errorcode[err]
-    return res
+    try:
+        return os.strerror(err)
+    except (ValueError, OverflowError, NameError):
+        if err in errorcode:
+            return errorcode[err]
+        return "Unknown error %s" %err
 
 class ExitNow(Exception):
     pass
@@ -331,8 +333,8 @@ class dispatcher:
     def connect(self, address):
         self.connected = False
         err = self.socket.connect_ex(address)
-        # XXX Should interpret Winsock return values
-        if err in (EINPROGRESS, EALREADY, EWOULDBLOCK):
+        if err in (EINPROGRESS, EALREADY, EWOULDBLOCK) \
+        or err == EINVAL and os.name in ('nt', 'ce'):
             return
         if err in (0, EISCONN):
             self.addr = address
@@ -344,12 +346,15 @@ class dispatcher:
         # XXX can return either an address pair or None
         try:
             conn, addr = self.socket.accept()
-            return conn, addr
+        except TypeError:
+            return None
         except socket.error as why:
-            if why.args[0] == EWOULDBLOCK:
-                pass
+            if why.args[0] in (EWOULDBLOCK, ECONNABORTED):
+                return None
             else:
                 raise
+        else:
+            return conn, addr
 
     def send(self, data):
         try:
@@ -395,7 +400,11 @@ class dispatcher:
     # cheap inheritance, used to pass all other attribute
     # references to the underlying socket object.
     def __getattr__(self, attr):
-        return getattr(self.socket, attr)
+        try:
+            return getattr(self.socket, attr)
+        except AttributeError:
+            raise AttributeError("%s instance has no attribute '%s'"
+                                 %(self.__class__.__name__, attr))
 
     # log and log_info may be overridden to provide more sophisticated
     # logging and warning methods. In general, log is for 'hit' logging
@@ -420,8 +429,11 @@ class dispatcher:
             self.handle_read()
 
     def handle_connect_event(self):
-        self.connected = True
+        err = self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+        if err != 0:
+            raise socket.error(err, _strerror(err))
         self.handle_connect()
+        self.connected = True
 
     def handle_write_event(self):
         if self.accepting:
@@ -591,6 +603,14 @@ if os.name == 'posix':
 
         def send(self, *args):
             return os.write(self.fd, *args)
+
+        def getsockopt(self, level, optname, buflen=None):
+            if (level == socket.SOL_SOCKET and
+                optname == socket.SO_ERROR and
+                not buflen):
+                return 0
+            raise NotImplementedError("Only asyncore specific behaviour "
+                                      "implemented.")
 
         read = recv
         write = send

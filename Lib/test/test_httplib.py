@@ -89,6 +89,33 @@ class HeaderTests(TestCase):
                 conn.request('POST', '/', body, headers)
                 self.assertEqual(conn._buffer.count[header.lower()], 1)
 
+    def test_putheader(self):
+        conn = client.HTTPConnection('example.com')
+        conn.sock = FakeSocket(None)
+        conn.putrequest('GET','/')
+        conn.putheader('Content-length', 42)
+        self.assertTrue(b'Content-length: 42' in conn._buffer)
+
+    def test_ipv6host_header(self):
+        # Default host header on IPv6 transaction should wrapped by [] if
+        # its actual IPv6 address
+        expected = b'GET /foo HTTP/1.1\r\nHost: [2001::]:81\r\n' \
+                   b'Accept-Encoding: identity\r\n\r\n'
+        conn = client.HTTPConnection('[2001::]:81')
+        sock = FakeSocket('')
+        conn.sock = sock
+        conn.request('GET', '/foo')
+        self.assertTrue(sock.data.startswith(expected))
+
+        expected = b'GET /foo HTTP/1.1\r\nHost: [2001:102A::]\r\n' \
+                   b'Accept-Encoding: identity\r\n\r\n'
+        conn = client.HTTPConnection('[2001:102A::]')
+        sock = FakeSocket('')
+        conn.sock = sock
+        conn.request('GET', '/foo')
+        self.assertTrue(sock.data.startswith(expected))
+
+
 class BasicTest(TestCase):
     def test_status_lines(self):
         # Test HTTP status lines
@@ -181,13 +208,13 @@ class BasicTest(TestCase):
         sock = FakeSocket(None)
         conn.sock = sock
         conn.send(expected)
-        self.assertEquals(expected, sock.data)
+        self.assertEqual(expected, sock.data)
         sock.data = b''
         conn.send(array.array('b', expected))
-        self.assertEquals(expected, sock.data)
+        self.assertEqual(expected, sock.data)
         sock.data = b''
         conn.send(io.BytesIO(expected))
-        self.assertEquals(expected, sock.data)
+        self.assertEqual(expected, sock.data)
 
     def test_chunked(self):
         chunked_start = (
@@ -201,7 +228,7 @@ class BasicTest(TestCase):
         sock = FakeSocket(chunked_start + '0\r\n')
         resp = client.HTTPResponse(sock, method="GET")
         resp.begin()
-        self.assertEquals(resp.read(), b'hello world')
+        self.assertEqual(resp.read(), b'hello world')
         resp.close()
 
         for x in ('', 'foo\r\n'):
@@ -211,7 +238,7 @@ class BasicTest(TestCase):
             try:
                 resp.read()
             except client.IncompleteRead as i:
-                self.assertEquals(i.partial, b'hello world')
+                self.assertEqual(i.partial, b'hello world')
                 self.assertEqual(repr(i),'IncompleteRead(11 bytes read)')
                 self.assertEqual(str(i),'IncompleteRead(11 bytes read)')
             else:
@@ -219,12 +246,29 @@ class BasicTest(TestCase):
             finally:
                 resp.close()
 
+    def test_chunked_head(self):
+        chunked_start = (
+            'HTTP/1.1 200 OK\r\n'
+            'Transfer-Encoding: chunked\r\n\r\n'
+            'a\r\n'
+            'hello world\r\n'
+            '1\r\n'
+            'd\r\n'
+        )
+        sock = FakeSocket(chunked_start + '0\r\n')
+        resp = client.HTTPResponse(sock, method="HEAD")
+        resp.begin()
+        self.assertEqual(resp.read(), b'')
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(resp.reason, 'OK')
+        self.assertTrue(resp.isclosed())
+
     def test_negative_content_length(self):
         sock = FakeSocket(
             'HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\nHello\r\n')
         resp = client.HTTPResponse(sock, method="GET")
         resp.begin()
-        self.assertEquals(resp.read(), b'Hello\r\n')
+        self.assertEqual(resp.read(), b'Hello\r\n')
         resp.close()
 
     def test_incomplete_read(self):
@@ -234,7 +278,7 @@ class BasicTest(TestCase):
         try:
             resp.read()
         except client.IncompleteRead as i:
-            self.assertEquals(i.partial, b'Hello\r\n')
+            self.assertEqual(i.partial, b'Hello\r\n')
             self.assertEqual(repr(i),
                              "IncompleteRead(7 bytes read, 3 more expected)")
             self.assertEqual(str(i),
@@ -261,7 +305,7 @@ class BasicTest(TestCase):
 
 class OfflineTest(TestCase):
     def test_responses(self):
-        self.assertEquals(client.responses[client.NOT_FOUND], "Not Found")
+        self.assertEqual(client.responses[client.NOT_FOUND], "Not Found")
 
 class TimeoutTest(TestCase):
     PORT = None
@@ -388,9 +432,45 @@ class RequestBodyTest(TestCase):
         self.assertEqual("5", message.get("content-length"))
         self.assertEqual(b'body\xc1', f.read())
 
+
+class HTTPResponseTest(TestCase):
+
+    def setUp(self):
+        body = "HTTP/1.1 200 Ok\r\nMy-Header: first-value\r\nMy-Header: \
+                second-value\r\n\r\nText"
+        sock = FakeSocket(body)
+        self.resp = client.HTTPResponse(sock)
+        self.resp.begin()
+
+    def test_getting_header(self):
+        header = self.resp.getheader('My-Header')
+        self.assertEqual(header, 'first-value, second-value')
+
+        header = self.resp.getheader('My-Header', 'some default')
+        self.assertEqual(header, 'first-value, second-value')
+
+    def test_getting_nonexistent_header_with_string_default(self):
+        header = self.resp.getheader('No-Such-Header', 'default-value')
+        self.assertEqual(header, 'default-value')
+
+    def test_getting_nonexistent_header_with_iterable_default(self):
+        header = self.resp.getheader('No-Such-Header', ['default', 'values'])
+        self.assertEqual(header, 'default, values')
+
+        header = self.resp.getheader('No-Such-Header', ('default', 'values'))
+        self.assertEqual(header, 'default, values')
+
+    def test_getting_nonexistent_header_without_default(self):
+        header = self.resp.getheader('No-Such-Header')
+        self.assertEqual(header, None)
+
+    def test_getting_header_defaultint(self):
+        header = self.resp.getheader('No-Such-Header',default=42)
+        self.assertEqual(header, 42)
+
 def test_main(verbose=None):
     support.run_unittest(HeaderTests, OfflineTest, BasicTest, TimeoutTest,
-                         HTTPSTimeoutTest, RequestBodyTest)
+                         HTTPSTimeoutTest, RequestBodyTest, HTTPResponseTest)
 
 if __name__ == '__main__':
     test_main()

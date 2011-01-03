@@ -5,6 +5,7 @@
 import os, sys
 import unittest
 from test import support
+threading = support.import_module("threading")
 
 # Do this first so test will be skipped if module doesn't exist
 support.import_module('winreg')
@@ -63,12 +64,12 @@ class WinregTests(unittest.TestCase):
 
         # Check we wrote as many items as we thought.
         nkeys, nvalues, since_mod = QueryInfoKey(key)
-        self.assertEquals(nkeys, 1, "Not the correct number of sub keys")
-        self.assertEquals(nvalues, 1, "Not the correct number of values")
+        self.assertEqual(nkeys, 1, "Not the correct number of sub keys")
+        self.assertEqual(nvalues, 1, "Not the correct number of values")
         nkeys, nvalues, since_mod = QueryInfoKey(sub_key)
-        self.assertEquals(nkeys, 0, "Not the correct number of sub keys")
-        self.assertEquals(nvalues, len(test_data),
-                          "Not the correct number of values")
+        self.assertEqual(nkeys, 0, "Not the correct number of sub keys")
+        self.assertEqual(nvalues, len(test_data),
+                         "Not the correct number of values")
         # Close this key this way...
         # (but before we do, copy the key as an integer - this allows
         # us to test that the key really gets closed).
@@ -93,8 +94,8 @@ class WinregTests(unittest.TestCase):
     def ReadTestData(self, root_key, subkeystr="sub_key"):
         # Check we can get default value for this key.
         val = QueryValue(root_key, test_key_name)
-        self.assertEquals(val, "Default value",
-                          "Registry didn't give back the correct value")
+        self.assertEqual(val, "Default value",
+                         "Registry didn't give back the correct value")
 
         key = OpenKey(root_key, test_key_name)
         # Read the sub-keys
@@ -106,22 +107,22 @@ class WinregTests(unittest.TestCase):
                     data = EnumValue(sub_key, index)
                 except EnvironmentError:
                     break
-                self.assertEquals(data in test_data, True,
-                                  "Didn't read back the correct test data")
+                self.assertEqual(data in test_data, True,
+                                 "Didn't read back the correct test data")
                 index = index + 1
-            self.assertEquals(index, len(test_data),
-                              "Didn't read the correct number of items")
+            self.assertEqual(index, len(test_data),
+                             "Didn't read the correct number of items")
             # Check I can directly access each item
             for value_name, value_data, value_type in test_data:
                 read_val, read_typ = QueryValueEx(sub_key, value_name)
-                self.assertEquals(read_val, value_data,
-                                  "Could not directly read the value")
-                self.assertEquals(read_typ, value_type,
-                                  "Could not directly read the value")
+                self.assertEqual(read_val, value_data,
+                                 "Could not directly read the value")
+                self.assertEqual(read_typ, value_type,
+                                 "Could not directly read the value")
         sub_key.Close()
         # Enumerate our main key.
         read_val = EnumKey(key, 0)
-        self.assertEquals(read_val, subkeystr, "Read subkey value wrong")
+        self.assertEqual(read_val, subkeystr, "Read subkey value wrong")
         try:
             EnumKey(key, 1)
             self.fail("Was able to get a second key when I only have one!")
@@ -140,8 +141,8 @@ class WinregTests(unittest.TestCase):
             DeleteValue(sub_key, value_name)
 
         nkeys, nvalues, since_mod = QueryInfoKey(sub_key)
-        self.assertEquals(nkeys, 0, "subkey not empty before delete")
-        self.assertEquals(nvalues, 0, "subkey not empty before delete")
+        self.assertEqual(nkeys, 0, "subkey not empty before delete")
+        self.assertEqual(nvalues, 0, "subkey not empty before delete")
         sub_key.Close()
         DeleteKey(key, subkeystr)
 
@@ -184,6 +185,59 @@ class WinregTests(unittest.TestCase):
         r = ExpandEnvironmentStrings("%windir%\\test")
         self.assertEqual(type(r), str)
         self.assertEqual(r, os.environ["windir"] + "\\test")
+
+    def test_changing_value(self):
+        # Issue2810: A race condition in 2.6 and 3.1 may cause
+        # EnumValue or QueryValue to throw "WindowsError: More data is
+        # available"
+        done = False
+
+        class VeryActiveThread(threading.Thread):
+            def run(self):
+                with CreateKey(HKEY_CURRENT_USER, test_key_name) as key:
+                    use_short = True
+                    long_string = 'x'*2000
+                    while not done:
+                        s = 'x' if use_short else long_string
+                        use_short = not use_short
+                        SetValue(key, 'changing_value', REG_SZ, s)
+
+        thread = VeryActiveThread()
+        thread.start()
+        try:
+            with CreateKey(HKEY_CURRENT_USER,
+                           test_key_name+'\\changing_value') as key:
+                for _ in range(1000):
+                    num_subkeys, num_values, t = QueryInfoKey(key)
+                    for i in range(num_values):
+                        name = EnumValue(key, i)
+                        QueryValue(key, name[0])
+        finally:
+            done = True
+            thread.join()
+            DeleteKey(HKEY_CURRENT_USER, test_key_name+'\\changing_value')
+            DeleteKey(HKEY_CURRENT_USER, test_key_name)
+
+    def test_long_key(self):
+        # Issue2810, in 2.6 and 3.1 when the key name was exactly 256
+        # characters, EnumKey threw "WindowsError: More data is
+        # available"
+        name = 'x'*256
+        try:
+            with CreateKey(HKEY_CURRENT_USER, test_key_name) as key:
+                SetValue(key, name, REG_SZ, 'x')
+                num_subkeys, num_values, t = QueryInfoKey(key)
+                EnumKey(key, 0)
+        finally:
+            DeleteKey(HKEY_CURRENT_USER, '\\'.join((test_key_name, name)))
+            DeleteKey(HKEY_CURRENT_USER, test_key_name)
+
+    def test_dynamic_key(self):
+        # Issue2810, when the value is dynamically generated, these
+        # throw "WindowsError: More data is available" in 2.6 and 3.1
+        EnumValue(HKEY_PERFORMANCE_DATA, 0)
+        QueryValueEx(HKEY_PERFORMANCE_DATA, "")
+
 
 def test_main():
     support.run_unittest(WinregTests)

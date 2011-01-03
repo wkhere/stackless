@@ -58,8 +58,9 @@ is exposed by the :mod:`weakref` module for the benefit of advanced uses.
 
 Not all objects can be weakly referenced; those objects which can include class
 instances, functions written in Python (but not in C), instance methods, sets,
-frozensets, file objects, :term:`generator`\s, type objects, sockets, arrays,
-deques, and regular expression pattern objects.
+frozensets, some :term:`file objects <file object>`, :term:`generator`\s, type
+objects, sockets, arrays, deques and regular expression pattern objects.
+
 
 Several built-in types such as :class:`list` and :class:`dict` do not directly
 support weak references but can add support through subclassing::
@@ -69,9 +70,9 @@ support weak references but can add support through subclassing::
 
    obj = Dict(red=1, green=2, blue=3)   # this object is weak referenceable
 
-Other built-in types such as :class:`tuple` and :class:`long` do not support
-weak references even when subclassed (This is an implementation detail and may
-be different across various Python implementations.).
+Other built-in types such as :class:`tuple` and :class:`int` do not support weak
+references even when subclassed (This is an implementation detail and may be
+different across various Python implementations.).
 
 Extension types can easily be made to support weak references; see
 :ref:`weakref-support`.

@@ -31,19 +31,21 @@ class FileUtilTestCase(support.TempdirManager, unittest.TestCase):
 
     def test_move_file_verbosity(self):
         f = open(self.source, 'w')
-        f.write('some content')
-        f.close()
+        try:
+            f.write('some content')
+        finally:
+            f.close()
 
         move_file(self.source, self.target, verbose=0)
         wanted = []
-        self.assertEquals(self._logs, wanted)
+        self.assertEqual(self._logs, wanted)
 
         # back to original state
         move_file(self.target, self.source, verbose=0)
 
         move_file(self.source, self.target, verbose=1)
         wanted = ['moving %s -> %s' % (self.source, self.target)]
-        self.assertEquals(self._logs, wanted)
+        self.assertEqual(self._logs, wanted)
 
         # back to original state
         move_file(self.target, self.source, verbose=0)
@@ -53,7 +55,7 @@ class FileUtilTestCase(support.TempdirManager, unittest.TestCase):
         os.mkdir(self.target_dir)
         move_file(self.source, self.target_dir, verbose=1)
         wanted = ['moving %s -> %s' % (self.source, self.target_dir)]
-        self.assertEquals(self._logs, wanted)
+        self.assertEqual(self._logs, wanted)
 
 
 def test_suite():
