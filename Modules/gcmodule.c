@@ -457,11 +457,55 @@ move_unreachable(PyGC_Head *young, PyGC_Head *unreachable)
     }
 }
 
-/* Return true if object has a finalization method. */
+/* STACKLESS addition to support collection of tasklets */
+
+/* A traversal callback for has_finalisers.  It is a dummy, used to identify
+ * this phase of finalizer discovery by its function pointer, and thus
+ * enable the action of PyObject_GC_Collectable() below.
+ */
+static int
+visit_has_finalizer(PyObject *op, void *data)
+{
+    assert(op != NULL);
+    return 0;
+}
+
+/* An object can call this function from its traversal function
+ * to indicate whether it wishes to be collected or not
+ * this is useful for objects that have state that determines
+ * whether non-trivial actions need to be undertaken when
+ * it is deleted.
+ */
+PyAPI_FUNC(void)
+PyObject_GC_Collectable(PyObject *op, visitproc proc, void *arg,
+                        int can_collect)
+{
+    /* only do this during the move_finalizers phase */
+    if (proc == &visit_has_finalizer)
+        *(int*)arg = can_collect;
+}
+
 static int
 has_finalizer(PyObject *op)
 {
-    if (PyGen_CheckExact(op))
+    /* first, dynamic decision per object */
+    traverseproc traverse;
+    int collectable;
+    traverse = Py_TYPE(op)->tp_traverse;
+    collectable = -1;
+    (void) traverse(op,
+                    (visitproc)visit_has_finalizer,
+                    (void *)&collectable);
+    if (collectable >= 0)
+        return collectable == 0;
+
+    if ( PyType_Check(op)) {
+        assert(delstr != NULL);
+        return _PyType_Lookup(Py_TYPE(op), delstr) != NULL;
+    }
+    else if (PyType_HasFeature(op->ob_type, Py_TPFLAGS_HEAPTYPE))
+        return op->ob_type->tp_del != NULL;
+    else if (PyGen_CheckExact(op))
         return PyGen_NeedsFinalizing((PyGenObject *)op);
     else
         return op->ob_type->tp_del != NULL;

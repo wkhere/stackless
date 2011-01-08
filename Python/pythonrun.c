@@ -295,6 +295,10 @@ Py_InitializeEx(int install_sigs)
     if (install_sigs)
         initsigs(); /* Signal handling stuff, including initintr() */
 
+#ifdef STACKLESS
+    _PyStackless_Init();
+#endif
+
     /* Initialize warnings. */
     if (PySys_HasWarnOptions()) {
         PyObject *warnings_module = PyImport_ImportModule("warnings");
@@ -303,9 +307,6 @@ Py_InitializeEx(int install_sigs)
         Py_XDECREF(warnings_module);
     }
 
-#ifdef STACKLESS
-    _PyStackless_Init();
-#endif
 
     initmain(); /* Module __main__ */
     if (initstdio() < 0)

@@ -14,133 +14,127 @@
  ******************************************************/
 
 static PyBombObject *free_list = NULL;
-static int numfree = 0;		/* number of bombs currently in free_list */
-#define MAXFREELIST 20		/* max value for numfree */
+static int numfree = 0;         /* number of bombs currently in free_list */
+#define MAXFREELIST 20          /* max value for numfree */
 
 static void
 bomb_dealloc(PyBombObject *bomb)
 {
-	_PyObject_GC_UNTRACK(bomb);
-	Py_XDECREF(bomb->curexc_type);
-	Py_XDECREF(bomb->curexc_value);
-	Py_XDECREF(bomb->curexc_traceback);
-	if (numfree < MAXFREELIST) {
-		++numfree;
-		bomb->curexc_type = (PyObject *) free_list;
-		free_list = bomb;
-	}
-	else
-		PyObject_GC_Del(bomb);
+    _PyObject_GC_UNTRACK(bomb);
+    Py_XDECREF(bomb->curexc_type);
+    Py_XDECREF(bomb->curexc_value);
+    Py_XDECREF(bomb->curexc_traceback);
+    if (numfree < MAXFREELIST) {
+        ++numfree;
+        bomb->curexc_type = (PyObject *) free_list;
+        free_list = bomb;
+    }
+    else
+        PyObject_GC_Del(bomb);
 }
 
 static int
 bomb_traverse(PyBombObject *bomb, visitproc visit, void *arg)
 {
-	int err;
-
-#define VISIT(o) if (o) {if ((err = visit((PyObject *)(o), arg))) return err;}
-
-	VISIT(bomb->curexc_type);
-	VISIT(bomb->curexc_value);
-	VISIT(bomb->curexc_traceback);
-
-#undef VISIT
-	return 0;
+    Py_VISIT(bomb->curexc_type);
+    Py_VISIT(bomb->curexc_value);
+    Py_VISIT(bomb->curexc_traceback);
+    return 0;
 }
 
 static void
 bomb_clear(PyBombObject *bomb)
 {
-	Py_CLEAR(bomb->curexc_type);
-	Py_CLEAR(bomb->curexc_value);
-	Py_CLEAR(bomb->curexc_traceback);
+    Py_CLEAR(bomb->curexc_type);
+    Py_CLEAR(bomb->curexc_value);
+    Py_CLEAR(bomb->curexc_traceback);
 }
 
 static PyBombObject *
 new_bomb(void)
 {
-	PyBombObject *bomb;
+    PyBombObject *bomb;
 
-	if (free_list == NULL) {
-		bomb = PyObject_GC_New(PyBombObject, &PyBomb_Type);
-		if (bomb == NULL)
-			return NULL;
-	}
-	else {
-		assert(numfree > 0);
-		--numfree;
-		bomb = free_list;
-		free_list = (PyBombObject *) free_list->curexc_type;
-		_Py_NewReference((PyObject *) bomb);
-	}
-	bomb->curexc_type = NULL;
-	bomb->curexc_value = NULL;
-	bomb->curexc_traceback = NULL;
-	PyObject_GC_Track(bomb);
-	return bomb;
+    if (free_list == NULL) {
+        bomb = PyObject_GC_New(PyBombObject, &PyBomb_Type);
+        if (bomb == NULL)
+            return NULL;
+    }
+    else {
+        assert(numfree > 0);
+        --numfree;
+        bomb = free_list;
+        free_list = (PyBombObject *) free_list->curexc_type;
+        _Py_NewReference((PyObject *) bomb);
+    }
+    bomb->curexc_type = NULL;
+    bomb->curexc_value = NULL;
+    bomb->curexc_traceback = NULL;
+    PyObject_GC_Track(bomb);
+    return bomb;
 }
 
 static PyObject *
 bomb_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	static char *kwlist[] = {"type", "value", "traceback", NULL};
-	PyBombObject *bomb = new_bomb();
+    static char *kwlist[] = {"type", "value", "traceback", NULL};
+    PyBombObject *bomb = new_bomb();
 
-	if (bomb == NULL)
-		return NULL;
+    if (bomb == NULL)
+        return NULL;
 
-	if (PyTuple_GET_SIZE(args) == 1 &&
-	    PyTuple_Check(PyTuple_GET_ITEM(args, 0)))
-		args = PyTuple_GET_ITEM(args, 0);
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OOO:bomb", kwlist,
-					 &bomb->curexc_type,
-					 &bomb->curexc_value,
-					 &bomb->curexc_traceback)) {
-		Py_DECREF(bomb);
-		return NULL;
-	}
-	Py_XINCREF(bomb->curexc_type);
-	Py_XINCREF(bomb->curexc_value);
-	Py_XINCREF(bomb->curexc_traceback);
-	return (PyObject*) bomb;
+    if (PyTuple_GET_SIZE(args) == 1 &&
+        PyTuple_Check(PyTuple_GET_ITEM(args, 0)))
+        args = PyTuple_GET_ITEM(args, 0);
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OOO:bomb", kwlist,
+                                     &bomb->curexc_type,
+                                     &bomb->curexc_value,
+                                     &bomb->curexc_traceback)) {
+        Py_DECREF(bomb);
+        return NULL;
+    }
+    Py_XINCREF(bomb->curexc_type);
+    Py_XINCREF(bomb->curexc_value);
+    Py_XINCREF(bomb->curexc_traceback);
+    return (PyObject*) bomb;
 }
 
 PyObject *
 slp_make_bomb(PyObject *klass, PyObject *args, char *msg)
 {
-	PyBombObject *bomb;
-	PyObject *tup;
+    PyBombObject *bomb;
+    PyObject *tup;
 
-	if (! (PyObject_IsSubclass(klass, PyExc_BaseException) == 1 ||
-	       PyUnicode_Check(klass) ) ) {
-		char s[256];
+    if (! (PyObject_IsSubclass(klass, PyExc_BaseException) == 1 ||
+           PyUnicode_Check(klass) ) ) {
+        char s[256];
 
-		sprintf(s, "%.128s needs Exception or string"
-			   " subclass as first parameter", msg);
-		TYPE_ERROR(s, NULL);
-	}
-	if ( (bomb = new_bomb()) == NULL)
-		return NULL;
-	Py_INCREF(klass);
-	bomb->curexc_type = klass;
-	tup = Py_BuildValue(PyTuple_Check(args) ? "O" : "(O)", args);
-	bomb->curexc_value = tup;
-	if (tup == NULL) {
-		Py_DECREF(bomb);
-		return NULL;
-	}
-	return (PyObject *) bomb;
+        sprintf(s, "%.128s needs Exception or string"
+                   " subclass as first parameter", msg);
+        TYPE_ERROR(s, NULL);
+    }
+    if ( (bomb = new_bomb()) == NULL)
+        return NULL;
+    Py_INCREF(klass);
+    bomb->curexc_type = klass;
+    tup = Py_BuildValue(PyTuple_Check(args) ? "O" : "(O)", args);
+    bomb->curexc_value = tup;
+    if (tup == NULL) {
+        Py_DECREF(bomb);
+        return NULL;
+    }
+    return (PyObject *) bomb;
 }
 
 PyObject *
 slp_curexc_to_bomb(void)
 {
-	PyBombObject *bomb = new_bomb();
+    PyBombObject *bomb = new_bomb();
 
-	if (bomb != NULL)
-		PyErr_Fetch(&bomb->curexc_type, &bomb->curexc_value,
-			    &bomb->curexc_traceback);
-	return (PyObject *) bomb;
+    if (bomb != NULL)
+        PyErr_Fetch(&bomb->curexc_type, &bomb->curexc_value,
+                    &bomb->curexc_traceback);
+    return (PyObject *) bomb;
 }
 
 /* set exception, consume bomb reference and return NULL */
@@ -148,52 +142,52 @@ slp_curexc_to_bomb(void)
 PyObject *
 slp_bomb_explode(PyObject *_bomb)
 {
-	PyBombObject* bomb = (PyBombObject*)_bomb;
+    PyBombObject* bomb = (PyBombObject*)_bomb;
 
-	assert(PyBomb_Check(bomb));
-	Py_XINCREF(bomb->curexc_type);
-	Py_XINCREF(bomb->curexc_value);
-	Py_XINCREF(bomb->curexc_traceback);
-	PyErr_Restore(bomb->curexc_type, bomb->curexc_value,
-		      bomb->curexc_traceback);
-	Py_DECREF(bomb);
-	return NULL;
+    assert(PyBomb_Check(bomb));
+    Py_XINCREF(bomb->curexc_type);
+    Py_XINCREF(bomb->curexc_value);
+    Py_XINCREF(bomb->curexc_traceback);
+    PyErr_Restore(bomb->curexc_type, bomb->curexc_value,
+                  bomb->curexc_traceback);
+    Py_DECREF(bomb);
+    return NULL;
 }
 
 static PyObject *
 bomb_reduce(PyBombObject *bomb)
 {
-	PyObject *tup;
+    PyObject *tup;
 
-	tup = slp_into_tuple_with_nulls(&bomb->curexc_type, 3);
-	if (tup != NULL)
-		tup = Py_BuildValue("(O()O)", &PyBomb_Type, tup);
-	return tup;
+    tup = slp_into_tuple_with_nulls(&bomb->curexc_type, 3);
+    if (tup != NULL)
+        tup = Py_BuildValue("(O()O)", &PyBomb_Type, tup);
+    return tup;
 }
 
 static PyObject *
 bomb_setstate(PyBombObject *bomb, PyObject *args)
 {
-	if (PyTuple_GET_SIZE(args) != 4)
-		VALUE_ERROR("bad exception tuple for bomb", NULL);
-	bomb_clear(bomb);
-	slp_from_tuple_with_nulls(&bomb->curexc_type, args);
-	Py_INCREF(bomb);
-	return (PyObject *) bomb;
+    if (PyTuple_GET_SIZE(args) != 4)
+        VALUE_ERROR("bad exception tuple for bomb", NULL);
+    bomb_clear(bomb);
+    slp_from_tuple_with_nulls(&bomb->curexc_type, args);
+    Py_INCREF(bomb);
+    return (PyObject *) bomb;
 }
 
 static PyMemberDef bomb_members[] = {
-	{"type",	T_OBJECT, offsetof(PyBombObject, curexc_type), READONLY},
-	{"value",	T_OBJECT, offsetof(PyBombObject, curexc_value), READONLY},
-	{"traceback",	T_OBJECT, offsetof(PyBombObject, curexc_traceback), READONLY},
-	{0}
+    {"type",            T_OBJECT, offsetof(PyBombObject, curexc_type), READONLY},
+    {"value",           T_OBJECT, offsetof(PyBombObject, curexc_value), READONLY},
+    {"traceback",       T_OBJECT, offsetof(PyBombObject, curexc_traceback), READONLY},
+    {0}
 };
 
 static PyMethodDef bomb_methods[] = {
-	{"__reduce__",		(PyCFunction)bomb_reduce,	METH_NOARGS},
-	{"__reduce_ex__",	(PyCFunction)bomb_reduce,	METH_VARARGS},
-	{"__setstate__",	(PyCFunction)bomb_setstate,	METH_O},
-	{NULL,     NULL}             /* sentinel */
+    {"__reduce__",              (PyCFunction)bomb_reduce,       METH_NOARGS},
+    {"__reduce_ex__",           (PyCFunction)bomb_reduce,       METH_VARARGS},
+    {"__setstate__",            (PyCFunction)bomb_setstate,     METH_O},
+    {NULL,     NULL}             /* sentinel */
 };
 
 static char bomb__doc__[] =
@@ -214,45 +208,45 @@ t.tempval = b\n\
 t.run()  # let the bomb explode";
 
 PyTypeObject PyBomb_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	"stackless.bomb",
-	sizeof(PyBombObject),
-	0,
-	(destructor)bomb_dealloc,		/* tp_dealloc */
-	0,					/* tp_print */
-	0,					/* tp_getattr */
-	0,					/* tp_setattr */
-	0,					/* tp_compare */
-	0,					/* tp_repr */
-	0,					/* tp_as_number */
-	0,					/* tp_as_sequence */
-	0,					/* tp_as_mapping */
-	0,					/* tp_hash */
-	0,					/* tp_call */
-	0,					/* tp_str */
-	PyObject_GenericGetAttr,		/* tp_getattro */
-	PyObject_GenericSetAttr,		/* tp_setattro */
-	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
-	bomb__doc__,				/* tp_doc */
- 	(traverseproc)bomb_traverse,		/* tp_traverse */
-	(inquiry) bomb_clear,			/* tp_clear */
-	0,					/* tp_richcompare */
-	0,					/* tp_weaklistoffset */
-	0,					/* tp_iter */
-	0,					/* tp_iternext */
-	bomb_methods,				/* tp_methods */
-	bomb_members,				/* tp_members */
-	0,					/* tp_getset */
-	0,					/* tp_base */
-	0,					/* tp_dict */
-	0,					/* tp_descr_get */
-	0,					/* tp_descr_set */
-	0,					/* tp_dictoffset */
-	0,					/* tp_init */
-	0,					/* tp_alloc */
-	bomb_new,				/* tp_new */
-	_PyObject_GC_Del,			/* tp_free */
+    PyObject_HEAD_INIT(&PyType_Type)
+    "stackless.bomb",
+    sizeof(PyBombObject),
+    0,
+    (destructor)bomb_dealloc,                   /* tp_dealloc */
+    0,                                          /* tp_print */
+    0,                                          /* tp_getattr */
+    0,                                          /* tp_setattr */
+    0,                                          /* tp_compare */
+    0,                                          /* tp_repr */
+    0,                                          /* tp_as_number */
+    0,                                          /* tp_as_sequence */
+    0,                                          /* tp_as_mapping */
+    0,                                          /* tp_hash */
+    0,                                          /* tp_call */
+    0,                                          /* tp_str */
+    PyObject_GenericGetAttr,                    /* tp_getattro */
+    PyObject_GenericSetAttr,                    /* tp_setattro */
+    0,                                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    bomb__doc__,                                /* tp_doc */
+    (traverseproc)bomb_traverse,                /* tp_traverse */
+    (inquiry) bomb_clear,                       /* tp_clear */
+    0,                                          /* tp_richcompare */
+    0,                                          /* tp_weaklistoffset */
+    0,                                          /* tp_iter */
+    0,                                          /* tp_iternext */
+    bomb_methods,                               /* tp_methods */
+    bomb_members,                               /* tp_members */
+    0,                                          /* tp_getset */
+    0,                                          /* tp_base */
+    0,                                          /* tp_dict */
+    0,                                          /* tp_descr_get */
+    0,                                          /* tp_descr_set */
+    0,                                          /* tp_dictoffset */
+    0,                                          /* tp_init */
+    0,                                          /* tp_alloc */
+    bomb_new,                                   /* tp_new */
+    _PyObject_GC_Del,                           /* tp_free */
 };
 
 
@@ -293,46 +287,46 @@ PyObject *_slp_schedule_hook;
 static int
 transfer_with_exc(PyCStackObject **cstprev, PyCStackObject *cst, PyTaskletObject *prev)
 {
-	PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = PyThreadState_GET();
 
-	int tracing = ts->tracing;
-	int use_tracing = ts->use_tracing;
+    int tracing = ts->tracing;
+    int use_tracing = ts->use_tracing;
 
-	Py_tracefunc c_profilefunc = ts->c_profilefunc;
-	Py_tracefunc c_tracefunc = ts->c_tracefunc;
-	PyObject *c_profileobj = ts->c_profileobj;
-	PyObject *c_traceobj = ts->c_traceobj;
+    Py_tracefunc c_profilefunc = ts->c_profilefunc;
+    Py_tracefunc c_tracefunc = ts->c_tracefunc;
+    PyObject *c_profileobj = ts->c_profileobj;
+    PyObject *c_traceobj = ts->c_traceobj;
 
-	PyObject *exc_type = ts->exc_type;
-	PyObject *exc_value = ts->exc_value;
-	PyObject *exc_traceback = ts->exc_traceback;
-	int ret;
+    PyObject *exc_type = ts->exc_type;
+    PyObject *exc_value = ts->exc_value;
+    PyObject *exc_traceback = ts->exc_traceback;
+    int ret;
 
-	ts->exc_type = ts->exc_value = ts->exc_traceback = NULL;
-	ts->c_profilefunc = ts->c_tracefunc = NULL;
-	ts->c_profileobj = ts->c_traceobj = NULL;
-	ts->use_tracing = ts->tracing = 0;
+    ts->exc_type = ts->exc_value = ts->exc_traceback = NULL;
+    ts->c_profilefunc = ts->c_tracefunc = NULL;
+    ts->c_profileobj = ts->c_traceobj = NULL;
+    ts->use_tracing = ts->tracing = 0;
 
-	/* note that trace/profile are set without ref */
-	Py_XINCREF(c_profileobj);
-	Py_XINCREF(c_traceobj);
+    /* note that trace/profile are set without ref */
+    Py_XINCREF(c_profileobj);
+    Py_XINCREF(c_traceobj);
 
-	ret = slp_transfer(cstprev, cst, prev);
+    ret = slp_transfer(cstprev, cst, prev);
 
-	ts->tracing = tracing;
-	ts->use_tracing = use_tracing;
+    ts->tracing = tracing;
+    ts->use_tracing = use_tracing;
 
-	ts->c_profilefunc = c_profilefunc;
-	ts->c_tracefunc = c_tracefunc;
-	ts->c_profileobj = c_profileobj;
-	ts->c_traceobj = c_traceobj;
-	Py_XDECREF(c_profileobj);
-	Py_XDECREF(c_traceobj);
+    ts->c_profilefunc = c_profilefunc;
+    ts->c_tracefunc = c_tracefunc;
+    ts->c_profileobj = c_profileobj;
+    ts->c_traceobj = c_traceobj;
+    Py_XDECREF(c_profileobj);
+    Py_XDECREF(c_traceobj);
 
-	ts->exc_type = exc_type;
-	ts->exc_value = exc_value;
-	ts->exc_traceback = exc_traceback;
-	return ret;
+    ts->exc_type = exc_type;
+    ts->exc_value = exc_value;
+    ts->exc_traceback = exc_traceback;
+    return ret;
 }
 
 /* scheduler monitoring */
@@ -340,100 +334,85 @@ transfer_with_exc(PyCStackObject **cstprev, PyCStackObject *cst, PyTaskletObject
 int
 slp_schedule_callback(PyTaskletObject *prev, PyTaskletObject *next)
 {
-	PyObject *type, *value, *traceback, *ret;
-	PyObject *tmp;
-	PyThreadState *ts = PyThreadState_GET();
+    PyObject *args;
+    PyObject *tmp;
+    PyThreadState *ts = PyThreadState_GET();
 
-	if (prev == NULL) prev = (PyTaskletObject *)Py_None;
-	if (next == NULL) next = (PyTaskletObject *)Py_None;
+    if (prev == NULL) prev = (PyTaskletObject *)Py_None;
+    if (next == NULL) next = (PyTaskletObject *)Py_None;
+    args = Py_BuildValue("(OO)", prev, next);
+    if (args != NULL) {
+        PyObject *type, *value, *traceback, *ret;
 
-	/* store the del post switch away temporarily to not have it
-	 * released in the dispatching loop we are about to invoke
-	 */
-	 tmp = ts->st.del_post_switch;
-	 ts->st.del_post_switch = NULL;
-		
-	PyErr_Fetch(&type, &value, &traceback);
-	ret = PyObject_CallFunction(_slp_schedule_hook, "(OO)", prev, next);
-		
-	assert(ts->st.del_post_switch == NULL);
-	ts->st.del_post_switch = tmp;
-		
-	if (ret != NULL)
-		PyErr_Restore(type, value, traceback);
-	else {
-		Py_XDECREF(type);
-		Py_XDECREF(value);
-		Py_XDECREF(traceback);
-	}
-	Py_XDECREF(ret);
-	return ret ? 0 : -1;
+        /* store the del post switch away temporarily to not have it
+         * released in the dispatching loop we are about to invoke
+         */
+        tmp = ts->st.del_post_switch;
+        ts->st.del_post_switch = NULL;
+
+        PyErr_Fetch(&type, &value, &traceback);
+        ret = PyObject_Call(_slp_schedule_hook, args, NULL);
+
+        assert(ts->st.del_post_switch == NULL);
+        ts->st.del_post_switch = tmp;
+
+        if (ret != NULL)
+            PyErr_Restore(type, value, traceback);
+        else {
+            Py_XDECREF(type);
+            Py_XDECREF(value);
+            Py_XDECREF(traceback);
+        }
+        Py_XDECREF(ret);
+        Py_DECREF(args);
+        return ret ? 0 : -1;
+    }
+    else
+        return -1;
 }
 
 #define NOTIFY_SCHEDULE(prev, next, errflag) \
-	if (_slp_schedule_fasthook != NULL) { \
-		int ret; \
-		if (ts->st.schedlock) { \
-			RUNTIME_ERROR( \
-			    "Recursive scheduler call due to callbacks!", \
-			    errflag); \
-		} \
-		ts->st.schedlock = 1; \
-		ret = _slp_schedule_fasthook(prev, next); \
-		ts->st.schedlock = 0; \
-		if (ret) return errflag; \
-	}
-
-/* a function to cath the "return" of the macro */
-static int
-notify_schedule_unmacro(PyThreadState *ts, PyTaskletObject *prev, PyTaskletObject *next)
-{
-	NOTIFY_SCHEDULE(prev, next, -1);
-	return 0;
-}
-
-/* call scheduling callback and ignore exceptions */
-static void
-notify_schedule(PyThreadState *ts, PyTaskletObject *prev, PyTaskletObject *next)
-{
-	if (_slp_schedule_fasthook == NULL)
-		return;
-	if (notify_schedule_unmacro(ts, prev, next)) {
-		PyObject *obj = Py_None;
-		if (slp_schedule_callback == _slp_schedule_fasthook)
-			obj = _slp_schedule_hook;
-		PyErr_WriteUnraisable(obj);
-	}
-}
+    if (_slp_schedule_fasthook != NULL) { \
+        int ret; \
+        if (ts->st.schedlock) { \
+            RUNTIME_ERROR( \
+                "Recursive scheduler call due to callbacks!", \
+                errflag); \
+        } \
+        ts->st.schedlock = 1; \
+        ret = _slp_schedule_fasthook(prev, next); \
+        ts->st.schedlock = 0; \
+        if (ret) return errflag; \
+    }
 
 static void
 kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
 {
-	/*
-	 * just in case a transfer didn't work, we pack the bad
-	 * tasklet into the exception and remove it from the runnables.
-	 *
-	 */
-	PyThreadState *ts = PyThreadState_GET();
-	PyObject *newval = PyTuple_New(2);
-	if (bad_guy->next != NULL) {
-		ts->st.current = bad_guy;
-		slp_current_remove();
-	}
-	/* restore last tasklet */
-	if (prev->next == NULL)
-		slp_current_insert(prev);
-	ts->frame = prev->f.frame;
-	ts->st.current = prev;
-	if (newval != NULL) {
-		/* merge bad guy into exception */
-		PyObject *exc, *val, *tb;
-		PyErr_Fetch(&exc, &val, &tb);
-		PyTuple_SET_ITEM(newval, 0, val);
-		PyTuple_SET_ITEM(newval, 1, (PyObject*)bad_guy);
-		Py_INCREF(bad_guy);
-		PyErr_Restore(exc, newval, tb);
-	}
+    /*
+     * just in case a transfer didn't work, we pack the bad
+     * tasklet into the exception and remove it from the runnables.
+     *
+     */
+    PyThreadState *ts = PyThreadState_GET();
+    PyObject *newval = PyTuple_New(2);
+    if (bad_guy->next != NULL) {
+        ts->st.current = bad_guy;
+        slp_current_remove();
+    }
+    /* restore last tasklet */
+    if (prev->next == NULL)
+        slp_current_insert(prev);
+    ts->frame = prev->f.frame;
+    ts->st.current = prev;
+    if (newval != NULL) {
+        /* merge bad guy into exception */
+        PyObject *exc, *val, *tb;
+        PyErr_Fetch(&exc, &val, &tb);
+        PyTuple_SET_ITEM(newval, 0, val);
+        PyTuple_SET_ITEM(newval, 1, (PyObject*)bad_guy);
+        Py_INCREF(bad_guy);
+        PyErr_Restore(exc, newval, tb);
+    }
 }
 
 /* slp_schedule_task is moved down and merged with soft switching */
@@ -443,36 +422,36 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
 static PyObject *
 restore_exception(PyFrameObject *f, int exc, PyObject *retval)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyThreadState *ts = PyThreadState_GET();
+    PyCFrameObject *cf = (PyCFrameObject *) f;
 
-	f = cf->f_back;
-	ts->exc_type = cf->ob1;
-	ts->exc_value = cf->ob2;
-	ts->exc_traceback = cf->ob3;
-	cf->ob1 = cf->ob2 = cf->ob3 = NULL;
-	Py_DECREF(cf);
-	ts->frame = f;
-	return STACKLESS_PACK(retval);
+    f = cf->f_back;
+    ts->exc_type = cf->ob1;
+    ts->exc_value = cf->ob2;
+    ts->exc_traceback = cf->ob3;
+    cf->ob1 = cf->ob2 = cf->ob3 = NULL;
+    Py_DECREF(cf);
+    ts->frame = f;
+    return STACKLESS_PACK(retval);
 }
 
 static PyObject *
 restore_tracing(PyFrameObject *f, int exc, PyObject *retval)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyThreadState *ts = PyThreadState_GET();
+    PyCFrameObject *cf = (PyCFrameObject *) f;
 
-	f = cf->f_back;
-	ts->c_tracefunc = cf->any1;
-	ts->c_profilefunc = cf->any2;
-	ts->c_traceobj = cf->ob1;
-	ts->c_profileobj = cf->ob2;
-	ts->tracing = cf->i;
-	ts->use_tracing = cf->n;
-	/* the objects *have* extra references here */
-	Py_DECREF(cf);
-	ts->frame = f;
-	return STACKLESS_PACK(retval);
+    f = cf->f_back;
+    ts->c_tracefunc = (Py_tracefunc)cf->any1;
+    ts->c_profilefunc = (Py_tracefunc)cf->any2;
+    ts->c_traceobj = cf->ob1;
+    ts->c_profileobj = cf->ob2;
+    ts->tracing = cf->i;
+    ts->use_tracing = cf->n;
+    /* the objects *have* extra references here */
+    Py_DECREF(cf);
+    ts->frame = f;
+    return STACKLESS_PACK(retval);
 }
 
 /* jumping from a soft tasklet to a hard switched */
@@ -480,21 +459,21 @@ restore_tracing(PyFrameObject *f, int exc, PyObject *retval)
 static PyObject *
 jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
 {
-	PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = PyThreadState_GET();
 
-	ts->frame = f->f_back;
-	
-	/* reinstate the del_post_switch */
-	assert(ts->st.del_post_switch == NULL);
-	ts->st.del_post_switch = ((PyCFrameObject*)f)->ob1;
-	((PyCFrameObject*)f)->ob1 = NULL;
+    ts->frame = f->f_back;
 
-	Py_DECREF(f);
-	/* ignore retval. everything is in the tasklet. */
-	Py_DECREF(retval); /* consume ref according to protocol */
-	slp_transfer_return(ts->st.current->cstate);
-	/* we either have an error or don't come back, so: */
-	return NULL;
+    /* reinstate the del_post_switch */
+    assert(ts->st.del_post_switch == NULL);
+    ts->st.del_post_switch = ((PyCFrameObject*)f)->ob1;
+    ((PyCFrameObject*)f)->ob1 = NULL;
+
+    Py_DECREF(f);
+    /* ignore retval. everything is in the tasklet. */
+    Py_DECREF(retval); /* consume ref according to protocol */
+    slp_transfer_return(ts->st.current->cstate);
+    /* we either have an error or don't come back, so: */
+    return NULL;
 }
 
 
@@ -503,12 +482,12 @@ jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
 int
 slp_ensure_linkage(PyTaskletObject *t)
 {
-	if (t->cstate->task == t)
-		return 0;
-	if (!slp_cstack_new(&t->cstate, t->cstate->tstate->st.cstack_base, t))
-		return -1;
-	t->cstate->nesting_level = 0;
-	return 0;
+    if (t->cstate->task == t)
+        return 0;
+    if (!slp_cstack_new(&t->cstate, t->cstate->tstate->st.cstack_base, t))
+        return -1;
+    t->cstate->nesting_level = 0;
+    return 0;
 }
 
 
@@ -518,514 +497,458 @@ static int
 is_thread_runnable(PyThreadState *ts)
 {
 #ifdef WITH_THREAD
-	if (ts == PyThreadState_GET())
-		return 0;
-	return !ts->st.thread.is_locked;
+    if (ts == PyThreadState_GET())
+        return 0;
+    return !ts->st.thread.is_blocked;
 #endif
-	return 0;
+    return 0;
 }
 
 static int
 check_for_deadlock(void)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyInterpreterState *interp = ts->interp;
+    PyThreadState *ts = PyThreadState_GET();
+    PyInterpreterState *interp = ts->interp;
 
-	/* see if anybody else will be able to run */
+    /* see if anybody else will be able to run */
 
-	for (ts = interp->tstate_head; ts != NULL; ts = ts->next)
-		if (is_thread_runnable(ts))
-			return 0;
-	return 1;
+    for (ts = interp->tstate_head; ts != NULL; ts = ts->next)
+        if (is_thread_runnable(ts))
+            return 0;
+    return 1;
 }
 
 static PyObject *
 make_deadlock_bomb(void)
 {
-	PyErr_SetString(PyExc_RuntimeError,
-		"Deadlock: the last runnable tasklet cannot be blocked.");
-	return slp_curexc_to_bomb();
+    PyErr_SetString(PyExc_RuntimeError,
+        "Deadlock: the last runnable tasklet cannot be blocked.");
+    return slp_curexc_to_bomb();
 }
 
 static int
 is_thread_alive(long thread_id)
 {
-	PyThreadState *ts = PyThreadState_Get();
-	PyInterpreterState *interp = ts->interp;
+    PyThreadState *ts = PyThreadState_Get();
+    PyInterpreterState *interp = ts->interp;
 
-	for (ts = interp->tstate_head; ts != NULL; ts = ts->next)
-		if (ts->thread_id == thread_id)
-			return 1;
-	return 0;
+    for (ts = interp->tstate_head; ts != NULL; ts = ts->next)
+        if (ts->thread_id == thread_id)
+            return 1;
+    return 0;
 }
-
-# if 0
-#define PR(s) printf("%d: %04x-%04x %04x-%04x %2d " s "\n", prev->cstate->tstate->thread_id, \
-	(int)prev & 0xffff, \
-(int)prev->cstate->tstate & 0xffff, (int)next & 0xffff, \
-	next ? (int)next->cstate->tstate & 0xffff : 0, \
-next ? next->flags.blocked : 0)
-
-# else
-#define PR(s)
-
-# endif
 
 #ifdef WITH_THREAD
 
 /* make sure that locks live longer than their threads */
 
 static void
-destruct_lock(PyThread_type_lock lock)
+destruct_lock(PyObject *capsule)
 {
-	PyThread_acquire_lock(lock, 0);
-	PyThread_release_lock(lock);
-	PyThread_free_lock(lock);
+    PyThread_type_lock lock = PyCapsule_GetPointer(capsule, 0);
+    if (lock) {
+        PyThread_acquire_lock(lock, 0);
+        PyThread_release_lock(lock);
+        PyThread_free_lock(lock);
+    }
 }
 
 static PyObject *
 new_lock(void)
 {
-	PyThread_type_lock lock;
+    PyThread_type_lock lock;
 
-	lock = PyThread_allocate_lock();
-	if (lock == NULL) return NULL;
+    lock = PyThread_allocate_lock();
+    if (lock == NULL) return NULL;
 
-	return PyCObject_FromVoidPtr(lock, destruct_lock);
+    return PyCapsule_New(lock, 0, destruct_lock);
 }
 
-#define get_lock(obj) PyCObject_AsVoidPtr(obj)
+#define get_lock(obj) PyCapsule_GetPointer(obj, 0)
 
 #define acquire_lock(lock, flag) PyThread_acquire_lock(get_lock(lock), flag)
 #define release_lock(lock) PyThread_release_lock(get_lock(lock))
 
+static int schedule_thread_block(PyThreadState *ts)
+{
+    assert(!ts->st.thread.is_blocked);
+    /* create on demand the lock we use to block */
+    if (ts->st.thread.block_lock == NULL) {
+        if (!(ts->st.thread.block_lock = new_lock()))
+            return -1;
+        acquire_lock(ts->st.thread.block_lock, 1);
+    }
+
+    /* block */
+    ts->st.thread.is_blocked = 1;
+    Py_BEGIN_ALLOW_THREADS
+    acquire_lock(ts->st.thread.block_lock, 1);
+    Py_END_ALLOW_THREADS
+
+    /* Now we have switched (on this thread), clear any post-switch stuff */
+    Py_CLEAR(ts->st.del_post_switch);
+    return 0;
+}
+
+static int schedule_thread_unblock(PyThreadState *nts)
+{
+    if (nts->st.thread.is_blocked) {
+        nts->st.thread.is_blocked = 0;
+        release_lock(nts->st.thread.block_lock);
+    }
+    return 0;
+}
 #endif
 
 static PyObject *
-schedule_task_block(PyTaskletObject *prev, int stackless)
+schedule_task_block(PyTaskletObject *prev, int stackless, int *did_switch)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyObject *retval;
-	PyTaskletObject *next = NULL;
-	PyObject *self_lock, *unlocker_lock;
-	int revive_main = 0;
-	
-#ifdef WITH_THREAD
-	if ( !(ts->st.runflags & Py_WATCHDOG_THREADBLOCK) && ts->st.main->next == NULL)
-		/* we also must never block if watchdog is running not in threadblocking mode */
-		revive_main = 1;
+    PyThreadState *ts = PyThreadState_GET();
+    PyObject *retval;
+    PyTaskletObject *next = NULL;
+    int revive_main = 0;
 
-	if (revive_main)
-		assert(ts->st.main->next == NULL); /* main must be floating */
+#ifdef WITH_THREAD
+    if ( !(ts->st.runflags & Py_WATCHDOG_THREADBLOCK) && ts->st.main->next == NULL)
+        /* we also must never block if watchdog is running not in threadblocking mode */
+        revive_main = 1;
+
+    if (revive_main)
+        assert(ts->st.main->next == NULL); /* main must be floating */
 #endif
 
-	if (revive_main || check_for_deadlock()) {
-		if (revive_main || (ts == slp_initial_tstate && ts->st.main->next == NULL)) {
-			/* emulate old revive_main behavior:
-			 * passing a value only if it is an exception
-			 */
-			if (PyBomb_Check(prev->tempval))
-				TASKLET_SETVAL(ts->st.main, prev->tempval);
-			return slp_schedule_task(prev, ts->st.main, stackless);
-		}
-		if (!(retval = make_deadlock_bomb()))
-			return NULL;
-		TASKLET_SETVAL_OWN(prev, retval);
-		return slp_schedule_task(prev, prev, stackless);
-	}
+    if (revive_main || check_for_deadlock()) {
+        if (revive_main || (ts == slp_initial_tstate && ts->st.main->next == NULL)) {
+            /* emulate old revive_main behavior:
+             * passing a value only if it is an exception
+             */
+            if (PyBomb_Check(prev->tempval))
+                TASKLET_SETVAL(ts->st.main, prev->tempval);
+            return slp_schedule_task(prev, ts->st.main, stackless, did_switch);
+        }
+        if (!(retval = make_deadlock_bomb()))
+            return NULL;
+        TASKLET_SETVAL_OWN(prev, retval);
+        return slp_schedule_task(prev, prev, stackless, did_switch);
+    }
 #ifdef WITH_THREAD
-	if (ts->st.thread.self_lock == NULL) {
-		if (!(ts->st.thread.self_lock = new_lock()))
-			return NULL;
-		acquire_lock(ts->st.thread.self_lock, 1);
-	}
+    if (schedule_thread_block(ts))
+        return NULL;
 
-	/* let somebody reactivate us */
-
-	ts->st.thread.is_locked = 1; /* flag as blocked and wait */
-
-	self_lock = ts->st.thread.self_lock;
-	Py_INCREF(self_lock);
-	Py_BEGIN_ALLOW_THREADS
-	PR("locker waiting for my lock");
-	acquire_lock(self_lock, 1);
-	PR("HAVE my lock");
-	Py_END_ALLOW_THREADS
-	Py_DECREF(self_lock);
-
-	if (ts->st.thread.unlock_target != NULL) {
-		next = (PyTaskletObject*)ts->st.thread.unlock_target;
-		ts->st.thread.unlock_target = NULL;
-	}
-	else
-		next = prev;
-
-	/*
-	 * get in shape. can't do this with schedule here because
-	 * hard switching might not get us back, soon enough.
-	 */
-	if (next->flags.blocked) {
-		/* unblock from channel */
-		slp_channel_remove_slow(next);
-		slp_current_insert(next);
-	}
-	else if (next->next == NULL) {
-		/* reactivate floating task */
-		Py_INCREF(next);
-		slp_current_insert(next);
-	}
-
-	if (ts->st.thread.unlocker_lock != NULL) {
-		PR("releasing unlocker");
-		unlocker_lock = ts->st.thread.unlocker_lock;
-		ts->st.thread.unlocker_lock = NULL;
-		release_lock(unlocker_lock);
-		PR("released unlocker");
-		Py_DECREF(unlocker_lock);
-	}
-
-	ts->st.thread.is_locked = 0;
+    /* now we should have something in the runnable queue */
+    next = slp_current_remove();
+    if (!next) {
+        /* weird, but what the h */
+        next = prev;
+        Py_INCREF(next);
+    }
 #else
-	(void)unlocker_lock;
-	next = prev;
+    next = prev;
+    Py_INCREF(next);
 #endif
-	/* this must be after releasing the locks because of hard switching */
-	retval = slp_schedule_task(prev, next, stackless);
-	PR("schedule() is done");
-	return retval;
+    /* this must be after releasing the locks because of hard switching */
+    retval = slp_schedule_task(prev, next, stackless, did_switch);
+    Py_DECREF(next);
+    return retval;
 }
 
 #ifdef WITH_THREAD
-
-static PyObject *schedule_task_unblock(PyTaskletObject *prev,
-				       PyTaskletObject *next,
-				       int stackless)
+static PyObject *schedule_task_interthread(PyTaskletObject *prev,
+                                       PyTaskletObject *next,
+                                       int stackless,
+                                       int *did_switch)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyThreadState *nts = next->cstate->tstate;
-	PyObject *retval;
-	long thread_id = nts->thread_id;
-	PyObject *unlock_lock;
+    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *nts = next->cstate->tstate;
+    PyObject *retval;
+    long thread_id = nts->thread_id;
 
-	if (ts->st.thread.self_lock == NULL) {
-		if (!(ts->st.thread.self_lock = new_lock()))
-			return NULL;
-		/* Non-recursive lock, used for blocking myself on second aquire() */
-		acquire_lock(ts->st.thread.self_lock, 1);
-	}
+    /* get myself ready, since the previous task is going to continue on the
+     * curren thread
+     */
+    retval = slp_schedule_task(prev, prev, stackless, did_switch);
 
-	/*
-	 * make sure nobody else tries a transaction at the same time
-	 * on this tasklet's thread state, because two tasklets of the
-	 * same thread could be talking to different threads. They must
-	 * be serviced in fifo order.
-	 */
+    /* put the next tasklet in the target thread's queue */
+   if (next->flags.blocked) {
+        /* unblock from channel */
+        slp_channel_remove_slow(next);
+        slp_current_insert(next);
+    }
+    else if (next->next == NULL) {
+        /* reactivate floating task */
+        Py_INCREF(next);
+        slp_current_insert(next);
+    }
 
-	if (nts->st.thread.unlock_lock == NULL) {
-		if (!(nts->st.thread.unlock_lock = new_lock()))
-			return NULL;
-	}
-	unlock_lock = nts->st.thread.unlock_lock;
-	Py_INCREF(unlock_lock);
+    /* unblock the thread if required */
+    schedule_thread_unblock(nts);
 
-	Py_BEGIN_ALLOW_THREADS
-	PR("unblocker waiting for unlocker lock");
-	acquire_lock(unlock_lock, 1);
-	PR("unblocker HAS unlocker lock");
-	Py_END_ALLOW_THREADS
-
-	/* get myself ready */
-	retval = slp_schedule_task(prev, prev, stackless);
-
-	/* see whether the other thread still exists and is really blocked */
-	if (is_thread_alive(thread_id) && nts->st.thread.is_locked) {
-		/* tell the blocker what comes next */
-		nts->st.thread.unlock_target = (PyObject*)next;
-		nts->st.thread.unlocker_lock = ts->st.thread.self_lock;
-		/* give it an extra ref, in case I would die early */
-		Py_INCREF(nts->st.thread.unlocker_lock);
-
-		/* unblock it */
-		release_lock(nts->st.thread.self_lock);
-
-		/* wait for the transaction to finish */
-		Py_BEGIN_ALLOW_THREADS
-		PR("unblocker waiting for own lock");
-		acquire_lock(ts->st.thread.self_lock, 1);
-		PR("unblocker HAS own lock");
-		Py_END_ALLOW_THREADS
-	}
-	else {
-		PR("unlocker: other is NOT LOCKED or dead");
-		if (next->flags.blocked) {
-			/* unblock from channel */
-			slp_channel_remove_slow(next);
-			slp_current_insert(next);
-		}
-		else if (next->next == NULL) {
-			/* reactivate floating task */
-			Py_INCREF(next);
-			slp_current_insert(next);
-		}
-	}
-	PR("unblocker releasing unlocker lock");
-	release_lock(unlock_lock);
-	PR("unblocker RELEASED unlocker lock");
-	Py_DECREF(unlock_lock);
-	
-	return retval;
+    return retval;
 }
 
 #endif
 
 /* deal with soft interrupts by modifying next to specify the main tasklet */
 static void slp_schedule_soft_irq(PyThreadState *ts, PyTaskletObject *prev,
-						   PyTaskletObject **next, int not_now)
+                                                   PyTaskletObject **next, int not_now)
 {
-	PyTaskletObject *tmp;
-	assert(*next);
-	if(!prev->flags.pending_irq || !(ts->st.runflags & PY_WATCHDOG_SOFT) )
-		return; /* no soft interrupt pending */
+    PyTaskletObject *tmp;
+    assert(*next);
+    if(!prev->flags.pending_irq || !(ts->st.runflags & PY_WATCHDOG_SOFT) )
+        return; /* no soft interrupt pending */
 
-	prev->flags.pending_irq = 0;
-	if (ts->st.main->next != NULL)
-		return; /* main isn't floating, we are probably raising an exception */
+    prev->flags.pending_irq = 0;
+    if (ts->st.main->next != NULL)
+        return; /* main isn't floating, we are probably raising an exception */
 
-	/* if were were swithing from main or to main, we don't do anything */
-	if (prev == ts->st.main || *next == ts->st.main)
-		return;
+    /* if were were swithing from main or to main, we don't do anything */
+    if (prev == ts->st.main || *next == ts->st.main)
+        return;
 
-	if (not_now || !TASKLET_NESTING_OK(prev)) {
-		/* pass the irq flag to the next tasklet */
-		(*next)->flags.pending_irq = 1;
-		return;
-	}
+    if (not_now || !TASKLET_NESTING_OK(prev)) {
+        /* pass the irq flag to the next tasklet */
+        (*next)->flags.pending_irq = 1;
+        return;
+    }
 
-	/* restore main.  insert it before the old next, so that the old next get
-	 * run after it
-	 */
-	tmp = ts->st.current;
-	ts->st.current = *next;
-	slp_current_insert(ts->st.main);
-	Py_INCREF(ts->st.main);
-	ts->st.current = tmp;
-	
-	*next = ts->st.main;
+    /* restore main.  insert it before the old next, so that the old next get
+     * run after it
+     */
+    tmp = ts->st.current;
+    ts->st.current = *next;
+    slp_current_insert(ts->st.main);
+    Py_INCREF(ts->st.main);
+    ts->st.current = tmp;
+
+    *next = ts->st.main;
 }
 
-PyObject *
-slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
-{
-	PyThreadState *ts = PyThreadState_GET();
-	PyCStackObject **cstprev;
-	PyObject *retval;
-	int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
-	int no_soft_irq;
 
-	if (next == NULL) {
-		return schedule_task_block(prev, stackless);
-	}
+PyObject *
+slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless,
+                  int *did_switch)
+{
+    PyThreadState *ts = PyThreadState_GET();
+    PyCStackObject **cstprev;
+    PyObject *retval;
+    int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
+    int no_soft_irq;
+    
+    if (did_switch)
+        *did_switch = 0; /* only set this if an actual switch occurs */
+
+    if (next == NULL) {
+        return schedule_task_block(prev, stackless, did_switch);
+    }
 #ifdef WITH_THREAD
-	/* note that next->cstate is undefined if it is ourself */
-	if (next->cstate != NULL && next->cstate->tstate != ts) {
-		return schedule_task_unblock(prev, next, stackless);
-	}
+    /* note that next->cstate is undefined if it is ourself */
+    if (next->cstate != NULL && next->cstate->tstate != ts) {
+        return schedule_task_interthread(prev, next, stackless, did_switch);
+    }
 #endif
 
-	/* remove the no-soft-irq flag from the runflags */
-	no_soft_irq = ts->st.runflags & PY_WATCHDOG_NO_SOFT_IRQ;
-	ts->st.runflags &= ~PY_WATCHDOG_NO_SOFT_IRQ;
+    /* remove the no-soft-irq flag from the runflags */
+    no_soft_irq = ts->st.runflags & PY_WATCHDOG_NO_SOFT_IRQ;
+    ts->st.runflags &= ~PY_WATCHDOG_NO_SOFT_IRQ;
 
-	if (next->flags.blocked) {
-		/* unblock from channel */
-		slp_channel_remove_slow(next);
-		slp_current_insert(next);
-	}
-	else if (next->next == NULL) {
-		/* reactivate floating task */
-		Py_INCREF(next);
-		slp_current_insert(next);
-	}
+    if (next->flags.blocked) {
+        /* unblock from channel */
+        slp_channel_remove_slow(next);
+        slp_current_insert(next);
+    }
+    else if (next->next == NULL) {
+        /* reactivate floating task */
+        Py_INCREF(next);
+        slp_current_insert(next);
+    }
 
-	slp_schedule_soft_irq(ts, prev, &next, no_soft_irq);
+    slp_schedule_soft_irq(ts, prev, &next, no_soft_irq);
 
-	if (prev == next) {
-		TASKLET_CLAIMVAL(prev, &retval);
-		if (PyBomb_Check(retval))
-			retval = slp_bomb_explode(retval);
-		return retval;
-	}
+    if (prev == next) {
+        TASKLET_CLAIMVAL(prev, &retval);
+        if (PyBomb_Check(retval))
+            retval = slp_bomb_explode(retval);
+        return retval;
+    }
 
-	notify_schedule(ts, prev, next);
+    NOTIFY_SCHEDULE(prev, next, NULL);
 
-	if (!(ts->st.runflags & PY_WATCHDOG_TOTALTIMEOUT))
-		ts->st.ticker = ts->st.interval; /* reset timeslice */
-	prev->recursion_depth = ts->recursion_depth;
-	prev->f.frame = ts->frame;
+    if (!(ts->st.runflags & PY_WATCHDOG_TOTALTIMEOUT))
+        ts->st.ticker = ts->st.interval; /* reset timeslice */
+    prev->recursion_depth = ts->recursion_depth;
+    prev->f.frame = ts->frame;
 
-	if (!stackless || ts->st.nesting_level != 0)
-		goto hard_switching;
+    if (!stackless || ts->st.nesting_level != 0)
+        goto hard_switching;
 
-	/* start of soft switching code */
+    /* start of soft switching code */
 
-	if (prev->cstate != ts->st.initial_stub) {
-		Py_INCREF(ts->st.initial_stub);
-		Py_CLEAR(prev->cstate);
-		prev->cstate = ts->st.initial_stub;
-	}
-	if (ts != slp_initial_tstate) {
-		/* ensure to get all tasklets into the other thread's chain */
-		if (slp_ensure_linkage(prev) || slp_ensure_linkage(next))
-			return NULL;
-	}
+    if (prev->cstate != ts->st.initial_stub) {
+        Py_DECREF(prev->cstate);
+        prev->cstate = ts->st.initial_stub;
+        Py_INCREF(prev->cstate);
+    }
+    if (ts != slp_initial_tstate) {
+        /* ensure to get all tasklets into the other thread's chain */
+        if (slp_ensure_linkage(prev) || slp_ensure_linkage(next))
+            return NULL;
+    }
 
-	/* handle exception */
-	if (ts->exc_type == Py_None)
-		Py_CLEAR(ts->exc_type);
-	if (ts->exc_type != NULL) {
-		/* build a shadow frame if we are returning here*/
-		if (ts->frame != NULL) {
-			PyCFrameObject *f = slp_cframe_new(restore_exception, 1);
-			if (f == NULL)
-				return NULL;
-			f->ob1 = ts->exc_type;
-			f->ob2 = ts->exc_value;
-			f->ob3 = ts->exc_traceback;
-			prev->f.frame = (PyFrameObject *) f;
-		}
-		ts->exc_type = ts->exc_value =
-				   ts->exc_traceback = NULL;
-	}
-	if (ts->use_tracing || ts->tracing) {
-		/* build a shadow frame if we are returning here */
-		if (ts->frame != NULL) {
-			PyCFrameObject *f = slp_cframe_new(restore_tracing, 1);
-			if (f == NULL)
-				return NULL;
-			f->any1 = ts->c_tracefunc;
-			f->any2 = ts->c_profilefunc;
-			f->ob1 = ts->c_traceobj;
-			f->ob2 = ts->c_profileobj;
-			/* trace/profile does not add references */
-			Py_XINCREF(f->ob1);
-			Py_XINCREF(f->ob2);
-			f->i = ts->tracing;
-			f->n = ts->use_tracing;
-			prev->f.frame = (PyFrameObject *) f;
-		}
-		ts->c_tracefunc = ts->c_profilefunc = NULL;
-		ts->c_traceobj = ts->c_profileobj = NULL;
-		ts->tracing = ts->use_tracing = 0;
-	}
-	ts->frame = next->f.frame;
-	next->f.frame = NULL;
+    /* handle exception */
+    if (ts->exc_type == Py_None) {
+        Py_XDECREF(ts->exc_type);
+        ts->exc_type = NULL;
+    }
+    if (ts->exc_type != NULL) {
+        /* build a shadow frame if we are returning here*/
+        if (ts->frame != NULL) {
+            PyCFrameObject *f = slp_cframe_new(restore_exception, 1);
+            if (f == NULL)
+                return NULL;
+            f->ob1 = ts->exc_type;
+            f->ob2 = ts->exc_value;
+            f->ob3 = ts->exc_traceback;
+            prev->f.frame = (PyFrameObject *) f;
+        }
+        ts->exc_type = ts->exc_value =
+                           ts->exc_traceback = NULL;
+    }
+    if (ts->use_tracing || ts->tracing) {
+        /* build a shadow frame if we are returning here */
+        if (ts->frame != NULL) {
+            PyCFrameObject *f = slp_cframe_new(restore_tracing, 1);
+            if (f == NULL)
+                return NULL;
+            f->any1 = ts->c_tracefunc;
+            f->any2 = ts->c_profilefunc;
+            f->ob1 = ts->c_traceobj;
+            f->ob2 = ts->c_profileobj;
+            /* trace/profile does not add references */
+            Py_XINCREF(f->ob1);
+            Py_XINCREF(f->ob2);
+            f->i = ts->tracing;
+            f->n = ts->use_tracing;
+            prev->f.frame = (PyFrameObject *) f;
+        }
+        ts->c_tracefunc = ts->c_profilefunc = NULL;
+        ts->c_traceobj = ts->c_profileobj = NULL;
+        ts->tracing = ts->use_tracing = 0;
+    }
+    ts->frame = next->f.frame;
+    next->f.frame = NULL;
 
-	ts->recursion_depth = next->recursion_depth;
+    ts->recursion_depth = next->recursion_depth;
 
-	ts->st.current = next;
+    ts->st.current = next;
+    if (did_switch)
+        *did_switch = 1;
 
-	assert(next->cstate != NULL);
-	if (next->cstate->nesting_level != 0) {
-		/* create a helper frame to restore the target stack */
-		ts->frame = (PyFrameObject *)
-			    slp_cframe_new(jump_soft_to_hard, 1);
-		if (ts->frame == NULL) {
-			ts->frame = prev->f.frame;
-			return NULL;
-		}
+    assert(next->cstate != NULL);
+    if (next->cstate->nesting_level != 0) {
+        /* create a helper frame to restore the target stack */
+        ts->frame = (PyFrameObject *)
+                    slp_cframe_new(jump_soft_to_hard, 1);
+        if (ts->frame == NULL) {
+            ts->frame = prev->f.frame;
+            return NULL;
+        }
 
-		/* Move the del_post_switch into the cframe for it to resurrect it.
-		 * switching isn't complete until after it has run
-		 */
-		((PyCFrameObject*)ts->frame)->ob1 = ts->st.del_post_switch;
-		ts->st.del_post_switch = NULL;
+        /* Move the del_post_switch into the cframe for it to resurrect it.
+         * switching isn't complete until after it has run
+         */
+        ((PyCFrameObject*)ts->frame)->ob1 = ts->st.del_post_switch;
+        ts->st.del_post_switch = NULL;
 
-		/* note that we don't explode any bomb now and leave it in next->tempval */
-		/* retval will be ignored eventually */
-		retval = next->tempval;
-		Py_INCREF(retval);
-		return STACKLESS_PACK(retval);
-	}
+        /* note that we don't explode any bomb now and leave it in next->tempval */
+        /* retval will be ignored eventually */
+        retval = next->tempval;
+        Py_INCREF(retval);
+        return STACKLESS_PACK(retval);
+    }
 
-	TASKLET_CLAIMVAL(next, &retval);
-	if (PyBomb_Check(retval))
-		retval = slp_bomb_explode(retval);
+    TASKLET_CLAIMVAL(next, &retval);
+    if (PyBomb_Check(retval))
+        retval = slp_bomb_explode(retval);
 
-	return STACKLESS_PACK(retval);
+    return STACKLESS_PACK(retval);
 
 hard_switching:
-	/* since we change the stack we must assure that the protocol was met */
-	STACKLESS_ASSERT();
+    /* since we change the stack we must assure that the protocol was met */
+    STACKLESS_ASSERT();
 
-	/* note: nesting_level is handled in cstack_new */
-	cstprev = &prev->cstate;
+    /* note: nesting_level is handled in cstack_new */
+    cstprev = &prev->cstate;
 
-	ts->st.current = next;
+    ts->st.current = next;
 
-	if (ts->exc_type == Py_None)
-		Py_CLEAR(ts->exc_type);
-	ts->recursion_depth = next->recursion_depth;
-	ts->frame = next->f.frame;
-	next->f.frame = NULL;
+    if (ts->exc_type == Py_None) {
+        Py_XDECREF(ts->exc_type);
+        ts->exc_type = NULL;
+    }
+    ts->recursion_depth = next->recursion_depth;
+    ts->frame = next->f.frame;
+    next->f.frame = NULL;
 
-	++ts->st.nesting_level;
-	if (ts->exc_type != NULL || ts->use_tracing || ts->tracing)
-		transfer = transfer_with_exc;
-	else
-		transfer = slp_transfer;
+    ++ts->st.nesting_level;
+    if (ts->exc_type != NULL || ts->use_tracing || ts->tracing)
+        transfer = transfer_with_exc;
+    else
+        transfer = slp_transfer;
 
-	if (transfer(cstprev, next->cstate, prev) == 0) {
-		--ts->st.nesting_level;
-		TASKLET_CLAIMVAL(prev, &retval);
-		if (PyBomb_Check(retval))
-			retval = slp_bomb_explode(retval);
-		return retval;
-	}
-	else {
-		--ts->st.nesting_level;
-		kill_wrap_bad_guy(prev, next);
-		return NULL;
-	}
+    if (transfer(cstprev, next->cstate, prev) == 0) {
+        --ts->st.nesting_level;
+        TASKLET_CLAIMVAL(prev, &retval);
+        if (PyBomb_Check(retval))
+            retval = slp_bomb_explode(retval);
+        if (did_switch)
+            *did_switch = 1;
+        return retval;
+    }
+    else {
+        --ts->st.nesting_level;
+        kill_wrap_bad_guy(prev, next);
+        return NULL;
+    }
 }
 
 int
 initialize_main_and_current(void)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyTaskletObject *task;
-	PyObject *noargs;
+    PyThreadState *ts = PyThreadState_GET();
+    PyTaskletObject *task;
+    PyObject *noargs;
 
-	/* refuse executing main in an unhandled error context */
-	if (! (PyErr_Occurred() == NULL || PyErr_Occurred() == Py_None) ) {
+    /* refuse executing main in an unhandled error context */
+    if (! (PyErr_Occurred() == NULL || PyErr_Occurred() == Py_None) ) {
 #ifdef _DEBUG
-		PyObject *type, *value, *traceback;
-		PyErr_Fetch(&type, &value, &traceback);
-		Py_XINCREF(type);
-		Py_XINCREF(value);
-		Py_XINCREF(traceback);
-		PyErr_Restore(type, value, traceback);
-		printf("Pending error while entering Stackless subsystem:\n");
-		PyErr_Print();
-		printf("Above exception is re-raised to the caller.\n");
-		PyErr_Restore(type, value, traceback);
+        PyObject *type, *value, *traceback;
+        PyErr_Fetch(&type, &value, &traceback);
+        Py_XINCREF(type);
+        Py_XINCREF(value);
+        Py_XINCREF(traceback);
+        PyErr_Restore(type, value, traceback);
+        printf("Pending error while entering Stackless subsystem:\n");
+        PyErr_Print();
+        printf("Above exception is re-raised to the caller.\n");
+        PyErr_Restore(type, value, traceback);
 #endif
-        return 1;
-	}
+    return 1;
+    }
 
-	noargs = PyTuple_New(0);
-	task = (PyTaskletObject *) PyTasklet_Type.tp_new(
-		    &PyTasklet_Type, noargs, NULL);
-	Py_DECREF(noargs);
-	if (task == NULL) return -1;
-	assert(task->cstate != NULL);
-	ts->st.main = task;
-	Py_INCREF(task);
-	slp_current_insert(task);
-	ts->st.current = task;
+    noargs = PyTuple_New(0);
+    task = (PyTaskletObject *) PyTasklet_Type.tp_new(
+                &PyTasklet_Type, noargs, NULL);
+    Py_DECREF(noargs);
+    if (task == NULL) return -1;
+    assert(task->cstate != NULL);
+    ts->st.main = task;
+    Py_INCREF(task);
+    slp_current_insert(task);
+    ts->st.current = task;
 
-	NOTIFY_SCHEDULE(NULL, task, -1);
+    NOTIFY_SCHEDULE(NULL, task, -1);
 
-	return 0;
+    return 0;
 }
 
 
@@ -1034,58 +957,57 @@ initialize_main_and_current(void)
 static PyObject *
 schedule_task_destruct(PyTaskletObject *prev, PyTaskletObject *next)
 {
-	/*
-	 * The problem is to leave the dying tasklet alive
-	 * until we have done the switch.  We use the st->ts.del_post_switch
-	 * field to help us with that, someone else with decref it.
-	 */
-	PyThreadState *ts = PyThreadState_GET();
-	PyObject *retval;
+    /*
+     * The problem is to leave the dying tasklet alive
+     * until we have done the switch.  We use the st->ts.del_post_switch
+     * field to help us with that, someone else with decref it.
+     */
+    PyThreadState *ts = PyThreadState_GET();
+    PyObject *retval;
 
-	/* we should have no nesting level */
-	assert(ts->st.nesting_level == 0);
-	/* even there is a (buggy) nesting, ensure soft switch */
-	if (ts->st.nesting_level != 0) {
-		printf("XXX error, nesting_level = %d\n", ts->st.nesting_level);
-		ts->st.nesting_level = 0;
-	}
+    /* we should have no nesting level */
+    assert(ts->st.nesting_level == 0);
+    /* even there is a (buggy) nesting, ensure soft switch */
+    if (ts->st.nesting_level != 0) {
+        printf("XXX error, nesting_level = %d\n", ts->st.nesting_level);
+        ts->st.nesting_level = 0;
+    }
 
-	/* update what's not yet updated
+    /* update what's not yet updated
 
-	Normal tasklets when created have no recursion depth yet, but the main
-	tasklet is initialized in the middle of an existing indeterminate call
-	stack.  Therefore it is not guaranteed that there is not a pre-existing
-	recursion depth from before its initialization.
+    Normal tasklets when created have no recursion depth yet, but the main
+    tasklet is initialized in the middle of an existing indeterminate call
+    stack.  Therefore it is not guaranteed that there is not a pre-existing
+    recursion depth from before its initialization. So, assert that this
+    is zero, or that we are the main tasklet being destroyed (see tasklet_end)
+    */
+    assert(ts->recursion_depth == 0 || (ts->st.main == NULL && prev == next));
+    prev->recursion_depth = 0;
+    assert(ts->frame == NULL);
+    prev->f.frame = NULL;
 
-	Previously, we exited a main tasklet with the expectation that there would
-	be no current one.  This is incorrect, and the case of the interpreter where
-	each command creates a new main tasklet to create a new tasklet, which is
-	scheduled (made the current now) but not run yet, means we need to expand
-	this check.
-	*/
-	assert(ts->recursion_depth == 0 || ts->st.main == NULL && ts->st.current != next && prev == next);
-	prev->recursion_depth = 0;
-	assert(ts->frame == NULL);
-	prev->f.frame = NULL;
+    /* The tasklet can only be cleanly decrefed after we have completely
+     * switched to another one, because the decref can trigger tasklet
+     * swithes. this would otherwise mess up our soft switching.  Generally
+     * nothing significant must happen once we are unwinding the stack.
+     */
+    assert(ts->st.del_post_switch == NULL);
+    ts->st.del_post_switch = (PyObject *)prev;
 
-	/* The tasklet can only be cleanly decrefed after we have completely
-	 * switched to another one, because the decref can trigger tasklet
-	 * swithes. this would otherwise mess up our soft switching.  Generally
-	 * nothing significant must happen once we are unwinding the stack.
-	 */
-	assert(ts->st.del_post_switch == NULL);
-	ts->st.del_post_switch = (PyObject *)prev;
-
-	/* do a soft switch */
-	if (prev != next)
-		retval = slp_schedule_task(prev, next, 1);
-	else {
-		/* main is exiting */
-		TASKLET_CLAIMVAL(prev, &retval);
-		if (PyBomb_Check(retval))
-			retval = slp_bomb_explode(retval);
-	}
-	return retval;
+    /* do a soft switch */
+    if (prev != next) {
+        int switched;
+        retval = slp_schedule_task(prev, next, 1, &switched);
+        if (!switched)
+            /* something happened, cancel prev's decref */
+            ts->st.del_post_switch  = 0;
+    } else {
+        /* main is exiting */
+        TASKLET_CLAIMVAL(prev, &retval);
+        if (PyBomb_Check(retval))
+            retval = slp_bomb_explode(retval);
+    }
+    return retval;
 }
 
 /* defined in pythonrun.c */
@@ -1094,110 +1016,111 @@ extern void PyStackless_HandleSystemExit(void);
 static PyObject *
 tasklet_end(PyObject *retval)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyTaskletObject *task = ts->st.current;
-	PyTaskletObject *next;
+    PyThreadState *ts = PyThreadState_GET();
+    PyTaskletObject *task = ts->st.current;
+    PyTaskletObject *next;
 
-	int ismain = task == ts->st.main;
+    int ismain = task == ts->st.main;
 
-	/*
-	 * see whether we have a SystemExit, which is no error.
-	 * Note that TaskletExit is a subclass.
-	 * otherwise make the exception into a bomb.
-	 */
-	if (retval == NULL) {
-		if (PyErr_ExceptionMatches(PyExc_SystemExit)) {
-			/* but if it is truly a SystemExit on the main thread, we want the exit! */
-			if (ts == slp_initial_tstate && !PyErr_ExceptionMatches(PyExc_TaskletExit))
-				PyStackless_HandleSystemExit();
-			PyErr_Clear();
-			Py_INCREF(Py_None);
-			retval = Py_None;
-		}
-		else {
-			retval = slp_curexc_to_bomb();
-			if (retval == NULL)
-				return NULL;
-		}
-	}
+    /*
+     * see whether we have a SystemExit, which is no error.
+     * Note that TaskletExit is a subclass.
+     * otherwise make the exception into a bomb.
+     */
+    if (retval == NULL) {
+        if (PyErr_ExceptionMatches(PyExc_SystemExit)) {
+            /* but if it is truly a SystemExit on the main thread, we want the exit! */
+            if (ts == slp_initial_tstate && !PyErr_ExceptionMatches(PyExc_TaskletExit))
+                PyStackless_HandleSystemExit();
+            PyErr_Clear();
+            Py_INCREF(Py_None);
+            retval = Py_None;
+        }
+        else {
+            retval = slp_curexc_to_bomb();
+            if (retval == NULL)
+                return NULL;
+        }
+    }
 
-	/*
-	 * put the result back into the dead tasklet, to be retrieved
-	 * by schedule_task_destruct(), or cleared there
-	 */
-	TASKLET_SETVAL(task, retval);
+    /*
+     * put the result back into the dead tasklet, to be retrieved
+     * by schedule_task_destruct(), or cleared there
+     */
+    TASKLET_SETVAL(task, retval);
 
-	if (ismain) {
-		/*
-		 * Because of soft switching, we may find ourself in the top level of a stack that was created
-		 * using another stub (another entry point into stackless).  If so, we need a final return to
-		 * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
-		 * the original stub, so we take the stub from the cstate)
-		 */
-		if (ts->st.serial_last_jump != ts->st.initial_stub->serial)
-			slp_transfer_return(ts->st.initial_stub);
-	}
-
-	/* remove from runnables */
-	slp_current_remove();
-
-	/*
-	 * clean up any current exception - this tasklet is dead.
-	 * This only happens if we are killing tasklets in the middle
-	 * of their execution.
+    if (ismain) {
+        /*
+         * Because of soft switching, we may find ourself in the top level of a stack that was created
+         * using another stub (another entry point into stackless).  If so, we need a final return to
+         * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
+         * the original stub, so we take the stub from the tstate)
          */
-	if (ts->exc_type != NULL && ts->exc_type != Py_None) {
-		Py_CLEAR(ts->exc_type);
-		Py_CLEAR(ts->exc_value);
-		Py_CLEAR(ts->exc_traceback);
-	}
+        if (ts->st.serial_last_jump != ts->st.initial_stub->serial)
+            slp_transfer_return(ts->st.initial_stub);
+    }
 
-	/* capture all exceptions */
-	if (ismain) {
-		/*
-		 * Main wants to exit. We clean up, but leave the
-		 * runnables chain intact.
-		 */
-		ts->st.main = NULL;
-		Py_DECREF(retval);
-		retval = schedule_task_destruct(task, task);
-		Py_DECREF(task);
-		return retval;
-	}
+    /* remove from runnables */
+    slp_current_remove();
 
-	next = ts->st.current;
-	if (next == NULL) {
-		int blocked = ts->st.main->flags.blocked;
+    /*
+     * clean up any current exception - this tasklet is dead.
+     * This only happens if we are killing tasklets in the middle
+     * of their execution.
+     */
+    if (ts->exc_type != NULL && ts->exc_type != Py_None) {
+        Py_DECREF(ts->exc_type);
+        Py_XDECREF(ts->exc_value);
+        Py_XDECREF(ts->exc_traceback);
+        ts->exc_type = ts->exc_value = ts->exc_traceback = NULL;
+    }
 
-		if (blocked) {
-			char *txt;
-			/* main was blocked and nobody can send */
-			if (blocked < 0)
-				txt = "the main tasklet is receiving"
-				    " without a sender available.";
-			else
-				txt = "the main tasklet is sending"
-				    " without a receiver available.";
-			PyErr_SetString(PyExc_StopIteration, txt);
-			/* fall through to error handling */
-			Py_DECREF(retval);
-			retval = slp_curexc_to_bomb();
-			if (retval == NULL)
-				return NULL;
-		}
-		next = ts->st.main;
-	}
+    /* capture all exceptions */
+    if (ismain) {
+        /*
+         * Main wants to exit. We clean up, but leave the
+         * runnables chain intact.
+         */
+        ts->st.main = NULL;
+        Py_DECREF(retval);
+        retval = schedule_task_destruct(task, task);
+        Py_DECREF(task);
+        return retval;
+    }
 
-	if (PyBomb_Check(retval)) {
-		/*
-		 * error handling: continue in the context of the main tasklet.
-		 */
-		next = ts->st.main;
-		TASKLET_SETVAL(next, retval);
-	}
-	Py_DECREF(retval);
+    next = ts->st.current;
+    if (next == NULL) {
+        int blocked = ts->st.main->flags.blocked;
 
-	return schedule_task_destruct(task, next);
+        if (blocked) {
+            char *txt;
+            /* main was blocked and nobody can send */
+            if (blocked < 0)
+                txt = "the main tasklet is receiving"
+                    " without a sender available.";
+            else
+                txt = "the main tasklet is sending"
+                    " without a receiver available.";
+            PyErr_SetString(PyExc_StopIteration, txt);
+            /* fall through to error handling */
+            Py_DECREF(retval);
+            retval = slp_curexc_to_bomb();
+            if (retval == NULL)
+                return NULL;
+        }
+        next = ts->st.main;
+    }
+
+    if (PyBomb_Check(retval)) {
+        /*
+         * error handling: continue in the context of the main tasklet.
+         */
+        next = ts->st.main;
+        TASKLET_SETVAL(next, retval);
+    }
+    Py_DECREF(retval);
+
+    return schedule_task_destruct(task, next);
 }
 
 /*
@@ -1210,28 +1133,28 @@ tasklet_end(PyObject *retval)
 PyObject *
 slp_run_tasklet(void)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyObject *retval;
+    PyThreadState *ts = PyThreadState_GET();
+    PyObject *retval;
 
-	if ( (ts->st.main == NULL) && initialize_main_and_current()) {
-		ts->frame = NULL;
-		return NULL;
-	}
+    if ( (ts->st.main == NULL) && initialize_main_and_current()) {
+        ts->frame = NULL;
+        return NULL;
+    }
 
-	TASKLET_CLAIMVAL(ts->st.current, &retval);
+    TASKLET_CLAIMVAL(ts->st.current, &retval);
 
-	if (PyBomb_Check(retval))
-		retval = slp_bomb_explode(retval);
-	while (ts->st.main != NULL) {
-		/* XXX correct condition? or current? */
-		retval = slp_frame_dispatch_top(retval);
-		retval = tasklet_end(retval);
-		if (STACKLESS_UNWINDING(retval))
-			STACKLESS_UNPACK(retval);
-		/* if we softswitched out from the tasklet end */
-		Py_CLEAR(ts->st.del_post_switch);
-	}
-	return retval;
+    if (PyBomb_Check(retval))
+        retval = slp_bomb_explode(retval);
+    while (ts->st.main != NULL) {
+        /* XXX correct condition? or current? */
+        retval = slp_frame_dispatch_top(retval);
+        retval = tasklet_end(retval);
+        if (STACKLESS_UNWINDING(retval))
+            STACKLESS_UNPACK(retval);
+        /* if we softswitched out from the tasklet end */
+        Py_CLEAR(ts->st.del_post_switch);
+    }
+    return retval;
 }
 
 /* Clear out the free list */
@@ -1239,13 +1162,13 @@ slp_run_tasklet(void)
 void
 slp_scheduling_fini(void)
 {
-	while (free_list != NULL) {
-		PyBombObject *bomb = free_list;
-		free_list = (PyBombObject *) free_list->curexc_type;
-		PyObject_GC_Del(bomb);
-		--numfree;
-	}
-	assert(numfree == 0);
+    while (free_list != NULL) {
+        PyBombObject *bomb = free_list;
+        free_list = (PyBombObject *) free_list->curexc_type;
+        PyObject_GC_Del(bomb);
+        --numfree;
+    }
+    assert(numfree == 0);
 }
 
 #endif

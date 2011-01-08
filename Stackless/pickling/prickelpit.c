@@ -383,12 +383,12 @@ slp_find_execfuncs(PyTypeObject *type, PyObject *exec_name,
 	PyObject *dic = dp ? dp->dict : NULL;
 	PyObject *exec_tup = dic ? PyDict_GetItem(dic, exec_name) : NULL;
 
-	if (0
-	    || exec_tup == NULL
-	    || !PyArg_ParseTuple(exec_tup, "OO", &g, &b)
-	    || (*good = PyLong_AsVoidPtr(g)) == NULL
-	    || (*bad = PyLong_AsVoidPtr(b)) == NULL) {
-		char msg[500];
+    if (0
+        || exec_tup == NULL
+        || !PyArg_ParseTuple(exec_tup, "OO", &g, &b)
+        || (*good = (PyFrame_ExecFunc*)PyLong_AsVoidPtr(g)) == NULL
+        || (*bad =  (PyFrame_ExecFunc*)PyLong_AsVoidPtr(b)) == NULL) {
+        char msg[500];
 
 		PyErr_Clear();
 		sprintf(msg, "Frame exec function '%.20s' not defined for %s",

@@ -15,7 +15,7 @@ class TestExceptionState(unittest.TestCase):
             schedule()
             ei = sys.exc_info()
             self.assertEquals(ei[0], ZeroDivisionError)
-            self.failUnless("by zero" in str(ei[1]))
+            self.assertTrue("by zero" in str(ei[1]))
 
     def testExceptionState(self):
         t = tasklet(self.Tasklet)
@@ -45,7 +45,7 @@ class TestTracingState(unittest.TestCase):
         n = len(self.trace)
         self.foo()
         n2 = len(self.trace)
-        self.failUnless(n2 > n)
+        self.assertTrue(n2 > n)
 
         schedule()
 
@@ -53,7 +53,7 @@ class TestTracingState(unittest.TestCase):
         n = len(self.trace)
         self.foo()
         n2 = len(self.trace)
-        self.failUnless(n2 > n)
+        self.assertTrue(n2 > n)
 
     def testTracingState(self):
         t = tasklet(self.Tasklet)

@@ -25,13 +25,13 @@ class SchedulingCallbackTestCase(unittest.TestCase):
         stackless.tasklet(stackless.test_cframe)(3)
         stackless.tasklet(stackless.test_cframe)(3)
         # precondition
-        self.failUnless(
+        self.assertTrue(
             mon1.count == 0,
             "No callbacks before running")
         # running
         stackless.run()
         # postcondition
-        self.failUnless(
+        self.assertTrue(
             mon1.count >= 2*3,
             "At least as may callbacks as many test_cframe calls")
 
@@ -39,7 +39,7 @@ class SchedulingCallbackTestCase(unittest.TestCase):
     def test1(self):
         "Test multiple monitors, from test/test_set_schedule_callback.py"
 
-        fu = self.failUnless
+        fu = self.assertTrue
         n = 2
 
         mon1 = SchedulingMonitor()

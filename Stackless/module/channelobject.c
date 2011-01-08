@@ -49,14 +49,10 @@ channel_dealloc(PyObject *ob)
 static int
 channel_traverse(PyChannelObject *ch, visitproc visit, void *arg)
 {
-	int err;
-	PyTaskletObject *p;
-
-#define VISIT(o) if (o) {if ((err = visit((PyObject *)(o), arg))) return err;}
-	for (p = ch->head; p != (PyTaskletObject *) ch; p = p->next) {
-		VISIT(p);
-	}
-#undef VISIT
+    PyTaskletObject *p;
+    for (p = ch->head; p != (PyTaskletObject *) ch; p = p->next) {
+        Py_VISIT(p);
+    }
 	return 0;
 }
 
@@ -400,90 +396,90 @@ PyChannel_Send(PyChannelObject *self, PyObject *arg)
 static PyObject *
 generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackless)
 {
-	PyThreadState *ts = PyThreadState_GET();
-	PyTaskletObject *source = ts->st.current;
-	PyTaskletObject *target = self->head;
-	int cando = dir > 0 ? self->balance < 0 : self->balance > 0;
-	int interthread = cando ? target->cstate->tstate != ts : 0;
-	PyObject *retval;
-	int runflags = 0;
+    PyThreadState *ts = PyThreadState_GET();
+    PyTaskletObject *source = ts->st.current;
+    PyTaskletObject *target = self->head;
+    int cando = dir > 0 ? self->balance < 0 : self->balance > 0;
+    int interthread = cando ? target->cstate->tstate != ts : 0;
+    PyObject *retval;
+    int runflags = 0;
 
-	assert(abs(dir) == 1);
+    assert(abs(dir) == 1);
 
-	TASKLET_SETVAL(source, arg);
+    TASKLET_SETVAL(source, arg);
 
-	/* note that notify might release the GIL. */
-	/* XXX for the moment, we notify late on interthread */
-	if (!interthread)
-		NOTIFY_CHANNEL(self, source, dir, cando, NULL);
+    /* note that notify might release the GIL. */
+    /* XXX for the moment, we notify late on interthread */
+    if (!interthread)
+        NOTIFY_CHANNEL(self, source, dir, cando, NULL);
 
-	if (cando) {
-		/* communication 1): there is somebody waiting */
-		target = slp_channel_remove(self, -dir);
-		/* exchange data */
-		TASKLET_SWAPVAL(source, target);
+    if (cando) {
+        /* communication 1): there is somebody waiting */
+        target = slp_channel_remove(self, -dir);
+        /* exchange data */
+        TASKLET_SWAPVAL(source, target);
 
-		if (interthread) {
-			;
-			/* interthread, always keep target!
-			slp_current_insert(target);*/
-		}
-		else {
-			if (self->flags.schedule_all) {
-				/* target goes last */
-				slp_current_insert(target);
-				/* always schedule away from source */
-				target = source->next;
-			}
-			else if (self->flags.preference == -dir) {
-				/* move target after source */
-				ts->st.current = source->next;
-				slp_current_insert(target);
-				ts->st.current = source;
-				/* don't mess with this scheduling behaviour: */
-				runflags = PY_WATCHDOG_NO_SOFT_IRQ;
-			}
-			else {
-				/* otherwise we return to the caller */
-				slp_current_insert(target);
-				target = source;
-				/* don't mess with this scheduling behaviour: */
-				runflags = PY_WATCHDOG_NO_SOFT_IRQ;
-			}
-		}
-	}
-	else {
-		/* communication 2): there is nobody waiting */
-		if (source->flags.block_trap)
-			RUNTIME_ERROR("this tasklet does not like to be"
-				      " blocked.", NULL);
-		if (self->flags.closing) {
-			PyErr_SetNone(PyExc_StopIteration);
-			return NULL;
-		}
-		slp_current_remove();
-		slp_channel_insert(self, source, dir);
-		target = ts->st.current;
-	}
-	
-	/* Make sure that the channel will exist past the actual switch, if
-	 * we are softswitching.  A temporary channel might disappear.
-	 */
-	if (Py_REFCNT(self) == 1) {
-		assert(ts->st.del_post_switch == NULL);
-		ts->st.del_post_switch = (PyObject*)self;
-		Py_INCREF(self);
-	}
-	ts->st.runflags |= runflags; /* extra info for slp_schedule_task */
-	retval = slp_schedule_task(source, target, stackless);
+        if (interthread) {
+            ;
+            /* interthread, always keep target!
+            slp_current_insert(target);*/
+        }
+        else {
+            if (self->flags.schedule_all) {
+                /* target goes last */
+                slp_current_insert(target);
+                /* always schedule away from source */
+                target = source->next;
+            }
+            else if (self->flags.preference == -dir) {
+                /* move target after source */
+                ts->st.current = source->next;
+                slp_current_insert(target);
+                ts->st.current = source;
+                /* don't mess with this scheduling behaviour: */
+                runflags = PY_WATCHDOG_NO_SOFT_IRQ;
+            }
+            else {
+                /* otherwise we return to the caller */
+                slp_current_insert(target);
+                target = source;
+                /* don't mess with this scheduling behaviour: */
+                runflags = PY_WATCHDOG_NO_SOFT_IRQ;
+            }
+        }
+    }
+    else {
+        /* communication 2): there is nobody waiting, so we must switch */
+        if (source->flags.block_trap)
+            RUNTIME_ERROR("this tasklet does not like to be"
+                          " blocked.", NULL);
+        if (self->flags.closing) {
+            PyErr_SetNone(PyExc_StopIteration);
+            return NULL;
+        }
+        slp_current_remove();
+        slp_channel_insert(self, source, dir);
+        target = ts->st.current;
 
-	if (interthread) {
-		if (cando) {
-			Py_DECREF(target);
-		}
-		NOTIFY_CHANNEL(self, source, dir, cando, NULL);
-	}
-	return retval;
+        /* Make sure that the channel will exist past the actual switch, if
+         * we are softswitching.  A temporary channel might disappear.
+         */
+        if (Py_REFCNT(self)) {
+            assert(ts->st.del_post_switch == NULL);
+            ts->st.del_post_switch = (PyObject*)self;
+            Py_INCREF(self);
+        }
+    }
+    ts->st.runflags |= runflags; /* extra info for slp_schedule_task */
+    retval = slp_schedule_task(source, target, stackless, 0);
+
+    if (interthread) {
+        if (cando) {
+            Py_DECREF(target);
+        }
+        NOTIFY_CHANNEL(self, source, dir, cando, NULL);
+    }
+    return retval;
 }
 
 static CHANNEL_SEND_HEAD(impl_channel_send)

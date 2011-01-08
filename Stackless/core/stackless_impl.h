@@ -353,8 +353,9 @@ PyAPI_FUNC(PyObject *) slp_tasklet_new(PyTypeObject *type, PyObject *args,
 				       PyObject *kwds);
 
 PyAPI_FUNC(PyObject *) slp_schedule_task(PyTaskletObject *prev,
-					 PyTaskletObject *next,
-					 int stackless);
+                                         PyTaskletObject *next,
+                                         int stackless,
+                                         int *did_switch);
 
 PyAPI_FUNC(int) initialize_main_and_current(void);
 

@@ -47,17 +47,18 @@ slp_current_remove(void)
 static int
 tasklet_traverse(PyTaskletObject *t, visitproc visit, void *arg)
 {
-	int err;
-	PyFrameObject *f;
+    PyFrameObject *f;
+    PyThreadState *ts = PyThreadState_GET();
+    if (ts != t->cstate->tstate)
+        /* can't collect from this thread! */
+        PyObject_GC_Collectable((PyObject *)t, visit, arg, 0);
 
-#define VISIT(o) if (o) {if ((err = visit((PyObject *)(o), arg))) return err;}
-	/* we own the "execute reference" of all the frames */
-	for (f = t->f.frame; f != NULL; f = f->f_back) {
-		VISIT(f);
-	}
-	VISIT(t->tempval);
-	VISIT(t->cstate);
-#undef VISIT
+    /* we own the "execute reference" of all the frames */
+    for (f = t->f.frame; f != NULL; f = f->f_back) {
+        Py_VISIT(f);
+    }
+    Py_VISIT(t->tempval);
+    Py_VISIT(t->cstate);
 	return 0;
 }
 
@@ -520,11 +521,11 @@ static TASKLET_RUN_HEAD(impl_tasklet_run)
 	STACKLESS_GETARG();
 	PyThreadState *ts = PyThreadState_GET();
 
-	assert(PyTasklet_Check(task));
-	if (ts->st.main == NULL) return PyTasklet_Run_M(task);
-	if (PyTasklet_Insert(task))
-		return NULL;
-	return slp_schedule_task(ts->st.current, task, stackless);
+    assert(PyTasklet_Check(task));
+    if (ts->st.main == NULL) return PyTasklet_Run_M(task);
+    if (PyTasklet_Insert(task))
+        return NULL;
+    return slp_schedule_task(ts->st.current, task, stackless, 0);
 }
 
 static TASKLET_RUN_HEAD(wrap_tasklet_run)
@@ -736,11 +737,11 @@ post_schedule_remove(PyFrameObject *f, int exc, PyObject *retval)
 	ts->frame = f->f_back;
 	Py_DECREF(f);
 
-	slp_current_remove(); /* reference used in tempval */
-	TASKLET_SETVAL_OWN(self, parent);
-	TASKLET_SETVAL_OWN(parent, retval); /* consume it */
-	ret = slp_schedule_task(parent, self, 1);
-	return ret;
+    slp_current_remove(); /* reference used in tempval */
+    TASKLET_SETVAL_OWN(self, parent);
+    TASKLET_SETVAL_OWN(parent, retval); /* consume it */
+    ret = slp_schedule_task(parent, self, 1, 0);
+    return ret;
 }
 
 static TASKLET_CAPTURE_HEAD(impl_tasklet_capture)
@@ -880,18 +881,18 @@ static TASKLET_RAISE_EXCEPTION_HEAD(impl_tasklet_raise_exception)
 	PyThreadState *ts = PyThreadState_GET();
 	PyObject *bomb;
 
-	if (ts->st.main == NULL)
-	    return PyTasklet_RaiseException_M(self, klass, args);
-	bomb = slp_make_bomb(klass, args, "tasklet.raise_exception");
-	if (bomb == NULL)
-		return NULL;
-	TASKLET_SETVAL_OWN(self, bomb);
-	/* if the tasklet is dead, do not run it (no frame) but explode */
-	if (slp_get_frame(self) == NULL) {
-		TASKLET_CLAIMVAL(self, &bomb);
-		return slp_bomb_explode(bomb);
-	}
-	return slp_schedule_task(ts->st.current, self, stackless);
+    if (ts->st.main == NULL)
+        return PyTasklet_RaiseException_M(self, klass, args);
+    bomb = slp_make_bomb(klass, args, "tasklet.raise_exception");
+    if (bomb == NULL)
+        return NULL;
+    TASKLET_SETVAL_OWN(self, bomb);
+    /* if the tasklet is dead, do not run it (no frame) but explode */
+    if (slp_get_frame(self) == NULL) {
+        TASKLET_CLAIMVAL(self, &bomb);
+        return slp_bomb_explode(bomb);
+    }
+    return slp_schedule_task(ts->st.current, self, stackless, 0);
 }
 
 

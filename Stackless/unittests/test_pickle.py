@@ -7,6 +7,15 @@ import gc
 from stackless import schedule, tasklet, stackless
 
 
+#because test runner instances in the testsuite contain copies of the old stdin/stdout thingies,
+#we need to make it appear that pickling them is ok, otherwise we will fail when pickling
+#closures that refer to test runner instances
+import copyreg
+import sys
+def reduce(obj):
+    return object, () #just create an empty object instance
+copyreg.pickle(type(sys.stdout), reduce, object)
+
 VERBOSE = False
 glist = []
 

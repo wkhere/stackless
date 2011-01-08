@@ -41,31 +41,39 @@ PyStackless_Schedule_M(PyObject *retval, int remove)
 PyObject *
 PyStackless_Schedule(PyObject *retval, int remove)
 {
-	STACKLESS_GETARG();
-	PyThreadState *ts = PyThreadState_GET();
-	PyTaskletObject *prev = ts->st.current, *next = prev->next;
-	PyObject *ret = NULL;
+    STACKLESS_GETARG();
+    PyThreadState *ts = PyThreadState_GET();
+    PyTaskletObject *prev = ts->st.current, *next = prev->next;
+    PyObject *ret = NULL;
+    int switched;
 
-	if (ts->st.main == NULL) return PyStackless_Schedule_M(retval, remove);
-	/* make sure we hold a reference to the previous tasklet */
-	Py_INCREF(prev);
-	TASKLET_SETVAL(prev, retval);
-	if (remove) {
-		slp_current_remove();
-		Py_DECREF(prev);
-		if (next == prev)
-			next = 0; /* we were the last runnable tasklet */
-	}
-	/* we mustn't DECREF prev here (after the slp_schedule_task().
-	 * This could be the last reference, thus
-	 * promting emergency reactivation of the tasklet,
-	 * and soft switching isn't really done until we have unwound.
-	 * Use the delayed release mechanism instead.
-	 */
-	assert(ts->st.del_post_switch == NULL);
-	ts->st.del_post_switch = (PyObject*)prev;
-	
-	return slp_schedule_task(prev, next, stackless);
+    if (ts->st.main == NULL) return PyStackless_Schedule_M(retval, remove);
+    /* make sure we hold a reference to the previous tasklet */
+    Py_INCREF(prev);
+    TASKLET_SETVAL(prev, retval);
+    if (remove) {
+        slp_current_remove();
+        Py_DECREF(prev);
+        if (next == prev)
+            next = 0; /* we were the last runnable tasklet */
+    }
+    /* we mustn't DECREF prev here (after the slp_schedule_task().
+     * This could be the last reference, thus
+     * promting emergency reactivation of the tasklet,
+     * and soft switching isn't really done until we have unwound.
+     * Use the delayed release mechanism instead.
+     */
+    assert(ts->st.del_post_switch == NULL);
+    ts->st.del_post_switch = (PyObject*)prev;
+
+    ret = slp_schedule_task(prev, next, stackless, &switched);
+
+    /* however, if this was a no-op (e.g. prev==next, or an error occurred)
+     * we need to decref prev ourselves
+     */
+    if (!switched)
+        Py_CLEAR(ts->st.del_post_switch);
+    return ret;
 }
 
 PyObject *
@@ -143,7 +151,7 @@ getcurrent(PyObject *self)
 
 static char getmain__doc__[] =
 "getmain() -- return the main tasklet of this thread.";
- 
+
 static PyObject *
 getmain(PyObject *self)
 {
@@ -209,7 +217,7 @@ interrupt_timeout_return(void)
 	PyTaskletObject *current = ts->st.current;
 
 	/*
-	 * we mark the IRQ as pending if 
+	 * we mark the IRQ as pending if
 	 * a) we are in soft interrupt mode
 	 * b) we are in hard interrupt mode, but aren't allowed to break here which happens
 	 * when "atomic" is set, or the "nesting level" is relevant and not ignored.
@@ -226,7 +234,7 @@ interrupt_timeout_return(void)
 	else
 		current->flags.pending_irq = 0;
 
-	return slp_schedule_task(ts->st.current, ts->st.main, 1);
+    return slp_schedule_task(ts->st.current, ts->st.main, 1, 0);
 }
 
 static PyObject *
@@ -249,7 +257,7 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *victim;
 	PyObject *retval;
-	
+
 	if (ts->st.main == NULL)
 		return PyStackless_RunWatchdog_M(timeout, flags);
 	if (ts->st.current != ts->st.main)
@@ -268,14 +276,11 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	slp_current_remove();
 	Py_DECREF(ts->st.main);
 
-	/* now let them run until the end. */
-	ts->st.runflags = flags;
-	retval = slp_schedule_task(ts->st.main, ts->st.current, 0);
-	ts->st.runflags = 0;
-	ts->st.interrupt = NULL;
-
-	/* we should be back in the main tasklet */
-	assert(ts->st.current == ts->st.main);
+    /* now let them run until the end. */
+    ts->st.runflags = flags;
+    retval = slp_schedule_task(ts->st.main, ts->st.current, 0, 0);
+    ts->st.runflags = 0;
+    ts->st.interrupt = NULL;
 
 	/* retval really should be PyNone here (or NULL).  Technically, it is the
 	 * tempval of some tasklet that has quit.  Even so, it is quite
@@ -285,7 +290,7 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	if (retval == NULL) /* an exception has occoured */
 		return NULL;
 
-	/* 
+	/*
 	 * back in main.
 	 * We were either revived by slp_tasklet_end or the interrupt.
 	 * If we were using hard interrupts (bit 1 in flags not set)
@@ -305,7 +310,7 @@ static PyObject *
 run_watchdog(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	static char *argnames[] = {"timeout", "threadblock", "soft",
-								"ignore_nesting", "totaltimeout", 
+								"ignore_nesting", "totaltimeout",
 								NULL};
 	long timeout = 0;
 	int threadblock = 0;
@@ -540,7 +545,7 @@ test_cstate(PyObject *f, PyObject *callable)
 
  ******************************************************/
 
-PyObject * 
+PyObject *
 PyStackless_Call_Main(PyObject *func, PyObject *args, PyObject *kwds)
 {
 	PyThreadState *ts = PyThreadState_GET();
@@ -1077,7 +1082,7 @@ static PyTypeObject PySlpModule_TypeTemplate = {
 	PyObject_GenericGetAttr,	/* tp_getattro */
 	PyObject_GenericSetAttr,	/* tp_setattro */
 	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | 
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
 		Py_TPFLAGS_HAVE_GC,	/* tp_flags */
 	PySlpModule_Type__doc__,	/* tp_doc */
 	0,				/* tp_traverse */
@@ -1169,7 +1174,7 @@ _PyStackless_Init(void)
 	PyObject *modules;
 	char *name = "stackless";
 	PySlpModuleObject *m;
-	
+
 	if (init_slpmoduletype())
 		return;
 

@@ -752,7 +752,10 @@ class _Pickler:
                     raise e
         return self.save_reduce(obj=obj, *rv)
 
-    dispatch[FunctionType] = save_function
+    if "Stackless" in sys.version:
+        dispatch[FunctionType] = save_function
+    else:
+        dispatch[FunctionType] = save_global
     dispatch[BuiltinFunctionType] = save_global
     dispatch[type] = save_global
 
