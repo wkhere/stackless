@@ -26,7 +26,7 @@ fileList = [
 
 for debug in ("", "_d"):
     for suffix in ("dll", "lib", "exp"):
-        fileList.append("python30%s.%s" % (debug, suffix))
+        fileList.append("python31%s.%s" % (debug, suffix))
 
 pathBySuffix = {
     "dll":  "",
@@ -49,7 +49,7 @@ for f in os.listdir(slpdir):
     elif f.endswith(".h"):
         includeFileList.append([ "include/Stackless/"+ f, os.path.join(slpdir, f) ])
 
-zname = os.path.join(exp_path, "stackless-python-30.zip")
+zname = os.path.join(exp_path, "stackless-python-31.zip")
 z = ZipFile(zname, "w", ZIP_DEFLATED)
 for fileName in fileList:
     if os.path.exists(fileName):
