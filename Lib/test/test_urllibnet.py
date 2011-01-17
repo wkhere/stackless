@@ -7,7 +7,8 @@ import socket
 import urllib
 import sys
 import os
-import mimetools
+mimetools = test_support.import_module("mimetools", deprecated=True)
+import time
 
 
 def _open_with_retry(func, host, *args, **kwargs):
@@ -178,14 +179,22 @@ class urlretrieveNetworkTests(unittest.TestCase):
         self.assert_(isinstance(header, mimetools.Message),
                      "header is not an instance of mimetools.Message")
 
+    def test_data_header(self):
+        logo = "http://www.python.org/community/logos/python-logo-master-v3-TM.png"
+        file_location, fileheaders = self.urlretrieve(logo)
+        os.unlink(file_location)
+        datevalue = fileheaders.getheader('Date')
+        dateformat = '%a, %d %b %Y %H:%M:%S GMT'
+        try:
+            time.strptime(datevalue, dateformat)
+        except ValueError:
+            self.fail('Date value not in %r format', dateformat)
 
 
 def test_main():
     test_support.requires('network')
-    from warnings import filterwarnings, catch_warnings
-    with catch_warnings():
-        filterwarnings('ignore', '.*urllib\.urlopen.*Python 3.0',
-                        DeprecationWarning)
+    with test_support._check_py3k_warnings(
+            ("urllib.urlopen.. has been removed", DeprecationWarning)):
         test_support.run_unittest(URLTimeoutTest,
                                   urlopenNetworkTests,
                                   urlretrieveNetworkTests)

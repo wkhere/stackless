@@ -549,7 +549,7 @@ class DictTest(unittest.TestCase):
         # Bug #3537: if an empty but presized dict with a size larger
         # than 7 was in the freelist, it triggered an assertion failure
         try:
-            d = {'a': 1/0,  'b': None, 'c': None, 'd': None, 'e': None,
+            d = {'a': 1//0,  'b': None, 'c': None, 'd': None, 'e': None,
                  'f': None, 'g': None, 'h': None}
         except ZeroDivisionError:
             pass
@@ -582,11 +582,14 @@ class SubclassMappingTests(mapping_tests.BasicTestMappingProtocol):
     type2test = Dict
 
 def test_main():
-    test_support.run_unittest(
-        DictTest,
-        GeneralMappingTests,
-        SubclassMappingTests,
-    )
+    with test_support._check_py3k_warnings(
+        ('dict(.has_key..| inequality comparisons) not supported in 3.x',
+         DeprecationWarning)):
+        test_support.run_unittest(
+            DictTest,
+            GeneralMappingTests,
+            SubclassMappingTests,
+        )
 
 if __name__ == "__main__":
     test_main()

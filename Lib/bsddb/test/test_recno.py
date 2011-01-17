@@ -38,8 +38,8 @@ class SimpleRecnoTestCase(unittest.TestCase):
 
         for x in letters:
             recno = d.append(x * 60)
-            self.assertEqual(type(recno), type(0))
-            self.assert_(recno >= 1)
+            self.assertTrue(isinstance(recno, int))
+            self.assertTrue(recno >= 1)
             if verbose:
                 print recno,
 
@@ -54,17 +54,13 @@ class SimpleRecnoTestCase(unittest.TestCase):
             if verbose:
                 print data
 
-            self.assertEqual(type(data), type(""))
+            self.assertTrue(isinstance(data, str))
             self.assertEqual(data, d.get(recno))
 
         try:
             data = d[0]  # This should raise a KeyError!?!?!
         except db.DBInvalidArgError, val:
-            import sys
-            if sys.version_info[0] < 3 :
-                self.assertEqual(val[0], db.EINVAL)
-            else :
-                self.assertEqual(val.args[0], db.EINVAL)
+            self.assertEqual(val.args[0], db.EINVAL)
             if verbose: print val
         else:
             self.fail("expected exception")
@@ -95,21 +91,21 @@ class SimpleRecnoTestCase(unittest.TestCase):
         keys = d.keys()
         if verbose:
             print keys
-        self.assertEqual(type(keys), type([]))
-        self.assertEqual(type(keys[0]), type(123))
+        self.assertTrue(isinstance(keys, list))
+        self.assertTrue(isinstance(keys[0], int))
         self.assertEqual(len(keys), len(d))
 
         items = d.items()
         if verbose:
             pprint(items)
-        self.assertEqual(type(items), type([]))
-        self.assertEqual(type(items[0]), type(()))
+        self.assertTrue(isinstance(items, list))
+        self.assertTrue(isinstance(items[0], tuple))
         self.assertEqual(len(items[0]), 2)
-        self.assertEqual(type(items[0][0]), type(123))
-        self.assertEqual(type(items[0][1]), type(""))
+        self.assertTrue(isinstance(items[0][0], int))
+        self.assertTrue(isinstance(items[0][1], str))
         self.assertEqual(len(items), len(d))
 
-        self.assert_(d.has_key(25))
+        self.assertTrue(d.has_key(25))
 
         del d[25]
         self.assertFalse(d.has_key(25))
@@ -181,7 +177,7 @@ class SimpleRecnoTestCase(unittest.TestCase):
             if get_returns_none:
                 self.fail("unexpected DBKeyEmptyError exception")
             else:
-                self.assertEqual(val[0], db.DB_KEYEMPTY)
+                self.assertEqual(val.args[0], db.DB_KEYEMPTY)
                 if verbose: print val
         else:
             if not get_returns_none:
@@ -269,11 +265,7 @@ class SimpleRecnoTestCase(unittest.TestCase):
         try:                    # this one will fail
             d.append('bad' * 20)
         except db.DBInvalidArgError, val:
-            import sys
-            if sys.version_info[0] < 3 :
-                self.assertEqual(val[0], db.EINVAL)
-            else :
-                self.assertEqual(val.args[0], db.EINVAL)
+            self.assertEqual(val.args[0], db.EINVAL)
             if verbose: print val
         else:
             self.fail("expected exception")

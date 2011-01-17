@@ -9,7 +9,7 @@ import array
 import threading
 import random
 import unittest
-from itertools import chain, cycle
+from itertools import cycle, count
 from test import test_support
 
 import codecs
@@ -107,6 +107,10 @@ class IOTest(unittest.TestCase):
 
         self.assertEqual(f.truncate(12), 12)
         self.assertEqual(f.tell(), 13)
+        self.assertEqual(f.write(b"hij"), 3)
+        self.assertEqual(f.seek(0,1), 16)
+        self.assertEqual(f.tell(), 16)
+        self.assertEqual(f.truncate(12), 12)
         self.assertRaises(TypeError, f.seek, 0.0)
 
     def read_ops(self, f, buffered=False):
@@ -129,6 +133,10 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.seek(-6, 1), 5)
         self.assertEqual(f.read(5), b" worl")
         self.assertEqual(f.tell(), 10)
+        f.seek(0)
+        f.read(2)
+        f.seek(0, 1)
+        self.assertEqual(f.tell(), 2)
         self.assertRaises(TypeError, f.seek, 0.0)
         if buffered:
             f.seek(0)
@@ -182,6 +190,13 @@ class IOTest(unittest.TestCase):
         self.assertEqual(f.writable(), False)
         self.assertEqual(f.seekable(), True)
         self.read_ops(f, True)
+        f = io.open(test_support.TESTFN, "r+b")
+        self.assertEqual(f.readable(), True)
+        self.assertEqual(f.writable(), True)
+        self.assertEqual(f.seekable(), True)
+        self.write_ops(f)
+        f.seek(0)
+        self.read_ops(f, True)
         f.close()
 
     def test_readline(self):
@@ -233,11 +248,11 @@ class IOTest(unittest.TestCase):
             f = None
             try:
                 with open(test_support.TESTFN, "wb", bufsize) as f:
-                    1/0
+                    1 // 0
             except ZeroDivisionError:
                 self.assertEqual(f.closed, True)
             else:
-                self.fail("1/0 didn't raise an exception")
+                self.fail("1 // 0 didn't raise an exception")
 
     # issue 5008
     def test_append_mode_tell(self):
@@ -312,6 +327,20 @@ class IOTest(unittest.TestCase):
             self.assertEqual(f.buffer.raw.closefd, True)
             file = io.open(f.fileno(), "r", closefd=False)
             self.assertEqual(file.buffer.raw.closefd, False)
+
+    def test_flush_error_on_close(self):
+        f = io.open(test_support.TESTFN, "wb", buffering=0)
+        def bad_flush():
+            raise IOError()
+        f.flush = bad_flush
+        self.assertRaises(IOError, f.close) # exception not swallowed
+
+    def test_multi_close(self):
+        f = io.open(test_support.TESTFN, "wb", buffering=0)
+        f.close()
+        f.close()
+        f.close()
+        self.assertRaises(ValueError, f.flush)
 
 
 class MemorySeekTestMixin:
@@ -499,7 +528,7 @@ class BufferedWriterTest(unittest.TestCase):
         self.assertEquals(b"abcdefghijkl", writer._write_stack[0])
 
     def testWriteNonBlocking(self):
-        raw = MockNonBlockWriterIO((9, 2, 22, -6, 10, 12, 12))
+        raw = MockNonBlockWriterIO((9, 2, 10, -6, 10, 8, 12))
         bufio = io.BufferedWriter(raw, 8, 16)
 
         bufio.write(b"asdf")
@@ -564,6 +593,22 @@ class BufferedWriterTest(unittest.TestCase):
                     "the following exceptions were caught: %r" % errors)
         finally:
             test_support.unlink(test_support.TESTFN)
+
+    def test_flush_error_on_close(self):
+        raw = MockRawIO()
+        def bad_flush():
+            raise IOError()
+        raw.flush = bad_flush
+        b = io.BufferedWriter(raw)
+        self.assertRaises(IOError, b.close) # exception not swallowed
+
+    def test_multi_close(self):
+        raw = MockRawIO()
+        b = io.BufferedWriter(raw)
+        b.close()
+        b.close()
+        b.close()
+        self.assertRaises(ValueError, b.flush)
 
 
 class BufferedRWPairTest(unittest.TestCase):
@@ -753,6 +798,37 @@ class StatefulIncrementalDecoderTest(unittest.TestCase):
         d = StatefulIncrementalDecoder()
         self.assertEquals(d.decode(b'oiabcd'), '')
         self.assertEquals(d.decode(b'', 1), 'abcd.')
+
+    def test_append_bom(self):
+        # The BOM is not written again when appending to a non-empty file
+        filename = test_support.TESTFN
+        for charset in ('utf-8-sig', 'utf-16', 'utf-32'):
+            with io.open(filename, 'w', encoding=charset) as f:
+                f.write('aaa')
+                pos = f.tell()
+            with io.open(filename, 'rb') as f:
+                self.assertEquals(f.read(), 'aaa'.encode(charset))
+
+            with io.open(filename, 'a', encoding=charset) as f:
+                f.write('xxx')
+            with io.open(filename, 'rb') as f:
+                self.assertEquals(f.read(), 'aaaxxx'.encode(charset))
+
+    def test_seek_bom(self):
+        # Same test, but when seeking manually
+        filename = test_support.TESTFN
+        for charset in ('utf-8-sig', 'utf-16', 'utf-32'):
+            with io.open(filename, 'w', encoding=charset) as f:
+                f.write('aaa')
+                pos = f.tell()
+            with io.open(filename, 'r+', encoding=charset) as f:
+                f.seek(pos)
+                f.write('zzz')
+                f.seek(0)
+                f.write('bbb')
+            with io.open(filename, 'rb') as f:
+                self.assertEquals(f.read(), 'bbbzzz'.encode(charset))
+
 
 class TextIOWrapperTest(unittest.TestCase):
 
@@ -1294,6 +1370,20 @@ class TextIOWrapperTest(unittest.TestCase):
         decoder = codecs.getincrementaldecoder("utf-8")()
         decoder = io.IncrementalNewlineDecoder(decoder, translate=True)
         self.check_newline_decoder_utf8(decoder)
+
+    def test_flush_error_on_close(self):
+        txt = io.TextIOWrapper(io.BytesIO(self.testdata), encoding="ascii")
+        def bad_flush():
+            raise IOError()
+        txt.flush = bad_flush
+        self.assertRaises(IOError, txt.close) # exception not swallowed
+
+    def test_multi_close(self):
+        txt = io.TextIOWrapper(io.BytesIO(self.testdata), encoding="ascii")
+        txt.close()
+        txt.close()
+        txt.close()
+        self.assertRaises(ValueError, txt.flush)
 
 
 # XXX Tests for open()

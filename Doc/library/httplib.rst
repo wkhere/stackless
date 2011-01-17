@@ -85,6 +85,14 @@ The module provides the following classes:
 
    .. versionadded:: 2.0
 
+.. class:: HTTPMessage
+
+   An :class:`HTTPMessage` instance is used to hold the headers from an HTTP
+   response. It is implemented using the :class:`mimetools.Message` class and
+   provides utility functions to deal with HTTP Headers. It is not directly
+   instantiated by the users.
+
+
 The following exceptions are raised as appropriate:
 
 
@@ -540,6 +548,22 @@ Here is an example session that uses the ``GET`` method::
    404 Not Found
    >>> data2 = r2.read()
    >>> conn.close()
+
+Here is an example session that uses ``HEAD`` method. Note that ``HEAD`` method
+never returns any data. ::
+
+
+   >>> import httplib
+   >>> conn = httplib.HTTPConnection("www.python.org")
+   >>> conn.request("HEAD","/index.html")
+   >>> res = conn.getresponse()
+   >>> print res.status, res.reason
+   200 OK
+   >>> data = res.read()
+   >>> print len(data)
+   0
+   >>> data == ''
+   True
 
 Here is an example session that shows how to ``POST`` requests::
 

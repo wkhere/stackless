@@ -9,6 +9,7 @@ import sys
 import stat
 from os.path import abspath
 import fnmatch
+import errno
 
 __all__ = ["copyfileobj","copyfile","copymode","copystat","copy","copy2",
            "copytree","move","rmtree","Error"]
@@ -44,19 +45,11 @@ def _samefile(src, dst):
 def copyfile(src, dst):
     """Copy data from src to dst"""
     if _samefile(src, dst):
-        raise Error, "`%s` and `%s` are the same file" % (src, dst)
+        raise Error("`%s` and `%s` are the same file" % (src, dst))
 
-    fsrc = None
-    fdst = None
-    try:
-        fsrc = open(src, 'rb')
-        fdst = open(dst, 'wb')
-        copyfileobj(fsrc, fdst)
-    finally:
-        if fdst:
-            fdst.close()
-        if fsrc:
-            fsrc.close()
+    with open(src, 'rb') as fsrc:
+        with open(dst, 'wb') as fdst:
+            copyfileobj(fsrc, fdst)
 
 def copymode(src, dst):
     """Copy mode bits from src to dst"""
@@ -74,8 +67,11 @@ def copystat(src, dst):
     if hasattr(os, 'chmod'):
         os.chmod(dst, mode)
     if hasattr(os, 'chflags') and hasattr(st, 'st_flags'):
-        os.chflags(dst, st.st_flags)
-
+        try:
+            os.chflags(dst, st.st_flags)
+        except OSError, why:
+            if not hasattr(errno, 'EOPNOTSUPP') or why.errno != errno.EOPNOTSUPP:
+                raise
 
 def copy(src, dst):
     """Copy data and mode bits ("cp src dst").

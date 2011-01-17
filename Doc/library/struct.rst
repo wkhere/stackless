@@ -10,18 +10,31 @@
    triple: packing; binary; data
 
 This module performs conversions between Python values and C structs represented
-as Python strings.  It uses :dfn:`format strings` (explained below) as compact
-descriptions of the lay-out of the C structs and the intended conversion to/from
-Python values.  This can be used in handling binary data stored in files or from
-network connections, among other sources.
+as Python strings.  This can be used in handling binary data stored in files or
+from network connections, among other sources.  It uses
+:ref:`struct-format-strings` as compact descriptions of the layout of the C
+structs and the intended conversion to/from Python values.
+
+.. note::
+
+   By default, the result of packing a given C struct includes pad bytes in
+   order to maintain proper alignment for the C types involved; similarly,
+   alignment is taken into account when unpacking.  This behavior is chosen so
+   that the bytes of a packed struct correspond exactly to the layout in memory
+   of the corresponding C struct.  To handle platform-independent data formats
+   or omit implicit pad bytes, use `standard` size and alignment instead of
+   `native` size and alignment: see :ref:`struct-alignment` for details.
+
+Functions and Exceptions
+------------------------
 
 The module defines the following exception and functions:
 
 
 .. exception:: error
 
-   Exception raised on various occasions; argument is a string describing what is
-   wrong.
+   Exception raised on various occasions; argument is a string describing what
+   is wrong.
 
 
 .. function:: pack(fmt, v1, v2, ...)
@@ -33,9 +46,9 @@ The module defines the following exception and functions:
 
 .. function:: pack_into(fmt, buffer, offset, v1, v2, ...)
 
-   Pack the values ``v1, v2, ...`` according to the given format, write the packed
-   bytes into the writable *buffer* starting at *offset*. Note that the offset is
-   a required argument.
+   Pack the values ``v1, v2, ...`` according to the given format, write the
+   packed bytes into the writable *buffer* starting at *offset*. Note that the
+   offset is a required argument.
 
    .. versionadded:: 2.5
 
@@ -43,17 +56,17 @@ The module defines the following exception and functions:
 .. function:: unpack(fmt, string)
 
    Unpack the string (presumably packed by ``pack(fmt, ...)``) according to the
-   given format.  The result is a tuple even if it contains exactly one item.  The
-   string must contain exactly the amount of data required by the format
+   given format.  The result is a tuple even if it contains exactly one item.
+   The string must contain exactly the amount of data required by the format
    (``len(string)`` must equal ``calcsize(fmt)``).
 
 
 .. function:: unpack_from(fmt, buffer[,offset=0])
 
    Unpack the *buffer* according to the given format. The result is a tuple even
-   if it contains exactly one item. The *buffer* must contain at least the amount
-   of data required by the format (``len(buffer[offset:])`` must be at least
-   ``calcsize(fmt)``).
+   if it contains exactly one item. The *buffer* must contain at least the
+   amount of data required by the format (``len(buffer[offset:])`` must be at
+   least ``calcsize(fmt)``).
 
    .. versionadded:: 2.5
 
@@ -63,49 +76,132 @@ The module defines the following exception and functions:
    Return the size of the struct (and hence of the string) corresponding to the
    given format.
 
-Format characters have the following meaning; the conversion between C and
-Python values should be obvious given their types:
+.. _struct-format-strings:
 
-+--------+-------------------------+--------------------+-------+
-| Format | C Type                  | Python             | Notes |
-+========+=========================+====================+=======+
-| ``x``  | pad byte                | no value           |       |
-+--------+-------------------------+--------------------+-------+
-| ``c``  | :ctype:`char`           | string of length 1 |       |
-+--------+-------------------------+--------------------+-------+
-| ``b``  | :ctype:`signed char`    | integer            |       |
-+--------+-------------------------+--------------------+-------+
-| ``B``  | :ctype:`unsigned char`  | integer            |       |
-+--------+-------------------------+--------------------+-------+
-| ``?``  | :ctype:`_Bool`          | bool               | \(1)  |
-+--------+-------------------------+--------------------+-------+
-| ``h``  | :ctype:`short`          | integer            |       |
-+--------+-------------------------+--------------------+-------+
-| ``H``  | :ctype:`unsigned short` | integer            |       |
-+--------+-------------------------+--------------------+-------+
-| ``i``  | :ctype:`int`            | integer            |       |
-+--------+-------------------------+--------------------+-------+
-| ``I``  | :ctype:`unsigned int`   | integer or long    |       |
-+--------+-------------------------+--------------------+-------+
-| ``l``  | :ctype:`long`           | integer            |       |
-+--------+-------------------------+--------------------+-------+
-| ``L``  | :ctype:`unsigned long`  | long               |       |
-+--------+-------------------------+--------------------+-------+
-| ``q``  | :ctype:`long long`      | long               | \(2)  |
-+--------+-------------------------+--------------------+-------+
-| ``Q``  | :ctype:`unsigned long   | long               | \(2)  |
-|        | long`                   |                    |       |
-+--------+-------------------------+--------------------+-------+
-| ``f``  | :ctype:`float`          | float              |       |
-+--------+-------------------------+--------------------+-------+
-| ``d``  | :ctype:`double`         | float              |       |
-+--------+-------------------------+--------------------+-------+
-| ``s``  | :ctype:`char[]`         | string             |       |
-+--------+-------------------------+--------------------+-------+
-| ``p``  | :ctype:`char[]`         | string             |       |
-+--------+-------------------------+--------------------+-------+
-| ``P``  | :ctype:`void \*`        | long               |       |
-+--------+-------------------------+--------------------+-------+
+Format Strings
+--------------
+
+Format strings are the mechanism used to specify the expected layout when
+packing and unpacking data.  They are built up from :ref:`format-characters`,
+which specify the type of data being packed/unpacked.  In addition, there are
+special characters for controlling the :ref:`struct-alignment`.
+
+
+.. _struct-alignment:
+
+Byte Order, Size, and Alignment
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, C types are represented in the machine's native format and byte
+order, and properly aligned by skipping pad bytes if necessary (according to the
+rules used by the C compiler).
+
+Alternatively, the first character of the format string can be used to indicate
+the byte order, size and alignment of the packed data, according to the
+following table:
+
++-----------+------------------------+----------+-----------+
+| Character | Byte order             | Size     | Alignment |
++===========+========================+==========+===========+
+| ``@``     | native                 | native   | native    |
++-----------+------------------------+----------+-----------+
+| ``=``     | native                 | standard | none      |
++-----------+------------------------+----------+-----------+
+| ``<``     | little-endian          | standard | none      |
++-----------+------------------------+----------+-----------+
+| ``>``     | big-endian             | standard | none      |
++-----------+------------------------+----------+-----------+
+| ``!``     | network (= big-endian) | standard | none      |
++-----------+------------------------+----------+-----------+
+
+If the first character is not one of these, ``'@'`` is assumed.
+
+Native byte order is big-endian or little-endian, depending on the host
+system. For example, Intel x86 and AMD64 (x86-64) are little-endian;
+Motorola 68000 and PowerPC G5 are big-endian; ARM and Intel Itanium feature
+switchable endianness (bi-endian). Use ``sys.byteorder`` to check the
+endianness of your system.
+
+Native size and alignment are determined using the C compiler's
+``sizeof`` expression.  This is always combined with native byte order.
+
+Standard size depends only on the format character;  see the table in
+the :ref:`format-characters` section.
+
+Note the difference between ``'@'`` and ``'='``: both use native byte order, but
+the size and alignment of the latter is standardized.
+
+The form ``'!'`` is available for those poor souls who claim they can't remember
+whether network byte order is big-endian or little-endian.
+
+There is no way to indicate non-native byte order (force byte-swapping); use the
+appropriate choice of ``'<'`` or ``'>'``.
+
+Notes:
+
+(1) Padding is only automatically added between successive structure members.
+    No padding is added at the beginning or the end of the encoded struct.
+
+(2) No padding is added when using non-native size and alignment, e.g.
+    with '<', '>', '=', and '!'.
+
+(3) To align the end of a structure to the alignment requirement of a
+    particular type, end the format with the code for that type with a repeat
+    count of zero.  See :ref:`struct-examples`.
+
+
+.. _format-characters:
+
+Format Characters
+^^^^^^^^^^^^^^^^^
+
+Format characters have the following meaning; the conversion between C and
+Python values should be obvious given their types.  The 'Standard size' column
+refers to the size of the packed value in bytes when using standard size; that
+is, when the format string starts with one of ``'<'``, ``'>'``, ``'!'`` or
+``'='``.  When using native size, the size of the packed value is
+platform-dependent.
+
++--------+-------------------------+--------------------+----------------+------------+
+| Format | C Type                  | Python type        | Standard size  | Notes      |
++========+=========================+====================+================+============+
+| ``x``  | pad byte                | no value           |                |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``c``  | :ctype:`char`           | string of length 1 | 1              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``b``  | :ctype:`signed char`    | integer            | 1              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``B``  | :ctype:`unsigned char`  | integer            | 1              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``?``  | :ctype:`_Bool`          | bool               | 1              | \(1)       |
++--------+-------------------------+--------------------+----------------+------------+
+| ``h``  | :ctype:`short`          | integer            | 2              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``H``  | :ctype:`unsigned short` | integer            | 2              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``i``  | :ctype:`int`            | integer            | 4              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``I``  | :ctype:`unsigned int`   | integer            | 4              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``l``  | :ctype:`long`           | integer            | 4              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``L``  | :ctype:`unsigned long`  | integer            | 4              |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``q``  | :ctype:`long long`      | integer            | 8              | \(2)       |
++--------+-------------------------+--------------------+----------------+------------+
+| ``Q``  | :ctype:`unsigned long   | integer            | 8              | \(2)       |
+|        | long`                   |                    |                |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``f``  | :ctype:`float`          | float              | 4              | \(3)       |
++--------+-------------------------+--------------------+----------------+------------+
+| ``d``  | :ctype:`double`         | float              | 8              | \(3)       |
++--------+-------------------------+--------------------+----------------+------------+
+| ``s``  | :ctype:`char[]`         | string             |                |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``p``  | :ctype:`char[]`         | string             |                |            |
++--------+-------------------------+--------------------+----------------+------------+
+| ``P``  | :ctype:`void \*`        | integer            |                | \(4)       |
++--------+-------------------------+--------------------+----------------+------------+
 
 Notes:
 
@@ -122,6 +218,19 @@ Notes:
    :ctype:`__int64`.  They are always available in standard modes.
 
    .. versionadded:: 2.2
+
+(3)
+   For the ``'f'`` and ``'d'`` conversion codes, the packed representation uses
+   the IEEE 754 binary32 (for ``'f'``) or binary64 (for ``'d'``) format,
+   regardless of the floating-point format used by the platform.
+
+(4)
+   The ``'P'`` format character is only available for the native byte ordering
+   (selected as the default or with the ``'@'`` byte order character). The byte
+   order character ``'='`` chooses to use little- or big-endian ordering based
+   on the host system. The struct module does not interpret this as native
+   ordering, so the ``'P'`` format is not available.
+
 
 A format character may be preceded by an integral repeat count.  For example,
 the format string ``'4h'`` means exactly the same as ``'hhhh'``.
@@ -147,9 +256,6 @@ count-1, it is padded with null bytes so that exactly count bytes in all are
 used.  Note that for :func:`unpack`, the ``'p'`` format character consumes count
 bytes, but that the string returned can never contain more than 255 characters.
 
-For the ``'I'``, ``'L'``, ``'q'`` and ``'Q'`` format characters, the return
-value is a Python long integer.
-
 For the ``'P'`` format character, the return value is a Python integer or long
 integer, depending on the size needed to hold a pointer when it has been cast to
 an integer type.  A *NULL* pointer will always be returned as the Python integer
@@ -163,60 +269,18 @@ For the ``'?'`` format character, the return value is either :const:`True` or
 Either 0 or 1 in the native or standard bool representation will be packed, and
 any non-zero value will be True when unpacking.
 
-By default, C numbers are represented in the machine's native format and byte
-order, and properly aligned by skipping pad bytes if necessary (according to the
-rules used by the C compiler).
 
-Alternatively, the first character of the format string can be used to indicate
-the byte order, size and alignment of the packed data, according to the
-following table:
 
-+-----------+------------------------+--------------------+
-| Character | Byte order             | Size and alignment |
-+===========+========================+====================+
-| ``@``     | native                 | native             |
-+-----------+------------------------+--------------------+
-| ``=``     | native                 | standard           |
-+-----------+------------------------+--------------------+
-| ``<``     | little-endian          | standard           |
-+-----------+------------------------+--------------------+
-| ``>``     | big-endian             | standard           |
-+-----------+------------------------+--------------------+
-| ``!``     | network (= big-endian) | standard           |
-+-----------+------------------------+--------------------+
+.. _struct-examples:
 
-If the first character is not one of these, ``'@'`` is assumed.
+Examples
+^^^^^^^^
 
-Native byte order is big-endian or little-endian, depending on the host system.
-For example, Motorola and Sun processors are big-endian; Intel and DEC
-processors are little-endian.
+.. note::
+   All examples assume a native byte order, size, and alignment with a
+   big-endian machine.
 
-Native size and alignment are determined using the C compiler's
-``sizeof`` expression.  This is always combined with native byte order.
-
-Standard size and alignment are as follows: no alignment is required for any
-type (so you have to use pad bytes); :ctype:`short` is 2 bytes; :ctype:`int` and
-:ctype:`long` are 4 bytes; :ctype:`long long` (:ctype:`__int64` on Windows) is 8
-bytes; :ctype:`float` and :ctype:`double` are 32-bit and 64-bit IEEE floating
-point numbers, respectively. :ctype:`_Bool` is 1 byte.
-
-Note the difference between ``'@'`` and ``'='``: both use native byte order, but
-the size and alignment of the latter is standardized.
-
-The form ``'!'`` is available for those poor souls who claim they can't remember
-whether network byte order is big-endian or little-endian.
-
-There is no way to indicate non-native byte order (force byte-swapping); use the
-appropriate choice of ``'<'`` or ``'>'``.
-
-The ``'P'`` format character is only available for the native byte ordering
-(selected as the default or with the ``'@'`` byte order character). The byte
-order character ``'='`` chooses to use little- or big-endian ordering based on
-the host system. The struct module does not interpret this as native ordering,
-so the ``'P'`` format is not available.
-
-Examples (all using native byte order, size and alignment, on a big-endian
-machine)::
+A basic example of packing/unpacking three integers::
 
    >>> from struct import *
    >>> pack('hhl', 1, 2, 3)
@@ -225,13 +289,6 @@ machine)::
    (1, 2, 3)
    >>> calcsize('hhl')
    8
-
-Hint: to align the end of a structure to the alignment requirement of a
-particular type, end the format with the code for that type with a repeat count
-of zero.  For example, the format ``'llh0l'`` specifies two pad bytes at the
-end, assuming longs are aligned on 4-byte boundaries.  This only works when
-native size and alignment are in effect; standard size and alignment does not
-enforce any alignment.
 
 Unpacked fields can be named by assigning them to variables or by wrapping
 the result in a named tuple::
@@ -244,6 +301,28 @@ the result in a named tuple::
     >>> Student._make(unpack('<10sHHb', s))
     Student(name='raymond   ', serialnum=4658, school=264, gradelevel=8)
 
+The ordering of format characters may have an impact on size since the padding
+needed to satisfy alignment requirements is different::
+
+    >>> pack('ci', '*', 0x12131415)
+    '*\x00\x00\x00\x12\x13\x14\x15'
+    >>> pack('ic', 0x12131415, '*')
+    '\x12\x13\x14\x15*'
+    >>> calcsize('ci')
+    8
+    >>> calcsize('ic')
+    5
+
+The following format ``'llh0l'`` specifies two pad bytes at the end, assuming
+longs are aligned on 4-byte boundaries::
+
+    >>> pack('llh0l', 1, 2, 3)
+    '\x00\x00\x00\x01\x00\x00\x00\x02\x00\x03\x00\x00'
+
+This only works when native size and alignment are in effect; standard size and
+alignment does not enforce any alignment.
+
+
 .. seealso::
 
    Module :mod:`array`
@@ -255,18 +334,18 @@ the result in a named tuple::
 
 .. _struct-objects:
 
-Struct Objects
---------------
+Classes
+-------
 
 The :mod:`struct` module also defines the following type:
 
 
 .. class:: Struct(format)
 
-   Return a new Struct object which writes and reads binary data according to the
-   format string *format*.  Creating a Struct object once and calling its methods
-   is more efficient than calling the :mod:`struct` functions with the same format
-   since the format string only needs to be compiled once.
+   Return a new Struct object which writes and reads binary data according to
+   the format string *format*.  Creating a Struct object once and calling its
+   methods is more efficient than calling the :mod:`struct` functions with the
+   same format since the format string only needs to be compiled once.
 
    .. versionadded:: 2.5
 

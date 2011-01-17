@@ -1497,6 +1497,17 @@ class Test_xrange(FixerTestCase):
         for call in fixer_util.consuming_calls:
             self.unchanged("a = %s(range(10))" % call)
 
+class Test_xrange_with_reduce(FixerTestCase):
+
+    def setUp(self):
+        super(Test_xrange_with_reduce, self).setUp(["xrange", "reduce"])
+
+    def test_double_transform(self):
+        b = """reduce(x, xrange(5))"""
+        a = """from functools import reduce
+reduce(x, range(5))"""
+        self.check(b, a)
+
 class Test_raw_input(FixerTestCase):
     fixer = "raw_input"
 
@@ -3679,7 +3690,7 @@ class Test_import(FixerTestCase):
             self.files_checked.append(name)
             return self.always_exists or (name in self.present_files)
 
-        from ..fixes import fix_import
+        from lib2to3.fixes import fix_import
         fix_import.exists = fake_exists
 
     def tearDown(self):
@@ -3722,6 +3733,12 @@ class Test_import(FixerTestCase):
         self.present_files = set(["bar.py"])
         self.unchanged(s)
 
+    def test_with_absolute_import_enabled(self):
+        s = "from __future__ import absolute_import\nimport bar"
+        self.always_exists = False
+        self.present_files = set(["__init__.py", "bar.py"])
+        self.unchanged(s)
+
     def test_in_package(self):
         b = "import bar"
         a = "from . import bar"
@@ -3735,6 +3752,10 @@ class Test_import(FixerTestCase):
         self.always_exists = False
         self.present_files = set(["__init__.py", "bar" + os.path.sep])
         self.check(b, a)
+
+    def test_already_relative_import(self):
+        s = "from . import bar"
+        self.unchanged(s)
 
     def test_comments_and_indent(self):
         b = "import bar # Foo"
@@ -4285,3 +4306,91 @@ class Test_operator(FixerTestCase):
     def test_bare_sequenceIncludes(self):
         s = "sequenceIncludes(x, y)"
         self.warns_unchanged(s, "You should use operator.contains here.")
+
+
+class Test_exitfunc(FixerTestCase):
+
+    fixer = "exitfunc"
+
+    def test_simple(self):
+        b = """
+            import sys
+            sys.exitfunc = my_atexit
+            """
+        a = """
+            import sys
+            import atexit
+            atexit.register(my_atexit)
+            """
+        self.check(b, a)
+
+    def test_names_import(self):
+        b = """
+            import sys, crumbs
+            sys.exitfunc = my_func
+            """
+        a = """
+            import sys, crumbs, atexit
+            atexit.register(my_func)
+            """
+        self.check(b, a)
+
+    def test_complex_expression(self):
+        b = """
+            import sys
+            sys.exitfunc = do(d)/a()+complex(f=23, g=23)*expression
+            """
+        a = """
+            import sys
+            import atexit
+            atexit.register(do(d)/a()+complex(f=23, g=23)*expression)
+            """
+        self.check(b, a)
+
+    def test_comments(self):
+        b = """
+            import sys # Foo
+            sys.exitfunc = f # Blah
+            """
+        a = """
+            import sys
+            import atexit # Foo
+            atexit.register(f) # Blah
+            """
+        self.check(b, a)
+
+        b = """
+            import apples, sys, crumbs, larry # Pleasant comments
+            sys.exitfunc = func
+            """
+        a = """
+            import apples, sys, crumbs, larry, atexit # Pleasant comments
+            atexit.register(func)
+            """
+        self.check(b, a)
+
+    def test_in_a_function(self):
+        b = """
+            import sys
+            def f():
+                sys.exitfunc = func
+            """
+        a = """
+            import sys
+            import atexit
+            def f():
+                atexit.register(func)
+             """
+        self.check(b, a)
+
+    def test_no_sys_import(self):
+        b = """sys.exitfunc = f"""
+        a = """atexit.register(f)"""
+        msg = ("Can't find sys import; Please add an atexit import at the "
+            "top of your file.")
+        self.warns(b, a, msg)
+
+
+    def test_unchanged(self):
+        s = """f(sys.exitfunc)"""
+        self.unchanged(s)

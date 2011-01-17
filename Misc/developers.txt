@@ -17,7 +17,64 @@ the format to accommodate documentation needs as they arise.
 Permissions History
 -------------------
 
-- Tarek Ziadé as given SVN access on Decmeber 21 2008 by NCN,
+- Brian Quinlan was given commit access on Jul 26 2010 by GFB,
+  for work related to PEP 3148.
+
+- Reid Kleckner was given commit access on Jul 11 2010 by GFB,
+  for work on the py3k-jit branch, at suggestion of the Unladen
+  Swallow team.
+
+- Alexander Belopolsky was given commit access on May 25 2010
+  by MvL at suggestion of Mark Dickinson.
+
+- Tim Golden was given commit access on April 21 2010 by MvL,
+  at suggestion of Michael Foord.
+
+- Giampaolo Rodolà was given commit access on April 17 2010 by
+  MvL, at suggestion of R. David Murray.
+
+- Jean-Paul Calderone was given commit access on April 6 2010 by
+  GFB, at suggestion of Michael Foord and others.
+
+- Brian Curtin was given commit access on March 24 2010 by MvL.
+
+- Florent Xicluna was given commit access on February 25 2010 by
+  MvL, based on Antoine Pitrou's recommendation.
+
+- Dino Viehland was given SVN access on February 23 2010 by Brett
+  Cannon, for backporting tests from IronPython.
+
+- Larry Hastings was given SVN access on February 22 2010 by
+  Andrew Kuchling, based on Brett Cannon's recommendation.
+
+- Victor Stinner was given SVN access on January 30 2010 by MvL,
+  at recommendation by Mark Dickinson and Amaury Forgeot d'Arc.
+
+- Stefan Krah was given SVN access on January 5 2010 by GFB, at
+  suggestion of Mark Dickinson, for work on the decimal module.
+
+- Doug Hellmann was given SVN access on September 19 2009 by GFB, at
+  suggestion of Jesse Noller, for documentation work.
+
+- Ezio Melotti was given SVN access on June 7 2009 by GFB, for work on and
+  fixes to the documentation.
+
+- Paul Kippes was given commit privileges at PyCon 2009 by BAC to work on 3to2.
+
+- Ron DuPlain was given commit privileges at PyCon 2009 by BAC to work on 3to2.
+
+- Several developers of alternative Python implementations where
+  given access for test suite and library adaptions by MvL:
+  Allison Randal (Parrot), Michael Foord (IronPython),
+  Jim Baker, Philip Jenvey, and Frank Wierzbicki (all Jython).
+
+- R. David Murray was given SVN access on March 30 2009 by MvL, after
+  recommendation by BAC.
+
+- Chris Withers was given SVN access on March 8 2009 by MvL,
+  after recommendation by GvR.
+
+- Tarek Ziadé was given SVN access on December 21 2008 by NCN,
   for maintenance of distutils.
 
 - Hirokazu Yamamoto was given SVN access on August 12 2008 by MvL,
@@ -241,10 +298,11 @@ Permissions Dropped after Loss of Contact
 Initials of Project Admins
 --------------------------
 
-GvR:  Guido van Rossum
-NCN:  Neal Norwitz
-RDH:  Raymond Hettinger
 TGP:  Tim Peters
+GFB:  Georg Brandl
+BAC:  Brett Cannon
+NCN:  Neal Norwitz
 DJG:  David Goodger
 MvL:  Martin v. Loewis
-GFB:  Georg Brandl
+GvR:  Guido van Rossum
+RDH:  Raymond Hettinger

@@ -1,13 +1,9 @@
 # Simple test suite for Cookie.py
 
-from test.test_support import run_unittest, run_doctest
+from test.test_support import run_unittest, run_doctest, check_warnings
 import unittest
 import Cookie
 
-import warnings
-warnings.filterwarnings("ignore",
-                        ".* class is insecure.*",
-                        DeprecationWarning)
 
 class CookieTests(unittest.TestCase):
     # Currently this only tests SimpleCookie
@@ -66,6 +62,16 @@ class CookieTests(unittest.TestCase):
         </script>
         """)
 
+        # loading 'expires'
+        C = Cookie.SimpleCookie()
+        C.load('Customer="W"; expires=Wed, 01-Jan-2010 00:00:00 GMT')
+        self.assertEqual(C['Customer']['expires'],
+                         'Wed, 01-Jan-2010 00:00:00 GMT')
+        C = Cookie.SimpleCookie()
+        C.load('Customer="W"; expires=Wed, 01-Jan-98 00:00:00 GMT')
+        self.assertEqual(C['Customer']['expires'],
+                         'Wed, 01-Jan-98 00:00:00 GMT')
+
     def test_quoted_meta(self):
         # Try cookie with quoted meta-data
         C = Cookie.SimpleCookie()
@@ -76,7 +82,9 @@ class CookieTests(unittest.TestCase):
 
 def test_main():
     run_unittest(CookieTests)
-    run_doctest(Cookie)
+    with check_warnings(('.+Cookie class is insecure; do not use it',
+                         DeprecationWarning)):
+        run_doctest(Cookie)
 
 if __name__ == '__main__':
     test_main()

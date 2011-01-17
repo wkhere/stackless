@@ -94,6 +94,12 @@ This module defines one class called :class:`Popen`:
    size.  A negative *bufsize* means to use the system default, which usually means
    fully buffered.  The default value for *bufsize* is :const:`0` (unbuffered).
 
+   .. note::
+
+      If you experience performance issues, it is recommended that you try to
+      enable buffering by setting *bufsize* to either -1 or a large enough
+      positive value (such as 4096).
+
    The *executable* argument specifies the program to execute. It is very seldom
    needed: Usually, the program to execute is defined by the *args* argument. If
    ``shell=True``, the *executable* argument specifies which shell to use. On Unix,
@@ -151,9 +157,10 @@ This module defines one class called :class:`Popen`:
 
    .. note::
 
-      This feature is only available if Python is built with universal newline support
-      (the default).  Also, the newlines attribute of the file objects :attr:`stdout`,
-      :attr:`stdin` and :attr:`stderr` are not updated by the communicate() method.
+      This feature is only available if Python is built with universal newline
+      support (the default).  Also, the newlines attribute of the file objects
+      :attr:`stdout`, :attr:`stdin` and :attr:`stderr` are not updated by the
+      communicate() method.
 
    The *startupinfo* and *creationflags*, if given, will be passed to the
    underlying CreateProcess() function.  They can specify things such as appearance
@@ -185,9 +192,9 @@ This module also defines two shortcut functions:
    Run command with arguments.  Wait for command to complete, then return the
    :attr:`returncode` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example::
+   The arguments are the same as for the :class:`Popen` constructor.  Example::
 
-      retcode = call(["ls", "-l"])
+      >>> retcode = subprocess.call(["ls", "-l"])
 
 
 .. function:: check_call(*popenargs, **kwargs)
@@ -197,9 +204,10 @@ This module also defines two shortcut functions:
    :exc:`CalledProcessError` object will have the return code in the
    :attr:`returncode` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example::
+   The arguments are the same as for the :class:`Popen` constructor.  Example::
 
-      check_call(["ls", "-l"])
+      >>> subprocess.check_call(["ls", "-l"])
+      0
 
    .. versionadded:: 2.5
 
@@ -336,6 +344,9 @@ The following attributes are also available:
 .. attribute:: Popen.pid
 
    The process ID of the child process.
+
+   Note that if you set the *shell* argument to ``True``, this is the process ID
+   of the spawned shell.
 
 
 .. attribute:: Popen.returncode
@@ -502,7 +513,7 @@ Return code handling translates as follows::
    pipe = os.popen("cmd", 'w')
    ...
    rc = pipe.close()
-   if rc != None and rc % 256:
+   if rc is not None and rc >> 8:
        print "There were some errors"
    ==>
    process = Popen("cmd", 'w', shell=True, stdin=PIPE)

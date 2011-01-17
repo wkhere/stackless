@@ -25,7 +25,7 @@ EXEC_PREFIX = os.path.normpath(sys.exec_prefix)
 # Path to the base directory of the project. On Windows the binary may
 # live in project/PCBuild9.  If we're dealing with an x64 Windows build,
 # it'll live in project/PCbuild/amd64.
-project_base = os.path.dirname(os.path.abspath(sys.executable))
+project_base = os.path.dirname(os.path.realpath(sys.executable))
 if os.name == "nt" and "pcbuild" in project_base[-8:].lower():
     project_base = os.path.abspath(os.path.join(project_base, os.path.pardir))
 # PC/VS7.1
@@ -71,15 +71,19 @@ def get_python_inc(plat_specific=0, prefix=None):
     """
     if prefix is None:
         prefix = plat_specific and EXEC_PREFIX or PREFIX
+
     if os.name == "posix":
         if python_build:
-            base = os.path.dirname(os.path.abspath(sys.executable))
+            buildir = os.path.dirname(os.path.realpath(sys.executable))
             if plat_specific:
-                inc_dir = base
+                # python.h is located in the buildir
+                inc_dir = buildir
             else:
-                inc_dir = os.path.join(base, "Include")
-                if not os.path.exists(inc_dir):
-                    inc_dir = os.path.join(os.path.dirname(base), "Include")
+                # the source dir is relative to the buildir
+                srcdir = os.path.abspath(os.path.join(buildir,
+                                         get_config_var('srcdir')))
+                # Include is located in the srcdir
+                inc_dir = os.path.join(srcdir, "Include")
             return inc_dir
         return os.path.join(prefix, "include", "python" + get_python_version())
     elif os.name == "nt":
@@ -218,7 +222,8 @@ def get_config_h_filename():
 def get_makefile_filename():
     """Return full pathname of installed Makefile from the Python build."""
     if python_build:
-        return os.path.join(os.path.dirname(sys.executable), "Makefile")
+        return os.path.join(os.path.dirname(os.path.realpath(sys.executable)),
+                            "Makefile")
     lib_dir = get_python_lib(plat_specific=1, standard_lib=1)
     return os.path.join(lib_dir, "config", "Makefile")
 
@@ -455,7 +460,7 @@ def _init_nt():
     g['SO'] = '.pyd'
     g['EXE'] = ".exe"
     g['VERSION'] = get_python_version().replace(".", "")
-    g['BINDIR'] = os.path.dirname(os.path.abspath(sys.executable))
+    g['BINDIR'] = os.path.dirname(os.path.realpath(sys.executable))
 
     global _config_vars
     _config_vars = g

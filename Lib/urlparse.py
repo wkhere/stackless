@@ -1,7 +1,28 @@
 """Parse (absolute and relative) URLs.
 
-See RFC 1808: "Relative Uniform Resource Locators", by R. Fielding,
-UC Irvine, June 1995.
+urlparse module is based upon the following RFC specifications.
+
+RFC 3986 (STD66): "Uniform Resource Identifiers" by T. Berners-Lee, R. Fielding
+and L.  Masinter, January 2005.
+
+RFC 2396:  "Uniform Resource Identifiers (URI)": Generic Syntax by T.
+Berners-Lee, R. Fielding, and L. Masinter, August 1998.
+
+RFC 2368: "The mailto URL scheme", by P.Hoffman , L Masinter, J. Zwinski, July 1998.
+
+RFC 1808: "Relative Uniform Resource Locators", by R. Fielding, UC Irvine, June
+1995.
+
+RFC 1738: "Uniform Resource Locators (URL)" by T. Berners-Lee, L. Masinter, M.
+McCahill, December 1994
+
+RFC 3986 is considered the current standard and any future changes to
+urlparse module should conform with it.  The urlparse module is
+currently not entirely compliant with this RFC due to defacto
+scenarios for parsing, and for backward compatibility purposes, some
+parsing quirks from older RFCs are retained. The testcases in
+test_urlparse.py provides a good indicator of parsing behavior.
+
 """
 
 __all__ = ["urlparse", "urlunparse", "urljoin", "urldefrag",
@@ -14,7 +35,7 @@ uses_relative = ['ftp', 'http', 'gopher', 'nntp', 'imap',
 uses_netloc = ['ftp', 'http', 'gopher', 'nntp', 'telnet',
                'imap', 'wais', 'file', 'mms', 'https', 'shttp',
                'snews', 'prospero', 'rtsp', 'rtspu', 'rsync', '',
-               'svn', 'svn+ssh', 'sftp']
+               'svn', 'svn+ssh', 'sftp','nfs','git', 'git+ssh']
 non_hierarchical = ['gopher', 'hdl', 'mailto', 'news',
                     'telnet', 'wais', 'imap', 'snews', 'sip', 'sips']
 uses_params = ['ftp', 'hdl', 'prospero', 'http', 'imap',
@@ -185,6 +206,11 @@ def urlunparse(data):
     return urlunsplit((scheme, netloc, url, query, fragment))
 
 def urlunsplit(data):
+    """Combine the elements of a tuple as returned by urlsplit() into a
+    complete URL as a string. The data argument can be any five-item iterable.
+    This may result in a slightly different, but equivalent URL, if the URL that
+    was parsed originally had unnecessary delimiters (for example, a ? with an
+    empty query; the RFC states that these are equivalent)."""
     scheme, netloc, url, query, fragment = data
     if netloc or (scheme and scheme in uses_netloc and url[:2] != '//'):
         if url and url[:1] != '/': url = '/' + url
@@ -272,8 +298,9 @@ def urldefrag(url):
 # Cannot use directly from urllib as it would create circular reference.
 # urllib uses urlparse methods ( urljoin)
 
-_hextochr = dict(('%02x' % i, chr(i)) for i in range(256))
-_hextochr.update(('%02X' % i, chr(i)) for i in range(256))
+
+_hexdig = '0123456789ABCDEFabcdef'
+_hextochr = dict((a+b, chr(int(a+b,16))) for a in _hexdig for b in _hexdig)
 
 def unquote(s):
     """unquote('abc%20def') -> 'abc def'."""
@@ -353,72 +380,3 @@ def parse_qsl(qs, keep_blank_values=0, strict_parsing=0):
             r.append((name, value))
 
     return r
-
-
-test_input = """
-      http://a/b/c/d
-
-      g:h        = <URL:g:h>
-      http:g     = <URL:http://a/b/c/g>
-      http:      = <URL:http://a/b/c/d>
-      g          = <URL:http://a/b/c/g>
-      ./g        = <URL:http://a/b/c/g>
-      g/         = <URL:http://a/b/c/g/>
-      /g         = <URL:http://a/g>
-      //g        = <URL:http://g>
-      ?y         = <URL:http://a/b/c/d?y>
-      g?y        = <URL:http://a/b/c/g?y>
-      g?y/./x    = <URL:http://a/b/c/g?y/./x>
-      .          = <URL:http://a/b/c/>
-      ./         = <URL:http://a/b/c/>
-      ..         = <URL:http://a/b/>
-      ../        = <URL:http://a/b/>
-      ../g       = <URL:http://a/b/g>
-      ../..      = <URL:http://a/>
-      ../../g    = <URL:http://a/g>
-      ../../../g = <URL:http://a/../g>
-      ./../g     = <URL:http://a/b/g>
-      ./g/.      = <URL:http://a/b/c/g/>
-      /./g       = <URL:http://a/./g>
-      g/./h      = <URL:http://a/b/c/g/h>
-      g/../h     = <URL:http://a/b/c/h>
-      http:g     = <URL:http://a/b/c/g>
-      http:      = <URL:http://a/b/c/d>
-      http:?y         = <URL:http://a/b/c/d?y>
-      http:g?y        = <URL:http://a/b/c/g?y>
-      http:g?y/./x    = <URL:http://a/b/c/g?y/./x>
-"""
-
-def test():
-    import sys
-    base = ''
-    if sys.argv[1:]:
-        fn = sys.argv[1]
-        if fn == '-':
-            fp = sys.stdin
-        else:
-            fp = open(fn)
-    else:
-        try:
-            from cStringIO import StringIO
-        except ImportError:
-            from StringIO import StringIO
-        fp = StringIO(test_input)
-    for line in fp:
-        words = line.split()
-        if not words:
-            continue
-        url = words[0]
-        parts = urlparse(url)
-        print '%-10s : %s' % (url, parts)
-        abs = urljoin(base, url)
-        if not base:
-            base = abs
-        wrapped = '<URL:%s>' % abs
-        print '%-10s = %s' % (url, wrapped)
-        if len(words) == 3 and words[1] == '=':
-            if wrapped != words[2]:
-                print 'EXPECTED', words[2], '!!!!!!!!!!'
-
-if __name__ == '__main__':
-    test()

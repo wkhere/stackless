@@ -152,7 +152,7 @@ class DBShelf(DictMixin):
 
 
     def keys(self, txn=None):
-        if txn != None:
+        if txn is not None:
             return self.db.keys(txn)
         else:
             return self.db.keys()
@@ -176,7 +176,7 @@ class DBShelf(DictMixin):
 
 
     def items(self, txn=None):
-        if txn != None:
+        if txn is not None:
             items = self.db.items(txn)
         else:
             items = self.db.items()
@@ -187,7 +187,7 @@ class DBShelf(DictMixin):
         return newitems
 
     def values(self, txn=None):
-        if txn != None:
+        if txn is not None:
             values = self.db.values(txn)
         else:
             values = self.db.values()
@@ -225,7 +225,7 @@ class DBShelf(DictMixin):
         # given nothing is passed to the extension module.  That way
         # an exception can be raised if set_get_returns_none is turned
         # off.
-        data = apply(self.db.get, args, kw)
+        data = self.db.get(*args, **kw)
         try:
             return cPickle.loads(data)
         except (EOFError, TypeError, cPickle.UnpicklingError):
@@ -294,7 +294,7 @@ class DBShelfCursor:
     def get(self, *args):
         count = len(args)  # a method overloading hack
         method = getattr(self, 'get_%d' % count)
-        apply(method, args)
+        method(*args)
 
     def get_1(self, flags):
         rec = self.dbc.get(flags)

@@ -234,7 +234,7 @@ class FTP:
         if self.debugging > 1: print '*put urgent*', self.sanitize(line)
         self.sock.sendall(line, MSG_OOB)
         resp = self.getmultiline()
-        if resp[:3] not in ('426', '226'):
+        if resp[:3] not in ('426', '225', '226'):
             raise error_proto, resp
 
     def sendcmd(self, cmd):
@@ -294,6 +294,8 @@ class FTP:
             resp = self.sendport(host, port)
         else:
             resp = self.sendeprt(host, port)
+        if self.timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+            sock.settimeout(self.timeout)
         return sock
 
     def makepasv(self):
@@ -346,6 +348,8 @@ class FTP:
             if resp[0] != '1':
                 raise error_reply, resp
             conn, sockaddr = sock.accept()
+            if self.timeout is not _GLOBAL_DEFAULT_TIMEOUT:
+                conn.settimeout(self.timeout)
         if resp[:3] == '150':
             # this is conditional in case we received a 125
             size = parse150(resp)

@@ -44,7 +44,8 @@ class OSSAudioDevTests(unittest.TestCase):
         try:
             dsp = ossaudiodev.open('w')
         except IOError, msg:
-            if msg[0] in (errno.EACCES, errno.ENOENT, errno.ENODEV, errno.EBUSY):
+            if msg.args[0] in (errno.EACCES, errno.ENOENT,
+                               errno.ENODEV, errno.EBUSY):
                 raise TestSkipped(msg)
             raise
 
@@ -70,11 +71,11 @@ class OSSAudioDevTests(unittest.TestCase):
                 self.fail("dsp.%s not read-only" % attr)
 
         # Compute expected running time of sound sample (in seconds).
-        expected_time = float(len(data)) / (ssize/8) / nchannels / rate
+        expected_time = float(len(data)) / (ssize//8) / nchannels / rate
 
         # set parameters based on .au file headers
         dsp.setparameters(AFMT_S16_NE, nchannels, rate)
-        self.assertTrue(abs(expected_time - 2.94) < 1e-2, expected_time)
+        self.assertTrue(abs(expected_time - 3.51) < 1e-2, expected_time)
         t1 = time.time()
         dsp.write(data)
         dsp.close()
@@ -161,7 +162,8 @@ def test_main():
     try:
         dsp = ossaudiodev.open('w')
     except (ossaudiodev.error, IOError), msg:
-        if msg[0] in (errno.EACCES, errno.ENOENT, errno.ENODEV, errno.EBUSY):
+        if msg.args[0] in (errno.EACCES, errno.ENOENT,
+                           errno.ENODEV, errno.EBUSY):
             raise TestSkipped(msg)
         raise
     dsp.close()

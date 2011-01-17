@@ -7,10 +7,13 @@ try:
 except ImportError:
     raise test_support.TestSkipped, "posix is not available"
 
+import errno
+import sys
 import time
 import os
 import pwd
 import shutil
+import sys
 import unittest
 import warnings
 warnings.filterwarnings('ignore', '.* potential security risk .*',
@@ -287,8 +290,13 @@ class PosixTester(unittest.TestCase):
                     os.chdir(dirname)
                     try:
                         os.getcwd()
-                        if current_path_length < 1027:
+                        if current_path_length < 4099:
                             _create_and_do_getcwd(dirname, current_path_length + len(dirname) + 1)
+                    except OSError as e:
+                        expected_errno = errno.ENAMETOOLONG
+                        if 'sunos' in sys.platform or 'openbsd' in sys.platform:
+                            expected_errno = errno.ERANGE # Issue 9185
+                        self.assertEqual(e.errno, expected_errno)
                     finally:
                         os.chdir('..')
                         os.rmdir(dirname)
@@ -299,9 +307,57 @@ class PosixTester(unittest.TestCase):
                 os.chdir(curdir)
                 shutil.rmtree(base_path)
 
+    def test_getgroups(self):
+        with os.popen('id -G 2>/dev/null') as idg:
+            groups = idg.read().strip()
+
+        if not groups:
+            # This test needs 'id -G'
+            return
+
+        # 'id -G' and 'os.getgroups()' should return the same
+        # groups, ignoring order and duplicates.
+        self.assertEqual(
+                set([int(x) for x in groups.split()]),
+                set(posix.getgroups()))
+
+class PosixGroupsTester(unittest.TestCase):
+    if posix.getuid() == 0 and hasattr(posix, 'getgroups') and sys.platform != 'darwin':
+
+        def setUp(self):
+            self.saved_groups = posix.getgroups()
+
+        def tearDown(self):
+            if hasattr(posix, 'setgroups'):
+                posix.setgroups(self.saved_groups)
+            elif hasattr(posix, 'initgroups'):
+                name = pwd.getpwuid(posix.getuid()).pw_name
+                posix.initgroups(name, self.saved_groups[0])
+
+        if hasattr(posix, 'initgroups'):
+            def test_initgroups(self):
+                # find missing group
+
+                groups = sorted(self.saved_groups)
+                for g1,g2 in zip(groups[:-1], groups[1:]):
+                    g = g1 + 1
+                    if g < g2:
+                        break
+                else:
+                    g = g2 + 1
+                name = pwd.getpwuid(posix.getuid()).pw_name
+                posix.initgroups(name, g)
+                self.assertIn(g, posix.getgroups())
+
+        if hasattr(posix, 'setgroups'):
+            def test_setgroups(self):
+                for groups in [[0], range(16)]:
+                    posix.setgroups(groups)
+                    self.assertListEqual(groups, posix.getgroups())
+
 
 def test_main():
-    test_support.run_unittest(PosixTester)
+    test_support.run_unittest(PosixTester, PosixGroupsTester)
 
 if __name__ == '__main__':
     test_main()

@@ -751,7 +751,7 @@ class IMAP4:
                               ', '.join(Commands[command])))
         name = 'UID'
         typ, dat = self._simple_command(name, command, *args)
-        if command in ('SEARCH', 'SORT'):
+        if command in ('SEARCH', 'SORT', 'THREAD'):
             name = command
         else:
             name = 'FETCH'
@@ -1212,7 +1212,7 @@ class IMAP4_stream(IMAP4):
 
     Instantiate with: IMAP4_stream(command)
 
-            where "command" is a string that can be passed to Subprocess.Popen()
+            where "command" is a string that can be passed to subprocess.Popen()
 
     for more documentation see the docstring of the parent class IMAP4.
     """

@@ -32,14 +32,14 @@ class TestServerThread(threading.Thread):
         threading.Thread.__init__(self)
         self.request_handler = request_handler
         self.test_object = test_object
-        self.test_object.lock.acquire()
 
     def run(self):
         self.server = HTTPServer(('', 0), self.request_handler)
         self.test_object.PORT = self.server.socket.getsockname()[1]
-        self.test_object.lock.release()
+        self.test_object.server_started.set()
+        self.test_object = None
         try:
-            self.server.serve_forever()
+            self.server.serve_forever(0.05)
         finally:
             self.server.server_close()
 
@@ -49,13 +49,12 @@ class TestServerThread(threading.Thread):
 
 class BaseTestCase(unittest.TestCase):
     def setUp(self):
-        self.lock = threading.Lock()
+        self.server_started = threading.Event()
         self.thread = TestServerThread(self, self.request_handler)
         self.thread.start()
-        self.lock.acquire()
+        self.server_started.wait()
 
     def tearDown(self):
-        self.lock.release()
         self.thread.stop()
 
     def request(self, uri, method='GET', body=None, headers={}):
@@ -292,14 +291,22 @@ class CGIHTTPServerTestCase(BaseTestCase):
         self.cgi_dir = os.path.join(self.parent_dir, 'cgi-bin')
         os.mkdir(self.cgi_dir)
 
+        # The shebang line should be pure ASCII: use symlink if possible.
+        # See issue #7668.
+        if hasattr(os, 'symlink'):
+            self.pythonexe = os.path.join(self.parent_dir, 'python')
+            os.symlink(sys.executable, self.pythonexe)
+        else:
+            self.pythonexe = sys.executable
+
         self.file1_path = os.path.join(self.cgi_dir, 'file1.py')
         with open(self.file1_path, 'w') as file1:
-            file1.write(cgi_file1 % sys.executable)
+            file1.write(cgi_file1 % self.pythonexe)
         os.chmod(self.file1_path, 0777)
 
         self.file2_path = os.path.join(self.cgi_dir, 'file2.py')
         with open(self.file2_path, 'w') as file2:
-            file2.write(cgi_file2 % sys.executable)
+            file2.write(cgi_file2 % self.pythonexe)
         os.chmod(self.file2_path, 0777)
 
         self.cwd = os.getcwd()
@@ -308,6 +315,8 @@ class CGIHTTPServerTestCase(BaseTestCase):
     def tearDown(self):
         try:
             os.chdir(self.cwd)
+            if self.pythonexe != sys.executable:
+                os.remove(self.pythonexe)
             os.remove(self.file1_path)
             os.remove(self.file2_path)
             os.rmdir(self.cgi_dir)

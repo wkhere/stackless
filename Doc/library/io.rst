@@ -226,8 +226,10 @@ I/O Base Classes
 
       Flush and close this stream. This method has no effect if the file is
       already closed. Once the file is closed, any operation on the file
-      (e.g. reading or writing) will raise an :exc:`IOError`. The internal
-      file descriptor isn't closed if *closefd* was False.
+      (e.g. reading or writing) will raise an :exc:`ValueError`.
+
+      As a convenience, it is allowed to call this method more than once;
+      only the first call, however, will have an effect.
 
    .. attribute:: closed
 
@@ -292,8 +294,12 @@ I/O Base Classes
 
    .. method:: truncate([size])
 
-      Truncate the file to at most *size* bytes.  *size* defaults to the current
-      file position, as returned by :meth:`tell`.
+      Resize the stream to the given *size* in bytes (or the current position
+      if *size* is not specified).  The current stream position isn't changed.
+      This resizing can extend or reduce the current file size.  In case of
+      extension, the contents of the new file area depend on the platform
+      (on most systems, additional bytes are zero-filled, on Windows they're
+      undetermined).  The new file size is returned.
 
    .. method:: writable()
 
@@ -466,11 +472,6 @@ Buffered Streams
    .. method:: read1()
 
       In :class:`BytesIO`, this is the same as :meth:`read`.
-
-   .. method:: truncate([size])
-
-      Truncate the buffer to at most *size* bytes.  *size* defaults to the
-      current stream position, as returned by :meth:`tell`.
 
 
 .. class:: BufferedReader(raw[, buffer_size])

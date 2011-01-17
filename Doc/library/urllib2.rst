@@ -43,8 +43,8 @@ The :mod:`urllib2` module defines the following functions:
    * :meth:`geturl` --- return the URL of the resource retrieved, commonly used to
      determine if a redirect was followed
 
-   * :meth:`info` --- return the meta-information of the page, such as headers, in
-     the form of an ``httplib.HTTPMessage`` instance
+   * :meth:`info` --- return the meta-information of the page, such as headers,
+     in the form of an :class:`mimetools.Message` instance
      (see `Quick Reference to HTTP Headers <http://www.cs.tut.fi/~jkorpela/http.html>`_)
 
    Raises :exc:`URLError` on errors.
@@ -427,7 +427,7 @@ OpenerDirector Objects
    method on the currently installed global :class:`OpenerDirector`).  The
    optional *timeout* parameter specifies a timeout in seconds for blocking
    operations like the connection attempt (if not specified, the global default
-   timeout setting will be usedi). The timeout feature actually works only for
+   timeout setting will be used). The timeout feature actually works only for
    HTTP, HTTPS, FTP and FTPS connections).
 
    .. versionchanged:: 2.6
@@ -464,7 +464,8 @@ sorting the handler instances.
    named :meth:`unknown_open`.
 
    Note that the implementation of these methods may involve calls of the parent
-   :class:`OpenerDirector` instance's :meth:`.open` and :meth:`.error` methods.
+   :class:`OpenerDirector` instance's :meth:`~OpenerDirector.open` and
+   :meth:`~OpenerDirector.error` methods.
 
 #. Every handler with a method named like :samp:`{protocol}_response` has that
    method called to post-process the response.

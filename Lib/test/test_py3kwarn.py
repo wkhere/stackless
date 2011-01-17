@@ -9,6 +9,23 @@ from contextlib import nested
 if not sys.py3kwarning:
     raise TestSkipped('%s must be run with the -3 flag' % __name__)
 
+try:
+    from test.test_support import __warningregistry__ as _registry
+except ImportError:
+    def check_deprecated_module(module_name):
+        return False
+else:
+    past_warnings = _registry.keys()
+    del _registry
+    def check_deprecated_module(module_name):
+        """Lookup the past warnings for module already loaded using
+        test_support.import_module(..., deprecated=True)
+        """
+        return any(module_name in msg and ' removed' in msg
+                   and issubclass(cls, DeprecationWarning)
+                   and (' module' in msg or ' package' in msg)
+                   for (msg, cls, line) in past_warnings)
+
 def reset_module_registry(module):
     try:
         registry = module.__warningregistry__
@@ -248,9 +265,7 @@ class TestPy3KWarnings(unittest.TestCase):
             # With object as the base class
             class WarnOnlyCmp(object):
                 def __cmp__(self, other): pass
-            self.assertEqual(len(w.warnings), 1)
-            self.assertWarning(None, w,
-                 "Overriding __cmp__ blocks inheritance of __hash__ in 3.x")
+            self.assertEqual(len(w.warnings), 0)
             w.reset()
             class WarnOnlyEq(object):
                 def __eq__(self, other): pass
@@ -261,9 +276,7 @@ class TestPy3KWarnings(unittest.TestCase):
             class WarnCmpAndEq(object):
                 def __cmp__(self, other): pass
                 def __eq__(self, other): pass
-            self.assertEqual(len(w.warnings), 2)
-            self.assertWarning(None, w.warnings[0],
-                 "Overriding __cmp__ blocks inheritance of __hash__ in 3.x")
+            self.assertEqual(len(w.warnings), 1)
             self.assertWarning(None, w,
                  "Overriding __eq__ blocks inheritance of __hash__ in 3.x")
             w.reset()
@@ -277,9 +290,7 @@ class TestPy3KWarnings(unittest.TestCase):
                 def __hash__(self): pass
             class WarnOnlyCmp(DefinesAllThree):
                 def __cmp__(self, other): pass
-            self.assertEqual(len(w.warnings), 1)
-            self.assertWarning(None, w,
-                 "Overriding __cmp__ blocks inheritance of __hash__ in 3.x")
+            self.assertEqual(len(w.warnings), 0)
             w.reset()
             class WarnOnlyEq(DefinesAllThree):
                 def __eq__(self, other): pass
@@ -290,9 +301,7 @@ class TestPy3KWarnings(unittest.TestCase):
             class WarnCmpAndEq(DefinesAllThree):
                 def __cmp__(self, other): pass
                 def __eq__(self, other): pass
-            self.assertEqual(len(w.warnings), 2)
-            self.assertWarning(None, w.warnings[0],
-                 "Overriding __cmp__ blocks inheritance of __hash__ in 3.x")
+            self.assertEqual(len(w.warnings), 1)
             self.assertWarning(None, w,
                  "Overriding __eq__ blocks inheritance of __hash__ in 3.x")
             w.reset()
@@ -339,10 +348,9 @@ class TestStdlibRemovals(unittest.TestCase):
         """Make sure the specified module, when imported, raises a
         DeprecationWarning and specifies itself in the message."""
         with nested(CleanImport(module_name), warnings.catch_warnings()):
-            # XXX: This is not quite enough for extension modules - those
-            # won't rerun their init code even with CleanImport.
-            # You can see this easily by running the whole test suite with -3
-            warnings.filterwarnings("error", ".+ removed",
+            warnings.filterwarnings("error", ".+ (module|package) .+ removed",
+                                    DeprecationWarning, __name__)
+            warnings.filterwarnings("error", ".+ removed .+ (module|package)",
                                     DeprecationWarning, __name__)
             try:
                 __import__(module_name, level=0)
@@ -355,7 +363,10 @@ class TestStdlibRemovals(unittest.TestCase):
                     self.fail("Non-optional module {0} raised an "
                               "ImportError.".format(module_name))
             else:
-                self.fail("DeprecationWarning not raised for {0}"
+                # For extension modules, check the __warningregistry__.
+                # They won't rerun their init code even with CleanImport.
+                if not check_deprecated_module(module_name):
+                    self.fail("DeprecationWarning not raised for {0}"
                             .format(module_name))
 
     def test_platform_independent_removals(self):
@@ -415,10 +426,8 @@ class TestStdlibRemovals(unittest.TestCase):
 
 
 def test_main():
-    with check_warnings():
-        warnings.simplefilter("always")
-        run_unittest(TestPy3KWarnings,
-                     TestStdlibRemovals)
+    run_unittest(TestPy3KWarnings,
+                 TestStdlibRemovals)
 
 if __name__ == '__main__':
     test_main()

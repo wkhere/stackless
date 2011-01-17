@@ -57,7 +57,7 @@ MAKESETUP=      $(srcdir)/Modules/makesetup
 # Compiler options
 OPT=		@OPT@
 BASECFLAGS=	@BASECFLAGS@
-CFLAGS=		$(BASECFLAGS) $(OPT) $(EXTRA_CFLAGS)
+CFLAGS=		$(BASECFLAGS) @CFLAGS@ $(OPT) $(EXTRA_CFLAGS)
 # Both CPPFLAGS and LDFLAGS need to contain the shell's value for setup.py to
 # be able to build extension modules using the directories specified in the
 # environment variables
@@ -87,8 +87,8 @@ exec_prefix=	@exec_prefix@
 datarootdir=    @datarootdir@
 
 # Expanded directories
-BINDIR=		$(exec_prefix)/bin
-LIBDIR=		$(exec_prefix)/lib
+BINDIR=		@bindir@
+LIBDIR=		@libdir@
 MANDIR=		@mandir@
 INCLUDEDIR=	@includedir@
 CONFINCLUDEDIR=	$(exec_prefix)/include
@@ -412,8 +412,8 @@ platform: $(BUILDPYTHON)
 # Build the shared modules
 sharedmods: $(BUILDPYTHON)
 	@case $$MAKEFLAGS in \
-	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
-	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
+	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' LDFLAGS='$(LDFLAGS)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
+	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' LDFLAGS='$(LDFLAGS)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
 	esac
 
 # Build static library
@@ -726,8 +726,8 @@ testall:	all platform
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		$(TESTPYTHON) $(srcdir)/Lib/compileall.py
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
-		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
-		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
+		-$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
+		$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
 
 teststackless:	all platform
 		pushd Stackless/unittests; $(RUNSHARED) ../../$(BUILDPYTHON) -E -tt runAll.py; popd
@@ -740,9 +740,9 @@ testuniversal:	all platform
 			exit 1 ;\
 		fi
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
-		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
-		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
-		$(RUNSHARED) /usr/libexec/oah/translate ./$(BUILDPYTHON) -E -tt $(TESTPROG) $(TESTOPTS) -uall
+		-$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
+		$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
+		$(RUNSHARED) /usr/libexec/oah/translate ./$(BUILDPYTHON) -E -tt $(TESTPROG) -uall $(TESTOPTS)
 
 
 # Like testall, but with a single pass only
@@ -751,7 +751,7 @@ buildbottest:	all platform
 		-@if which pybuildbot.identify >/dev/null 2>&1; then \
 			pybuildbot.identify "CC='$(CC)'" "CXX='$(CXX)'"; \
 		fi
-		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall -rw
+		$(TESTPYTHON) $(TESTPROG) -uall -rw $(TESTOPTS)
 
 QUICKTESTOPTS=	$(TESTOPTS) -x test_thread test_signal test_strftime \
 		test_unicodedata test_re test_sre test_select test_poll \
@@ -872,7 +872,7 @@ LIBSUBDIRS=	lib-tk site-packages test test/output test/data \
 		distutils distutils/command distutils/tests $(XMLLIBSUBDIRS) \
 		multiprocessing multiprocessing/dummy \
 		lib-old \
-		curses $(MACHDEPS)
+		curses pydoc_data $(MACHDEPS)
 libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 	@for i in $(SCRIPTDIR) $(LIBDEST); \
 	do \
@@ -1193,10 +1193,11 @@ pycremoval:
 	find $(srcdir) -name '*.py[co]' -exec rm -f {} ';'
 
 clean: pycremoval
-	find . -name '*.o' -exec rm -f {} ';'
+	find . -name '*.[oa]' -exec rm -f {} ';'
 	find . -name '*.s[ol]' -exec rm -f {} ';'
 	find $(srcdir)/build -name 'fficonfig.h' -exec rm -f {} ';' || true
 	find $(srcdir)/build -name 'fficonfig.py' -exec rm -f {} ';' || true
+	find . -name '*.so.[0-9]*.[0-9]*' -exec rm -f {} ';'
 	-rm -f Lib/lib2to3/*Grammar*.pickle
 
 profile-removal:

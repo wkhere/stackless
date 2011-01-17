@@ -114,24 +114,24 @@ bytes_buffer_getcharbuf(PyByteArrayObject *self, Py_ssize_t index, const char **
 static int
 bytes_getbuffer(PyByteArrayObject *obj, Py_buffer *view, int flags)
 {
-        int ret;
-        void *ptr;
-        if (view == NULL) {
-                obj->ob_exports++;
-                return 0;
-        }
-        ptr = (void *) PyByteArray_AS_STRING(obj);
-        ret = PyBuffer_FillInfo(view, (PyObject*)obj, ptr, Py_SIZE(obj), 0, flags);
-        if (ret >= 0) {
-                obj->ob_exports++;
-        }
-        return ret;
+    int ret;
+    void *ptr;
+    if (view == NULL) {
+        obj->ob_exports++;
+        return 0;
+    }
+    ptr = (void *) PyByteArray_AS_STRING(obj);
+    ret = PyBuffer_FillInfo(view, (PyObject*)obj, ptr, Py_SIZE(obj), 0, flags);
+    if (ret >= 0) {
+        obj->ob_exports++;
+    }
+    return ret;
 }
 
 static void
 bytes_releasebuffer(PyByteArrayObject *obj, Py_buffer *view)
 {
-        obj->ob_exports--;
+    obj->ob_exports--;
 }
 
 static Py_ssize_t
@@ -830,14 +830,17 @@ bytes_init(PyByteArrayObject *self, PyObject *args, PyObject *kwds)
     }
 
     /* Is it an int? */
-    count = PyNumber_AsSsize_t(arg, PyExc_ValueError);
-    if (count == -1 && PyErr_Occurred())
-        PyErr_Clear();
-    else {
-        if (count < 0) {
-            PyErr_SetString(PyExc_ValueError, "negative count");
+    count = PyNumber_AsSsize_t(arg, PyExc_OverflowError);
+    if (count == -1 && PyErr_Occurred()) {
+        if (PyErr_ExceptionMatches(PyExc_OverflowError))
             return -1;
-        }
+        PyErr_Clear();
+    }
+    else if (count < 0) {
+        PyErr_SetString(PyExc_ValueError, "negative count");
+        return -1;
+    }
+    else {
         if (count > 0) {
             if (PyByteArray_Resize((PyObject *)self, count))
                 return -1;
@@ -1806,43 +1809,43 @@ replace_single_character_in_place(PyByteArrayObject *self,
                                   char from_c, char to_c,
                                   Py_ssize_t maxcount)
 {
-        char *self_s, *result_s, *start, *end, *next;
-        Py_ssize_t self_len;
-        PyByteArrayObject *result;
+    char *self_s, *result_s, *start, *end, *next;
+    Py_ssize_t self_len;
+    PyByteArrayObject *result;
 
-        /* The result string will be the same size */
-        self_s = PyByteArray_AS_STRING(self);
-        self_len = PyByteArray_GET_SIZE(self);
+    /* The result string will be the same size */
+    self_s = PyByteArray_AS_STRING(self);
+    self_len = PyByteArray_GET_SIZE(self);
 
-        next = findchar(self_s, self_len, from_c);
+    next = findchar(self_s, self_len, from_c);
 
-        if (next == NULL) {
-                /* No matches; return the original bytes */
-                return return_self(self);
-        }
+    if (next == NULL) {
+        /* No matches; return the original bytes */
+        return return_self(self);
+    }
 
-        /* Need to make a new bytes */
-        result = (PyByteArrayObject *) PyByteArray_FromStringAndSize(NULL, self_len);
-        if (result == NULL)
-                return NULL;
-        result_s = PyByteArray_AS_STRING(result);
-        Py_MEMCPY(result_s, self_s, self_len);
+    /* Need to make a new bytes */
+    result = (PyByteArrayObject *) PyByteArray_FromStringAndSize(NULL, self_len);
+    if (result == NULL)
+        return NULL;
+    result_s = PyByteArray_AS_STRING(result);
+    Py_MEMCPY(result_s, self_s, self_len);
 
-        /* change everything in-place, starting with this one */
-        start =  result_s + (next-self_s);
-        *start = to_c;
-        start++;
-        end = result_s + self_len;
+    /* change everything in-place, starting with this one */
+    start =  result_s + (next-self_s);
+    *start = to_c;
+    start++;
+    end = result_s + self_len;
 
-        while (--maxcount > 0) {
-                next = findchar(start, end-start, from_c);
-                if (next == NULL)
-                        break;
-                *next = to_c;
-                start = next+1;
-        }
+    while (--maxcount > 0) {
+        next = findchar(start, end-start, from_c);
+        if (next == NULL)
+            break;
+        *next = to_c;
+        start = next+1;
+    }
 
-        return result;
+    return result;
 }
 
 /* len(self)>=1, len(from)==len(to)>=2, maxcount>=1 */

@@ -113,8 +113,6 @@ AC_SUBST(ARCH_RUN_32BIT)
 UNIVERSAL_ARCHS="32-bit"
 AC_SUBST(LIPO_32BIT_FLAGS)
 AC_SUBST(LIPO_64BIT_FLAGS)
-AC_SUBST(UNIVERSAL_ARCH32_FLAGS)
-AC_SUBST(UNIVERSAL_ARCH64_FLAGS)
 AC_MSG_CHECKING(for --with-universal-archs)
 AC_ARG_WITH(universal-archs,
     AC_HELP_STRING(--with-universal-archs=ARCH, select architectures for universal build ("32-bit", "64-bit", "3-way", "intel" or "all")),
@@ -880,7 +878,7 @@ fi],
 # tweak OPT based on compiler and platform, only if the user didn't set
 # it on the command line
 AC_SUBST(OPT)
-if test "${OPT-unset}" == "unset"
+if test "${OPT-unset}" = "unset"
 then
     case $GCC in
     yes)
@@ -971,6 +969,22 @@ yes)
 	    # -Wno-long-double, -no-cpp-precomp, and -mno-fused-madd
 	    # used to be here, but non-Apple gcc doesn't accept them.
 
+	    if test "${CC}" = gcc
+	    then
+		AC_MSG_CHECKING(which compiler should be used)
+		case "${UNIVERSALSDK}" in
+		*/MacOSX10.4u.sdk)
+			# Build using 10.4 SDK, force usage of gcc when the 
+			# compiler is gcc, otherwise the user will get very
+			# confusing error messages when building on OSX 10.6
+			CC=gcc-4.0
+			CPP=cpp-4.0
+			;;
+		esac
+		AC_MSG_RESULT($CC)
+	    fi
+
+
 	    if test "${enable_universalsdk}"; then
 		UNIVERSAL_ARCH_FLAGS=""
 	        if test "$UNIVERSAL_ARCHS" = "32-bit" ; then
@@ -984,24 +998,18 @@ yes)
 	         elif test "$UNIVERSAL_ARCHS" = "all" ; then
 		   ARCH_RUN_32BIT="/usr/bin/arch -i386 -ppc"
 		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch ppc -arch ppc64 -arch x86_64"
-		   UNIVERSAL_ARCH32_FLAGS="-arch i386 -arch ppc"
-		   UNIVERSAL_ARCH64_FLAGS="-arch x86_64 -arch ppc64"
 		   LIPO_32BIT_FLAGS="-extract i386 -extract ppc7400"
 		   LIPO_64BIT_FLAGS="-extract x86_64 -extract ppc64"
 
 	         elif test "$UNIVERSAL_ARCHS" = "intel" ; then
 		   ARCH_RUN_32BIT="/usr/bin/arch -i386"
 		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch x86_64"
-		   UNIVERSAL_ARCH32_FLAGS="-arch i386"
-		   UNIVERSAL_ARCH64_FLAGS="-arch x86_64"
 		   LIPO_32BIT_FLAGS="-extract i386"
 		   LIPO_64BIT_FLAGS="-extract x86_64"
 
 	         elif test "$UNIVERSAL_ARCHS" = "3-way" ; then
 		   ARCH_RUN_32BIT="/usr/bin/arch -i386 -ppc"
 		   UNIVERSAL_ARCH_FLAGS="-arch i386 -arch ppc -arch x86_64"
-		   UNIVERSAL_ARCH32_FLAGS="-arch i386 -arch ppc"
-		   UNIVERSAL_ARCH64_FLAGS="-arch x86_64"
 		   LIPO_32BIT_FLAGS="-extract i386 -extract ppc7400"
 		   LIPO_64BIT_FLAGS="-extract x86_64"
 
@@ -1011,10 +1019,11 @@ yes)
 		 fi
 
 
-		BASECFLAGS="${UNIVERSAL_ARCH_FLAGS} -isysroot ${UNIVERSALSDK} ${BASECFLAGS}"
-		tgt=`sw_vers -productVersion | sed 's/\(10\.[[0-9]]*\).*/\1/'`
-		if test "${UNIVERSALSDK}" != "/" -a "${tgt}" '>' '10.4' ; then
-			CFLAGS="${UNIVERSAL_ARCH_FLAGS} -isysroot ${UNIVERSALSDK} ${CFLAGS}"
+		CFLAGS="${UNIVERSAL_ARCH_FLAGS} ${CFLAGS}"
+		if test "${UNIVERSALSDK}" != "/"
+		then
+			CFLAGS="-isysroot ${UNIVERSALSDK} ${CFLAGS}"
+			CPPFLAGS="-isysroot ${UNIVERSALSDK} ${CPPFLAGS}"
 		fi
 	    fi
 
@@ -1369,7 +1378,14 @@ AC_MSG_RESULT($was_it_defined)
 
 # Check whether using makedev requires defining _OSF_SOURCE
 AC_MSG_CHECKING(for makedev)
-AC_TRY_LINK([#include <sys/types.h> ],
+AC_TRY_LINK([
+#if defined(MAJOR_IN_MKDEV)
+#include <sys/mkdev.h>
+#elif defined(MAJOR_IN_SYSMACROS)
+#include <sys/sysmacros.h>
+#else
+#include <sys/types.h>
+#endif ],
 	    [ makedev(0, 0) ],
 	    ac_cv_has_makedev=yes,
 	    ac_cv_has_makedev=no)
@@ -1836,7 +1852,7 @@ then
 	FreeBSD*)
 		if [[ "`$CC -dM -E - </dev/null | grep __ELF__`" != "" ]]
 		then
-			LDSHARED="$CC -shared ${LDFLAGS}"
+			LDSHARED='$(CC) -shared ${LDFLAGS}'
 		else
 			LDSHARED="ld -Bshareable ${LDFLAGS}"
 		fi;;
@@ -3426,7 +3442,7 @@ fi
 AC_MSG_CHECKING(what type to use for unicode)
 dnl quadrigraphs "@<:@" and "@:>@" produce "[" and "]" in the output
 AC_ARG_ENABLE(unicode, 
-              AC_HELP_STRING(--enable-unicode@<:@=ucs@<:@24@:>@@:>@, Enable Unicode strings (default is yes)),
+              AC_HELP_STRING(--enable-unicode@<:@=ucs@<:@24@:>@@:>@, Enable Unicode strings (default is ucs2)),
               [],
               [enable_unicode=yes])
 

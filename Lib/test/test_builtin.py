@@ -1,17 +1,13 @@
 # Python test set -- built-in functions
 
 import platform
-import test.test_support, unittest
-from test.test_support import fcmp, have_unicode, TESTFN, unlink, \
-                              run_unittest, run_with_locale
+import unittest
+import warnings
+from test.test_support import (fcmp, have_unicode, TESTFN, unlink,
+                              run_unittest, _check_py3k_warnings, check_warnings)
 from operator import neg
 
-import sys, warnings, cStringIO, random, fractions, UserDict
-warnings.filterwarnings("ignore", "hex../oct.. of negative int",
-                        FutureWarning, __name__)
-warnings.filterwarnings("ignore", "integer argument expected",
-                        DeprecationWarning, "unittest")
-
+import sys, cStringIO, random, UserDict
 # count the number of test runs.
 # used to skip running test_execfile() multiple times
 # and to create unique strings to intern in test_intern()
@@ -419,7 +415,9 @@ class BuiltinTest(unittest.TestCase):
     f.write('z = z+1\n')
     f.write('z = z*2\n')
     f.close()
-    execfile(TESTFN)
+    with _check_py3k_warnings(("execfile.. not supported in 3.x",
+                              DeprecationWarning)):
+        execfile(TESTFN)
 
     def test_execfile(self):
         global numruns
@@ -1073,13 +1071,67 @@ class BuiltinTest(unittest.TestCase):
 
         # Reject floats when it would require PyLongs to represent.
         # (smaller floats still accepted, but deprecated)
-        self.assertRaises(TypeError, range, 1e100, 1e101, 1e101)
+        with check_warnings() as w:
+            warnings.simplefilter("always")
+            self.assertRaises(TypeError, range, 1e100, 1e101, 1e101)
+        with check_warnings() as w:
+            warnings.simplefilter("always")
+            self.assertEqual(range(1.0), [0])
 
         self.assertRaises(TypeError, range, 0, "spam")
         self.assertRaises(TypeError, range, 0, 42, "spam")
 
         self.assertRaises(OverflowError, range, -sys.maxint, sys.maxint)
         self.assertRaises(OverflowError, range, 0, 2*sys.maxint)
+
+        bignum = 2*sys.maxint
+        smallnum = 42
+        # Old-style user-defined class with __int__ method
+        class I0:
+            def __init__(self, n):
+                self.n = int(n)
+            def __int__(self):
+                return self.n
+        self.assertEqual(range(I0(bignum), I0(bignum + 1)), [bignum])
+        self.assertEqual(range(I0(smallnum), I0(smallnum + 1)), [smallnum])
+
+        # New-style user-defined class with __int__ method
+        class I1(object):
+            def __init__(self, n):
+                self.n = int(n)
+            def __int__(self):
+                return self.n
+        self.assertEqual(range(I1(bignum), I1(bignum + 1)), [bignum])
+        self.assertEqual(range(I1(smallnum), I1(smallnum + 1)), [smallnum])
+
+        # New-style user-defined class with failing __int__ method
+        class IX(object):
+            def __int__(self):
+                raise RuntimeError
+        self.assertRaises(RuntimeError, range, IX())
+
+        # New-style user-defined class with invalid __int__ method
+        class IN(object):
+            def __int__(self):
+                return "not a number"
+        self.assertRaises(TypeError, range, IN())
+
+        # Exercise various combinations of bad arguments, to check
+        # refcounting logic
+        with check_warnings():
+            self.assertRaises(TypeError, range, 1e100)
+
+            self.assertRaises(TypeError, range, 0, 1e100)
+            self.assertRaises(TypeError, range, 1e100, 0)
+            self.assertRaises(TypeError, range, 1e100, 1e100)
+
+            self.assertRaises(TypeError, range, 0, 0, 1e100)
+            self.assertRaises(TypeError, range, 0, 1e100, 1)
+            self.assertRaises(TypeError, range, 0, 1e100, 1e100)
+            self.assertRaises(TypeError, range, 1e100, 0, 1)
+            self.assertRaises(TypeError, range, 1e100, 0, 1e100)
+            self.assertRaises(TypeError, range, 1e100, 1e100, 1)
+            self.assertRaises(TypeError, range, 1e100, 1e100, 1e100)
 
     def test_input_and_raw_input(self):
         self.write_testfile()
@@ -1525,17 +1577,25 @@ class TestSorted(unittest.TestCase):
         data = 'The quick Brown fox Jumped over The lazy Dog'.split()
         self.assertRaises(TypeError, sorted, data, None, lambda x,y: 0)
 
+def _run_unittest(*args):
+    with _check_py3k_warnings(
+            (".+ not supported in 3.x", DeprecationWarning),
+            (".+ is renamed to imp.reload", DeprecationWarning),
+            ("classic int division", DeprecationWarning)):
+        run_unittest(*args)
+
+
 def test_main(verbose=None):
     test_classes = (BuiltinTest, TestSorted)
 
-    run_unittest(*test_classes)
+    _run_unittest(*test_classes)
 
     # verify reference counting
     if verbose and hasattr(sys, "gettotalrefcount"):
         import gc
         counts = [None] * 5
         for i in xrange(len(counts)):
-            run_unittest(*test_classes)
+            _run_unittest(*test_classes)
             gc.collect()
             counts[i] = sys.gettotalrefcount()
         print counts

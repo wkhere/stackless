@@ -3,7 +3,7 @@
 See http://www.zope.org/Members/fdrake/DateTimeWiki/TestCases
 """
 
-import os
+import sys
 import pickle
 import cPickle
 import unittest
@@ -709,15 +709,16 @@ class TestDate(HarmlessMixedComparison, unittest.TestCase):
     def test_overflow(self):
         tiny = self.theclass.resolution
 
-        dt = self.theclass.min + tiny
-        dt -= tiny  # no problem
-        self.assertRaises(OverflowError, dt.__sub__, tiny)
-        self.assertRaises(OverflowError, dt.__add__, -tiny)
+        for delta in [tiny, timedelta(1), timedelta(2)]:
+            dt = self.theclass.min + delta
+            dt -= delta  # no problem
+            self.assertRaises(OverflowError, dt.__sub__, delta)
+            self.assertRaises(OverflowError, dt.__add__, -delta)
 
-        dt = self.theclass.max - tiny
-        dt += tiny  # no problem
-        self.assertRaises(OverflowError, dt.__add__, tiny)
-        self.assertRaises(OverflowError, dt.__sub__, -tiny)
+            dt = self.theclass.max - delta
+            dt += delta  # no problem
+            self.assertRaises(OverflowError, dt.__add__, delta)
+            self.assertRaises(OverflowError, dt.__sub__, -delta)
 
     def test_fromtimestamp(self):
         import time
@@ -1502,7 +1503,7 @@ class TestDateTime(TestDate):
 
     def test_negative_float_fromtimestamp(self):
         # Windows doesn't accept negative timestamps
-        if os.name == "nt":
+        if sys.platform == "win32":
             return
         # The result is tz-dependent; at least test that this doesn't
         # fail (like it did before bug 1646728 was fixed).
@@ -1510,7 +1511,7 @@ class TestDateTime(TestDate):
 
     def test_negative_float_utcfromtimestamp(self):
         # Windows doesn't accept negative timestamps
-        if os.name == "nt":
+        if sys.platform == "win32":
             return
         d = self.theclass.utcfromtimestamp(-1.05)
         self.assertEquals(d, self.theclass(1969, 12, 31, 23, 59, 58, 950000))

@@ -188,6 +188,17 @@ class BaseTest(unittest.TestCase):
                 f.close()
             test_support.unlink(test_support.TESTFN)
 
+    def test_fromfile_ioerror(self):
+        # Issue #5395: Check if fromfile raises a proper IOError
+        # instead of EOFError.
+        a = array.array(self.typecode)
+        f = open(test_support.TESTFN, 'wb')
+        try:
+            self.assertRaises(IOError, a.fromfile, f, len(self.example))
+        finally:
+            f.close()
+            test_support.unlink(test_support.TESTFN)
+
     def test_tofromlist(self):
         a = array.array(self.typecode, 2*self.example)
         b = array.array(self.typecode)
@@ -717,7 +728,8 @@ class BaseTest(unittest.TestCase):
 
     def test_buffer(self):
         a = array.array(self.typecode, self.example)
-        b = buffer(a)
+        with test_support._check_py3k_warnings():
+            b = buffer(a)
         self.assertEqual(b[0], a.tostring()[0])
 
     def test_weakref(self):

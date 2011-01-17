@@ -130,6 +130,10 @@ import sys
 import time
 import traceback
 import warnings
+# keep a reference to the ascii module to workaround #7140 bug
+# (see issue #7027)
+import encodings.ascii
+import imp
 
 # I see no other way to suppress these warnings;
 # putting them in test_grammar.py has no effect:
@@ -399,11 +403,6 @@ def main(tests=None, testdir=None, verbose=0, quiet=False,
             if module not in save_modules and module.startswith("test."):
                 test_support.unload(module)
 
-    # The lists won't be sorted if running with -r
-    good.sort()
-    bad.sort()
-    skipped.sort()
-
     if good and not quiet:
         if not bad and not skipped and len(good) > 1:
             print "All",
@@ -484,6 +483,13 @@ STDTESTS = [
     'test_unittest',
     'test_doctest',
     'test_doctest2',
+    # On 2.6, when a C module like dl or linuxaudiodev is imported by some
+    # test, a DeprecationWarning is raised, but test_py3kwarn can not find
+    # it in the __warningregistry__ of the modules in sys.modules.
+    # C modules raise the warning only once, and since there's no way to
+    # find these warnings, test_py3kwarn is executed first to catch them
+    # before the other modules.  This shouldn't affect 2.7+
+    'test_py3kwarn',
    ]
 
 NOTTESTS = [
@@ -659,7 +665,7 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
             indirect_test()
     else:
         def run_the_test():
-            reload(the_module)
+            imp.reload(the_module)
 
     deltas = []
     nwarmup, ntracked, fname = huntrleaks
@@ -757,7 +763,8 @@ def printlist(x, width=70, indent=4):
 
     from textwrap import fill
     blanks = ' ' * indent
-    print fill(' '.join(map(str, x)), width,
+    # Print the sorted list: 'x' may be a '--random' list or a set()
+    print fill(' '.join(str(elt) for elt in sorted(x)), width,
                initial_indent=blanks, subsequent_indent=blanks)
 
 # Map sys.platform to a string containing the basenames of tests

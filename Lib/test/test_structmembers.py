@@ -1,4 +1,4 @@
-from _testcapi import test_structmembersType, \
+from _testcapi import _test_structmembersType, \
     CHAR_MAX, CHAR_MIN, UCHAR_MAX, \
     SHRT_MAX, SHRT_MIN, USHRT_MAX, \
     INT_MAX, INT_MIN, UINT_MAX, \
@@ -8,17 +8,19 @@ from _testcapi import test_structmembersType, \
 import warnings, exceptions, unittest, sys
 from test import test_support
 
-ts=test_structmembersType(False, 1, 2, 3, 4, 5, 6, 7, 8,
-                          9.99999, 10.1010101010)
+ts=_test_structmembersType(False, 1, 2, 3, 4, 5, 6, 7, 8,
+                          9.99999, 10.1010101010, "hi")
 
 class ReadWriteTests(unittest.TestCase):
-    def test_types(self):
+
+    def test_bool(self):
         ts.T_BOOL = True
         self.assertEquals(ts.T_BOOL, True)
         ts.T_BOOL = False
         self.assertEquals(ts.T_BOOL, False)
         self.assertRaises(TypeError, setattr, ts, 'T_BOOL', 1)
 
+    def test_byte(self):
         ts.T_BYTE = CHAR_MAX
         self.assertEquals(ts.T_BYTE, CHAR_MAX)
         ts.T_BYTE = CHAR_MIN
@@ -26,6 +28,7 @@ class ReadWriteTests(unittest.TestCase):
         ts.T_UBYTE = UCHAR_MAX
         self.assertEquals(ts.T_UBYTE, UCHAR_MAX)
 
+    def test_short(self):
         ts.T_SHORT = SHRT_MAX
         self.assertEquals(ts.T_SHORT, SHRT_MAX)
         ts.T_SHORT = SHRT_MIN
@@ -33,6 +36,7 @@ class ReadWriteTests(unittest.TestCase):
         ts.T_USHORT = USHRT_MAX
         self.assertEquals(ts.T_USHORT, USHRT_MAX)
 
+    def test_int(self):
         ts.T_INT = INT_MAX
         self.assertEquals(ts.T_INT, INT_MAX)
         ts.T_INT = INT_MIN
@@ -40,6 +44,7 @@ class ReadWriteTests(unittest.TestCase):
         ts.T_UINT = UINT_MAX
         self.assertEquals(ts.T_UINT, UINT_MAX)
 
+    def test_long(self):
         ts.T_LONG = LONG_MAX
         self.assertEquals(ts.T_LONG, LONG_MAX)
         ts.T_LONG = LONG_MIN
@@ -47,8 +52,8 @@ class ReadWriteTests(unittest.TestCase):
         ts.T_ULONG = ULONG_MAX
         self.assertEquals(ts.T_ULONG, ULONG_MAX)
 
-        ## T_LONGLONG and T_ULONGLONG may not be present on some platforms
-        if hasattr(ts, 'T_LONGLONG'):
+    if hasattr(ts, "T_LONGLONG"):
+        def test_longlong(self):
             ts.T_LONGLONG = LLONG_MAX
             self.assertEquals(ts.T_LONGLONG, LLONG_MAX)
             ts.T_LONGLONG = LLONG_MIN
@@ -62,6 +67,11 @@ class ReadWriteTests(unittest.TestCase):
             self.assertEquals(ts.T_LONGLONG, 3)
             ts.T_ULONGLONG = 4
             self.assertEquals(ts.T_ULONGLONG, 4)
+
+    def test_inplace_string(self):
+        self.assertEquals(ts.T_STRING_INPLACE, "hi")
+        self.assertRaises(TypeError, setattr, ts, "T_STRING_INPLACE", "s")
+        self.assertRaises(TypeError, delattr, ts, "T_STRING_INPLACE")
 
 
 class TestWarnings(unittest.TestCase):

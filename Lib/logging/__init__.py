@@ -18,7 +18,7 @@
 Logging package for Python. Based on PEP 282 and comments thereto in
 comp.lang.python, and influenced by Apache's log4j system.
 
-Copyright (C) 2001-2009 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2010 Vinay Sajip. All Rights Reserved.
 
 To use, simply 'import logging' and log away!
 """
@@ -445,7 +445,13 @@ class Formatter:
         if record.exc_text:
             if s[-1:] != "\n":
                 s = s + "\n"
-            s = s + record.exc_text
+            try:
+                s = s + record.exc_text
+            except UnicodeError:
+                # Sometimes filenames have non-ASCII chars, which can lead
+                # to errors when s is Unicode and record.exc_text is str
+                # See issue 8924
+                s = s + record.exc_text.decode(sys.getfilesystemencoding())
         return s
 
 #
@@ -702,8 +708,10 @@ class Handler(Filterer):
         #get the module data lock, as we're updating a shared structure.
         _acquireLock()
         try:    #unlikely to raise an exception, but you never know...
-            del _handlers[self]
-            _handlerList.remove(self)
+            if self in _handlers:
+                del _handlers[self]
+            if self in _handlerList:
+                _handlerList.remove(self)
         finally:
             _releaseLock()
 

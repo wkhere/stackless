@@ -91,7 +91,7 @@
 
 __copyright__ = """
     Copyright (c) 1999-2000, Marc-Andre Lemburg; mailto:mal@lemburg.com
-    Copyright (c) 2000-2008, eGenix.com Software GmbH; mailto:info@egenix.com
+    Copyright (c) 2000-2010, eGenix.com Software GmbH; mailto:info@egenix.com
 
     Permission to use, copy, modify, and distribute this software and its
     documentation for any purpose and without fee or royalty is hereby granted,
@@ -596,12 +596,19 @@ def win32_ver(release='',version='',csd='',ptype=''):
             VER_PLATFORM_WIN32_WINDOWS = 1
             VER_PLATFORM_WIN32_NT = 2
             VER_NT_WORKSTATION = 1
+            VER_NT_SERVER = 3
+            REG_SZ = 1
 
     # Find out the registry key and some general version infos
-    maj,min,buildno,plat,csd = GetVersionEx()
+    winver = GetVersionEx()
+    maj,min,buildno,plat,csd = winver
     version = '%i.%i.%i' % (maj,min,buildno & 0xFFFF)
-    if csd[:13] == 'Service Pack ':
-        csd = 'SP' + csd[13:]
+    if hasattr(winver, "service_pack"):
+        if winver.service_pack != "":
+            csd = 'SP%s' % winver.service_pack_major
+    else:
+        if csd[:13] == 'Service Pack ':
+            csd = 'SP' + csd[13:]
     if plat == VER_PLATFORM_WIN32_WINDOWS:
         regkey = 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion'
         # Try to guess the release name
@@ -630,20 +637,33 @@ def win32_ver(release='',version='',csd='',ptype=''):
             else:
                 release = 'post2003'
         elif maj == 6:
-            if min == 0:
-                # Per http://msdn2.microsoft.com/en-us/library/ms724429.aspx
+            if hasattr(winver, "product_type"):
+                product_type = winver.product_type
+            else:
+                product_type = VER_NT_WORKSTATION
+                # Without an OSVERSIONINFOEX capable sys.getwindowsversion(),
+                # or help from the registry, we cannot properly identify
+                # non-workstation versions.
                 try:
-                    productType = GetVersionEx(1)[8]
-                except TypeError:
-                    # sys.getwindowsversion() doesn't take any arguments, so
-                    # we cannot detect 2008 Server that way.
-                    # XXX Add some other means of detecting 2008 Server ?!
+                    key = RegOpenKeyEx(HKEY_LOCAL_MACHINE, regkey)
+                    name, type = RegQueryValueEx(key, "ProductName")
+                    # Discard any type that isn't REG_SZ
+                    if type == REG_SZ and name.find("Server") != -1:
+                        product_type = VER_NT_SERVER
+                except WindowsError:
+                    # Use default of VER_NT_WORKSTATION
+                    pass
+
+            if min == 0:
+                if product_type == VER_NT_WORKSTATION:
                     release = 'Vista'
                 else:
-                    if productType == VER_NT_WORKSTATION:
-                        release = 'Vista'
-                    else:
-                        release = '2008Server'
+                    release = '2008Server'
+            elif min == 1:
+                if product_type == VER_NT_WORKSTATION:
+                    release = '7'
+                else:
+                    release = '2008ServerR2'
             else:
                 release = 'post2008Server'
     else:
@@ -697,28 +717,20 @@ def _bcd2str(bcd):
 
     return hex(bcd)[2:]
 
-def mac_ver(release='',versioninfo=('','',''),machine=''):
-
-    """ Get MacOS version information and return it as tuple (release,
-        versioninfo, machine) with versioninfo being a tuple (version,
-        dev_stage, non_release_version).
-
-        Entries which cannot be determined are set to the paramter values
-        which default to ''. All tuple entries are strings.
-
+def _mac_ver_gestalt():
+    """
         Thanks to Mark R. Levinson for mailing documentation links and
         code examples for this function. Documentation for the
         gestalt() API is available online at:
 
            http://www.rgaros.nl/gestalt/
-
     """
     # Check whether the version info module is available
     try:
         import gestalt
         import MacOS
     except ImportError:
-        return release,versioninfo,machine
+        return None
     # Get the infos
     sysv,sysa = _mac_ver_lookup(('sysv','sysa'))
     # Decode the infos
@@ -742,6 +754,53 @@ def mac_ver(release='',versioninfo=('','',''),machine=''):
         machine = {0x1: '68k',
                    0x2: 'PowerPC',
                    0xa: 'i386'}.get(sysa,'')
+
+    return release,versioninfo,machine
+
+def _mac_ver_xml():
+    fn = '/System/Library/CoreServices/SystemVersion.plist'
+    if not os.path.exists(fn):
+        return None
+
+    try:
+        import plistlib
+    except ImportError:
+        return None
+
+    pl = plistlib.readPlist(fn)
+    release = pl['ProductVersion']
+    versioninfo=('', '', '')
+    machine = os.uname()[4]
+    if machine in ('ppc', 'Power Macintosh'):
+        # for compatibility with the gestalt based code
+        machine = 'PowerPC'
+
+    return release,versioninfo,machine
+
+
+def mac_ver(release='',versioninfo=('','',''),machine=''):
+
+    """ Get MacOS version information and return it as tuple (release,
+        versioninfo, machine) with versioninfo being a tuple (version,
+        dev_stage, non_release_version).
+
+        Entries which cannot be determined are set to the paramter values
+        which default to ''. All tuple entries are strings.
+    """
+
+    # First try reading the information from an XML file which should
+    # always be present
+    info = _mac_ver_xml()
+    if info is not None:
+        return info
+
+    # If that doesn't work for some reason fall back to reading the
+    # information using gestalt calls.
+    info = _mac_ver_gestalt()
+    if info is not None:
+        return info
+
+    # If that also doesn't work return the default values
     return release,versioninfo,machine
 
 def _java_getprop(name,default):
@@ -953,7 +1012,7 @@ def _syscmd_file(target,default=''):
     if sys.platform in ('dos','win32','win16','os2'):
         # XXX Others too ?
         return default
-    target = _follow_symlinks(target)
+    target = _follow_symlinks(target).replace('"', '\\"')
     try:
         f = os.popen('file "%s" 2> /dev/null' % target)
     except (AttributeError,os.error):
@@ -1019,13 +1078,13 @@ def architecture(executable=sys.executable,bits='',linkage=''):
        executable == sys.executable:
         # "file" command did not return anything; we'll try to provide
         # some sensible defaults then...
-        if _default_architecture.has_key(sys.platform):
-            b,l = _default_architecture[sys.platform]
+        if sys.platform in _default_architecture:
+            b, l = _default_architecture[sys.platform]
             if b:
                 bits = b
             if l:
                 linkage = l
-        return bits,linkage
+        return bits, linkage
 
     # Split the output into a list of strings omitting the filename
     fileout = _architecture_split(output)[1:]

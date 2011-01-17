@@ -365,6 +365,23 @@ def captureCommand(commandline):
 
     return data
 
+def getTclTkVersion(configfile, versionline):
+    """
+    search Tcl or Tk configuration file for version line
+    """
+    try:
+        f = open(configfile, "r")
+    except:
+        fatal("Framework configuration file not found: %s" % configfile)
+
+    for l in f:
+        if l.startswith(versionline):
+            f.close()
+            return l
+
+    fatal("Version variable %s not found in framework configuration file: %s"
+            % (versionline, configfile))
+
 def checkEnvironment():
     """
     Check that we're running on a supported system.
@@ -380,6 +397,41 @@ def checkEnvironment():
         fatal("Please install the latest version of Xcode and the %s SDK"%(
             os.path.basename(SDKPATH[:-4])))
 
+    # Because we only support dynamic load of only one major/minor version of
+    # Tcl/Tk, ensure:
+    # 1. there are no user-installed frameworks of Tcl/Tk with version
+    #       higher than the Apple-supplied system version
+    # 2. there is a user-installed framework in /Library/Frameworks with the
+    #       same version as the system version.  This allows users to choose
+    #       to install a newer patch level.
+
+    for framework in ['Tcl', 'Tk']:
+        fw = dict(lower=framework.lower(),
+                    upper=framework.upper(),
+                    cap=framework.capitalize())
+        fwpth = "Library/Frameworks/%(cap)s.framework/%(lower)sConfig.sh" % fw
+        sysfw = os.path.join('/System', fwpth)
+        libfw = os.path.join('/', fwpth)
+        usrfw = os.path.join(os.getenv('HOME'), fwpth)
+        version = "%(upper)s_VERSION" % fw
+        if getTclTkVersion(libfw, version) != getTclTkVersion(sysfw, version):
+            fatal("Version of %s must match %s" % (libfw, sysfw) )
+        if os.path.exists(usrfw):
+            fatal("Please rename %s to avoid possible dynamic load issues."
+                    % usrfw)
+
+    # Remove inherited environment variables which might influence build
+    environ_var_prefixes = ['CPATH', 'C_INCLUDE_', 'DYLD_', 'LANG', 'LC_',
+                            'LD_', 'LIBRARY_', 'PATH', 'PYTHON']
+    for ev in list(os.environ):
+        for prefix in environ_var_prefixes:
+            if ev.startswith(prefix) :
+                print "INFO: deleting environment variable %s=%s" % (
+                                                    ev, os.environ[ev])
+                del os.environ[ev]
+
+    os.environ['PATH'] = '/bin:/sbin:/usr/bin:/usr/sbin'
+    print "Setting default PATH: %s"%(os.environ['PATH'])
 
 
 def parseOptions(args=None):
@@ -670,7 +722,7 @@ def buildPythonDocs():
     curDir = os.getcwd()
     os.chdir(buildDir)
     runCommand('make update')
-    runCommand('make html')
+    runCommand("make html PYTHON='%s'" % os.path.abspath(sys.executable))
     os.chdir(curDir)
     if not os.path.exists(docdir):
         os.mkdir(docdir)
@@ -1041,13 +1093,14 @@ def setIcon(filePath, icnsPath):
     Set the custom icon for the specified file or directory.
     """
 
-    toolPath = os.path.join(os.path.dirname(__file__), "seticon.app/Contents/MacOS/seticon")
-    dirPath = os.path.dirname(__file__)
+    dirPath = os.path.normpath(os.path.dirname(__file__))
+    toolPath = os.path.join(dirPath, "seticon.app/Contents/MacOS/seticon")
     if not os.path.exists(toolPath) or os.stat(toolPath).st_mtime < os.stat(dirPath + '/seticon.m').st_mtime:
         # NOTE: The tool is created inside an .app bundle, otherwise it won't work due
         # to connections to the window server.
-        if not os.path.exists('seticon.app/Contents/MacOS'):
-            os.makedirs('seticon.app/Contents/MacOS')
+        appPath = os.path.join(dirPath, "seticon.app/Contents/MacOS")
+        if not os.path.exists(appPath):
+            os.makedirs(appPath)
         runCommand("cc -o %s %s/seticon.m -framework Cocoa"%(
             shellQuote(toolPath), shellQuote(dirPath)))
 
@@ -1065,6 +1118,8 @@ def main():
     if os.path.exists(WORKDIR):
         shutil.rmtree(WORKDIR)
     os.mkdir(WORKDIR)
+
+    os.environ['LC_ALL'] = 'C'
 
     # Then build third-party libraries such as sleepycat DB4.
     buildLibraries()

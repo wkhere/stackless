@@ -4,12 +4,13 @@
 '''
 import unittest
 import os, tempfile, re
-import warnings
 
-warnings.filterwarnings('ignore', r".*commands.getstatus.. is deprecated",
-                        DeprecationWarning)
+from test.test_support import (run_unittest, reap_children, import_module,
+                               check_warnings)
 
-from test.test_support import TestSkipped, run_unittest, reap_children
+from test.test_support import TestSkipped, run_unittest, reap_children, import_module
+# Silence Py3k warning
+import_module('commands', deprecated=True)
 from commands import *
 
 # The module says:
@@ -56,8 +57,8 @@ class CommandTests(unittest.TestCase):
                   [^/]*        # Skip user, group, size, and date.
                   /\.          # and end with the name of the file.
                '''
-
-        self.assert_(re.match(pat, getstatus("/."), re.VERBOSE))
+        with check_warnings(quiet=True):
+            self.assertTrue(re.match(pat, getstatus("/."), re.VERBOSE))
 
 
 def test_main():

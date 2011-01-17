@@ -3,9 +3,9 @@
 Test script for doctest.
 """
 
+import sys
 from test import test_support
 import doctest
-import warnings
 
 # NOTE: There are some additional tests relating to interaction with
 #       zipimport in the test_zipimport_support test module.
@@ -908,6 +908,35 @@ unexpected exception:
         ZeroDivisionError: integer division or modulo by zero
     TestResults(failed=1, attempted=1)
 """
+    def displayhook(): r"""
+Test that changing sys.displayhook doesn't matter for doctest.
+
+    >>> import sys
+    >>> orig_displayhook = sys.displayhook
+    >>> def my_displayhook(x):
+    ...     print('hi!')
+    >>> sys.displayhook = my_displayhook
+    >>> def f():
+    ...     '''
+    ...     >>> 3
+    ...     3
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> r = doctest.DocTestRunner(verbose=False).run(test)
+    >>> post_displayhook = sys.displayhook
+
+    We need to restore sys.displayhook now, so that we'll be able to test
+    results.
+
+    >>> sys.displayhook = orig_displayhook
+
+    Ok, now we can check that everything is ok.
+
+    >>> r
+    TestResults(failed=0, attempted=1)
+    >>> post_displayhook is my_displayhook
+    True
+"""
     def optionflags(): r"""
 Tests of `DocTestRunner`'s option flag handling.
 
@@ -1508,7 +1537,33 @@ source:
     >>> test = doctest.DocTestParser().get_doctest(s, {}, 's', 's.py', 0)
     Traceback (most recent call last):
     ValueError: line 0 of the doctest for s has an option directive on a line with no example: '# doctest: +ELLIPSIS'
-"""
+
+    """
+
+    def test_unicode_output(self): r"""
+
+Check that unicode output works:
+
+    >>> u'\xe9'
+    u'\xe9'
+
+If we return unicode, SpoofOut's buf variable becomes automagically
+converted to unicode. This means all subsequent output becomes converted
+to unicode, and if the output contains non-ascii characters that failed.
+It used to be that this state change carried on between tests, meaning
+tests would fail if unicode has been output previously in the testrun.
+This test tests that this is no longer so:
+
+    >>> print u'abc'
+    abc
+
+And then return a string with non-ascii characters:
+
+    >>> print u'\xe9'.encode('utf-8')
+    é
+
+    """
+
 
 def test_testsource(): r"""
 Unit tests for `testsource()`.
@@ -2167,7 +2222,7 @@ We don't want `-v` in sys.argv for these tests.
     >>> doctest.master = None  # Reset master.
 
 (Note: we'll be clearing doctest.master after each call to
-`doctest.testfile`, to supress warnings about multiple tests with the
+`doctest.testfile`, to suppress warnings about multiple tests with the
 same name.)
 
 Globals may be specified with the `globs` and `extraglobs` parameters:
@@ -2331,12 +2386,6 @@ bothering with the current sys.stdout encoding.
 # that these use the deprecated doctest.Tester, so should go away (or
 # be rewritten) someday.
 
-# Ignore all warnings about the use of class Tester in this module.
-# Note that the name of this module may differ depending on how it's
-# imported, so the use of __name__ is important.
-warnings.filterwarnings("ignore", "class Tester", DeprecationWarning,
-                        __name__, 0)
-
 def old_test1(): r"""
 >>> from doctest import Tester
 >>> t = Tester(globs={'x': 42}, verbose=0)
@@ -2460,9 +2509,16 @@ def old_test4(): """
 def test_main():
     # Check the doctest cases in doctest itself:
     test_support.run_doctest(doctest, verbosity=True)
-    # Check the doctest cases defined here:
+
     from test import test_doctest
-    test_support.run_doctest(test_doctest, verbosity=True)
+    # Ignore all warnings about the use of class Tester in this module.
+    deprecations = [("class Tester is deprecated", DeprecationWarning)]
+    if sys.py3kwarning:
+        deprecations += [("backquote not supported", SyntaxWarning),
+                         ("execfile.. not supported", DeprecationWarning)]
+    with test_support.check_warnings(*deprecations):
+        # Check the doctest cases defined here:
+        test_support.run_doctest(test_doctest, verbosity=True)
 
 import trace, sys
 def test_coverage(coverdir):

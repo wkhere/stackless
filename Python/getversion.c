@@ -13,9 +13,9 @@ const char *
 Py_GetVersion(void)
 {
 	static char version[250];
-	PyOS_snprintf(version, sizeof(version), "%.80s Stackless %.80s (%.80s) %.80s", 
-		      PY_VERSION, STACKLESS_VERSION, Py_GetBuildInfo(), Py_GetCompiler());
-	return version;
+    PyOS_snprintf(version, sizeof(version), "%.80s Stackless %.80s (%.80s) %.80s",
+              PY_VERSION, STACKLESS_VERSION, Py_GetBuildInfo(), Py_GetCompiler());
+    return version;
 }
 
 #else
@@ -24,7 +24,7 @@ const char *
 Py_GetVersion(void)
 {
 	static char version[250];
-	PyOS_snprintf(version, sizeof(version), "%.80s (%.80s) %.80s", 
+	PyOS_snprintf(version, sizeof(version), "%.80s (%.80s) %.80s",
 		      PY_VERSION, Py_GetBuildInfo(), Py_GetCompiler());
 	return version;
 }

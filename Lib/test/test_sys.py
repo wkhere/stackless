@@ -82,7 +82,8 @@ class SysModuleTest(unittest.TestCase):
             self.assert_(value is exc)
             self.assert_(traceback is not None)
 
-            sys.exc_clear()
+            with test.test_support._check_py3k_warnings():
+                sys.exc_clear()
 
             typ, value, traceback = sys.exc_info()
             self.assert_(typ is None)
@@ -180,6 +181,26 @@ class SysModuleTest(unittest.TestCase):
                               "raise SystemExit(47)"])
         self.assertEqual(rc, 47)
 
+        def check_exit_message(code, expected, env=None):
+            process = subprocess.Popen([sys.executable, "-c", code],
+                                       stderr=subprocess.PIPE, env=env)
+            stdout, stderr = process.communicate()
+            self.assertEqual(process.returncode, 1)
+            self.assertTrue(stderr.startswith(expected),
+                "%s doesn't start with %s" % (repr(stderr), repr(expected)))
+
+        # test that stderr buffer if flushed before the exit message is written
+        # into stderr
+        check_exit_message(
+            r'import sys; sys.stderr.write("unflushed,"); sys.exit("message")',
+            b"unflushed,message")
+
+        # test that the unicode message is encoded to the stderr encoding
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'latin-1'
+        check_exit_message(
+            r'import sys; sys.exit(u"h\xe9")',
+            b"h\xe9", env=env)
 
     def test_getdefaultencoding(self):
         if test.test_support.have_unicode:
@@ -402,6 +423,20 @@ class SysModuleTest(unittest.TestCase):
         self.assertEqual(sys.call_tracing(str, (2,)), "2")
         self.assertRaises(TypeError, sys.call_tracing, str, 2)
 
+    def test_executable(self):
+        # Issue #7774: Ensure that sys.executable is an empty string if argv[0]
+        # has been set to an non existent program name and Python is unable to
+        # retrieve the real program name
+        import subprocess
+        # For a normal installation, it should work without 'cwd'
+        # argument. For test runs in the build directory, see #7774.
+        python_dir = os.path.dirname(os.path.realpath(sys.executable))
+        p = subprocess.Popen(
+            ["nonexistent", "-c", 'import sys; print repr(sys.executable)'],
+            executable=sys.executable, stdout=subprocess.PIPE, cwd=python_dir)
+        executable = p.communicate()[0].strip()
+        p.wait()
+        self.assert_(executable in ["''", repr(sys.executable)], executable)
 
 class SizeofTest(unittest.TestCase):
 
@@ -471,7 +506,8 @@ class SizeofTest(unittest.TestCase):
         # bool
         check(True, size(h + 'l'))
         # buffer
-        check(buffer(''), size(h + '2P2Pil'))
+        with test.test_support._check_py3k_warnings():
+            check(buffer(''), size(h + '2P2Pil'))
         # builtin_function_or_method
         check(len, size(h + '3P'))
         # bytearray

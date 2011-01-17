@@ -19,11 +19,6 @@ import curses.panel
 from test.test_support import requires, TestSkipped
 requires('curses')
 
-# skip all these tests on FreeBSD: test_curses currently hangs the
-# FreeBSD buildbots, preventing other tests from running.  See issue
-# #7384.
-if 'freebsd' in sys.platform:
-    raise unittest.SkipTest('The curses module is broken on FreeBSD.  See http://bugs.python.org/issue7384.')
 
 # XXX: if newterm was supported we could use it instead of initscr and not exit
 term = os.environ.get('TERM')
@@ -221,8 +216,8 @@ def module_funcs(stdscr):
         if availmask != 0:
             curses.mouseinterval(10)
             # just verify these don't cause errors
+            curses.ungetmouse(0, 0, 0, 0, curses.BUTTON1_PRESSED)
             m = curses.getmouse()
-            curses.ungetmouse(*m)
 
     if hasattr(curses, 'is_term_resized'):
         curses.is_term_resized(*stdscr.getmaxyx())

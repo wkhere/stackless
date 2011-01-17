@@ -14,7 +14,7 @@ The :mod:`dummy_threading` module is provided for situations where
 
 .. note::
 
-   Starting with Python 2.6, this module provides PEP 8 compliant aliases and
+   Starting with Python 2.6, this module provides :pep:`8` compliant aliases and
    properties to replace the ``camelCase`` names that were inspired by Java's
    threading API. This updated API is compatible with that of the
    :mod:`multiprocessing` module. However, no schedule has been set for the
@@ -319,8 +319,8 @@ impossible to detect the termination of alien threads.
 
       Return whether the thread is alive.
 
-      Roughly, a thread is alive from the moment the :meth:`start` method
-      returns until its :meth:`run` method terminates. The module function
+      This method returns ``True`` just before the :meth:`run` method starts
+      until just after the :meth:`run` method terminates.  The module function
       :func:`.enumerate` returns a list of all alive threads.
 
    .. method:: isDaemon()
@@ -667,6 +667,9 @@ An event object manages an internal flag that can be set to true with the
 
       Return true if and only if the internal flag is true.
 
+      .. versionchanged:: 2.6
+         The ``is_set()`` syntax is new.
+
    .. method:: set()
 
       Set the internal flag to true. All threads waiting for it to become true
@@ -690,11 +693,7 @@ An event object manages an internal flag that can be set to true with the
       floating point number specifying a timeout for the operation in seconds
       (or fractions thereof).
 
-      This method returns the internal flag on exit, so it will always return
-      ``True`` except if a timeout is given and the operation times out.
-
-      .. versionchanged:: 2.7
-         Previously, the method always returned ``None``.
+      This method always returns ``None``.
 
 
 .. _timer-objects:

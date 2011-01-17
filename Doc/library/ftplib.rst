@@ -33,8 +33,8 @@ Here's a sample session using the :mod:`ftplib` module::
    '226 Transfer complete.'
    >>> ftp.quit()
 
-The module defines the following items:
 
+The module defines the following items:
 
 .. class:: FTP([host[, user[, passwd[, acct[, timeout]]]]])
 
@@ -50,42 +50,42 @@ The module defines the following items:
       *timeout* was added.
 
 
-   .. attribute:: all_errors
+.. exception:: error_reply
 
-      The set of all exceptions (as a tuple) that methods of :class:`FTP`
-      instances may raise as a result of problems with the FTP connection (as
-      opposed to programming errors made by the caller).  This set includes the
-      four exceptions listed below as well as :exc:`socket.error` and
-      :exc:`IOError`.
+   Exception raised when an unexpected reply is received from the server.
 
 
-   .. exception:: error_reply
+.. exception:: error_temp
 
-      Exception raised when an unexpected reply is received from the server.
-
-
-   .. exception:: error_temp
-
-      Exception raised when an error code in the range 400--499 is received.
+   Exception raised when an error code in the range 400--499 is received.
 
 
-   .. exception:: error_perm
+.. exception:: error_perm
 
-      Exception raised when an error code in the range 500--599 is received.
+   Exception raised when an error code in the range 500--599 is received.
 
 
-   .. exception:: error_proto
+.. exception:: error_proto
 
-      Exception raised when a reply is received from the server that does not
-      begin with a digit in the range 1--5.
+   Exception raised when a reply is received from the server that does not
+   begin with a digit in the range 1--5.
+
+
+.. data:: all_errors
+
+   The set of all exceptions (as a tuple) that methods of :class:`FTP`
+   instances may raise as a result of problems with the FTP connection (as
+   opposed to programming errors made by the caller).  This set includes the
+   four exceptions listed below as well as :exc:`socket.error` and
+   :exc:`IOError`.
 
 
 .. seealso::
 
    Module :mod:`netrc`
-      Parser for the :file:`.netrc` file format.  The file :file:`.netrc` is typically
-      used by FTP clients to load user authentication information before prompting the
-      user.
+      Parser for the :file:`.netrc` file format.  The file :file:`.netrc` is
+      typically used by FTP clients to load user authentication information
+      before prompting the user.
 
    .. index:: single: ftpmirror.py
 
@@ -186,9 +186,9 @@ followed by ``lines`` for the text version or ``binary`` for the binary version.
    Retrieve a file or directory listing in ASCII transfer mode.  *command*
    should be an appropriate ``RETR`` command (see :meth:`retrbinary`) or a
    command such as ``LIST``, ``NLST`` or ``MLSD`` (usually just the string
-   ``'LIST'``).  The *callback* function is called for each line, with the
-   trailing CRLF stripped.  The default *callback* prints the line to
-   ``sys.stdout``.
+   ``'LIST'``).  The *callback* function is called for each line with a
+   string argument containing the line with the trailing CRLF stripped.
+   The default *callback* prints the line to ``sys.stdout``.
 
 
 .. method:: FTP.set_pasv(boolean)

@@ -34,13 +34,16 @@ class AutoFileTests(unittest.TestCase):
     def testAttributes(self):
         # verify expected attributes exist
         f = self.f
-        softspace = f.softspace
+
         f.name     # merely shouldn't blow up
         f.mode     # ditto
         f.closed   # ditto
 
-        # verify softspace is writable
-        f.softspace = softspace    # merely shouldn't blow up
+        with test_support._check_py3k_warnings(
+            ('file.softspace not supported in 3.x', DeprecationWarning)):
+            softspace = f.softspace
+            # verify softspace is writable
+            f.softspace = softspace    # merely shouldn't blow up
 
         # verify the others aren't
         for attr in 'name', 'mode', 'closed':
@@ -111,14 +114,15 @@ class AutoFileTests(unittest.TestCase):
         for methodname in methods:
             method = getattr(self.f, methodname)
             # should raise on closed file
-            self.assertRaises(ValueError, method)
+            with test_support._check_py3k_warnings(quiet=True):
+                self.assertRaises(ValueError, method)
         self.assertRaises(ValueError, self.f.writelines, [])
 
         # file is closed, __exit__ shouldn't do anything
         self.assertEquals(self.f.__exit__(None, None, None), None)
         # it must also return None if an exception was given
         try:
-            1/0
+            1 // 0
         except:
             self.assertEquals(self.f.__exit__(*sys.exc_info()), None)
 
@@ -218,9 +222,9 @@ class OtherFileTests(unittest.TestCase):
         try:
             f = open(TESTFN, bad_mode)
         except ValueError, msg:
-            if msg[0] != 0:
+            if msg.args[0] != 0:
                 s = str(msg)
-                if s.find(TESTFN) != -1 or s.find(bad_mode) == -1:
+                if TESTFN in s or bad_mode not in s:
                     self.fail("bad error message for invalid mode: %s" % s)
             # if msg[0] == 0, we're probably on Windows where there may be
             # no obvious way to discover why open() failed.
@@ -417,6 +421,7 @@ class FileThreadingTests(unittest.TestCase):
         self._count_lock = threading.Lock()
         self.close_count = 0
         self.close_success_count = 0
+        self.use_buffering = False
 
     def tearDown(self):
         if self.f:
@@ -430,7 +435,10 @@ class FileThreadingTests(unittest.TestCase):
             pass
 
     def _create_file(self):
-        self.f = open(self.filename, "w+")
+        if self.use_buffering:
+            self.f = open(self.filename, "w+", buffering=1024*16)
+        else:
+            self.f = open(self.filename, "w+")
 
     def _close_file(self):
         with self._count_lock:
@@ -513,6 +521,12 @@ class FileThreadingTests(unittest.TestCase):
         self._test_close_open_io(io_func)
 
     def test_close_open_print(self):
+        def io_func():
+            print >> self.f, ''
+        self._test_close_open_io(io_func)
+
+    def test_close_open_print_buffered(self):
+        self.use_buffering = True
         def io_func():
             print >> self.f, ''
         self._test_close_open_io(io_func)

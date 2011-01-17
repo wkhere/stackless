@@ -315,6 +315,16 @@ class UTF32Test(ReadTest):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_decode,
                           "\xff", "strict", True)
 
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded_le = '\xff\xfe\x00\x00' + '\x00\x00\x01\x00' * 1024
+        self.assertEqual(u'\U00010000' * 1024,
+                         codecs.utf_32_decode(encoded_le)[0])
+        encoded_be = '\x00\x00\xfe\xff' + '\x00\x01\x00\x00' * 1024
+        self.assertEqual(u'\U00010000' * 1024,
+                         codecs.utf_32_decode(encoded_be)[0])
+
 class UTF32LETest(ReadTest):
     encoding = "utf-32-le"
 
@@ -348,6 +358,13 @@ class UTF32LETest(ReadTest):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_le_decode,
                           "\xff", "strict", True)
 
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded = '\x00\x00\x01\x00' * 1024
+        self.assertEqual(u'\U00010000' * 1024,
+                         codecs.utf_32_le_decode(encoded)[0])
+
 class UTF32BETest(ReadTest):
     encoding = "utf-32-be"
 
@@ -380,6 +397,14 @@ class UTF32BETest(ReadTest):
     def test_errors(self):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_be_decode,
                           "\xff", "strict", True)
+
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded = '\x00\x01\x00\x00' * 1024
+        self.assertEqual(u'\U00010000' * 1024,
+                         codecs.utf_32_be_decode(encoded)[0])
+
 
 class UTF16Test(ReadTest):
     encoding = "utf-16"
@@ -828,6 +853,9 @@ class UnicodeInternalTest(unittest.TestCase):
             ignored = decoder("%s\x22\x22\x22\x22%s" % (ab[:4], ab[4:]),
                 "UnicodeInternalTest")
             self.assertEquals((u"ab", 12), ignored)
+
+        encoder = codecs.getencoder("string-escape")
+        self.assertEquals(encoder(r'\x00')[1], 4)
 
 # From http://www.gnu.org/software/libidn/draft-josefsson-idn-test-vectors.html
 nameprep_tests = [
@@ -1488,6 +1516,62 @@ class WithStmtTest(unittest.TestCase):
             self.assertEquals(srw.read(), u"\xfc")
 
 
+class BomTest(unittest.TestCase):
+    def test_seek0(self):
+        data = u"1234567890"
+        tests = ("utf-16",
+                 "utf-16-le",
+                 "utf-16-be",
+                 "utf-32",
+                 "utf-32-le",
+                 "utf-32-be")
+        for encoding in tests:
+            # Check if the BOM is written only once
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data)
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+            # Check that the BOM is written after a seek(0)
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data[0])
+                self.assertNotEquals(f.tell(), 0)
+                f.seek(0)
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data)
+
+            # (StreamWriter) Check that the BOM is written after a seek(0)
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.writer.write(data[0])
+                self.assertNotEquals(f.writer.tell(), 0)
+                f.writer.seek(0)
+                f.writer.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data)
+
+            # Check that the BOM is not written after a seek() at a position
+            # different than the start
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data)
+                f.seek(f.tell())
+                f.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+            # (StreamWriter) Check that the BOM is not written after a seek()
+            # at a position different than the start
+            with codecs.open(test_support.TESTFN, 'w+', encoding=encoding) as f:
+                f.writer.write(data)
+                f.writer.seek(f.writer.tell())
+                f.writer.write(data)
+                f.seek(0)
+                self.assertEquals(f.read(), data * 2)
+
+
 def test_main():
     test_support.run_unittest(
         UTF32Test,
@@ -1516,6 +1600,7 @@ def test_main():
         BasicStrTest,
         CharmapTest,
         WithStmtTest,
+        BomTest,
     )
 
 

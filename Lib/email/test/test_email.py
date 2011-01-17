@@ -1,4 +1,4 @@
-# Copyright (C) 2001-2007 Python Software Foundation
+# Copyright (C) 2001-2010 Python Software Foundation
 # Contact: email-sig@python.org
 # email package unit tests
 
@@ -51,7 +51,7 @@ def openfile(filename, mode='r'):
 class TestEmailBase(unittest.TestCase):
     def ndiffAssertEqual(self, first, second):
         """Like failUnlessEqual except use ndiff for readable output."""
-        if first <> second:
+        if first != second:
             sfirst = str(first)
             ssecond = str(second)
             diff = difflib.ndiff(sfirst.splitlines(), ssecond.splitlines())
@@ -338,6 +338,14 @@ class TestMessageAPI(TestEmailBase):
         self.assertEqual(msg.get_param('name', unquote=False),
                          '"Jim&amp;&amp;Jill"')
 
+    def test_get_param_with_quotes(self):
+        msg = email.message_from_string(
+            'Content-Type: foo; bar*0="baz\\"foobar"; bar*1="\\"baz"')
+        self.assertEqual(msg.get_param('bar'), 'baz"foobar"baz')
+        msg = email.message_from_string(
+            "Content-Type: foo; bar*0=\"baz\\\"foobar\"; bar*1=\"\\\"baz\"")
+        self.assertEqual(msg.get_param('bar'), 'baz"foobar"baz')
+
     def test_has_key(self):
         msg = email.message_from_string('Header: exists')
         self.failUnless(msg.has_key('header'))
@@ -533,15 +541,10 @@ class TestEncoders(unittest.TestCase):
 
     def test_default_cte(self):
         eq = self.assertEqual
+        # 7bit data and the default us-ascii _charset
         msg = MIMEText('hello world')
         eq(msg['content-transfer-encoding'], '7bit')
-
-    def test_default_cte(self):
-        eq = self.assertEqual
-        # With no explicit _charset its us-ascii, and all are 7-bit
-        msg = MIMEText('hello world')
-        eq(msg['content-transfer-encoding'], '7bit')
-        # Similar, but with 8-bit data
+        # Similar, but with 8bit data
         msg = MIMEText('hello \xf8 world')
         eq(msg['content-transfer-encoding'], '8bit')
         # And now with a different charset
@@ -1022,6 +1025,31 @@ class TestMIMEText(unittest.TestCase):
         eq(msg.get_charset().input_charset, 'us-ascii')
         eq(msg['content-type'], 'text/plain; charset="us-ascii"')
 
+    def test_7bit_unicode_input(self):
+        eq = self.assertEqual
+        msg = MIMEText(u'hello there', _charset='us-ascii')
+        eq(msg.get_charset().input_charset, 'us-ascii')
+        eq(msg['content-type'], 'text/plain; charset="us-ascii"')
+
+    def test_7bit_unicode_input_no_charset(self):
+        eq = self.assertEqual
+        msg = MIMEText(u'hello there')
+        eq(msg.get_charset(), 'us-ascii')
+        eq(msg['content-type'], 'text/plain; charset="us-ascii"')
+        self.assertTrue('hello there' in msg.as_string())
+
+    def test_8bit_unicode_input(self):
+        teststr = u'\u043a\u0438\u0440\u0438\u043b\u0438\u0446\u0430'
+        eq = self.assertEqual
+        msg = MIMEText(teststr, _charset='utf-8')
+        eq(msg.get_charset().output_charset, 'utf-8')
+        eq(msg['content-type'], 'text/plain; charset="utf-8"')
+        eq(msg.get_payload(decode=True), teststr.encode('utf-8'))
+
+    def test_8bit_unicode_input_no_charset(self):
+        teststr = u'\u043a\u0438\u0440\u0438\u043b\u0438\u0446\u0430'
+        self.assertRaises(UnicodeEncodeError, MIMEText, teststr)
+
 
 
 # Test complicated multipart/* messages
@@ -1058,7 +1086,7 @@ This is the dingus fish.
             sign = '-'
         else:
             sign = '+'
-        tzoffset = ' %s%04d' % (sign, tzsecs / 36)
+        tzoffset = ' %s%04d' % (sign, tzsecs // 36)
         container['Date'] = time.strftime(
             '%a, %d %b %Y %H:%M:%S',
             time.localtime(now)) + tzoffset
@@ -2417,6 +2445,39 @@ Do you like this message?
 -Me
 """)
 
+    def test_pushCR_LF(self):
+        '''FeedParser BufferedSubFile.push() assumed it received complete
+           line endings.  A CR ending one push() followed by a LF starting
+           the next push() added an empty line.
+        '''
+        imt = [
+            ("a\r \n",  2),
+            ("b",       0),
+            ("c\n",     1),
+            ("",        0),
+            ("d\r\n",   1),
+            ("e\r",     0),
+            ("\nf",     1),
+            ("\r\n",    1),
+          ]
+        from email.feedparser import BufferedSubFile, NeedMoreData
+        bsf = BufferedSubFile()
+        om = []
+        nt = 0
+        for il, n in imt:
+            bsf.push(il)
+            nt += n
+            n1 = 0
+            while True:
+                ol = bsf.readline()
+                if ol == NeedMoreData:
+                    break
+                om.append(ol)
+                n1 += 1
+            self.assertTrue(n == n1)
+        self.assertTrue(len(om) == nt)
+        self.assertTrue(''.join([il for il, n in imt]) == ''.join(om))
+
 
 
 class TestParsers(TestEmailBase):
@@ -2562,6 +2623,24 @@ Here's the message body
         eq(headers, ['A', 'B', 'CC'])
         eq(msg.get_payload(), 'body')
 
+    def test_CRLFLF_at_end_of_part(self):
+        # issue 5610: feedparser should not eat two chars from body part ending
+        # with "\r\n\n".
+        m = (
+            "From: foo@bar.com\n"
+            "To: baz\n"
+            "Mime-Version: 1.0\n"
+            "Content-Type: multipart/mixed; boundary=BOUNDARY\n"
+            "\n"
+            "--BOUNDARY\n"
+            "Content-Type: text/plain\n"
+            "\n"
+            "body ending with CRLF newline\r\n"
+            "\n"
+            "--BOUNDARY--\n"
+          )
+        msg = email.message_from_string(m)
+        self.assertTrue(msg.get_payload(0).get_payload().endswith('\r\n'))
 
 
 class TestBase64(unittest.TestCase):
@@ -2778,7 +2857,7 @@ class TestCharset(unittest.TestCase):
         # Try a charset with None body encoding
         c = Charset('us-ascii')
         eq('hello world', c.body_encode('hello world'))
-        # Try the convert argument, where input codec <> output codec
+        # Try the convert argument, where input codec != output codec
         c = Charset('euc-jp')
         # With apologies to Tokio Kikuchi ;)
         try:

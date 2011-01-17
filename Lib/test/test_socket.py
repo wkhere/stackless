@@ -123,8 +123,9 @@ class ThreadableTest:
         self.server_ready.wait()
         self.client_ready.set()
         self.clientSetUp()
-        if not callable(test_func):
-            raise TypeError, "test_func must be a callable function"
+        with test_support._check_py3k_warnings():
+            if not callable(test_func):
+                raise TypeError("test_func must be a callable function.")
         try:
             test_func()
         except Exception, strerror:
@@ -132,7 +133,7 @@ class ThreadableTest:
         self.clientTearDown()
 
     def clientSetUp(self):
-        raise NotImplementedError, "clientSetUp must be implemented."
+        raise NotImplementedError("clientSetUp must be implemented.")
 
     def clientTearDown(self):
         self.done.set()
@@ -282,8 +283,8 @@ class GeneralModuleTests(unittest.TestCase):
                 orig = sys.getrefcount(__name__)
                 socket.getnameinfo(__name__,0)
             except TypeError:
-                if sys.getrefcount(__name__) <> orig:
-                    self.fail("socket.getnameinfo loses a reference")
+                self.assertEqual(sys.getrefcount(__name__), orig,
+                                 "socket.getnameinfo loses a reference")
 
     def testInterpreterCrash(self):
         # Making sure getnameinfo doesn't crash the interpreter
@@ -834,6 +835,77 @@ class FileObjectClassTestCase(SocketConnectedTest):
     def _testClosedAttr(self):
         self.assert_(not self.cli_file.closed)
 
+
+class FileObjectInterruptedTestCase(unittest.TestCase):
+    """Test that the file object correctly handles EINTR internally."""
+
+    class MockSocket(object):
+        def __init__(self, recv_funcs=()):
+            # A generator that returns callables that we'll call for each
+            # call to recv().
+            self._recv_step = iter(recv_funcs)
+
+        def recv(self, size):
+            return self._recv_step.next()()
+
+    @staticmethod
+    def _raise_eintr():
+        raise socket.error(errno.EINTR)
+
+    def _test_readline(self, size=-1, **kwargs):
+        mock_sock = self.MockSocket(recv_funcs=[
+                lambda : "This is the first line\nAnd the sec",
+                self._raise_eintr,
+                lambda : "ond line is here\n",
+                lambda : "",
+            ])
+        fo = socket._fileobject(mock_sock, **kwargs)
+        self.assertEquals(fo.readline(size), "This is the first line\n")
+        self.assertEquals(fo.readline(size), "And the second line is here\n")
+
+    def _test_read(self, size=-1, **kwargs):
+        mock_sock = self.MockSocket(recv_funcs=[
+                lambda : "This is the first line\nAnd the sec",
+                self._raise_eintr,
+                lambda : "ond line is here\n",
+                lambda : "",
+            ])
+        fo = socket._fileobject(mock_sock, **kwargs)
+        self.assertEquals(fo.read(size), "This is the first line\n"
+                          "And the second line is here\n")
+
+    def test_default(self):
+        self._test_readline()
+        self._test_readline(size=100)
+        self._test_read()
+        self._test_read(size=100)
+
+    def test_with_1k_buffer(self):
+        self._test_readline(bufsize=1024)
+        self._test_readline(size=100, bufsize=1024)
+        self._test_read(bufsize=1024)
+        self._test_read(size=100, bufsize=1024)
+
+    def _test_readline_no_buffer(self, size=-1):
+        mock_sock = self.MockSocket(recv_funcs=[
+                lambda : "aa",
+                lambda : "\n",
+                lambda : "BB",
+                self._raise_eintr,
+                lambda : "bb",
+                lambda : "",
+            ])
+        fo = socket._fileobject(mock_sock, bufsize=0)
+        self.assertEquals(fo.readline(size), "aa\n")
+        self.assertEquals(fo.readline(size), "BBbb")
+
+    def test_no_buffer(self):
+        self._test_readline_no_buffer()
+        self._test_readline_no_buffer(size=4)
+        self._test_read(bufsize=0)
+        self._test_read(size=100, bufsize=0)
+
+
 class UnbufferedFileObjectClassTestCase(FileObjectClassTestCase):
 
     """Repeat the tests from FileObjectClassTestCase with bufsize==0.
@@ -971,6 +1043,30 @@ class NetworkConnectionBehaviourTest(SocketTCPTest, ThreadableTest):
     def _testOutsideTimeout(self):
         self.cli = sock = socket.create_connection((HOST, self.port), timeout=1)
         self.failUnlessRaises(socket.timeout, lambda: sock.recv(5))
+
+class TestIssue9543(SocketTCPTest, NetworkConnectionTest):
+    """
+    This test exercises the code in the _fileobject.flush() method when the
+    whole write buffer hasn't been flushed.
+    See http://bugs.python.org/issue9543
+    """
+    # XXX: this is just a sanity check, proper tests for flush() should still
+    #      be added
+    def setUp(self):
+        SocketTCPTest.setUp(self)
+        NetworkConnectionTest.clientSetUp(self)
+
+    def test_issue9543(self):
+        self.cli.close()
+        file_a = self.serv.makefile('w')
+        file_a.write('x')
+        # flush() will try to send data to self.cli and raise an error because
+        # it's closed
+        self.assertRaises(socket.error, file_a.flush)
+        # close() will raise an error too, because it calls flush() before
+        # closing the file
+        self.assertRaises(socket.error, file_a.close)
+        self.assertTrue(file_a.closed)
 
 
 class Urllib2FileobjectTest(unittest.TestCase):
@@ -1127,7 +1223,8 @@ class BufferIOTest(SocketConnectedTest):
         self.assertEqual(msg, MSG)
 
     def _testRecvInto(self):
-        buf = buffer(MSG)
+        with test_support._check_py3k_warnings():
+            buf = buffer(MSG)
         self.serv_conn.send(buf)
 
     def testRecvFromInto(self):
@@ -1138,7 +1235,8 @@ class BufferIOTest(SocketConnectedTest):
         self.assertEqual(msg, MSG)
 
     def _testRecvFromInto(self):
-        buf = buffer(MSG)
+        with test_support._check_py3k_warnings():
+            buf = buffer(MSG)
         self.serv_conn.send(buf)
 
 
@@ -1229,6 +1327,7 @@ def test_main():
     tests.extend([
         NonBlockingTCPTests,
         FileObjectClassTestCase,
+        FileObjectInterruptedTestCase,
         UnbufferedFileObjectClassTestCase,
         LineBufferedFileObjectClassTestCase,
         SmallBufferedFileObjectClassTestCase,
@@ -1236,6 +1335,7 @@ def test_main():
         NetworkConnectionNoServer,
         NetworkConnectionAttributesTest,
         NetworkConnectionBehaviourTest,
+        TestIssue9543,
     ])
     if hasattr(socket, "socketpair"):
         tests.append(BasicSocketPairTest)

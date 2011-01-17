@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright 2001-2004 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2010 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -18,7 +18,7 @@
 
 """Test harness for the logging module. Run all tests.
 
-Copyright (C) 2001-2002 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2010 Vinay Sajip. All Rights Reserved.
 """
 
 import logging
@@ -68,6 +68,12 @@ class BaseTest(unittest.TestCase):
             self.saved_level_names = logging._levelNames.copy()
         finally:
             logging._releaseLock()
+
+        # Set two unused loggers: one non-ASCII and one Unicode.
+        # This is to test correct operation when sorting existing
+        # loggers in the configuration code. See issues 8201, 9310.
+        logging.getLogger("\xab\xd7\xbb")
+        logging.getLogger(u"\u013f\u00d6\u0047")
 
         self.root_logger = logging.getLogger("")
         self.original_logging_level = self.root_logger.getEffectiveLevel()

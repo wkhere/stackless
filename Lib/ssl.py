@@ -74,9 +74,11 @@ from _ssl import \
      SSL_ERROR_EOF, \
      SSL_ERROR_INVALID_ERROR_CODE
 
-from socket import socket, _fileobject
+from socket import socket, _fileobject, _delegate_methods
+from socket import error as socket_error
 from socket import getnameinfo as _getnameinfo
 import base64        # for DER-to-PEM translation
+import errno
 
 class SSLSocket(socket):
 
@@ -90,20 +92,23 @@ class SSLSocket(socket):
                  do_handshake_on_connect=True,
                  suppress_ragged_eofs=True):
         socket.__init__(self, _sock=sock._sock)
-        # the initializer for socket trashes the methods (tsk, tsk), so...
-        self.send = lambda data, flags=0: SSLSocket.send(self, data, flags)
-        self.sendto = lambda data, addr, flags=0: SSLSocket.sendto(self, data, addr, flags)
-        self.recv = lambda buflen=1024, flags=0: SSLSocket.recv(self, buflen, flags)
-        self.recvfrom = lambda addr, buflen=1024, flags=0: SSLSocket.recvfrom(self, addr, buflen, flags)
-        self.recv_into = lambda buffer, nbytes=None, flags=0: SSLSocket.recv_into(self, buffer, nbytes, flags)
-        self.recvfrom_into = lambda buffer, nbytes=None, flags=0: SSLSocket.recvfrom_into(self, buffer, nbytes, flags)
+        # The initializer for socket overrides the methods send(), recv(), etc.
+        # in the instancce, which we don't need -- but we want to provide the
+        # methods defined in SSLSocket.
+        for attr in _delegate_methods:
+            try:
+                delattr(self, attr)
+            except AttributeError:
+                pass
 
         if certfile and not keyfile:
             keyfile = certfile
         # see if it's connected
         try:
             socket.getpeername(self)
-        except:
+        except socket_error, e:
+            if e.errno != errno.ENOTCONN:
+                raise
             # no, no connection yet
             self._sslobj = None
         else:
@@ -112,12 +117,7 @@ class SSLSocket(socket):
                                         keyfile, certfile,
                                         cert_reqs, ssl_version, ca_certs)
             if do_handshake_on_connect:
-                timeout = self.gettimeout()
-                try:
-                    self.settimeout(None)
-                    self.do_handshake()
-                finally:
-                    self.settimeout(timeout)
+                self.do_handshake()
         self.keyfile = keyfile
         self.certfile = certfile
         self.cert_reqs = cert_reqs
@@ -210,16 +210,9 @@ class SSLSocket(socket):
         if self._sslobj:
             if flags != 0:
                 raise ValueError(
-                    "non-zero flags not allowed in calls to sendall() on %s" %
+                    "non-zero flags not allowed in calls to recv() on %s" %
                     self.__class__)
-            while True:
-                try:
-                    return self.read(buflen)
-                except SSLError, x:
-                    if x.args[0] == SSL_ERROR_WANT_READ:
-                        continue
-                    else:
-                        raise x
+            return self.read(buflen)
         else:
             return socket.recv(self, buflen, flags)
 
@@ -233,17 +226,10 @@ class SSLSocket(socket):
                 raise ValueError(
                   "non-zero flags not allowed in calls to recv_into() on %s" %
                   self.__class__)
-            while True:
-                try:
-                    tmp_buffer = self.read(nbytes)
-                    v = len(tmp_buffer)
-                    buffer[:v] = tmp_buffer
-                    return v
-                except SSLError as x:
-                    if x.args[0] == SSL_ERROR_WANT_READ:
-                        continue
-                    else:
-                        raise x
+            tmp_buffer = self.read(nbytes)
+            v = len(tmp_buffer)
+            buffer[:v] = tmp_buffer
+            return v
         else:
             return socket.recv_into(self, buffer, nbytes, flags)
 
@@ -333,7 +319,9 @@ class SSLSocket(socket):
         from the socket module."""
 
         self._makefile_refs += 1
-        return _fileobject(self, mode, bufsize)
+        # close=True so as to decrement the reference count when done with
+        # the file-like object.
+        return _fileobject(self, mode, bufsize, close=True)
 
 
 
@@ -373,7 +361,7 @@ def DER_cert_to_PEM_cert(der_cert_bytes):
         # preferred because older API gets line-length wrong
         f = base64.standard_b64encode(der_cert_bytes)
         return (PEM_HEADER + '\n' +
-                textwrap.fill(f, 64) +
+                textwrap.fill(f, 64) + '\n' +
                 PEM_FOOTER + '\n')
     else:
         return (PEM_HEADER + '\n' +

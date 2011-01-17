@@ -617,10 +617,14 @@ class WriteTest(WriteTestBase):
         if hasattr(os, "link"):
             link = os.path.join(TEMPDIR, "link")
             target = os.path.join(TEMPDIR, "link_target")
-            open(target, "wb").close()
+            fobj = open(target, "wb")
+            fobj.write("aaa")
+            fobj.close()
             os.link(target, link)
             try:
                 tar = tarfile.open(tmpname, self.mode)
+                # Record the link target in the inodes list.
+                tar.gettarinfo(target)
                 tarinfo = tar.gettarinfo(link)
                 self.assertEqual(tarinfo.size, 0)
             finally:
@@ -702,6 +706,24 @@ class StreamWriteTest(WriteTestBase):
 
         self.assert_(data.count("\0") == tarfile.RECORDSIZE,
                          "incorrect zero padding")
+
+    def test_file_mode(self):
+        # Test for issue #8464: Create files with correct
+        # permissions.
+        if sys.platform == "win32" or not hasattr(os, "umask"):
+            return
+
+        if os.path.exists(tmpname):
+            os.remove(tmpname)
+
+        original_umask = os.umask(0022)
+        try:
+            tar = tarfile.open(tmpname, self.mode)
+            tar.close()
+            mode = os.stat(tmpname).st_mode & 0777
+            self.assertEqual(mode, 0644, "wrong file permissions")
+        finally:
+            os.umask(original_umask)
 
 
 class GNUWriteTest(unittest.TestCase):

@@ -144,8 +144,7 @@ def get_platform ():
                 cflags = get_config_vars().get('CFLAGS')
 
                 archs = re.findall('-arch\s+(\S+)', cflags)
-                archs.sort()
-                archs = tuple(archs)
+                archs = tuple(sorted(set(archs)))
 
                 if len(archs) == 1:
                     machine = archs[0]
@@ -206,7 +205,7 @@ def convert_path (pathname):
         paths.remove('.')
     if not paths:
         return os.curdir
-    return apply(os.path.join, paths)
+    return os.path.join(*paths)
 
 # convert_path ()
 
@@ -406,7 +405,7 @@ def execute (func, args, msg=None, verbose=0, dry_run=0):
 
     log.info(msg)
     if not dry_run:
-        apply(func, args)
+        func(*args)
 
 
 def strtobool (val):

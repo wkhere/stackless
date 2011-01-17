@@ -26,12 +26,6 @@ from optparse import make_option, Option, IndentedHelpFormatter, \
 from optparse import _match_abbrev
 from optparse import _parse_num
 
-# Do the right thing with boolean values for all known Python versions.
-try:
-    True, False
-except NameError:
-    (True, False) = (1, 0)
-
 retype = type(re.compile(''))
 
 class InterceptedError(Exception):
@@ -772,6 +766,11 @@ class TestStandard(BaseTest):
                            {'a': "-b3", 'boo': None, 'foo': None},
                            [])
 
+    def test_combined_single_invalid_option(self):
+        self.parser.add_option("-t", action="store_true")
+        self.assertParseFail(["-test"],
+                             "no such option: -e")
+
 class TestBool(BaseTest):
     def setUp(self):
         options = [make_option("-v",
@@ -794,15 +793,13 @@ class TestBool(BaseTest):
         (options, args) = self.assertParseOK(["-q"],
                                              {'verbose': 0},
                                              [])
-        if hasattr(__builtins__, 'False'):
-            self.failUnless(options.verbose is False)
+        self.assertTrue(options.verbose is False)
 
     def test_bool_true(self):
         (options, args) = self.assertParseOK(["-v"],
                                              {'verbose': 1},
                                              [])
-        if hasattr(__builtins__, 'True'):
-            self.failUnless(options.verbose is True)
+        self.assertTrue(options.verbose is True)
 
     def test_bool_flicker_on_and_off(self):
         self.assertParseOK(["-qvq", "-q", "-v"],

@@ -1,4 +1,4 @@
-This is Python version 2.6.5
+This is Python version 2.6.6
 ============================
 
 Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
@@ -97,9 +97,6 @@ Web sites
 New Python releases and related technologies are published at
 http://www.python.org/.  Come visit us!
 
-There's also a Python community web site at
-http://starship.python.net/.
-
 
 Newsgroups and Mailing Lists
 ----------------------------
@@ -166,7 +163,7 @@ variables.  When it's done, you are ready to run make.
 
 To build Python, you normally type "make" in the toplevel directory.
 If you have changed the configuration, the Makefile may have to be
-rebuilt.  In this case you may have to run make again to correctly
+rebuilt.  In this case, you may have to run make again to correctly
 build your desired target.  The interpreter executable is built in the
 top level directory.
 
@@ -228,8 +225,8 @@ executable which is compiling the library.
 Unsupported systems
 -------------------
 
-A number of features are not supported in Python 2.5 anymore. Some
-support code is still present, but will be removed in Python 2.6. 
+A number of systems is not supported in Python 2.6 anymore. Some
+support code is still present, but will be removed in later versions.
 If you still need to use current Python versions on these systems,
 please send a message to python-dev@python.org indicating that you
 volunteer to support this system. For a more detailed discussion 
@@ -880,11 +877,14 @@ that are not yet using glibc 6), test_strftime fails due to a
 non-standard implementation of strftime() in the C library. Please
 ignore this, or upgrade to glibc version 6.
 
+By default, tests are prevented from overusing resources like disk space and
+memory.  To enable these tests, run "make testall".
+
 IMPORTANT: If the tests fail and you decide to mail a bug report,
 *don't* include the output of "make test".  It is useless.  Run the
 failing test manually, as follows:
 
-        ./python ./Lib/test/test_whatever.py
+        ./python Lib/test/regrtest.py -v test_whatever
 
 (substituting the top of the source tree for '.' if you built in a
 different directory).  This runs the test in verbose mode.
@@ -939,7 +939,7 @@ Installing multiple versions
 On Unix and Mac systems if you intend to install multiple versions of Python
 using the same installation prefix (--prefix argument to the configure
 script) you must take care that your primary python executable is not
-overwritten by the installation of a different versio.  All files and
+overwritten by the installation of a different version.  All files and
 directories installed using "make altinstall" contain the major and minor
 version and can thus live side-by-side.  "make install" also creates
 ${prefix}/bin/python which refers to ${prefix}/bin/pythonX.Y.  If you intend

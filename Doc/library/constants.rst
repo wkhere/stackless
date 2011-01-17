@@ -3,7 +3,6 @@ Built-in Constants
 
 A small number of constants live in the built-in namespace.  They are:
 
-
 .. data:: False
 
    The false value of the :class:`bool` type.
@@ -39,14 +38,18 @@ A small number of constants live in the built-in namespace.  They are:
 
    Special value used in conjunction with extended slicing syntax.
 
-   .. XXX Someone who understands extended slicing should fill in here.
-
 
 .. data:: __debug__
 
    This constant is true if Python was not started with an :option:`-O` option.
-   Assignments to :const:`__debug__` are illegal and raise a :exc:`SyntaxError`.
-   See also the :keyword:`assert` statement.
+   It cannot be reassigned.  See also the :keyword:`assert` statement.
+
+
+.. note::
+
+   The name :data:`None` cannot be reassigned (assignments to it, even as an
+   attribute name, raise :exc:`SyntaxError`), so it can be considered a "true"
+   constant.
 
 
 Constants added by the :mod:`site` module

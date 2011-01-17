@@ -61,10 +61,12 @@ except NameError:
     socket_map = {}
 
 def _strerror(err):
-    res = os.strerror(err)
-    if res == 'Unknown error':
-        res = errorcode[err]
-    return res
+    try:
+        return os.strerror(err)
+    except (ValueError, OverflowError, NameError):
+        if err in errorcode:
+            return errorcode[err]
+        return "Unknown error %s" %err
 
 class ExitNow(Exception):
     pass
@@ -101,10 +103,16 @@ def readwrite(obj, flags):
             obj.handle_read_event()
         if flags & select.POLLOUT:
             obj.handle_write_event()
-        if flags & (select.POLLHUP | select.POLLERR | select.POLLNVAL):
-            obj.handle_close()
         if flags & select.POLLPRI:
             obj.handle_expt_event()
+        if flags & (select.POLLHUP | select.POLLERR | select.POLLNVAL):
+            obj.handle_close()
+    except socket.error, e:
+        if e.args[0] not in (EBADF, ECONNRESET, ENOTCONN, ESHUTDOWN,
+ECONNABORTED):
+            obj.handle_error()
+        else:
+            obj.handle_close()
     except _reraised_exceptions:
         raise
     except:
@@ -391,7 +399,11 @@ class dispatcher:
     # cheap inheritance, used to pass all other attribute
     # references to the underlying socket object.
     def __getattr__(self, attr):
-        return getattr(self.socket, attr)
+        try:
+            return getattr(self.socket, attr)
+        except AttributeError:
+            raise AttributeError("%s instance has no attribute '%s'"
+                                 %(self.__class__.__name__, attr))
 
     # log and log_info may be overridden to provide more sophisticated
     # logging and warning methods. In general, log is for 'hit' logging
@@ -416,8 +428,8 @@ class dispatcher:
             self.handle_read()
 
     def handle_connect_event(self):
-        self.connected = True
         self.handle_connect()
+        self.connected = True
 
     def handle_write_event(self):
         if self.accepting:
@@ -587,6 +599,14 @@ if os.name == 'posix':
 
         def send(self, *args):
             return os.write(self.fd, *args)
+
+        def getsockopt(self, level, optname, buflen=None):
+            if (level == socket.SOL_SOCKET and
+                optname == socket.SO_ERROR and
+                not buflen):
+                return 0
+            raise NotImplementedError("Only asyncore specific behaviour "
+                                      "implemented.")
 
         read = recv
         write = send

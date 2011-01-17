@@ -49,7 +49,7 @@ High-level interface
    .. index:: module: mimetools
 
    The :meth:`info` method returns an instance of the class
-   :class:`httplib.HTTPMessage` containing meta-information associated with the
+   :class:`mimetools.Message` containing meta-information associated with the
    URL.  When the method is HTTP, these headers are those returned by the server
    at the head of the retrieved HTML page (including Content-Length and
    Content-Type).  When the method is FTP, a Content-Length header will be
@@ -236,17 +236,19 @@ Utility functions
 
 .. function:: urlencode(query[, doseq])
 
-   Convert a mapping object or a sequence of two-element tuples  to a "url-encoded"
-   string, suitable to pass to :func:`urlopen` above as the optional *data*
-   argument.  This is useful to pass a dictionary of form fields to a ``POST``
-   request.  The resulting string is a series of ``key=value`` pairs separated by
-   ``'&'`` characters, where both *key* and *value* are quoted using
-   :func:`quote_plus` above.  If the optional parameter *doseq* is present and
-   evaluates to true, individual ``key=value`` pairs are generated for each element
-   of the sequence. When a sequence of two-element tuples is used as the *query*
-   argument, the first element of each tuple is a key and the second is a value.
-   The order of parameters in the encoded string will match the order of parameter
-   tuples in the sequence. The :mod:`urlparse` module provides the functions
+   Convert a mapping object or a sequence of two-element tuples  to a
+   "url-encoded" string, suitable to pass to :func:`urlopen` above as the
+   optional *data* argument.  This is useful to pass a dictionary of form
+   fields to a ``POST`` request.  The resulting string is a series of
+   ``key=value`` pairs separated by ``'&'`` characters, where both *key* and
+   *value* are quoted using :func:`quote_plus` above.  When a sequence of
+   two-element tuples is used as the *query* argument, the first element of
+   each tuple is a key and the second is a value. The value element in itself
+   can be a sequence and in that case, if the optional parameter *doseq* is
+   evaluates to *True*, individual ``key=value`` pairs separated by ``'&'`` are
+   generated for each element of the value sequence for the key.  The order of
+   parameters in the encoded string will match the order of parameter tuples in
+   the sequence. The :mod:`urlparse` module provides the functions
    :func:`parse_qs` and :func:`parse_qsl` which are used to parse query strings
    into Python data structures.
 

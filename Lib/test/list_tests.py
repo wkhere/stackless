@@ -36,7 +36,7 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertEqual(str(a0), str(l0))
         self.assertEqual(repr(a0), repr(l0))
-        self.assertEqual(`a2`, `l2`)
+        self.assertEqual(repr(a2), repr(l2))
         self.assertEqual(str(a2), "[0, 1, 2]")
         self.assertEqual(repr(a2), "[0, 1, 2]")
 
@@ -57,13 +57,11 @@ class CommonTest(seq_tests.CommonTest):
         d.append(d)
         d.append(400)
         try:
-            fo = open(test_support.TESTFN, "wb")
-            print >> fo, d,
-            fo.close()
-            fo = open(test_support.TESTFN, "rb")
-            self.assertEqual(fo.read(), repr(d))
+            with open(test_support.TESTFN, "wb") as fo:
+                print >> fo, d,
+            with open(test_support.TESTFN, "rb") as fo:
+                self.assertEqual(fo.read(), repr(d))
         finally:
-            fo.close()
             os.remove(test_support.TESTFN)
 
     def test_set_subscript(self):
@@ -421,6 +419,11 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(TypeError, u.reverse, 42)
 
     def test_sort(self):
+        with test_support._check_py3k_warnings(
+                ("the cmp argument is not supported", DeprecationWarning)):
+            self._test_sort()
+
+    def _test_sort(self):
         u = self.type2test([1, 0])
         u.sort()
         self.assertEqual(u, [0, 1])

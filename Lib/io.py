@@ -368,6 +368,9 @@ class IOBase(object):
 
         This is not implemented for read-only and non-blocking streams.
         """
+        if self.__closed:
+            raise ValueError("flush of closed file")
+        #self._checkClosed()
         # XXX Should this return the number of bytes written???
 
     __closed = False
@@ -378,10 +381,7 @@ class IOBase(object):
         This method has no effect if the file is already closed.
         """
         if not self.__closed:
-            try:
-                self.flush()
-            except IOError:
-                pass  # If flush() fails, just give up
+            self.flush()
             self.__closed = True
 
     def __del__(self):
@@ -751,10 +751,7 @@ class _BufferedIOMixin(BufferedIOBase):
 
     def close(self):
         if not self.closed:
-            try:
-                self.flush()
-            except IOError:
-                pass  # If flush() fails, just give up
+            self.flush()
             self.raw.close()
 
     ### Inquiries ###
@@ -852,8 +849,8 @@ class _BytesIO(BufferedIOBase):
         if self.closed:
             raise ValueError("seek on closed file")
         try:
-            pos = pos.__index__()
-        except AttributeError as err:
+            pos.__index__
+        except AttributeError:
             raise TypeError("an integer is required") # from err
         if whence == 0:
             if pos < 0:
@@ -877,8 +874,13 @@ class _BytesIO(BufferedIOBase):
             raise ValueError("truncate on closed file")
         if pos is None:
             pos = self._pos
-        elif pos < 0:
-            raise ValueError("negative truncate position %r" % (pos,))
+        else:
+            try:
+                pos.__index__
+            except AttributeError:
+                raise TypeError("an integer is required")
+            if pos < 0:
+                raise ValueError("negative truncate position %r" % (pos,))
         del self._buffer[pos:]
         return pos
 
@@ -1087,6 +1089,8 @@ class BufferedWriter(_BufferedIOMixin):
             return self.raw.truncate(pos)
 
     def flush(self):
+        if self.closed:
+            raise ValueError("flush of closed file")
         with self._write_lock:
             self._flush_unlocked()
 
@@ -1200,6 +1204,10 @@ class BufferedRandom(BufferedWriter, BufferedReader):
         self.flush()
         # First do the raw seek, then empty the read buffer, so that
         # if the raw seek fails, we don't lose buffered data forever.
+        if self._read_buf and whence == 1:
+            # Undo read ahead.
+            with self._read_lock:
+                self.raw.seek(self._read_pos - len(self._read_buf), 1)
         pos = self.raw.seek(pos, whence)
         with self._read_lock:
             self._reset_read_buf()
@@ -1437,6 +1445,15 @@ class TextIOWrapper(TextIOBase):
         self._snapshot = None  # info for reconstructing decoder state
         self._seekable = self._telling = self.buffer.seekable()
 
+        if self._seekable and self.writable():
+            position = self.buffer.tell()
+            if position != 0:
+                try:
+                    self._get_encoder().setstate(0)
+                except LookupError:
+                    # Sometimes the encoder doesn't exist
+                    pass
+
     # self._snapshot is either None, or a tuple (dec_flags, next_input)
     # where dec_flags is the second (integer) item of the decoder state
     # and next_input is the chunk of input bytes that comes next after the
@@ -1472,11 +1489,9 @@ class TextIOWrapper(TextIOBase):
         self._telling = self._seekable
 
     def close(self):
-        try:
+        if not self.closed:
             self.flush()
-        except:
-            pass  # If flush() fails, just give up
-        self.buffer.close()
+            self.buffer.close()
 
     @property
     def closed(self):
@@ -1725,12 +1740,27 @@ class TextIOWrapper(TextIOBase):
                 raise IOError("can't restore logical file position")
             self._decoded_chars_used = chars_to_skip
 
+        # Finally, reset the encoder (merely useful for proper BOM handling)
+        try:
+            encoder = self._encoder or self._get_encoder()
+        except LookupError:
+            # Sometimes the encoder doesn't exist
+            pass
+        else:
+            if cookie != 0:
+                encoder.setstate(0)
+            else:
+                encoder.reset()
         return cookie
 
     def read(self, n=None):
         if n is None:
             n = -1
         decoder = self._decoder or self._get_decoder()
+        try:
+            n.__index__
+        except AttributeError:
+            raise TypeError("an integer is required")
         if n < 0:
             # Read everything.
             result = (self._get_decoded_chars() +

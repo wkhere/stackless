@@ -173,7 +173,7 @@ available.  They are listed here in alphabetical order.
 
    .. note::
 
-      When compiling a string with multi-line statements, line endings must be
+      When compiling a string with multi-line code, line endings must be
       represented by a single newline character (``'\n'``), and the input must
       be terminated by at least one newline character.  If line endings are
       represented by ``'\r\n'``, use :meth:`str.replace` to change them into
@@ -336,7 +336,7 @@ available.  They are listed here in alphabetical order.
    This function can also be used to execute arbitrary code objects (such as
    those created by :func:`compile`).  In this case pass a code object instead
    of a string.  If the code object has been compiled with ``'exec'`` as the
-   *kind* argument, :func:`eval`\'s return value will be ``None``.
+   *mode* argument, :func:`eval`\'s return value will be ``None``.
 
    Hints: dynamic execution of statements is supported by the :keyword:`exec`
    statement.  Execution of statements from a file is supported by the
@@ -399,8 +399,9 @@ available.  They are listed here in alphabetical order.
    iterable if function(item)]`` if function is not ``None`` and ``[item for item
    in iterable if item]`` if function is ``None``.
 
-   See :func:`itertools.filterfalse` for the complementary function that returns
-   elements of *iterable* for which *function* returns false.
+   See :func:`itertools.ifilter` and :func:`itertools.ifilterfalse` for iterator
+   versions of this function, including a variation that filters for elements
+   where the *function* returns false.
 
 
 .. function:: float([x])
@@ -863,7 +864,7 @@ available.  They are listed here in alphabetical order.
 
    *fget* is a function for getting an attribute value, likewise *fset* is a
    function for setting, and *fdel* a function for del'ing, an attribute.  Typical
-   use is to define a managed attribute x::
+   use is to define a managed attribute ``x``::
 
       class C(object):
           def __init__(self):
@@ -876,6 +877,9 @@ available.  They are listed here in alphabetical order.
           def delx(self):
               del self._x
           x = property(getx, setx, delx, "I'm the 'x' property.")
+
+   If then *c* is an instance of *C*, ``c.x`` will invoke the getter,
+   ``c.x = value`` will invoke the setter and ``del c.x`` the deleter.
 
    If given, *doc* will be the docstring of the property attribute. Otherwise, the
    property will copy *fget*'s docstring (if it exists).  This makes it possible to
@@ -1087,7 +1091,7 @@ available.  They are listed here in alphabetical order.
 .. function:: set([iterable])
    :noindex:
 
-   Return a new set, optionally with elements are taken from *iterable*.
+   Return a new set, optionally with elements taken from *iterable*.
    The set type is described in :ref:`types-set`.
 
    For other containers see the built in :class:`dict`, :class:`list`, and
@@ -1135,7 +1139,8 @@ available.  They are listed here in alphabetical order.
    value is ``None``.
 
    *key* specifies a function of one argument that is used to extract a comparison
-   key from each list element: ``key=str.lower``.  The default value is ``None``.
+   key from each list element: ``key=str.lower``.  The default value is ``None``
+   (compare the elements directly).
 
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
@@ -1146,6 +1151,9 @@ available.  They are listed here in alphabetical order.
    each element only once.  To convert an old-style *cmp* function to a *key*
    function, see the `CmpToKey recipe in the ASPN cookbook
    <http://code.activestate.com/recipes/576653/>`_\.
+
+   For sorting examples and a brief sorting tutorial, see `Sorting HowTo
+   <http://wiki.python.org/moin/HowTo/Sorting/>`_\.
 
    .. versionadded:: 2.4
 
@@ -1386,8 +1394,8 @@ available.  They are listed here in alphabetical order.
       restricts all arguments to native C longs ("short" Python integers), and
       also requires that the number of elements fit in a native C long.  If a
       larger range is needed, an alternate version can be crafted using the
-      :mod:`itertools` module: ``islice(count(start, step),
-      (stop-start+step-1)//step)``.
+      :mod:`itertools` module: ``takewhile(lambda x: x<stop, (start+i*step
+      for i in count()))``.
 
 
 .. function:: zip([iterable, ...])
@@ -1435,8 +1443,8 @@ available.  They are listed here in alphabetical order.
       programming.
 
    This function is invoked by the :keyword:`import` statement.  It can be
-   replaced (by importing the :mod:`builtins` module and assigning to
-   ``builtins.__import__``) in order to change semantics of the
+   replaced (by importing the :mod:`__builtin__` module and assigning to
+   ``__builtin__.__import__``) in order to change semantics of the
    :keyword:`import` statement, but nowadays it is usually simpler to use import
    hooks (see :pep:`302`).  Direct use of :func:`__import__` is rare, except in
    cases where you want to import a module whose name is only known at runtime.

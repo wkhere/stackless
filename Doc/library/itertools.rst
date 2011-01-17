@@ -101,7 +101,7 @@ loops that truncate the stream.
                   yield element
 
 
-.. function:: itertools.chain.from_iterable(iterable)
+.. classmethod:: chain.from_iterable(iterable)
 
    Alternate constructor for :func:`chain`.  Gets chained inputs from a
    single iterable argument that is evaluated lazily.  Equivalent to::
@@ -632,9 +632,6 @@ which incur interpreter overhead.
        "Return first n items of the iterable as a list"
        return list(islice(iterable, n))
 
-   def enumerate(iterable, start=0):
-       return izip(count(start), iterable)
-
    def tabulate(function, start=0):
        "Return function(0), function(1), ..."
        return imap(function, count(start))
@@ -666,13 +663,14 @@ which incur interpreter overhead.
 
    def ncycles(iterable, n):
        "Returns the sequence elements n times"
-       return chain.from_iterable(repeat(iterable, n))
+       return chain.from_iterable(repeat(tuple(iterable), n))
 
    def dotproduct(vec1, vec2):
        return sum(imap(operator.mul, vec1, vec2))
 
    def flatten(listOfLists):
-       return list(chain.from_iterable(listOfLists))
+       "Flatten one level of nesting"
+       return chain.from_iterable(listOfLists)
 
    def repeatfunc(func, times=None, *args):
        """Repeat calls to func with specified arguments.
@@ -741,10 +739,9 @@ which incur interpreter overhead.
        seen = set()
        seen_add = seen.add
        if key is None:
-           for element in iterable:
-               if element not in seen:
-                   seen_add(element)
-                   yield element
+           for element in ifilterfalse(seen.__contains__, iterable):
+               seen_add(element)
+               yield element
        else:
            for element in iterable:
                k = key(element)
@@ -757,6 +754,55 @@ which incur interpreter overhead.
        # unique_justseen('AAAABBBCCDAABBB') --> A B C D A B
        # unique_justseen('ABBCcAD', str.lower) --> A B C A D
        return imap(next, imap(itemgetter(1), groupby(iterable, key)))
+
+   def iter_except(func, exception, first=None):
+       """ Call a function repeatedly until an exception is raised.
+
+       Converts a call-until-exception interface to an iterator interface.
+       Like __builtin__.iter(func, sentinel) but uses an exception instead
+       of a sentinel to end the loop.
+
+       Examples:
+           bsddbiter = iter_except(db.next, bsddb.error, db.first)
+           heapiter = iter_except(functools.partial(heappop, h), IndexError)
+           dictiter = iter_except(d.popitem, KeyError)
+           dequeiter = iter_except(d.popleft, IndexError)
+           queueiter = iter_except(q.get_nowait, Queue.Empty)
+           setiter = iter_except(s.pop, KeyError)
+
+       """
+       try:
+           if first is not None:
+               yield first()
+           while 1:
+               yield func()
+       except exception:
+           pass
+
+   def random_product(*args, **kwds):
+       "Random selection from itertools.product(*args, **kwds)"
+       pools = map(tuple, args) * kwds.get('repeat', 1)
+       return tuple(random.choice(pool) for pool in pools)
+
+   def random_permutation(iterable, r=None):
+       "Random selection from itertools.permutations(iterable, r)"
+       pool = tuple(iterable)
+       r = len(pool) if r is None else r
+       return tuple(random.sample(pool, r))
+
+   def random_combination(iterable, r):
+       "Random selection from itertools.combinations(iterable, r)"
+       pool = tuple(iterable)
+       n = len(pool)
+       indices = sorted(random.sample(xrange(n), r))
+       return tuple(pool[i] for i in indices)
+
+   def random_combination_with_replacement(iterable, r):
+       "Random selection from itertools.combinations_with_replacement(iterable, r)"
+       pool = tuple(iterable)
+       n = len(pool)
+       indices = sorted(random.randrange(n) for i in xrange(r))
+       return tuple(pool[i] for i in indices)
 
 Note, many of the above recipes can be optimized by replacing global lookups
 with local variables defined as default values.  For example, the

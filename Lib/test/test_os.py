@@ -500,14 +500,15 @@ class DevNullTests (unittest.TestCase):
 class URandomTests (unittest.TestCase):
     def test_urandom(self):
         try:
-            self.assertEqual(len(os.urandom(1)), 1)
-            self.assertEqual(len(os.urandom(10)), 10)
-            self.assertEqual(len(os.urandom(100)), 100)
-            self.assertEqual(len(os.urandom(1000)), 1000)
-            # see http://bugs.python.org/issue3708
-            self.assertEqual(len(os.urandom(0.9)), 0)
-            self.assertEqual(len(os.urandom(1.1)), 1)
-            self.assertEqual(len(os.urandom(2.0)), 2)
+            with test_support.check_warnings():
+                self.assertEqual(len(os.urandom(1)), 1)
+                self.assertEqual(len(os.urandom(10)), 10)
+                self.assertEqual(len(os.urandom(100)), 100)
+                self.assertEqual(len(os.urandom(1000)), 1000)
+                # see http://bugs.python.org/issue3708
+                self.assertEqual(len(os.urandom(0.9)), 0)
+                self.assertEqual(len(os.urandom(1.1)), 1)
+                self.assertEqual(len(os.urandom(2.0)), 2)
         except NotImplementedError:
             pass
 

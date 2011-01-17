@@ -6,6 +6,7 @@ import socket
 import threading
 import sys
 import time
+import errno
 
 from test import test_support
 from test.test_support import TESTFN, run_unittest, unlink
@@ -301,6 +302,26 @@ class DispatcherTests(unittest.TestCase):
                     'warning: unhandled accept event']
         self.assertEquals(lines, expected)
 
+    def test_issue_8594(self):
+        d = asyncore.dispatcher(socket.socket())
+        # make sure the error message no longer refers to the socket
+        # object but the dispatcher instance instead
+        try:
+            d.foo
+        except AttributeError, err:
+            self.assertTrue('dispatcher instance' in str(err))
+        else:
+            self.fail("exception not raised")
+        # test cheap inheritance with the underlying socket
+        self.assertEqual(d.family, socket.AF_INET)
+
+    def test_strerror(self):
+        # refers to bug #8573
+        err = asyncore._strerror(errno.EPERM)
+        if hasattr(os, 'strerror'):
+            self.assertEqual(err, os.strerror(errno.EPERM))
+        err = asyncore._strerror(-1)
+        self.assertTrue("unknown error" in err.lower())
 
 
 class dispatcherwithsend_noread(asyncore.dispatcher_with_send):
@@ -390,6 +411,17 @@ if hasattr(asyncore, 'file_wrapper'):
             w.send(d2)
             w.close()
             self.assertEqual(file(TESTFN).read(), self.d + d1 + d2)
+
+        def test_dispatcher(self):
+            fd = os.open(TESTFN, os.O_RDONLY)
+            data = []
+            class FileDispatcher(asyncore.file_dispatcher):
+                def handle_read(self):
+                    data.append(self.recv(29))
+            s = FileDispatcher(fd)
+            os.close(fd)
+            asyncore.loop(timeout=0.01, use_poll=True, count=2)
+            self.assertEqual("".join(data), self.d)
 
 
 def test_main():

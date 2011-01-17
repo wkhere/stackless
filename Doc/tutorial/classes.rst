@@ -64,7 +64,7 @@ Let's begin with some definitions.
 A *namespace* is a mapping from names to objects.  Most namespaces are currently
 implemented as Python dictionaries, but that's normally not noticeable in any
 way (except for performance), and it may change in the future.  Examples of
-namespaces are: the set of built-in names (functions such as :func:`abs`, and
+namespaces are: the set of built-in names (containing functions such as :func:`abs`, and
 built-in exception names); the global names in a module; and the local names in
 a function invocation.  In a sense the set of attributes of an object also form
 a namespace.  The important thing to know about namespaces is that there is
@@ -693,7 +693,7 @@ This example shows how it all works::
    StopIteration
 
 Having seen the mechanics behind the iterator protocol, it is easy to add
-iterator behavior to your classes.  Define a :meth:`__iter__` method which
+iterator behavior to your classes.  Define an :meth:`__iter__` method which
 returns an object with a :meth:`next` method.  If the class defines
 :meth:`next`, then :meth:`__iter__` can just return ``self``::
 
@@ -710,7 +710,10 @@ returns an object with a :meth:`next` method.  If the class defines
            self.index = self.index - 1
            return self.data[self.index]
 
-   >>> for char in Reverse('spam'):
+   >>> rev = Reverse('spam')
+   >>> iter(rev)
+   <__main__.Reverse object at 0x00A1DB50>
+   >>> for char in rev:
    ...     print char
    ...
    m

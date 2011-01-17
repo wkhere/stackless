@@ -163,9 +163,7 @@ required option
    an option that must be supplied on the command-line; note that the phrase
    "required option" is self-contradictory in English.  :mod:`optparse` doesn't
    prevent you from implementing required options, but doesn't give you much
-   help at it either.  See ``examples/required_1.py`` and
-   ``examples/required_2.py`` in the :mod:`optparse` source distribution for two
-   ways to implement required options with :mod:`optparse`.
+   help at it either.
 
 For example, consider this hypothetical command-line::
 
@@ -769,7 +767,8 @@ The first step in using :mod:`optparse` is to create an OptionParser instance.
       The string to use when expanding ``"%prog"`` in ``usage`` and ``version``
       instead of ``os.path.basename(sys.argv[0])``.
 
-
+   ``epilog`` (default: ``None``)
+      A paragraph of help text to print after the option help.
 
 .. _optparse-populating-parser:
 
@@ -1234,8 +1233,9 @@ where the input parameters are
    the list of arguments to process (default: ``sys.argv[1:]``)
 
 ``values``
-   object to store option arguments in (default: a new instance of
-   :class:`optparse.Values`)
+   a :class:`optparse.Values` object to store option arguments in (default: a
+   new instance of :class:`Values`) -- if you give an existing object, the
+   option defaults will not be initialized on it
 
 and the return values are
 
