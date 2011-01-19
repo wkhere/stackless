@@ -1,4 +1,3 @@
-
 :mod:`timeit` --- Measure execution time of small code snippets
 ===============================================================
 
@@ -18,14 +17,15 @@ for measuring execution times.  See also Tim Peters' introduction to the
 The module defines the following public class:
 
 
-.. class:: Timer([stmt='pass' [, setup='pass' [, timer=<timer function>]]])
+.. class:: Timer(stmt='pass', setup='pass', timer=<timer function>)
 
    Class for timing execution speed of small code snippets.
 
    The constructor takes a statement to be timed, an additional statement used for
    setup, and a timer function.  Both statements default to ``'pass'``; the timer
-   function is platform-dependent (see the module doc string).  The statements may
-   contain newlines, as long as they don't contain multi-line string literals.
+   function is platform-dependent (see the module doc string).  *stmt* and *setup*
+   may also contain multiple statements separated by ``;`` or newlines, as long as
+   they don't contain multi-line string literals.
 
    To measure the execution time of the first statement, use the :meth:`timeit`
    method.  The :meth:`repeat` method is a convenience to call :meth:`timeit`
@@ -37,7 +37,7 @@ The module defines the following public class:
    little larger in this case because of the extra function calls.
 
 
-.. method:: Timer.print_exc([file=None])
+.. method:: Timer.print_exc(file=None)
 
    Helper to print a traceback from the timed code.
 
@@ -54,7 +54,7 @@ The module defines the following public class:
    traceback is sent; it defaults to ``sys.stderr``.
 
 
-.. method:: Timer.repeat([repeat=3 [, number=1000000]])
+.. method:: Timer.repeat(repeat=3, number=1000000)
 
    Call :meth:`timeit` a few times.
 
@@ -75,7 +75,7 @@ The module defines the following public class:
       and apply common sense rather than statistics.
 
 
-.. method:: Timer.timeit([number=1000000])
+.. method:: Timer.timeit(number=1000000)
 
    Time *number* executions of the main statement. This executes the setup
    statement once, and then returns the time it takes to execute the main statement
@@ -97,14 +97,14 @@ The module defines the following public class:
 
 The module also defines two convenience functions:
 
-.. function:: repeat(stmt[, setup[, timer[, repeat=3 [, number=1000000]]]])
+.. function:: repeat(stmt='pass', setup='pass', timer=<default timer>, repeat=3, number=1000000)
 
    Create a :class:`Timer` instance with the given statement, setup code and timer
    function and run its :meth:`repeat` method with the given repeat count and
    *number* executions.
 
 
-.. function:: timeit(stmt[, setup[, timer[, number=1000000]]])
+.. function:: timeit(stmt='pass', setup='pass', timer=<default timer>, number=1000000)
 
    Create a :class:`Timer` instance with the given statement, setup code and timer
    function and run its :meth:`timeit` method with *number* executions.
@@ -117,27 +117,36 @@ When called as a program from the command line, the following form is used::
 
    python -m timeit [-n N] [-r N] [-s S] [-t] [-c] [-h] [statement ...]
 
-where the following options are understood:
+Where the following options are understood:
 
--n N/:option:`--number=N`
+.. program:: timeit
+
+.. cmdoption:: -n N, --number=N
+
    how many times to execute 'statement'
 
--r N/:option:`--repeat=N`
+.. cmdoption:: -r N, --repeat=N
+
    how many times to repeat the timer (default 3)
 
--s S/:option:`--setup=S`
-   statement to be executed once initially (default ``'pass'``)
+.. cmdoption:: -s S, --setup=S
 
--t/:option:`--time`
+   statement to be executed once initially (default ``pass``)
+
+.. cmdoption:: -t, --time
+
    use :func:`time.time` (default on all platforms but Windows)
 
--c/:option:`--clock`
+.. cmdoption:: -c, --clock
+
    use :func:`time.clock` (default on Windows)
 
--v/:option:`--verbose`
+.. cmdoption:: -v, --verbose
+
    print raw timing results; repeat for more digits precision
 
--h/:option:`--help`
+.. cmdoption:: -h, --help
+
    print a short usage message and exit
 
 A multi-line statement may be given by specifying each line as a separate

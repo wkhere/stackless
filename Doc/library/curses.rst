@@ -4,9 +4,9 @@
 .. module:: curses
    :synopsis: An interface to the curses library, providing portable
               terminal handling.
+   :platform: Unix
 .. sectionauthor:: Moshe Zadka <moshez@zadka.site.co.il>
 .. sectionauthor:: Eric Raymond <esr@thyrsus.com>
-
 
 The :mod:`curses` module provides an interface to the curses library, the
 de-facto standard for portable advanced terminal handling.
@@ -49,7 +49,7 @@ Linux and the BSD variants of Unix.
       Tutorial material on using curses with Python, by Andrew Kuchling and Eric
       Raymond.
 
-   The :file:`Demo/curses/` directory in the Python source distribution contains
+   The :file:`Tools/demo/` directory in the Python source distribution contains
    some example programs using the curses bindings provided by this module.
 
 
@@ -183,7 +183,7 @@ The module :mod:`curses` defines the following functions:
 
 .. function:: filter()
 
-   The :func:`filter` routine, if used, must be called before :func:`initscr` is
+   The :func:`.filter` routine, if used, must be called before :func:`initscr` is
    called.  The effect is that, during those calls, LINES is set to 1; the
    capabilities clear, cup, cud, cud1, cuu1, cuu, vpa are disabled; and the home
    string is set to the value of cr. The effect is that the cursor is confined to
@@ -606,9 +606,9 @@ the following methods:
    .. note::
 
       A *character* means a C character (an ASCII code), rather then a Python
-      character (a string of length 1). (This note is true whenever the documentation
-      mentions a character.) The builtin :func:`ord` is handy for conveying strings to
-      codes.
+      character (a string of length 1). (This note is true whenever the
+      documentation mentions a character.) The built-in :func:`ord` is handy for
+      conveying strings to codes.
 
    Paint character *ch* at ``(y, x)`` with attributes *attr*, overwriting any
    character previously painter at that location.  By default, the character

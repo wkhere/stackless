@@ -350,7 +350,7 @@ PyDoc_STRVAR(stringio_truncate_doc,
     "Truncate size to pos.\n"
     "\n"
     "The pos argument defaults to the current file position, as\n"
-    "returned by tell().  Imply an absolute seek to pos.\n"
+    "returned by tell().  The current file position is unchanged.\n"
     "Returns the new absolute position.\n");
 
 static PyObject *
@@ -390,7 +390,6 @@ stringio_truncate(stringio *self, PyObject *args)
             return NULL;
         self->string_size = size;
     }
-    self->pos = size;
 
     return PyLong_FromSsize_t(size);
 }
@@ -509,11 +508,15 @@ static void
 stringio_dealloc(stringio *self)
 {
     _PyObject_GC_UNTRACK(self);
+    self->ok = 0;
+    if (self->buf) {
+        PyMem_Free(self->buf);
+        self->buf = NULL;
+    }
     Py_CLEAR(self->readnl);
     Py_CLEAR(self->writenl);
     Py_CLEAR(self->decoder);
-    if (self->buf)
-        PyMem_Free(self->buf);
+    Py_CLEAR(self->dict);
     if (self->weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *) self);
     Py_TYPE(self)->tp_free(self);
@@ -529,9 +532,9 @@ stringio_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self == NULL)
         return NULL;
 
-    self->string_size = 0;
-    self->pos = 0;
-    self->buf_size = 0;
+    /* tp_alloc initializes all the fields to zero. So we don't have to
+       initialize them here. */
+
     self->buf = (Py_UNICODE *)PyMem_Malloc(0);
     if (self->buf == NULL) {
         Py_DECREF(self);
@@ -546,22 +549,42 @@ stringio_init(stringio *self, PyObject *args, PyObject *kwds)
 {
     char *kwlist[] = {"initial_value", "newline", NULL};
     PyObject *value = NULL;
+    PyObject *newline_obj = NULL;
     char *newline = "\n";
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oz:__init__", kwlist,
-                                     &value, &newline))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OO:__init__", kwlist,
+                                     &value, &newline_obj))
         return -1;
+
+    /* Parse the newline argument. This used to be done with the 'z'
+       specifier, however this allowed any object with the buffer interface to
+       be converted. Thus we have to parse it manually since we only want to
+       allow unicode objects or None. */
+    if (newline_obj == Py_None) {
+        newline = NULL;
+    }
+    else if (newline_obj) {
+        if (!PyUnicode_Check(newline_obj)) {
+            PyErr_Format(PyExc_TypeError,
+                         "newline must be str or None, not %.200s",
+                         Py_TYPE(newline_obj)->tp_name);
+            return -1;
+        }
+        newline = _PyUnicode_AsString(newline_obj);
+        if (newline == NULL)
+            return -1;
+    }
 
     if (newline && newline[0] != '\0'
         && !(newline[0] == '\n' && newline[1] == '\0')
         && !(newline[0] == '\r' && newline[1] == '\0')
         && !(newline[0] == '\r' && newline[1] == '\n' && newline[2] == '\0')) {
         PyErr_Format(PyExc_ValueError,
-                     "illegal newline value: %s", newline);
+                     "illegal newline value: %R", newline_obj);
         return -1;
     }
     if (value && value != Py_None && !PyUnicode_Check(value)) {
-        PyErr_Format(PyExc_ValueError,
+        PyErr_Format(PyExc_TypeError,
                      "initial_value must be str or None, not %.200s",
                      Py_TYPE(value)->tp_name);
         return -1;
@@ -572,6 +595,9 @@ stringio_init(stringio *self, PyObject *args, PyObject *kwds)
     Py_CLEAR(self->readnl);
     Py_CLEAR(self->writenl);
     Py_CLEAR(self->decoder);
+
+    assert((newline != NULL && newline_obj != Py_None) ||
+           (newline == NULL && newline_obj == Py_None));
 
     if (newline) {
         self->readnl = PyUnicode_FromString(newline);
@@ -645,6 +671,135 @@ stringio_writable(stringio *self, PyObject *args)
     Py_RETURN_TRUE;
 }
 
+/* Pickling support.
+
+   The implementation of __getstate__ is similar to the one for BytesIO,
+   except that we also save the newline parameter. For __setstate__ and unlike
+   BytesIO, we call __init__ to restore the object's state. Doing so allows us
+   to avoid decoding the complex newline state while keeping the object
+   representation compact.
+
+   See comment in bytesio.c regarding why only pickle protocols and onward are
+   supported.
+*/
+
+static PyObject *
+stringio_getstate(stringio *self)
+{
+    PyObject *initvalue = stringio_getvalue(self);
+    PyObject *dict;
+    PyObject *state;
+
+    if (initvalue == NULL)
+        return NULL;
+    if (self->dict == NULL) {
+        Py_INCREF(Py_None);
+        dict = Py_None;
+    }
+    else {
+        dict = PyDict_Copy(self->dict);
+        if (dict == NULL)
+            return NULL;
+    }
+
+    state = Py_BuildValue("(OOnN)", initvalue,
+                          self->readnl ? self->readnl : Py_None,
+                          self->pos, dict);
+    Py_DECREF(initvalue);
+    return state;
+}
+
+static PyObject *
+stringio_setstate(stringio *self, PyObject *state)
+{
+    PyObject *initarg;
+    PyObject *position_obj;
+    PyObject *dict;
+    Py_ssize_t pos;
+
+    assert(state != NULL);
+    CHECK_CLOSED(self);
+
+    /* We allow the state tuple to be longer than 4, because we may need
+       someday to extend the object's state without breaking
+       backward-compatibility. */
+    if (!PyTuple_Check(state) || Py_SIZE(state) < 4) {
+        PyErr_Format(PyExc_TypeError,
+                     "%.200s.__setstate__ argument should be 4-tuple, got %.200s",
+                     Py_TYPE(self)->tp_name, Py_TYPE(state)->tp_name);
+        return NULL;
+    }
+
+    /* Initialize the object's state. */
+    initarg = PyTuple_GetSlice(state, 0, 2);
+    if (initarg == NULL)
+        return NULL;
+    if (stringio_init(self, initarg, NULL) < 0) {
+        Py_DECREF(initarg);
+        return NULL;
+    }
+    Py_DECREF(initarg);
+
+    /* Restore the buffer state. Even if __init__ did initialize the buffer,
+       we have to initialize it again since __init__ may translates the
+       newlines in the inital_value string. We clearly do not want that
+       because the string value in the state tuple has already been translated
+       once by __init__. So we do not take any chance and replace object's
+       buffer completely. */
+    {
+        Py_UNICODE *buf = PyUnicode_AS_UNICODE(PyTuple_GET_ITEM(state, 0));
+        Py_ssize_t bufsize = PyUnicode_GET_SIZE(PyTuple_GET_ITEM(state, 0));
+        if (resize_buffer(self, bufsize) < 0)
+            return NULL;
+        memcpy(self->buf, buf, bufsize * sizeof(Py_UNICODE));
+        self->string_size = bufsize;
+    }
+
+    /* Set carefully the position value. Alternatively, we could use the seek
+       method instead of modifying self->pos directly to better protect the
+       object internal state against errneous (or malicious) inputs. */
+    position_obj = PyTuple_GET_ITEM(state, 2);
+    if (!PyLong_Check(position_obj)) {
+        PyErr_Format(PyExc_TypeError,
+                     "third item of state must be an integer, got %.200s",
+                     Py_TYPE(position_obj)->tp_name);
+        return NULL;
+    }
+    pos = PyLong_AsSsize_t(position_obj);
+    if (pos == -1 && PyErr_Occurred())
+        return NULL;
+    if (pos < 0) {
+        PyErr_SetString(PyExc_ValueError,
+                        "position value cannot be negative");
+        return NULL;
+    }
+    self->pos = pos;
+
+    /* Set the dictionary of the instance variables. */
+    dict = PyTuple_GET_ITEM(state, 3);
+    if (dict != Py_None) {
+        if (!PyDict_Check(dict)) {
+            PyErr_Format(PyExc_TypeError,
+                         "fourth item of state should be a dict, got a %.200s",
+                         Py_TYPE(dict)->tp_name);
+            return NULL;
+        }
+        if (self->dict) {
+            /* Alternatively, we could replace the internal dictionary
+               completely. However, it seems more practical to just update it. */
+            if (PyDict_Update(self->dict, dict) < 0)
+                return NULL;
+        }
+        else {
+            Py_INCREF(dict);
+            self->dict = dict;
+        }
+    }
+
+    Py_RETURN_NONE;
+}
+
+
 static PyObject *
 stringio_closed(stringio *self, void *context)
 {
@@ -672,17 +827,20 @@ stringio_newlines(stringio *self, void *context)
 
 static struct PyMethodDef stringio_methods[] = {
     {"close",    (PyCFunction)stringio_close,    METH_NOARGS,  stringio_close_doc},
-    {"getvalue", (PyCFunction)stringio_getvalue, METH_VARARGS, stringio_getvalue_doc},
+    {"getvalue", (PyCFunction)stringio_getvalue, METH_NOARGS,  stringio_getvalue_doc},
     {"read",     (PyCFunction)stringio_read,     METH_VARARGS, stringio_read_doc},
     {"readline", (PyCFunction)stringio_readline, METH_VARARGS, stringio_readline_doc},
     {"tell",     (PyCFunction)stringio_tell,     METH_NOARGS,  stringio_tell_doc},
     {"truncate", (PyCFunction)stringio_truncate, METH_VARARGS, stringio_truncate_doc},
     {"seek",     (PyCFunction)stringio_seek,     METH_VARARGS, stringio_seek_doc},
     {"write",    (PyCFunction)stringio_write,    METH_O,       stringio_write_doc},
-    
+
     {"seekable", (PyCFunction)stringio_seekable, METH_NOARGS},
     {"readable", (PyCFunction)stringio_readable, METH_NOARGS},
     {"writable", (PyCFunction)stringio_writable, METH_NOARGS},
+
+    {"__getstate__", (PyCFunction)stringio_getstate, METH_NOARGS},
+    {"__setstate__", (PyCFunction)stringio_setstate, METH_O},
     {NULL, NULL}        /* sentinel */
 };
 

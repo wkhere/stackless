@@ -1,7 +1,9 @@
 from importlib import _bootstrap
 from .. import abc
 from . import util as source_util
+from test.support import make_legacy_pyc
 import os
+import errno
 import py_compile
 import unittest
 import warnings
@@ -32,7 +34,9 @@ class FinderTests(abc.FinderTests):
     """
 
     def import_(self, root, module):
-        finder = _bootstrap._PyPycFileFinder(root)
+        finder = _bootstrap._FileFinder(root,
+                                        _bootstrap._SourceFinderDetails(),
+                                        _bootstrap._SourcelessFinderDetails())
         return finder.find_module(module)
 
     def run_test(self, test, create=None, *, compile_=None, unlink=None):
@@ -52,15 +56,24 @@ class FinderTests(abc.FinderTests):
             if unlink:
                 for name in unlink:
                     os.unlink(mapping[name])
+                    try:
+                        make_legacy_pyc(mapping[name])
+                    except OSError as error:
+                        # Some tests do not set compile_=True so the source
+                        # module will not get compiled and there will be no
+                        # PEP 3147 pyc file to rename.
+                        if error.errno != errno.ENOENT:
+                            raise
             loader = self.import_(mapping['.root'], test)
-            self.assert_(hasattr(loader, 'load_module'))
+            self.assertTrue(hasattr(loader, 'load_module'))
             return loader
 
     def test_module(self):
         # [top-level source]
         self.run_test('top_level')
         # [top-level bc]
-        self.run_test('top_level', compile_={'top_level'}, unlink={'top_level'})
+        self.run_test('top_level', compile_={'top_level'},
+                      unlink={'top_level'})
         # [top-level both]
         self.run_test('top_level', compile_={'top_level'})
 
@@ -79,7 +92,7 @@ class FinderTests(abc.FinderTests):
         with source_util.create_modules('pkg.__init__', 'pkg.sub') as mapping:
             pkg_dir = os.path.dirname(mapping['pkg.__init__'])
             loader = self.import_(pkg_dir, 'pkg.sub')
-            self.assert_(hasattr(loader, 'load_module'))
+            self.assertTrue(hasattr(loader, 'load_module'))
 
     # [sub package]
     def test_package_in_package(self):
@@ -87,7 +100,7 @@ class FinderTests(abc.FinderTests):
         with context as mapping:
             pkg_dir = os.path.dirname(mapping['pkg.__init__'])
             loader = self.import_(pkg_dir, 'pkg.sub')
-            self.assert_(hasattr(loader, 'load_module'))
+            self.assertTrue(hasattr(loader, 'load_module'))
 
     # [sub empty]
     def test_empty_sub_directory(self):
@@ -97,28 +110,38 @@ class FinderTests(abc.FinderTests):
             with context as mapping:
                 os.unlink(mapping['pkg.sub.__init__'])
                 pkg_dir = os.path.dirname(mapping['pkg.__init__'])
-                self.assertRaises(ImportWarning, self.import_, pkg_dir,
-                                    'pkg.sub')
+                with self.assertRaises(ImportWarning):
+                    self.import_(pkg_dir, 'pkg.sub')
 
     # [package over modules]
     def test_package_over_module(self):
-        # XXX This is not a blackbox test!
         name = '_temp'
         loader = self.run_test(name, {'{0}.__init__'.format(name), name})
-        self.assert_('__init__' in loader._base_path)
+        self.assertTrue('__init__' in loader.get_filename(name))
 
 
     def test_failure(self):
         with source_util.create_modules('blah') as mapping:
             nothing = self.import_(mapping['.root'], 'sdfsadsadf')
-            self.assert_(nothing is None)
+            self.assertTrue(nothing is None)
 
     # [empty dir]
     def test_empty_dir(self):
         with warnings.catch_warnings():
             warnings.simplefilter("error", ImportWarning)
-            self.assertRaises(ImportWarning, self.run_test, 'pkg',
-            {'pkg.__init__'}, unlink={'pkg.__init__'})
+            with self.assertRaises(ImportWarning):
+                self.run_test('pkg', {'pkg.__init__'}, unlink={'pkg.__init__'})
+
+    def test_empty_string_for_dir(self):
+        # The empty string from sys.path means to search in the cwd.
+        finder = _bootstrap._FileFinder('', _bootstrap._SourceFinderDetails())
+        with open('mod.py', 'w') as file:
+            file.write("# test file for importlib")
+        try:
+            loader = finder.find_module('mod')
+            self.assertTrue(hasattr(loader, 'load_module'))
+        finally:
+            os.unlink('mod.py')
 
 
 def test_main():

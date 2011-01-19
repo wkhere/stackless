@@ -10,11 +10,11 @@ Using the Python Interpreter
 Invoking the Interpreter
 ========================
 
-The Python interpreter is usually installed as :file:`/usr/local/bin/python3.1`
+The Python interpreter is usually installed as :file:`/usr/local/bin/python3.2`
 on those machines where it is available; putting :file:`/usr/local/bin` in your
 Unix shell's search path makes it possible to start it by typing the command ::
 
-   python3.1
+   python3.2
 
 to the shell. [#]_ Since the choice of the directory where the interpreter lives
 is an installation option, other places are possible; check with your local
@@ -22,16 +22,16 @@ Python guru or system administrator.  (E.g., :file:`/usr/local/python` is a
 popular alternative location.)
 
 On Windows machines, the Python installation is usually placed in
-:file:`C:\\Python31`, though you can change this when you're running the
+:file:`C:\\Python32`, though you can change this when you're running the
 installer.  To add this directory to your path,  you can type the following
 command into the command prompt in a DOS box::
 
-   set path=%path%;C:\python31
+   set path=%path%;C:\python32
 
 Typing an end-of-file character (:kbd:`Control-D` on Unix, :kbd:`Control-Z` on
 Windows) at the primary prompt causes the interpreter to exit with a zero exit
 status.  If that doesn't work, you can exit the interpreter by typing the
-following commands: ``import sys; sys.exit()``.
+following command: ``quit()``.
 
 The interpreter's line-editing features usually aren't very sophisticated.  On
 Unix, whoever installed the interpreter may have enabled support for the GNU
@@ -58,14 +58,6 @@ Some Python modules are also useful as scripts.  These can be invoked using
 ``python -m module [arg] ...``, which executes the source file for *module* as
 if you had spelled out its full name on the command line.
 
-Note that there is a difference between ``python file`` and ``python
-<file``.  In the latter case, input requests from the program, such as calling
-``sys.stdin.read()``, are satisfied from *file*.  Since this file has already
-been read until the end by the parser before the program starts executing, the
-program will encounter end-of-file immediately.  In the former case (which is
-usually what you want) they are satisfied from whatever file or device is
-connected to standard input of the Python interpreter.
-
 When a script file is used, it is sometimes useful to be able to run the script
 and enter interactive mode afterwards.  This can be done by passing :option:`-i`
 before the script.  (This does not work if the script is read from standard
@@ -78,8 +70,9 @@ Argument Passing
 ----------------
 
 When known to the interpreter, the script name and additional arguments
-thereafter are passed to the script in the variable ``sys.argv``, which is a
-list of strings.  Its length is at least one; when no script and no arguments
+thereafter are turned into a list of strings and assigned to the ``argv``
+variable in the ``sys`` module.  You can access this list by executing ``import
+sys``.  The length of the list is at least one; when no script and no arguments
 are given, ``sys.argv[0]`` is an empty string.  When the script name is given as
 ``'-'`` (meaning  standard input), ``sys.argv[0]`` is set to ``'-'``.  When
 :option:`-c` *command* is used, ``sys.argv[0]`` is set to ``'-c'``.  When
@@ -101,13 +94,13 @@ with the *secondary prompt*, by default three dots (``...``). The interpreter
 prints a welcome message stating its version number and a copyright notice
 before printing the first prompt::
 
-   $ python3.1
-   Python 3.1a1 (py3k, Sep 12 2007, 12:21:02)
+   $ python3.2
+   Python 3.2 (py3k, Sep 12 2007, 12:21:02)
    [GCC 3.4.6 20060404 (Red Hat 3.4.6-8)] on linux2
    Type "help", "copyright", "credits" or "license" for more information.
    >>>
 
-.. XXX update for final release of Python 3.1
+.. XXX update for new releases
 
 Continuation lines are needed when entering a multi-line construct. As an
 example, take a look at this :keyword:`if` statement::
@@ -155,7 +148,7 @@ Executable Python Scripts
 On BSD'ish Unix systems, Python scripts can be made directly executable, like
 shell scripts, by putting the line ::
 
-   #! /usr/bin/env python3.1
+   #! /usr/bin/env python3.2
 
 (assuming that the interpreter is on the user's :envvar:`PATH`) at the beginning
 of the script and giving the file an executable mode.  The ``#!`` must be the
@@ -243,7 +236,7 @@ in the script::
 
 .. rubric:: Footnotes
 
-.. [#] On Unix, the 3.1 interpreter is by default not installed with the
+.. [#] On Unix, the Python 3.x interpreter is by default not installed with the
    executable named ``python``, so that it does not conflict with a
    simultaneously installed Python 2.x executable.
 

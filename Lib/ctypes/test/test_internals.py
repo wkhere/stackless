@@ -18,22 +18,22 @@ What about pointers?
 """
 
 class ObjectsTestCase(unittest.TestCase):
-    def failUnlessSame(self, a, b):
-        self.failUnlessEqual(id(a), id(b))
+    def assertSame(self, a, b):
+        self.assertEqual(id(a), id(b))
 
     def test_ints(self):
         i = 42000123
-        rc = grc(i)
+        refcnt = grc(i)
         ci = c_int(i)
-        self.failUnlessEqual(rc, grc(i))
-        self.failUnlessEqual(ci._objects, None)
+        self.assertEqual(refcnt, grc(i))
+        self.assertEqual(ci._objects, None)
 
     def test_c_char_p(self):
         s = b"Hello, World"
-        rc = grc(s)
+        refcnt = grc(s)
         cs = c_char_p(s)
-        self.failUnlessEqual(rc + 1, grc(s))
-        self.failUnlessSame(cs._objects, s)
+        self.assertEqual(refcnt + 1, grc(s))
+        self.assertSame(cs._objects, s)
 
     def test_simple_struct(self):
         class X(Structure):
@@ -42,10 +42,10 @@ class ObjectsTestCase(unittest.TestCase):
         a = 421234
         b = 421235
         x = X()
-        self.failUnlessEqual(x._objects, None)
+        self.assertEqual(x._objects, None)
         x.a = a
         x.b = b
-        self.failUnlessEqual(x._objects, None)
+        self.assertEqual(x._objects, None)
 
     def test_embedded_structs(self):
         class X(Structure):
@@ -55,13 +55,13 @@ class ObjectsTestCase(unittest.TestCase):
             _fields_ = [("x", X), ("y", X)]
 
         y = Y()
-        self.failUnlessEqual(y._objects, None)
+        self.assertEqual(y._objects, None)
 
         x1, x2 = X(), X()
         y.x, y.y = x1, x2
-        self.failUnlessEqual(y._objects, {"0": {}, "1": {}})
+        self.assertEqual(y._objects, {"0": {}, "1": {}})
         x1.a, x2.b = 42, 93
-        self.failUnlessEqual(y._objects, {"0": {}, "1": {}})
+        self.assertEqual(y._objects, {"0": {}, "1": {}})
 
     def test_xxx(self):
         class X(Structure):
@@ -70,19 +70,17 @@ class ObjectsTestCase(unittest.TestCase):
         class Y(Structure):
             _fields_ = [("x", X), ("y", X)]
 
-        s1 = "Hello, World"
-        s2 = "Hallo, Welt"
+        s1 = b"Hello, World"
+        s2 = b"Hallo, Welt"
 
         x = X()
         x.a = s1
         x.b = s2
-        self.failUnlessEqual(x._objects, {"0": bytes(s1, "ascii"),
-                                          "1": bytes(s2, "ascii")})
+        self.assertEqual(x._objects, {"0": s1, "1": s2})
 
         y = Y()
         y.x = x
-        self.failUnlessEqual(y._objects, {"0": {"0": bytes(s1, "ascii"),
-                                                "1": bytes(s2, "ascii")}})
+        self.assertEqual(y._objects, {"0": {"0": s1, "1": s2}})
 ##        x = y.x
 ##        del y
 ##        print x._b_base_._objects
@@ -93,7 +91,7 @@ class ObjectsTestCase(unittest.TestCase):
 
         A = c_int*4
         a = A(11, 22, 33, 44)
-        self.failUnlessEqual(a._objects, None)
+        self.assertEqual(a._objects, None)
 
         x = X()
         x.data = a

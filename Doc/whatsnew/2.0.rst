@@ -189,7 +189,7 @@ support Unicode:
   ignored and ``'replace'`` uses U+FFFD, the official replacement character, in
   case of any problems.
 
-* The :keyword:`exec` statement, and various built-ins such as ``eval()``,
+* The ``exec`` statement, and various built-ins such as ``eval()``,
   ``getattr()``, and ``setattr()`` will also accept Unicode strings as well as
   regular strings.  (It's possible that the process of fixing this missed some
   built-ins; if you find a built-in function that accepts strings but doesn't
@@ -515,11 +515,11 @@ functions::
        # kw is a dictionary of keyword args
        ...
 
-The :keyword:`print` statement can now have its output directed to a file-like
-object by following the :keyword:`print` with  ``>> file``, similar to the
+The ``print`` statement can now have its output directed to a file-like
+object by following the ``print`` with  ``>> file``, similar to the
 redirection operator in Unix shells. Previously you'd either have to use the
 :meth:`write` method of the file-like object, which lacks the convenience and
-simplicity of :keyword:`print`, or you could assign a new value to
+simplicity of ``print``, or you could assign a new value to
 ``sys.stdout`` and then restore the old value.  For sending output to standard
 error, it's much easier to write this::
 
@@ -572,8 +572,7 @@ Work has been done on porting Python to 64-bit Windows on the Itanium processor,
 mostly by Trent Mick of ActiveState.  (Confusingly, ``sys.platform`` is still
 ``'win32'`` on Win64 because it seems that for ease of porting, MS Visual C++
 treats code as 32 bit on Itanium.) PythonWin also supports Windows CE; see the
-Python CE page at http://starship.python.net/crew/mhammond/ce/ for more
-information.
+Python CE page at http://pythonce.sourceforge.net/ for more information.
 
 Another new platform is Darwin/MacOS X; initial support for it is in Python 2.0.
 Dynamic loading works, if you specify "configure --with-dyld --with-suffix=.x".
@@ -582,7 +581,7 @@ Consult the README in the Python source distribution for more instructions.
 An attempt has been made to alleviate one of Python's warts, the often-confusing
 :exc:`NameError` exception when code refers to a local variable before the
 variable has been assigned a value.  For example, the following code raises an
-exception on the :keyword:`print` statement in both 1.5.2 and 2.0; in 1.5.2 a
+exception on the ``print`` statement in both 1.5.2 and 2.0; in 1.5.2 a
 :exc:`NameError` exception is raised, while 2.0 raises a new
 :exc:`UnboundLocalError` exception. :exc:`UnboundLocalError` is a subclass of
 :exc:`NameError`, so any existing code that expects :exc:`NameError` to be
@@ -657,7 +656,7 @@ break.
 The change which will probably break the most code is tightening up the
 arguments accepted by some methods.  Some methods would take multiple arguments
 and treat them as a tuple, particularly various list methods such as
-:meth:`.append` and :meth:`.insert`. In earlier versions of Python, if ``L`` is
+:meth:`append` and :meth:`insert`. In earlier versions of Python, if ``L`` is
 a list, ``L.append( 1,2 )`` appends the tuple ``(1,2)`` to the list.  In Python
 2.0 this causes a :exc:`TypeError` exception to be raised, with the message:
 'append requires exactly 1 argument; 2 given'.  The fix is to simply add an
@@ -1041,8 +1040,8 @@ sent over a socket.  When compiling Python, you can edit :file:`Modules/Setup`
 to include SSL support, which adds an additional function to the :mod:`socket`
 module: :func:`socket.ssl(socket, keyfile, certfile)`, which takes a socket
 object and returns an SSL socket.  The :mod:`httplib` and :mod:`urllib` modules
-were also changed to support "https://" URLs, though no one has implemented FTP
-or SMTP over SSL.
+were also changed to support ``https://`` URLs, though no one has implemented
+FTP or SMTP over SSL.
 
 The :mod:`httplib` module has been rewritten by Greg Stein to support HTTP/1.1.
 Backward compatibility with the 1.5 version of :mod:`httplib` is provided,

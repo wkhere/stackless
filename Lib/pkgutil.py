@@ -241,7 +241,8 @@ class ImpLoader:
         return mod
 
     def get_data(self, pathname):
-        return open(pathname, "rb").read()
+        with open(pathname, "rb") as file:
+            return file.read()
 
     def _reopen(self):
         if self.file and self.file.closed:
@@ -318,8 +319,7 @@ try:
     from zipimport import zipimporter
 
     def iter_zipimport_modules(importer, prefix=''):
-        dirlist = zipimport._zip_directory_cache[importer.archive].keys()
-        dirlist.sort()
+        dirlist = sorted(zipimport._zip_directory_cache[importer.archive])
         _prefix = importer.prefix
         plen = len(_prefix)
         yielded = {}

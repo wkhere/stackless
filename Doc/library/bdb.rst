@@ -50,9 +50,10 @@ The :mod:`bdb` module also defines two classes:
       Mark the breakpoint as disabled.
 
 
-   .. method:: bpprint(out=None)
+   .. method:: bpformat()
 
-      Print all the information about the breakpoint:
+      Return a string with all the information about the breakpoint, nicely
+      formatted:
 
       * The breakpoint number.
       * If it is temporary or not.
@@ -61,15 +62,30 @@ The :mod:`bdb` module also defines two classes:
       * If it must be ignored the next N times.
       * The breakpoint hit count.
 
+      .. versionadded:: 3.2
 
-.. class:: Bdb()
+   .. method:: bpprint(out=None)
 
-   The :class:`Bdb` acts as a generic Python debugger base class.
+      Print the output of :meth:`bpformat` to the file *out*, or if it is
+      ``None``, to standard output.
+
+
+.. class:: Bdb(skip=None)
+
+   The :class:`Bdb` class acts as a generic Python debugger base class.
 
    This class takes care of the details of the trace facility; a derived class
    should implement user interaction.  The standard debugger class
    (:class:`pdb.Pdb`) is an example.
 
+   The *skip* argument, if given, must be an iterable of glob-style
+   module name patterns.  The debugger will not step into frames that
+   originate in a module that matches one of these patterns. Whether a
+   frame is considered to originate in a certain module is determined
+   by the ``__name__`` in the frame globals.
+
+   .. versionadded:: 3.1
+      The *skip* argument.
 
    The following methods of :class:`Bdb` normally don't need to be overridden.
 
@@ -100,7 +116,7 @@ The :mod:`bdb` module also defines two classes:
       * ``"exception"``: An exception has occurred.
       * ``"c_call"``: A C function is about to be called.
       * ``"c_return"``: A C function has returned.
-      * ``"c_exception"``: A C function has thrown an exception.
+      * ``"c_exception"``: A C function has raised an exception.
 
       For the Python events, specialized functions (see below) are called.  For
       the C events, no action is taken.
@@ -259,6 +275,15 @@ The :mod:`bdb` module also defines two classes:
 
       Delete all existing breakpoints.
 
+   .. method:: get_bpbynumber(arg)
+
+      Return a breakpoint specified by the given number.  If *arg* is a string,
+      it will be converted to a number.  If *arg* is a non-numeric string, if
+      the given breakpoint never existed or has been deleted, a
+      :exc:`ValueError` is raised.
+
+      .. versionadded:: 3.2
+
    .. method:: get_break(filename, lineno)
 
       Check if there is a breakpoint for *lineno* of *filename*.
@@ -334,12 +359,10 @@ Finally, the module defines the following functions:
 .. function:: effective(file, line, frame)
 
    Determine if there is an effective (active) breakpoint at this line of code.
-   Return breakpoint number or 0 if none.
-
-   Called only if we know there is a breakpoint at this location.  Returns the
-   breakpoint that was triggered and a flag that indicates if it is ok to delete
-   a temporary breakpoint.
+   Return a tuple of the breakpoint and a boolean that indicates if it is ok
+   to delete a temporary breakpoint.  Return ``(None, None)`` if there is no
+   matching breakpoint.
 
 .. function:: set_trace()
 
-   Starts debugging with a :class:`Bdb` instance from caller's frame.
+   Start debugging with a :class:`Bdb` instance from caller's frame.

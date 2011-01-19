@@ -13,7 +13,7 @@ try:
     from docutils.parsers.rst import Parser
     from docutils import frontend
     from docutils import nodes
-    from StringIO import StringIO
+    from io import StringIO
 
     class SilentReporter(Reporter):
 
@@ -92,7 +92,7 @@ class check(Command):
                 missing.append(attr)
 
         if missing:
-            self.warn("missing required meta-data: %s"  % ' ,'.join(missing))
+            self.warn("missing required meta-data: %s"  % ', '.join(missing))
         if metadata.author:
             if not metadata.author_email:
                 self.warn("missing meta-data: if 'author' supplied, " +

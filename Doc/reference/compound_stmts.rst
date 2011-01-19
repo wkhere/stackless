@@ -272,14 +272,12 @@ was translated to ::
        try:
            foo
        finally:
-           N = None
            del N
 
-That means that you have to assign the exception to a different name if you want
-to be able to refer to it after the except clause.  The reason for this is that
-with the traceback attached to them, exceptions will form a reference cycle with
-the stack frame, keeping all locals in that frame alive until the next garbage
-collection occurs.
+This means the exception must be assigned to a different name to be able to
+refer to it after the except clause.  Exceptions are cleared because with the
+traceback attached to them, they form a reference cycle with the stack frame,
+keeping all locals in that frame alive until the next garbage collection occurs.
 
 .. index::
    module: sys
@@ -287,12 +285,11 @@ collection occurs.
 
 Before an except clause's suite is executed, details about the exception are
 stored in the :mod:`sys` module and can be access via :func:`sys.exc_info`.
-:func:`sys.exc_info` returns a 3-tuple consisting of: ``exc_type``, the
-exception class; ``exc_value``, the exception instance; ``exc_traceback``, a
-traceback object (see section :ref:`types`) identifying the point in the program
-where the exception occurred. :func:`sys.exc_info` values are restored to their
-previous values (before the call) when returning from a function that handled an
-exception.
+:func:`sys.exc_info` returns a 3-tuple consisting of the exception class, the
+exception instance and a traceback object (see section :ref:`types`) identifying
+the point in the program where the exception occurred.  :func:`sys.exc_info`
+values are restored to their previous values (before the call) when returning
+from a function that handled an exception.
 
 .. index::
    keyword: else
@@ -352,7 +349,10 @@ usage patterns to be encapsulated for convenient reuse.
 
 The execution of the :keyword:`with` statement with one "item" proceeds as follows:
 
-#. The context expression is evaluated to obtain a context manager.
+#. The context expression (the expression given in the :token:`with_item`) is
+   evaluated to obtain a context manager.
+
+#. The context manager's :meth:`__exit__` is loaded for later use.
 
 #. The context manager's :meth:`__enter__` method is invoked.
 
@@ -363,9 +363,9 @@ The execution of the :keyword:`with` statement with one "item" proceeds as follo
 
       The :keyword:`with` statement guarantees that if the :meth:`__enter__`
       method returns without an error, then :meth:`__exit__` will always be
-      called.  Thus, if an error occurs during the assignment to the target
-      list, it will be treated the same as an error occurring within the suite
-      would be.  See step 5 below.
+      called. Thus, if an error occurs during the assignment to the target list,
+      it will be treated the same as an error occurring within the suite would
+      be. See step 6 below.
 
 #. The suite is executed.
 
@@ -552,26 +552,37 @@ Class definitions
 
 A class definition defines a class object (see section :ref:`types`):
 
-.. XXX need to document PEP 3115 changes here (new metaclasses)
-
 .. productionlist::
    classdef: [`decorators`] "class" `classname` [`inheritance`] ":" `suite`
-   inheritance: "(" [`expression_list`] ")"
+   inheritance: "(" [`argument_list` [","] | `comprehension`] ")"
    classname: `identifier`
 
+A class definition is an executable statement.  The inheritance list usually
+gives a list of base classes (see :ref:`metaclasses` for more advanced uses), so
+each item in the list should evaluate to a class object which allows
+subclassing.  Classes without an inheritance list inherit, by default, from the
+base class :class:`object`; hence, ::
 
-A class definition is an executable statement.  It first evaluates the
-inheritance list, if present.  Each item in the inheritance list should evaluate
-to a class object or class type which allows subclassing.  The class's suite is
-then executed in a new execution frame (see section :ref:`naming`), using a
-newly created local namespace and the original global namespace. (Usually, the
-suite contains only function definitions.)  When the class's suite finishes
-execution, its execution frame is discarded but its local namespace is
-saved. [#]_ A class object is then created using the inheritance list for the
-base classes and the saved local namespace for the attribute dictionary.  The
-class name is bound to this class object in the original local namespace.
+   class Foo:
+       pass
 
-Classes can also be decorated; as with functions, ::
+is equivalent to ::
+
+   class Foo(object):
+       pass
+
+The class's suite is then executed in a new execution frame (see :ref:`naming`),
+using a newly created local namespace and the original global namespace.
+(Usually, the suite contains mostly function definitions.)  When the class's
+suite finishes execution, its execution frame is discarded but its local
+namespace is saved. [#]_ A class object is then created using the inheritance
+list for the base classes and the saved local namespace for the attribute
+dictionary.  The class name is bound to this class object in the original local
+namespace.
+
+Class creation can be customized heavily using :ref:`metaclasses <metaclasses>`.
+
+Classes can also be decorated: just like when decorating functions, ::
 
    @f1(arg)
    @f2
@@ -582,25 +593,24 @@ is equivalent to ::
    class Foo: pass
    Foo = f1(arg)(f2(Foo))
 
-**Programmer's note:** Variables defined in the class definition are class
-variables; they are shared by instances. Instance variables can be set in a
-method with ``self.name = value``.  Both class and instance variables are
-accessible through the notation "``self.name``", and an instance variable hides
-a class variable with the same name when accessed in this way.  Class variables
-can be used as defaults for instance variables, but using mutable values there
-can lead to unexpected results.  Descriptors can be used to create instance
-variables with different implementation details.
+The evaluation rules for the decorator expressions are the same as for function
+decorators.  The result must be a class object, which is then bound to the class
+name.
 
-.. XXX add link to descriptor docs above
+**Programmer's note:** Variables defined in the class definition are class
+attributes; they are shared by instances.  Instance attributes can be set in a
+method with ``self.name = value``.  Both class and instance attributes are
+accessible through the notation "``self.name``", and an instance attribute hides
+a class attribute with the same name when accessed in this way.  Class
+attributes can be used as defaults for instance attributes, but using mutable
+values there can lead to unexpected results.  :ref:`Descriptors <descriptors>`
+can be used to create instance variables with different implementation details.
+
 
 .. seealso::
 
+   :pep:`3116` - Metaclasses in Python 3
    :pep:`3129` - Class Decorators
-
-Class definitions, like function definitions, may be wrapped by one or more
-:term:`decorator` expressions.  The evaluation rules for the decorator
-expressions are the same as for functions.  The result must be a class object,
-which is then bound to the class name.
 
 
 .. rubric:: Footnotes
@@ -608,9 +618,9 @@ which is then bound to the class name.
 .. [#] The exception is propagated to the invocation stack only if there is no
    :keyword:`finally` clause that negates the exception.
 
-.. [#] Currently, control "flows off the end" except in the case of an exception or the
-   execution of a :keyword:`return`, :keyword:`continue`, or :keyword:`break`
-   statement.
+.. [#] Currently, control "flows off the end" except in the case of an exception
+   or the execution of a :keyword:`return`, :keyword:`continue`, or
+   :keyword:`break` statement.
 
 .. [#] A string literal appearing as the first statement in the function body is
    transformed into the function's ``__doc__`` attribute and therefore the

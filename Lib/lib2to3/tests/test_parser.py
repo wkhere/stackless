@@ -6,6 +6,8 @@ parts of the grammar we've changed, we also make sure we can parse the
 test_grammar.py files from both Python 2 and Python 3.
 """
 
+from __future__ import with_statement
+
 # Testing imports
 from . import support
 from .support import driver, test_dir
@@ -147,13 +149,13 @@ class TestParserIdempotency(support.TestCase):
 
     def test_all_project_files(self):
         for filepath in support.all_project_files():
-            print("Parsing %s..." % filepath)
             with open(filepath, "rb") as fp:
                 encoding = tokenize.detect_encoding(fp.readline)[0]
-                fp.seek(0)
+            self.assertTrue(encoding is not None,
+                            "can't detect encoding for %s" % filepath)
+            with open(filepath, "r") as fp:
                 source = fp.read()
-                if encoding:
-                    source = source.decode(encoding)
+                source = source.decode(encoding)
             tree = driver.parse_string(source)
             new = str(tree)
             if encoding:
@@ -161,6 +163,11 @@ class TestParserIdempotency(support.TestCase):
             if diff(filepath, new):
                 self.fail("Idempotency failed: %s" % filepath)
 
+    def test_extended_unpacking(self):
+        driver.parse_string("a, *b, c = x\n")
+        driver.parse_string("[*a, b] = x\n")
+        driver.parse_string("(z, *y, w) = m\n")
+        driver.parse_string("for *z, m in d: pass\n")
 
 class TestLiterals(GrammarTest):
 
@@ -195,13 +202,14 @@ class TestLiterals(GrammarTest):
         self.validate(s)
 
 
-def diff(fn, result):
-    f = open("@", "wb")
+def diff(fn, result, encoding):
+    f = open("@", "w")
     try:
-        f.write(result)
+        f.write(result.encode(encoding))
     finally:
         f.close()
     try:
-        return os.system("diff -u %s @" % fn)
+        fn = fn.replace('"', '\\"')
+        return os.system('diff -u "%s" @' % fn)
     finally:
         os.remove("@")

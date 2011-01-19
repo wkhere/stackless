@@ -7,7 +7,6 @@ import copy
 import pickle
 from io import StringIO
 import random
-import os
 
 BIG = 100000
 
@@ -115,6 +114,30 @@ class TestBasic(unittest.TestCase):
             d = deque('abc')
             d.maxlen = 10
 
+    def test_count(self):
+        for s in ('', 'abracadabra', 'simsalabim'*500+'abc'):
+            s = list(s)
+            d = deque(s)
+            for letter in 'abcdefghijklmnopqrstuvwxyz':
+                self.assertEqual(s.count(letter), d.count(letter), (s, d, letter))
+        self.assertRaises(TypeError, d.count)       # too few args
+        self.assertRaises(TypeError, d.count, 1, 2) # too many args
+        class BadCompare:
+            def __eq__(self, other):
+                raise ArithmeticError
+        d = deque([1, 2, BadCompare(), 3])
+        self.assertRaises(ArithmeticError, d.count, 2)
+        d = deque([1, 2, 3])
+        self.assertRaises(ArithmeticError, d.count, BadCompare())
+        class MutatingCompare:
+            def __eq__(self, other):
+                self.d.pop()
+                return True
+        m = MutatingCompare()
+        d = deque([1, 2, 3, m, 4, 5])
+        m.d = d
+        self.assertRaises(RuntimeError, d.count, 3)
+
     def test_comparisons(self):
         d = deque('xabc'); d.popleft()
         for e in [d, deque('abc'), deque('ab'), deque(), list(d)]:
@@ -136,12 +159,23 @@ class TestBasic(unittest.TestCase):
         self.assertRaises(TypeError, d.extend, 1)
         d.extend('bcd')
         self.assertEqual(list(d), list('abcd'))
+        d.extend(d)
+        self.assertEqual(list(d), list('abcdabcd'))
+
+    def test_iadd(self):
+        d = deque('a')
+        d += 'bcd'
+        self.assertEqual(list(d), list('abcd'))
+        d += d
+        self.assertEqual(list(d), list('abcdabcd'))
 
     def test_extendleft(self):
         d = deque('a')
         self.assertRaises(TypeError, d.extendleft, 1)
         d.extendleft('bcd')
         self.assertEqual(list(d), list(reversed('abcd')))
+        d.extendleft(d)
+        self.assertEqual(list(d), list('abcddcba'))
         d = deque()
         d.extendleft(range(1000))
         self.assertEqual(list(d), list(reversed(range(1000))))
@@ -188,10 +222,22 @@ class TestBasic(unittest.TestCase):
             self.assertEqual(len(d), n-i)
             j = random.randrange(-len(d), len(d))
             val = d[j]
-            self.assert_(val in d)
+            self.assertIn(val, d)
             del d[j]
-            self.assert_(val not in d)
+            self.assertNotIn(val, d)
         self.assertEqual(len(d), 0)
+
+    def test_reverse(self):
+        n = 500         # O(n**2) test, don't make this too big
+        data = [random.random() for i in range(n)]
+        for i in range(n):
+            d = deque(data[:i])
+            r = d.reverse()
+            self.assertEqual(list(d), list(reversed(data[:i])))
+            self.assertIs(r, None)
+            d.reverse()
+            self.assertEqual(list(d), data[:i])
+        self.assertRaises(TypeError, d.reverse, 1)          # Arity is zero
 
     def test_rotate(self):
         s = tuple('abcde')
@@ -291,7 +337,7 @@ class TestBasic(unittest.TestCase):
         self.assertRaises(RuntimeError, d.remove, 'c')
         for x, y in zip(d, e):
             # verify that original order and values are retained.
-            self.assert_(x is y)
+            self.assertTrue(x is y)
 
         # Handle evil mutator
         for match in (True, False):
@@ -305,7 +351,7 @@ class TestBasic(unittest.TestCase):
         e = eval(repr(d))
         self.assertEqual(list(d), list(e))
         d.append(d)
-        self.assert_('...' in repr(d))
+        self.assertIn('...', repr(d))
 
     def test_print(self):
         d = deque(range(200))
@@ -461,7 +507,7 @@ class TestBasic(unittest.TestCase):
             obj.x = iter(container)
             del obj, container
             gc.collect()
-            self.assert_(ref() is None, "Cycle was not collected")
+            self.assertTrue(ref() is None, "Cycle was not collected")
 
 class TestVariousIteratorArgs(unittest.TestCase):
 

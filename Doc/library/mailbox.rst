@@ -180,15 +180,19 @@ Maildir, mbox, MH, Babyl, and MMDF.
    .. method:: get_file(key)
 
       Return a file-like representation of the message corresponding to *key*,
-      or raise a :exc:`KeyError` exception if no such message exists. The
-      file-like object behaves as if open in binary mode. This file should be
+      or raise a :exc:`KeyError` exception if no such message exists.  The
+      file-like object behaves as if open in binary mode.  This file should be
       closed once it is no longer needed.
+
+      .. versionadded:: 3.2
+         The file-like object supports the context manager protocol, so that
+         you can use a :keyword:`with` statement to automatically close it.
 
       .. note::
 
          Unlike other representations of messages, file-like representations are
          not necessarily independent of the :class:`Mailbox` instance that
-         created them or of the underlying mailbox. More specific documentation
+         created them or of the underlying mailbox.  More specific documentation
          is provided by each subclass.
 
 
@@ -329,7 +333,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
       Return a list of the names of all folders.
 
 
-   .. method:: .et_folder(folder)
+   .. method:: get_folder(folder)
 
       Return a :class:`Maildir` instance representing the folder whose name is
       *folder*. A :exc:`NoSuchMailboxError` exception is raised if the folder
@@ -452,7 +456,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
                unlock()
 
       Three locking mechanisms are used---dot locking and, if available, the
-      :cfunc:`flock` and :cfunc:`lockf` system calls.
+      :c:func:`flock` and :c:func:`lockf` system calls.
 
 
 .. seealso::
@@ -566,7 +570,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
                unlock()
 
       Three locking mechanisms are used---dot locking and, if available, the
-      :cfunc:`flock` and :cfunc:`lockf` system calls. For MH mailboxes, locking
+      :c:func:`flock` and :c:func:`lockf` system calls. For MH mailboxes, locking
       the mailbox means locking the :file:`.mh_sequences` file and, only for the
       duration of any operations that affect them, locking individual message
       files.
@@ -595,7 +599,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
    `nmh - Message Handling System <http://www.nongnu.org/nmh/>`_
       Home page of :program:`nmh`, an updated version of the original :program:`mh`.
 
-   `MH & nmh: Email for Users & Programmers <http://www.ics.uci.edu/~mh/book/>`_
+   `MH & nmh: Email for Users & Programmers <http://rand-mh.sourceforge.net/book/>`_
       A GPL-licensed book on :program:`mh` and :program:`nmh`, with some information
       on the mailbox format.
 
@@ -664,7 +668,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
                unlock()
 
       Three locking mechanisms are used---dot locking and, if available, the
-      :cfunc:`flock` and :cfunc:`lockf` system calls.
+      :c:func:`flock` and :c:func:`lockf` system calls.
 
 
 .. seealso::
@@ -715,7 +719,7 @@ Maildir, mbox, MH, Babyl, and MMDF.
                unlock()
 
       Three locking mechanisms are used---dot locking and, if available, the
-      :cfunc:`flock` and :cfunc:`lockf` system calls.
+      :c:func:`flock` and :c:func:`lockf` system calls.
 
 
 .. seealso::

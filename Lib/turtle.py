@@ -2,7 +2,7 @@
 # turtle.py: a Tkinter based turtle graphics module for Python
 # Version 1.1b - 4. 5. 2009
 #
-# Copyright (C) 2006 - 2009  Gregor Lingl
+# Copyright (C) 2006 - 2010  Gregor Lingl
 # email: glingl@aon.at
 #
 # This software is provided 'as-is', without any express or implied
@@ -109,6 +109,7 @@ import types
 import math
 import time
 import os
+import inspect
 
 from os.path import isfile, split, join
 from copy import deepcopy
@@ -126,7 +127,7 @@ _tg_screen_functions = ['addshape', 'bgcolor', 'bgpic', 'bye',
 _tg_turtle_functions = ['back', 'backward', 'begin_fill', 'begin_poly', 'bk',
         'circle', 'clear', 'clearstamp', 'clearstamps', 'clone', 'color',
         'degrees', 'distance', 'dot', 'down', 'end_fill', 'end_poly', 'fd',
-        'fillcolor', 'forward', 'get_poly', 'getpen', 'getscreen', 'get_shapepoly',
+        'fillcolor', 'filling', 'forward', 'get_poly', 'getpen', 'getscreen', 'get_shapepoly',
         'getturtle', 'goto', 'heading', 'hideturtle', 'home', 'ht', 'isdown',
         'isvisible', 'left', 'lt', 'onclick', 'ondrag', 'onrelease', 'pd',
         'pen', 'pencolor', 'pendown', 'pensize', 'penup', 'pos', 'position',
@@ -169,9 +170,8 @@ _CFG = {"width" : 0.5,               # Screen
 
 def config_dict(filename):
     """Convert content of config-file into dictionary."""
-    f = open(filename, "r")
-    cfglines = f.readlines()
-    f.close()
+    with open(filename, "r") as f:
+        cfglines = f.readlines()
     cfgdict = {}
     for line in cfglines:
         line = line.strip()
@@ -752,7 +752,7 @@ class TurtleScreenBase(object):
         [(0.0, 9.9999999999999982), (0.0, -9.9999999999999982),
         (9.9999999999999982, 0.0)]
         >>> """
-        cl = list(self.cv.coords(item))
+        cl = self.cv.coords(item)
         pl = [(cl[i], -cl[i+1]) for i in range(0, len(cl), 2)]
         return  pl
 
@@ -778,7 +778,7 @@ class TurtleScreenBase(object):
         # needs amendment
         if not isinstance(self.cv, ScrolledCanvas):
             return self.canvwidth, self.canvheight
-        if canvwidth is None and canvheight is None and bg is None:
+        if canvwidth is canvheight is bg is None:
             return self.cv.canvwidth, self.cv.canvheight
         if canvwidth is not None:
             self.canvwidth = canvwidth
@@ -1046,7 +1046,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> mode()
         'logo'
         """
-        if mode == None:
+        if mode is None:
             return self._mode
         mode = mode.lower()
         if mode not in ["standard", "logo", "world"]:
@@ -1385,7 +1385,7 @@ class TurtleScreen(TurtleScreenBase):
         ### repeatedly pressing the up-arrow key,
         ### consequently drawing a hexagon
         """
-        if fun == None:
+        if fun is None:
             if key in self._keys:
                 self._keys.remove(key)
         elif key not in self._keys:
@@ -1418,7 +1418,7 @@ class TurtleScreen(TurtleScreenBase):
         ### or by keeping pressed the up-arrow key.
         ### consequently drawing a hexagon.
         """
-        if fun == None:
+        if fun is None:
             if key in self._keys:
                 self._keys.remove(key)
         elif key is not None and key not in self._keys:
@@ -1540,7 +1540,7 @@ class TNavigator(object):
     def _setmode(self, mode=None):
         """Set turtle-mode to 'standard', 'world' or 'logo'.
         """
-        if mode == None:
+        if mode is None:
             return self._mode
         if mode not in ["standard", "logo", "world"]:
             return
@@ -1575,7 +1575,10 @@ class TNavigator(object):
         >>> turtle.left(90)
         >>> turtle.heading()
         90
-        >>> turtle.degrees(400.0)  # angle measurement in gon
+
+        Change angle measurement unit to grad (also known as gon,
+        grade, or gradian and equals 1/100-th of the right angle.)
+        >>> turtle.degrees(400.0)
         >>> turtle.heading()
         100
 
@@ -2795,7 +2798,7 @@ class RawTurtle(TPen, TNavigator):
         >>> turtle.shapesize(5, 5, 12)
         >>> turtle.shapesize(outline=8)
         """
-        if stretch_wid is stretch_len is outline == None:
+        if stretch_wid is stretch_len is outline is None:
             stretch_wid, stretch_len = self._stretchfactor
             return stretch_wid, stretch_len, self._outlinewidth
         if stretch_wid == 0 or stretch_len == 0:
@@ -3144,7 +3147,7 @@ class RawTurtle(TPen, TNavigator):
         if pen is down. All other methodes for turtle movement depend
         on this one.
         """
-        ## Version mit undo-stuff
+        ## Version with undo-stuff
         go_modes = ( self._drawing,
                      self._pencolor,
                      self._pensize,
@@ -3890,31 +3893,35 @@ except:
 
 
 def getmethparlist(ob):
-    "Get strings describing the arguments for the given object"
-    argText1 = argText2 = ""
+    """Get strings describing the arguments for the given object
+
+    Returns a pair of strings representing function parameter lists
+    including parenthesis.  The first string is suitable for use in
+    function definition and the second is suitable for use in function
+    call.  The "self" parameter is not included.
+    """
+    defText = callText = ""
     # bit of a hack for methods - turn it into a function
     # but we drop the "self" param.
     # Try and build one for Python defined functions
-    argOffset = 1
-    counter = ob.__code__.co_argcount
-    items2 = list(ob.__code__.co_varnames[argOffset:counter])
-    realArgs = ob.__code__.co_varnames[argOffset:counter]
+    args, varargs, varkw = inspect.getargs(ob.__code__)
+    items2 = args[1:]
+    realArgs = args[1:]
     defaults = ob.__defaults__ or []
-    defaults = list(map(lambda name: "=%s" % repr(name), defaults))
+    defaults = ["=%r" % (value,) for value in defaults]
     defaults = [""] * (len(realArgs)-len(defaults)) + defaults
-    items1 = list(map(lambda arg, dflt: arg+dflt, realArgs, defaults))
-    if ob.__code__.co_flags & 0x4:
-        items1.append("*"+ob.__code__.co_varnames[counter])
-        items2.append("*"+ob.__code__.co_varnames[counter])
-        counter += 1
-    if ob.__code__.co_flags & 0x8:
-        items1.append("**"+ob.__code__.co_varnames[counter])
-        items2.append("**"+ob.__code__.co_varnames[counter])
-    argText1 = ", ".join(items1)
-    argText1 = "(%s)" % argText1
-    argText2 = ", ".join(items2)
-    argText2 = "(%s)" % argText2
-    return argText1, argText2
+    items1 = [arg + dflt for arg, dflt in zip(realArgs, defaults)]
+    if varargs is not None:
+        items1.append("*" + varargs)
+        items2.append("*" + varargs)
+    if varkw is not None:
+        items1.append("**" + varkw)
+        items2.append("**" + varkw)
+    defText = ", ".join(items1)
+    defText = "(%s)" % defText
+    callText = ", ".join(items2)
+    callText = "(%s)" % callText
+    return defText, callText
 
 def _turtle_docrevise(docstr):
     """To reduce docstrings from RawTurtle class for functions

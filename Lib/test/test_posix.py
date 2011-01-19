@@ -5,15 +5,16 @@ from test import support
 # Skip these tests if there is no posix module.
 posix = support.import_module('posix')
 
+import errno
+import sys
 import time
 import os
 import pwd
 import shutil
+import stat
 import unittest
 import warnings
 
-warnings.filterwarnings('ignore', '.* potential security risk .*',
-                        RuntimeWarning)
 
 class PosixTester(unittest.TestCase):
 
@@ -21,9 +22,14 @@ class PosixTester(unittest.TestCase):
         # create empty file
         fp = open(support.TESTFN, 'w+')
         fp.close()
+        self._warnings_manager = support.check_warnings()
+        self._warnings_manager.__enter__()
+        warnings.filterwarnings('ignore', '.* potential security risk .*',
+                                RuntimeWarning)
 
     def tearDown(self):
         support.unlink(support.TESTFN)
+        self._warnings_manager.__exit__(None, None, None)
 
     def testNoArgFunctions(self):
         # test posix functions which take no arguments and have
@@ -40,15 +46,78 @@ class PosixTester(unittest.TestCase):
                 posix_func()
                 self.assertRaises(TypeError, posix_func, 1)
 
+    if hasattr(posix, 'getresuid'):
+        def test_getresuid(self):
+            user_ids = posix.getresuid()
+            self.assertEqual(len(user_ids), 3)
+            for val in user_ids:
+                self.assertGreaterEqual(val, 0)
+
+    if hasattr(posix, 'getresgid'):
+        def test_getresgid(self):
+            group_ids = posix.getresgid()
+            self.assertEqual(len(group_ids), 3)
+            for val in group_ids:
+                self.assertGreaterEqual(val, 0)
+
+    if hasattr(posix, 'setresuid'):
+        def test_setresuid(self):
+            current_user_ids = posix.getresuid()
+            self.assertIsNone(posix.setresuid(*current_user_ids))
+            # -1 means don't change that value.
+            self.assertIsNone(posix.setresuid(-1, -1, -1))
+
+        def test_setresuid_exception(self):
+            # Don't do this test if someone is silly enough to run us as root.
+            current_user_ids = posix.getresuid()
+            if 0 not in current_user_ids:
+                new_user_ids = (current_user_ids[0]+1, -1, -1)
+                self.assertRaises(OSError, posix.setresuid, *new_user_ids)
+
+    if hasattr(posix, 'setresgid'):
+        def test_setresgid(self):
+            current_group_ids = posix.getresgid()
+            self.assertIsNone(posix.setresgid(*current_group_ids))
+            # -1 means don't change that value.
+            self.assertIsNone(posix.setresgid(-1, -1, -1))
+
+        def test_setresgid_exception(self):
+            # Don't do this test if someone is silly enough to run us as root.
+            current_group_ids = posix.getresgid()
+            if 0 not in current_group_ids:
+                new_group_ids = (current_group_ids[0]+1, -1, -1)
+                self.assertRaises(OSError, posix.setresgid, *new_group_ids)
+
+    @unittest.skipUnless(hasattr(posix, 'initgroups'),
+                         "test needs os.initgroups()")
+    def test_initgroups(self):
+        # It takes a string and an integer; check that it raises a TypeError
+        # for other argument lists.
+        self.assertRaises(TypeError, posix.initgroups)
+        self.assertRaises(TypeError, posix.initgroups, None)
+        self.assertRaises(TypeError, posix.initgroups, 3, "foo")
+        self.assertRaises(TypeError, posix.initgroups, "foo", 3, object())
+
+        # If a non-privileged user invokes it, it should fail with OSError
+        # EPERM.
+        if os.getuid() != 0:
+            name = pwd.getpwuid(posix.getuid()).pw_name
+            try:
+                posix.initgroups(name, 13)
+            except OSError as e:
+                self.assertEqual(e.errno, errno.EPERM)
+            else:
+                self.fail("Expected OSError to be raised by initgroups")
+
     def test_statvfs(self):
         if hasattr(posix, 'statvfs'):
-            self.assert_(posix.statvfs(os.curdir))
+            self.assertTrue(posix.statvfs(os.curdir))
 
     def test_fstatvfs(self):
         if hasattr(posix, 'fstatvfs'):
             fp = open(support.TESTFN)
             try:
-                self.assert_(posix.fstatvfs(fp.fileno()))
+                self.assertTrue(posix.fstatvfs(fp.fileno()))
             finally:
                 fp.close()
 
@@ -68,7 +137,7 @@ class PosixTester(unittest.TestCase):
             fp = open(support.TESTFN)
             try:
                 fd = posix.dup(fp.fileno())
-                self.assert_(isinstance(fd, int))
+                self.assertIsInstance(fd, int)
                 os.close(fd)
             finally:
                 fp.close()
@@ -123,63 +192,112 @@ class PosixTester(unittest.TestCase):
         if hasattr(posix, 'fstat'):
             fp = open(support.TESTFN)
             try:
-                self.assert_(posix.fstat(fp.fileno()))
+                self.assertTrue(posix.fstat(fp.fileno()))
             finally:
                 fp.close()
 
     def test_stat(self):
         if hasattr(posix, 'stat'):
-            self.assert_(posix.stat(support.TESTFN))
+            self.assertTrue(posix.stat(support.TESTFN))
 
-    if hasattr(posix, 'chown'):
-        def test_chown(self):
-            # raise an OSError if the file does not exist
-            os.unlink(support.TESTFN)
-            self.assertRaises(OSError, posix.chown, support.TESTFN, -1, -1)
+    @unittest.skipUnless(hasattr(posix, 'mkfifo'), "don't have mkfifo()")
+    def test_mkfifo(self):
+        support.unlink(support.TESTFN)
+        posix.mkfifo(support.TESTFN, stat.S_IRUSR | stat.S_IWUSR)
+        self.assertTrue(stat.S_ISFIFO(posix.stat(support.TESTFN).st_mode))
 
-            # re-create the file
-            open(support.TESTFN, 'w').close()
-            if os.getuid() == 0:
-                try:
-                    # Many linux distros have a nfsnobody user as MAX_UID-2
-                    # that makes a good test case for signedness issues.
-                    #   http://bugs.python.org/issue1747858
-                    # This part of the test only runs when run as root.
-                    # Only scary people run their tests as root.
-                    ent = pwd.getpwnam('nfsnobody')
-                    posix.chown(support.TESTFN, ent.pw_uid, ent.pw_gid)
-                except KeyError:
-                    pass
-            else:
-                # non-root cannot chown to root, raises OSError
-                self.assertRaises(OSError, posix.chown,
-                                  support.TESTFN, 0, 0)
+    @unittest.skipUnless(hasattr(posix, 'mknod') and hasattr(stat, 'S_IFIFO'),
+                         "don't have mknod()/S_IFIFO")
+    def test_mknod(self):
+        # Test using mknod() to create a FIFO (the only use specified
+        # by POSIX).
+        support.unlink(support.TESTFN)
+        mode = stat.S_IFIFO | stat.S_IRUSR | stat.S_IWUSR
+        try:
+            posix.mknod(support.TESTFN, mode, 0)
+        except OSError as e:
+            # Some old systems don't allow unprivileged users to use
+            # mknod(), or only support creating device nodes.
+            self.assertIn(e.errno, (errno.EPERM, errno.EINVAL))
+        else:
+            self.assertTrue(stat.S_ISFIFO(posix.stat(support.TESTFN).st_mode))
 
-            # test a successful chown call
-            posix.chown(support.TESTFN, os.getuid(), os.getgid())
+    def _test_all_chown_common(self, chown_func, first_param):
+        """Common code for chown, fchown and lchown tests."""
+        if os.getuid() == 0:
+            try:
+                # Many linux distros have a nfsnobody user as MAX_UID-2
+                # that makes a good test case for signedness issues.
+                #   http://bugs.python.org/issue1747858
+                # This part of the test only runs when run as root.
+                # Only scary people run their tests as root.
+                ent = pwd.getpwnam('nfsnobody')
+                chown_func(first_param, ent.pw_uid, ent.pw_gid)
+            except KeyError:
+                pass
+        else:
+            # non-root cannot chown to root, raises OSError
+            self.assertRaises(OSError, chown_func,
+                              first_param, 0, 0)
+        # test a successful chown call
+        chown_func(first_param, os.getuid(), os.getgid())
+
+    @unittest.skipUnless(hasattr(posix, 'chown'), "test needs os.chown()")
+    def test_chown(self):
+        # raise an OSError if the file does not exist
+        os.unlink(support.TESTFN)
+        self.assertRaises(OSError, posix.chown, support.TESTFN, -1, -1)
+
+        # re-create the file
+        open(support.TESTFN, 'w').close()
+        self._test_all_chown_common(posix.chown, support.TESTFN)
+
+    @unittest.skipUnless(hasattr(posix, 'fchown'), "test needs os.fchown()")
+    def test_fchown(self):
+        os.unlink(support.TESTFN)
+
+        # re-create the file
+        test_file = open(support.TESTFN, 'w')
+        try:
+            fd = test_file.fileno()
+            self._test_all_chown_common(posix.fchown, fd)
+        finally:
+            test_file.close()
+
+    @unittest.skipUnless(hasattr(posix, 'lchown'), "test needs os.lchown()")
+    def test_lchown(self):
+        os.unlink(support.TESTFN)
+        # create a symlink
+        os.symlink('/tmp/dummy-symlink-target', support.TESTFN)
+        self._test_all_chown_common(posix.lchown, support.TESTFN)
 
     def test_chdir(self):
         if hasattr(posix, 'chdir'):
             posix.chdir(os.curdir)
             self.assertRaises(OSError, posix.chdir, support.TESTFN)
 
-    def test_lsdir(self):
-        if hasattr(posix, 'lsdir'):
-            self.assert_(support.TESTFN in posix.lsdir(os.curdir))
+    def test_listdir(self):
+        if hasattr(posix, 'listdir'):
+            self.assertTrue(support.TESTFN in posix.listdir(os.curdir))
+
+    def test_listdir_default(self):
+        # When listdir is called without argument, it's the same as listdir(os.curdir)
+        if hasattr(posix, 'listdir'):
+            self.assertTrue(support.TESTFN in posix.listdir())
 
     def test_access(self):
         if hasattr(posix, 'access'):
-            self.assert_(posix.access(support.TESTFN, os.R_OK))
+            self.assertTrue(posix.access(support.TESTFN, os.R_OK))
 
     def test_umask(self):
         if hasattr(posix, 'umask'):
             old_mask = posix.umask(0)
-            self.assert_(isinstance(old_mask, int))
+            self.assertIsInstance(old_mask, int)
             posix.umask(old_mask)
 
     def test_strerror(self):
         if hasattr(posix, 'strerror'):
-            self.assert_(posix.strerror(0))
+            self.assertTrue(posix.strerror(0))
 
     def test_pipe(self):
         if hasattr(posix, 'pipe'):
@@ -210,9 +328,13 @@ class PosixTester(unittest.TestCase):
                 posix.lchflags(support.TESTFN, st.st_flags)
 
     def test_environ(self):
+        if os.name == "nt":
+            item_type = str
+        else:
+            item_type = bytes
         for k, v in posix.environ.items():
-            self.assertEqual(type(k), str)
-            self.assertEqual(type(v), str)
+            self.assertEqual(type(k), item_type)
+            self.assertEqual(type(v), item_type)
 
     def test_getcwd_long_pathnames(self):
         if hasattr(posix, 'getcwd'):
@@ -248,12 +370,63 @@ class PosixTester(unittest.TestCase):
                 _create_and_do_getcwd(dirname)
 
             finally:
-                support.rmtree(base_path)
                 os.chdir(curdir)
+                support.rmtree(base_path)
+
+    @unittest.skipUnless(hasattr(os, 'getegid'), "test needs os.getegid()")
+    def test_getgroups(self):
+        with os.popen('id -G') as idg:
+            groups = idg.read().strip()
+
+        if not groups:
+            raise unittest.SkipTest("need working 'id -G'")
+
+        # 'id -G' and 'os.getgroups()' should return the same
+        # groups, ignoring order and duplicates.
+        # #10822 - it is implementation defined whether posix.getgroups()
+        # includes the effective gid so we include it anyway, since id -G does
+        self.assertEqual(
+                set([int(x) for x in groups.split()]),
+                set(posix.getgroups() + [posix.getegid()]))
+
+class PosixGroupsTester(unittest.TestCase):
+
+    def setUp(self):
+        if posix.getuid() != 0:
+            raise unittest.SkipTest("not enough privileges")
+        if not hasattr(posix, 'getgroups'):
+            raise unittest.SkipTest("need posix.getgroups")
+        if sys.platform == 'darwin':
+            raise unittest.SkipTest("getgroups(2) is broken on OSX")
+        self.saved_groups = posix.getgroups()
+
+    def tearDown(self):
+        if hasattr(posix, 'setgroups'):
+            posix.setgroups(self.saved_groups)
+        elif hasattr(posix, 'initgroups'):
+            name = pwd.getpwuid(posix.getuid()).pw_name
+            posix.initgroups(name, self.saved_groups[0])
+
+    @unittest.skipUnless(hasattr(posix, 'initgroups'),
+                         "test needs posix.initgroups()")
+    def test_initgroups(self):
+        # find missing group
+
+        g = max(self.saved_groups) + 1
+        name = pwd.getpwuid(posix.getuid()).pw_name
+        posix.initgroups(name, g)
+        self.assertIn(g, posix.getgroups())
+
+    @unittest.skipUnless(hasattr(posix, 'setgroups'),
+                         "test needs posix.setgroups()")
+    def test_setgroups(self):
+        for groups in [[0], list(range(16))]:
+            posix.setgroups(groups)
+            self.assertListEqual(groups, posix.getgroups())
 
 
 def test_main():
-    support.run_unittest(PosixTester)
+    support.run_unittest(PosixTester, PosixGroupsTester)
 
 if __name__ == '__main__':
     test_main()

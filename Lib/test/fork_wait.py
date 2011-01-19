@@ -1,6 +1,6 @@
 """This test case provides support for checking forking and wait behavior.
 
-To test different wait behavior, overrise the wait_impl method.
+To test different wait behavior, override the wait_impl method.
 
 We want fork1() semantics -- only the forking thread survives in the
 child after a fork().
@@ -9,7 +9,9 @@ On some systems (e.g. Solaris without posix threads) we find that all
 active threads survive in the child after a fork(); this is an error.
 """
 
-import os, sys, time, _thread, unittest
+import os, sys, time, unittest
+import test.support as support
+_thread = support.import_module('_thread')
 
 LONGSLEEP = 2
 SHORTSLEEP = 0.5
@@ -38,8 +40,8 @@ class ForkWait(unittest.TestCase):
                 break
             time.sleep(2 * SHORTSLEEP)
 
-        self.assertEquals(spid, cpid)
-        self.assertEquals(status, 0, "cause = %d, exit = %d" % (status&0xff, status>>8))
+        self.assertEqual(spid, cpid)
+        self.assertEqual(status, 0, "cause = %d, exit = %d" % (status&0xff, status>>8))
 
     def test_wait(self):
         for i in range(NUM_THREADS):
@@ -48,7 +50,7 @@ class ForkWait(unittest.TestCase):
         time.sleep(LONGSLEEP)
 
         a = sorted(self.alive.keys())
-        self.assertEquals(a, list(range(NUM_THREADS)))
+        self.assertEqual(a, list(range(NUM_THREADS)))
 
         prefork_lives = self.alive.copy()
 

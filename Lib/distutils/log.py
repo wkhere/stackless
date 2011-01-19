@@ -17,6 +17,9 @@ class Log:
         self.threshold = threshold
 
     def _log(self, level, msg, args):
+        if level not in (DEBUG, INFO, WARN, ERROR, FATAL):
+            raise ValueError('%s wrong log level' % str(level))
+
         if level >= self.threshold:
             if args:
                 msg = msg % args
@@ -24,6 +27,10 @@ class Log:
                 stream = sys.stderr
             else:
                 stream = sys.stdout
+            if stream.errors == 'strict':
+                # emulate backslashreplace error handler
+                encoding = stream.encoding
+                msg = msg.encode(encoding, "backslashreplace").decode(encoding)
             stream.write('%s\n' % msg)
             stream.flush()
 

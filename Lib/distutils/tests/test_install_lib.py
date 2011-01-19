@@ -7,19 +7,20 @@ from distutils.command.install_lib import install_lib
 from distutils.extension import Extension
 from distutils.tests import support
 from distutils.errors import DistutilsOptionError
+from test.support import run_unittest
 
 class InstallLibTestCase(support.TempdirManager,
                          support.LoggingSilencer,
+                         support.EnvironGuard,
                          unittest.TestCase):
-
 
     def test_finalize_options(self):
         pkg_dir, dist = self.create_dist()
         cmd = install_lib(dist)
 
         cmd.finalize_options()
-        self.assertEquals(cmd.compile, 1)
-        self.assertEquals(cmd.optimize, 0)
+        self.assertEqual(cmd.compile, 1)
+        self.assertEqual(cmd.optimize, 0)
 
         # optimize must be 0, 1, or 2
         cmd.optimize = 'foo'
@@ -29,8 +30,10 @@ class InstallLibTestCase(support.TempdirManager,
 
         cmd.optimize = '2'
         cmd.finalize_options()
-        self.assertEquals(cmd.optimize, 2)
+        self.assertEqual(cmd.optimize, 2)
 
+    @unittest.skipUnless(not sys.dont_write_bytecode,
+                         'byte-compile not supported')
     def test_byte_compile(self):
         pkg_dir, dist = self.create_dist()
         cmd = install_lib(dist)
@@ -39,8 +42,8 @@ class InstallLibTestCase(support.TempdirManager,
         f = os.path.join(pkg_dir, 'foo.py')
         self.write_file(f, '# python file')
         cmd.byte_compile([f])
-        self.assert_(os.path.exists(os.path.join(pkg_dir, 'foo.pyc')))
-        self.assert_(os.path.exists(os.path.join(pkg_dir, 'foo.pyo')))
+        self.assertTrue(os.path.exists(os.path.join(pkg_dir, 'foo.pyc')))
+        self.assertTrue(os.path.exists(os.path.join(pkg_dir, 'foo.pyo')))
 
     def test_get_outputs(self):
         pkg_dir, dist = self.create_dist()
@@ -57,7 +60,7 @@ class InstallLibTestCase(support.TempdirManager,
         cmd.distribution.script_name = 'setup.py'
 
         # get_output should return 4 elements
-        self.assert_(len(cmd.get_outputs()) >= 2)
+        self.assertTrue(len(cmd.get_outputs()) >= 2)
 
     def test_get_inputs(self):
         pkg_dir, dist = self.create_dist()
@@ -74,11 +77,26 @@ class InstallLibTestCase(support.TempdirManager,
         cmd.distribution.script_name = 'setup.py'
 
         # get_input should return 2 elements
-        self.assertEquals(len(cmd.get_inputs()), 2)
+        self.assertEqual(len(cmd.get_inputs()), 2)
 
+    def test_dont_write_bytecode(self):
+        # makes sure byte_compile is not used
+        pkg_dir, dist = self.create_dist()
+        cmd = install_lib(dist)
+        cmd.compile = 1
+        cmd.optimize = 1
+
+        old_dont_write_bytecode = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        try:
+            cmd.byte_compile([])
+        finally:
+            sys.dont_write_bytecode = old_dont_write_bytecode
+
+        self.assertTrue('byte-compiling is disabled' in self.logs[0][1])
 
 def test_suite():
     return unittest.makeSuite(InstallLibTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

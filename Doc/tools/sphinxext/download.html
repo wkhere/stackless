@@ -1,15 +1,14 @@
 {% extends "layout.html" %}
 {% set title = 'Download' %}
-{% set dlbase = 'http://docs.python.org/ftp/python/doc/' + release %}
-{% block body %}
+{% if daily is defined %}
+  {% set dlbase = pathto('archives', 1) %}
+{% else %}
+  {% set dlbase = 'http://docs.python.org/ftp/python/doc/' + release %}
+{% endif %}
 
+{% block body %}
 <h1>Download Python {{ release }} Documentation</h1>
 
-{% if 'a' in release or 'b' in release or 'c' in release %}
-<p>We don't package the documentation for development releases for download.
-  Downloads will be available for the final release.</p>
-
-{% else %}
 {% if last_updated %}<p><b>Last updated on: {{ last_updated }}.</b></p>{% endif %}
 
 <p>To download an archive containing all the documents for this version of
@@ -34,6 +33,10 @@ in the table are the size of the download files in megabytes.</p>
     <td><a href="{{ dlbase }}/python-{{ release }}-docs-text.zip">Download</a> (ca. 2 MB)</td>
     <td><a href="{{ dlbase }}/python-{{ release }}-docs-text.tar.bz2">Download</a> (ca. 1.5 MB)</td>
   </tr>
+ <tr><td>EPUB</td>
+    <td><a href="{{ dlbase }}/python-{{ release }}-docs-epub.zip">Download</a> (ca. 3.5 MB)</td>
+    <td><a href="{{ dlbase }}/python-{{ release }}-docs-epub.tar.bz2">Download</a> (ca. 3.5 MB)</td>
+  </tr>
 </table>
 
 
@@ -55,6 +58,4 @@ platform. These are created on Unix using the InfoZIP zip program.</p>
 
 <p>If you have comments or suggestions for the Python documentation, please send
 email to <a href="mailto:docs@python.org">docs@python.org</a>.</p>
-{% endif %}
-
 {% endblock %}

@@ -2,9 +2,11 @@ import unittest
 from test import support
 import base64
 import binascii
+import sys
+import subprocess
 
 
-
+
 class LegacyBase64TestCase(unittest.TestCase):
     def test_encodebytes(self):
         eq = self.assertEqual
@@ -56,7 +58,7 @@ class LegacyBase64TestCase(unittest.TestCase):
         base64.decode(infp, outfp)
         self.assertEqual(outfp.getvalue(), b'www.python.org')
 
-
+
 class BaseXYTestCase(unittest.TestCase):
     def test_b64encode(self):
         eq = self.assertEqual
@@ -136,8 +138,24 @@ class BaseXYTestCase(unittest.TestCase):
         eq(base64.urlsafe_b64decode(b'01a-b_cd'), b'\xd3V\xbeo\xf7\x1d')
         self.assertRaises(TypeError, base64.urlsafe_b64decode, "")
 
-    def test_b64decode_error(self):
+    def test_b64decode_padding_error(self):
         self.assertRaises(binascii.Error, base64.b64decode, b'abc')
+
+    def test_b64decode_invalid_chars(self):
+        # issue 1466065: Test some invalid characters.
+        tests = ((b'%3d==', b'\xdd'),
+                 (b'$3d==', b'\xdd'),
+                 (b'[==', b''),
+                 (b'YW]3=', b'am'),
+                 (b'3{d==', b'\xdd'),
+                 (b'3d}==', b'\xdd'),
+                 (b'@@', b''),
+                 (b'!', b''),
+                 (b'YWJj\nYWI=', b'abcab'))
+        for bstr, res in tests:
+            self.assertEqual(base64.b64decode(bstr), res)
+            with self.assertRaises(binascii.Error):
+                base64.b64decode(bstr, validate=True)
 
     def test_b32encode(self):
         eq = self.assertEqual
@@ -204,10 +222,42 @@ class BaseXYTestCase(unittest.TestCase):
         self.assertRaises(TypeError, base64.b16decode, "")
 
     def test_ErrorHeritage(self):
-        self.assert_(issubclass(binascii.Error, ValueError))
+        self.assertTrue(issubclass(binascii.Error, ValueError))
 
 
-
+
+class TestMain(unittest.TestCase):
+    def get_output(self, *args, **options):
+        args = (sys.executable, '-m', 'base64') + args
+        return subprocess.check_output(args, **options)
+
+    def test_encode_decode(self):
+        output = self.get_output('-t')
+        self.assertSequenceEqual(output.splitlines(), (
+            b"b'Aladdin:open sesame'",
+            br"b'QWxhZGRpbjpvcGVuIHNlc2FtZQ==\n'",
+            b"b'Aladdin:open sesame'",
+        ))
+
+    def test_encode_file(self):
+        with open(support.TESTFN, 'wb') as fp:
+            fp.write(b'a\xffb\n')
+
+        output = self.get_output('-e', support.TESTFN)
+        self.assertEqual(output.rstrip(), b'Yf9iCg==')
+
+        with open(support.TESTFN, 'rb') as fp:
+            output = self.get_output('-e', stdin=fp)
+        self.assertEqual(output.rstrip(), b'Yf9iCg==')
+
+    def test_decode(self):
+        with open(support.TESTFN, 'wb') as fp:
+            fp.write(b'Yf9iCg==')
+        output = self.get_output('-d', support.TESTFN)
+        self.assertEqual(output.rstrip(), b'a\xffb')
+
+
+
 def test_main():
     support.run_unittest(__name__)
 

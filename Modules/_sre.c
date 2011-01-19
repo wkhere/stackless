@@ -67,9 +67,6 @@ static char copyright[] =
 /* enables fast searching */
 #define USE_FAST_SEARCH
 
-/* enables aggressive inlining (always on for Visual C) */
-#undef USE_INLINE
-
 /* enables copy/deepcopy handling (work in progress) */
 #undef USE_BUILTIN_COPY
 
@@ -168,7 +165,7 @@ static unsigned int sre_lower_locale(unsigned int ch)
 
 #if defined(HAVE_UNICODE)
 
-#define SRE_UNI_IS_DIGIT(ch) Py_UNICODE_ISDIGIT((Py_UNICODE)(ch))
+#define SRE_UNI_IS_DIGIT(ch) Py_UNICODE_ISDECIMAL((Py_UNICODE)(ch))
 #define SRE_UNI_IS_SPACE(ch) Py_UNICODE_ISSPACE((Py_UNICODE)(ch))
 #define SRE_UNI_IS_LINEBREAK(ch) Py_UNICODE_ISLINEBREAK((Py_UNICODE)(ch))
 #define SRE_UNI_IS_ALNUM(ch) Py_UNICODE_ISALNUM((Py_UNICODE)(ch))
@@ -2674,6 +2671,10 @@ _compile(PyObject* self_, PyObject* args)
     self = PyObject_NEW_VAR(PatternObject, &Pattern_Type, n);
     if (!self)
         return NULL;
+    self->weakreflist = NULL;
+    self->pattern = NULL;
+    self->groupindex = NULL;
+    self->indexgroup = NULL;
 
     self->codesize = n;
 
@@ -2689,7 +2690,7 @@ _compile(PyObject* self_, PyObject* args)
     }
 
     if (PyErr_Occurred()) {
-        PyObject_DEL(self);
+        Py_DECREF(self);
         return NULL;
     }
 
@@ -2698,7 +2699,7 @@ _compile(PyObject* self_, PyObject* args)
 	else {
 		Py_ssize_t p_length;
 		if (!getstring(pattern, &p_length, &self->charsize)) {
-			PyObject_DEL(self);
+			Py_DECREF(self);
 			return NULL;
 		}
 	}
@@ -3730,7 +3731,7 @@ static void
 scanner_dealloc(ScannerObject* self)
 {
     state_fini(&self->state);
-    Py_DECREF(self->pattern);
+    Py_XDECREF(self->pattern);
     PyObject_DEL(self);
 }
 
@@ -3860,10 +3861,11 @@ pattern_scanner(PatternObject* pattern, PyObject* args)
     self = PyObject_NEW(ScannerObject, &Scanner_Type);
     if (!self)
         return NULL;
+    self->pattern = NULL;
 
     string = state_init(&self->state, pattern, string, start, end);
     if (!string) {
-        PyObject_DEL(self);
+        Py_DECREF(self);
         return NULL;
     }
 
@@ -3898,12 +3900,9 @@ PyMODINIT_FUNC PyInit__sre(void)
     PyObject* d;
     PyObject* x;
 
-    /* Initialize object types */
-    if (PyType_Ready(&Pattern_Type) < 0)
-        return NULL;
-    if (PyType_Ready(&Match_Type) < 0)
-        return NULL;
-    if (PyType_Ready(&Scanner_Type) < 0)
+    /* Patch object types */
+    if (PyType_Ready(&Pattern_Type) || PyType_Ready(&Match_Type) ||
+        PyType_Ready(&Scanner_Type))
         return NULL;
 
     m = PyModule_Create(&sremodule);

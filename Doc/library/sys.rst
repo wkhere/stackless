@@ -1,4 +1,3 @@
-
 :mod:`sys` --- System-specific parameters and functions
 =======================================================
 
@@ -10,6 +9,13 @@ This module provides access to some variables used or maintained by the
 interpreter and to functions that interact strongly with the interpreter. It is
 always available.
 
+
+.. data:: abiflags
+
+   On POSIX systems where Python is build with the standard ``configure``
+   script, this contains the ABI flags as specified by :pep:`3149`.
+
+   .. versionadded:: 3.2
 
 .. data:: argv
 
@@ -49,6 +55,13 @@ always available.
    ``modules.keys()`` only lists the imported modules.)
 
 
+.. function:: call_tracing(func, args)
+
+   Call ``func(*args)``, while tracing is enabled.  The tracing state is saved,
+   and restored afterwards.  This is intended to be called from a debugger from
+   a checkpoint, to recursively debug some other code.
+
+
 .. data:: copyright
 
    A string containing the copyright pertaining to the Python interpreter.
@@ -86,12 +99,38 @@ always available.
 
 .. function:: displayhook(value)
 
-   If *value* is not ``None``, this function prints it to ``sys.stdout``, and saves
-   it in ``builtins._``.
+   If *value* is not ``None``, this function prints ``repr(value)`` to
+   ``sys.stdout``, and saves *value* in ``builtins._``. If ``repr(value)`` is
+   not encodable to ``sys.stdout.encoding`` with ``sys.stdout.errors`` error
+   handler (which is probably ``'strict'``), encode it to
+   ``sys.stdout.encoding`` with ``'backslashreplace'`` error handler.
 
    ``sys.displayhook`` is called on the result of evaluating an :term:`expression`
    entered in an interactive Python session.  The display of these values can be
    customized by assigning another one-argument function to ``sys.displayhook``.
+
+   Pseudo-code::
+
+       def displayhook(value):
+           if value is None:
+               return
+           # Set '_' to None to avoid recursion
+           builtins._ = None
+           text = repr(value)
+           try:
+               sys.stdout.write(text)
+           except UnicodeEncodeError:
+               bytes = text.encode(sys.stdout.encoding, 'backslashreplace')
+               if hasattr(sys.stdout, 'buffer'):
+                   sys.stdout.buffer.write(bytes)
+               else:
+                   text = bytes.decode(sys.stdout.encoding, 'strict')
+                   sys.stdout.write(text)
+           sys.stdout.write("\n")
+           builtins._ = value
+
+   .. versionchanged:: 3.2
+      Use ``'backslashreplace'`` error handler on :exc:`UnicodeEncodeError`.
 
 
 .. function:: excepthook(type, value, traceback)
@@ -128,13 +167,12 @@ always available.
 
    .. index:: object: traceback
 
-   If no exception is being handled anywhere on the stack, a tuple containing three
-   ``None`` values is returned.  Otherwise, the values returned are ``(type, value,
-   traceback)``.  Their meaning is: *type* gets the exception type of the exception
-   being handled (a class object); *value* gets the exception parameter (its
-   :dfn:`associated value` or the second argument to :keyword:`raise`, which is
-   always a class instance if the exception type is a class object); *traceback*
-   gets a traceback object (see the Reference Manual) which encapsulates the call
+   If no exception is being handled anywhere on the stack, a tuple containing
+   three ``None`` values is returned.  Otherwise, the values returned are
+   ``(type, value, traceback)``.  Their meaning is: *type* gets the type of the
+   exception being handled (a subclass of :exc:`BaseException`); *value* gets
+   the exception instance (an instance of the exception type); *traceback* gets
+   a traceback object (see the Reference Manual) which encapsulates the call
    stack at the point where the exception originally occurred.
 
    .. warning::
@@ -157,7 +195,7 @@ always available.
 
    A string giving the site-specific directory prefix where the platform-dependent
    Python files are installed; by default, this is also ``'/usr/local'``.  This can
-   be set at build time with the :option:`--exec-prefix` argument to the
+   be set at build time with the ``--exec-prefix`` argument to the
    :program:`configure` script.  Specifically, all configuration files (e.g. the
    :file:`pyconfig.h` header file) are installed in the directory ``exec_prefix +
    '/lib/pythonversion/config'``, and shared library modules are installed in
@@ -175,19 +213,25 @@ always available.
 
    Exit from Python.  This is implemented by raising the :exc:`SystemExit`
    exception, so cleanup actions specified by finally clauses of :keyword:`try`
-   statements are honored, and it is possible to intercept the exit attempt at an
-   outer level.  The optional argument *arg* can be an integer giving the exit
-   status (defaulting to zero), or another type of object.  If it is an integer,
-   zero is considered "successful termination" and any nonzero value is considered
-   "abnormal termination" by shells and the like.  Most systems require it to be in
-   the range 0-127, and produce undefined results otherwise.  Some systems have a
-   convention for assigning specific meanings to specific exit codes, but these are
-   generally underdeveloped; Unix programs generally use 2 for command line syntax
-   errors and 1 for all other kind of errors.  If another type of object is passed,
-   ``None`` is equivalent to passing zero, and any other object is printed to
-   ``sys.stderr`` and results in an exit code of 1.  In particular,
-   ``sys.exit("some error message")`` is a quick way to exit a program when an
-   error occurs.
+   statements are honored, and it is possible to intercept the exit attempt at
+   an outer level.
+
+   The optional argument *arg* can be an integer giving the exit status
+   (defaulting to zero), or another type of object.  If it is an integer, zero
+   is considered "successful termination" and any nonzero value is considered
+   "abnormal termination" by shells and the like.  Most systems require it to be
+   in the range 0-127, and produce undefined results otherwise.  Some systems
+   have a convention for assigning specific meanings to specific exit codes, but
+   these are generally underdeveloped; Unix programs generally use 2 for command
+   line syntax errors and 1 for all other kind of errors.  If another type of
+   object is passed, ``None`` is equivalent to passing zero, and any other
+   object is printed to :data:`stderr` and results in an exit code of 1.  In
+   particular, ``sys.exit("some error message")`` is a quick way to exit a
+   program when an error occurs.
+
+   Since :func:`exit` ultimately "only" raises an exception, it will only exit
+   the process when called from the main thread, and the exception is not
+   intercepted.
 
 
 .. data:: flags
@@ -200,11 +244,7 @@ always available.
    +==============================+==========================================+
    | :const:`debug`               | -d                                       |
    +------------------------------+------------------------------------------+
-   | :const:`py3k_warning`        | -3                                       |
-   +------------------------------+------------------------------------------+
    | :const:`division_warning`    | -Q                                       |
-   +------------------------------+------------------------------------------+
-   | :const:`division_new`        | -Qnew                                    |
    +------------------------------+------------------------------------------+
    | :const:`inspect`             | -i                                       |
    +------------------------------+------------------------------------------+
@@ -214,57 +254,85 @@ always available.
    +------------------------------+------------------------------------------+
    | :const:`dont_write_bytecode` | -B                                       |
    +------------------------------+------------------------------------------+
+   | :const:`no_user_site`        | -s                                       |
+   +------------------------------+------------------------------------------+
    | :const:`no_site`             | -S                                       |
    +------------------------------+------------------------------------------+
    | :const:`ignore_environment`  | -E                                       |
    +------------------------------+------------------------------------------+
    | :const:`verbose`             | -v                                       |
    +------------------------------+------------------------------------------+
-   | :const:`unicode`             | -U                                       |
+   | :const:`bytes_warning`       | -b                                       |
    +------------------------------+------------------------------------------+
+   | :const:`quiet`               | -q                                       |
+   +------------------------------+------------------------------------------+
+
+   .. versionchanged:: 3.2
+      Added ``quiet`` attribute for the new :option:`-q` flag.
 
 
 .. data:: float_info
 
    A structseq holding information about the float type. It contains low level
-   information about the precision and internal representation. Please study
-   your system's :file:`float.h` for more information.
+   information about the precision and internal representation.  The values
+   correspond to the various floating-point constants defined in the standard
+   header file :file:`float.h` for the 'C' programming language; see section
+   5.2.4.2.2 of the 1999 ISO/IEC C standard [C99]_, 'Characteristics of
+   floating types', for details.
 
-   +---------------------+--------------------------------------------------+
-   | attribute           |  explanation                                     |
-   +=====================+==================================================+
-   | :const:`epsilon`    | Difference between 1 and the next representable  |
-   |                     | floating point number                            |
-   +---------------------+--------------------------------------------------+
-   | :const:`dig`        | digits (see :file:`float.h`)                     |
-   +---------------------+--------------------------------------------------+
-   | :const:`mant_dig`   | mantissa digits (see :file:`float.h`)            |
-   +---------------------+--------------------------------------------------+
-   | :const:`max`        | maximum representable finite float               |
-   +---------------------+--------------------------------------------------+
-   | :const:`max_exp`    | maximum int e such that radix**(e-1) is in the   |
-   |                     | range of finite representable floats             |
-   +---------------------+--------------------------------------------------+
-   | :const:`max_10_exp` | maximum int e such that 10**e is in the          |
-   |                     | range of finite representable floats             |
-   +---------------------+--------------------------------------------------+
-   | :const:`min`        | Minimum positive normalizer float                |
-   +---------------------+--------------------------------------------------+
-   | :const:`min_exp`    | minimum int e such that radix**(e-1) is a        |
-   |                     | normalized float                                 |
-   +---------------------+--------------------------------------------------+
-   | :const:`min_10_exp` | minimum int e such that 10**e is a normalized    |
-   |                     | float                                            |
-   +---------------------+--------------------------------------------------+
-   | :const:`radix`      | radix of exponent                                |
-   +---------------------+--------------------------------------------------+
-   | :const:`rounds`     | addition rounds (see :file:`float.h`)            |
-   +---------------------+--------------------------------------------------+
+   +---------------------+----------------+--------------------------------------------------+
+   | attribute           | float.h macro  | explanation                                      |
+   +=====================+================+==================================================+
+   | :const:`epsilon`    | DBL_EPSILON    | difference between 1 and the least value greater |
+   |                     |                | than 1 that is representable as a float          |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`dig`        | DBL_DIG        | maximum number of decimal digits that can be     |
+   |                     |                | faithfully represented in a float;  see below    |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`mant_dig`   | DBL_MANT_DIG   | float precision: the number of base-``radix``    |
+   |                     |                | digits in the significand of a float             |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max`        | DBL_MAX        | maximum representable finite float               |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max_exp`    | DBL_MAX_EXP    | maximum integer e such that ``radix**(e-1)`` is  |
+   |                     |                | a representable finite float                     |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`max_10_exp` | DBL_MAX_10_EXP | maximum integer e such that ``10**e`` is in the  |
+   |                     |                | range of representable finite floats             |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min`        | DBL_MIN        | minimum positive normalized float                |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min_exp`    | DBL_MIN_EXP    | minimum integer e such that ``radix**(e-1)`` is  |
+   |                     |                | a normalized float                               |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`min_10_exp` | DBL_MIN_10_EXP | minimum integer e such that ``10**e`` is a       |
+   |                     |                | normalized float                                 |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`radix`      | FLT_RADIX      | radix of exponent representation                 |
+   +---------------------+----------------+--------------------------------------------------+
+   | :const:`rounds`     | FLT_ROUNDS     | constant representing rounding mode              |
+   |                     |                | used for arithmetic operations                   |
+   +---------------------+----------------+--------------------------------------------------+
 
-   .. note::
+   The attribute :attr:`sys.float_info.dig` needs further explanation.  If
+   ``s`` is any string representing a decimal number with at most
+   :attr:`sys.float_info.dig` significant digits, then converting ``s`` to a
+   float and back again will recover a string representing the same decimal
+   value::
 
-      The information in the table is simplified.
+      >>> import sys
+      >>> sys.float_info.dig
+      15
+      >>> s = '3.14159265358979'    # decimal string with 15 significant digits
+      >>> format(float(s), '.15g')  # convert to float and back -> same value
+      '3.14159265358979'
 
+   But for strings with more than :attr:`sys.float_info.dig` significant digits,
+   this isn't always true::
+
+      >>> s = '9876543211234567'    # 16 significant digits is too many!
+      >>> format(float(s), '.16g')  # conversion changes value
+      '9876543211234568'
 
 .. data:: float_repr_style
 
@@ -283,6 +351,9 @@ always available.
 
    Return the interpreter's "check interval"; see :func:`setcheckinterval`.
 
+   .. deprecated:: 3.2
+      Use :func:`getswitchinterval` instead.
+
 
 .. function:: getdefaultencoding()
 
@@ -292,28 +363,32 @@ always available.
 
 .. function:: getdlopenflags()
 
-   Return the current value of the flags that are used for :cfunc:`dlopen` calls.
+   Return the current value of the flags that are used for :c:func:`dlopen` calls.
    The flag constants are defined in the :mod:`ctypes` and :mod:`DLFCN` modules.
    Availability: Unix.
 
 
 .. function:: getfilesystemencoding()
 
-   Return the name of the encoding used to convert Unicode filenames into system
-   file names, or ``None`` if the system default encoding is used. The result value
-   depends on the operating system:
+   Return the name of the encoding used to convert Unicode filenames into
+   system file names. The result value depends on the operating system:
 
-   * On Windows 9x, the encoding is "mbcs".
-
-   * On Mac OS X, the encoding is "utf-8".
+   * On Mac OS X, the encoding is ``'utf-8'``.
 
    * On Unix, the encoding is the user's preference according to the result of
-     nl_langinfo(CODESET), or :const:`None` if the ``nl_langinfo(CODESET)`` failed.
+     nl_langinfo(CODESET), or ``'utf-8'`` if ``nl_langinfo(CODESET)`` failed.
 
    * On Windows NT+, file names are Unicode natively, so no conversion is
-     performed. :func:`getfilesystemencoding` still returns ``'mbcs'``, as this is
-     the encoding that applications should use when they explicitly want to convert
-     Unicode strings to byte strings that are equivalent when used as file names.
+     performed. :func:`getfilesystemencoding` still returns ``'mbcs'``, as
+     this is the encoding that applications should use when they explicitly
+     want to convert Unicode strings to byte strings that are equivalent when
+     used as file names.
+
+   * On Windows 9x, the encoding is ``'mbcs'``.
+
+   .. versionchanged:: 3.2
+      On Unix, use ``'utf-8'`` instead of ``None`` if ``nl_langinfo(CODESET)``
+      failed. :func:`getfilesystemencoding` result cannot be ``None``.
 
 
 .. function:: getrefcount(object)
@@ -338,12 +413,23 @@ always available.
    does not have to hold true for third-party extensions as it is implementation
    specific.
 
-   The *default* argument allows to define a value which will be returned
-   if the object type does not provide means to retrieve the size and would
-   cause a `TypeError`.
+   If given, *default* will be returned if the object does not provide means to
+   retrieve the size.  Otherwise a :exc:`TypeError` will be raised.
 
-   func:`getsizeof` calls the object's __sizeof__ method and adds an additional
-   garbage collector overhead if the object is managed by the garbage collector.
+   :func:`getsizeof` calls the object's ``__sizeof__`` method and adds an
+   additional garbage collector overhead if the object is managed by the garbage
+   collector.
+
+   See `recursive sizeof recipe <http://code.activestate.com/recipes/577504>`_
+   for an example of using :func:`getsizeof` recursively to find the size of
+   containers and all their contents.
+
+.. function:: getswitchinterval()
+
+   Return the interpreter's "thread switch interval"; see
+   :func:`setswitchinterval`.
+
+   .. versionadded:: 3.2
 
 
 .. function:: _getframe([depth])
@@ -353,7 +439,10 @@ always available.
    that is deeper than the call stack, :exc:`ValueError` is raised.  The default
    for *depth* is zero, returning the frame at the top of the call stack.
 
-   This function should be used for internal and specialized purposes only.
+   .. impl-detail::
+
+      This function should be used for internal and specialized purposes only.
+      It is not guaranteed to exist in all implementations of Python.
 
 
 .. function:: getprofile()
@@ -373,19 +462,25 @@ always available.
 
    Get the trace function as set by :func:`settrace`.
 
-   .. note::
+   .. impl-detail::
 
       The :func:`gettrace` function is intended only for implementing debuggers,
-      profilers, coverage tools and the like. Its behavior is part of the
-      implementation platform, rather than part of the language definition,
-      and thus may not be available in all Python implementations.
+      profilers, coverage tools and the like.  Its behavior is part of the
+      implementation platform, rather than part of the language definition, and
+      thus may not be available in all Python implementations.
 
 
 .. function:: getwindowsversion()
 
-   Return a tuple containing five components, describing the Windows version
-   currently running.  The elements are *major*, *minor*, *build*, *platform*, and
-   *text*.  *text* contains a string while all other values are integers.
+   Return a named tuple describing the Windows version
+   currently running.  The named elements are *major*, *minor*,
+   *build*, *platform*, *service_pack*, *service_pack_minor*,
+   *service_pack_major*, *suite_mask*, and *product_type*.
+   *service_pack* contains a string while all other values are
+   integers. The components can also be accessed by name, so
+   ``sys.getwindowsversion()[0]`` is equivalent to
+   ``sys.getwindowsversion().major``. For compatibility with prior
+   versions, only the first 5 elements are retrievable by indexing.
 
    *platform* may be one of the following values:
 
@@ -401,10 +496,53 @@ always available.
    | :const:`3 (VER_PLATFORM_WIN32_CE)`      | Windows CE              |
    +-----------------------------------------+-------------------------+
 
-   This function wraps the Win32 :cfunc:`GetVersionEx` function; see the Microsoft
-   documentation for more information about these fields.
+   *product_type* may be one of the following values:
+
+   +---------------------------------------+---------------------------------+
+   | Constant                              | Meaning                         |
+   +=======================================+=================================+
+   | :const:`1 (VER_NT_WORKSTATION)`       | The system is a workstation.    |
+   +---------------------------------------+---------------------------------+
+   | :const:`2 (VER_NT_DOMAIN_CONTROLLER)` | The system is a domain          |
+   |                                       | controller.                     |
+   +---------------------------------------+---------------------------------+
+   | :const:`3 (VER_NT_SERVER)`            | The system is a server, but not |
+   |                                       | a domain controller.            |
+   +---------------------------------------+---------------------------------+
+
+
+   This function wraps the Win32 :c:func:`GetVersionEx` function; see the
+   Microsoft documentation on :c:func:`OSVERSIONINFOEX` for more information
+   about these fields.
 
    Availability: Windows.
+
+   .. versionchanged:: 3.2
+      Changed to a named tuple and added *service_pack_minor*,
+      *service_pack_major*, *suite_mask*, and *product_type*.
+
+
+.. data:: hash_info
+
+   A structseq giving parameters of the numeric hash implementation.  For
+   more details about hashing of numeric types, see :ref:`numeric-hash`.
+
+   +---------------------+--------------------------------------------------+
+   | attribute           | explanation                                      |
+   +=====================+==================================================+
+   | :const:`width`      | width in bits used for hash values               |
+   +---------------------+--------------------------------------------------+
+   | :const:`modulus`    | prime modulus P used for numeric hash scheme     |
+   +---------------------+--------------------------------------------------+
+   | :const:`inf`        | hash value returned for a positive infinity      |
+   +---------------------+--------------------------------------------------+
+   | :const:`nan`        | hash value returned for a nan                    |
+   +---------------------+--------------------------------------------------+
+   | :const:`imag`       | multiplier used for the imaginary part of a      |
+   |                     | complex number                                   |
+   +---------------------+--------------------------------------------------+
+
+   .. versionadded:: 3.2
 
 
 .. data:: hexversion
@@ -468,18 +606,16 @@ always available.
    Their intended use is to allow an interactive user to import a debugger module
    and engage in post-mortem debugging without having to re-execute the command
    that caused the error.  (Typical use is ``import pdb; pdb.pm()`` to enter the
-   post-mortem debugger; see chapter :ref:`debugger` for
+   post-mortem debugger; see :mod:`pdb` module for
    more information.)
 
    The meaning of the variables is the same as that of the return values from
-   :func:`exc_info` above.  (Since there is only one interactive thread,
-   thread-safety is not a concern for these variables, unlike for ``exc_type``
-   etc.)
+   :func:`exc_info` above.
 
 
 .. data:: maxsize
 
-   An integer giving the maximum value a variable of type :ctype:`Py_ssize_t` can
+   An integer giving the maximum value a variable of type :c:type:`Py_ssize_t` can
    take.  It's usually ``2**31 - 1`` on a 32-bit platform and ``2**63 - 1`` on a
    64-bit platform.
 
@@ -498,7 +634,7 @@ always available.
     imported. The :meth:`find_module` method is called at least with the
     absolute name of the module being imported. If the module to be imported is
     contained in package then the parent package's :attr:`__path__` attribute
-    is passed in as a second argument. The method returns :keyword:`None` if
+    is passed in as a second argument. The method returns ``None`` if
     the module cannot be found, else returns a :term:`loader`.
 
     :data:`sys.meta_path` is searched before any implicit default finders or
@@ -551,7 +687,7 @@ always available.
     A dictionary acting as a cache for :term:`finder` objects. The keys are
     paths that have been passed to :data:`sys.path_hooks` and the values are
     the finders that are found. If a path is a valid file system path but no
-    explicit finder is found on :data:`sys.path_hooks` then :keyword:`None` is
+    explicit finder is found on :data:`sys.path_hooks` then ``None`` is
     stored to represent the implicit default finder should be used. If the path
     is not an existing path then :class:`imp.NullImporter` is set.
 
@@ -576,7 +712,6 @@ always available.
    Mac OS X         ``'darwin'``
    OS/2             ``'os2'``
    OS/2 EMX         ``'os2emx'``
-   AtheOS           ``'atheos'``
    ================ ===========================
 
 
@@ -584,7 +719,7 @@ always available.
 
    A string giving the site-specific directory prefix where the platform
    independent Python files are installed; by default, this is the string
-   ``'/usr/local'``.  This can be set at build time with the :option:`--prefix`
+   ``'/usr/local'``.  This can be set at build time with the ``--prefix``
    argument to the :program:`configure` script.  The main collection of Python
    library modules is installed in the directory ``prefix + '/lib/pythonversion'``
    while the platform independent header files (all except :file:`pyconfig.h`) are
@@ -625,22 +760,15 @@ always available.
    performance for programs using threads.  Setting it to a value ``<=`` 0 checks
    every virtual instruction, maximizing responsiveness as well as overhead.
 
-
-.. function:: setdefaultencoding(name)
-
-   Set the current default string encoding used by the Unicode implementation.  If
-   *name* does not match any available encoding, :exc:`LookupError` is raised.
-   This function is only intended to be used by the :mod:`site` module
-   implementation and, where needed, by :mod:`sitecustomize`.  Once used by the
-   :mod:`site` module, it is removed from the :mod:`sys` module's namespace.
-
-   .. Note that :mod:`site` is not imported if the :option:`-S` option is passed
-      to the interpreter, in which case this function will remain available.
+   .. deprecated:: 3.2
+      This function doesn't have an effect anymore, as the internal logic for
+      thread switching and asynchronous tasks has been rewritten.  Use
+      :func:`setswitchinterval` instead.
 
 
 .. function:: setdlopenflags(n)
 
-   Set the flags used by the interpreter for :cfunc:`dlopen` calls, such as when
+   Set the flags used by the interpreter for :c:func:`dlopen` calls, such as when
    the interpreter loads extension modules.  Among other things, this will enable a
    lazy resolving of symbols when importing a module, if called as
    ``sys.setdlopenflags(0)``.  To share symbols across extension modules, call as
@@ -649,15 +777,6 @@ always available.
    module. If :mod:`DLFCN` is not available, it can be generated from
    :file:`/usr/include/dlfcn.h` using the :program:`h2py` script. Availability:
    Unix.
-
-.. function:: setfilesystemencoding(enc)
-
-   Set the encoding used when converting Python strings to file names to *enc*.
-   By default, Python tries to determine the encoding it should use automatically
-   on Unix; on Windows, it avoids such conversion completely. This function can
-   be used when Python's determination of the encoding needs to be overwritten,
-   e.g. when not all file names on disk can be decoded using the encoding that
-   Python had chosen.
 
 .. function:: setprofile(profilefunc)
 
@@ -686,6 +805,19 @@ always available.
    limit higher when she has a program that requires deep recursion and a platform
    that supports a higher limit.  This should be done with care, because a too-high
    limit can lead to a crash.
+
+
+.. function:: setswitchinterval(interval)
+
+   Set the interpreter's thread switch interval (in seconds).  This floating-point
+   value determines the ideal duration of the "timeslices" allocated to
+   concurrently running Python threads.  Please note that the actual value
+   can be higher, especially if long-running internal functions or methods
+   are used.  Also, which thread becomes scheduled at the end of the interval
+   is the operating system's decision.  The interpreter doesn't have its
+   own scheduler.
+
+   .. versionadded:: 3.2
 
 
 .. function:: settrace(tracefunc)
@@ -720,14 +852,17 @@ always available.
       specifies the local trace function.
 
    ``'line'``
-      The interpreter is about to execute a new line of code (sometimes multiple
-      line events on one line exist).  The local trace function is called; *arg*
-      is ``None``; the return value specifies the new local trace function.
+      The interpreter is about to execute a new line of code or re-execute the
+      condition of a loop.  The local trace function is called; *arg* is
+      ``None``; the return value specifies the new local trace function.  See
+      :file:`Objects/lnotab_notes.txt` for a detailed explanation of how this
+      works.
 
    ``'return'``
       A function (or other code block) is about to return.  The local trace
-      function is called; *arg* is the value that will be returned.  The trace
-      function's return value is ignored.
+      function is called; *arg* is the value that will be returned, or ``None``
+      if the event is caused by an exception being raised.  The trace function's
+      return value is ignored.
 
    ``'exception'``
       An exception has occurred.  The local trace function is called; *arg* is a
@@ -736,43 +871,47 @@ always available.
 
    ``'c_call'``
       A C function is about to be called.  This may be an extension function or
-      a builtin.  *arg* is the C function object.
+      a built-in.  *arg* is the C function object.
 
    ``'c_return'``
-      A C function has returned. *arg* is ``None``.
+      A C function has returned. *arg* is the C function object.
 
    ``'c_exception'``
-      A C function has thrown an exception.  *arg* is ``None``.
+      A C function has raised an exception.  *arg* is the C function object.
 
    Note that as an exception is propagated down the chain of callers, an
    ``'exception'`` event is generated at each level.
 
    For more information on code and frame objects, refer to :ref:`types`.
 
-   .. note::
+   .. impl-detail::
 
       The :func:`settrace` function is intended only for implementing debuggers,
-      profilers, coverage tools and the like. Its behavior is part of the
-      implementation platform, rather than part of the language definition, and thus
-      may not be available in all Python implementations.
+      profilers, coverage tools and the like.  Its behavior is part of the
+      implementation platform, rather than part of the language definition, and
+      thus may not be available in all Python implementations.
 
 
 .. function:: settscdump(on_flag)
 
    Activate dumping of VM measurements using the Pentium timestamp counter, if
    *on_flag* is true. Deactivate these dumps if *on_flag* is off. The function is
-   available only if Python was compiled with :option:`--with-tsc`. To understand
+   available only if Python was compiled with ``--with-tsc``. To understand
    the output of this dump, read :file:`Python/ceval.c` in the Python sources.
+
+   .. impl-detail::
+      This function is intimately bound to CPython implementation details and
+      thus not likely to be implemented elsewhere.
 
 
 .. data:: stdin
           stdout
           stderr
 
-   File objects corresponding to the interpreter's standard input, output and error
-   streams.  ``stdin`` is used for all interpreter input except for scripts but
-   including calls to :func:`input`.  ``stdout`` is used for
-   the output of :func:`print` and :term:`expression` statements and for the
+   :term:`File objects <file object>` corresponding to the interpreter's standard
+   input, output and error streams.  ``stdin`` is used for all interpreter input
+   except for scripts but including calls to :func:`input`.  ``stdout`` is used
+   for the output of :func:`print` and :term:`expression` statements and for the
    prompts of :func:`input`. The interpreter's own prompts
    and (almost all of) its error messages go to ``stderr``.  ``stdout`` and
    ``stderr`` needn't be built-in file objects: any object is acceptable as long
@@ -830,14 +969,10 @@ always available.
 .. data:: version
 
    A string containing the version number of the Python interpreter plus additional
-   information on the build number and compiler used. It has a value of the form
-   ``'version (#build_number, build_date, build_time) [compiler]'``.  The first
-   three characters are used to identify the version in the installation
-   directories (where appropriate on each platform).  An example::
-
-      >>> import sys
-      >>> sys.version
-      '1.5.2 (#0 Apr 13 1999, 10:51:12) [MSC 32 bit (Intel)]'
+   information on the build number and compiler used.  This string is displayed
+   when the interactive interpreter is started.  Do not extract version information
+   out of it, rather, use :data:`version_info` and the functions provided by the
+   :mod:`platform` module.
 
 
 .. data:: api_version
@@ -857,7 +992,7 @@ always available.
    and so on.
 
    .. versionchanged:: 3.1
-      Added named component attributes
+      Added named component attributes.
 
 .. data:: warnoptions
 
@@ -873,3 +1008,32 @@ always available.
    first three characters of :const:`version`.  It is provided in the :mod:`sys`
    module for informational purposes; modifying this value has no effect on the
    registry keys used by Python. Availability: Windows.
+
+
+.. data:: _xoptions
+
+   A dictionary of the various implementation-specific flags passed through
+   the :option:`-X` command-line option.  Option names are either mapped to
+   their values, if given explicitly, or to :const:`True`.  Example::
+
+      $ ./python -Xa=b -Xc
+      Python 3.2a3+ (py3k, Oct 16 2010, 20:14:50)
+      [GCC 4.4.3] on linux2
+      Type "help", "copyright", "credits" or "license" for more information.
+      >>> import sys
+      >>> sys._xoptions
+      {'a': 'b', 'c': True}
+
+   .. impl-detail::
+
+      This is a CPython-specific way of accessing options passed through
+      :option:`-X`.  Other implementations may export them through other
+      means, or not at all.
+
+   .. versionadded:: 3.2
+
+
+.. rubric:: Citations
+
+.. [C99] ISO/IEC 9899:1999.  "Programming languages -- C."  A public draft of this standard is available at http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf .
+

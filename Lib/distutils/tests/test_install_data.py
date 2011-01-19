@@ -6,9 +6,11 @@ import getpass
 
 from distutils.command.install_data import install_data
 from distutils.tests import support
+from test.support import run_unittest
 
 class InstallDataTestCase(support.TempdirManager,
                           support.LoggingSilencer,
+                          support.EnvironGuard,
                           unittest.TestCase):
 
     def test_simple_run(self):
@@ -26,18 +28,18 @@ class InstallDataTestCase(support.TempdirManager,
         self.write_file(two, 'xxx')
 
         cmd.data_files = [one, (inst2, [two])]
-        self.assertEquals(cmd.get_inputs(), [one, (inst2, [two])])
+        self.assertEqual(cmd.get_inputs(), [one, (inst2, [two])])
 
         # let's run the command
         cmd.ensure_finalized()
         cmd.run()
 
         # let's check the result
-        self.assertEquals(len(cmd.get_outputs()), 2)
+        self.assertEqual(len(cmd.get_outputs()), 2)
         rtwo = os.path.split(two)[-1]
-        self.assert_(os.path.exists(os.path.join(inst2, rtwo)))
+        self.assertTrue(os.path.exists(os.path.join(inst2, rtwo)))
         rone = os.path.split(one)[-1]
-        self.assert_(os.path.exists(os.path.join(inst, rone)))
+        self.assertTrue(os.path.exists(os.path.join(inst, rone)))
         cmd.outfiles = []
 
         # let's try with warn_dir one
@@ -46,9 +48,9 @@ class InstallDataTestCase(support.TempdirManager,
         cmd.run()
 
         # let's check the result
-        self.assertEquals(len(cmd.get_outputs()), 2)
-        self.assert_(os.path.exists(os.path.join(inst2, rtwo)))
-        self.assert_(os.path.exists(os.path.join(inst, rone)))
+        self.assertEqual(len(cmd.get_outputs()), 2)
+        self.assertTrue(os.path.exists(os.path.join(inst2, rtwo)))
+        self.assertTrue(os.path.exists(os.path.join(inst, rone)))
         cmd.outfiles = []
 
         # now using root and empty dir
@@ -64,12 +66,12 @@ class InstallDataTestCase(support.TempdirManager,
         cmd.run()
 
         # let's check the result
-        self.assertEquals(len(cmd.get_outputs()), 4)
-        self.assert_(os.path.exists(os.path.join(inst2, rtwo)))
-        self.assert_(os.path.exists(os.path.join(inst, rone)))
+        self.assertEqual(len(cmd.get_outputs()), 4)
+        self.assertTrue(os.path.exists(os.path.join(inst2, rtwo)))
+        self.assertTrue(os.path.exists(os.path.join(inst, rone)))
 
 def test_suite():
     return unittest.makeSuite(InstallDataTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

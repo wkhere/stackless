@@ -888,7 +888,7 @@ tarballs or zipfiles.
 .. function:: make_zipfile(base_name, base_dir[, verbose=0, dry_run=0])
 
    Create a zip file from all files in and under *base_dir*.  The output zip file
-   will be named *base_dir* + :file:`.zip`.  Uses either the  :mod:`zipfile` Python
+   will be named *base_name* + :file:`.zip`.  Uses either the  :mod:`zipfile` Python
    module (if available) or the InfoZIP :file:`zip`  utility (if installed and
    found on the default search path).  If neither  tool is available, raises
    :exc:`DistutilsExecError`.   Returns the name of the output zip file.
@@ -995,7 +995,7 @@ directories.
    errors are ignored (apart from being reported to ``sys.stdout`` if *verbose* is
    true).
 
-**\*\*** Some of this could be replaced with the shutil module? **\*\***
+.. XXX Some of this could be replaced with the shutil module?
 
 
 :mod:`distutils.file_util` --- Single file operations
@@ -1095,7 +1095,10 @@ other utility module.
    the univeral binary status instead of the architecture of the current
    processor. For 32-bit universal binaries the architecture is ``fat``,
    for 64-bit universal binaries the architecture is ``fat64``, and
-   for 4-way universal binaries the architecture is ``universal``.
+   for 4-way universal binaries the architecture is ``universal``. Starting
+   from Python 2.7 and Python 3.2 the architecture ``fat3`` is used for
+   a 3-way universal build (ppc, i386, x86_64) and ``intel`` is used for
+   a univeral build with the i386 and x86_64 architectures
 
    Examples of returned values on Mac OS X:
 
@@ -1104,6 +1107,8 @@ other utility module.
    * ``macosx-10.3-fat``
 
    * ``macosx-10.5-universal``
+
+   * ``macosx-10.6-intel``
 
    .. % XXX isn't this also provided by some other non-distutils module?
 
@@ -1306,9 +1311,7 @@ provides the following additional features:
   the "negative alias" of :option:`--verbose`, then :option:`--quiet` on the
   command line sets *verbose* to false.
 
-**\*\*** Should be replaced with :mod:`optik` (which is also now known as
-:mod:`optparse` in Python 2.3 and later). **\*\***
-
+.. XXX Should be replaced with optparse
 
 .. function:: fancy_getopt(options, negative_opt, object, args)
 
@@ -1601,7 +1604,7 @@ lines, and joining lines with backslashes.
    +------------------+--------------------------------+---------+
 
    Note that since *rstrip_ws* can strip the trailing newline, the semantics of
-   :meth:`readline` must differ from those of the builtin file object's
+   :meth:`readline` must differ from those of the built-in file object's
    :meth:`readline` method!  In particular, :meth:`readline`  returns ``None`` for
    end-of-file: an empty string might just be a  blank line (or an all-whitespace
    line), if *rstrip_ws* is true  but *skip_blanks* is not.
@@ -1609,8 +1612,8 @@ lines, and joining lines with backslashes.
 
    .. method:: TextFile.open(filename)
 
-      Open a new file *filename*. This overrides any *file* or  *filename* constructor
-      arguments.
+      Open a new file *filename*.  This overrides any *file* or *filename*
+      constructor arguments.
 
 
    .. method:: TextFile.close()
@@ -1842,7 +1845,7 @@ This module supplies the abstract base class :class:`Command`.
 
    to your setup.py, and later::
 
-      cmdclass = {'build_py':build_py}
+      cmdclass = {'build_py': build_py}
 
    to the invocation of setup().
 
@@ -1947,7 +1950,7 @@ This is described in more detail in :pep:`301`.
 
 
 The ``check`` command performs some tests on the meta-data of a package.
-It makes sure for example that all required meta-data are provided through
+For example, it verifies that all required meta-data are provided as
 the arguments passed to the :func:`setup` function.
 
 .. % todo
@@ -1971,9 +1974,9 @@ it so that it's implementing the class :class:`peel_banana`, a subclass of
 Subclasses of :class:`Command` must define the following methods.
 
 
-.. method:: Command.initialize_options()(S)
+.. method:: Command.initialize_options()
 
-   et default values for all the options that this command supports.  Note that
+   Set default values for all the options that this command supports.  Note that
    these defaults may be overridden by other commands, by the setup script, by
    config files, or by the command-line.  Thus, this is not the place to code
    dependencies between options; generally, :meth:`initialize_options`

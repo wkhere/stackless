@@ -344,7 +344,7 @@ All of this makes generator functions quite similar to coroutines; they yield
 multiple times, they have more than one entry point and their execution can be
 suspended.  The only difference is that a generator function cannot control
 where should the execution continue after it yields; the control is always
-transfered to the generator's caller.
+transferred to the generator's caller.
 
 The :keyword:`yield` statement is allowed in the :keyword:`try` clause of a
 :keyword:`try` ...  :keyword:`finally` construct.  If the generator is not
@@ -416,7 +416,7 @@ generator functions::
    ...         while True:
    ...             try:
    ...                 value = (yield value)
-   ...             except Exception, e:
+   ...             except Exception as e:
    ...                 value = e
    ...     finally:
    ...         print("Don't forget to clean up when 'close()' is called.")
@@ -518,11 +518,18 @@ whose value is one of the keys of the mapping, and the subscription selects the
 value in the mapping that corresponds to that key.  (The expression list is a
 tuple except if it has exactly one item.)
 
-If the primary is a sequence, the expression (list) must evaluate to an integer.
-If this value is negative, the length of the sequence is added to it (so that,
-e.g., ``x[-1]`` selects the last item of ``x``.)  The resulting value must be a
-nonnegative integer less than the number of items in the sequence, and the
-subscription selects the item whose index is that value (counting from zero).
+If the primary is a sequence, the expression (list) must evaluate to an integer
+or a slice (as discussed in the following section).
+
+The formal syntax makes no special provision for negative indices in
+sequences; however, built-in sequences all provide a :meth:`__getitem__`
+method that interprets negative indices by adding the length of the sequence
+to the index (so that ``x[-1]`` selects the last item of ``x``).  The
+resulting value must be a nonnegative integer less than the number of items in
+the sequence, and the subscription selects the item whose index is that value
+(counting from zero). Since the support for negative indices and slicing
+occurs in the object's :meth:`__getitem__` method, subclasses overriding
+this method will need to explicitly add that support.
 
 .. index::
    single: character
@@ -639,13 +646,13 @@ slots for which no default value is specified, a :exc:`TypeError` exception is
 raised.  Otherwise, the list of filled slots is used as the argument list for
 the call.
 
-.. note::
+.. impl-detail::
 
-   An implementation may provide builtin functions whose positional parameters do
-   not have names, even if they are 'named' for the purpose of documentation, and
-   which therefore cannot be supplied by keyword.  In CPython, this is the case for
-   functions implemented in C that use :cfunc:`PyArg_ParseTuple` to parse their
-   arguments.
+   An implementation may provide built-in functions whose positional parameters
+   do not have names, even if they are 'named' for the purpose of documentation,
+   and which therefore cannot be supplied by keyword.  In CPython, this is the
+   case for functions implemented in C that use :c:func:`PyArg_ParseTuple` to
+   parse their arguments.
 
 If there are more positional arguments than there are formal parameter slots, a
 :exc:`TypeError` exception is raised, unless a formal parameter using the syntax
@@ -914,6 +921,11 @@ the left or right by the number of bits given by the second argument.
 A right shift by *n* bits is defined as division by ``pow(2,n)``.  A left shift
 by *n* bits is defined as multiplication with ``pow(2,n)``.
 
+.. note::
+
+   In the current implementation, the right-hand operand is required
+   to be at most :attr:`sys.maxsize`.  If the right-hand operand is larger than
+   :attr:`sys.maxsize` an :exc:`OverflowError` exception is raised.
 
 .. _bitwise:
 
@@ -951,9 +963,9 @@ must be integers.
 
 .. _comparisons:
 .. _is:
-.. _isnot:
+.. _is not:
 .. _in:
-.. _notin:
+.. _not in:
 
 Comparisons
 ===========
@@ -996,7 +1008,7 @@ operators *always* consider objects of different types to be unequal, while the
 ``<``, ``>``, ``>=`` and ``<=`` operators raise a :exc:`TypeError` when
 comparing objects of different types that do not implement these operators for
 the given pair of types.  You can control comparison behavior of objects of
-non-builtin types by defining rich comparison methods like :meth:`__gt__`,
+non-built-in types by defining rich comparison methods like :meth:`__gt__`,
 described in section :ref:`customization`.
 
 Comparison of objects of the same type depends on the type:
@@ -1026,9 +1038,9 @@ Comparison of objects of the same type depends on the type:
   ``x <= y``.  If the corresponding element does not exist, the shorter
   sequence is ordered first (for example, ``[1,2] < [1,2,3]``).
 
-* Mappings (dictionaries) compare equal if and only if their sorted ``(key,
-  value)`` lists compare equal. [#]_ Outcomes other than equality are resolved
-  consistently, but are not otherwise defined. [#]_
+* Mappings (dictionaries) compare equal if and only if they have the same
+  ``(key, value)`` pairs. Order comparisons ``('<', '<=', '>=', '>')``
+  raise :exc:`TypeError`.
 
 * Sets and frozensets define comparison operators to mean subset and superset
   tests.  Those relations do not define total orderings (the two sets ``{1,2}``
@@ -1037,7 +1049,7 @@ Comparison of objects of the same type depends on the type:
   which depend on total ordering.  For example, :func:`min`, :func:`max`, and
   :func:`sorted` produce undefined results given a list of sets as inputs.
 
-* Most other objects of builtin types compare unequal unless they are the same
+* Most other objects of built-in types compare unequal unless they are the same
   object; the choice whether one object is considered smaller or larger than
   another one is made arbitrarily but consistently within one execution of a
   program.
@@ -1051,7 +1063,9 @@ and therefore not exactly equal to ``Decimal('1.1')`` which is.  When
 cross-type comparison is not supported, the comparison method returns
 ``NotImplemented``.  This can create the illusion of non-transitivity between
 supported cross-type comparisons and unsupported comparisons.  For example,
-``Decimal(2) == 2`` and `2 == float(2)`` but ``Decimal(2) != float(2)``.
+``Decimal(2) == 2`` and ``2 == float(2)`` but ``Decimal(2) != float(2)``.
+
+.. _membership-test-details:
 
 The operators :keyword:`in` and :keyword:`not in` test for membership.  ``x in
 s`` evaluates to true if *x* is a member of *s*, and false otherwise.  ``x not
@@ -1059,7 +1073,7 @@ in s`` returns the negation of ``x in s``.  All built-in sequences and set types
 support this as well as dictionary, for which :keyword:`in` tests whether a the
 dictionary has a given key. For container types such as list, tuple, set,
 frozenset, dict, or collections.deque, the expression ``x in y`` is equivalent
-to ``any(x is e or x == e for val e in y)``.
+to ``any(x is e or x == e for e in y)``.
 
 For the string and bytes types, ``x in y`` is true if and only if *x* is a
 substring of *y*.  An equivalent test is ``y.find(x) != -1``.  Empty strings are
@@ -1069,7 +1083,12 @@ return ``True``.
 For user-defined classes which define the :meth:`__contains__` method, ``x in
 y`` is true if and only if ``y.__contains__(x)`` is true.
 
-For user-defined classes which do not define :meth:`__contains__` and do define
+For user-defined classes which do not define :meth:`__contains__` but do define
+:meth:`__iter__`, ``x in y`` is true if some value ``z`` with ``x == z`` is
+produced while iterating over ``y``.  If an exception is raised during the
+iteration, it is as if :keyword:`in` raised that exception.
+
+Lastly, the old-style iteration protocol is tried: if a class defines
 :meth:`__getitem__`, ``x in y`` is true if and only if there is a non-negative
 integer index *i* such that ``x == y[i]``, and all lower integer indices do not
 raise :exc:`IndexError` exception.  (If any other exception is raised, it is as
@@ -1106,12 +1125,7 @@ Boolean operations
    pair: Conditional; expression
    pair: Boolean; operation
 
-Boolean operations have the lowest priority of all Python operations:
-
 .. productionlist::
-   expression: `conditional_expression` | `lambda_form`
-   expression_nocond: `or_test` | `lambda_form_nocond`
-   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
    or_test: `and_test` | `or_test` "or" `and_test`
    and_test: `not_test` | `and_test` "and" `not_test`
    not_test: `comparison` | "not" `not_test`
@@ -1127,10 +1141,6 @@ truth value by providing a :meth:`__bool__` method.
 
 The operator :keyword:`not` yields ``True`` if its argument is false, ``False``
 otherwise.
-
-The expression ``x if C else y`` first evaluates *C* (*not* *x*); if *C* is
-true, *x* is evaluated and its value is returned; otherwise, *y* is evaluated
-and its value is returned.
 
 .. index:: operator: and
 
@@ -1149,6 +1159,28 @@ replaced by a default value if it is empty, the expression ``s or 'foo'`` yields
 the desired value.  Because :keyword:`not` has to invent a value anyway, it does
 not bother to return a value of the same type as its argument, so e.g., ``not
 'foo'`` yields ``False``, not ``''``.)
+
+
+Conditional expressions
+=======================
+
+.. index::
+   pair: conditional; expression
+   pair: ternary; operator
+
+.. productionlist::
+   conditional_expression: `or_test` ["if" `or_test` "else" `expression`]
+   expression: `conditional_expression` | `lambda_form`
+   expression_nocond: `or_test` | `lambda_form_nocond`
+
+Conditional expressions (sometimes called a "ternary operator") have the lowest
+priority of all Python operations.
+
+The expression ``x if C else y`` first evaluates the condition, *C* (*not* *x*);
+if *C* is true, *x* is evaluated and its value is returned; otherwise, *y* is
+evaluated and its value is returned.
+
+See :pep:`308` for more details about conditional expressions.
 
 
 .. _lambdas:
@@ -1245,6 +1277,8 @@ groups from right to left).
 +===============================================+=====================================+
 | :keyword:`lambda`                             | Lambda expression                   |
 +-----------------------------------------------+-------------------------------------+
+| :keyword:`if` -- :keyword:`else`              | Conditional expression              |
++-----------------------------------------------+-------------------------------------+
 | :keyword:`or`                                 | Boolean OR                          |
 +-----------------------------------------------+-------------------------------------+
 | :keyword:`and`                                | Boolean AND                         |
@@ -1266,6 +1300,7 @@ groups from right to left).
 | ``+``, ``-``                                  | Addition and subtraction            |
 +-----------------------------------------------+-------------------------------------+
 | ``*``, ``/``, ``//``, ``%``                   | Multiplication, division, remainder |
+|                                               | [#]_                                |
 +-----------------------------------------------+-------------------------------------+
 | ``+x``, ``-x``, ``~x``                        | Positive, negative, bitwise NOT     |
 +-----------------------------------------------+-------------------------------------+
@@ -1277,6 +1312,7 @@ groups from right to left).
 | ``(expressions...)``,                         | Binding or tuple display,           |
 | ``[expressions...]``,                         | list display,                       |
 | ``{key:datum...}``,                           | dictionary display,                 |
+| ``{expressions...}``                          | set display                         |
 +-----------------------------------------------+-------------------------------------+
 
 
@@ -1286,8 +1322,8 @@ groups from right to left).
    true numerically due to roundoff.  For example, and assuming a platform on which
    a Python float is an IEEE 754 double-precision number, in order that ``-1e-100 %
    1e100`` have the same sign as ``1e100``, the computed result is ``-1e-100 +
-   1e100``, which is numerically exactly equal to ``1e100``.  Function :func:`fmod`
-   in the :mod:`math` module returns a result whose sign matches the sign of the
+   1e100``, which is numerically exactly equal to ``1e100``.  The function
+   :func:`math.fmod` returns a result whose sign matches the sign of the
    first argument instead, and so returns ``-1e-100`` in this case. Which approach
    is more appropriate depends on the application.
 
@@ -1303,19 +1339,13 @@ groups from right to left).
    strings in a human recognizable way, compare using
    :func:`unicodedata.normalize`.
 
-.. [#] The implementation computes this efficiently, without constructing lists
-   or sorting.
-
-.. [#] Earlier versions of Python used lexicographic comparison of the sorted (key,
-   value) lists, but this was very expensive for the common case of comparing
-   for equality.  An even earlier version of Python compared dictionaries by
-   identity only, but this caused surprises because people expected to be able
-   to test a dictionary for emptiness by comparing it to ``{}``.
-
 .. [#] Due to automatic garbage-collection, free lists, and the dynamic nature of
    descriptors, you may notice seemingly unusual behaviour in certain uses of
    the :keyword:`is` operator, like those involving comparisons between instance
    methods, or constants.  Check their documentation for more info.
+
+.. [#] The ``%`` operator is also used for string formatting; the same
+   precedence applies.
 
 .. [#] The power operator ``**`` binds less tightly than an arithmetic or
    bitwise unary operator on its right, that is, ``2**-1`` is ``0.5``.

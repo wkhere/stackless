@@ -64,7 +64,7 @@ PyStackless_Schedule(PyObject *retval, int remove)
 	 */
 	assert(ts->st.del_post_switch == NULL);
 	ts->st.del_post_switch = (PyObject*)prev;
-	
+
 	return slp_schedule_task(prev, next, stackless);
 }
 
@@ -143,7 +143,7 @@ getcurrent(PyObject *self)
 
 static char getmain__doc__[] =
 "getmain() -- return the main tasklet of this thread.";
- 
+
 static PyObject *
 getmain(PyObject *self)
 {
@@ -209,7 +209,7 @@ interrupt_timeout_return(void)
 	PyTaskletObject *current = ts->st.current;
 
 	/*
-	 * we mark the IRQ as pending if 
+	 * we mark the IRQ as pending if
 	 * a) we are in soft interrupt mode
 	 * b) we are in hard interrupt mode, but aren't allowed to break here which happens
 	 * when "atomic" is set, or the "nesting level" is relevant and not ignored.
@@ -249,7 +249,7 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	PyThreadState *ts = PyThreadState_GET();
 	PyTaskletObject *victim;
 	PyObject *retval;
-	
+
 	if (ts->st.main == NULL)
 		return PyStackless_RunWatchdog_M(timeout, flags);
 	if (ts->st.current != ts->st.main)
@@ -285,7 +285,7 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	if (retval == NULL) /* an exception has occoured */
 		return NULL;
 
-	/* 
+	/*
 	 * back in main.
 	 * We were either revived by slp_tasklet_end or the interrupt.
 	 * If we were using hard interrupts (bit 1 in flags not set)
@@ -305,7 +305,7 @@ static PyObject *
 run_watchdog(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	static char *argnames[] = {"timeout", "threadblock", "soft",
-								"ignore_nesting", "totaltimeout", 
+								"ignore_nesting", "totaltimeout",
 								NULL};
 	long timeout = 0;
 	int threadblock = 0;
@@ -540,7 +540,7 @@ test_cstate(PyObject *f, PyObject *callable)
 
  ******************************************************/
 
-PyObject * 
+PyObject *
 PyStackless_Call_Main(PyObject *func, PyObject *args, PyObject *kwds)
 {
 	PyThreadState *ts = PyThreadState_GET();
@@ -1077,7 +1077,7 @@ static PyTypeObject PySlpModule_TypeTemplate = {
 	PyObject_GenericGetAttr,	/* tp_getattro */
 	PyObject_GenericSetAttr,	/* tp_setattro */
 	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | 
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
 		Py_TPFLAGS_HAVE_GC,	/* tp_flags */
 	PySlpModule_Type__doc__,	/* tp_doc */
 	0,				/* tp_traverse */
@@ -1097,7 +1097,7 @@ static PyTypeObject PySlpModule_TypeTemplate = {
 	0,				/* tp_init */
 	0,				/* tp_alloc */
 	0,				/* tp_new */
-	_PyObject_GC_Del,		/* tp_free */
+	PyObject_GC_Del,		/* tp_free */
 };
 
 
@@ -1169,7 +1169,7 @@ _PyStackless_Init(void)
 	PyObject *modules;
 	char *name = "stackless";
 	PySlpModuleObject *m;
-	
+
 	if (init_slpmoduletype())
 		return;
 

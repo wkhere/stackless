@@ -82,7 +82,7 @@ class SymtableTest(unittest.TestCase):
         func = self.spam
         self.assertEqual(func.get_parameters(), ("a", "b", "kw", "var"))
         self.assertEqual(func.get_locals(),
-                         ("a", "b", "bar", "glob", "internal", "kw", "var", "x"))
+                         ("a", "b", "internal", "kw", "var", "x"))
         self.assertEqual(func.get_globals(), ("bar", "glob"))
         self.assertEqual(self.internal.get_frees(), ("x",))
 
@@ -122,7 +122,7 @@ class SymtableTest(unittest.TestCase):
         self.assertTrue(self.top.lookup("namespace_test").is_namespace())
         self.assertFalse(self.spam.lookup("x").is_namespace())
 
-        self.assert_(self.top.lookup("spam").get_namespace() is self.spam)
+        self.assertTrue(self.top.lookup("spam").get_namespace() is self.spam)
         ns_test = self.top.lookup("namespace_test")
         self.assertEqual(len(ns_test.get_namespaces()), 2)
         self.assertRaises(ValueError, ns_test.get_namespace)

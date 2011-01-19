@@ -143,15 +143,14 @@ class ImportHooksBaseTestCase(unittest.TestCase):
         self.meta_path = sys.meta_path[:]
         self.path_hooks = sys.path_hooks[:]
         sys.path_importer_cache.clear()
-        self.modules_before = sys.modules.copy()
+        self.modules_before = support.modules_setup()
 
     def tearDown(self):
         sys.path[:] = self.path
         sys.meta_path[:] = self.meta_path
         sys.path_hooks[:] = self.path_hooks
         sys.path_importer_cache.clear()
-        sys.modules.clear()
-        sys.modules.update(self.modules_before)
+        support.modules_cleanup(*self.modules_before)
 
 
 class ImportHooksTestCase(ImportHooksBaseTestCase):
@@ -177,7 +176,7 @@ class ImportHooksTestCase(ImportHooksBaseTestCase):
 
         TestImporter.modules['reloadmodule'] = (False, test_co)
         import reloadmodule
-        self.failIf(hasattr(reloadmodule,'reloaded'))
+        self.assertFalse(hasattr(reloadmodule,'reloaded'))
 
         import hooktestpackage.newrel
         self.assertEqual(hooktestpackage.newrel.get_name(),
@@ -222,15 +221,9 @@ class ImportHooksTestCase(ImportHooksBaseTestCase):
 
     def testBlocker(self):
         mname = "exceptions"  # an arbitrary harmless builtin module
-        if mname in sys.modules:
-            del sys.modules[mname]
+        support.unload(mname)
         sys.meta_path.append(ImportBlocker(mname))
-        try:
-            __import__(mname)
-        except ImportError:
-            pass
-        else:
-            self.fail("'%s' was not supposed to be importable" % mname)
+        self.assertRaises(ImportError, __import__, mname)
 
     def testImpWrapper(self):
         i = ImpWrapper()

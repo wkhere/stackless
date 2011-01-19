@@ -5,9 +5,6 @@
 :Author: A. M. Kuchling
 :Release: 0.31
 
-(This is a first draft.  Please send comments/error reports/suggestions to
-amk@amk.ca.)
-
 In this document, we'll take a tour of Python's features suitable for
 implementing programs in a functional style.  After an introduction to the
 concepts of functional programming, we'll look at language features such as
@@ -336,7 +333,7 @@ substring.
 
 List comprehensions and generator expressions (short form: "listcomps" and
 "genexps") are a concise notation for such operations, borrowed from the
-functional programming language Haskell (http://www.haskell.org).  You can strip
+functional programming language Haskell (http://www.haskell.org/).  You can strip
 all the whitespace from a stream of strings with the following code::
 
     line_list = ['  line 1\n', 'line 2  \n', ...]

@@ -25,21 +25,21 @@ class TestDefaultDict(unittest.TestCase):
         d1[13]
         d1[14]
         self.assertEqual(d1, {12: [42, 24], 13: [], 14: []})
-        self.assert_(d1[12] is not d1[13] is not d1[14])
+        self.assertTrue(d1[12] is not d1[13] is not d1[14])
         d2 = defaultdict(list, foo=1, bar=2)
         self.assertEqual(d2.default_factory, list)
         self.assertEqual(d2, {"foo": 1, "bar": 2})
         self.assertEqual(d2["foo"], 1)
         self.assertEqual(d2["bar"], 2)
         self.assertEqual(d2[42], [])
-        self.assert_("foo" in d2)
-        self.assert_("foo" in d2.keys())
-        self.assert_("bar" in d2)
-        self.assert_("bar" in d2.keys())
-        self.assert_(42 in d2)
-        self.assert_(42 in d2.keys())
-        self.assert_(12 not in d2)
-        self.assert_(12 not in d2.keys())
+        self.assertIn("foo", d2)
+        self.assertIn("foo", d2.keys())
+        self.assertIn("bar", d2)
+        self.assertIn("bar", d2.keys())
+        self.assertIn(42, d2)
+        self.assertIn(42, d2.keys())
+        self.assertNotIn(12, d2)
+        self.assertNotIn(12, d2.keys())
         d2.default_factory = None
         self.assertEqual(d2.default_factory, None)
         try:
@@ -60,6 +60,7 @@ class TestDefaultDict(unittest.TestCase):
         d1 = defaultdict()
         self.assertEqual(d1.default_factory, None)
         self.assertEqual(repr(d1), "defaultdict(None, {})")
+        self.assertEqual(eval(repr(d1)), d1)
         d1[11] = 41
         self.assertEqual(repr(d1), "defaultdict(None, {11: 41})")
         d2 = defaultdict(int)
@@ -68,7 +69,7 @@ class TestDefaultDict(unittest.TestCase):
         self.assertEqual(repr(d2), "defaultdict(<class 'int'>, {12: 42})")
         def foo(): return 43
         d3 = defaultdict(foo)
-        self.assert_(d3.default_factory is foo)
+        self.assertTrue(d3.default_factory is foo)
         d3[13]
         self.assertEqual(repr(d3), "defaultdict(%s, {13: 43})" % repr(foo))
 
@@ -112,6 +113,12 @@ class TestDefaultDict(unittest.TestCase):
         d4[12]
         self.assertEqual(d4, {42: [], 12: []})
 
+        # Issue 6637: Copy fails for empty default dict
+        d = defaultdict()
+        d['a'] = 42
+        e = d.copy()
+        self.assertEqual(e['a'], 42)
+
     def test_shallow_copy(self):
         d1 = defaultdict(foobar, {1: 1})
         d2 = copy.copy(d1)
@@ -127,7 +134,7 @@ class TestDefaultDict(unittest.TestCase):
         d2 = copy.deepcopy(d1)
         self.assertEqual(d2.default_factory, foobar)
         self.assertEqual(d2, d1)
-        self.assert_(d1[1] is not d2[1])
+        self.assertTrue(d1[1] is not d2[1])
         d1.default_factory = list
         d2 = copy.deepcopy(d1)
         self.assertEqual(d2.default_factory, list)
@@ -150,7 +157,7 @@ class TestDefaultDict(unittest.TestCase):
             def _factory(self):
                 return []
         d = sub()
-        self.assert_(repr(d).startswith(
+        self.assertTrue(repr(d).startswith(
             "defaultdict(<bound method sub._factory of defaultdict(..."))
 
         # NOTE: printing a subclass of a builtin type does not call its

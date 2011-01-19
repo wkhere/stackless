@@ -13,6 +13,7 @@ import sys as _sys
 import heapq as _heapq
 from weakref import proxy as _proxy
 from itertools import repeat as _repeat, chain as _chain, starmap as _starmap
+from reprlib import recursive_repr as _recursive_repr
 
 ################################################################################
 ### OrderedDict
@@ -21,7 +22,7 @@ from itertools import repeat as _repeat, chain as _chain, starmap as _starmap
 class _Link(object):
     __slots__ = 'prev', 'next', 'key', '__weakref__'
 
-class OrderedDict(dict, MutableMapping):
+class OrderedDict(dict):
     'Dictionary that remembers insertion order'
     # An inherited dict maps keys to values.
     # The inherited dict provides __getitem__, __len__, __contains__, and get.
@@ -31,6 +32,7 @@ class OrderedDict(dict, MutableMapping):
     # The internal self.__map dictionary maps keys to links in a doubly linked list.
     # The circular doubly linked list starts and ends with a sentinel element.
     # The sentinel element never gets deleted (this simplifies the algorithm).
+    # The sentinel is stored in self.__hardroot with a weakref proxy in self.__root.
     # The prev/next links are weakref proxies (to prevent circular references).
     # Individual links are kept alive by the hard reference in self.__map.
     # Those hard references disappear when a key is deleted from an OrderedDict.
@@ -46,38 +48,36 @@ class OrderedDict(dict, MutableMapping):
         try:
             self.__root
         except AttributeError:
-            self.__root = root = _Link()    # sentinel node for the doubly linked list
+            self.__hardroot = _Link()
+            self.__root = root = _proxy(self.__hardroot)
             root.prev = root.next = root
             self.__map = {}
-        self.update(*args, **kwds)
+        self.__update(*args, **kwds)
 
-    def clear(self):
-        'od.clear() -> None.  Remove all items from od.'
-        root = self.__root
-        root.prev = root.next = root
-        self.__map.clear()
-        dict.clear(self)
-
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value,
+                    dict_setitem=dict.__setitem__, proxy=_proxy, Link=_Link):
         'od.__setitem__(i, y) <==> od[i]=y'
         # Setting a new item creates a new link which goes at the end of the linked
         # list, and the inherited dictionary is updated with the new key/value pair.
         if key not in self:
-            self.__map[key] = link = _Link()
+            self.__map[key] = link = Link()
             root = self.__root
             last = root.prev
             link.prev, link.next, link.key = last, root, key
-            last.next = root.prev = _proxy(link)
-        dict.__setitem__(self, key, value)
+            last.next = link
+            root.prev = proxy(link)
+        dict_setitem(self, key, value)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key, dict_delitem=dict.__delitem__):
         'od.__delitem__(y) <==> del od[y]'
         # Deleting an existing item uses self.__map to find the link which is
         # then removed by updating the links in the predecessor and successor nodes.
-        dict.__delitem__(self, key)
+        dict_delitem(self, key)
         link = self.__map.pop(key)
-        link.prev.next = link.next
-        link.next.prev = link.prev
+        link_prev = link.prev
+        link_next = link.next
+        link_prev.next = link_next
+        link_next.prev = link_prev
 
     def __iter__(self):
         'od.__iter__() <==> iter(od)'
@@ -97,23 +97,12 @@ class OrderedDict(dict, MutableMapping):
             yield curr.key
             curr = curr.prev
 
-    def __reduce__(self):
-        'Return state information for pickling'
-        items = [[k, self[k]] for k in self]
-        tmp = self.__map, self.__root
-        del self.__map, self.__root
-        inst_dict = vars(self).copy()
-        self.__map, self.__root = tmp
-        if inst_dict:
-            return (self.__class__, (items,), inst_dict)
-        return self.__class__, (items,)
-
-    setdefault = MutableMapping.setdefault
-    update = MutableMapping.update
-    pop = MutableMapping.pop
-    keys = MutableMapping.keys
-    values = MutableMapping.values
-    items = MutableMapping.items
+    def clear(self):
+        'od.clear() -> None.  Remove all items from od.'
+        root = self.__root
+        root.prev = root.next = root
+        self.__map.clear()
+        dict.clear(self)
 
     def popitem(self, last=True):
         '''od.popitem() -> (k, v), return and remove a (key, value) pair.
@@ -122,10 +111,91 @@ class OrderedDict(dict, MutableMapping):
         '''
         if not self:
             raise KeyError('dictionary is empty')
-        key = next(reversed(self) if last else iter(self))
-        value = self.pop(key)
+        root = self.__root
+        if last:
+            link = root.prev
+            link_prev = link.prev
+            link_prev.next = root
+            root.prev = link_prev
+        else:
+            link = root.next
+            link_next = link.next
+            root.next = link_next
+            link_next.prev = root
+        key = link.key
+        del self.__map[key]
+        value = dict.pop(self, key)
         return key, value
 
+    def move_to_end(self, key, last=True):
+        '''Move an existing element to the end (or beginning if last==False).
+
+        Raises KeyError if the element does not exist.
+        When last=True, acts like a fast version of self[key]=self.pop(key).
+
+        '''
+        link = self.__map[key]
+        link_prev = link.prev
+        link_next = link.next
+        link_prev.next = link_next
+        link_next.prev = link_prev
+        root = self.__root
+        if last:
+            last = root.prev
+            link.prev = last
+            link.next = root
+            last.next = root.prev = link
+        else:
+            first = root.next
+            link.prev = root
+            link.next = first
+            root.next = first.prev = link
+
+    def __reduce__(self):
+        'Return state information for pickling'
+        items = [[k, self[k]] for k in self]
+        tmp = self.__map, self.__root, self.__hardroot
+        del self.__map, self.__root, self.__hardroot
+        inst_dict = vars(self).copy()
+        self.__map, self.__root, self.__hardroot = tmp
+        if inst_dict:
+            return (self.__class__, (items,), inst_dict)
+        return self.__class__, (items,)
+
+    def __sizeof__(self):
+        sizeof = _sys.getsizeof
+        n = len(self) + 1                       # number of links including root
+        size = sizeof(self.__dict__)            # instance dictionary
+        size += sizeof(self.__map) * 2          # internal dict and inherited dict
+        size += sizeof(self.__hardroot) * n     # link objects
+        size += sizeof(self.__root) * n         # proxy objects
+        return size
+
+    update = __update = MutableMapping.update
+    keys = MutableMapping.keys
+    values = MutableMapping.values
+    items = MutableMapping.items
+    __ne__ = MutableMapping.__ne__
+
+    __marker = object()
+
+    def pop(self, key, default=__marker):
+        if key in self:
+            result = self[key]
+            del self[key]
+            return result
+        if default is self.__marker:
+            raise KeyError(key)
+        return default
+
+    def setdefault(self, key, default=None):
+        'OD.setdefault(k[,d]) -> OD.get(k,d), also set OD[k]=d if k not in OD'
+        if key in self:
+            return self[key]
+        self[key] = default
+        return default
+
+    @_recursive_repr()
     def __repr__(self):
         'od.__repr__() <==> repr(od)'
         if not self:
@@ -156,14 +226,6 @@ class OrderedDict(dict, MutableMapping):
             return len(self)==len(other) and \
                    all(p==q for p, q in zip(self.items(), other.items()))
         return dict.__eq__(self, other)
-
-    def __ne__(self, other):
-        '''od.__ne__(y) <==> od!=y.  Comparison to another OD is order-sensitive
-        while comparison to a regular mapping is order-insensitive.
-
-        '''
-        return not self == other
-
 
 
 ################################################################################
@@ -233,6 +295,7 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
         __slots__ = () \n
         _fields = %(field_names)r \n
         def __new__(_cls, %(argtxt)s):
+            'Create new instance of %(typename)s(%(argtxt)s)'
             return _tuple.__new__(_cls, (%(argtxt)s)) \n
         @classmethod
         def _make(cls, iterable, new=tuple.__new__, len=len):
@@ -242,7 +305,8 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
                 raise TypeError('Expected %(numfields)d arguments, got %%d' %% len(result))
             return result \n
         def __repr__(self):
-            return '%(typename)s(%(reprtxt)s)' %% self \n
+            'Return a nicely formatted representation string'
+            return self.__class__.__name__ + '(%(reprtxt)s)' %% self \n
         def _asdict(self):
             'Return a new OrderedDict which maps field names to their values'
             return OrderedDict(zip(self._fields, self)) \n
@@ -253,9 +317,10 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
                 raise ValueError('Got unexpected field names: %%r' %% kwds.keys())
             return result \n
         def __getnewargs__(self):
+            'Return self as a plain tuple.  Used by copy and pickle.'
             return tuple(self) \n\n''' % locals()
     for i, name in enumerate(field_names):
-        template += '        %s = _property(_itemgetter(%d))\n' % (name, i)
+        template += "        %s = _property(_itemgetter(%d), doc='Alias for field number %d')\n" % (name, i, i)
     if verbose:
         print(template)
 
@@ -266,7 +331,7 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
     try:
         exec(template, namespace)
     except SyntaxError as e:
-        raise SyntaxError(e.msg + ':\n' + template) from e
+        raise SyntaxError(e.msg + ':\n\n' + template)
     result = namespace[typename]
 
     # For pickling to work, the __module__ variable needs to be set to the frame
@@ -285,21 +350,32 @@ def namedtuple(typename, field_names, verbose=False, rename=False):
 ###  Counter
 ########################################################################
 
+def _count_elements(mapping, iterable):
+    'Tally elements from the iterable.'
+    mapping_get = mapping.get
+    for elem in iterable:
+        mapping[elem] = mapping_get(elem, 0) + 1
+
+try:                                    # Load C helper function if available
+    from _collections import _count_elements
+except ImportError:
+    pass
+
 class Counter(dict):
     '''Dict subclass for counting hashable items.  Sometimes called a bag
     or multiset.  Elements are stored as dictionary keys and their counts
     are stored as dictionary values.
 
-    >>> c = Counter('abracadabra')      # count elements from a string
+    >>> c = Counter('abcdeabcdabcaba')  # count elements from a string
 
     >>> c.most_common(3)                # three most common elements
-    [('a', 5), ('r', 2), ('b', 2)]
+    [('a', 5), ('b', 4), ('c', 3)]
     >>> sorted(c)                       # list all unique elements
-    ['a', 'b', 'c', 'd', 'r']
+    ['a', 'b', 'c', 'd', 'e']
     >>> ''.join(sorted(c.elements()))   # list elements with repetitions
-    'aaaaabbcdrr'
+    'aaaaabbbbcccdde'
     >>> sum(c.values())                 # total of all counts
-    11
+    15
 
     >>> c['a']                          # count of letter 'a'
     5
@@ -307,8 +383,8 @@ class Counter(dict):
     ...     c[elem] += 1                # by adding 1 to each element's count
     >>> c['a']                          # now there are seven 'a'
     7
-    >>> del c['r']                      # remove all 'r'
-    >>> c['r']                          # now there are zero 'r'
+    >>> del c['b']                      # remove all 'b'
+    >>> c['b']                          # now there are zero 'b'
     0
 
     >>> d = Counter('simsalabim')       # make another counter
@@ -347,6 +423,7 @@ class Counter(dict):
         >>> c = Counter(a=4, b=2)                   # a new counter from keyword args
 
         '''
+        super().__init__()
         self.update(iterable, **kwds)
 
     def __missing__(self, key):
@@ -358,8 +435,8 @@ class Counter(dict):
         '''List the n most common elements and their counts from the most
         common to the least.  If n is None, then list all element counts.
 
-        >>> Counter('abracadabra').most_common(3)
-        [('a', 5), ('r', 2), ('b', 2)]
+        >>> Counter('abcdeabcdabcaba').most_common(3)
+        [('a', 5), ('b', 4), ('c', 3)]
 
         '''
         # Emulate Bag.sortedByCount from Smalltalk
@@ -421,24 +498,54 @@ class Counter(dict):
         if iterable is not None:
             if isinstance(iterable, Mapping):
                 if self:
+                    self_get = self.get
                     for elem, count in iterable.items():
-                        self[elem] += count
+                        self[elem] = count + self_get(elem, 0)
                 else:
-                    dict.update(self, iterable) # fast path when counter is empty
+                    super().update(iterable) # fast path when counter is empty
             else:
-                for elem in iterable:
-                    self[elem] += 1
+                _count_elements(self, iterable)
         if kwds:
             self.update(kwds)
+
+    def subtract(self, iterable=None, **kwds):
+        '''Like dict.update() but subtracts counts instead of replacing them.
+        Counts can be reduced below zero.  Both the inputs and outputs are
+        allowed to contain zero and negative counts.
+
+        Source can be an iterable, a dictionary, or another Counter instance.
+
+        >>> c = Counter('which')
+        >>> c.subtract('witch')             # subtract elements from another iterable
+        >>> c.subtract(Counter('watch'))    # subtract elements from another counter
+        >>> c['h']                          # 2 in which, minus 1 in witch, minus 1 in watch
+        0
+        >>> c['w']                          # 1 in which, minus 1 in witch, minus 1 in watch
+        -1
+
+        '''
+        if iterable is not None:
+            self_get = self.get
+            if isinstance(iterable, Mapping):
+                for elem, count in iterable.items():
+                    self[elem] = self_get(elem, 0) - count
+            else:
+                for elem in iterable:
+                    self[elem] = self_get(elem, 0) - 1
+        if kwds:
+            self.subtract(kwds)
 
     def copy(self):
         'Like dict.copy() but returns a Counter instance instead of a dict.'
         return Counter(self)
 
+    def __reduce__(self):
+        return self.__class__, (dict(self),)
+
     def __delitem__(self, elem):
         'Like dict.__delitem__() but does not raise KeyError for missing values.'
         if elem in self:
-            dict.__delitem__(self, elem)
+            super().__delitem__(elem)
 
     def __repr__(self):
         if not self:
@@ -765,6 +872,8 @@ class UserString(Sequence):
             new = new.data
         return self.__class__(self.data.replace(old, new, maxsplit))
     def rfind(self, sub, start=0, end=_sys.maxsize):
+        if isinstance(sub, UserString):
+            sub = sub.data
         return self.data.rfind(sub, start, end)
     def rindex(self, sub, start=0, end=_sys.maxsize):
         return self.data.rindex(sub, start, end)

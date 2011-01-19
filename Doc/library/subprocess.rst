@@ -1,4 +1,3 @@
-
 :mod:`subprocess` --- Subprocess management
 ===========================================
 
@@ -29,7 +28,7 @@ Using the subprocess Module
 This module defines one class called :class:`Popen`:
 
 
-.. class:: Popen(args, bufsize=0, executable=None, stdin=None, stdout=None, stderr=None, preexec_fn=None, close_fds=False, shell=False, cwd=None, env=None, universal_newlines=False, startupinfo=None, creationflags=0)
+.. class:: Popen(args, bufsize=0, executable=None, stdin=None, stdout=None, stderr=None, preexec_fn=None, close_fds=True, shell=False, cwd=None, env=None, universal_newlines=False, startupinfo=None, creationflags=0, restore_signals=True, start_new_session=False, pass_fds=())
 
    Arguments are:
 
@@ -42,14 +41,58 @@ This module defines one class called :class:`Popen`:
    name for the executing program in utilities such as :program:`ps`.
 
    On Unix, with *shell=False* (default): In this case, the Popen class uses
-   :meth:`os.execvp` to execute the child program. *args* should normally be a
-   sequence.  A string will be treated as a sequence with the string as the only
-   item (the program to execute).
+   :meth:`os.execvp` like behavior to execute the child program.
+   *args* should normally be a
+   sequence.  If a string is specified for *args*, it will be used as the name
+   or path of the program to execute; this will only work if the program is
+   being given no arguments.
 
-   On Unix, with *shell=True*: If args is a string, it specifies the command string
-   to execute through the shell.  If *args* is a sequence, the first item specifies
-   the command string, and any additional items will be treated as additional shell
-   arguments.
+   .. note::
+
+      :meth:`shlex.split` can be useful when determining the correct
+      tokenization for *args*, especially in complex cases::
+
+         >>> import shlex, subprocess
+         >>> command_line = input()
+         /bin/vikings -input eggs.txt -output "spam spam.txt" -cmd "echo '$MONEY'"
+         >>> args = shlex.split(command_line)
+         >>> print(args)
+         ['/bin/vikings', '-input', 'eggs.txt', '-output', 'spam spam.txt', '-cmd', "echo '$MONEY'"]
+         >>> p = subprocess.Popen(args) # Success!
+
+      Note in particular that options (such as *-input*) and arguments (such
+      as *eggs.txt*) that are separated by whitespace in the shell go in separate
+      list elements, while arguments that need quoting or backslash escaping when
+      used in the shell (such as filenames containing spaces or the *echo* command
+      shown above) are single list elements.
+
+   On Unix, with *shell=True*: If args is a string, it specifies the command
+   string to execute through the shell.  This means that the string must be
+   formatted exactly as it would be when typed at the shell prompt.  This
+   includes, for example, quoting or backslash escaping filenames with spaces in
+   them.  If *args* is a sequence, the first item specifies the command string, and
+   any additional items will be treated as additional arguments to the shell
+   itself.  That is to say, *Popen* does the equivalent of::
+
+      Popen(['/bin/sh', '-c', args[0], args[1], ...])
+
+   .. warning::
+
+      Executing shell commands that incorporate unsanitized input from an
+      untrusted source makes a program vulnerable to `shell injection
+      <http://en.wikipedia.org/wiki/Shell_injection#Shell_injection>`_,
+      a serious security flaw which can result in arbitrary command execution.
+      For this reason, the use of *shell=True* is **strongly discouraged** in cases
+      where the command string is constructed from external input::
+
+         >>> from subprocess import call
+         >>> filename = input("What file would you like to display?\n")
+         What file would you like to display?
+         non_existent; rm -rf / #
+         >>> call("cat " + filename, shell=True) # Uh-oh. This will end badly...
+
+      *shell=False* does not suffer from this vulnerability; the above Note may be
+      helpful in getting code using *shell=False* to work.
 
    On Windows: the :class:`Popen` class uses CreateProcess() to execute the child
    program, which operates on strings.  If *args* is a sequence, it will be
@@ -64,48 +107,97 @@ This module defines one class called :class:`Popen`:
    size.  A negative *bufsize* means to use the system default, which usually means
    fully buffered.  The default value for *bufsize* is :const:`0` (unbuffered).
 
+   .. note::
+
+      If you experience performance issues, it is recommended that you try to
+      enable buffering by setting *bufsize* to either -1 or a large enough
+      positive value (such as 4096).
+
    The *executable* argument specifies the program to execute. It is very seldom
    needed: Usually, the program to execute is defined by the *args* argument. If
    ``shell=True``, the *executable* argument specifies which shell to use. On Unix,
    the default shell is :file:`/bin/sh`.  On Windows, the default shell is
-   specified by the :envvar:`COMSPEC` environment variable.
+   specified by the :envvar:`COMSPEC` environment variable. The only reason you
+   would need to specify ``shell=True`` on Windows is where the command you
+   wish to execute is actually built in to the shell, eg ``dir``, ``copy``.
+   You don't need ``shell=True`` to run a batch file, nor to run a console-based
+   executable.
 
    *stdin*, *stdout* and *stderr* specify the executed programs' standard input,
    standard output and standard error file handles, respectively.  Valid values
    are :data:`PIPE`, an existing file descriptor (a positive integer), an
-   existing file object, and ``None``.  :data:`PIPE` indicates that a new pipe
-   to the child should be created.  With ``None``, no redirection will occur;
-   the child's file handles will be inherited from the parent.  Additionally,
+   existing :term:`file object`, and ``None``.  :data:`PIPE` indicates that a
+   new pipe to the child should be created.  With ``None``, no redirection will
+   occur; the child's file handles will be inherited from the parent.  Additionally,
    *stderr* can be :data:`STDOUT`, which indicates that the stderr data from the
    applications should be captured into the same file handle as for stdout.
 
    If *preexec_fn* is set to a callable object, this object will be called in the
-   child process just before the child is executed. (Unix only)
+   child process just before the child is executed.
+   (Unix only)
+
+   .. warning::
+
+      The *preexec_fn* parameter is not safe to use in the presence of threads
+      in your application.  The child process could deadlock before exec is
+      called.
+      If you must use it, keep it trivial!  Minimize the number of libraries
+      you call into.
+
+   .. note::
+
+      If you need to modify the environment for the child use the *env*
+      parameter rather than doing it in a *preexec_fn*.
+      The *start_new_session* parameter can take the place of a previously
+      common use of *preexec_fn* to call os.setsid() in the child.
 
    If *close_fds* is true, all file descriptors except :const:`0`, :const:`1` and
    :const:`2` will be closed before the child process is executed. (Unix only).
-   Or, on Windows, if *close_fds* is true then no handles will be inherited by the
+   The default varies by platform:  Always true on Unix.  On Windows it is
+   true when *stdin*/*stdout*/*stderr* are :const:`None`, false otherwise.
+   On Windows, if *close_fds* is true then no handles will be inherited by the
    child process.  Note that on Windows, you cannot set *close_fds* to true and
    also redirect the standard handles by setting *stdin*, *stdout* or *stderr*.
 
-   If *shell* is :const:`True`, the specified command will be executed through the
-   shell.
+   .. versionchanged:: 3.2
+      The default for *close_fds* was changed from :const:`False` to
+      what is described above.
+
+   *pass_fds* is an optional sequence of file descriptors to keep open
+   between the parent and child.  Providing any *pass_fds* forces
+   *close_fds* to be :const:`True`.  (Unix only)
+
+   .. versionadded:: 3.2
+      The *pass_fds* parameter was added.
 
    If *cwd* is not ``None``, the child's current directory will be changed to *cwd*
    before it is executed.  Note that this directory is not considered when
    searching the executable, so you can't specify the program's path relative to
    *cwd*.
 
+   If *restore_signals* is True (the default) all signals that Python has set to
+   SIG_IGN are restored to SIG_DFL in the child process before the exec.
+   Currently this includes the SIGPIPE, SIGXFZ and SIGXFSZ signals.
+   (Unix only)
+
+   .. versionchanged:: 3.2
+      *restore_signals* was added.
+
+   If *start_new_session* is True the setsid() system call will be made in the
+   child process prior to the execution of the subprocess.  (Unix only)
+
+   .. versionchanged:: 3.2
+      *start_new_session* was added.
+
    If *env* is not ``None``, it must be a mapping that defines the environment
-   variables for the new process; these are used instead of inheriting the current
-   process' environment, which is the default behavior.
+   variables for the new process; these are used instead of the default
+   behavior of inheriting the current process' environment.
 
    .. note::
 
-      If specified, *env* must provide any variables required
-      for the program to execute.  On Windows, in order to run a
-      `side-by-side assembly`_ the specified *env* **must** include a valid
-      :envvar:`SystemRoot`.
+      If specified, *env* must provide any variables required for the program to
+      execute.  On Windows, in order to run a `side-by-side assembly`_ the
+      specified *env* **must** include a valid :envvar:`SystemRoot`.
 
    .. _side-by-side assembly: http://en.wikipedia.org/wiki/Side-by-Side_Assembly
 
@@ -117,13 +209,24 @@ This module defines one class called :class:`Popen`:
 
    .. note::
 
-      This feature is only available if Python is built with universal newline support
-      (the default).  Also, the newlines attribute of the file objects :attr:`stdout`,
-      :attr:`stdin` and :attr:`stderr` are not updated by the :meth:`communicate` method.
+      This feature is only available if Python is built with universal newline
+      support (the default).  Also, the newlines attribute of the file objects
+      :attr:`stdout`, :attr:`stdin` and :attr:`stderr` are not updated by the
+      :meth:`communicate` method.
 
    The *startupinfo* and *creationflags*, if given, will be passed to the
    underlying CreateProcess() function.  They can specify things such as appearance
    of the main window and priority for the new process.  (Windows only)
+
+   Popen objects are supported as context managers via the :keyword:`with` statement,
+   closing any open file descriptors on exit.
+   ::
+
+      with Popen(["ifconfig"], stdout=PIPE) as proc:
+          log.write(proc.stdout.read())
+
+   .. versionchanged:: 3.2
+      Added context manager support.
 
 
 .. data:: PIPE
@@ -151,15 +254,16 @@ This module also defines four shortcut functions:
    Run command with arguments.  Wait for command to complete, then return the
    :attr:`returncode` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example::
+   The arguments are the same as for the :class:`Popen` constructor.  Example::
 
-      retcode = call(["ls", "-l"])
+      >>> retcode = subprocess.call(["ls", "-l"])
 
    .. warning::
 
-      Like :meth:`Popen.wait`, this will deadlock if the child process
-      generates enough output to a stdout or stderr pipe such that it blocks
-      waiting for the OS pipe buffer to accept more data.
+      Like :meth:`Popen.wait`, this will deadlock when using
+      ``stdout=PIPE`` and/or ``stderr=PIPE`` and the child process
+      generates enough output to a pipe such that it blocks waiting
+      for the OS pipe buffer to accept more data.
 
 
 .. function:: check_call(*popenargs, **kwargs)
@@ -169,9 +273,10 @@ This module also defines four shortcut functions:
    :exc:`CalledProcessError` object will have the return code in the
    :attr:`returncode` attribute.
 
-   The arguments are the same as for the Popen constructor.  Example::
+   The arguments are the same as for the :class:`Popen` constructor.  Example::
 
-      check_call(["ls", "-l"])
+      >>> subprocess.check_call(["ls", "-l"])
+      0
 
    .. warning::
 
@@ -190,29 +295,29 @@ This module also defines four shortcut functions:
    The arguments are the same as for the :class:`Popen` constructor.  Example::
 
       >>> subprocess.check_output(["ls", "-l", "/dev/null"])
-      'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
+      b'crw-rw-rw- 1 root root 1, 3 Oct 18  2007 /dev/null\n'
 
    The stdout argument is not allowed as it is used internally.
    To capture standard error in the result, use ``stderr=subprocess.STDOUT``::
 
       >>> subprocess.check_output(
-              ["/bin/sh", "-c", "ls non_existent_file ; exit 0"],
-              stderr=subprocess.STDOUT)
-      'ls: non_existent_file: No such file or directory\n'
+      ...     ["/bin/sh", "-c", "ls non_existent_file; exit 0"],
+      ...     stderr=subprocess.STDOUT)
+      b'ls: non_existent_file: No such file or directory\n'
 
    .. versionadded:: 3.1
 
 
 .. function:: getstatusoutput(cmd)
+
    Return ``(status, output)`` of executing *cmd* in a shell.
 
    Execute the string *cmd* in a shell with :func:`os.popen` and return a 2-tuple
    ``(status, output)``.  *cmd* is actually run as ``{ cmd ; } 2>&1``, so that the
    returned output will contain output or error messages.  A trailing newline is
    stripped from the output.  The exit status for the command can be interpreted
-   according to the rules for the C function :cfunc:`wait`.  Example::
+   according to the rules for the C function :c:func:`wait`.  Example::
 
-      >>> import subprocess
       >>> subprocess.getstatusoutput('ls /bin/ls')
       (0, '/bin/ls')
       >>> subprocess.getstatusoutput('cat /bin/junk')
@@ -224,12 +329,12 @@ This module also defines four shortcut functions:
 
 
 .. function:: getoutput(cmd)
+
    Return output (stdout and stderr) of executing *cmd* in a shell.
 
    Like :func:`getstatusoutput`, except the exit status is ignored and the return
    value is a string containing the command's output.  Example::
 
-      >>> import subprocess
       >>> subprocess.getoutput('ls /bin/ls')
       '/bin/ls'
 
@@ -242,7 +347,7 @@ Exceptions
 Exceptions raised in the child process, before the new program has started to
 execute, will be re-raised in the parent.  Additionally, the exception object
 will have one extra attribute called :attr:`child_traceback`, which is a string
-containing traceback information from the childs point of view.
+containing traceback information from the child's point of view.
 
 The most common exception raised is :exc:`OSError`.  This occurs, for example,
 when trying to execute a non-existent file.  Applications should prepare for
@@ -282,9 +387,10 @@ Instances of the :class:`Popen` class have the following methods:
 
    .. warning::
 
-      This will deadlock if the child process generates enough output to a
-      stdout or stderr pipe such that it blocks waiting for the OS pipe buffer
-      to accept more data.  Use :meth:`communicate` to avoid that.
+      This will deadlock when using ``stdout=PIPE`` and/or
+      ``stderr=PIPE`` and the child process generates enough output to
+      a pipe such that it blocks waiting for the OS pipe buffer to
+      accept more data.  Use :meth:`communicate` to avoid that.
 
 
 .. method:: Popen.communicate(input=None)
@@ -313,14 +419,15 @@ Instances of the :class:`Popen` class have the following methods:
 
    .. note::
 
-      On Windows only SIGTERM is supported so far. It's an alias for
-      :meth:`terminate`.
+      On Windows, SIGTERM is an alias for :meth:`terminate`. CTRL_C_EVENT and
+      CTRL_BREAK_EVENT can be sent to processes started with a *creationflags*
+      parameter which includes `CREATE_NEW_PROCESS_GROUP`.
 
 
 .. method:: Popen.terminate()
 
    Stop the child. On Posix OSs the method sends SIGTERM to the
-   child. On Windows the Win32 API function :cfunc:`TerminateProcess` is called
+   child. On Windows the Win32 API function :c:func:`TerminateProcess` is called
    to stop the child.
 
 
@@ -342,26 +449,29 @@ The following attributes are also available:
 
 .. attribute:: Popen.stdin
 
-   If the *stdin* argument was :data:`PIPE`, this attribute is a file object
-   that provides input to the child process.  Otherwise, it is ``None``.
+   If the *stdin* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides input to the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stdout
 
-   If the *stdout* argument was :data:`PIPE`, this attribute is a file object
-   that provides output from the child process.  Otherwise, it is ``None``.
+   If the *stdout* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides output from the child process.  Otherwise, it is ``None``.
 
 
 .. attribute:: Popen.stderr
 
-   If the *stderr* argument was :data:`PIPE`, this attribute is a file object
-   that provides error output from the child process.  Otherwise, it is
+   If the *stderr* argument was :data:`PIPE`, this attribute is a :term:`file
+   object` that provides error output from the child process.  Otherwise, it is
    ``None``.
 
 
 .. attribute:: Popen.pid
 
    The process ID of the child process.
+
+   Note that if you set the *shell* argument to ``True``, this is the process ID
+   of the spawned shell.
 
 
 .. attribute:: Popen.returncode
@@ -420,7 +530,7 @@ Replacing :func:`os.system`
    sts = os.system("mycmd" + " myarg")
    ==>
    p = Popen("mycmd" + " myarg", shell=True)
-   sts = os.waitpid(p.pid, 0)
+   sts = os.waitpid(p.pid, 0)[1]
 
 Notes:
 
@@ -505,14 +615,14 @@ Return code handling translates as follows::
    pipe = os.popen(cmd, 'w')
    ...
    rc = pipe.close()
-   if  rc != None and rc % 256:
-       print "There were some errors"
+   if rc is not None and rc >> 8:
+       print("There were some errors")
    ==>
    process = Popen(cmd, 'w', stdin=PIPE)
    ...
    process.stdin.close()
    if process.wait() != 0:
-       print "There were some errors"
+       print("There were some errors")
 
 
 Replacing functions from the :mod:`popen2` module
@@ -549,4 +659,5 @@ Replacing functions from the :mod:`popen2` module
 * ``stdin=PIPE`` and ``stdout=PIPE`` must be specified.
 
 * popen2 closes all file descriptors by default, but you have to specify
-  ``close_fds=True`` with :class:`Popen`.
+  ``close_fds=True`` with :class:`Popen` to guarantee this behavior on
+  all platforms or past Python versions.

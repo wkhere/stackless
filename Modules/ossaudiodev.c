@@ -470,6 +470,23 @@ oss_close(oss_audio_t *self, PyObject *unused)
 }
 
 static PyObject *
+oss_self(PyObject *self, PyObject *unused)
+{
+    Py_INCREF(self);
+    return self;
+}
+
+static PyObject * 
+oss_exit(PyObject *self, PyObject *unused)
+{
+    PyObject *ret = PyObject_CallMethod(self, "close", NULL);
+    if (!ret)
+        return NULL;
+    Py_DECREF(ret);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
 oss_fileno(oss_audio_t *self, PyObject *unused)
 {
     return PyLong_FromLong(self->fd);
@@ -782,6 +799,10 @@ static PyMethodDef oss_methods[] = {
     /* Aliases for backwards compatibility */
     { "flush",          (PyCFunction)oss_sync, METH_VARARGS },
 
+    /* Support for the context manager protocol */
+    { "__enter__",      oss_self, METH_NOARGS },
+    { "__exit__",       oss_exit, METH_VARARGS },
+
     { NULL,             NULL}           /* sentinel */
 };
 
@@ -789,6 +810,10 @@ static PyMethodDef oss_mixer_methods[] = {
     /* Regular file method - OSS mixers are ioctl-only interface */
     { "close",          (PyCFunction)oss_mixer_close, METH_NOARGS },
     { "fileno",         (PyCFunction)oss_mixer_fileno, METH_NOARGS },
+
+    /* Support for the context manager protocol */
+    { "__enter__",      oss_self, METH_NOARGS },
+    { "__exit__",       oss_exit, METH_VARARGS },
 
     /* Simple ioctl wrappers */
     { "controls",       (PyCFunction)oss_mixer_controls, METH_VARARGS },
@@ -809,8 +834,8 @@ oss_getattro(oss_audio_t *self, PyObject *nameobj)
     PyObject * rval = NULL;
 
     if (PyUnicode_Check(nameobj))
-	name = _PyUnicode_AsString(nameobj);
-    
+        name = _PyUnicode_AsString(nameobj);
+
     if (strcmp(name, "closed") == 0) {
         rval = (self->fd == -1) ? Py_True : Py_False;
         Py_INCREF(rval);
@@ -975,28 +1000,34 @@ error1:
 
 
 static struct PyModuleDef ossaudiodevmodule = {
-	PyModuleDef_HEAD_INIT,
-	"ossaudiodev",
-	NULL,
-	-1,
-	ossaudiodev_methods,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+        PyModuleDef_HEAD_INIT,
+        "ossaudiodev",
+        NULL,
+        -1,
+        ossaudiodev_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
 };
 
-PyObject*
+PyMODINIT_FUNC
 PyInit_ossaudiodev(void)
 {
     PyObject *m;
 
+    if (PyType_Ready(&OSSAudioType) < 0)
+        return NULL;
+
+    if (PyType_Ready(&OSSMixerType) < 0)
+        return NULL;
+
     m = PyModule_Create(&ossaudiodevmodule);
     if (m == NULL)
-	return NULL;
+        return NULL;
 
     OSSAudioError = PyErr_NewException("ossaudiodev.OSSAudioError",
-				       NULL, NULL);
+                                       NULL, NULL);
     if (OSSAudioError) {
         /* Each call to PyModule_AddObject decrefs it; compensate: */
         Py_INCREF(OSSAudioError);

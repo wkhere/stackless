@@ -15,6 +15,17 @@ class ModuleTest(unittest.TestCase):
         string.punctuation
         string.printable
 
+    def test_capwords(self):
+        self.assertEqual(string.capwords('abc def ghi'), 'Abc Def Ghi')
+        self.assertEqual(string.capwords('abc\tdef\nghi'), 'Abc Def Ghi')
+        self.assertEqual(string.capwords('abc\t   def  \nghi'), 'Abc Def Ghi')
+        self.assertEqual(string.capwords('ABC DEF GHI'), 'Abc Def Ghi')
+        self.assertEqual(string.capwords('ABC-DEF-GHI', '-'), 'Abc-Def-Ghi')
+        self.assertEqual(string.capwords('ABC-def DEF-ghi GHI'), 'Abc-def Def-ghi Ghi')
+        self.assertEqual(string.capwords('   aBc  DeF   '), 'Abc Def')
+        self.assertEqual(string.capwords('\taBc\tDeF\t'), 'Abc Def')
+        self.assertEqual(string.capwords('\taBc\tDeF\t', '\t'), '\tAbc\tDef\t')
+
     def test_formatter(self):
         fmt = string.Formatter()
         self.assertEqual(fmt.format("foo"), "foo")

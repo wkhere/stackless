@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Python documentation build configuration file
 #
@@ -66,6 +65,9 @@ highlight_language = 'python3'
 # Options for HTML output
 # -----------------------
 
+html_theme = 'default'
+html_theme_options = {'collapsiblesidebar': True}
+
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
 html_last_updated_fmt = '%b %d, %Y'
@@ -86,7 +88,7 @@ html_additional_pages = {
 }
 
 # Output an OpenSearch description file.
-html_use_opensearch = 'http://docs.python.org/dev/3.0'
+html_use_opensearch = 'http://docs.python.org/dev/py3k'
 
 # Additional static files.
 html_static_path = ['tools/sphinxext/static']
@@ -128,7 +130,9 @@ latex_documents = [
     ('tutorial/index', 'tutorial.tex',
      'Python Tutorial', _stdauthor, 'manual'),
     ('using/index', 'using.tex',
-     'Using Python', _stdauthor, 'manual'),
+     'Python Setup and Usage', _stdauthor, 'manual'),
+    ('faq/index', 'faq.tex',
+     'Python Frequently Asked Questions', _stdauthor, 'manual'),
     ('whatsnew/' + version, 'whatsnew.tex',
      'What\'s New in Python', 'A. M. Kuchling', 'howto'),
 ]
@@ -150,6 +154,9 @@ latex_preamble = r'''
 
 # Documents to append as an appendix to all manuals.
 latex_appendices = ['glossary', 'about', 'license', 'copyright']
+
+# Get LaTeX to handle Unicode correctly
+latex_elements = {'inputenc': r'\usepackage[utf8x]{inputenc}', 'utf8extra': ''}
 
 # Options for the coverage checker
 # --------------------------------

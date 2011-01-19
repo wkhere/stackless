@@ -9,6 +9,10 @@
 
 .. index:: module: re
 
+**Source code:** :source:`Lib/fnmatch.py`
+
+--------------
+
 This module provides support for Unix shell-style wildcards, which are *not* the
 same as regular expressions (which are documented in the :mod:`re` module).  The
 special characters used in shell-style wildcards are:
@@ -36,11 +40,12 @@ patterns.
 
 .. function:: fnmatch(filename, pattern)
 
-   Test whether the *filename* string matches the *pattern* string, returning true
-   or false.  If the operating system is case-insensitive, then both parameters
-   will be normalized to all lower- or upper-case before the comparison is
-   performed.  If you require a case-sensitive comparison regardless of whether
-   that's standard for your operating system, use :func:`fnmatchcase` instead.
+   Test whether the *filename* string matches the *pattern* string, returning
+   :const:`True` or :const:`False`.  If the operating system is case-insensitive,
+   then both parameters will be normalized to all lower- or upper-case before
+   the comparison is performed.  :func:`fnmatchcase` can be used to perform a
+   case-sensitive comparison, regardless of whether that's standard for the
+   operating system.
 
    This example will print all file names in the current directory with the
    extension ``.txt``::
@@ -55,8 +60,8 @@ patterns.
 
 .. function:: fnmatchcase(filename, pattern)
 
-   Test whether *filename* matches *pattern*, returning true or false; the
-   comparison is case-sensitive.
+   Test whether *filename* matches *pattern*, returning :const:`True` or
+   :const:`False`; the comparison is case-sensitive.
 
 
 .. function:: filter(names, pattern)
@@ -69,6 +74,8 @@ patterns.
 
    Return the shell-style *pattern* converted to a regular expression.
 
+   Be aware there is no way to quote meta-characters.
+
    Example:
 
       >>> import fnmatch, re
@@ -77,7 +84,7 @@ patterns.
       >>> regex
       '.*\\.txt$'
       >>> reobj = re.compile(regex)
-      >>> print(reobj.match('foobar.txt'))
+      >>> reobj.match('foobar.txt')
       <_sre.SRE_Match object at 0x...>
 
 
@@ -85,4 +92,3 @@ patterns.
 
    Module :mod:`glob`
       Unix shell-style path expansion.
-

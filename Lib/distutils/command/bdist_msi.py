@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (C) 2005, 2006 Martin von Löwis
 # Licensed to PSF under a Contributor Agreement.
 # The bdist_wininst command proper
@@ -148,7 +147,7 @@ class bdist_msi(Command):
             if not self.skip_build and self.distribution.has_ext_modules()\
                and self.target_version != short_version:
                 raise DistutilsOptionError(
-                      "target version can only be %s, or the '--skip_build'"
+                      "target version can only be %s, or the '--skip-build'"
                       " option must be specified" % (short_version,))
         else:
             self.versions = list(self.all_versions)

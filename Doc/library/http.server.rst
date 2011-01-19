@@ -155,6 +155,17 @@ of which this module provides three different variants:
       This method will parse and dispatch the request to the appropriate
       :meth:`do_\*` method.  You should never need to override it.
 
+   .. method:: handle_expect_100()
+
+      When a HTTP/1.1 compliant server receives a ``Expect: 100-continue``
+      request header it responds back with a ``100 Continue`` followed by ``200
+      OK`` headers.
+      This method can be overridden to raise an error if the server does not
+      want the client to continue.  For e.g. server can chose to send ``417
+      Expectation Failed`` as a response header and ``return False``.
+
+      .. versionadded:: 3.2
+
    .. method:: send_error(code, message=None)
 
       Sends and logs a complete error reply to the client. The numeric *code*
@@ -171,13 +182,29 @@ of which this module provides three different variants:
 
    .. method:: send_header(keyword, value)
 
-      Writes a specific HTTP header to the output stream. *keyword* should
-      specify the header keyword, with *value* specifying its value.
+      Stores the HTTP header to an internal buffer which will be written to the
+      output stream when :meth:`end_headers` method is invoked.
+      *keyword* should specify the header keyword, with *value*
+      specifying its value.
+
+      .. versionchanged:: 3.2 Storing the headers in an internal buffer
+
+
+   .. method:: send_response_only(code, message=None)
+
+      Sends the reponse header only, used for the purposes when ``100
+      Continue`` response is sent by the server to the client. The headers not
+      buffered and sent directly the output stream.If the *message* is not
+      specified, the HTTP message corresponding the response *code*  is sent.
+
+      .. versionadded:: 3.2
 
    .. method:: end_headers()
 
-      Sends a blank line, indicating the end of the HTTP headers in the
-      response.
+      Write the buffered HTTP headers to the output stream and send a blank
+      line, indicating the end of the HTTP headers in the response.
+
+      .. versionchanged:: 3.2 Writing the buffered headers to the output stream.
 
    .. method:: log_request(code='-', size='-')
 
@@ -281,7 +308,31 @@ of which this module provides three different variants:
       contents of the file are output. If the file's MIME type starts with
       ``text/`` the file is opened in text mode; otherwise binary mode is used.
 
-      For example usage, see the implementation of the :func:`test` function.
+      For example usage, see the implementation of the :func:`test` function
+      invocation in the :mod:`http.server` module.
+
+
+The :class:`SimpleHTTPRequestHandler` class can be used in the following
+manner in order to create a very basic webserver serving files relative to
+the current directory. ::
+
+   import http.server
+   import socketserver
+
+   PORT = 8000
+
+   Handler = http.server.SimpleHTTPRequestHandler
+
+   httpd = socketserver.TCPServer(("", PORT), Handler)
+
+   print("serving at port", PORT)
+   httpd.serve_forever()
+
+:mod:`http.server` can also be invoked directly using the :option:`-m`
+switch of the interpreter a with ``port number`` argument.  Similar to
+the previous example, this serves files relative to the current directory. ::
+
+        python -m http.server 8000
 
 
 .. class:: CGIHTTPRequestHandler(request, client_address, server)

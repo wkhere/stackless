@@ -1,4 +1,3 @@
-
 :mod:`termios` --- POSIX style tty control
 ==========================================
 
@@ -18,7 +17,7 @@ I/O control (and then only if configured at installation time).
 
 All functions in this module take a file descriptor *fd* as their first
 argument.  This can be an integer file descriptor, such as returned by
-``sys.stdin.fileno()``, or a file object, such as ``sys.stdin`` itself.
+``sys.stdin.fileno()``, or a :term:`file object`, such as ``sys.stdin`` itself.
 
 This module also defines all the constants needed to work with the functions
 provided here; these have the same name as their counterparts in C.  Please
@@ -80,17 +79,17 @@ The module defines the following functions:
       Convenience functions for common terminal control operations.
 
 
+.. _termios-example:
+
 Example
 -------
-
-.. _termios-example:
 
 Here's a function that prompts for a password with echoing turned off.  Note the
 technique using a separate :func:`tcgetattr` call and a :keyword:`try` ...
 :keyword:`finally` statement to ensure that the old tty attributes are restored
 exactly no matter what happens::
 
-   def getpass(prompt = "Password: "):
+   def getpass(prompt="Password: "):
        import termios, sys
        fd = sys.stdin.fileno()
        old = termios.tcgetattr(fd)

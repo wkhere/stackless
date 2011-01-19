@@ -53,7 +53,7 @@ It defines the following functions:
    *incrementalencoder* and *incrementaldecoder*: These have to be factory
    functions providing the following interface:
 
-   ``factory(errors='strict')``
+      ``factory(errors='strict')``
 
    The factory functions must return objects providing the interfaces defined by
    the base classes :class:`IncrementalEncoder` and :class:`IncrementalDecoder`,
@@ -62,20 +62,25 @@ It defines the following functions:
    *streamreader* and *streamwriter*: These have to be factory functions providing
    the following interface:
 
-   ``factory(stream, errors='strict')``
+      ``factory(stream, errors='strict')``
 
    The factory functions must return objects providing the interfaces defined by
    the base classes :class:`StreamWriter` and :class:`StreamReader`, respectively.
    Stream codecs can maintain state.
 
-   Possible values for errors are ``'strict'`` (raise an exception in case of an
-   encoding error), ``'replace'`` (replace malformed data with a suitable
-   replacement marker, such as ``'?'``), ``'ignore'`` (ignore malformed data and
-   continue without further notice), ``'xmlcharrefreplace'`` (replace with the
-   appropriate XML character reference (for encoding only)) and
-   ``'backslashreplace'`` (replace with backslashed escape sequences (for encoding
-   only)) as well as any other error handling name defined via
-   :func:`register_error`.
+   Possible values for errors are
+
+   * ``'strict'``: raise an exception in case of an encoding error
+   * ``'replace'``: replace malformed data with a suitable replacement marker,
+     such as ``'?'`` or ``'\ufffd'``
+   * ``'ignore'``: ignore malformed data and continue without further notice
+   * ``'xmlcharrefreplace'``: replace with the appropriate XML character
+     reference (for encoding only)
+   * ``'backslashreplace'``: replace with backslashed escape sequences (for
+     encoding only)
+   * ``'surrogateescape'``: replace with surrogate U+DCxx, see :pep:`383`
+
+   as well as any other error handling name defined via :func:`register_error`.
 
    In case a search function cannot find a given encoding, it should return
    ``None``.
@@ -172,27 +177,33 @@ functions which use :func:`lookup` for the codec lookup:
 
 .. function:: strict_errors(exception)
 
-   Implements the ``strict`` error handling.
+   Implements the ``strict`` error handling: each encoding or decoding error
+   raises a :exc:`UnicodeError`.
 
 
 .. function:: replace_errors(exception)
 
-   Implements the ``replace`` error handling.
+   Implements the ``replace`` error handling: malformed data is replaced with a
+   suitable replacement character such as ``'?'`` in bytestrings and
+   ``'\ufffd'`` in Unicode strings.
 
 
 .. function:: ignore_errors(exception)
 
-   Implements the ``ignore`` error handling.
+   Implements the ``ignore`` error handling: malformed data is ignored and
+   encoding or decoding is continued without further notice.
 
 
 .. function:: xmlcharrefreplace_errors(exception)
 
-   Implements the ``xmlcharrefreplace`` error handling.
+   Implements the ``xmlcharrefreplace`` error handling (for encoding only): the
+   unencodable character is replaced by an appropriate XML character reference.
 
 
 .. function:: backslashreplace_errors(exception)
 
-   Implements the ``backslashreplace`` error handling.
+   Implements the ``backslashreplace`` error handling (for encoding only): the
+   unencodable character is replaced by a backslashed escape sequence.
 
 To simplify working with encoded files or stream, the module also defines these
 utility functions:
@@ -322,7 +333,8 @@ and implemented by all standard Python codecs:
 | ``'backslashreplace'``  | Replace with backslashed escape sequences     |
 |                         | (only for encoding).                          |
 +-------------------------+-----------------------------------------------+
-| ``'surrogateescape'``   | Replace byte with surrogate U+DCxx.           |
+| ``'surrogateescape'``   | Replace byte with surrogate U+DCxx, as defined|
+|                         | in :pep:`383`.                                |
 +-------------------------+-----------------------------------------------+
 
 In addition, the following error handlers are specific to a single codec:
@@ -775,9 +787,9 @@ Encodings and Unicode
 ---------------------
 
 Strings are stored internally as sequences of codepoints (to be precise
-as :ctype:`Py_UNICODE` arrays). Depending on the way Python is compiled (either
-via :option:`--without-wide-unicode` or :option:`--with-wide-unicode`, with the
-former being the default) :ctype:`Py_UNICODE` is either a 16-bit or 32-bit data
+as :c:type:`Py_UNICODE` arrays). Depending on the way Python is compiled (either
+via ``--without-wide-unicode`` or ``--with-wide-unicode``, with the
+former being the default) :c:type:`Py_UNICODE` is either a 16-bit or 32-bit data
 type. Once a string object is used outside of CPU and memory, CPU endianness
 and how these arrays are stored as bytes become an issue.  Transforming a
 string object into a sequence of bytes is called encoding and recreating the
@@ -889,7 +901,8 @@ or with dictionaries as mapping tables. The following table lists the codecs by
 name, together with a few common aliases, and the languages for which the
 encoding is likely used. Neither the list of aliases nor the list of languages
 is meant to be exhaustive. Notice that spelling alternatives that only differ in
-case or use a hyphen instead of an underscore are also valid aliases.
+case or use a hyphen instead of an underscore are also valid aliases; therefore,
+e.g. ``'utf-8'`` is a valid alias for the ``'utf_8'`` codec.
 
 Many of the character sets support the same languages. They vary in individual
 characters (e.g. whether the EURO SIGN is supported or not), and in the
@@ -923,6 +936,8 @@ particular, the following variants typically exist:
 | cp500           | EBCDIC-CP-BE, EBCDIC-CP-CH,    | Western Europe                 |
 |                 | IBM500                         |                                |
 +-----------------+--------------------------------+--------------------------------+
+| cp720           |                                | Arabic                         |
++-----------------+--------------------------------+--------------------------------+
 | cp737           |                                | Greek                          |
 +-----------------+--------------------------------+--------------------------------+
 | cp775           | IBM775                         | Baltic languages               |
@@ -937,6 +952,8 @@ particular, the following variants typically exist:
 | cp856           |                                | Hebrew                         |
 +-----------------+--------------------------------+--------------------------------+
 | cp857           | 857, IBM857                    | Turkish                        |
++-----------------+--------------------------------+--------------------------------+
+| cp858           | 858, IBM858                    | Western Europe                 |
 +-----------------+--------------------------------+--------------------------------+
 | cp860           | 860, IBM860                    | Portuguese                     |
 +-----------------+--------------------------------+--------------------------------+
@@ -983,7 +1000,7 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | cp1255          | windows-1255                   | Hebrew                         |
 +-----------------+--------------------------------+--------------------------------+
-| cp1256          | windows1256                    | Arabic                         |
+| cp1256          | windows-1256                   | Arabic                         |
 +-----------------+--------------------------------+--------------------------------+
 | cp1257          | windows-1257                   | Baltic languages               |
 +-----------------+--------------------------------+--------------------------------+
@@ -1050,11 +1067,13 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | iso8859_10      | iso-8859-10, latin6, L6        | Nordic languages               |
 +-----------------+--------------------------------+--------------------------------+
-| iso8859_13      | iso-8859-13                    | Baltic languages               |
+| iso8859_13      | iso-8859-13, latin7, L7        | Baltic languages               |
 +-----------------+--------------------------------+--------------------------------+
 | iso8859_14      | iso-8859-14, latin8, L8        | Celtic languages               |
 +-----------------+--------------------------------+--------------------------------+
-| iso8859_15      | iso-8859-15                    | Western Europe                 |
+| iso8859_15      | iso-8859-15, latin9, L9        | Western Europe                 |
++-----------------+--------------------------------+--------------------------------+
+| iso8859_16      | iso-8859-16, latin10, L10      | South-Eastern Europe           |
 +-----------------+--------------------------------+--------------------------------+
 | johab           | cp1361, ms1361                 | Korean                         |
 +-----------------+--------------------------------+--------------------------------+
@@ -1071,7 +1090,7 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | mac_latin2      | maclatin2, maccentraleurope    | Central and Eastern Europe     |
 +-----------------+--------------------------------+--------------------------------+
-| mac_roman       | macroman                       | Western Europe                 |
+| mac_roman       | macroman, macintosh            | Western Europe                 |
 +-----------------+--------------------------------+--------------------------------+
 | mac_turkish     | macturkish                     | Turkish                        |
 +-----------------+--------------------------------+--------------------------------+
@@ -1095,9 +1114,9 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | utf_16          | U16, utf16                     | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
-| utf_16_be       | UTF-16BE                       | all languages (BMP only)       |
+| utf_16_be       | UTF-16BE                       | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
-| utf_16_le       | UTF-16LE                       | all languages (BMP only)       |
+| utf_16_le       | UTF-16LE                       | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
 | utf_7           | U7, unicode-1-1-utf-7          | all languages                  |
 +-----------------+--------------------------------+--------------------------------+
@@ -1145,6 +1164,44 @@ particular, the following variants typically exist:
 |                    |         | representation of the     |
 |                    |         | operand                   |
 +--------------------+---------+---------------------------+
+
+The following codecs provide bytes-to-bytes mappings.
+
++--------------------+---------------------------+---------------------------+
+| Codec              | Aliases                   | Purpose                   |
++====================+===========================+===========================+
+| base64_codec       | base64, base-64           | Convert operand to MIME   |
+|                    |                           | base64                    |
++--------------------+---------------------------+---------------------------+
+| bz2_codec          | bz2                       | Compress the operand      |
+|                    |                           | using bz2                 |
++--------------------+---------------------------+---------------------------+
+| hex_codec          | hex                       | Convert operand to        |
+|                    |                           | hexadecimal               |
+|                    |                           | representation, with two  |
+|                    |                           | digits per byte           |
++--------------------+---------------------------+---------------------------+
+| quopri_codec       | quopri, quoted-printable, | Convert operand to MIME   |
+|                    | quotedprintable           | quoted printable          |
++--------------------+---------------------------+---------------------------+
+| uu_codec           | uu                        | Convert the operand using |
+|                    |                           | uuencode                  |
++--------------------+---------------------------+---------------------------+
+| zlib_codec         | zip, zlib                 | Compress the operand      |
+|                    |                           | using gzip                |
++--------------------+---------------------------+---------------------------+
+
+The following codecs provide string-to-string mappings.
+
++--------------------+---------------------------+---------------------------+
+| Codec              | Aliases                   | Purpose                   |
++====================+===========================+===========================+
+| rot_13             | rot13                     | Returns the Caesar-cypher |
+|                    |                           | encryption of the operand |
++--------------------+---------------------------+---------------------------+
+
+.. versionadded:: 3.2
+   bytes-to-bytes and string-to-string codecs.
 
 
 :mod:`encodings.idna` --- Internationalized Domain Names in Applications
@@ -1204,6 +1261,23 @@ functions can be used directly if desired.
 .. function:: ToUnicode(label)
 
    Convert a label to Unicode, as specified in :rfc:`3490`.
+
+
+:mod:`encodings.mbcs` --- Windows ANSI codepage
+-----------------------------------------------
+
+.. module:: encodings.mbcs
+   :synopsis: Windows ANSI codepage
+
+Encode operand according to the ANSI codepage (CP_ACP). This codec only
+supports ``'strict'`` and ``'replace'`` error handlers to encode, and
+``'strict'`` and ``'ignore'`` error handlers to decode.
+
+Availability: Windows only.
+
+.. versionchanged:: 3.2
+   Before 3.2, the *errors* argument was ignored; ``'replace'`` was always used
+   to encode, and ``'ignore'`` to decode.
 
 
 :mod:`encodings.utf_8_sig` --- UTF-8 codec with BOM signature

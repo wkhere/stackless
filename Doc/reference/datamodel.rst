@@ -59,13 +59,16 @@ Objects are never explicitly destroyed; however, when they become unreachable
 they may be garbage-collected.  An implementation is allowed to postpone garbage
 collection or omit it altogether --- it is a matter of implementation quality
 how garbage collection is implemented, as long as no objects are collected that
-are still reachable.  (Implementation note: CPython currently uses a
-reference-counting scheme with (optional) delayed detection of cyclically linked
-garbage, which collects most objects as soon as they become unreachable, but is
-not guaranteed to collect garbage containing circular references.  See the
-documentation of the :mod:`gc` module for information on controlling the
-collection of cyclic garbage.  Other implementations act differently and CPython
-may change.)
+are still reachable.
+
+.. impl-detail::
+
+   CPython currently uses a reference-counting scheme with (optional) delayed
+   detection of cyclically linked garbage, which collects most objects as soon
+   as they become unreachable, but is not guaranteed to collect garbage
+   containing circular references.  See the documentation of the :mod:`gc`
+   module for information on controlling the collection of cyclic garbage.
+   Other implementations act differently and CPython may change.
 
 Note that the use of the implementation's tracing or debugging facilities may
 keep objects alive that would normally be collectable. Also note that catching
@@ -615,7 +618,7 @@ Callable types
       an object passed to the C function as an implicit extra argument.  An example of
       a built-in method is ``alist.append()``, assuming *alist* is a list object. In
       this case, the special read-only attribute :attr:`__self__` is set to the object
-      denoted by *list*.
+      denoted by *alist*.
 
    Classes
       Classes are callable.  These objects normally act as factories for new
@@ -651,6 +654,13 @@ Modules
    Special read-only attribute: :attr:`__dict__` is the module's namespace as a
    dictionary object.
 
+   .. impl-detail::
+
+      Because of the way CPython clears module dictionaries, the module
+      dictionary will be cleared when the module falls out of scope even if the
+      dictionary still has live references.  To avoid this, copy the dictionary
+      or keep the module around while using its dictionary directly.
+
    .. index::
       single: __name__ (module attribute)
       single: __doc__ (module attribute)
@@ -666,7 +676,7 @@ Modules
    of the shared library file.
 
 Custom classes
-   Custon class types are typically created by class definitions (see section
+   Custom class types are typically created by class definitions (see section
    :ref:`class`).  A class has a namespace implemented by a dictionary object.
    Class attribute references are translated to lookups in this dictionary, e.g.,
    ``C.x`` is translated to ``C.__dict__["x"]`` (although there are a number of
@@ -764,10 +774,10 @@ Class instances
    Special attributes: :attr:`__dict__` is the attribute dictionary;
    :attr:`__class__` is the instance's class.
 
-Files
+I/O objects (also known as file objects)
    .. index::
-      object: file
       builtin: open
+      module: io
       single: popen() (in module os)
       single: makefile() (socket method)
       single: sys.stdin
@@ -778,14 +788,17 @@ Files
       single: stdout (in module sys)
       single: stderr (in module sys)
 
-   A file object represents an open file.  File objects are created by the
-   :func:`open` built-in function, and also by :func:`os.popen`,
-   :func:`os.fdopen`, and the :meth:`makefile` method of socket objects (and
-   perhaps by other functions or methods provided by extension modules).  The
-   objects ``sys.stdin``, ``sys.stdout`` and ``sys.stderr`` are initialized to
-   file objects corresponding to the interpreter's standard input, output and
-   error streams.  See :ref:`bltin-file-objects` for complete documentation of
-   file objects.
+   A :term:`file object` represents an open file.  Various shortcuts are
+   available to create file objects: the :func:`open` built-in function, and
+   also :func:`os.popen`, :func:`os.fdopen`, and the :meth:`makefile` method
+   of socket objects (and perhaps by other functions or methods provided
+   by extension modules).
+
+   The objects ``sys.stdin``, ``sys.stdout`` and ``sys.stderr`` are
+   initialized to file objects corresponding to the interpreter's standard
+   input, output and error streams; they are all open in text mode and
+   therefore follow the interface defined by the :class:`io.TextIOBase`
+   abstract class.
 
 Internal types
    .. index::
@@ -810,6 +823,22 @@ Internal types
       objects, code objects are immutable and contain no references (directly or
       indirectly) to mutable objects.
 
+      .. index::
+         single: co_argcount (code object attribute)
+         single: co_code (code object attribute)
+         single: co_consts (code object attribute)
+         single: co_filename (code object attribute)
+         single: co_firstlineno (code object attribute)
+         single: co_flags (code object attribute)
+         single: co_lnotab (code object attribute)
+         single: co_name (code object attribute)
+         single: co_names (code object attribute)
+         single: co_nlocals (code object attribute)
+         single: co_stacksize (code object attribute)
+         single: co_varnames (code object attribute)
+         single: co_cellvars (code object attribute)
+         single: co_freevars (code object attribute)
+
       Special read-only attributes: :attr:`co_name` gives the function name;
       :attr:`co_argcount` is the number of positional arguments (including arguments
       with default values); :attr:`co_nlocals` is the number of local variables used
@@ -826,22 +855,6 @@ Internal types
       line numbers (for details see the source code of the interpreter);
       :attr:`co_stacksize` is the required stack size (including local variables);
       :attr:`co_flags` is an integer encoding a number of flags for the interpreter.
-
-      .. index::
-         single: co_argcount (code object attribute)
-         single: co_code (code object attribute)
-         single: co_consts (code object attribute)
-         single: co_filename (code object attribute)
-         single: co_firstlineno (code object attribute)
-         single: co_flags (code object attribute)
-         single: co_lnotab (code object attribute)
-         single: co_name (code object attribute)
-         single: co_names (code object attribute)
-         single: co_nlocals (code object attribute)
-         single: co_stacksize (code object attribute)
-         single: co_varnames (code object attribute)
-         single: co_cellvars (code object attribute)
-         single: co_freevars (code object attribute)
 
       .. index:: object: generator
 
@@ -863,6 +876,8 @@ Internal types
 
       If a code object represents a function, the first item in :attr:`co_consts` is
       the documentation string of the function, or ``None`` if undefined.
+
+   .. _frame-objects:
 
    Frame objects
       .. index:: object: frame
@@ -1201,8 +1216,7 @@ Basic customization
    Arguments to rich comparison methods are never coerced.
 
    To automatically generate ordering operations from a single root operation,
-   see the `Total Ordering recipe in the ASPN cookbook
-   <http://code.activestate.com/recipes/576529/>`_\.
+   see :func:`functools.total_ordering`.
 
 .. method:: object.__hash__(self)
 
@@ -1254,11 +1268,11 @@ Basic customization
    .. index:: single: __len__() (mapping object method)
 
    Called to implement truth value testing and the built-in operation
-   ``bool()``; should return ``False`` or ``True``, or their integer equivalents
-   ``0`` or ``1``.  When this method is not defined, :meth:`__len__` is called,
-   if it is defined, and the object is considered true if its result is nonzero.
-   If a class defines neither :meth:`__len__` nor :meth:`__bool__`, all its
-   instances are considered true.
+   ``bool()``; should return ``False`` or ``True``.  When this method is not
+   defined, :meth:`__len__` is called, if it is defined, and the object is
+   considered true if its result is nonzero.  If a class defines neither
+   :meth:`__len__` nor :meth:`__bool__`, all its instances are considered
+   true.
 
 
 .. _attribute-access:
@@ -1304,7 +1318,7 @@ access (use of, assignment to, or deletion of ``x.name``) for class instances.
    .. note::
 
       This method may still be bypassed when looking up special methods as the
-      result of implicit invocation via language syntax or builtin functions.
+      result of implicit invocation via language syntax or built-in functions.
       See :ref:`special-lookup`.
 
 
@@ -1405,11 +1419,17 @@ Super Binding
    ``A.__dict__['m'].__get__(obj, A)``.
 
 For instance bindings, the precedence of descriptor invocation depends on the
-which descriptor methods are defined.  Normally, data descriptors define both
-:meth:`__get__` and :meth:`__set__`, while non-data descriptors have just the
-:meth:`__get__` method.  Data descriptors always override a redefinition in an
+which descriptor methods are defined.  A descriptor can define any combination
+of :meth:`__get__`, :meth:`__set__` and :meth:`__delete__`.  If it does not
+define :meth:`__get__`, then accessing the attribute will return the descriptor
+object itself unless there is a value in the object's instance dictionary.  If
+the descriptor defines :meth:`__set__` and/or :meth:`__delete__`, it is a data
+descriptor; if it defines neither, it is a non-data descriptor.  Normally, data
+descriptors define both :meth:`__get__` and :meth:`__set__`, while non-data
+descriptors have just the :meth:`__get__` method.  Data descriptors with
+:meth:`__set__` and :meth:`__get__` defined always override a redefinition in an
 instance dictionary.  In contrast, non-data descriptors can be overridden by
-instances. [#]_
+instances.
 
 Python methods (including :func:`staticmethod` and :func:`classmethod`) are
 implemented as non-data descriptors.  Accordingly, instances can redefine and
@@ -1467,14 +1487,14 @@ Notes on using *__slots__*
   *__slots__*; otherwise, the class attribute would overwrite the descriptor
   assignment.
 
+* The action of a *__slots__* declaration is limited to the class where it is
+  defined.  As a result, subclasses will have a *__dict__* unless they also define
+  *__slots__* (which must only contain names of any *additional* slots).
+
 * If a class defines a slot also defined in a base class, the instance variable
   defined by the base class slot is inaccessible (except by retrieving its
   descriptor directly from the base class). This renders the meaning of the
   program undefined.  In the future, a check may be added to prevent this.
-
-* The action of a *__slots__* declaration is limited to the class where it is
-  defined.  As a result, subclasses will have a *__dict__* unless they also define
-  *__slots__*.
 
 * Nonempty *__slots__* does not work for classes derived from "variable-length"
   built-in types such as :class:`int`, :class:`str` and :class:`tuple`.
@@ -1530,7 +1550,7 @@ returning an ordered dictionary.
 
 The appropriate metaclass is determined by the following precedence rules:
 
-* If the ``metaclass`` keyword argument is based with the bases, it is used.
+* If the ``metaclass`` keyword argument is passed with the bases, it is used.
 
 * Otherwise, if there is at least one base class, its metaclass is used.
 
@@ -1571,7 +1591,47 @@ attributes of *A* as they are defined within the body of the class statement.
 Once those definitions are executed, the ordered dictionary is fully populated
 and the metaclass's :meth:`__new__` method gets invoked.  That method builds
 the new type and it saves the ordered dictionary keys in an attribute
-called *members*.
+called ``members``.
+
+
+Customizing instance and subclass checks
+----------------------------------------
+
+The following methods are used to override the default behavior of the
+:func:`isinstance` and :func:`issubclass` built-in functions.
+
+In particular, the metaclass :class:`abc.ABCMeta` implements these methods in
+order to allow the addition of Abstract Base Classes (ABCs) as "virtual base
+classes" to any class or type (including built-in types), including other
+ABCs.
+
+.. method:: class.__instancecheck__(self, instance)
+
+   Return true if *instance* should be considered a (direct or indirect)
+   instance of *class*. If defined, called to implement ``isinstance(instance,
+   class)``.
+
+
+.. method:: class.__subclasscheck__(self, subclass)
+
+   Return true if *subclass* should be considered a (direct or indirect)
+   subclass of *class*.  If defined, called to implement ``issubclass(subclass,
+   class)``.
+
+
+Note that these methods are looked up on the type (metaclass) of a class.  They
+cannot be defined as class methods in the actual class.  This is consistent with
+the lookup of special methods that are called on instances, only in this
+case the instance is itself a class.
+
+.. seealso::
+
+   :pep:`3119` - Introducing Abstract Base Classes
+      Includes the specification for customizing :func:`isinstance` and
+      :func:`issubclass` behavior through :meth:`__instancecheck__` and
+      :meth:`__subclasscheck__`, with motivation for this functionality in the
+      context of adding Abstract Base Classes (see the :mod:`abc` module) to the
+      language.
 
 
 .. _callable-types:
@@ -1696,12 +1756,12 @@ through the container; for mappings, :meth:`__iter__` should be the same as
 
 .. method:: object.__reversed__(self)
 
-   Called (if present) by the :func:`reversed` builtin to implement
+   Called (if present) by the :func:`reversed` built-in to implement
    reverse iteration.  It should return a new iterator object that iterates
    over all the objects in the container in reverse order.
 
    If the :meth:`__reversed__` method is not provided, the :func:`reversed`
-   builtin will fall back to using the sequence protocol (:meth:`__len__` and
+   built-in will fall back to using the sequence protocol (:meth:`__len__` and
    :meth:`__getitem__`).  Objects that support the sequence protocol should
    only provide :meth:`__reversed__` if they can provide an implementation
    that is more efficient than the one provided by :func:`reversed`.
@@ -1712,12 +1772,16 @@ implemented as an iteration through a sequence.  However, container objects can
 supply the following special method with a more efficient implementation, which
 also does not require the object be a sequence.
 
-
 .. method:: object.__contains__(self, item)
 
-   Called to implement membership test operators.  Should return true if *item* is
-   in *self*, false otherwise.  For mapping objects, this should consider the keys
-   of the mapping rather than the values or the key-item pairs.
+   Called to implement membership test operators.  Should return true if *item*
+   is in *self*, false otherwise.  For mapping objects, this should consider the
+   keys of the mapping rather than the values or the key-item pairs.
+
+   For objects that don't define :meth:`__contains__`, the membership test first
+   tries iteration via :meth:`__iter__`, then the old sequence iteration
+   protocol via :meth:`__getitem__`, see :ref:`this section in the language
+   reference <membership-test-details>`.
 
 
 .. _numeric-types:
@@ -1923,7 +1987,7 @@ to work correctly if defined on an object's type, not in the object's instance
 dictionary.  That behaviour is the reason why the following code raises an
 exception::
 
-   >>> class C(object):
+   >>> class C:
    ...     pass
    ...
    >>> c = C()
@@ -1993,13 +2057,6 @@ object itself in order to be consistently invoked by the interpreter).
 .. [#] It *is* possible in some cases to change an object's type, under certain
    controlled conditions. It generally isn't a good idea though, since it can
    lead to some very strange behaviour if it is handled incorrectly.
-
-.. [#] A descriptor can define any combination of :meth:`__get__`,
-   :meth:`__set__` and :meth:`__delete__`.  If it does not define :meth:`__get__`,
-   then accessing the attribute even on an instance will return the descriptor
-   object itself.  If the descriptor defines :meth:`__set__` and/or
-   :meth:`__delete__`, it is a data descriptor; if it defines neither, it is a
-   non-data descriptor.
 
 .. [#] For operands of the same type, it is assumed that if the non-reflected method
    (such as :meth:`__add__`) fails the operation is not supported, which is why the

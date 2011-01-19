@@ -9,11 +9,12 @@ class FinderTests(abc.FinderTests):
     """Test the finder for extension modules."""
 
     def find_module(self, fullname):
-        importer = _bootstrap._ExtensionFileFinder(util.PATH)
+        importer = _bootstrap._FileFinder(util.PATH,
+                                          _bootstrap._ExtensionFinderDetails())
         return importer.find_module(fullname)
 
     def test_module(self):
-        self.assert_(self.find_module(util.NAME))
+        self.assertTrue(self.find_module(util.NAME))
 
     def test_package(self):
         # Extension modules cannot be an __init__ for a package.
@@ -32,7 +33,7 @@ class FinderTests(abc.FinderTests):
         pass
 
     def test_failure(self):
-        self.assert_(self.find_module('asdfjkl;') is None)
+        self.assertTrue(self.find_module('asdfjkl;') is None)
 
     # XXX Raise an exception if someone tries to use the 'path' argument?
 

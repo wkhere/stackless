@@ -1,19 +1,19 @@
 """Unit tests for collections.py."""
 
-import unittest, doctest
+import unittest, doctest, operator
 import inspect
 from test import support
-from collections import namedtuple, Counter, OrderedDict
+from collections import namedtuple, Counter, OrderedDict, _count_elements
 from test import mapping_tests
 import pickle, copy
 from random import randrange, shuffle
-import operator
 import keyword
 import re
+import sys
 from collections import Hashable, Iterable, Iterator
 from collections import Sized, Container, Callable
 from collections import Set, MutableSet
-from collections import Mapping, MutableMapping
+from collections import Mapping, MutableMapping, KeysView, ItemsView, UserDict
 from collections import Sequence, MutableSequence
 from collections import ByteString
 
@@ -24,7 +24,6 @@ class TestNamedTuple(unittest.TestCase):
     def test_factory(self):
         Point = namedtuple('Point', 'x y')
         self.assertEqual(Point.__name__, 'Point')
-        self.assertEqual(Point.__doc__, 'Point(x, y)')
         self.assertEqual(Point.__slots__, ())
         self.assertEqual(Point.__module__, __name__)
         self.assertEqual(Point.__getitem__, tuple.__getitem__)
@@ -44,12 +43,18 @@ class TestNamedTuple(unittest.TestCase):
         namedtuple('_', 'a b c')        # Test leading underscores in a typename
 
         nt = namedtuple('nt', 'the quick brown fox')                       # check unicode input
-        self.assert_("u'" not in repr(nt._fields))
+        self.assertNotIn("u'", repr(nt._fields))
         nt = namedtuple('nt', ('the', 'quick'))                           # check unicode input
-        self.assert_("u'" not in repr(nt._fields))
+        self.assertNotIn("u'", repr(nt._fields))
 
         self.assertRaises(TypeError, Point._make, [11])                     # catch too few args
         self.assertRaises(TypeError, Point._make, [11, 22, 33])             # catch too many args
+
+    @unittest.skipIf(sys.flags.optimize >= 2,
+                     "Docstrings are omitted with -O2 and above")
+    def test_factory_doc_attr(self):
+        Point = namedtuple('Point', 'x y')
+        self.assertEqual(Point.__doc__, 'Point(x, y)')
 
     def test_name_fixer(self):
         for spec, renamed in [
@@ -75,8 +80,8 @@ class TestNamedTuple(unittest.TestCase):
         self.assertRaises(TypeError, eval, 'Point(XXX=1, y=2)', locals())   # wrong keyword argument
         self.assertRaises(TypeError, eval, 'Point(x=1)', locals())          # missing keyword argument
         self.assertEqual(repr(p), 'Point(x=11, y=22)')
-        self.assert_('__dict__' not in dir(p))                              # verify instance has no dict
-        self.assert_('__weakref__' not in dir(p))
+        self.assertNotIn('__dict__', dir(p))                              # verify instance has no dict
+        self.assertNotIn('__weakref__', dir(p))
         self.assertEqual(p, Point._make([11, 22]))                          # test _make classmethod
         self.assertEqual(p._fields, ('x', 'y'))                             # test _fields attribute
         self.assertEqual(p._replace(x=1), (1, 22))                          # test _replace method
@@ -103,7 +108,7 @@ class TestNamedTuple(unittest.TestCase):
         Point = namedtuple('Point', 'x y')
         p = Point(11, 22)
 
-        self.assert_(isinstance(p, tuple))
+        self.assertIsInstance(p, tuple)
         self.assertEqual(p, (11, 22))                                       # matches a real tuple
         self.assertEqual(tuple(p), (11, 22))                                # coercable to a real tuple
         self.assertEqual(list(p), [11, 22])                                 # coercable to a list
@@ -213,6 +218,16 @@ class TestNamedTuple(unittest.TestCase):
         # test __getnewargs__
         self.assertEqual(t.__getnewargs__(), values)
 
+    def test_repr(self):
+        with support.captured_stdout() as template:
+            A = namedtuple('A', 'x', verbose=True)
+        self.assertEqual(repr(A(1)), 'A(x=1)')
+        # repr should show the name of the subclass
+        class B(A):
+            pass
+        self.assertEqual(repr(B(1)), 'B(x=1)')
+
+
 class ABCTestCase(unittest.TestCase):
 
     def validate_abstract_methods(self, abc, *names):
@@ -229,6 +244,48 @@ class ABCTestCase(unittest.TestCase):
             C = type('C', (abc,), stubs)
             self.assertRaises(TypeError, C, name)
 
+    def validate_isinstance(self, abc, name):
+        stub = lambda s, *args: 0
+
+        C = type('C', (object,), {'__hash__': None})
+        setattr(C, name, stub)
+        self.assertIsInstance(C(), abc)
+        self.assertTrue(issubclass(C, abc))
+
+        C = type('C', (object,), {'__hash__': None})
+        self.assertNotIsInstance(C(), abc)
+        self.assertFalse(issubclass(C, abc))
+
+    def validate_comparison(self, instance):
+        ops = ['lt', 'gt', 'le', 'ge', 'ne', 'or', 'and', 'xor', 'sub']
+        operators = {}
+        for op in ops:
+            name = '__' + op + '__'
+            operators[name] = getattr(operator, name)
+
+        class Other:
+            def __init__(self):
+                self.right_side = False
+            def __eq__(self, other):
+                self.right_side = True
+                return True
+            __lt__ = __eq__
+            __gt__ = __eq__
+            __le__ = __eq__
+            __ge__ = __eq__
+            __ne__ = __eq__
+            __ror__ = __eq__
+            __rand__ = __eq__
+            __rxor__ = __eq__
+            __rsub__ = __eq__
+
+        for name, op in operators.items():
+            if not hasattr(instance, name):
+                continue
+            other = Other()
+            op(instance, other)
+            self.assertTrue(other.right_side,'Right side not called for %s.%s'
+                            % (type(instance), name))
 
 class TestOneTrickPonyABCs(ABCTestCase):
 
@@ -236,8 +293,8 @@ class TestOneTrickPonyABCs(ABCTestCase):
         # Check some non-hashables
         non_samples = [bytearray(), list(), set(), dict()]
         for x in non_samples:
-            self.failIf(isinstance(x, Hashable), repr(x))
-            self.failIf(issubclass(type(x), Hashable), repr(type(x)))
+            self.assertNotIsInstance(x, Hashable)
+            self.assertFalse(issubclass(type(x), Hashable), repr(type(x)))
         # Check some hashables
         samples = [None,
                    int(), float(), complex(),
@@ -246,23 +303,24 @@ class TestOneTrickPonyABCs(ABCTestCase):
                    int, list, object, type, bytes()
                    ]
         for x in samples:
-            self.failUnless(isinstance(x, Hashable), repr(x))
-            self.failUnless(issubclass(type(x), Hashable), repr(type(x)))
+            self.assertIsInstance(x, Hashable)
+            self.assertTrue(issubclass(type(x), Hashable), repr(type(x)))
         self.assertRaises(TypeError, Hashable)
         # Check direct subclassing
         class H(Hashable):
             def __hash__(self):
                 return super().__hash__()
         self.assertEqual(hash(H()), 0)
-        self.failIf(issubclass(int, H))
+        self.assertFalse(issubclass(int, H))
         self.validate_abstract_methods(Hashable, '__hash__')
+        self.validate_isinstance(Hashable, '__hash__')
 
     def test_Iterable(self):
         # Check some non-iterables
         non_samples = [None, 42, 3.14, 1j]
         for x in non_samples:
-            self.failIf(isinstance(x, Iterable), repr(x))
-            self.failIf(issubclass(type(x), Iterable), repr(type(x)))
+            self.assertNotIsInstance(x, Iterable)
+            self.assertFalse(issubclass(type(x), Iterable), repr(type(x)))
         # Check some iterables
         samples = [bytes(), str(),
                    tuple(), list(), set(), frozenset(), dict(),
@@ -271,21 +329,22 @@ class TestOneTrickPonyABCs(ABCTestCase):
                    (x for x in []),
                    ]
         for x in samples:
-            self.failUnless(isinstance(x, Iterable), repr(x))
-            self.failUnless(issubclass(type(x), Iterable), repr(type(x)))
+            self.assertIsInstance(x, Iterable)
+            self.assertTrue(issubclass(type(x), Iterable), repr(type(x)))
         # Check direct subclassing
         class I(Iterable):
             def __iter__(self):
                 return super().__iter__()
         self.assertEqual(list(I()), [])
-        self.failIf(issubclass(str, I))
+        self.assertFalse(issubclass(str, I))
         self.validate_abstract_methods(Iterable, '__iter__')
+        self.validate_isinstance(Iterable, '__iter__')
 
     def test_Iterator(self):
         non_samples = [None, 42, 3.14, 1j, b"", "", (), [], {}, set()]
         for x in non_samples:
-            self.failIf(isinstance(x, Iterator), repr(x))
-            self.failIf(issubclass(type(x), Iterator), repr(type(x)))
+            self.assertNotIsInstance(x, Iterator)
+            self.assertFalse(issubclass(type(x), Iterator), repr(type(x)))
         samples = [iter(bytes()), iter(str()),
                    iter(tuple()), iter(list()), iter(dict()),
                    iter(set()), iter(frozenset()),
@@ -295,9 +354,16 @@ class TestOneTrickPonyABCs(ABCTestCase):
                    (x for x in []),
                    ]
         for x in samples:
-            self.failUnless(isinstance(x, Iterator), repr(x))
-            self.failUnless(issubclass(type(x), Iterator), repr(type(x)))
-        self.validate_abstract_methods(Iterator, '__next__')
+            self.assertIsInstance(x, Iterator)
+            self.assertTrue(issubclass(type(x), Iterator), repr(type(x)))
+        self.validate_abstract_methods(Iterator, '__next__', '__iter__')
+
+        # Issue 10565
+        class NextOnly:
+            def __next__(self):
+                yield 1
+                raise StopIteration
+        self.assertNotIsInstance(NextOnly(), Iterator)
 
     def test_Sized(self):
         non_samples = [None, 42, 3.14, 1j,
@@ -305,16 +371,17 @@ class TestOneTrickPonyABCs(ABCTestCase):
                        (x for x in []),
                        ]
         for x in non_samples:
-            self.failIf(isinstance(x, Sized), repr(x))
-            self.failIf(issubclass(type(x), Sized), repr(type(x)))
+            self.assertNotIsInstance(x, Sized)
+            self.assertFalse(issubclass(type(x), Sized), repr(type(x)))
         samples = [bytes(), str(),
                    tuple(), list(), set(), frozenset(), dict(),
                    dict().keys(), dict().items(), dict().values(),
                    ]
         for x in samples:
-            self.failUnless(isinstance(x, Sized), repr(x))
-            self.failUnless(issubclass(type(x), Sized), repr(type(x)))
+            self.assertIsInstance(x, Sized)
+            self.assertTrue(issubclass(type(x), Sized), repr(type(x)))
         self.validate_abstract_methods(Sized, '__len__')
+        self.validate_isinstance(Sized, '__len__')
 
     def test_Container(self):
         non_samples = [None, 42, 3.14, 1j,
@@ -322,16 +389,17 @@ class TestOneTrickPonyABCs(ABCTestCase):
                        (x for x in []),
                        ]
         for x in non_samples:
-            self.failIf(isinstance(x, Container), repr(x))
-            self.failIf(issubclass(type(x), Container), repr(type(x)))
+            self.assertNotIsInstance(x, Container)
+            self.assertFalse(issubclass(type(x), Container), repr(type(x)))
         samples = [bytes(), str(),
                    tuple(), list(), set(), frozenset(), dict(),
                    dict().keys(), dict().items(),
                    ]
         for x in samples:
-            self.failUnless(isinstance(x, Container), repr(x))
-            self.failUnless(issubclass(type(x), Container), repr(type(x)))
+            self.assertIsInstance(x, Container)
+            self.assertTrue(issubclass(type(x), Container), repr(type(x)))
         self.validate_abstract_methods(Container, '__contains__')
+        self.validate_isinstance(Container, '__contains__')
 
     def test_Callable(self):
         non_samples = [None, 42, 3.14, 1j,
@@ -340,32 +408,33 @@ class TestOneTrickPonyABCs(ABCTestCase):
                        (x for x in []),
                        ]
         for x in non_samples:
-            self.failIf(isinstance(x, Callable), repr(x))
-            self.failIf(issubclass(type(x), Callable), repr(type(x)))
+            self.assertNotIsInstance(x, Callable)
+            self.assertFalse(issubclass(type(x), Callable), repr(type(x)))
         samples = [lambda: None,
                    type, int, object,
                    len,
                    list.append, [].append,
                    ]
         for x in samples:
-            self.failUnless(isinstance(x, Callable), repr(x))
-            self.failUnless(issubclass(type(x), Callable), repr(type(x)))
+            self.assertIsInstance(x, Callable)
+            self.assertTrue(issubclass(type(x), Callable), repr(type(x)))
         self.validate_abstract_methods(Callable, '__call__')
+        self.validate_isinstance(Callable, '__call__')
 
     def test_direct_subclassing(self):
         for B in Hashable, Iterable, Iterator, Sized, Container, Callable:
             class C(B):
                 pass
-            self.failUnless(issubclass(C, B))
-            self.failIf(issubclass(int, C))
+            self.assertTrue(issubclass(C, B))
+            self.assertFalse(issubclass(int, C))
 
     def test_registration(self):
         for B in Hashable, Iterable, Iterator, Sized, Container, Callable:
             class C:
                 __hash__ = None  # Make sure it isn't hashable by default
-            self.failIf(issubclass(C, B), B.__name__)
+            self.assertFalse(issubclass(C, B), B.__name__)
             B.register(C)
-            self.failUnless(issubclass(C, B))
+            self.assertTrue(issubclass(C, B))
 
 class WithSet(MutableSet):
 
@@ -395,9 +464,17 @@ class TestCollectionABCs(ABCTestCase):
 
     def test_Set(self):
         for sample in [set, frozenset]:
-            self.failUnless(isinstance(sample(), Set))
-            self.failUnless(issubclass(sample, Set))
+            self.assertIsInstance(sample(), Set)
+            self.assertTrue(issubclass(sample, Set))
         self.validate_abstract_methods(Set, '__contains__', '__iter__', '__len__')
+        class MySet(Set):
+            def __contains__(self, x):
+                return False
+            def __len__(self):
+                return 0
+            def __iter__(self):
+                return iter([])
+        self.validate_comparison(MySet())
 
     def test_hash_Set(self):
         class OneTwoThreeSet(Set):
@@ -412,13 +489,13 @@ class TestCollectionABCs(ABCTestCase):
             def __hash__(self):
                 return self._hash()
         a, b = OneTwoThreeSet(), OneTwoThreeSet()
-        self.failUnless(hash(a) == hash(b))
+        self.assertTrue(hash(a) == hash(b))
 
     def test_MutableSet(self):
-        self.failUnless(isinstance(set(), MutableSet))
-        self.failUnless(issubclass(set, MutableSet))
-        self.failIf(isinstance(frozenset(), MutableSet))
-        self.failIf(issubclass(frozenset, MutableSet))
+        self.assertIsInstance(set(), MutableSet)
+        self.assertTrue(issubclass(set, MutableSet))
+        self.assertNotIsInstance(frozenset(), MutableSet)
+        self.assertFalse(issubclass(frozenset, MutableSet))
         self.validate_abstract_methods(MutableSet, '__contains__', '__iter__', '__len__',
             'add', 'discard')
 
@@ -455,48 +532,96 @@ class TestCollectionABCs(ABCTestCase):
         s = MySet([5,43,2,1])
         self.assertEqual(s.pop(), 1)
 
+    def test_issue8750(self):
+        empty = WithSet()
+        full = WithSet(range(10))
+        s = WithSet(full)
+        s -= s
+        self.assertEqual(s, empty)
+        s = WithSet(full)
+        s ^= s
+        self.assertEqual(s, empty)
+        s = WithSet(full)
+        s &= s
+        self.assertEqual(s, full)
+        s |= s
+        self.assertEqual(s, full)
+
     def test_Mapping(self):
         for sample in [dict]:
-            self.failUnless(isinstance(sample(), Mapping))
-            self.failUnless(issubclass(sample, Mapping))
+            self.assertIsInstance(sample(), Mapping)
+            self.assertTrue(issubclass(sample, Mapping))
         self.validate_abstract_methods(Mapping, '__contains__', '__iter__', '__len__',
             '__getitem__')
+        class MyMapping(collections.Mapping):
+            def __len__(self):
+                return 0
+            def __getitem__(self, i):
+                raise IndexError
+            def __iter__(self):
+                return iter(())
+        self.validate_comparison(MyMapping())
 
     def test_MutableMapping(self):
         for sample in [dict]:
-            self.failUnless(isinstance(sample(), MutableMapping))
-            self.failUnless(issubclass(sample, MutableMapping))
+            self.assertIsInstance(sample(), MutableMapping)
+            self.assertTrue(issubclass(sample, MutableMapping))
         self.validate_abstract_methods(MutableMapping, '__contains__', '__iter__', '__len__',
             '__getitem__', '__setitem__', '__delitem__')
 
+    def test_MutableMapping_subclass(self):
+        # Test issue 9214
+        mymap = UserDict()
+        mymap['red'] = 5
+        self.assertIsInstance(mymap.keys(), Set)
+        self.assertIsInstance(mymap.keys(), KeysView)
+        self.assertIsInstance(mymap.items(), Set)
+        self.assertIsInstance(mymap.items(), ItemsView)
+
+        mymap = UserDict()
+        mymap['red'] = 5
+        z = mymap.keys() | {'orange'}
+        self.assertIsInstance(z, set)
+        list(z)
+        mymap['blue'] = 7               # Shouldn't affect 'z'
+        self.assertEqual(sorted(z), ['orange', 'red'])
+
+        mymap = UserDict()
+        mymap['red'] = 5
+        z = mymap.items() | {('orange', 3)}
+        self.assertIsInstance(z, set)
+        list(z)
+        mymap['blue'] = 7               # Shouldn't affect 'z'
+        self.assertEqual(sorted(z), [('orange', 3), ('red', 5)])
+
     def test_Sequence(self):
         for sample in [tuple, list, bytes, str]:
-            self.failUnless(isinstance(sample(), Sequence))
-            self.failUnless(issubclass(sample, Sequence))
-        self.failUnless(isinstance(range(10), Sequence))
-        self.failUnless(issubclass(range, Sequence))
-        self.failUnless(issubclass(str, Sequence))
+            self.assertIsInstance(sample(), Sequence)
+            self.assertTrue(issubclass(sample, Sequence))
+        self.assertIsInstance(range(10), Sequence)
+        self.assertTrue(issubclass(range, Sequence))
+        self.assertTrue(issubclass(str, Sequence))
         self.validate_abstract_methods(Sequence, '__contains__', '__iter__', '__len__',
             '__getitem__')
 
     def test_ByteString(self):
         for sample in [bytes, bytearray]:
-            self.failUnless(isinstance(sample(), ByteString))
-            self.failUnless(issubclass(sample, ByteString))
+            self.assertIsInstance(sample(), ByteString)
+            self.assertTrue(issubclass(sample, ByteString))
         for sample in [str, list, tuple]:
-            self.failIf(isinstance(sample(), ByteString))
-            self.failIf(issubclass(sample, ByteString))
-        self.failIf(isinstance(memoryview(b""), ByteString))
-        self.failIf(issubclass(memoryview, ByteString))
+            self.assertNotIsInstance(sample(), ByteString)
+            self.assertFalse(issubclass(sample, ByteString))
+        self.assertNotIsInstance(memoryview(b""), ByteString)
+        self.assertFalse(issubclass(memoryview, ByteString))
 
     def test_MutableSequence(self):
         for sample in [tuple, str, bytes]:
-            self.failIf(isinstance(sample(), MutableSequence))
-            self.failIf(issubclass(sample, MutableSequence))
+            self.assertNotIsInstance(sample(), MutableSequence)
+            self.assertFalse(issubclass(sample, MutableSequence))
         for sample in [list, bytearray]:
-            self.failUnless(isinstance(sample(), MutableSequence))
-            self.failUnless(issubclass(sample, MutableSequence))
-        self.failIf(issubclass(str, MutableSequence))
+            self.assertIsInstance(sample(), MutableSequence)
+            self.assertTrue(issubclass(sample, MutableSequence))
+        self.assertFalse(issubclass(str, MutableSequence))
         self.validate_abstract_methods(MutableSequence, '__contains__', '__iter__',
             '__len__', '__getitem__', '__setitem__', '__delitem__', 'insert')
 
@@ -506,10 +631,10 @@ class TestCounter(unittest.TestCase):
         c = Counter('abcaba')
         self.assertEqual(c, Counter({'a':3 , 'b': 2, 'c': 1}))
         self.assertEqual(c, Counter(a=3, b=2, c=1))
-        self.assert_(isinstance(c, dict))
-        self.assert_(isinstance(c, Mapping))
-        self.assert_(issubclass(Counter, dict))
-        self.assert_(issubclass(Counter, Mapping))
+        self.assertIsInstance(c, dict)
+        self.assertIsInstance(c, Mapping)
+        self.assertTrue(issubclass(Counter, dict))
+        self.assertTrue(issubclass(Counter, Mapping))
         self.assertEqual(len(c), 3)
         self.assertEqual(sum(c.values()), 6)
         self.assertEqual(sorted(c.values()), [1, 2, 3])
@@ -540,10 +665,10 @@ class TestCounter(unittest.TestCase):
         self.assertEqual(c, dict(a=4, b=0, d=-2, e=-5, f=4))
         self.assertEqual(''.join(sorted(c.elements())), 'aaaaffff')
         self.assertEqual(c.pop('f'), 4)
-        self.assertEqual('f' in c, False)
+        self.assertNotIn('f', c)
         for i in range(3):
             elem, cnt = c.popitem()
-            self.assertEqual(elem in c, False)
+            self.assertNotIn(elem, c)
         c.clear()
         self.assertEqual(c, {})
         self.assertEqual(repr(c), 'Counter()')
@@ -581,10 +706,10 @@ class TestCounter(unittest.TestCase):
                     Counter(words),
                     ]):
             msg = (i, dup, words)
-            self.assert_(dup is not words)
-            self.assertEquals(dup, words)
-            self.assertEquals(len(dup), len(words))
-            self.assertEquals(type(dup), type(words))
+            self.assertTrue(dup is not words)
+            self.assertEqual(dup, words)
+            self.assertEqual(len(dup), len(words))
+            self.assertEqual(type(dup), type(words))
 
     def test_conversions(self):
         # Convert to: set, list, dict
@@ -597,7 +722,8 @@ class TestCounter(unittest.TestCase):
     def test_invariant_for_the_in_operator(self):
         c = Counter(a=10, b=-2, c=0)
         for elem in c:
-            self.assert_(elem in c)
+            self.assertTrue(elem in c)
+            self.assertIn(elem, c)
 
     def test_multiset_operations(self):
         # Verify that adding a zero counter will strip zeros and negatives
@@ -622,7 +748,7 @@ class TestCounter(unittest.TestCase):
                     self.assertEqual(numberop(p[x], q[x]), result[x],
                                      (counterop, x, p, q))
                 # verify that results exclude non-positive counts
-                self.assert_(x>0 for x in result.values())
+                self.assertTrue(x>0 for x in result.values())
 
         elements = 'abcdef'
         for i in range(100):
@@ -638,6 +764,29 @@ class TestCounter(unittest.TestCase):
                 set_result = setop(set(p.elements()), set(q.elements()))
                 self.assertEqual(counter_result, dict.fromkeys(set_result, 1))
 
+    def test_subtract(self):
+        c = Counter(a=-5, b=0, c=5, d=10, e=15,g=40)
+        c.subtract(a=1, b=2, c=-3, d=10, e=20, f=30, h=-50)
+        self.assertEqual(c, Counter(a=-6, b=-2, c=8, d=0, e=-5, f=-30, g=40, h=50))
+        c = Counter(a=-5, b=0, c=5, d=10, e=15,g=40)
+        c.subtract(Counter(a=1, b=2, c=-3, d=10, e=20, f=30, h=-50))
+        self.assertEqual(c, Counter(a=-6, b=-2, c=8, d=0, e=-5, f=-30, g=40, h=50))
+        c = Counter('aaabbcd')
+        c.subtract('aaaabbcce')
+        self.assertEqual(c, Counter(a=-1, b=0, c=-1, d=1, e=-1))
+
+    def test_helper_function(self):
+        # two paths, one for real dicts and one for other mappings
+        elems = list('abracadabra')
+
+        d = dict()
+        _count_elements(d, elems)
+        self.assertEqual(d, {'a': 5, 'r': 2, 'b': 2, 'c': 1, 'd': 1})
+
+        m = OrderedDict()
+        _count_elements(m, elems)
+        self.assertEqual(m,
+             OrderedDict([('a', 5), ('b', 2), ('r', 2), ('c', 1), ('d', 1)]))
 
 class TestOrderedDict(unittest.TestCase):
 
@@ -678,12 +827,29 @@ class TestOrderedDict(unittest.TestCase):
         od.update([('a', 1), ('b', 2), ('c', 9), ('d', 4)], c=3, e=5)
         self.assertEqual(list(od.items()), pairs)                                   # mixed input
 
+        # Issue 9137: Named argument called 'other' or 'self'
+        # shouldn't be treated specially.
+        od = OrderedDict()
+        od.update(self=23)
+        self.assertEqual(list(od.items()), [('self', 23)])
+        od = OrderedDict()
+        od.update(other={})
+        self.assertEqual(list(od.items()), [('other', {})])
+        od = OrderedDict()
+        od.update(red=5, blue=6, other=7, self=8)
+        self.assertEqual(sorted(list(od.items())),
+                         [('blue', 6), ('other', 7), ('red', 5), ('self', 8)])
+
         # Make sure that direct calls to update do not clear previous contents
         # add that updates items are not moved to the end
         d = OrderedDict([('a', 1), ('b', 2), ('c', 3), ('d', 44), ('e', 55)])
         d.update([('e', 5), ('f', 6)], g=7, d=4)
         self.assertEqual(list(d.items()),
             [('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('f', 6), ('g', 7)])
+
+    def test_abc(self):
+        self.assertIsInstance(OrderedDict(), MutableMapping)
+        self.assertTrue(issubclass(OrderedDict, MutableMapping))
 
     def test_clear(self):
         pairs = [('c', 1), ('b', 2), ('a', 3), ('d', 4), ('e', 5), ('f', 6)]
@@ -697,7 +863,7 @@ class TestOrderedDict(unittest.TestCase):
         pairs = [('c', 1), ('b', 2), ('a', 3), ('d', 4), ('e', 5), ('f', 6)]
         od = OrderedDict(pairs)
         del od['a']
-        self.assert_('a' not in od)
+        self.assertNotIn('a', od)
         with self.assertRaises(KeyError):
             del od['a']
         self.assertEqual(list(od.items()), pairs[:2] + pairs[3:])
@@ -743,6 +909,17 @@ class TestOrderedDict(unittest.TestCase):
         self.assertEqual(len(od), 0)
         self.assertEqual(od.pop(k, 12345), 12345)
 
+        # make sure pop still works when __missing__ is defined
+        class Missing(OrderedDict):
+            def __missing__(self, key):
+                return 0
+        m = Missing(a=1)
+        self.assertEqual(m.pop('b', 5), 5)
+        self.assertEqual(m.pop('a', 6), 1)
+        self.assertEqual(m.pop('a', 6), 6)
+        with self.assertRaises(KeyError):
+            m.pop('a')
+
     def test_equality(self):
         pairs = [('c', 1), ('b', 2), ('a', 3), ('d', 4), ('e', 5), ('f', 6)]
         shuffle(pairs)
@@ -778,11 +955,11 @@ class TestOrderedDict(unittest.TestCase):
                     update_test,
                     OrderedDict(od),
                     ]):
-            self.assert_(dup is not od)
-            self.assertEquals(dup, od)
-            self.assertEquals(list(dup.items()), list(od.items()))
-            self.assertEquals(len(dup), len(od))
-            self.assertEquals(type(dup), type(od))
+            self.assertTrue(dup is not od)
+            self.assertEqual(dup, od)
+            self.assertEqual(list(dup.items()), list(od.items()))
+            self.assertEqual(len(dup), len(od))
+            self.assertEqual(type(dup), type(od))
 
     def test_yaml_linkage(self):
         # Verify that __reduce__ is setup in a way that supports PyYAML's dump() feature.
@@ -791,7 +968,7 @@ class TestOrderedDict(unittest.TestCase):
         od = OrderedDict(pairs)
         # yaml.dump(od) -->
         # '!!python/object/apply:__main__.OrderedDict\n- - [a, 1]\n  - [b, 2]\n'
-        self.assert_(all(type(pair)==list for pair in od.__reduce__()[1]))
+        self.assertTrue(all(type(pair)==list for pair in od.__reduce__()[1]))
 
     def test_reduce_not_too_fat(self):
         # do not save instance dictionary if not needed
@@ -808,6 +985,13 @@ class TestOrderedDict(unittest.TestCase):
         self.assertEqual(eval(repr(od)), od)
         self.assertEqual(repr(OrderedDict()), "OrderedDict()")
 
+    def test_repr_recursive(self):
+        # See issue #9826
+        od = OrderedDict.fromkeys('abc')
+        od['x'] = od
+        self.assertEqual(repr(od),
+            "OrderedDict([('a', None), ('b', None), ('c', None), ('x', ...)])")
+
     def test_setdefault(self):
         pairs = [('c', 1), ('b', 2), ('a', 3), ('d', 4), ('e', 5), ('f', 6)]
         shuffle(pairs)
@@ -820,6 +1004,12 @@ class TestOrderedDict(unittest.TestCase):
         # make sure 'x' is added to the end
         self.assertEqual(list(od.items())[-1], ('x', 10))
 
+        # make sure setdefault still works when __missing__ is defined
+        class Missing(OrderedDict):
+            def __missing__(self, key):
+                return 0
+        self.assertEqual(Missing().setdefault(5, 9), 9)
+
     def test_reinsert(self):
         # Given insert a, insert b, delete a, re-insert a,
         # verify that a is now later than b.
@@ -830,7 +1020,33 @@ class TestOrderedDict(unittest.TestCase):
         od['a'] = 1
         self.assertEqual(list(od.items()), [('b', 2), ('a', 1)])
 
+    def test_move_to_end(self):
+        od = OrderedDict.fromkeys('abcde')
+        self.assertEqual(list(od), list('abcde'))
+        od.move_to_end('c')
+        self.assertEqual(list(od), list('abdec'))
+        od.move_to_end('c', 0)
+        self.assertEqual(list(od), list('cabde'))
+        od.move_to_end('c', 0)
+        self.assertEqual(list(od), list('cabde'))
+        od.move_to_end('e')
+        self.assertEqual(list(od), list('cabde'))
+        with self.assertRaises(KeyError):
+            od.move_to_end('x')
 
+    def test_sizeof(self):
+        # Wimpy test: Just verify the reported size is larger than a regular dict
+        d = dict(a=1)
+        od = OrderedDict(**d)
+        self.assertGreater(sys.getsizeof(od), sys.getsizeof(d))
+
+    def test_override_update(self):
+        # Verify that subclasses can override update() without breaking __init__()
+        class MyOD(OrderedDict):
+            def update(self, *args, **kwds):
+                raise Exception()
+        items = [('a', 1), ('c', 3), ('b', 2)]
+        self.assertEqual(list(MyOD(items).items()), items)
 
 class GeneralMappingTests(mapping_tests.BasicTestMappingProtocol):
     type2test = OrderedDict

@@ -2,12 +2,16 @@
 # these are all functions _testcapi exports whose name begins with 'test_'.
 
 from __future__ import with_statement
+import random
+import subprocess
 import sys
 import time
-import random
 import unittest
-import threading
 from test import support
+try:
+    import threading
+except ImportError:
+    threading = None
 import _testcapi
 
 
@@ -24,7 +28,7 @@ class CAPITest(unittest.TestCase):
     def test_instancemethod(self):
         inst = InstanceMethod()
         self.assertEqual(id(inst), inst.id())
-        self.assert_(inst.testfunction() is inst)
+        self.assertTrue(inst.testfunction() is inst)
         self.assertEqual(inst.testfunction.__doc__, testfunction.__doc__)
         self.assertEqual(InstanceMethod.testfunction.__doc__, testfunction.__doc__)
 
@@ -32,7 +36,22 @@ class CAPITest(unittest.TestCase):
         self.assertEqual(testfunction.attribute, "test")
         self.assertRaises(AttributeError, setattr, inst.testfunction, "attribute", "test")
 
+    @unittest.skipUnless(threading, 'Threading required for this test.')
+    def test_no_FatalError_infinite_loop(self):
+        p = subprocess.Popen([sys.executable, "-c",
+                              'import _testcapi;'
+                              '_testcapi.crash_no_current_thread()'],
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        (out, err) = p.communicate()
+        self.assertEqual(out, b'')
+        # This used to cause an infinite loop.
+        self.assertEqual(err.rstrip(),
+                         b'Fatal Python error:'
+                         b' PyThreadState_Get: no current thread')
 
+
+@unittest.skipUnless(threading, 'Threading required for this test.')
 class TestPendingCalls(unittest.TestCase):
 
     def pendingcalls_submit(self, l, n):
@@ -64,7 +83,7 @@ class TestPendingCalls(unittest.TestCase):
             if context and not context.event.is_set():
                 continue
             count += 1
-            self.failUnless(count < 10000,
+            self.assertTrue(count < 10000,
                 "timeout waiting for %i callbacks, got %i"%(n, len(l)))
         if False and support.verbose:
             print("(%i)"%(len(l),))
@@ -148,17 +167,10 @@ def test_main():
             raise support.TestFailed(
                         "Couldn't find main thread correctly in the list")
 
-    try:
-        _testcapi._test_thread_state
-        have_thread_state = True
-    except AttributeError:
-        have_thread_state = False
-
-    if have_thread_state:
+    if threading:
         import _thread
         import time
         TestThreadState()
-        import threading
         t = threading.Thread(target=TestThreadState)
         t.start()
         t.join()

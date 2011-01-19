@@ -5,10 +5,10 @@
    :synopsis: Interfaces to various Unix "database" formats.
 
 :mod:`dbm` is a generic interface to variants of the DBM database ---
- :mod:`dbm.gnu` or :mod:`dbm.ndbm`.  If none of these modules is installed, the
- slow-but-simple implementation in module :mod:`dbm.dumb` will be used.  There
- is a `third party interface <http://www.jcea.es/programacion/pybsddb.htm>`_ to
- the Oracle Berkely DB.
+:mod:`dbm.gnu` or :mod:`dbm.ndbm`.  If none of these modules is installed, the
+slow-but-simple implementation in module :mod:`dbm.dumb` will be used.  There
+is a `third party interface <http://www.jcea.es/programacion/pybsddb.htm>`_ to
+the Oracle Berkeley DB.
 
 
 .. exception:: error
@@ -20,9 +20,9 @@
 
 .. function:: whichdb(filename)
 
-   This functionattempts to guess which of the several simple database modules
-   available --- :mod:`dbm.bsd`, :mod:`dbm.gnu`, :mod:`dbm.ndbm` or
-   :mod:`dbm.dumb` --- should be used to open a given file.
+   This function attempts to guess which of the several simple database modules
+   available --- :mod:`dbm.gnu`, :mod:`dbm.ndbm` or :mod:`dbm.dumb` --- should
+   be used to open a given file.
 
    Returns one of the following values: ``None`` if the file can't be opened
    because it's unreadable or doesn't exist; the empty string (``''``) if the
@@ -61,10 +61,15 @@
    modified by the prevailing umask).
 
 
-The object returned by :func:`open` supports most of the same functionality as
+The object returned by :func:`.open` supports the same basic functionality as
 dictionaries; keys and their corresponding values can be stored, retrieved, and
 deleted, and the :keyword:`in` operator and the :meth:`keys` method are
-available. Key and values are always stored as bytes. This means that when
+available, as well as :meth:`get` and :meth:`setdefault`.
+
+.. versionchanged:: 3.2
+   :meth:`get` and :meth:`setdefault` are now available in all database modules.
+
+Key and values are always stored as bytes. This means that when
 strings are used they are implicitly converted to the default encoding before
 being stored.
 
@@ -86,10 +91,8 @@ then prints out the contents of the database::
    # Notice how the value is now in bytes.
    assert db['www.cnn.com'] == b'Cable News Network'
 
-   # Loop through contents.  Other dictionary methods
-   # such as .keys(), .values() also work.
-   for k, v in db.iteritems():
-       print(k, '\t', v)
+   # Often-used methods of the dict interface work too.
+   print(db.get('python.org', b'not present'))
 
    # Storing a non-string key or value will raise an exception (most
    # likely a TypeError).
@@ -227,10 +230,9 @@ Dbm objects behave like mappings (dictionaries), except that keys and values are
 always stored as bytes. Printing a ``dbm`` object doesn't print the keys and
 values, and the :meth:`items` and :meth:`values` methods are not supported.
 
-This module can be used with the "classic" ndbm interface, the BSD DB
-compatibility interface, or the GNU GDBM compatibility interface. On Unix, the
-:program:`configure` script will attempt to locate the appropriate header file
-to simplify building this module.
+This module can be used with the "classic" ndbm interface or the GNU GDBM
+compatibility interface. On Unix, the :program:`configure` script will attempt
+to locate the appropriate header file to simplify building this module.
 
 .. exception:: error
 
@@ -246,9 +248,7 @@ to simplify building this module.
 .. function:: open(filename[, flag[, mode]])
 
    Open a dbm database and return a ``dbm`` object.  The *filename* argument is the
-   name of the database file (without the :file:`.dir` or :file:`.pag` extensions;
-   note that the BSD DB implementation of the interface will append the extension
-   :file:`.db` and only create one file).
+   name of the database file (without the :file:`.dir` or :file:`.pag` extensions).
 
    The optional *flag* argument must be one of these values:
 

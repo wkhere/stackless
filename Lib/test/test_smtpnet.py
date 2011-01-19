@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import unittest
 from test import support
@@ -12,7 +12,8 @@ class SmtpSSLTest(unittest.TestCase):
 
     def test_connect(self):
         support.get_attribute(smtplib, 'SMTP_SSL')
-        server = smtplib.SMTP_SSL(self.testServer, self.remotePort)
+        with support.transient_internet(self.testServer):
+            server = smtplib.SMTP_SSL(self.testServer, self.remotePort)
         server.ehlo()
         server.quit()
 

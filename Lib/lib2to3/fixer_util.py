@@ -1,6 +1,8 @@
 """Utility functions, node construction macros, etc."""
 # Author: Collin Winter
 
+from itertools import islice
+
 # Local imports
 from .pgen2 import token
 from .pytree import Leaf, Node
@@ -14,7 +16,7 @@ from . import patcomp
 
 def KeywordArg(keyword, value):
     return Node(syms.argument,
-                [keyword, Leaf(token.EQUAL, '='), value])
+                [keyword, Leaf(token.EQUAL, "="), value])
 
 def LParen():
     return Leaf(token.LPAR, "(")
@@ -76,9 +78,9 @@ def Number(n, prefix=None):
 
 def Subscript(index_node):
     """A numeric or string subscript"""
-    return Node(syms.trailer, [Leaf(token.LBRACE, '['),
+    return Node(syms.trailer, [Leaf(token.LBRACE, "["),
                                index_node,
-                               Leaf(token.RBRACE, ']')])
+                               Leaf(token.RBRACE, "]")])
 
 def String(string, prefix=None):
     """A string leaf"""
@@ -120,9 +122,9 @@ def FromImport(package_name, name_leafs):
         # Pull the leaves out of their old tree
         leaf.remove()
 
-    children = [Leaf(token.NAME, 'from'),
+    children = [Leaf(token.NAME, "from"),
                 Leaf(token.NAME, package_name, prefix=" "),
-                Leaf(token.NAME, 'import', prefix=" "),
+                Leaf(token.NAME, "import", prefix=" "),
                 Node(syms.import_as_names, name_leafs)]
     imp = Node(syms.import_from, children)
     return imp
@@ -245,6 +247,16 @@ def is_probably_builtin(node):
         return False
     return True
 
+def find_indentation(node):
+    """Find the indentation of *node*."""
+    while node is not None:
+        if node.type == syms.suite and len(node.children) > 2:
+            indent = node.children[1]
+            if indent.type == token.INDENT:
+                return indent.value
+        node = node.parent
+    return ""
+
 ###########################################################
 ### The following functions are to find bindings in a suite
 ###########################################################
@@ -283,15 +295,13 @@ def touch_import(package, name, node):
     """ Works like `does_tree_import` but adds an import statement
         if it was not imported. """
     def is_import_stmt(node):
-        return node.type == syms.simple_stmt and node.children and \
-               is_import(node.children[0])
+        return (node.type == syms.simple_stmt and node.children and
+                is_import(node.children[0]))
 
     root = find_root(node)
 
     if does_tree_import(package, name, root):
         return
-
-    add_newline_before = False
 
     # figure out where to insert the new import.  First try to find
     # the first import and then skip to the last one.
@@ -309,23 +319,20 @@ def touch_import(package, name, node):
     # if that also fails, we stick to the beginning of the file
     if insert_pos == 0:
         for idx, node in enumerate(root.children):
-            if node.type == syms.simple_stmt and node.children and \
-               node.children[0].type == token.STRING:
+            if (node.type == syms.simple_stmt and node.children and
+               node.children[0].type == token.STRING):
                 insert_pos = idx + 1
-                add_newline_before
                 break
 
     if package is None:
         import_ = Node(syms.import_name, [
-            Leaf(token.NAME, 'import'),
-            Leaf(token.NAME, name, prefix=' ')
+            Leaf(token.NAME, "import"),
+            Leaf(token.NAME, name, prefix=" ")
         ])
     else:
-        import_ = FromImport(package, [Leaf(token.NAME, name, prefix=' ')])
+        import_ = FromImport(package, [Leaf(token.NAME, name, prefix=" ")])
 
     children = [import_, Newline()]
-    if add_newline_before:
-        children.insert(0, Newline())
     root.insert_child(insert_pos, Node(syms.simple_stmt, children))
 
 
@@ -409,7 +416,7 @@ def _is_import_binding(node, name, package=None):
         if package and str(node.children[1]).strip() != package:
             return None
         n = node.children[3]
-        if package and _find('as', n):
+        if package and _find("as", n):
             # See test_from_import_as for explanation
             return None
         elif n.type == syms.import_as_names and _find(name, n):

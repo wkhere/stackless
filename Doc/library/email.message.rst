@@ -40,7 +40,10 @@ Here are the methods of the :class:`Message` class:
 
       Return the entire message flattened as a string.  When optional *unixfrom*
       is ``True``, the envelope header is included in the returned string.
-      *unixfrom* defaults to ``False``.
+      *unixfrom* defaults to ``False``.  Flattening the message may trigger
+      changes to the :class:`Message` if defaults need to be filled in to
+      complete the transformation to a string (for example, MIME boundaries may
+      be generated or modified).
 
       Note that this method is provided as a convenience and may not always
       format the message the way you want.  For example, by default it mangles
@@ -108,9 +111,18 @@ Here are the methods of the :class:`Message` class:
       be decoded if this header's value is ``quoted-printable`` or ``base64``.
       If some other encoding is used, or :mailheader:`Content-Transfer-Encoding`
       header is missing, or if the payload has bogus base64 data, the payload is
-      returned as-is (undecoded).  If the message is a multipart and the
-      *decode* flag is ``True``, then ``None`` is returned.  The default for
-      *decode* is ``False``.
+      returned as-is (undecoded).  In all cases the returned value is binary
+      data.  If the message is a multipart and the *decode* flag is ``True``,
+      then ``None`` is returned.
+
+      When *decode* is ``False`` (the default) the body is returned as a string
+      without decoding the :mailheader:`Content-Transfer-Encoding`.  However,
+      for a :mailheader:`Content-Transfer-Encoding` of 8bit, an attempt is made
+      to decode the original bytes using the ``charset`` specified by the
+      :mailheader:`Content-Type` header, using the ``replace`` error handler.
+      If no ``charset`` is specified, or if the ``charset`` given is not
+      recognized by the email package, the body is decoded using the default
+      ASCII charset.
 
 
    .. method:: set_payload(payload, charset=None)
@@ -156,6 +168,11 @@ Here are the methods of the :class:`Message` class:
 
    Note that in all cases, any envelope header present in the message is not
    included in the mapping interface.
+
+   In a model generated from bytes, any header values that (in contravention of
+   the RFCs) contain non-ASCII bytes will, when retrieved through this
+   interface, be represented as :class:`~email.header.Header` objects with
+   a charset of `unknown-8bit`.
 
 
    .. method:: __len__()
@@ -254,7 +271,15 @@ Here are the methods of the :class:`Message` class:
       taken as the parameter name, with underscores converted to dashes (since
       dashes are illegal in Python identifiers).  Normally, the parameter will
       be added as ``key="value"`` unless the value is ``None``, in which case
-      only the key will be added.
+      only the key will be added.  If the value contains non-ASCII characters,
+      it can be specified as a three tuple in the format
+      ``(CHARSET, LANGUAGE, VALUE)``, where ``CHARSET`` is a string naming the
+      charset to be used to encode the value, ``LANGUAGE`` can usually be set
+      to ``None`` or the empty string (see :rfc:`2231` for other possibilities),
+      and ``VALUE`` is the string value containing non-ASCII code points.  If
+      a three tuple is not passed and the value contains non-ASCII characters,
+      it is automatically encoded in :rfc:`2231` format using a ``CHARSET``
+      of ``utf-8`` and a ``LANGUAGE`` of ``None``.
 
       Here's an example::
 
@@ -263,6 +288,15 @@ Here are the methods of the :class:`Message` class:
       This will add a header that looks like ::
 
          Content-Disposition: attachment; filename="bud.gif"
+
+      An example with with non-ASCII characters::
+
+         msg.add_header('Content-Disposition', 'attachment',
+                        filename=('iso-8859-1', '', 'Fußballer.ppt'))
+
+      Which produces ::
+
+         Content-Disposition: attachment; filename*="iso-8859-1''Fu%DFballer.ppt"
 
 
    .. method:: replace_header(_name, _value)
@@ -353,7 +387,7 @@ Here are the methods of the :class:`Message` class:
       :rfc:`2231`, you can collapse the parameter value by calling
       :func:`email.utils.collapse_rfc2231_value`, passing in the return value
       from :meth:`get_param`.  This will return a suitably decoded Unicode
-      string whn the value is a tuple, or the original string unquoted if it
+      string when the value is a tuple, or the original string unquoted if it
       isn't.  For example::
 
          rawparam = msg.get_param('foo')
@@ -412,9 +446,10 @@ Here are the methods of the :class:`Message` class:
       Return the value of the ``filename`` parameter of the
       :mailheader:`Content-Disposition` header of the message.  If the header
       does not have a ``filename`` parameter, this method falls back to looking
-      for the ``name`` parameter.  If neither is found, or the header is
-      missing, then *failobj* is returned.  The returned string will always be
-      unquoted as per :func:`email.utils.unquote`.
+      for the ``name`` parameter on the :mailheader:`Content-Type` header.  If
+      neither is found, or the header is missing, then *failobj* is returned.
+      The returned string will always be unquoted as per
+      :func:`email.utils.unquote`.
 
 
    .. method:: get_boundary(failobj=None)

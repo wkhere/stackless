@@ -292,9 +292,11 @@ Unicode Character Database as included in the :mod:`unicodedata` module.
 Identifiers are unlimited in length.  Case is significant.
 
 .. productionlist::
-   identifier: `id_start` `id_continue`*
+   identifier: `xid_start` `xid_continue`*
    id_start: <all characters in general categories Lu, Ll, Lt, Lm, Lo, Nl, the underscore, and characters with the Other_ID_Start property>
    id_continue: <all characters in `id_start`, plus characters in the categories Mn, Mc, Nd, Pc and others with the Other_ID_Continue property>
+   xid_start: <all characters in `id_start` whose NFKC normalization is in "id_start xid_continue*">
+   xid_continue: <all characters in `id_continue` whose NFKC normalization is in "id_continue*">
 
 The Unicode category codes mentioned above stand for:
 
@@ -308,9 +310,11 @@ The Unicode category codes mentioned above stand for:
 * *Mc* - spacing combining marks
 * *Nd* - decimal numbers
 * *Pc* - connector punctuations
+* *Other_ID_Start* - explicit list of characters in `PropList.txt <http://unicode.org/Public/UNIDATA/PropList.txt>`_ to support backwards compatibility
+* *Other_ID_Continue* - likewise
 
-All identifiers are converted into the normal form NFC while parsing; comparison
-of identifiers is based on NFC.
+All identifiers are converted into the normal form NFKC while parsing; comparison
+of identifiers is based on NFKC.
 
 A non-normative HTML file listing all valid identifier characters for Unicode
 4.1 can be found at
@@ -362,11 +366,12 @@ characters:
       information on this convention.
 
 ``__*__``
-   System-defined names.  These names are defined by the interpreter and its
-   implementation (including the standard library); applications should not expect
-   to define additional names using this convention.  The set of names of this
-   class defined by Python may be extended in future versions. See section
-   :ref:`specialnames`.
+   System-defined names. These names are defined by the interpreter and its
+   implementation (including the standard library).  Current system names are
+   discussed in the :ref:`specialnames` section and elsewhere.  More will likely
+   be defined in future versions of Python.  *Any* use of ``__*__`` names, in
+   any context, that does not follow explicitly documented use, is subject to
+   breakage without warning.
 
 ``__*``
    Class-private names.  Names in this category, when used within the context of a
@@ -407,7 +412,7 @@ String literals are described by the following lexical definitions:
 
 .. productionlist::
    bytesliteral: `bytesprefix`(`shortbytes` | `longbytes`)
-   bytesprefix: "b" | "B"
+   bytesprefix: "b" | "B" | "br" | "Br" | "bR" | "BR"
    shortbytes: "'" `shortbytesitem`* "'" | '"' `shortbytesitem`* '"'
    longbytes: "'''" `longbytesitem`* "'''" | '"""' `longbytesitem`* '"""'
    shortbytesitem: `shortbyteschar` | `bytesescapeseq`
@@ -431,15 +436,15 @@ of three single or double quotes (these are generally referred to as
 characters that otherwise have a special meaning, such as newline, backslash
 itself, or the quote character.
 
-String literals may optionally be prefixed with a letter ``'r'`` or ``'R'``;
-such strings are called :dfn:`raw strings` and treat backslashes as literal
-characters.  As a result, ``'\U'`` and ``'\u'`` escapes in raw strings are not
-treated specially.
-
 Bytes literals are always prefixed with ``'b'`` or ``'B'``; they produce an
 instance of the :class:`bytes` type instead of the :class:`str` type.  They
 may only contain ASCII characters; bytes with a numeric value of 128 or greater
 must be expressed with escapes.
+
+Both string and bytes literals may optionally be prefixed with a letter ``'r'``
+or ``'R'``; such strings are called :dfn:`raw strings` and treat backslashes as
+literal characters.  As a result, in string literals, ``'\U'`` and ``'\u'``
+escapes in raw strings are not treated specially.
 
 In triple-quoted strings, unescaped newlines and quotes are allowed (and are
 retained), except that three unescaped quotes in a row terminate the string.  (A
@@ -503,7 +508,7 @@ Notes:
    As in Standard C, up to three octal digits are accepted.
 
 (2)
-   Unlike in Standard C, at most two hex digits are accepted.
+   Unlike in Standard C, exactly two hex digits are required.
 
 (3)
    In a bytes literal, hexadecimal and octal escapes denote the byte with the
@@ -512,13 +517,13 @@ Notes:
 
 (4)
    Individual code units which form parts of a surrogate pair can be encoded using
-   this escape sequence. Unlike in Standard C, exactly two hex digits are required.
+   this escape sequence.  Exactly four hex digits are required.
 
 (5)
    Any Unicode character can be encoded this way, but characters outside the Basic
    Multilingual Plane (BMP) will be encoded using a surrogate pair if Python is
-   compiled to use 16-bit code units (the default).  Individual code units which
-   form parts of a surrogate pair can be encoded using this escape sequence.
+   compiled to use 16-bit code units (the default).  Exactly eight hex digits
+   are required.
 
 
 .. index:: unrecognized escape sequence
@@ -545,9 +550,9 @@ characters as part of the string, *not* as a line continuation.
 String literal concatenation
 ----------------------------
 
-Multiple adjacent string literals (delimited by whitespace), possibly using
-different quoting conventions, are allowed, and their meaning is the same as
-their concatenation.  Thus, ``"hello" 'world'`` is equivalent to
+Multiple adjacent string or bytes literals (delimited by whitespace), possibly
+using different quoting conventions, are allowed, and their meaning is the same
+as their concatenation.  Thus, ``"hello" 'world'`` is equivalent to
 ``"helloworld"``.  This feature can be used to reduce the number of backslashes
 needed, to split long strings conveniently across long lines, or even to add
 comments to parts of strings, for example::
@@ -700,4 +705,4 @@ tokens or are otherwise significant to the lexical analyzer::
 The following printing ASCII characters are not used in Python.  Their
 occurrence outside string literals and comments is an unconditional error::
 
-   $       ?
+   $       ?       `

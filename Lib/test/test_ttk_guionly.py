@@ -1,5 +1,4 @@
 import os
-import sys
 import unittest
 from test import support
 
@@ -9,6 +8,7 @@ support.import_module('_tkinter')
 from _tkinter import TclError
 from tkinter import ttk
 from tkinter.test import runtktests
+from tkinter.test.support import get_tk_root
 
 try:
     ttk.Button()
@@ -23,8 +23,11 @@ def test_main(enable_gui=False):
         elif 'gui' not in support.use_resources:
             support.use_resources.append('gui')
 
-    support.run_unittest(
-            *runtktests.get_tests(text=False, packages=['test_ttk']))
+    try:
+        support.run_unittest(
+                *runtktests.get_tests(text=False, packages=['test_ttk']))
+    finally:
+        get_tk_root().destroy()
 
 if __name__ == '__main__':
     test_main(enable_gui=True)

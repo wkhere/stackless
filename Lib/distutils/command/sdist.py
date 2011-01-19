@@ -63,7 +63,8 @@ class sdist(Command):
          "just regenerate the manifest and then stop "
          "(implies --force-manifest)"),
         ('force-manifest', 'f',
-         "forcibly regenerate the manifest and carry on as usual"),
+         "forcibly regenerate the manifest and carry on as usual. "
+         "Deprecated: now the manifest is always regenerated."),
         ('formats=', None,
          "formats for source distribution (comma-separated list)"),
         ('keep-temp', 'k',
@@ -72,7 +73,7 @@ class sdist(Command):
         ('dist-dir=', 'd',
          "directory to put the source distribution archive(s) in "
          "[default: dist]"),
-        ('medata-check', None,
+        ('metadata-check', None,
          "Ensure that all required elements of meta-data "
          "are supplied. Warn if any missing. [default]"),
         ]
@@ -173,66 +174,34 @@ class sdist(Command):
         distribution, and put it in 'self.filelist'.  This might involve
         reading the manifest template (and writing the manifest), or just
         reading the manifest, or just using the default file set -- it all
-        depends on the user's options and the state of the filesystem.
+        depends on the user's options.
         """
-        # If we have a manifest template, see if it's newer than the
-        # manifest; if so, we'll regenerate the manifest.
+        # new behavior:
+        # the file list is recalculated everytime because
+        # even if MANIFEST.in or setup.py are not changed
+        # the user might have added some files in the tree that
+        # need to be included.
+        #
+        #  This makes --force the default and only behavior.
         template_exists = os.path.isfile(self.template)
+        if not template_exists:
+            self.warn(("manifest template '%s' does not exist " +
+                        "(using default file list)") %
+                        self.template)
+        self.filelist.findall()
+
+        if self.use_defaults:
+            self.add_defaults()
+
         if template_exists:
-            template_newer = dep_util.newer(self.template, self.manifest)
+            self.read_template()
 
-        # The contents of the manifest file almost certainly depend on the
-        # setup script as well as the manifest template -- so if the setup
-        # script is newer than the manifest, we'll regenerate the manifest
-        # from the template.  (Well, not quite: if we already have a
-        # manifest, but there's no template -- which will happen if the
-        # developer elects to generate a manifest some other way -- then we
-        # can't regenerate the manifest, so we don't.)
-        self.debug_print("checking if %s newer than %s" %
-                         (self.distribution.script_name, self.manifest))
-        setup_newer = dep_util.newer(self.distribution.script_name,
-                                     self.manifest)
+        if self.prune:
+            self.prune_file_list()
 
-        # cases:
-        #   1) no manifest, template exists: generate manifest
-        #      (covered by 2a: no manifest == template newer)
-        #   2) manifest & template exist:
-        #      2a) template or setup script newer than manifest:
-        #          regenerate manifest
-        #      2b) manifest newer than both:
-        #          do nothing (unless --force or --manifest-only)
-        #   3) manifest exists, no template:
-        #      do nothing (unless --force or --manifest-only)
-        #   4) no manifest, no template: generate w/ warning ("defaults only")
-
-        manifest_outofdate = (template_exists and
-                              (template_newer or setup_newer))
-        force_regen = self.force_manifest or self.manifest_only
-        manifest_exists = os.path.isfile(self.manifest)
-        neither_exists = (not template_exists and not manifest_exists)
-
-        # Regenerate the manifest if necessary (or if explicitly told to)
-        if manifest_outofdate or neither_exists or force_regen:
-            if not template_exists:
-                self.warn("manifest template '%s' does not exist "
-                          "(using default file list)"
-                          % self.template)
-            self.filelist.findall()
-
-            if self.use_defaults:
-                self.add_defaults()
-            if template_exists:
-                self.read_template()
-            if self.prune:
-                self.prune_file_list()
-
-            self.filelist.sort()
-            self.filelist.remove_duplicates()
-            self.write_manifest()
-
-        # Don't regenerate the manifest, just read it in.
-        else:
-            self.read_manifest()
+        self.filelist.sort()
+        self.filelist.remove_duplicates()
+        self.write_manifest()
 
     def add_defaults(self):
         """Add all the default files to self.filelist:
@@ -271,8 +240,7 @@ class sdist(Command):
         optional = ['test/test*.py', 'setup.cfg']
         for pattern in optional:
             files = filter(os.path.isfile, glob(pattern))
-            if files:
-                self.filelist.extend(files)
+            self.filelist.extend(files)
 
         # build_py is used to get:
         #  - python modules
@@ -367,8 +335,21 @@ class sdist(Command):
         by 'add_defaults()' and 'read_template()') to the manifest file
         named by 'self.manifest'.
         """
-        self.execute(file_util.write_file,
-                     (self.manifest, self.filelist.files),
+        if os.path.isfile(self.manifest):
+            fp = open(self.manifest)
+            try:
+                first_line = fp.readline()
+            finally:
+                fp.close()
+
+            if first_line != '# file GENERATED by distutils, do NOT edit\n':
+                log.info("not writing to manually maintained "
+                         "manifest file '%s'" % self.manifest)
+                return
+
+        content = self.filelist.files[:]
+        content.insert(0, '# file GENERATED by distutils, do NOT edit')
+        self.execute(file_util.write_file, (self.manifest, content),
                      "writing manifest file '%s'" % self.manifest)
 
     def read_manifest(self):

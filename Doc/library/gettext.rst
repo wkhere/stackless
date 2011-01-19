@@ -173,8 +173,8 @@ class can also install themselves in the built-in namespace as the function
    associated :file:`.mo` file paths.  Instances with identical :file:`.mo` file
    names are cached.  The actual class instantiated is either *class_* if
    provided, otherwise :class:`GNUTranslations`.  The class's constructor must
-   take a single file object argument.  If provided, *codeset* will change the
-   charset used to encode translated strings in the :meth:`lgettext` and
+   take a single :term:`file object` argument.  If provided, *codeset* will change
+   the charset used to encode translated strings in the :meth:`lgettext` and
    :meth:`lngettext` methods.
 
    If multiple files are found, later files are used as fallbacks for earlier ones.
@@ -189,12 +189,12 @@ class can also install themselves in the built-in namespace as the function
 
 .. function:: install(domain, localedir=None, codeset=None, names=None)
 
-   This installs the function :func:`_` in Python's builtin namespace, based on
+   This installs the function :func:`_` in Python's builtins namespace, based on
    *domain*, *localedir*, and *codeset* which are passed to the function
    :func:`translation`.
 
    For the *names* parameter, please see the description of the translation
-   object's :meth:`install` method.
+   object's :meth:`~NullTranslations.install` method.
 
    As seen below, you usually mark the strings in your application that are
    candidates for translation, by wrapping them in a call to the :func:`_`
@@ -203,7 +203,7 @@ class can also install themselves in the built-in namespace as the function
       print(_('This string will be translated.'))
 
    For convenience, you want the :func:`_` function to be installed in Python's
-   builtin namespace, so it is easily accessible in all modules of your
+   builtins namespace, so it is easily accessible in all modules of your
    application.
 
 
@@ -219,7 +219,7 @@ are the methods of :class:`NullTranslations`:
 
 .. class:: NullTranslations(fp=None)
 
-   Takes an optional file object *fp*, which is ignored by the base class.
+   Takes an optional :term:`file object` *fp*, which is ignored by the base class.
    Initializes "protected" instance variables *_info* and *_charset* which are set
    by derived classes, as well as *_fallback*, which is set through
    :meth:`add_fallback`.  It then calls ``self._parse(fp)`` if *fp* is not
@@ -294,7 +294,7 @@ are the methods of :class:`NullTranslations`:
       binding it to ``_``.
 
       If the *names* parameter is given, it must be a sequence containing the
-      names of functions you want to install in the builtin namespace in
+      names of functions you want to install in the builtins namespace in
       addition to :func:`_`.  Supported names are ``'gettext'`` (bound to
       :meth:`self.gettext`), ``'ngettext'`` (bound to :meth:`self.ngettext`),
       ``'lgettext'`` and ``'lngettext'``.

@@ -84,8 +84,8 @@ def build_pattern(mapping=MAPPING):
 
 class FixImports(fixer_base.BaseFix):
 
-    order = "pre" # Pre-order tree traversal
-
+    BM_compatible = True
+    keep_line_order = True
     # This is overridden in fix_imports2.
     mapping = MAPPING
 
@@ -110,7 +110,7 @@ class FixImports(fixer_base.BaseFix):
             # Module usage could be in the trailer of an attribute lookup, so we
             # might have nested matches when "bare_with_attr" is present.
             if "bare_with_attr" not in results and \
-                    any([match(obj) for obj in attr_chain(node, "parent")]):
+                    any(match(obj) for obj in attr_chain(node, "parent")):
                 return False
             return results
         return False

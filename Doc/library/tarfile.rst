@@ -1,5 +1,3 @@
-.. _tarfile-mod:
-
 :mod:`tarfile` --- Read and write tar archive files
 ===================================================
 
@@ -22,7 +20,8 @@ Some facts and figures:
 * read/write support for the POSIX.1-1988 (ustar) format.
 
 * read/write support for the GNU tar format including *longname* and *longlink*
-  extensions, read-only support for the *sparse* extension.
+  extensions, read-only support for all variants of the *sparse* extension
+  including restoration of sparse files.
 
 * read/write support for the POSIX.1-2001 (pax) format.
 
@@ -68,8 +67,8 @@ Some facts and figures:
    *mode* ``'r'`` to avoid this.  If a compression method is not supported,
    :exc:`CompressionError` is raised.
 
-   If *fileobj* is specified, it is used as an alternative to a file object opened
-   for *name*. It is supposed to be at position 0.
+   If *fileobj* is specified, it is used as an alternative to a :term:`file object`
+   opened in binary mode for *name*. It is supposed to be at position 0.
 
    For special purposes, there is a second format for *mode*:
    ``'filemode|[compression]'``.  :func:`tarfile.open` will return a :class:`TarFile`
@@ -77,7 +76,7 @@ Some facts and figures:
    be done on the file. If given, *fileobj* may be any object that has a
    :meth:`read` or :meth:`write` method (depending on the *mode*). *bufsize*
    specifies the blocksize and defaults to ``20 * 512`` bytes. Use this variant
-   in combination with e.g. ``sys.stdin``, a socket file object or a tape
+   in combination with e.g. ``sys.stdin``, a socket :term:`file object` or a tape
    device. However, such a :class:`TarFile` object is limited in that it does
    not allow to be accessed randomly, see :ref:`tar-examples`.  The currently
    possible modes:
@@ -187,8 +186,8 @@ The following variables are available on module level:
 
 .. data:: ENCODING
 
-   The default character encoding i.e. the value from either
-   :func:`sys.getfilesystemencoding` or :func:`sys.getdefaultencoding`.
+   The default character encoding: ``'utf-8'`` on Windows,
+   :func:`sys.getfilesystemencoding` otherwise.
 
 
 .. seealso::
@@ -211,8 +210,16 @@ a header block followed by data blocks. It is possible to store a file in a tar
 archive several times. Each archive member is represented by a :class:`TarInfo`
 object, see :ref:`tarinfo-objects` for details.
 
+A :class:`TarFile` object can be used as a context manager in a :keyword:`with`
+statement. It will automatically be closed when the block is completed. Please
+note that in the event of an exception an archive opened for writing will not
+be finalized; only the internally used file object will be closed. See the
+:ref:`tar-examples` section for a use case.
 
-.. class:: TarFile(name=None, mode='r', fileobj=None, format=DEFAULT_FORMAT, tarinfo=TarInfo, dereference=False, ignore_zeros=False, encoding=ENCODING, errors=None, pax_headers=None, debug=0, errorlevel=0)
+.. versionadded:: 3.2
+   Added support for the context manager protocol.
+
+.. class:: TarFile(name=None, mode='r', fileobj=None, format=DEFAULT_FORMAT, tarinfo=TarInfo, dereference=False, ignore_zeros=False, encoding=ENCODING, errors='surrogateescape', pax_headers=None, debug=0, errorlevel=0)
 
    All following arguments are optional and can be accessed as instance attributes
    as well.
@@ -260,6 +267,9 @@ object, see :ref:`tarinfo-objects` for details.
    used for reading or writing the archive and how conversion errors are going
    to be handled. The default settings will work for most users.
    See section :ref:`tar-unicode` for in-depth information.
+
+   .. versionchanged:: 3.2
+      Use ``'surrogateescape'`` as the default for the *errors* argument.
 
    The *pax_headers* argument is an optional dictionary of strings which
    will be added as a pax global header if *format* is :const:`PAX_FORMAT`.
@@ -326,12 +336,13 @@ object, see :ref:`tarinfo-objects` for details.
       dots ``".."``.
 
 
-.. method:: TarFile.extract(member, path="")
+.. method:: TarFile.extract(member, path="", set_attrs=True)
 
    Extract a member from the archive to the current working directory, using its
    full name. Its file information is extracted as accurately as possible. *member*
    may be a filename or a :class:`TarInfo` object. You can specify a different
-   directory using *path*.
+   directory using *path*. File attributes (owner, mtime, mode) are set unless
+   *set_attrs* is False.
 
    .. note::
 
@@ -342,13 +353,15 @@ object, see :ref:`tarinfo-objects` for details.
 
       See the warning for :meth:`extractall`.
 
+   .. versionchanged:: 3.2
+      Added the *set_attrs* parameter.
 
 .. method:: TarFile.extractfile(member)
 
    Extract a member from the archive as a file object. *member* may be a filename
-   or a :class:`TarInfo` object. If *member* is a regular file, a file-like object
-   is returned. If *member* is a link, a file-like object is constructed from the
-   link's target. If *member* is none of the above, :const:`None` is returned.
+   or a :class:`TarInfo` object. If *member* is a regular file, a :term:`file-like
+   object` is returned. If *member* is a link, a file-like object is constructed from
+   the link's target. If *member* is none of the above, :const:`None` is returned.
 
    .. note::
 
@@ -357,7 +370,7 @@ object, see :ref:`tarinfo-objects` for details.
       and :meth:`close`, and also supports iteration over its lines.
 
 
-.. method:: TarFile.add(name, arcname=None, recursive=True, exclude=None)
+.. method:: TarFile.add(name, arcname=None, recursive=True, exclude=None, filter=None)
 
    Add the file *name* to the archive. *name* may be any type of file (directory,
    fifo, symbolic link, etc.). If given, *arcname* specifies an alternative name
@@ -365,7 +378,18 @@ object, see :ref:`tarinfo-objects` for details.
    can be avoided by setting *recursive* to :const:`False`. If *exclude* is given,
    it must be a function that takes one filename argument and returns a boolean
    value. Depending on this value the respective file is either excluded
-   (:const:`True`) or added (:const:`False`).
+   (:const:`True`) or added (:const:`False`). If *filter* is specified it must
+   be a function that takes a :class:`TarInfo` object argument and returns the
+   changed :class:`TarInfo` object. If it instead returns :const:`None` the :class:`TarInfo`
+   object will be excluded from the archive. See :ref:`tar-examples` for an
+   example.
+
+   .. versionchanged:: 3.2
+      Added the *filter* parameter.
+
+   .. deprecated:: 3.2
+      The *exclude* parameter is deprecated, please use the *filter* parameter
+      instead.
 
 
 .. method:: TarFile.addfile(tarinfo, fileobj=None)
@@ -382,9 +406,9 @@ object, see :ref:`tarinfo-objects` for details.
 
 .. method:: TarFile.gettarinfo(name=None, arcname=None, fileobj=None)
 
-   Create a :class:`TarInfo` object for either the file *name* or the file object
-   *fileobj* (using :func:`os.fstat` on its file descriptor).  You can modify some
-   of the :class:`TarInfo`'s attributes before you add it using :meth:`addfile`.
+   Create a :class:`TarInfo` object for either the file *name* or the :term:`file
+   object` *fileobj* (using :func:`os.fstat` on its file descriptor).  You can modify
+   some of the :class:`TarInfo`'s attributes before you add it using :meth:`addfile`.
    If given, *arcname* specifies an alternative name for the file in the archive.
 
 
@@ -432,10 +456,13 @@ It does *not* contain the file's data itself.
    a :class:`TarInfo` object.
 
 
-.. method:: TarInfo.tobuf(format=DEFAULT_FORMAT, encoding=ENCODING, errors='strict')
+.. method:: TarInfo.tobuf(format=DEFAULT_FORMAT, encoding=ENCODING, errors='surrogateescape')
 
    Create a string buffer from a :class:`TarInfo` object. For information on the
    arguments see the constructor of the :class:`TarFile` class.
+
+   .. versionchanged:: 3.2
+      Use ``'surrogateescape'`` as the default for the *errors* argument.
 
 
 A ``TarInfo`` object has the following public data attributes:
@@ -584,6 +611,13 @@ How to create an uncompressed tar archive from a list of filenames::
        tar.add(name)
    tar.close()
 
+The same example using the :keyword:`with` statement::
+
+    import tarfile
+    with tarfile.open("sample.tar", "w") as tar:
+        for name in ["foo", "bar", "quux"]:
+            tar.add(name)
+
 How to read a gzip compressed tar archive and display some member information::
 
    import tarfile
@@ -597,6 +631,18 @@ How to read a gzip compressed tar archive and display some member information::
        else:
            print("something else.")
    tar.close()
+
+How to create an archive and reset the user information using the *filter*
+parameter in :meth:`TarFile.add`::
+
+    import tarfile
+    def reset(tarinfo):
+        tarinfo.uid = tarinfo.gid = 0
+        tarinfo.uname = tarinfo.gname = "root"
+        return tarinfo
+    tar = tarfile.open("sample.tar.gz", "w:gz")
+    tar.add("foo", filter=reset)
+    tar.close()
 
 
 .. _tar-formats:
@@ -665,11 +711,12 @@ metadata must be either decoded or encoded. If *encoding* is not set
 appropriately, this conversion may fail.
 
 The *errors* argument defines how characters are treated that cannot be
-converted. Possible values are listed in section :ref:`codec-base-classes`. In
-read mode the default scheme is ``'replace'``. This avoids unexpected
-:exc:`UnicodeError` exceptions and guarantees that an archive can always be
-read. In write mode the default value for *errors* is ``'strict'``.  This
-ensures that name information is not altered unnoticed.
+converted. Possible values are listed in section :ref:`codec-base-classes`.
+The default scheme is ``'surrogateescape'`` which Python also uses for its
+file system calls, see :ref:`os-filenames`.
 
-In case of writing :const:`PAX_FORMAT` archives, *encoding* is ignored because
-non-ASCII metadata is stored using *UTF-8*.
+In case of :const:`PAX_FORMAT` archives, *encoding* is generally not needed
+because all the metadata is stored using *UTF-8*. *encoding* is only used in
+the rare cases when binary pax headers are decoded or when strings with
+surrogate characters are stored.
+

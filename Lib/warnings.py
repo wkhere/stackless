@@ -29,10 +29,17 @@ def formatwarning(message, category, filename, lineno, line=None):
     return s
 
 def filterwarnings(action, message="", category=Warning, module="", lineno=0,
-                   append=0):
+                   append=False):
     """Insert an entry into the list of warnings filters (at the front).
 
-    Use assertions to check that all arguments have the right type."""
+    'action' -- one of "error", "ignore", "always", "default", "module",
+                or "once"
+    'message' -- a regex that the warning message must match
+    'category' -- a class that the warning must be a subclass of
+    'module' -- a regex that the module name must match
+    'lineno' -- an integer line number, 0 matches all warnings
+    'append' -- if true, append to the list of filters
+    """
     import re
     assert action in ("error", "ignore", "always", "default", "module",
                       "once"), "invalid action: %r" % (action,)
@@ -49,10 +56,15 @@ def filterwarnings(action, message="", category=Warning, module="", lineno=0,
     else:
         filters.insert(0, item)
 
-def simplefilter(action, category=Warning, lineno=0, append=0):
+def simplefilter(action, category=Warning, lineno=0, append=False):
     """Insert a simple entry into the list of warnings filters (at the front).
 
     A simple filter matches all modules and messages.
+    'action' -- one of "error", "ignore", "always", "default", "module",
+                or "once"
+    'category' -- a class that the warning must be a subclass of
+    'lineno' -- an integer line number, 0 matches all warnings
+    'append' -- if true, append to the list of filters
     """
     assert action in ("error", "ignore", "always", "default", "module",
                       "once"), "invalid action: %r" % (action,)
@@ -345,10 +357,10 @@ class catch_warnings(object):
 # If either if the compiled regexs are None, match anything.
 _warnings_defaults = False
 try:
-    from _warnings import (filters, default_action, once_registry,
+    from _warnings import (filters, _defaultaction, _onceregistry,
                             warn, warn_explicit)
-    defaultaction = default_action
-    onceregistry = once_registry
+    defaultaction = _defaultaction
+    onceregistry = _onceregistry
     _warnings_defaults = True
 except ImportError:
     filters = []
@@ -359,8 +371,10 @@ except ImportError:
 # Module initialization
 _processoptions(sys.warnoptions)
 if not _warnings_defaults:
-    simplefilter("ignore", category=PendingDeprecationWarning, append=1)
-    simplefilter("ignore", category=ImportWarning, append=1)
+    silence = [ImportWarning, PendingDeprecationWarning]
+    silence.append(DeprecationWarning)
+    for cls in silence:
+        simplefilter("ignore", category=cls)
     bytes_warning = sys.flags.bytes_warning
     if bytes_warning > 1:
         bytes_action = "error"
@@ -369,4 +383,11 @@ if not _warnings_defaults:
     else:
         bytes_action = "ignore"
     simplefilter(bytes_action, category=BytesWarning, append=1)
+    # resource usage warnings are enabled by default in pydebug mode
+    if hasattr(sys, 'gettotalrefcount'):
+        resource_action = "always"
+    else:
+        resource_action = "ignore"
+    simplefilter(resource_action, category=ResourceWarning, append=1)
+
 del _warnings_defaults

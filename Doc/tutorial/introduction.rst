@@ -1,4 +1,4 @@
-.. _tut-informal:
+﻿.. _tut-informal:
 
 **********************************
 An Informal Introduction to Python
@@ -56,20 +56,13 @@ operators ``+``, ``-``, ``*`` and ``/`` work just like in most other languages
    >>> (50-5*6)/4
    5.0
    >>> 8/5 # Fractions aren't lost when dividing integers
-   1.6000000000000001
+   1.6
 
 Note: You might not see exactly the same result; floating point results can
 differ from one machine to another.  We will say more later about controlling
-the appearance of floating point output; what we see here is the most
-informative display but not as easy to read as we would get with::
-
-   >>> print(8/5)
-   1.6
-
-For clarity in this tutorial we will show the simpler floating point output
-unless we are specifically discussing output formatting, and explain later
-why these two ways of displaying floating point data come to be different.
-See :ref:`tut-fp-issues` for a full discussion.
+the appearance of floating point output.  See also :ref:`tut-fp-issues` for a
+full discussion of some of the subtleties of floating point numbers and their
+representations.
 
 To do integer division and get an integer result,
 discarding any fractional result, there is another operator, ``//``::
@@ -157,7 +150,6 @@ convert a complex number to a real number.  Use ``abs(z)`` to get its magnitude
    4.0
    >>> abs(a)  # sqrt(a.real**2 + a.imag**2)
    5.0
-   >>>
 
 In interactive mode, the last printed expression is assigned to the variable
 ``_``.  This means that when you are using Python as a desk calculator, it is
@@ -171,7 +163,6 @@ somewhat easier to continue calculations, for example::
    113.0625
    >>> round(_, 2)
    113.06
-   >>>
 
 This variable should be treated as read-only by the user.  Don't explicitly
 assign a value to it --- you would create an independent local variable with the
@@ -203,8 +194,8 @@ The interpreter prints the result of string operations in the same way as they
 are typed for input: inside quotes, and with quotes and other funny characters
 escaped by backslashes, to show the precise value.  The string is enclosed in
 double quotes if the string contains a single quote and no double quotes, else
-it's enclosed in single quotes.  Once again, the :func:`print` function
-produces the more readable output.
+it's enclosed in single quotes.  The :func:`print` function produces a more
+readable output for such input strings.
 
 String literals can span multiple lines in several ways.  Continuation lines can
 be used, with a backslash as the last character on the line indicating that the
@@ -217,13 +208,34 @@ next line is a logical continuation of the line::
 
    print(hello)
 
-Note that newlines still need to be embedded in the string using ``\n``; the
+Note that newlines still need to be embedded in the string using ``\n`` -- the
 newline following the trailing backslash is discarded.  This example would print
-the following::
+the following:
+
+.. code-block:: text
 
    This is a rather long string containing
    several lines of text just as you would do in C.
        Note that whitespace at the beginning of the line is significant.
+
+Or, strings can be surrounded in a pair of matching triple-quotes: ``"""`` or
+``'''``.  End of lines do not need to be escaped when using triple-quotes, but
+they will be included in the string.  So the following uses one escape to
+avoid an unwanted initial blank line.  ::
+
+   print("""\
+   Usage: thingy [OPTIONS]
+        -h                        Display this usage message
+        -H hostname               Hostname to connect to
+   """)
+
+produces the following output:
+
+.. code-block:: text
+
+   Usage: thingy [OPTIONS]
+        -h                        Display this usage message
+        -H hostname               Hostname to connect to
 
 If we make the string literal a "raw" string, ``\n`` sequences are not converted
 to newlines, but the backslash at the end of the line, and the newline character
@@ -234,7 +246,9 @@ in the source, are both included in the string as data.  Thus, the example::
 
    print(hello)
 
-would print::
+would print:
+
+.. code-block:: text
 
    This is a rather long string containing\n\
    several lines of text much as you would do in C.
@@ -469,6 +483,12 @@ concatenated and so on::
    >>> 3*a[:3] + ['Boo!']
    ['spam', 'eggs', 100, 'spam', 'eggs', 100, 'spam', 'eggs', 100, 'Boo!']
 
+All slice operations return a new list containing the requested elements.  This
+means that the following slice returns a shallow copy of the list *a*::
+
+   >>> a[:]
+   ['spam', 'eggs', 100, 1234]
+
 Unlike strings, which are *immutable*, it is possible to change individual
 elements of a list::
 
@@ -597,7 +617,7 @@ This example introduces several new features.
 
      >>> a, b = 0, 1
      >>> while b < 1000:
-     ...     print(b, end=' ')
+     ...     print(b, end=',')
      ...     a, b = b, a+b
      ...
-     1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987
+     1,1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,

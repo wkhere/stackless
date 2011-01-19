@@ -143,6 +143,7 @@ def fixup_indent(suite):
 
 
 class FixMetaclass(fixer_base.BaseFix):
+    BM_compatible = True
 
     PATTERN = """
     classdef<any*>
@@ -150,7 +151,7 @@ class FixMetaclass(fixer_base.BaseFix):
 
     def transform(self, node, results):
         if not has_metaclass(node):
-            return node
+            return
 
         fixup_parse_tree(node)
 

@@ -7,6 +7,24 @@ Built-in Functions
 The Python interpreter has a number of functions and types built into it that
 are always available.  They are listed here in alphabetical order.
 
+===================  =================  ==================  ================  ====================
+..                   ..                 Built-in Functions  ..                ..
+===================  =================  ==================  ================  ====================
+:func:`abs`          :func:`dict`       :func:`help`        :func:`min`       :func:`setattr`
+:func:`all`          :func:`dir`        :func:`hex`         :func:`next`      :func:`slice`
+:func:`any`          :func:`divmod`     :func:`id`          :func:`object`    :func:`sorted`
+:func:`ascii`        :func:`enumerate`  :func:`input`       :func:`oct`       :func:`staticmethod`
+:func:`bin`          :func:`eval`       :func:`int`         :func:`open`      :func:`str`
+:func:`bool`         :func:`exec`       :func:`isinstance`  :func:`ord`       :func:`sum`
+:func:`bytearray`    :func:`filter`     :func:`issubclass`  :func:`pow`       :func:`super`
+:func:`bytes`        :func:`float`      :func:`iter`        :func:`print`     :func:`tuple`
+:func:`callable`     :func:`format`     :func:`len`         :func:`property`  :func:`type`
+:func:`chr`          :func:`frozenset`  :func:`list`        :func:`range`     :func:`vars`
+:func:`classmethod`  :func:`getattr`    :func:`locals`      :func:`repr`      :func:`zip`
+:func:`compile`      :func:`globals`    :func:`map`         :func:`reversed`  :func:`__import__`
+:func:`complex`      :func:`hasattr`    :func:`max`         :func:`round`
+:func:`delattr`      :func:`hash`       :func:`memoryview`  :func:`set`
+===================  =================  ==================  ================  ====================
 
 .. function:: abs(x)
 
@@ -70,7 +88,7 @@ are always available.  They are listed here in alphabetical order.
    Return a new array of bytes.  The :class:`bytearray` type is a mutable
    sequence of integers in the range 0 <= x < 256.  It has most of the usual
    methods of mutable sequences, described in :ref:`typesseq-mutable`, as well
-   as most methods that the :class:`str` type has, see :ref:`bytes-methods`.
+   as most methods that the :class:`bytes` type has, see :ref:`bytes-methods`.
 
    The optional *source* parameter can be used to initialize the array in a few
    different ways:
@@ -103,13 +121,30 @@ are always available.  They are listed here in alphabetical order.
    Bytes objects can also be created with literals, see :ref:`strings`.
 
 
+.. function:: callable(object)
+
+   Return :const:`True` if the *object* argument appears callable,
+   :const:`False` if not.  If this returns true, it is still possible that a
+   call fails, but if it is false, calling *object* will never succeed.
+   Note that classes are callable (calling a class returns a new instance);
+   instances are callable if their class has a :meth:`__call__` method.
+
+   .. versionadded:: 3.2
+      This function was first removed in Python 3.0 and then brought back
+      in Python 3.2.
+
+
 .. function:: chr(i)
 
-   Return the string of one character whose Unicode codepoint is the integer
+   Return the string representing a character whose Unicode codepoint is the integer
    *i*.  For example, ``chr(97)`` returns the string ``'a'``. This is the
-   inverse of :func:`ord`.  The valid range for the argument depends how Python
-   was configured -- it may be either UCS2 [0..0xFFFF] or UCS4 [0..0x10FFFF].
-   :exc:`ValueError` will be raised if *i* is outside that range.
+   inverse of :func:`ord`.  The valid range for the argument is from 0 through
+   1,114,111 (0x10FFFF in base 16).  :exc:`ValueError` will be raised if *i* is
+   outside that range.
+
+   Note that on narrow Unicode builds, the result is a string of
+   length two for *i* greater than 65,535 (0xFFFF in hexadecimal).
+
 
 
 .. function:: classmethod(function)
@@ -139,12 +174,12 @@ are always available.  They are listed here in alphabetical order.
    type hierarchy in :ref:`types`.
 
 
-.. function:: compile(source, filename, mode, flags=0, dont_inherit=False)
+.. function:: compile(source, filename, mode, flags=0, dont_inherit=False, optimize=-1)
 
    Compile the *source* into a code or AST object.  Code objects can be executed
-   by an :keyword:`exec` statement or evaluated by a call to :func:`eval`.
-   *source* can either be a string or an AST object.  Refer to the :mod:`ast`
-   module documentation for information on how to work with AST objects.
+   by :func:`exec` or :func:`eval`.  *source* can either be a string or an AST
+   object.  Refer to the :mod:`ast` module documentation for information on how
+   to work with AST objects.
 
    The *filename* argument should give the file from which the code was read;
    pass some recognizable value if it wasn't read from a file (``'<string>'`` is
@@ -171,16 +206,25 @@ are always available.  They are listed here in alphabetical order.
    can be found as the :attr:`compiler_flag` attribute on the :class:`_Feature`
    instance in the :mod:`__future__` module.
 
+   The argument *optimize* specifies the optimization level of the compiler; the
+   default value of ``-1`` selects the optimization level of the interpreter as
+   given by :option:`-O` options.  Explicit levels are ``0`` (no optimization;
+   ``__debug__`` is true), ``1`` (asserts are removed, ``__debug__`` is false)
+   or ``2`` (docstrings are removed too).
+
    This function raises :exc:`SyntaxError` if the compiled source is invalid,
    and :exc:`TypeError` if the source contains null bytes.
 
    .. note::
 
-      When compiling a string with multi-line statements, line endings must be
-      represented by a single newline character (``'\n'``), and the input must
-      be terminated by at least one newline character.  If line endings are
-      represented by ``'\r\n'``, use :meth:`str.replace` to change them into
-      ``'\n'``.
+      When compiling a string with multi-line code in ``'single'`` or
+      ``'eval'`` mode, input must be terminated by at least one newline
+      character.  This is to facilitate detection of incomplete and complete
+      statements in the :mod:`code` module.
+
+   .. versionchanged:: 3.2
+      Allowed use of Windows and Mac newlines.  Also input in ``'exec'`` mode
+      does not have to end in a newline anymore.  Added the *optimize* parameter.
 
 
 .. function:: complex([real[, imag]])
@@ -252,7 +296,7 @@ are always available.  They are listed here in alphabetical order.
       ['Struct', '__builtins__', '__doc__', '__file__', '__name__',
        '__package__', '_clearcache', 'calcsize', 'error', 'pack', 'pack_into',
        'unpack', 'unpack_from']
-      >>> class Foo(object):
+      >>> class Foo:
       ...     def __dir__(self):
       ...         return ["kan", "ga", "roo"]
       ...
@@ -324,12 +368,15 @@ are always available.  They are listed here in alphabetical order.
    This function can also be used to execute arbitrary code objects (such as
    those created by :func:`compile`).  In this case pass a code object instead
    of a string.  If the code object has been compiled with ``'exec'`` as the
-   *kind* argument, :func:`eval`\'s return value will be ``None``.
+   *mode* argument, :func:`eval`\'s return value will be ``None``.
 
    Hints: dynamic execution of statements is supported by the :func:`exec`
    function.  The :func:`globals` and :func:`locals` functions
    returns the current global and local dictionary, respectively, which may be
    useful to pass around for use by :func:`eval` or :func:`exec`.
+
+   See :func:`ast.literal_eval` for a function that can safely evaluate strings
+   with expressions containing only literals.
 
 
 .. function:: exec(object[, globals[, locals]])
@@ -389,26 +436,54 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: float([x])
 
-   Convert a string or a number to floating point.  If the argument is a string,
-   it must contain a possibly signed decimal or floating point number, possibly
-   embedded in whitespace. The argument may also be ``'[+|-]nan'`` or
-   ``'[+|-]inf'``.  Otherwise, the argument may be an integer or a floating
-   point number, and a floating point number with the same value (within
-   Python's floating point precision) is returned.  If no argument is given,
-   ``0.0`` is returned.
+   .. index::
+      single: NaN
+      single: Infinity
 
-   .. note::
+   Convert a string or a number to floating point.
 
-      .. index::
-         single: NaN
-         single: Infinity
+   If the argument is a string, it should contain a decimal number, optionally
+   preceded by a sign, and optionally embedded in whitespace.  The optional
+   sign may be ``'+'`` or ``'-'``; a ``'+'`` sign has no effect on the value
+   produced.  The argument may also be a string representing a NaN
+   (not-a-number), or a positive or negative infinity.  More precisely, the
+   input must conform to the following grammar after leading and trailing
+   whitespace characters are removed:
 
-      When passing in a string, values for NaN and Infinity may be returned,
-      depending on the underlying C library.  Float accepts the strings
-      ``'nan'``, ``'inf'`` and ``'-inf'`` for NaN and positive or negative
-      infinity.  The case and a leading + are ignored as well as a leading - is
-      ignored for NaN.  Float always represents NaN and infinity as ``nan``,
-      ``inf`` or ``-inf``.
+   .. productionlist::
+      sign: "+" | "-"
+      infinity: "Infinity" | "inf"
+      nan: "nan"
+      numeric_value: `floatnumber` | `infinity` | `nan`
+      numeric_string: [`sign`] `numeric_value`
+
+   Here ``floatnumber`` is the form of a Python floating-point literal,
+   described in :ref:`floating`.  Case is not significant, so, for example,
+   "inf", "Inf", "INFINITY" and "iNfINity" are all acceptable spellings for
+   positive infinity.
+
+   Otherwise, if the argument is an integer or a floating point number, a
+   floating point number with the same value (within Python's floating point
+   precision) is returned.  If the argument is outside the range of a Python
+   float, an :exc:`OverflowError` will be raised.
+
+   For a general Python object ``x``, ``float(x)`` delegates to
+   ``x.__float__()``.
+
+   If no argument is given, ``0.0`` is returned.
+
+   Examples::
+
+      >>> float('+1.23')
+      1.23
+      >>> float('   -12345\n')
+      -12345.0
+      >>> float('1e-003')
+      0.001
+      >>> float('+1E6')
+      1000000.0
+      >>> float('-Infinity')
+      -inf
 
    The float type is described in :ref:`typesnumeric`.
 
@@ -441,7 +516,7 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: getattr(object, name[, default])
 
-   Return the value of the named attributed of *object*.  *name* must be a string.
+   Return the value of the named attribute of *object*.  *name* must be a string.
    If the string is the name of one of the object's attributes, the result is the
    value of that attribute.  For example, ``getattr(x, 'foobar')`` is equivalent to
    ``x.foobar``.  If the named attribute does not exist, *default* is returned if
@@ -457,10 +532,10 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: hasattr(object, name)
 
-   The arguments are an object and a string.  The result is ``True`` if the string
-   is the name of one of the object's attributes, ``False`` if not. (This is
-   implemented by calling ``getattr(object, name)`` and seeing whether it raises an
-   exception or not.)
+   The arguments are an object and a string.  The result is ``True`` if the
+   string is the name of one of the object's attributes, ``False`` if not. (This
+   is implemented by calling ``getattr(object, name)`` and seeing whether it
+   raises an :exc:`AttributeError` or not.)
 
 
 .. function:: hash(object)
@@ -489,13 +564,20 @@ are always available.  They are listed here in alphabetical order.
    expression.  If *x* is not a Python :class:`int` object, it has to define an
    :meth:`__index__` method that returns an integer.
 
+   .. note::
+
+      To obtain a hexadecimal string representation for a float, use the
+      :meth:`float.hex` method.
+
 
 .. function:: id(object)
 
    Return the "identity" of an object.  This is an integer which
    is guaranteed to be unique and constant for this object during its lifetime.
-   Two objects with non-overlapping lifetimes may have the same :func:`id` value.
-   (Implementation note: this is the address of the object.)
+   Two objects with non-overlapping lifetimes may have the same :func:`id`
+   value.
+
+   .. impl-detail:: This is the address of the object.
 
 
 .. function:: input([prompt])
@@ -514,7 +596,7 @@ are always available.  They are listed here in alphabetical order.
    to provide elaborate line editing and history features.
 
 
-.. function:: int([number | string[, radix]])
+.. function:: int([number | string[, base]])
 
    Convert a number or string to an integer.  If no arguments are given, return
    ``0``.  If a number is given, return ``number.__int__()``.  Conversion of
@@ -522,10 +604,10 @@ are always available.  They are listed here in alphabetical order.
    a base-radix integer literal optionally preceded by '+' or '-' (with no space
    in between) and optionally surrounded by whitespace.  A base-n literal
    consists of the digits 0 to n-1, with 'a' to 'z' (or 'A' to 'Z') having
-   values 10 to 35.  The default radix is 10. The allowed values are 0 and 2-36.
+   values 10 to 35.  The default *base* is 10. The allowed values are 0 and 2-36.
    Base-2, -8, and -16 literals can be optionally prefixed with ``0b``/``0B``,
-   ``0o``/``0O``, or ``0x``/``0X``, as with integer literals in code.  Radix 0
-   means to interpret exactly as a code literal, so that the actual radix is 2,
+   ``0o``/``0O``, or ``0x``/``0X``, as with integer literals in code.  Base 0
+   means to interpret exactly as a code literal, so that the actual base is 2,
    8, 10, or 16, and so that ``int('010', 0)`` is not legal, while
    ``int('010')`` is, as well as ``int('010', 8)``.
 
@@ -595,16 +677,12 @@ are always available.  They are listed here in alphabetical order.
 .. function:: locals()
 
    Update and return a dictionary representing the current local symbol table.
+   Free variables are returned by :func:`locals` when it is called in function
+   blocks, but not in class blocks.
 
    .. note::
-
       The contents of this dictionary should not be modified; changes may not
-      affect the values of local variables used by the interpreter.
-
-   Free variables are returned by :func:`locals` when it is called in a function
-   block.  Modifications of free variables may not affect the values used by the
-   interpreter.  Free variables are not returned in class blocks.
-
+      affect the values of local and free variables used by the interpreter.
 
 .. function:: map(function, iterable, ...)
 
@@ -625,6 +703,10 @@ are always available.  They are listed here in alphabetical order.
    The optional keyword-only *key* argument specifies a one-argument ordering
    function like that used for :meth:`list.sort`.
 
+   If multiple items are maximal, the function returns the first one
+   encountered.  This is consistent with other sort-stability preserving tools
+   such as ``sorted(iterable, key=keyfunc, reverse=True)[0]`` and
+   ``heapq.nlargest(1, iterable, key=keyfunc)``.
 
 .. function:: memoryview(obj)
    :noindex:
@@ -642,6 +724,10 @@ are always available.  They are listed here in alphabetical order.
    The optional keyword-only *key* argument specifies a one-argument ordering
    function like that used for :meth:`list.sort`.
 
+   If multiple items are minimal, the function returns the first one
+   encountered.  This is consistent with other sort-stability preserving tools
+   such as ``sorted(iterable, key=keyfunc)[0]`` and ``heapq.nsmallest(1,
+   iterable, key=keyfunc)``.
 
 .. function:: next(iterator[, default])
 
@@ -669,56 +755,71 @@ are always available.  They are listed here in alphabetical order.
    :meth:`__index__` method that returns an integer.
 
 
-.. function:: open(file, mode='r', buffering=None, encoding=None, errors=None, newline=None, closefd=True)
+.. function:: open(file, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True)
 
    Open *file* and return a corresponding stream.  If the file cannot be opened,
    an :exc:`IOError` is raised.
 
-   *file* is either a string or bytes object giving the name (and the path if
-   the file isn't in the current working directory) of the file to be opened or
+   *file* is either a string or bytes object giving the pathname (absolute or
+   relative to the current working directory) of the file to be opened or
    an integer file descriptor of the file to be wrapped.  (If a file descriptor
    is given, it is closed when the returned I/O object is closed, unless
    *closefd* is set to ``False``.)
 
    *mode* is an optional string that specifies the mode in which the file is
-   opened.  The available modes are:
+   opened.  It defaults to ``'r'`` which means open for reading in text mode.
+   Other common values are ``'w'`` for writing (truncating the file if it
+   already exists), and ``'a'`` for appending (which on *some* Unix systems,
+   means that *all* writes append to the end of the file regardless of the
+   current seek position).  In text mode, if *encoding* is not specified the
+   encoding used is platform dependent. (For reading and writing raw bytes use
+   binary mode and leave *encoding* unspecified.)  The available modes are:
 
    ========= ===============================================================
    Character Meaning
    --------- ---------------------------------------------------------------
    ``'r'``   open for reading (default)
-   ``'w'``   open for writing, truncating the file first if it exists
+   ``'w'``   open for writing, truncating the file first
    ``'a'``   open for writing, appending to the end of the file if it exists
-   ========= ===============================================================
-
-   Several characters can be appended that modify the given mode:
-
-   ========= ===============================================================
-   ``'t'``   text mode (default)
    ``'b'``   binary mode
-   ``'+'``   open for updating (reading and writing)
+   ``'t'``   text mode (default)
+   ``'+'``   open a disk file for updating (reading and writing)
    ``'U'``   universal newline mode (for backwards compatibility; should
              not be used in new code)
    ========= ===============================================================
 
-   The mode ``'w+'`` opens and truncates the file to 0 bytes, while ``'r+'``
-   opens the file without truncation.  On *some* Unix systems, append mode means
-   that *all* writes append to the end of the file regardless of the current
-   seek position.
+   The default mode is ``'r'`` (open for reading text, synonym of ``'rt'``).
+   For binary read-write access, the mode ``'w+b'`` opens and truncates the file
+   to 0 bytes.  ``'r+b'`` opens the file without truncation.
 
-   Python distinguishes between files opened in binary and text modes, even when
-   the underlying operating system doesn't.  Files opened in binary mode
-   (including ``'b'`` in the *mode* argument) return contents as ``bytes``
-   objects without any decoding.  In text mode (the default, or when ``'t'`` is
-   included in the *mode* argument), the contents of the file are returned as
-   strings, the bytes having been first decoded using the specified *encoding*.
-   If *encoding* is not specified, a platform-dependent default encoding is
-   used, see below.
+   As mentioned in the :ref:`io-overview`, Python distinguishes between binary
+   and text I/O.  Files opened in binary mode (including ``'b'`` in the *mode*
+   argument) return contents as :class:`bytes` objects without any decoding.  In
+   text mode (the default, or when ``'t'`` is included in the *mode* argument),
+   the contents of the file are returned as :class:`str`, the bytes having been
+   first decoded using a platform-dependent encoding or using the specified
+   *encoding* if given.
 
-   *buffering* is an optional integer used to set the buffering policy.  By
-   default full buffering is on.  Pass 0 to switch buffering off (only allowed
-   in binary mode), 1 to set line buffering, and an integer > 1 for full
-   buffering.
+   .. note::
+
+      Python doesn't depend on the underlying operating system's notion of text
+      files; all the the processing is done by Python itself, and is therefore
+      platform-independent.
+
+   *buffering* is an optional integer used to set the buffering policy.  Pass 0
+   to switch buffering off (only allowed in binary mode), 1 to select line
+   buffering (only usable in text mode), and an integer > 1 to indicate the size
+   of a fixed-size chunk buffer.  When no *buffering* argument is given, the
+   default buffering policy works as follows:
+
+   * Binary files are buffered in fixed-size chunks; the size of the buffer is
+     chosen using a heuristic trying to determine the underlying device's "block
+     size" and falling back on :attr:`io.DEFAULT_BUFFER_SIZE`.  On many systems,
+     the buffer will typically be 4096 or 8192 bytes long.
+
+   * "Interactive" text files (files for which :meth:`isatty` returns True) use
+     line buffering.  Other text files use the policy described above for binary
+     files.
 
    *encoding* is the name of the encoding used to decode or encode the file.
    This should only be used in text mode.  The default encoding is platform
@@ -790,14 +891,14 @@ are always available.  They are listed here in alphabetical order.
 .. XXX works for bytes too, but should it?
 .. function:: ord(c)
 
-   Given a string of length one, return an integer representing the Unicode code
-   point of the character.  For example, ``ord('a')`` returns the integer ``97``
+   Given a string representing one Uncicode character, return an integer
+   representing the Unicode code
+   point of that character.  For example, ``ord('a')`` returns the integer ``97``
    and ``ord('\u2020')`` returns ``8224``.  This is the inverse of :func:`chr`.
 
-   If the argument length is not one, a :exc:`TypeError` will be raised.  (If
-   Python was built with UCS2 Unicode, then the character's code point must be
-   in the range [0..65535] inclusive; otherwise the string length is two!)
-
+   On wide Unicode builds, if the argument length is not one, a
+   :exc:`TypeError` will be raised.  On narrow Unicode builds, strings
+   of length two are accepted when they form a UTF-16 surrogate pair.
 
 .. function:: pow(x, y[, z])
 
@@ -837,9 +938,9 @@ are always available.  They are listed here in alphabetical order.
 
    *fget* is a function for getting an attribute value, likewise *fset* is a
    function for setting, and *fdel* a function for del'ing, an attribute.  Typical
-   use is to define a managed attribute x::
+   use is to define a managed attribute ``x``::
 
-      class C(object):
+      class C:
           def __init__(self):
               self._x = None
 
@@ -851,11 +952,14 @@ are always available.  They are listed here in alphabetical order.
               del self._x
           x = property(getx, setx, delx, "I'm the 'x' property.")
 
+   If then *c* is an instance of *C*, ``c.x`` will invoke the getter,
+   ``c.x = value`` will invoke the setter and ``del c.x`` the deleter.
+
    If given, *doc* will be the docstring of the property attribute. Otherwise, the
    property will copy *fget*'s docstring (if it exists).  This makes it possible to
    create read-only properties easily using :func:`property` as a :term:`decorator`::
 
-      class Parrot(object):
+      class Parrot:
           def __init__(self):
               self._voltage = 100000
 
@@ -872,7 +976,7 @@ are always available.  They are listed here in alphabetical order.
    corresponding accessor function set to the decorated function.  This is
    best explained with an example::
 
-      class C(object):
+      class C:
           def __init__(self):
               self._x = None
 
@@ -925,6 +1029,35 @@ are always available.  They are listed here in alphabetical order.
       >>> list(range(1, 0))
       []
 
+   Range objects implement the :class:`collections.Sequence` ABC, and provide
+   features such as containment tests, element index lookup, slicing and
+   support for negative indices:
+
+      >>> r = range(0, 20, 2)
+      >>> r
+      range(0, 20, 2)
+      >>> 11 in r
+      False
+      >>> 10 in r
+      True
+      >>> r.index(10)
+      5
+      >>> r[5]
+      10
+      >>> r[:5]
+      range(0, 10, 2)
+      >>> r[-1]
+      18
+
+   Ranges containing absolute values larger than :data:`sys.maxsize` are permitted
+   but some features (such as :func:`len`) will raise :exc:`OverflowError`.
+
+   .. versionchanged:: 3.2
+      Implement the Sequence ABC.
+      Support slicing and negative indices.
+      Test integers for membership in constant time instead of iterating
+      through all items.
+
 
 .. function:: repr(object)
 
@@ -958,11 +1091,18 @@ are always available.  They are listed here in alphabetical order.
    The return value is an integer if called with one argument, otherwise of the
    same type as *x*.
 
+   .. note::
+
+      The behavior of :func:`round` for floats can be surprising: for example,
+      ``round(2.675, 2)`` gives ``2.67`` instead of the expected ``2.68``.
+      This is not a bug: it's a result of the fact that most decimal fractions
+      can't be represented exactly as a float.  See :ref:`tut-fp-issues` for
+      more information.
 
 .. function:: set([iterable])
    :noindex:
 
-   Return a new set, optionally with elements are taken from *iterable*.
+   Return a new set, optionally with elements taken from *iterable*.
    The set type is described in :ref:`types-set`.
 
 
@@ -997,14 +1137,17 @@ are always available.  They are listed here in alphabetical order.
    Has two optional arguments which must be specified as keyword arguments.
 
    *key* specifies a function of one argument that is used to extract a comparison
-   key from each list element: ``key=str.lower``.  The default value is ``None``.
+   key from each list element: ``key=str.lower``.  The default value is ``None``
+   (compare the elements directly).
 
    *reverse* is a boolean value.  If set to ``True``, then the list elements are
    sorted as if each comparison were reversed.
 
-   To convert an old-style *cmp* function to a *key* function, see the
-   `CmpToKey recipe in the ASPN cookbook
-   <http://code.activestate.com/recipes/576653/>`_\.
+   Use :func:`functools.cmp_to_key` to convert an old-style *cmp* function to a
+   *key* function.
+
+   For sorting examples and a brief sorting tutorial, see `Sorting HowTo
+   <http://wiki.python.org/moin/HowTo/Sorting/>`_\.
 
 .. function:: staticmethod(function)
 
@@ -1066,10 +1209,13 @@ are always available.  They are listed here in alphabetical order.
 
    Sums *start* and the items of an *iterable* from left to right and returns the
    total.  *start* defaults to ``0``. The *iterable*'s items are normally numbers,
-   and are not allowed to be strings.  The fast, correct way to concatenate a
-   sequence of strings is by calling ``''.join(sequence)``.  To add floating
-   point values with extended precision, see :func:`math.fsum`\.
+   and the start value is not allowed to be a string.
 
+   For some use cases, there are good alternatives to :func:`sum`.
+   The preferred, fast way to concatenate a sequence of strings is by calling
+   ``''.join(sequence)``.  To add floating point values with extended precision,
+   see :func:`math.fsum`\.  To concatenate a series of iterables, consider using
+   :func:`itertools.chain`.
 
 .. function:: super([type[, object-or-type]])
 
@@ -1159,7 +1305,7 @@ are always available.  They are listed here in alphabetical order.
    attribute.  For example, the following two statements create identical
    :class:`type` objects:
 
-      >>> class X(object):
+      >>> class X:
       ...     a = 1
       ...
       >>> X = type('X', (object,), dict(a=1))
@@ -1167,10 +1313,10 @@ are always available.  They are listed here in alphabetical order.
 
 .. function:: vars([object])
 
-   Without arguments, return a dictionary corresponding to the current local symbol
-   table.  With a module, class or class instance object as argument (or anything
-   else that has a :attr:`__dict__` attribute), returns a dictionary corresponding
-   to the object's symbol table.
+   Without an argument, act like :func:`locals`.
+
+   With a module, class or class instance object as argument (or anything else that
+   has a :attr:`__dict__` attribute), return that attribute.
 
    .. note::
       The returned dictionary should not be modified:
@@ -1186,11 +1332,18 @@ are always available.  They are listed here in alphabetical order.
    iterable argument, it returns an iterator of 1-tuples.  With no arguments,
    it returns an empty iterator.  Equivalent to::
 
-      def zip(*iterables):
-          # zip('ABCD', 'xy') --> Ax By
-          iterables = map(iter, iterables)
-          while iterables:
-              yield tuple(map(next, iterables))
+        def zip(*iterables):
+            # zip('ABCD', 'xy') --> Ax By
+            sentinel = object()
+            iterables = [iter(it) for it in iterables]
+            while iterables:
+                result = []
+                for it in iterables:
+                    elem = next(it, sentinel)
+                    if elem is sentinel:
+                        return
+                    result.append(elem)
+                yield tuple(result)
 
    The left-to-right evaluation order of the iterables is guaranteed. This
    makes possible an idiom for clustering a data series into n-length groups
@@ -1213,7 +1366,7 @@ are always available.  They are listed here in alphabetical order.
       True
 
 
-.. function:: __import__(name, globals={}, locals={}, fromlist=[], level=-1)
+.. function:: __import__(name, globals={}, locals={}, fromlist=[], level=0)
 
    .. index::
       statement: import

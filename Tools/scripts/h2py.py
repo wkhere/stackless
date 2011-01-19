@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # Read #define's and translate to Python code.
 # Handle #include statements.
@@ -49,13 +49,7 @@ except KeyError:
     try:
         searchdirs=os.environ['INCLUDE'].split(';')
     except KeyError:
-        try:
-            if sys.platform.startswith("atheos"):
-                searchdirs=os.environ['C_INCLUDE_PATH'].split(':')
-            else:
-                raise KeyError
-        except KeyError:
-            searchdirs=['/usr/include']
+        searchdirs=['/usr/include']
 
 def main():
     global filedict
@@ -93,7 +87,7 @@ def pytify(body):
     for p in ignores:
         body = p.sub(' ', body)
     # replace char literals by ord(...)
-    body = p_char.sub('ord(\\0)', body)
+    body = p_char.sub("ord('\\1')", body)
     # Compute negative hexadecimal constants
     start = 0
     UMAX = 2*(sys.maxsize+1)

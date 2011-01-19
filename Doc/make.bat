@@ -34,10 +34,10 @@ echo.
 goto end
 
 :checkout
-svn co %SVNROOT%/external/Sphinx-0.6.1/sphinx tools/sphinx
-svn co %SVNROOT%/external/docutils-0.5/docutils tools/docutils
-svn co %SVNROOT%/external/Jinja-2.1.1/jinja2 tools/jinja2
-svn co %SVNROOT%/external/Pygments-0.11.1/pygments tools/pygments
+svn co %SVNROOT%/external/Sphinx-1.0.7/sphinx tools/sphinx
+svn co %SVNROOT%/external/docutils-0.6/docutils tools/docutils
+svn co %SVNROOT%/external/Jinja-2.3.1/jinja2 tools/jinja2
+svn co %SVNROOT%/external/Pygments-1.3.1/pygments tools/pygments
 goto end
 
 :update

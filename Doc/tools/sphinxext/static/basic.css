@@ -5,15 +5,6 @@
 
 /* -- main layout ----------------------------------------------------------- */
 
-div.documentwrapper {
-    float: left;
-    width: 100%;
-}
-
-div.bodywrapper {
-    margin: 0 0 0 230px;
-}
-
 div.clearer {
     clear: both;
 }
@@ -262,8 +253,8 @@ table.docutils {
 
 table.docutils td, table.docutils th {
     padding: 2px 5px 2px 5px;
-    border-left: 0;    
-    background-color: #eef;    
+    border-left: 0;
+    background-color: #eef;
 }
 
 table.field-list td, table.field-list th {
@@ -275,7 +266,7 @@ table.footnote td, table.footnote th {
 }
 
 table.docutils th {
-    border-top: 1px solid #cac;    
+    border-top: 1px solid #cac;
     background-color: #ede;
 }
 
@@ -285,7 +276,7 @@ th {
 }
 
 th.head {
-    text-align: center;    
+    text-align: center;
 }
 
 /* -- other body styles ----------------------------------------------------- */
@@ -338,6 +329,12 @@ dl.glossary dt {
     font-style: italic;
 }
 
+p.deprecated, p.deprecated-removed {
+    background-color: #ffe4e4;
+    border: 1px solid #f66;
+    padding: 7px
+}
+
 .system-message {
     background-color: #fda;
     padding: 5px;
@@ -345,13 +342,29 @@ dl.glossary dt {
 }
 
 .footnote:target  {
-    background-color: #ffa
+    background-color: #ffa;
+}
+
+.impl-detail {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 7px;
+    border: 1px solid #ccc;
+}
+
+.impl-detail .compound-first {
+    margin-top: 0;
+}
+
+.impl-detail .compound-last {
+    margin-bottom: 0;
 }
 
 /* -- code displays --------------------------------------------------------- */
 
 pre {
     overflow: auto;
+    overflow-y: hidden;
 }
 
 td.linenos pre {
@@ -394,7 +407,7 @@ img.math {
     vertical-align: middle;
 }
 
-div.math p {
+div.body div.math p {
     text-align: center;
 }
 
@@ -408,7 +421,7 @@ span.eqno {
     div.document,
     div.documentwrapper,
     div.bodywrapper {
-        margin: 0;
+        margin: 0 !important;
         width: 100%;
     }
 

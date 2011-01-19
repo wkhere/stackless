@@ -14,7 +14,7 @@ __author__ = "Guido van Rossum <guido@python.org>"
 import os
 
 # Fairly local imports
-from .pgen2 import driver, literals, token, tokenize, parse
+from .pgen2 import driver, literals, token, tokenize, parse, grammar
 
 # Really local imports
 from . import pytree
@@ -52,14 +52,17 @@ class PatternCompiler(object):
         self.pysyms = pygram.python_symbols
         self.driver = driver.Driver(self.grammar, convert=pattern_convert)
 
-    def compile_pattern(self, input, debug=False):
+    def compile_pattern(self, input, debug=False, with_tree=False):
         """Compiles a pattern string to a nested pytree.*Pattern object."""
         tokens = tokenize_wrapper(input)
         try:
             root = self.driver.parse_tokens(tokens, debug=debug)
         except parse.ParseError as e:
             raise PatternSyntaxError(str(e))
-        return self.compile_node(root)
+        if with_tree:
+            return self.compile_node(root), root
+        else:
+            return self.compile_node(root)
 
     def compile_node(self, node):
         """Compiles a node, recursively.
@@ -138,7 +141,7 @@ class PatternCompiler(object):
         node = nodes[0]
         if node.type == token.STRING:
             value = str(literals.evalString(node.value))
-            return pytree.LeafPattern(content=value)
+            return pytree.LeafPattern(_type_of_literal(value), value)
         elif node.type == token.NAME:
             value = node.value
             if value.isupper():
@@ -177,6 +180,15 @@ TOKEN_MAP = {"NAME": token.NAME,
              "STRING": token.STRING,
              "NUMBER": token.NUMBER,
              "TOKEN": None}
+
+
+def _type_of_literal(value):
+    if value[0].isalpha():
+        return token.NAME
+    elif value in grammar.opmap:
+        return grammar.opmap[value]
+    else:
+        return None
 
 
 def pattern_convert(grammar, raw_node_info):

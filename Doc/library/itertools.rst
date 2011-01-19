@@ -22,7 +22,7 @@ algebra" making it possible to construct specialized tools succinctly and
 efficiently in pure Python.
 
 For instance, SML provides a tabulation tool: ``tabulate(f)`` which produces a
-sequence ``f(0), f(1), ...``.  But, this effect can be achieved in Python
+sequence ``f(0), f(1), ...``.  The same effect can be achieved in Python
 by combining :func:`map` and :func:`count` to form ``map(f, count())``.
 
 These tools and their built-in counterparts also work well with the high-speed
@@ -46,16 +46,17 @@ Iterator            Arguments               Results                             
 ====================    ============================    =================================================   =============================================================
 Iterator                Arguments                       Results                                             Example
 ====================    ============================    =================================================   =============================================================
+:func:`accumulate`      p                               p0, p0+p1, p0+p1+p2, ...                            ``accumulate([1,2,3,4,5]) --> 1 3 6 10 15``
 :func:`chain`           p, q, ...                       p0, p1, ... plast, q0, q1, ...                      ``chain('ABC', 'DEF') --> A B C D E F``
 :func:`compress`        data, selectors                 (d[0] if s[0]), (d[1] if s[1]), ...                 ``compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F``
 :func:`dropwhile`       pred, seq                       seq[n], seq[n+1], starting when pred fails          ``dropwhile(lambda x: x<5, [1,4,6,4,1]) --> 6 4 1``
-:func:`filterfalse`     pred, seq                       elements of seq where pred(elem) is False           ``ifilterfalse(lambda x: x%2, range(10)) --> 0 2 4 6 8``
+:func:`filterfalse`     pred, seq                       elements of seq where pred(elem) is False           ``filterfalse(lambda x: x%2, range(10)) --> 0 2 4 6 8``
 :func:`groupby`         iterable[, keyfunc]             sub-iterators grouped by value of keyfunc(v)
 :func:`islice`          seq, [start,] stop [, step]     elements from seq[start:stop:step]                  ``islice('ABCDEFG', 2, None) --> C D E F G``
 :func:`starmap`         func, seq                       func(\*seq[0]), func(\*seq[1]), ...                 ``starmap(pow, [(2,5), (3,2), (10,3)]) --> 32 9 1000``
 :func:`takewhile`       pred, seq                       seq[0], seq[1], until pred fails                    ``takewhile(lambda x: x<5, [1,4,6,4,1]) --> 1 4``
 :func:`tee`             it, n                           it1, it2 , ... itn  splits one iterator into n
-:func:`zip_longest`     p, q, ...                       (p[0], q[0]), (p[1], q[1]), ...                     ``izip_longest('ABCD', 'xy', fillvalue='-') --> Ax By C- D-``
+:func:`zip_longest`     p, q, ...                       (p[0], q[0]), (p[1], q[1]), ...                     ``zip_longest('ABCD', 'xy', fillvalue='-') --> Ax By C- D-``
 ====================    ============================    =================================================   =============================================================
 
 **Combinatoric generators:**
@@ -65,9 +66,8 @@ Iterator                                         Arguments                  Resu
 ==============================================   ====================       =============================================================
 :func:`product`                                  p, q, ... [repeat=1]       cartesian product, equivalent to a nested for-loop
 :func:`permutations`                             p[, r]                     r-length tuples, all possible orderings, no repeated elements
-:func:`combinations`                             p[, r]                     r-length tuples, in sorted order, no repeated elements
-:func:`combinations_with_replacement`            p[, r]                     r-length tuples, in sorted order, with repeated elements
-|
+:func:`combinations`                             p, r                       r-length tuples, in sorted order, no repeated elements
+:func:`combinations_with_replacement`            p, r                       r-length tuples, in sorted order, with repeated elements
 ``product('ABCD', repeat=2)``                                               ``AA AB AC AD BA BB BC BD CA CB CC CD DA DB DC DD``
 ``permutations('ABCD', 2)``                                                 ``AB AC AD BA BC BD CA CB CD DA DB DC``
 ``combinations('ABCD', 2)``                                                 ``AB AC AD BC BD CD``
@@ -84,6 +84,22 @@ The following module functions all construct and return iterators. Some provide
 streams of infinite length, so they should only be accessed by functions or
 loops that truncate the stream.
 
+.. function:: accumulate(iterable)
+
+    Make an iterator that returns accumulated sums. Elements may be any addable
+    type including :class:`Decimal` or :class:`Fraction`.  Equivalent to::
+
+        def accumulate(iterable):
+            'Return running totals'
+            # accumulate([1,2,3,4,5]) --> 1 3 6 10 15
+            it = iter(iterable)
+            total = next(it)
+            yield total
+            for element in it:
+                total = total + element
+                yield total
+
+    .. versionadded:: 3.2
 
 .. function:: chain(*iterables)
 
@@ -99,7 +115,7 @@ loops that truncate the stream.
                   yield element
 
 
-.. function:: itertools.chain.from_iterable(iterable)
+.. classmethod:: chain.from_iterable(iterable)
 
    Alternate constructor for :func:`chain`.  Gets chained inputs from a
    single iterable argument that is evaluated lazily.  Equivalent to::
@@ -207,6 +223,7 @@ loops that truncate the stream.
 
    .. versionadded:: 3.1
 
+
 .. function:: compress(data, selectors)
 
    Make an iterator that filters elements from *data* returning only those that
@@ -229,7 +246,7 @@ loops that truncate the stream.
 
       def count(start=0, step=1):
           # count(10) --> 10 11 12 13 14 ...
-          # count(2.5, 0.5) -> 3.5 3.0 4.5 ...
+          # count(2.5, 0.5) -> 2.5 3.0 3.5 ...
           n = start
           while True:
               yield n
@@ -240,7 +257,7 @@ loops that truncate the stream.
    for i in count())``.
 
    .. versionchanged:: 3.1
-      added *step* argument and allowed non-integer arguments.
+      Added *step* argument and allowed non-integer arguments.
 
 .. function:: cycle(iterable)
 
@@ -322,7 +339,7 @@ loops that truncate the stream.
 
    :func:`groupby` is equivalent to::
 
-      class groupby(object):
+      class groupby:
           # [k for k, g in groupby('AAAABBBCCDAABBB')] --> A B C D A B
           # [list(g) for k, g in groupby('AAAABBBCCD')] --> AAAA BBB CC D
           def __init__(self, iterable, key=None):
@@ -455,7 +472,7 @@ loops that truncate the stream.
        def product(*args, repeat=1):
            # product('ABCD', 'xy') --> Ax Ay Bx By Cx Cy Dx Dy
            # product(range(2), repeat=3) --> 000 001 010 011 100 101 110 111
-           pools = map(tuple, args) * repeat
+           pools = [tuple(pool) for pool in args] * repeat
            result = [[]]
            for pool in pools:
                result = [x+[y] for x in result for y in pool]
@@ -560,8 +577,8 @@ loops that truncate the stream.
 
 .. _itertools-recipes:
 
-Recipes
--------
+Itertools Recipes
+-----------------
 
 This section shows recipes for creating an extended toolset using the existing
 itertools as building blocks.
@@ -580,16 +597,19 @@ which incur interpreter overhead.
        "Return first n items of the iterable as a list"
        return list(islice(iterable, n))
 
-   def enumerate(iterable, start=0):
-       return zip(count(start), iterable)
-
    def tabulate(function, start=0):
        "Return function(0), function(1), ..."
        return map(function, count(start))
 
    def consume(iterator, n):
        "Advance the iterator n-steps ahead. If n is none, consume entirely."
-       collections.deque(islice(iterator, n), maxlen=0)
+       # Use functions that consume iterators at C speed.
+       if n is None:
+           # feed the entire iterator into a zero-length deque
+           collections.deque(iterator, maxlen=0)
+       else:
+           # advance to the empty slice starting at position n
+           next(islice(iterator, n, n), None)
 
    def nth(iterable, n, default=None):
        "Returns the nth item or a default value"
@@ -608,13 +628,14 @@ which incur interpreter overhead.
 
    def ncycles(iterable, n):
        "Returns the sequence elements n times"
-       return chain.from_iterable(repeat(iterable, n))
+       return chain.from_iterable(repeat(tuple(iterable), n))
 
    def dotproduct(vec1, vec2):
        return sum(map(operator.mul, vec1, vec2))
 
    def flatten(listOfLists):
-       return list(chain.from_iterable(listOfLists))
+       "Flatten one level of nesting"
+       return chain.from_iterable(listOfLists)
 
    def repeatfunc(func, times=None, *args):
        """Repeat calls to func with specified arguments.
@@ -649,6 +670,12 @@ which incur interpreter overhead.
                pending -= 1
                nexts = cycle(islice(nexts, pending))
 
+   def partition(pred, iterable):
+       'Use a predicate to partition entries into false entries and true entries'
+       # partition(is_odd, range(10)) --> 0 2 4 6 8   and  1 3 5 7 9
+       t1, t2 = tee(iterable)
+       return filterfalse(pred, t1), filter(pred, t2)
+
    def powerset(iterable):
        "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
        s = list(iterable)
@@ -661,10 +688,9 @@ which incur interpreter overhead.
        seen = set()
        seen_add = seen.add
        if key is None:
-           for element in iterable:
-               if element not in seen:
-                   seen_add(element)
-                   yield element
+           for element in filterfalse(seen.__contains__, iterable):
+               seen_add(element)
+               yield element
        else:
            for element in iterable:
                k = key(element)
@@ -677,3 +703,58 @@ which incur interpreter overhead.
        # unique_justseen('AAAABBBCCDAABBB') --> A B C D A B
        # unique_justseen('ABBCcAD', str.lower) --> A B C A D
        return map(next, map(itemgetter(1), groupby(iterable, key)))
+
+   def iter_except(func, exception, first=None):
+       """ Call a function repeatedly until an exception is raised.
+
+       Converts a call-until-exception interface to an iterator interface.
+       Like __builtin__.iter(func, sentinel) but uses an exception instead
+       of a sentinel to end the loop.
+
+       Examples:
+           iter_except(functools.partial(heappop, h), IndexError)   # priority queue iterator
+           iter_except(d.popitem, KeyError)                         # non-blocking dict iterator
+           iter_except(d.popleft, IndexError)                       # non-blocking deque iterator
+           iter_except(q.get_nowait, Queue.Empty)                   # loop over a producer Queue
+           iter_except(s.pop, KeyError)                             # non-blocking set iterator
+
+       """
+       try:
+           if first is not None:
+               yield first()            # For database APIs needing an initial cast to db.first()
+           while 1:
+               yield func()
+       except exception:
+           pass
+
+   def random_product(*args, repeat=1):
+       "Random selection from itertools.product(*args, **kwds)"
+       pools = [tuple(pool) for pool in args] * repeat
+       return tuple(random.choice(pool) for pool in pools)
+
+   def random_permutation(iterable, r=None):
+       "Random selection from itertools.permutations(iterable, r)"
+       pool = tuple(iterable)
+       r = len(pool) if r is None else r
+       return tuple(random.sample(pool, r))
+
+   def random_combination(iterable, r):
+       "Random selection from itertools.combinations(iterable, r)"
+       pool = tuple(iterable)
+       n = len(pool)
+       indices = sorted(random.sample(range(n), r))
+       return tuple(pool[i] for i in indices)
+
+   def random_combination_with_replacement(iterable, r):
+       "Random selection from itertools.combinations_with_replacement(iterable, r)"
+       pool = tuple(iterable)
+       n = len(pool)
+       indices = sorted(random.randrange(n) for i in range(r))
+       return tuple(pool[i] for i in indices)
+
+Note, many of the above recipes can be optimized by replacing global lookups
+with local variables defined as default values.  For example, the
+*dotproduct* recipe can be written as::
+
+   def dotproduct(vec1, vec2, sum=sum, map=map, mul=operator.mul):
+       return sum(map(mul, vec1, vec2))

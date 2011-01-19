@@ -45,7 +45,7 @@ Using Tix
 ---------
 
 
-.. class:: Tix(screenName[, baseName[, className]])
+.. class:: Tk(screenName=None, baseName=None, className='Tix')
 
    Toplevel widget of Tix which represents mostly the main window of an
    application. It has an associated Tcl interpreter.
@@ -84,11 +84,7 @@ Tix Widgets
 -----------
 
 `Tix <http://tix.sourceforge.net/dist/current/man/html/TixCmd/TixIntro.htm>`_
-introduces over 40 widget classes to the :mod:`Tkinter`  repertoire.  There is a
-demo of all the :mod:`tkinter.tix` widgets in the :file:`Demo/tix` directory of
-the standard distribution.
-
-.. The Python sample code is still being added to Python, hence commented out
+introduces over 40 widget classes to the :mod:`tkinter` repertoire.
 
 
 Basic Widgets
@@ -122,7 +118,7 @@ Basic Widgets
    The `ComboBox
    <http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixComboBox.htm>`_
    widget is similar to the combo box control in MS Windows. The user can select a
-   choice by either typing in the entry subwdget or selecting from the listbox
+   choice by either typing in the entry subwidget or selecting from the listbox
    subwidget.
 
 .. Python Demo of:

@@ -232,7 +232,7 @@ class build_ext(Command):
 
             elif MSVC_VERSION == 8:
                 self.library_dirs.append(os.path.join(sys.exec_prefix,
-                                         'PC', 'VS8.0', 'win32release'))
+                                         'PC', 'VS8.0'))
             elif MSVC_VERSION == 7:
                 self.library_dirs.append(os.path.join(sys.exec_prefix,
                                          'PC', 'VS7.1'))
@@ -328,7 +328,7 @@ class build_ext(Command):
 
         # Setup the CCompiler object that we'll use to do all the
         # compiling and linking
-        self.compiler = new_compiler(compiler=None,
+        self.compiler = new_compiler(compiler=self.compiler,
                                      verbose=self.verbose,
                                      dry_run=self.dry_run,
                                      force=self.force)
@@ -648,18 +648,24 @@ class build_ext(Command):
         (inplace option).
         """
         fullname = self.get_ext_fullname(ext_name)
-        filename = self.get_ext_filename(fullname)
+        modpath = fullname.split('.')
+        filename = self.get_ext_filename(modpath[-1])
+
         if not self.inplace:
             # no further work needed
+            # returning :
+            #   build_dir/package/path/filename
+            filename = os.path.join(*modpath[:-1]+[filename])
             return os.path.join(self.build_lib, filename)
 
         # the inplace option requires to find the package directory
-        # using the build_py command
-        modpath = fullname.split('.')
+        # using the build_py command for that
         package = '.'.join(modpath[0:-1])
-        base = modpath[-1]
         build_py = self.get_finalized_command('build_py')
         package_dir = os.path.abspath(build_py.get_package_dir(package))
+
+        # returning
+        #   package_dir/filename
         return os.path.join(package_dir, filename)
 
     def get_ext_fullname(self, ext_name):
@@ -691,7 +697,7 @@ class build_ext(Command):
         """Return the list of symbols that a shared extension has to
         export.  This either uses 'ext.export_symbols' or, if it's not
         provided, "PyInit_" + module_name.  Only relevant on Windows, where
-        the .pyd file (DLL) must export the module "init" function.
+        the .pyd file (DLL) must export the module "PyInit_" function.
         """
         initfunc_name = "PyInit_" + ext.name.split('.')[-1]
         if initfunc_name not in ext.export_symbols:
@@ -760,12 +766,15 @@ class build_ext(Command):
         elif sys.platform == 'darwin':
             # Don't use the default code below
             return ext.libraries
+        elif sys.platform[:3] == 'aix':
+            # Don't use the default code below
+            return ext.libraries
         else:
             from distutils import sysconfig
             if sysconfig.get_config_var('Py_ENABLE_SHARED'):
-                template = "python%d.%d"
-                pythonlib = (template %
-                             (sys.hexversion >> 24, (sys.hexversion >> 16) & 0xff))
+                pythonlib = 'python{}.{}{}'.format(
+                    sys.hexversion >> 24, (sys.hexversion >> 16) & 0xff,
+                    sys.abiflags)
                 return ext.libraries + [pythonlib]
             else:
                 return ext.libraries

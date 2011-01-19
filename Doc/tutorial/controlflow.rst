@@ -87,7 +87,6 @@ The :func:`range` Function
 If you do need to iterate over a sequence of numbers, the built-in function
 :func:`range` comes in handy.  It generates arithmetic progressions::
 
-
     >>> for i in range(5):
     ...     print(i)
     ...
@@ -97,9 +96,7 @@ If you do need to iterate over a sequence of numbers, the built-in function
     3
     4
 
-
-
-The given end point is never part of the generated list; ``range(10)`` generates
+The given end point is never part of the generated sequence; ``range(10)`` generates
 10 values, the legal indices for items of a sequence of length 10.  It
 is possible to let the range start at another number, or to specify a different
 increment (even negative; sometimes this is called the 'step')::
@@ -225,14 +222,14 @@ boundary::
    >>> def fib(n):    # write Fibonacci series up to n
    ...     """Print a Fibonacci series up to n."""
    ...     a, b = 0, 1
-   ...     while b < n:
-   ...         print(b, end=' ')
+   ...     while a < n:
+   ...         print(a, end=' ')
    ...         a, b = b, a+b
    ...     print()
    ...
    >>> # Now call the function we just defined:
    ... fib(2000)
-   1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
+   0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
 
 .. index::
    single: documentation strings
@@ -276,7 +273,7 @@ mechanism::
    <function fib at 10042ed0>
    >>> f = fib
    >>> f(100)
-   1 1 2 3 5 8 13 21 34 55 89
+   0 1 1 2 3 5 8 13 21 34 55 89
 
 Coming from other languages, you might object that ``fib`` is not a function but
 a procedure since it doesn't return a value.  In fact, even functions without a
@@ -296,14 +293,14 @@ Fibonacci series, instead of printing it::
    ...     """Return a list containing the Fibonacci series up to n."""
    ...     result = []
    ...     a, b = 0, 1
-   ...     while b < n:
-   ...         result.append(b)    # see below
+   ...     while a < n:
+   ...         result.append(a)    # see below
    ...         a, b = b, a+b
    ...     return result
    ...
    >>> f100 = fib2(100)    # call it
    >>> f100                # write the result
-   [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
+   [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
 
 This example, as usual, demonstrates some new Python features:
 
@@ -311,7 +308,7 @@ This example, as usual, demonstrates some new Python features:
   :keyword:`return` without an expression argument returns ``None``. Falling off
   the end of a function also returns ``None``.
 
-* The statement ``result.append(b)`` calls a *method* of the list object
+* The statement ``result.append(a)`` calls a *method* of the list object
   ``result``.  A method is a function that 'belongs' to an object and is named
   ``obj.methodname``, where ``obj`` is some object (this may be an expression),
   and ``methodname`` is the name of a method that is defined by the object's type.
@@ -320,7 +317,7 @@ This example, as usual, demonstrates some new Python features:
   object types and methods, using *classes*, see :ref:`tut-classes`)
   The method :meth:`append` shown in the example is defined for list objects; it
   adds a new element at the end of the list.  In this example it is equivalent to
-  ``result = result + [b]``, but more efficient.
+  ``result = result + [a]``, but more efficient.
 
 
 .. _tut-defining:
@@ -461,10 +458,12 @@ function like this::
    def cheeseshop(kind, *arguments, **keywords):
        print("-- Do you have any", kind, "?")
        print("-- I'm sorry, we're all out of", kind)
-       for arg in arguments: print(arg)
+       for arg in arguments:
+           print(arg)
        print("-" * 40)
        keys = sorted(keywords.keys())
-       for kw in keys: print(kw, ":", keywords[kw])
+       for kw in keys:
+           print(kw, ":", keywords[kw])
 
 It could be called like this::
 

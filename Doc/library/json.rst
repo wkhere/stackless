@@ -82,12 +82,12 @@ Extending :class:`JSONEncoder`::
     ...             return [obj.real, obj.imag]
     ...         return json.JSONEncoder.default(self, obj)
     ...
-    >>> dumps(2 + 1j, cls=ComplexEncoder)
+    >>> json.dumps(2 + 1j, cls=ComplexEncoder)
     '[2.0, 1.0]'
     >>> ComplexEncoder().encode(2 + 1j)
     '[2.0, 1.0]'
     >>> list(ComplexEncoder().iterencode(2 + 1j))
-    ['[', '2.0', ', ', '1.0', ']']
+    ['[2.0', ', 1.0', ']']
 
 
 .. highlight:: none
@@ -118,7 +118,7 @@ Basic Usage
    file-like object).
 
    If *skipkeys* is ``True`` (default: ``False``), then dict keys that are not
-   of a basic type (:class:`str`, :class:`unicode`, :class:`int`,
+   of a basic type (:class:`bytes`, :class:`str`, :class:`int`,
    :class:`float`, :class:`bool`, ``None``) will be skipped instead of raising a
    :exc:`TypeError`.
 
@@ -135,10 +135,12 @@ Basic Usage
    ``inf``, ``-inf``) in strict compliance of the JSON specification, instead of
    using the JavaScript equivalents (``NaN``, ``Infinity``, ``-Infinity``).
 
-   If *indent* is a non-negative integer, then JSON array elements and object
-   members will be pretty-printed with that indent level.  An indent level of 0
-   will only insert newlines.  ``None`` (the default) selects the most compact
-   representation.
+   If *indent* is a non-negative integer or string, then JSON array elements and
+   object members will be pretty-printed with that indent level.  An indent level
+   of 0 or ``""`` will only insert newlines.  ``None`` (the default) selects the
+   most compact representation. Using an integer indent indents that many spaces
+   per level.  If *indent* is a string (such at '\t'), that string is used to indent
+   each level.
 
    If *separators* is an ``(item_separator, dict_separator)`` tuple, then it
    will be used instead of the default ``(', ', ': ')`` separators.  ``(',',
@@ -149,7 +151,7 @@ Basic Usage
 
    To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
    :meth:`default` method to serialize additional types), specify it with the
-   *cls* kwarg.
+   *cls* kwarg; otherwise :class:`JSONEncoder` is used.
 
 
 .. function:: dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, **kw)
@@ -195,21 +197,21 @@ Basic Usage
    are encountered.
 
    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
-   kwarg.  Additional keyword arguments will be passed to the constructor of the
-   class.
+   kwarg; otherwise :class:`JSONDecoder` is used.  Additional keyword arguments
+   will be passed to the constructor of the class.
 
 
 .. function:: loads(s, encoding=None, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, object_pairs_hook=None, **kw)
 
-   Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
+   Deserialize *s* (a :class:`bytes` or :class:`str` instance containing a JSON
    document) to a Python object.
 
-   If *s* is a :class:`str` instance and is encoded with an ASCII based encoding
+   If *s* is a :class:`bytes` instance and is encoded with an ASCII based encoding
    other than UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be
    specified.  Encodings that are not ASCII based (such as UCS-2) are not
-   allowed and should be decoded to :class:`unicode` first.
+   allowed and should be decoded to :class:`str` first.
 
-   The other arguments have the same meaning as in :func:`dump`.
+   The other arguments have the same meaning as in :func:`load`.
 
 
 Encoders and decoders
@@ -275,6 +277,11 @@ Encoders and decoders
    ``'false'``.  This can be used to raise an exception if invalid JSON numbers
    are encountered.
 
+   If *strict* is ``False`` (``True`` is the default), then control characters
+   will be allowed inside strings.  Control characters in this context are
+   those with character codes in the 0-31 range, including ``'\t'`` (tab),
+   ``'\n'``, ``'\r'`` and ``'\0'``.
+
 
    .. method:: decode(s)
 
@@ -339,7 +346,7 @@ Encoders and decoders
    encoders and decoders.  Otherwise, it will be a :exc:`ValueError` to encode
    such floats.
 
-   If *sort_keys* is ``True`` (the default), then the output of dictionaries
+   If *sort_keys* is ``True`` (default ``False``), then the output of dictionaries
    will be sorted by key; this is useful for regression tests to ensure that
    JSON serializations can be compared on a day-to-day basis.
 
@@ -373,7 +380,7 @@ Encoders and decoders
                 pass
             else:
                 return list(iterable)
-            return JSONEncoder.default(self, o)
+            return json.JSONEncoder.default(self, o)
 
 
    .. method:: encode(o)
@@ -381,7 +388,7 @@ Encoders and decoders
       Return a JSON string representation of a Python data structure, *o*.  For
       example::
 
-        >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
+        >>> json.JSONEncoder().encode({"foo": ["bar", "baz"]})
         '{"foo": ["bar", "baz"]}'
 
 
@@ -390,5 +397,5 @@ Encoders and decoders
       Encode the given object, *o*, and yield each string representation as
       available.  For example::
 
-            for chunk in JSONEncoder().iterencode(bigobject):
+            for chunk in json.JSONEncoder().iterencode(bigobject):
                 mysocket.write(chunk)

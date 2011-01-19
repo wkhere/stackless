@@ -89,7 +89,7 @@ class bdist_wininst(Command):
             short_version = get_python_version()
             if self.target_version and self.target_version != short_version:
                 raise DistutilsOptionError(
-                      "target version can only be %s, or the '--skip_build'" \
+                      "target version can only be %s, or the '--skip-build'" \
                       " option must be specified" % (short_version,))
             self.target_version = short_version
 
@@ -340,4 +340,8 @@ class bdist_wininst(Command):
             sfix = ''
 
         filename = os.path.join(directory, "wininst-%.1f%s.exe" % (bv, sfix))
-        return open(filename, "rb").read()
+        f = open(filename, "rb")
+        try:
+            return f.read()
+        finally:
+            f.close()

@@ -107,11 +107,11 @@ index entries more informative.
 
 The directives are:
 
-.. describe:: cfunction
+.. describe:: c:function
 
    Describes a C function. The signature should be given as in C, e.g.::
 
-      .. cfunction:: PyObject* PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
+      .. c:function:: PyObject* PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
 
    This is also used to describe function-like preprocessor macros.  The names
    of the arguments should be given so they may be used in the description.
@@ -119,29 +119,29 @@ The directives are:
    Note that you don't have to backslash-escape asterisks in the signature,
    as it is not parsed by the reST inliner.
 
-.. describe:: cmember
+.. describe:: c:member
 
    Describes a C struct member. Example signature::
 
-      .. cmember:: PyObject* PyTypeObject.tp_bases
+      .. c:member:: PyObject* PyTypeObject.tp_bases
 
    The text of the description should include the range of values allowed, how
    the value should be interpreted, and whether the value can be changed.
    References to structure members in text should use the ``member`` role.
 
-.. describe:: cmacro
+.. describe:: c:macro
 
    Describes a "simple" C macro.  Simple macros are macros which are used
    for code expansion, but which do not take arguments so cannot be described as
    functions.  This is not to be used for simple constant definitions.  Examples
-   of its use in the Python documentation include :cmacro:`PyObject_HEAD` and
-   :cmacro:`Py_BEGIN_ALLOW_THREADS`.
+   of its use in the Python documentation include :c:macro:`PyObject_HEAD` and
+   :c:macro:`Py_BEGIN_ALLOW_THREADS`.
 
-.. describe:: ctype
+.. describe:: c:type
 
    Describes a C type. The signature should just be the type name.
 
-.. describe:: cvar
+.. describe:: c:var
 
    Describes a global C variable.  The signature should include the type, such
    as::
@@ -177,6 +177,37 @@ The directives are:
    are modified), side effects, and possible exceptions.  A small example may be
    provided.
 
+.. describe:: decorator
+
+   Describes a decorator function.  The signature should *not* represent the
+   signature of the actual function, but the usage as a decorator.  For example,
+   given the functions
+
+   .. code-block:: python
+
+      def removename(func):
+          func.__name__ = ''
+          return func
+
+      def setnewname(name):
+          def decorator(func):
+              func.__name__ = name
+              return func
+          return decorator
+
+   the descriptions should look like this::
+
+      .. decorator:: removename
+
+         Remove name of the decorated function.
+
+      .. decorator:: setnewname(name)
+
+         Set name of the decorated function to *name*.
+
+   There is no ``deco`` role to link to a decorator that is marked up with
+   this directive; rather, use the ``:func:`` role.
+
 .. describe:: class
 
    Describes a class.  The signature can include parentheses with parameters
@@ -194,14 +225,20 @@ The directives are:
    parameter.  The description should include similar information to that
    described for ``function``.
 
+.. describe:: decoratormethod
+
+   Same as ``decorator``, but for decorators that are methods.
+
+   Refer to a decorator method using the ``:meth:`` role.
+
 .. describe:: opcode
 
    Describes a Python :term:`bytecode` instruction.
 
 .. describe:: cmdoption
 
-   Describes a command line option or switch.  Option argument names should be
-   enclosed in angle brackets.  Example::
+   Describes a Python command line option or switch.  Option argument names
+   should be enclosed in angle brackets.  Example::
 
       .. cmdoption:: -m <module>
 
@@ -366,21 +403,25 @@ the currently documented class.
 The following roles create cross-references to C-language constructs if they
 are defined in the API documentation:
 
-.. describe:: cdata
+.. describe:: c:data
 
    The name of a C-language variable.
 
-.. describe:: cfunc
+.. describe:: c:func
 
    The name of a C-language function. Should include trailing parentheses.
 
-.. describe:: cmacro
+.. describe:: c:macro
 
    The name of a "simple" C macro, as defined above.
 
-.. describe:: ctype
+.. describe:: c:type
 
    The name of a C-language type.
+
+.. describe:: c:member
+
+   The name of a C type member, as defined above.
 
 
 The following role does possibly create a cross-reference, but does not refer
@@ -502,8 +543,9 @@ in a different style:
 
 .. describe:: option
 
-   A command-line option to an executable program.  The leading hyphen(s) must
-   be included.
+   A command-line option of Python.  The leading hyphen(s) must be included.
+   If a matching ``cmdoption`` directive exists, it is linked to.  For options
+   of other programs or scripts, use simple ````code```` markup.
 
 .. describe:: program
 
@@ -522,10 +564,6 @@ in a different style:
 
    If you don't need the "variable part" indication, use the standard
    ````code```` instead.
-
-.. describe:: var
-
-   A Python or C variable or parameter name.
 
 
 The following roles generate external links:
@@ -572,6 +610,8 @@ Example::
 
 The ``:ref:`` invocation is replaced with the section title.
 
+Alternatively, you can reference any label (not just section titles)
+if you provide the link text ``:ref:`link text <reference-label>```.
 
 Paragraph-level markup
 ----------------------
@@ -597,8 +637,10 @@ units as well as normal text:
    An important bit of information about an API that a user should be aware of
    when using whatever bit of API the warning pertains to.  The content of the
    directive should be written in complete sentences and include all appropriate
-   punctuation.  This should only be chosen over ``note`` for information
-   regarding the possibility of crashes, data loss, or security implications.
+   punctuation.  In the interest of not scaring users away from pages filled
+   with warnings, this directive should only be chosen over ``note`` for
+   information regarding the possibility of crashes, data loss, or security
+   implications.
 
 .. describe:: versionadded
 
@@ -623,6 +665,24 @@ units as well as normal text:
    feature in some way (new parameters, changed side effects, etc.).
 
 --------------
+
+.. describe:: impl-detail
+
+   This directive is used to mark CPython-specific information.  Use either with
+   a block content or a single sentence as an argument, i.e. either ::
+
+      .. impl-detail::
+
+         This describes some implementation detail.
+
+         More explanation.
+
+   or ::
+
+      .. impl-detail:: This shortly mentions an implementation detail.
+
+   "\ **CPython implementation detail:**\ " is automatically prepended to the
+   content.
 
 .. describe:: seealso
 
@@ -678,10 +738,10 @@ tables of contents.  The ``toctree`` directive is the central element.
       .. toctree::
          :maxdepth: 2
 
-         intro.rst
-         strings.rst
-         datatypes.rst
-         numeric.rst
+         intro
+         strings
+         datatypes
+         numeric
          (many more files listed here)
 
    This accomplishes two things:
@@ -689,8 +749,8 @@ tables of contents.  The ``toctree`` directive is the central element.
    * Tables of contents from all those files are inserted, with a maximum depth
      of two, that means one nested heading.  ``toctree`` directives in those
      files are also taken into account.
-   * Sphinx knows that the relative order of the files ``intro.rst``,
-     ``strings.rst`` and so forth, and it knows that they are children of the
+   * Sphinx knows that the relative order of the files ``intro``,
+     ``strings`` and so forth, and it knows that they are children of the
      shown file, the library index.  From this information it generates "next
      chapter", "previous chapter" and "parent chapter" links.
 

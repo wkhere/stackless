@@ -350,16 +350,19 @@ def check_config_h():
     # let's see if __GNUC__ is mentioned in python.h
     fn = sysconfig.get_config_h_filename()
     try:
-        with open(fn) as config_h:
+        config_h = open(fn)
+        try:
             if "__GNUC__" in config_h.read():
                 return CONFIG_H_OK, "'%s' mentions '__GNUC__'" % fn
             else:
                 return CONFIG_H_NOTOK, "'%s' does not mention '__GNUC__'" % fn
+        finally:
+            config_h.close()
     except IOError as exc:
         return (CONFIG_H_UNCERTAIN,
                 "couldn't read '%s': %s" % (fn, exc.strerror))
 
-RE_VERSION = re.compile('(\d+\.\d+(\.\d+)*)')
+RE_VERSION = re.compile(b'(\d+\.\d+(\.\d+)*)')
 
 def _find_exe_version(cmd):
     """Find the version of an executable by running `cmd` in the shell.
@@ -378,7 +381,9 @@ def _find_exe_version(cmd):
     result = RE_VERSION.search(out_string)
     if result is None:
         return None
-    return LooseVersion(result.group(1))
+    # LooseVersion works with strings
+    # so we need to decode our bytes
+    return LooseVersion(result.group(1).decode())
 
 def get_versions():
     """ Try to find out the versions of gcc, ld and dllwrap.

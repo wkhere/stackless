@@ -33,22 +33,23 @@ This module provides an interface to the mechanisms used to implement the
 
 .. function:: find_module(name[, path])
 
-   Try to find the module *name* on the search path *path*.  If *path* is a list
-   of directory names, each directory is searched for files with any of the
-   suffixes returned by :func:`get_suffixes` above.  Invalid names in the list
-   are silently ignored (but all list items must be strings).  If *path* is
-   omitted or ``None``, the list of directory names given by ``sys.path`` is
-   searched, but first it searches a few special places: it tries to find a
-   built-in module with the given name (:const:`C_BUILTIN`), then a frozen
-   module (:const:`PY_FROZEN`), and on some systems some other places are looked
-   in as well (on Windows, it looks in the registry which may point to a
-   specific file).
+   Try to find the module *name*.  If *path* is omitted or ``None``, the list of
+   directory names given by ``sys.path`` is searched, but first a few special
+   places are searched: the function tries to find a built-in module with the
+   given name (:const:`C_BUILTIN`), then a frozen module (:const:`PY_FROZEN`),
+   and on some systems some other places are looked in as well (on Windows, it
+   looks in the registry which may point to a specific file).
+
+   Otherwise, *path* must be a list of directory names; each directory is
+   searched for files with any of the suffixes returned by :func:`get_suffixes`
+   above.  Invalid names in the list are silently ignored (but all list items
+   must be strings).
 
    If search is successful, the return value is a 3-element tuple ``(file,
    pathname, description)``:
 
-   *file* is an open file object positioned at the beginning, *pathname* is the
-   pathname of the file found, and *description* is a 3-element tuple as
+   *file* is an open :term:`file object` positioned at the beginning, *pathname*
+   is the pathname of the file found, and *description* is a 3-element tuple as
    contained in the list returned by :func:`get_suffixes` describing the kind of
    module found.
 
@@ -112,8 +113,7 @@ This module provides an interface to the mechanisms used to implement the
 .. function:: acquire_lock()
 
    Acquire the interpreter's import lock for the current thread.  This lock should
-   be used by import hooks to ensure thread-safety when importing modules. On
-   platforms without threads, this function does nothing.
+   be used by import hooks to ensure thread-safety when importing modules.
 
    Once a thread has acquired the import lock, the same thread may acquire it
    again without blocking; the thread must release it once for each time it has
@@ -190,21 +190,43 @@ This module provides an interface to the mechanisms used to implement the
    continue to use the old class definition.  The same is true for derived classes.
 
 
-.. function:: acquire_lock()
+The following functions are conveniences for handling :pep:`3147` byte-compiled
+file paths.
 
-   Acquires the interpreter's import lock for the current thread.  This lock should
-   be used by import hooks to ensure thread-safety when importing modules. On
-   platforms without threads, this function does nothing.
+.. versionadded:: 3.2
+
+.. function:: cache_from_source(path, debug_override=None)
+
+   Return the :pep:`3147` path to the byte-compiled file associated with the
+   source *path*.  For example, if *path* is ``/foo/bar/baz.py`` the return
+   value would be ``/foo/bar/__pycache__/baz.cpython-32.pyc`` for Python 3.2.
+   The ``cpython-32`` string comes from the current magic tag (see
+   :func:`get_tag`).  The returned path will end in ``.pyc`` when
+   ``__debug__`` is True or ``.pyo`` for an optimized Python
+   (i.e. ``__debug__`` is False).  By passing in True or False for
+   *debug_override* you can override the system's value for ``__debug__`` for
+   extension selection.
+
+   *path* need not exist.
 
 
-.. function:: release_lock()
+.. function:: source_from_cache(path)
 
-   Release the interpreter's import lock. On platforms without threads, this
-   function does nothing.
+   Given the *path* to a :pep:`3147` file name, return the associated source code
+   file path.  For example, if *path* is
+   ``/foo/bar/__pycache__/baz.cpython-32.pyc`` the returned path would be
+   ``/foo/bar/baz.py``.  *path* need not exist, however if it does not conform
+   to :pep:`3147` format, a ``ValueError`` is raised.
 
 
-The following constants with integer values, defined in this module, are used to
-indicate the search result of :func:`find_module`.
+.. function:: get_tag()
+
+   Return the :pep:`3147` magic tag string matching this version of Python's
+   magic number, as returned by :func:`get_magic`.
+
+
+The following constants with integer values, defined in this module, are used
+to indicate the search result of :func:`find_module`.
 
 
 .. data:: PY_SOURCE
@@ -235,88 +257,6 @@ indicate the search result of :func:`find_module`.
 .. data:: PY_FROZEN
 
    The module was found as a frozen module (see :func:`init_frozen`).
-
-The following constant and functions are obsolete; their functionality is
-available through :func:`find_module` or :func:`load_module`. They are kept
-around for backward compatibility:
-
-
-.. data:: SEARCH_ERROR
-
-   Unused.
-
-
-.. function:: init_builtin(name)
-
-   Initialize the built-in module called *name* and return its module object along
-   with storing it in ``sys.modules``.  If the module was already initialized, it
-   will be initialized *again*.  Re-initialization involves the copying of the
-   built-in module's ``__dict__`` from the cached module over the module's entry in
-   ``sys.modules``.  If there is no built-in module called *name*, ``None`` is
-   returned.
-
-
-.. function:: init_frozen(name)
-
-   Initialize the frozen module called *name* and return its module object.  If
-   the module was already initialized, it will be initialized *again*.  If there
-   is no frozen module called *name*, ``None`` is returned.  (Frozen modules are
-   modules written in Python whose compiled byte-code object is incorporated
-   into a custom-built Python interpreter by Python's :program:`freeze`
-   utility. See :file:`Tools/freeze/` for now.)
-
-
-.. function:: is_builtin(name)
-
-   Return ``1`` if there is a built-in module called *name* which can be
-   initialized again.  Return ``-1`` if there is a built-in module called *name*
-   which cannot be initialized again (see :func:`init_builtin`).  Return ``0`` if
-   there is no built-in module called *name*.
-
-
-.. function:: is_frozen(name)
-
-   Return ``True`` if there is a frozen module (see :func:`init_frozen`) called
-   *name*, or ``False`` if there is no such module.
-
-
-.. function:: load_compiled(name, pathname, [file])
-
-   .. index:: pair: file; byte-code
-
-   Load and initialize a module implemented as a byte-compiled code file and return
-   its module object.  If the module was already initialized, it will be
-   initialized *again*.  The *name* argument is used to create or access a module
-   object.  The *pathname* argument points to the byte-compiled code file.  The
-   *file* argument is the byte-compiled code file, open for reading in binary mode,
-   from the beginning. It must currently be a real file object, not a user-defined
-   class emulating a file.
-
-
-.. function:: load_dynamic(name, pathname[, file])
-
-   Load and initialize a module implemented as a dynamically loadable shared
-   library and return its module object.  If the module was already initialized, it
-   will be initialized *again*. Re-initialization involves copying the ``__dict__``
-   attribute of the cached instance of the module over the value used in the module
-   cached in ``sys.modules``.  The *pathname* argument must point to the shared
-   library.  The *name* argument is used to construct the name of the
-   initialization function: an external C function called ``initname()`` in the
-   shared library is called.  The optional *file* argument is ignored.  (Note:
-   using shared libraries is highly system dependent, and not all systems support
-   it.)
-
-
-.. function:: load_source(name, pathname[, file])
-
-   Load and initialize a module implemented as a Python source file and return its
-   module object.  If the module was already initialized, it will be initialized
-   *again*.  The *name* argument is used to create or access a module object.  The
-   *pathname* argument points to the source file.  The *file* argument is the
-   source file, open for reading as text, from the beginning. It must currently be
-   a real file object, not a user-defined class emulating a file.  Note that if a
-   properly matching byte-compiled file (with suffix :file:`.pyc` or :file:`.pyo`)
-   exists, it will be used instead of parsing the given source file.
 
 
 .. class:: NullImporter(path_string)
@@ -368,10 +308,3 @@ in that version, since :func:`find_module` has been extended and
            # Since we may exit via an exception, close fp explicitly.
            if fp:
                fp.close()
-
-.. index:: module: knee
-
-A more complete example that implements hierarchical module names and includes a
-:func:`reload` function can be found in the module :mod:`knee`.  The :mod:`knee`
-module can be found in :file:`Demo/imputil/` in the Python source distribution.
-

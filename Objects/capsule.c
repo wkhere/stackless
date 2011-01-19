@@ -33,7 +33,7 @@ name_matches(const char *name1, const char *name2) {
     /* if either is NULL, */
     if (!name1 || !name2) {
         /* they're only the same if they're both NULL. */
-        return name2 == name2;
+        return name1 == name2;
     }
     return !strcmp(name1, name2);
 }
@@ -197,7 +197,7 @@ PyCapsule_Import(const char *name, int no_block)
     PyObject *object = NULL;
     void *return_value = NULL;
     char *trace;
-    int name_length = (strlen(name) + 1) * sizeof(char);
+    size_t name_length = (strlen(name) + 1) * sizeof(char);
     char *name_dup = (char *)PyMem_MALLOC(name_length);
 
     if (!name_dup) {
@@ -298,27 +298,27 @@ Python import mechanism to link to one another.\n\
 
 PyTypeObject PyCapsule_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
-    "PyCapsule",		/*tp_name*/
-    sizeof(PyCapsule),		/*tp_basicsize*/
-    0,				/*tp_itemsize*/
+    "PyCapsule",                /*tp_name*/
+    sizeof(PyCapsule),          /*tp_basicsize*/
+    0,                          /*tp_itemsize*/
     /* methods */
     capsule_dealloc, /*tp_dealloc*/
-    0,				/*tp_print*/
-    0,				/*tp_getattr*/
-    0,				/*tp_setattr*/
-    0,				/*tp_reserved*/
+    0,                          /*tp_print*/
+    0,                          /*tp_getattr*/
+    0,                          /*tp_setattr*/
+    0,                          /*tp_reserved*/
     capsule_repr, /*tp_repr*/
-    0,				/*tp_as_number*/
-    0,				/*tp_as_sequence*/
-    0,				/*tp_as_mapping*/
-    0,				/*tp_hash*/
-    0,				/*tp_call*/
-    0,				/*tp_str*/
-    0,				/*tp_getattro*/
-    0,				/*tp_setattro*/
-    0,				/*tp_as_buffer*/
-    0,				/*tp_flags*/
-    PyCapsule_Type__doc__	/*tp_doc*/
+    0,                          /*tp_as_number*/
+    0,                          /*tp_as_sequence*/
+    0,                          /*tp_as_mapping*/
+    0,                          /*tp_hash*/
+    0,                          /*tp_call*/
+    0,                          /*tp_str*/
+    0,                          /*tp_getattro*/
+    0,                          /*tp_setattro*/
+    0,                          /*tp_as_buffer*/
+    0,                          /*tp_flags*/
+    PyCapsule_Type__doc__       /*tp_doc*/
 };
 
 

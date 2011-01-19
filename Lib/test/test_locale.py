@@ -9,11 +9,17 @@ enUS_locale = None
 def get_enUS_locale():
     global enUS_locale
     if sys.platform == 'darwin':
-        raise unittest.SkipTest("Locale support on MacOSX is minimal")
-    if sys.platform.startswith("win"):
+        import os
+        tlocs = ("en_US.UTF-8", "en_US.ISO8859-1", "en_US")
+        if int(os.uname()[2].split('.')[0]) < 10:
+            # The locale test work fine on OSX 10.6, I (ronaldoussoren)
+            # haven't had time yet to verify if tests work on OSX 10.5
+            # (10.4 is known to be bad)
+            raise unittest.SkipTest("Locale support on MacOSX is minimal")
+    elif sys.platform.startswith("win"):
         tlocs = ("En", "English")
     else:
-        tlocs = ("en_US.UTF-8", "en_US.US-ASCII", "en_US")
+        tlocs = ("en_US.UTF-8", "en_US.ISO8859-1", "en_US.US-ASCII", "en_US")
     oldlocale = locale.setlocale(locale.LC_NUMERIC)
     for tloc in tlocs:
         try:
@@ -230,6 +236,25 @@ class TestFormatPatternArg(unittest.TestCase):
         self.assertRaises(ValueError, locale.format, " %f", 'foo')
         self.assertRaises(ValueError, locale.format, "%fg", 'foo')
         self.assertRaises(ValueError, locale.format, "%^g", 'foo')
+        self.assertRaises(ValueError, locale.format, "%f%%", 'foo')
+
+
+class TestLocaleFormatString(unittest.TestCase):
+    """General tests on locale.format_string"""
+
+    def test_percent_escape(self):
+        self.assertEqual(locale.format_string('%f%%', 1.0), '%f%%' % 1.0)
+        self.assertEqual(locale.format_string('%d %f%%d', (1, 1.0)),
+            '%d %f%%d' % (1, 1.0))
+        self.assertEqual(locale.format_string('%(foo)s %%d', {'foo': 'bar'}),
+            ('%(foo)s %%d' % {'foo': 'bar'}))
+
+    def test_mapping(self):
+        self.assertEqual(locale.format_string('%(foo)s bing.', {'foo': 'bar'}),
+            ('%(foo)s bing.' % {'foo': 'bar'}))
+        self.assertEqual(locale.format_string('%(foo)s', {'foo': 'bar'}),
+            ('%(foo)s' % {'foo': 'bar'}))
+
 
 
 class TestNumberFormatting(BaseLocalizedTest, EnUSNumberFormatting):
@@ -309,6 +334,39 @@ class TestFrFRNumberFormatting(FrFRCookedTest, BaseFormattingTest):
             grouping=True, international=True)
 
 
+class TestCollation(unittest.TestCase):
+    # Test string collation functions
+
+    def test_strcoll(self):
+        self.assertLess(locale.strcoll('a', 'b'), 0)
+        self.assertEqual(locale.strcoll('a', 'a'), 0)
+        self.assertGreater(locale.strcoll('b', 'a'), 0)
+
+    def test_strxfrm(self):
+        self.assertLess(locale.strxfrm('a'), locale.strxfrm('b'))
+
+
+class TestEnUSCollation(BaseLocalizedTest, TestCollation):
+    # Test string collation functions with a real English locale
+
+    locale_type = locale.LC_ALL
+
+    def setUp(self):
+        enc = codecs.lookup(locale.getpreferredencoding(False) or 'ascii').name
+        if enc not in ('utf-8', 'iso8859-1', 'cp1252'):
+            raise unittest.SkipTest('encoding not suitable')
+        if enc != 'iso8859-1' and (sys.platform == 'darwin' or
+                                   sys.platform.startswith('freebsd')):
+            raise unittest.SkipTest('wcscoll/wcsxfrm have known bugs')
+        BaseLocalizedTest.setUp(self)
+
+    def test_strcoll_with_diacritic(self):
+        self.assertLess(locale.strcoll('à', 'b'), 0)
+
+    def test_strxfrm_with_diacritic(self):
+        self.assertLess(locale.strxfrm('à'), locale.strxfrm('b'))
+
+
 class TestMiscellaneous(unittest.TestCase):
     def test_getpreferredencoding(self):
         # Invoke getpreferredencoding to make sure it does not cause exceptions.
@@ -317,20 +375,32 @@ class TestMiscellaneous(unittest.TestCase):
             # If encoding non-empty, make sure it is valid
             codecs.lookup(enc)
 
-    if hasattr(locale, "strcoll"):
-        def test_strcoll_3303(self):
-            # test crasher from bug #3303
-            self.assertRaises(TypeError, locale.strcoll, "a", None)
-            self.assertRaises(TypeError, locale.strcoll, b"a", None)
+    def test_strcoll_3303(self):
+        # test crasher from bug #3303
+        self.assertRaises(TypeError, locale.strcoll, "a", None)
+        self.assertRaises(TypeError, locale.strcoll, b"a", None)
+
+    def test_setlocale_category(self):
+        locale.setlocale(locale.LC_ALL)
+        locale.setlocale(locale.LC_TIME)
+        locale.setlocale(locale.LC_CTYPE)
+        locale.setlocale(locale.LC_COLLATE)
+        locale.setlocale(locale.LC_MONETARY)
+        locale.setlocale(locale.LC_NUMERIC)
+
+        # crasher from bug #7419
+        self.assertRaises(locale.Error, locale.setlocale, 12345)
 
 
 def test_main():
     tests = [
         TestMiscellaneous,
         TestFormatPatternArg,
+        TestLocaleFormatString,
         TestEnUSNumberFormatting,
         TestCNumberFormatting,
         TestFrFRNumberFormatting,
+        TestCollation
     ]
     # SkipTest can't be raised inside unittests, handle it manually instead
     try:
@@ -339,7 +409,7 @@ def test_main():
         if verbose:
             print("Some tests will be disabled: %s" % e)
     else:
-        tests += [TestNumberFormatting]
+        tests += [TestNumberFormatting, TestEnUSCollation]
     run_unittest(*tests)
 
 if __name__ == '__main__':

@@ -2,10 +2,11 @@
 import os
 import shutil
 import tempfile
+from copy import deepcopy
 
 from distutils import log
+from distutils.log import DEBUG, INFO, WARN, ERROR, FATAL
 from distutils.core import Distribution
-from test.support import EnvironmentVarGuard
 
 class LoggingSilencer(object):
 
@@ -25,6 +26,8 @@ class LoggingSilencer(object):
         super().tearDown()
 
     def _log(self, level, msg, args):
+        if level not in (DEBUG, INFO, WARN, ERROR, FATAL):
+            raise ValueError('%s wrong log level' % str(level))
         self.logs.append((level, msg, args))
 
     def get_logs(self, *levels):
@@ -108,8 +111,15 @@ class EnvironGuard(object):
 
     def setUp(self):
         super(EnvironGuard, self).setUp()
-        self.environ = EnvironmentVarGuard()
+        self.old_environ = deepcopy(os.environ)
 
     def tearDown(self):
-        self.environ.__exit__()
+        for key, value in self.old_environ.items():
+            if os.environ.get(key) != value:
+                os.environ[key] = value
+
+        for key in tuple(os.environ.keys()):
+            if key not in self.old_environ:
+                del os.environ[key]
+
         super(EnvironGuard, self).tearDown()

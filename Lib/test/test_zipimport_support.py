@@ -2,7 +2,6 @@
 # for working with modules located inside zipfiles
 # The tests are centralised in this fashion to make it easy to drop them
 # if a platform doesn't support zipimport
-import unittest
 import test.support
 import os
 import os.path
@@ -14,6 +13,9 @@ import doctest
 import inspect
 import linecache
 import pdb
+import unittest
+from test.script_helper import (spawn_python, kill_python, assert_python_ok,
+                                temp_dir, make_script, make_zip_script)
 
 verbose = test.support.verbose
 
@@ -28,12 +30,6 @@ verbose = test.support.verbose
 
 # Retrieve some helpers from other test cases
 from test import test_doctest, sample_doctest
-from test.test_importhooks import ImportHooksBaseTestCase
-from test.test_cmd_line_script import temp_dir, _run_python,        \
-                                      _spawn_python, _kill_python,  \
-                                      _make_test_script,            \
-                                      _compile_test_script,         \
-                                      _make_test_zip, _make_test_pkg
 
 
 def _run_object_doctest(obj, module):
@@ -63,25 +59,36 @@ def _run_object_doctest(obj, module):
 
 
 
-class ZipSupportTests(ImportHooksBaseTestCase):
-    # We use the ImportHooksBaseTestCase to restore
+class ZipSupportTests(unittest.TestCase):
+    # This used to use the ImportHooksBaseTestCase to restore
     # the state of the import related information
-    # in the sys module after each test
+    # in the sys module after each test. However, that restores
+    # *too much* information and breaks for the invocation of
+    # of test_doctest. So we do our own thing and leave
+    # sys.modules alone.
     # We also clear the linecache and zipimport cache
     # just to avoid any bogus errors due to name reuse in the tests
     def setUp(self):
         linecache.clearcache()
         zipimport._zip_directory_cache.clear()
-        ImportHooksBaseTestCase.setUp(self)
+        self.path = sys.path[:]
+        self.meta_path = sys.meta_path[:]
+        self.path_hooks = sys.path_hooks[:]
+        sys.path_importer_cache.clear()
 
+    def tearDown(self):
+        sys.path[:] = self.path
+        sys.meta_path[:] = self.meta_path
+        sys.path_hooks[:] = self.path_hooks
+        sys.path_importer_cache.clear()
 
     def test_inspect_getsource_issue4223(self):
         test_src = "def foo(): pass\n"
         with temp_dir() as d:
-            init_name = _make_test_script(d, '__init__', test_src)
+            init_name = make_script(d, '__init__', test_src)
             name_in_zip = os.path.join('zip_pkg',
                                        os.path.basename(init_name))
-            zip_name, run_name = _make_test_zip(d, 'test_zip',
+            zip_name, run_name = make_zip_script(d, 'test_zip',
                                                 init_name, name_in_zip)
             os.remove(init_name)
             sys.path.insert(0, zip_name)
@@ -106,9 +113,9 @@ class ZipSupportTests(ImportHooksBaseTestCase):
         sample_src = sample_src.replace("test.test_doctest",
                                         "test_zipped_doctest")
         with temp_dir() as d:
-            script_name = _make_test_script(d, 'test_zipped_doctest',
+            script_name = make_script(d, 'test_zipped_doctest',
                                             test_src)
-            zip_name, run_name = _make_test_zip(d, 'test_zip',
+            zip_name, run_name = make_zip_script(d, 'test_zip',
                                                 script_name)
             z = zipfile.ZipFile(zip_name, 'a')
             z.writestr("sample_zipped_doctest.py", sample_src)
@@ -180,23 +187,23 @@ class ZipSupportTests(ImportHooksBaseTestCase):
                     """)
         pattern = 'File "%s", line 2, in %s'
         with temp_dir() as d:
-            script_name = _make_test_script(d, 'script', test_src)
-            exit_code, data = _run_python(script_name)
+            script_name = make_script(d, 'script', test_src)
+            rc, out, err = assert_python_ok(script_name)
             expected = pattern % (script_name, "__main__.Test")
             if verbose:
                 print ("Expected line", expected)
                 print ("Got stdout:")
-                print (data)
-            self.assert_(expected in data)
-            zip_name, run_name = _make_test_zip(d, "test_zip",
+                print (ascii(out))
+            self.assertIn(expected.encode('utf-8'), out)
+            zip_name, run_name = make_zip_script(d, "test_zip",
                                                 script_name, '__main__.py')
-            exit_code, data = _run_python(zip_name)
+            rc, out, err = assert_python_ok(zip_name)
             expected = pattern % (run_name, "__main__.Test")
             if verbose:
                 print ("Expected line", expected)
                 print ("Got stdout:")
-                print (data)
-            self.assert_(expected in data)
+                print (ascii(out))
+            self.assertIn(expected.encode('utf-8'), out)
 
     def test_pdb_issue4201(self):
         test_src = textwrap.dedent("""\
@@ -204,20 +211,20 @@ class ZipSupportTests(ImportHooksBaseTestCase):
                         pass
 
                     import pdb
-                    pdb.runcall(f)
+                    pdb.Pdb(nosigint=True).runcall(f)
                     """)
         with temp_dir() as d:
-            script_name = _make_test_script(d, 'script', test_src)
-            p = _spawn_python(script_name)
+            script_name = make_script(d, 'script', test_src)
+            p = spawn_python(script_name)
             p.stdin.write(b'l\n')
-            data = _kill_python(p).decode()
-            self.assert_(script_name in data)
-            zip_name, run_name = _make_test_zip(d, "test_zip",
+            data = kill_python(p)
+            self.assertIn(script_name.encode('utf-8'), data)
+            zip_name, run_name = make_zip_script(d, "test_zip",
                                                 script_name, '__main__.py')
-            p = _spawn_python(zip_name)
+            p = spawn_python(zip_name)
             p.stdin.write(b'l\n')
-            data = _kill_python(p).decode()
-            self.assert_(run_name in data)
+            data = kill_python(p)
+            self.assertIn(run_name.encode('utf-8'), data)
 
 
 def test_main():

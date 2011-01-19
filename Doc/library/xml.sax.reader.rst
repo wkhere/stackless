@@ -1,4 +1,3 @@
-
 :mod:`xml.sax.xmlreader` --- Interface for XML parsers
 ======================================================
 
@@ -48,7 +47,7 @@ a new  parser object.
    methods may return ``None``.
 
 
-.. class:: InputSource([systemId])
+.. class:: InputSource(system_id=None)
 
    Encapsulation of the information needed by the :class:`XMLReader` to read
    entities.
@@ -155,7 +154,7 @@ The :class:`XMLReader` interface supports the following methods:
    Allow an application to set the locale for errors and warnings.
 
    SAX parsers are not required to provide localization for errors and warnings; if
-   they cannot support the requested locale, however, they must throw a SAX
+   they cannot support the requested locale, however, they must raise a SAX
    exception.  Applications may request a locale change in the middle of a parse.
 
 

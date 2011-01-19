@@ -3,6 +3,23 @@
 
 #include "Python.h"
 
+#define IS_RELEASED(memobj) \
+    (((PyMemoryViewObject *) memobj)->view.buf == NULL)
+
+#define CHECK_RELEASED(memobj) \
+    if (IS_RELEASED(memobj)) { \
+        PyErr_SetString(PyExc_ValueError, \
+                        "operation forbidden on released memoryview object"); \
+        return NULL; \
+    }
+
+#define CHECK_RELEASED_INT(memobj) \
+    if (IS_RELEASED(memobj)) { \
+        PyErr_SetString(PyExc_ValueError, \
+                        "operation forbidden on released memoryview object"); \
+        return -1; \
+    }
+
 static Py_ssize_t
 get_shape0(Py_buffer *buf)
 {
@@ -34,6 +51,7 @@ static int
 memory_getbuf(PyMemoryViewObject *self, Py_buffer *view, int flags)
 {
     int res = 0;
+    CHECK_RELEASED_INT(self);
     /* XXX for whatever reason fixing the flags seems necessary */
     if (self->view.readonly)
         flags &= ~PyBUF_WRITABLE;
@@ -64,7 +82,6 @@ PyMemoryView_FromBuffer(Py_buffer *info)
         PyObject_GC_New(PyMemoryViewObject, &PyMemoryView_Type);
     if (mview == NULL)
         return NULL;
-    mview->base = NULL;
     dup_buffer(&mview->view, info);
     /* NOTE: mview->view.obj should already have been incref'ed as
        part of PyBuffer_FillInfo(). */
@@ -76,6 +93,7 @@ PyObject *
 PyMemoryView_FromObject(PyObject *base)
 {
     PyMemoryViewObject *mview;
+    Py_buffer view;
 
     if (!PyObject_CheckBuffer(base)) {
         PyErr_SetString(PyExc_TypeError,
@@ -84,20 +102,15 @@ PyMemoryView_FromObject(PyObject *base)
         return NULL;
     }
 
-    mview = (PyMemoryViewObject *)
-        PyObject_GC_New(PyMemoryViewObject, &PyMemoryView_Type);
-    if (mview == NULL)
+    if (PyObject_GetBuffer(base, &view, PyBUF_FULL_RO) < 0)
         return NULL;
 
-    mview->base = NULL;
-    if (PyObject_GetBuffer(base, &(mview->view), PyBUF_FULL_RO) < 0) {
-        Py_DECREF(mview);
+    mview = (PyMemoryViewObject *)PyMemoryView_FromBuffer(&view);
+    if (mview == NULL) {
+        PyBuffer_Release(&view);
         return NULL;
     }
 
-    mview->base = base;
-    Py_INCREF(base);
-    _PyObject_GC_TRACK(mview);
     return (PyObject *)mview;
 }
 
@@ -174,9 +187,6 @@ _strided_copy_nd(char *dest, char *src, int nd, Py_ssize_t *shape,
     return;
 }
 
-void _add_one_to_index_F(int nd, Py_ssize_t *index, Py_ssize_t *shape);
-void _add_one_to_index_C(int nd, Py_ssize_t *index, Py_ssize_t *shape);
-
 static int
 _indirect_copy_nd(char *dest, Py_buffer *view, char fort)
 {
@@ -184,7 +194,7 @@ _indirect_copy_nd(char *dest, Py_buffer *view, char fort)
     int k;
     Py_ssize_t elements;
     char *ptr;
-    void (*func)(int, Py_ssize_t *, Py_ssize_t *);
+    void (*func)(int, Py_ssize_t *, const Py_ssize_t *);
 
     if (view->ndim > PY_SSIZE_T_MAX / sizeof(Py_ssize_t)) {
         PyErr_NoMemory();
@@ -205,10 +215,10 @@ _indirect_copy_nd(char *dest, Py_buffer *view, char fort)
         elements *= view->shape[k];
     }
     if (fort == 'F') {
-        func = _add_one_to_index_F;
+        func = _Py_add_one_to_index_F;
     }
     else {
-        func = _add_one_to_index_C;
+        func = _Py_add_one_to_index_C;
     }
     while (elements--) {
         func(view->ndim, indices, view->shape);
@@ -255,7 +265,7 @@ PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char fort)
 
     if (!PyObject_CheckBuffer(obj)) {
         PyErr_SetString(PyExc_TypeError,
-                        "object does not have the buffer interface");
+                        "object does not support the buffer interface");
         return NULL;
     }
 
@@ -278,8 +288,6 @@ PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char fort)
 
     if (PyBuffer_IsContiguous(view, fort)) {
         /* no copy needed */
-        Py_INCREF(obj);
-        mem->base = obj;
         _PyObject_GC_TRACK(mem);
         return (PyObject *)mem;
     }
@@ -311,21 +319,7 @@ PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char fort)
             Py_DECREF(mem);
             return NULL;
         }
-    }
-    if (buffertype == PyBUF_SHADOW) {
-        /* return a shadowed memory-view object */
-        view->buf = dest;
-        mem->base = PyTuple_Pack(2, obj, bytes);
-        Py_DECREF(bytes);
-        if (mem->base == NULL) {
-            Py_DECREF(mem);
-            return NULL;
-        }
-    }
-    else {
         PyBuffer_Release(view);  /* XXX ? */
-        /* steal the reference */
-        mem->base = bytes;
     }
     _PyObject_GC_TRACK(mem);
     return (PyObject *)mem;
@@ -335,12 +329,14 @@ PyMemoryView_GetContiguous(PyObject *obj, int buffertype, char fort)
 static PyObject *
 memory_format_get(PyMemoryViewObject *self)
 {
+    CHECK_RELEASED(self);
     return PyUnicode_FromString(self->view.format);
 }
 
 static PyObject *
 memory_itemsize_get(PyMemoryViewObject *self)
 {
+    CHECK_RELEASED(self);
     return PyLong_FromSsize_t(self->view.itemsize);
 }
 
@@ -356,8 +352,9 @@ _IntTupleFromSsizet(int len, Py_ssize_t *vals)
         return Py_None;
     }
     intTuple = PyTuple_New(len);
-    if (!intTuple) return NULL;
-    for(i=0; i<len; i++) {
+    if (!intTuple)
+        return NULL;
+    for (i=0; i<len; i++) {
         o = PyLong_FromSsize_t(vals[i]);
         if (!o) {
             Py_DECREF(intTuple);
@@ -371,30 +368,35 @@ _IntTupleFromSsizet(int len, Py_ssize_t *vals)
 static PyObject *
 memory_shape_get(PyMemoryViewObject *self)
 {
+    CHECK_RELEASED(self);
     return _IntTupleFromSsizet(self->view.ndim, self->view.shape);
 }
 
 static PyObject *
 memory_strides_get(PyMemoryViewObject *self)
 {
+    CHECK_RELEASED(self);
     return _IntTupleFromSsizet(self->view.ndim, self->view.strides);
 }
 
 static PyObject *
 memory_suboffsets_get(PyMemoryViewObject *self)
 {
+    CHECK_RELEASED(self);
     return _IntTupleFromSsizet(self->view.ndim, self->view.suboffsets);
 }
 
 static PyObject *
 memory_readonly_get(PyMemoryViewObject *self)
 {
+    CHECK_RELEASED(self);
     return PyBool_FromLong(self->view.readonly);
 }
 
 static PyObject *
 memory_ndim_get(PyMemoryViewObject *self)
 {
+    CHECK_RELEASED(self);
     return PyLong_FromLong(self->view.ndim);
 }
 
@@ -413,6 +415,7 @@ static PyGetSetDef memory_getsetlist[] ={
 static PyObject *
 memory_tobytes(PyMemoryViewObject *mem, PyObject *noargs)
 {
+    CHECK_RELEASED(mem);
     return PyObject_CallFunctionObjArgs(
             (PyObject *) &PyBytes_Type, mem, NULL);
 }
@@ -428,6 +431,7 @@ memory_tolist(PyMemoryViewObject *mem, PyObject *noargs)
     PyObject *res, *item;
     char *buf;
 
+    CHECK_RELEASED(mem);
     if (strcmp(view->format, "B") || view->itemsize != 1) {
         PyErr_SetString(PyExc_NotImplementedError, 
                 "tolist() only supports byte views");
@@ -454,9 +458,37 @@ memory_tolist(PyMemoryViewObject *mem, PyObject *noargs)
     return res;
 }
 
+static void
+do_release(PyMemoryViewObject *self)
+{
+    if (self->view.obj != NULL) {
+        PyBuffer_Release(&(self->view));
+    }
+    self->view.obj = NULL;
+    self->view.buf = NULL;
+}
+
+static PyObject *
+memory_enter(PyObject *self, PyObject *args)
+{
+    CHECK_RELEASED(self);
+    Py_INCREF(self);
+    return self;
+}
+
+static PyObject *
+memory_exit(PyObject *self, PyObject *args)
+{
+    do_release((PyMemoryViewObject *) self);
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef memory_methods[] = {
+    {"release", memory_exit, METH_NOARGS},
     {"tobytes", (PyCFunction)memory_tobytes, METH_NOARGS, NULL},
     {"tolist", (PyCFunction)memory_tolist, METH_NOARGS, NULL},
+    {"__enter__", memory_enter, METH_NOARGS},
+    {"__exit__", memory_exit, METH_VARARGS},
     {NULL,          NULL}           /* sentinel */
 };
 
@@ -465,43 +497,24 @@ static void
 memory_dealloc(PyMemoryViewObject *self)
 {
     _PyObject_GC_UNTRACK(self);
-    if (self->view.obj != NULL) {
-        if (self->base && PyTuple_Check(self->base)) {
-            /* Special case when first element is generic object
-               with buffer interface and the second element is a
-               contiguous "shadow" that must be copied back into
-               the data areay of the first tuple element before
-               releasing the buffer on the first element.
-            */
-
-            PyObject_CopyData(PyTuple_GET_ITEM(self->base,0),
-                              PyTuple_GET_ITEM(self->base,1));
-
-            /* The view member should have readonly == -1 in
-               this instance indicating that the memory can
-               be "locked" and was locked and will be unlocked
-               again after this call.
-            */
-            PyBuffer_Release(&(self->view));
-        }
-        else {
-            PyBuffer_Release(&(self->view));
-        }
-        Py_CLEAR(self->base);
-    }
+    do_release(self);
     PyObject_GC_Del(self);
 }
 
 static PyObject *
 memory_repr(PyMemoryViewObject *self)
 {
-    return PyUnicode_FromFormat("<memory at %p>", self);
+    if (IS_RELEASED(self))
+        return PyUnicode_FromFormat("<released memory at %p>", self);
+    else
+        return PyUnicode_FromFormat("<memory at %p>", self);
 }
 
 /* Sequence methods */
 static Py_ssize_t
 memory_length(PyMemoryViewObject *self)
 {
+    CHECK_RELEASED_INT(self);
     return get_shape0(&self->view);
 }
 
@@ -513,6 +526,7 @@ memory_item(PyMemoryViewObject *self, Py_ssize_t result)
 {
     Py_buffer *view = &(self->view);
 
+    CHECK_RELEASED(self);
     if (view->ndim == 0) {
         PyErr_SetString(PyExc_IndexError,
                         "invalid indexing of 0-dim memory");
@@ -562,6 +576,7 @@ memory_subscript(PyMemoryViewObject *self, PyObject *key)
     Py_buffer *view;
     view = &(self->view);
     
+    CHECK_RELEASED(self);
     if (view->ndim == 0) {
         if (key == Py_Ellipsis ||
             (PyTuple_Check(key) && PyTuple_GET_SIZE(key)==0)) {
@@ -584,7 +599,7 @@ memory_subscript(PyMemoryViewObject *self, PyObject *key)
     else if (PySlice_Check(key)) {
         Py_ssize_t start, stop, step, slicelength;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)key, get_shape0(view),
+        if (PySlice_GetIndicesEx(key, get_shape0(view),
                                  &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }
@@ -626,14 +641,20 @@ memory_subscript(PyMemoryViewObject *self, PyObject *key)
 static int
 memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
 {
-    Py_ssize_t start, len, bytelen, i;
+    Py_ssize_t start, len, bytelen;
     Py_buffer srcview;
     Py_buffer *view = &(self->view);
     char *srcbuf, *destbuf;
 
+    CHECK_RELEASED_INT(self);
     if (view->readonly) {
         PyErr_SetString(PyExc_TypeError,
             "cannot modify read-only memory");
+        return -1;
+    }
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError,
+                        "cannot delete memory");
         return -1;
     }
     if (view->ndim != 1) {
@@ -657,7 +678,7 @@ memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
     else if (PySlice_Check(key)) {
         Py_ssize_t stop, step;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)key, get_shape0(view),
+        if (PySlice_GetIndicesEx(key, get_shape0(view),
                          &start, &stop, &step, &len) < 0) {
             return -1;
         }
@@ -696,16 +717,8 @@ memory_ass_sub(PyMemoryViewObject *self, PyObject *key, PyObject *value)
     if (destbuf + bytelen < srcbuf || srcbuf + bytelen < destbuf)
         /* No overlapping */
         memcpy(destbuf, srcbuf, bytelen);
-    else if (destbuf < srcbuf) {
-        /* Copy in ascending order */
-        for (i = 0; i < bytelen; i++)
-            destbuf[i] = srcbuf[i];
-    }
-    else {
-        /* Copy in descencing order */
-        for (i = bytelen - 1; i >= 0; i--)
-            destbuf[i] = srcbuf[i];
-    }
+    else
+        memmove(destbuf, srcbuf, bytelen);
 
     PyBuffer_Release(&srcview);
     return 0;
@@ -726,6 +739,11 @@ memory_richcompare(PyObject *v, PyObject *w, int op)
     ww.obj = NULL;
     if (op != Py_EQ && op != Py_NE)
         goto _notimpl;
+    if ((PyMemoryView_Check(v) && IS_RELEASED(v)) ||
+        (PyMemoryView_Check(w) && IS_RELEASED(w))) {
+        equal = (v == w);
+        goto _end;
+    }
     if (PyObject_GetBuffer(v, &vv, PyBUF_CONTIG_RO) == -1) {
         PyErr_Clear();
         goto _notimpl;
@@ -761,8 +779,6 @@ _notimpl:
 static int
 memory_traverse(PyMemoryViewObject *self, visitproc visit, void *arg)
 {
-    if (self->base != NULL)
-        Py_VISIT(self->base);
     if (self->view.obj != NULL)
         Py_VISIT(self->view.obj);
     return 0;
@@ -771,7 +787,6 @@ memory_traverse(PyMemoryViewObject *self, visitproc visit, void *arg)
 static int
 memory_clear(PyMemoryViewObject *self)
 {
-    Py_CLEAR(self->base);
     PyBuffer_Release(&self->view);
     return 0;
 }
@@ -785,10 +800,10 @@ static PyMappingMethods memory_as_mapping = {
 };
 
 static PySequenceMethods memory_as_sequence = {
-	0,                                  /* sq_length */
-	0,                                  /* sq_concat */
-	0,                                  /* sq_repeat */
-	(ssizeargfunc)memory_item,          /* sq_item */
+        0,                                  /* sq_length */
+        0,                                  /* sq_concat */
+        0,                                  /* sq_repeat */
+        (ssizeargfunc)memory_item,          /* sq_item */
 };
 
 /* Buffer methods */

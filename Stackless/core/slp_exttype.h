@@ -25,7 +25,6 @@ typedef struct _slp_methodflags {
 	signed char nb_xor;
 	signed char nb_or;
 	signed char nb_int;
-	signed char nb_long;
 	signed char nb_float;
 	signed char nb_inplace_add;
 	signed char nb_inplace_subtract;
@@ -67,7 +66,6 @@ typedef struct _slp_methodflags {
 	signed char tp_alloc;
 	signed char tp_is_gc;
 	signed char tp_free;
-	signed char tp_compare;
 	signed char tp_hash;
 	signed char tp_getattro;
 	signed char tp_getattr;

@@ -17,24 +17,23 @@ HTTPS protocols.  It is normally not used directly --- the module
 
 .. note::
 
-   HTTPS support is only available if the :mod:`socket` module was compiled with
-   SSL support.
+   HTTPS support is only available if Python was compiled with SSL support
+   (through the :mod:`ssl` module).
 
 The module provides the following classes:
 
 
-.. class:: HTTPConnection(host, port=None, strict=None[, timeout])
+.. class:: HTTPConnection(host, port=None[, strict[, timeout[, source_address]]])
 
    An :class:`HTTPConnection` instance represents one transaction with an HTTP
    server.  It should be instantiated passing it a host and optional port
    number.  If no port number is passed, the port is extracted from the host
    string if it has the form ``host:port``, else the default HTTP port (80) is
-   used.  When True, the optional parameter *strict* (which defaults to a false
-   value) causes ``BadStatusLine`` to
-   be raised if the status line can't be parsed as a valid HTTP/1.0 or 1.1
-   status line.  If the optional *timeout* parameter is given, blocking
+   used.  If the optional *timeout* parameter is given, blocking
    operations (like connection attempts) will timeout after that many seconds
    (if it is not given, the global default timeout setting is used).
+   The optional *source_address* parameter may be a typle of a (host, port)
+   to use as the source address the HTTP connection is made from.
 
    For example, the following calls all create instances that connect to the server
    at the same host and port::
@@ -44,23 +43,57 @@ The module provides the following classes:
       >>> h3 = http.client.HTTPConnection('www.cwi.nl', 80)
       >>> h3 = http.client.HTTPConnection('www.cwi.nl', 80, timeout=10)
 
+   .. versionchanged:: 3.2
+      *source_address* was added.
 
-.. class:: HTTPSConnection(host, port=None, key_file=None, cert_file=None, strict=None[, timeout])
+   .. versionchanged:: 3.2
+      The *strict* parameter is deprecated.  HTTP 0.9-style "Simple Responses"
+      are not supported anymore.
+
+
+.. class:: HTTPSConnection(host, port=None, key_file=None, cert_file=None[, strict[, timeout[, source_address]]], *, context=None, check_hostname=None)
 
    A subclass of :class:`HTTPConnection` that uses SSL for communication with
-   secure servers.  Default port is ``443``. *key_file* is the name of a PEM
-   formatted file that contains your private key. *cert_file* is a PEM formatted
-   certificate chain file.
+   secure servers.  Default port is ``443``.  If *context* is specified, it
+   must be a :class:`ssl.SSLContext` instance describing the various SSL
+   options.  If *context* is specified and has a :attr:`~ssl.SSLContext.verify_mode`
+   of either :data:`~ssl.CERT_OPTIONAL` or :data:`~ssl.CERT_REQUIRED`, then
+   by default *host* is matched against the host name(s) allowed by the
+   server's certificate.  If you want to change that behaviour, you can
+   explicitly set *check_hostname* to False.
 
-   .. note::
+   *key_file* and *cert_file* are deprecated, please use
+   :meth:`ssl.SSLContext.load_cert_chain` instead.
 
-      This does not do any certificate verification.
+   If you access arbitrary hosts on the Internet, it is recommended to
+   require certificate checking and feed the *context* with a set of
+   trusted CA certificates::
+
+      context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+      context.verify_mode = ssl.CERT_REQUIRED
+      context.load_verify_locations('/etc/pki/tls/certs/ca-bundle.crt')
+      h = client.HTTPSConnection('svn.python.org', 443, context=context)
+
+   .. versionchanged:: 3.2
+      *source_address*, *context* and *check_hostname* were added.
+
+   .. versionchanged:: 3.2
+      This class now supports HTTPS virtual hosts if possible (that is,
+      if :data:`ssl.HAS_SNI` is true).
+
+   .. versionchanged:: 3.2
+      The *strict* parameter is deprecated.  HTTP 0.9-style "Simple Responses"
+      are not supported anymore.
 
 
-.. class:: HTTPResponse(sock, debuglevel=0, strict=0, method=None, url=None)
+.. class:: HTTPResponse(sock, debuglevel=0[, strict], method=None, url=None)
 
    Class whose instances are returned upon successful connection.  Not
    instantiated directly by user.
+
+   .. versionchanged:: 3.2
+      The *strict* parameter is deprecated.  HTTP 0.9-style "Simple Responses"
+      are not supported anymore.
 
 
 The following exceptions are raised as appropriate:
@@ -359,14 +392,18 @@ HTTPConnection Objects
    object.  The Content-Length header is set to the length of the
    string.
 
-   The *body* may also be an open file object, in which case the
-   contents of the file is sent; this file object should support
-   ``fileno()`` and ``read()`` methods. The header Content-Length is
-   automatically set to the length of the file as reported by
-   stat.
+   The *body* may also be an open :term:`file object`, in which case the
+   contents of the file is sent; this file object should support ``fileno()``
+   and ``read()`` methods. The header Content-Length is automatically set to
+   the length of the file as reported by stat. The *body* argument may also be
+   an iterable and Contet-Length header should be explicitly provided when the
+   body is an iterable.
 
    The *headers* argument should be a mapping of extra HTTP
    headers to send with the request.
+
+   .. versionadded:: 3.2
+      *body* can now be an iterable.
 
 .. method:: HTTPConnection.getresponse()
 
@@ -381,10 +418,23 @@ HTTPConnection Objects
 
 .. method:: HTTPConnection.set_debuglevel(level)
 
-   Set the debugging level (the amount of debugging output printed). The default
-   debug level is ``0``, meaning no debugging output is printed.
+   Set the debugging level.  The default debug level is ``0``, meaning no
+   debugging output is printed.  Any value greater than ``0`` will cause all
+   currently defined debug output to be printed to stdout.  The ``debuglevel``
+   is passed to any new :class:`HTTPResponse` objects that are created.
 
-   .. versionadded:: 2.7
+   .. versionadded:: 3.1
+
+
+.. method:: HTTPConnection.set_tunnel(host, port=None, headers=None)
+
+   Set the host and the port for HTTP Connect Tunnelling. Normally used when it
+   is required to a HTTPS Connection through a proxy server.
+
+   The headers argument should be a mapping of extra HTTP headers to to sent
+   with the CONNECT request.
+
+   .. versionadded:: 3.2
 
 
 .. method:: HTTPConnection.connect()
@@ -448,14 +498,19 @@ statement.
 
 .. method:: HTTPResponse.getheader(name, default=None)
 
-   Get the contents of the header *name*, or *default* if there is no matching
-   header.
+   Return the value of the header *name*, or *default* if there is no header
+   matching *name*.  If there is more than one  header with the name *name*,
+   return all of the values joined by ', '.  If 'default' is any iterable other
+   than a single string, its elements are similarly returned joined by commas.
 
 
 .. method:: HTTPResponse.getheaders()
 
    Return a list of (header, value) tuples.
 
+.. method:: HTTPResponse.fileno()
+
+   Return the ``fileno`` of the underlying socket.
 
 .. attribute:: HTTPResponse.msg
 
@@ -481,7 +536,7 @@ statement.
 
 .. attribute:: HTTPResponse.debuglevel
 
-   A debugging hook.  If `debuglevel` is greater than zero, messages
+   A debugging hook.  If :attr:`debuglevel` is greater than zero, messages
    will be printed to stdout as the response is read and parsed.
 
 
@@ -503,6 +558,21 @@ Here is an example session that uses the ``GET`` method::
    404 Not Found
    >>> data2 = r2.read()
    >>> conn.close()
+
+Here is an example session that uses the ``HEAD`` method.  Note that the
+``HEAD`` method never returns any data. ::
+
+   >>> import http.client
+   >>> conn = http.client.HTTPConnection("www.python.org")
+   >>> conn.request("HEAD","/index.html")
+   >>> res = conn.getresponse()
+   >>> print(res.status, res.reason)
+   200 OK
+   >>> data = res.read()
+   >>> print(len(data))
+   0
+   >>> data == b''
+   True
 
 Here is an example session that shows how to ``POST`` requests::
 

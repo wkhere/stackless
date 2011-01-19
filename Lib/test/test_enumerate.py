@@ -103,6 +103,7 @@ class EnumerateTestCase(unittest.TestCase):
         self.assertRaises(TypeError, self.enum, 'abc', 'a') # wrong type
         self.assertRaises(TypeError, self.enum, 'abc', 2, 3) # too many arguments
 
+    @support.cpython_only
     def test_tuple_reuse(self):
         # Tests an implementation detail where tuple is reused
         # whenever nothing else holds a reference to it
@@ -145,6 +146,7 @@ class TestReversed(unittest.TestCase):
         x = range(1)
         self.assertEqual(type(reversed(x)), type(iter(x)))
 
+    @support.cpython_only
     def test_len(self):
         # This is an implementation detail, not an interface requirement
         from test.test_iterlen import len
@@ -198,31 +200,48 @@ class TestReversed(unittest.TestCase):
                 self.fail("non-callable __reversed__ didn't raise!")
         self.assertEqual(rc, sys.getrefcount(r))
 
+    def test_objmethods(self):
+        # Objects must have __len__() and __getitem__() implemented.
+        class NoLen(object):
+            def __getitem__(self): return 1
+        nl = NoLen()
+        self.assertRaises(TypeError, reversed, nl)
 
-class TestStart(EnumerateTestCase):
+        class NoGetItem(object):
+            def __len__(self): return 2
+        ngi = NoGetItem()
+        self.assertRaises(TypeError, reversed, ngi)
 
-    enum = lambda i: enumerate(i, start=11)
-    seq, res = 'abc', [(1, 'a'), (2, 'b'), (3, 'c')]
+
+class EnumerateStartTestCase(EnumerateTestCase):
+
+    def test_basicfunction(self):
+        e = self.enum(self.seq)
+        self.assertEqual(iter(e), e)
+        self.assertEqual(list(self.enum(self.seq)), self.res)
 
 
-class TestLongStart(EnumerateTestCase):
+class TestStart(EnumerateStartTestCase):
 
-    enum = lambda i: enumerate(i, start=sys.maxsize+1)
+    enum = lambda self, i: enumerate(i, start=11)
+    seq, res = 'abc', [(11, 'a'), (12, 'b'), (13, 'c')]
+
+
+class TestLongStart(EnumerateStartTestCase):
+
+    enum = lambda self, i: enumerate(i, start=sys.maxsize+1)
     seq, res = 'abc', [(sys.maxsize+1,'a'), (sys.maxsize+2,'b'),
                        (sys.maxsize+3,'c')]
 
 
 def test_main(verbose=None):
-    testclasses = (EnumerateTestCase, SubclassTestCase, TestEmpty, TestBig,
-                   TestReversed)
-    support.run_unittest(*testclasses)
+    support.run_unittest(__name__)
 
     # verify reference counting
-    import sys
     if verbose and hasattr(sys, "gettotalrefcount"):
         counts = [None] * 5
         for i in range(len(counts)):
-            support.run_unittest(*testclasses)
+            support.run_unittest(__name__)
             counts[i] = sys.gettotalrefcount()
         print(counts)
 

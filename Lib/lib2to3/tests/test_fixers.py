@@ -18,8 +18,6 @@ class FixerTestCase(support.TestCase):
     def setUp(self, fix_list=None, fixer_pkg="lib2to3", options=None):
         if fix_list is None:
             fix_list = [self.fixer]
-        if options is None:
-            options = {"print_function" : False}
         self.refactor = support.get_refactorer(fixer_pkg, fix_list, options)
         self.fixer_log = []
         self.filename = "<string>"
@@ -32,20 +30,20 @@ class FixerTestCase(support.TestCase):
         before = support.reformat(before)
         after = support.reformat(after)
         tree = self.refactor.refactor_string(before, self.filename)
-        self.failUnlessEqual(after, str(tree))
+        self.assertEqual(after, str(tree))
         return tree
 
     def check(self, before, after, ignore_warnings=False):
         tree = self._check(before, after)
-        self.failUnless(tree.was_changed)
+        self.assertTrue(tree.was_changed)
         if not ignore_warnings:
-            self.failUnlessEqual(self.fixer_log, [])
+            self.assertEqual(self.fixer_log, [])
 
     def warns(self, before, after, message, unchanged=False):
         tree = self._check(before, after)
-        self.failUnless(message in "".join(self.fixer_log))
+        self.assertTrue(message in "".join(self.fixer_log))
         if not unchanged:
-            self.failUnless(tree.was_changed)
+            self.assertTrue(tree.was_changed)
 
     def warns_unchanged(self, before, message):
         self.warns(before, before, message, unchanged=True)
@@ -53,13 +51,12 @@ class FixerTestCase(support.TestCase):
     def unchanged(self, before, ignore_warnings=False):
         self._check(before, before)
         if not ignore_warnings:
-            self.failUnlessEqual(self.fixer_log, [])
+            self.assertEqual(self.fixer_log, [])
 
     def assert_runs_after(self, *names):
         fixes = [self.fixer]
         fixes.extend(names)
-        options = {"print_function" : False}
-        r = support.get_refactorer("lib2to3", fixes, options)
+        r = support.get_refactorer("lib2to3", fixes)
         (pre, post) = r.get_fixers()
         n = "fix_" + self.fixer
         if post and post[-1].__class__.__module__.endswith(n):
@@ -342,6 +339,12 @@ class Test_reduce(FixerTestCase):
         a = "from functools import reduce\nreduce(a, b, c)"
         self.check(b, a)
 
+    def test_bug_7253(self):
+        # fix_tuple_params was being bad and orphaning nodes in the tree.
+        b = "def x(arg): reduce(sum, [])"
+        a = "from functools import reduce\ndef x(arg): reduce(sum, [])"
+        self.check(b, a)
+
     def test_call_with_lambda(self):
         b = "reduce(lambda x, y: x + y, seq)"
         a = "from functools import reduce\nreduce(lambda x, y: x + y, seq)"
@@ -379,18 +382,15 @@ class Test_print(FixerTestCase):
         self.unchanged(s)
 
     def test_idempotency_print_as_function(self):
-        print_stmt = pygram.python_grammar.keywords.pop("print")
-        try:
-            s = """print(1, 1+1, 1+1+1)"""
-            self.unchanged(s)
+        self.refactor.driver.grammar = pygram.python_grammar_no_print_statement
+        s = """print(1, 1+1, 1+1+1)"""
+        self.unchanged(s)
 
-            s = """print()"""
-            self.unchanged(s)
+        s = """print()"""
+        self.unchanged(s)
 
-            s = """print('')"""
-            self.unchanged(s)
-        finally:
-            pygram.python_grammar.keywords["print"] = print_stmt
+        s = """print('')"""
+        self.unchanged(s)
 
     def test_1(self):
         b = """print 1, 1+1, 1+1+1"""
@@ -462,31 +462,15 @@ class Test_print(FixerTestCase):
         a = """print(file=sys.stderr)"""
         self.check(b, a)
 
-    # With from __future__ import print_function
     def test_with_future_print_function(self):
-        # XXX: These tests won't actually do anything until the parser
-        #      is fixed so it won't crash when it sees print(x=y).
-        #      When #2412 is fixed, the try/except block can be taken
-        #      out and the tests can be run like normal.
-        # MvL: disable entirely for now, so that it doesn't print to stdout
-        return
-        try:
-            s = "from __future__ import print_function\n"\
-                "print('Hai!', end=' ')"
-            self.unchanged(s)
+        s = "from __future__ import print_function\n" \
+            "print('Hai!', end=' ')"
+        self.unchanged(s)
 
-            b = "print 'Hello, world!'"
-            a = "print('Hello, world!')"
-            self.check(b, a)
+        b = "print 'Hello, world!'"
+        a = "print('Hello, world!')"
+        self.check(b, a)
 
-            s = "from __future__ import *\n"\
-                "print('Hai!', end=' ')"
-            self.unchanged(s)
-        except:
-            return
-        else:
-            self.assertFalse(True, "#2421 has been fixed -- printing tests "\
-                                   "need to be updated!")
 
 class Test_exec(FixerTestCase):
     fixer = "exec"
@@ -884,6 +868,11 @@ class Test_raise(FixerTestCase):
                     raise Exception(5).with_traceback(6) # foo"""
         self.check(b, a)
 
+    def test_None_value(self):
+        b = """raise Exception(5), None, tb"""
+        a = """raise Exception(5).with_traceback(tb)"""
+        self.check(b, a)
+
     def test_tuple_value(self):
         b = """raise Exception, (5, 6, 7)"""
         a = """raise Exception(5, 6, 7)"""
@@ -1231,6 +1220,14 @@ class Test_dict(FixerTestCase):
         a = "[i for i in    d.  keys(  )  ]"
         self.check(b, a)
 
+        b = "if   d. viewkeys  ( )  : pass"
+        a = "if   d. keys  ( )  : pass"
+        self.check(b, a)
+
+        b = "[i for i in    d.  viewkeys(  )  ]"
+        a = "[i for i in    d.  keys(  )  ]"
+        self.check(b, a)
+
     def test_trailing_comment(self):
         b = "d.keys() # foo"
         a = "list(d.keys()) # foo"
@@ -1248,6 +1245,16 @@ class Test_dict(FixerTestCase):
                ]"""
         a = """[i for i in d.keys() # foo
                ]"""
+        self.check(b, a)
+
+        b = """[i for i in d.iterkeys() # foo
+               ]"""
+        a = """[i for i in d.keys() # foo
+               ]"""
+        self.check(b, a)
+
+        b = "d.viewitems()  # foo"
+        a = "d.items()  # foo"
         self.check(b, a)
 
     def test_unchanged(self):
@@ -1383,6 +1390,46 @@ class Test_dict(FixerTestCase):
         a = "for x in list(h.keys())[0]: print x"
         self.check(b, a)
 
+    def test_25(self):
+        b = "d.viewkeys()"
+        a = "d.keys()"
+        self.check(b, a)
+
+    def test_26(self):
+        b = "d.viewitems()"
+        a = "d.items()"
+        self.check(b, a)
+
+    def test_27(self):
+        b = "d.viewvalues()"
+        a = "d.values()"
+        self.check(b, a)
+
+    def test_14(self):
+        b = "[i for i in d.viewkeys()]"
+        a = "[i for i in d.keys()]"
+        self.check(b, a)
+
+    def test_15(self):
+        b = "(i for i in d.viewkeys())"
+        a = "(i for i in d.keys())"
+        self.check(b, a)
+
+    def test_17(self):
+        b = "iter(d.viewkeys())"
+        a = "iter(d.keys())"
+        self.check(b, a)
+
+    def test_18(self):
+        b = "list(d.viewkeys())"
+        a = "list(d.keys())"
+        self.check(b, a)
+
+    def test_19(self):
+        b = "sorted(d.viewkeys())"
+        a = "sorted(d.keys())"
+        self.check(b, a)
+
 class Test_xrange(FixerTestCase):
     fixer = "xrange"
 
@@ -1454,6 +1501,17 @@ class Test_xrange(FixerTestCase):
     def test_in_consuming_context(self):
         for call in fixer_util.consuming_calls:
             self.unchanged("a = %s(range(10))" % call)
+
+class Test_xrange_with_reduce(FixerTestCase):
+
+    def setUp(self):
+        super(Test_xrange_with_reduce, self).setUp(["xrange", "reduce"])
+
+    def test_double_transform(self):
+        b = """reduce(x, xrange(5))"""
+        a = """from functools import reduce
+reduce(x, range(5))"""
+        self.check(b, a)
 
 class Test_raw_input(FixerTestCase):
     fixer = "raw_input"
@@ -1705,6 +1763,11 @@ class Test_imports_fixer_order(FixerTestCase, ImportsFixerTests):
         for key in ('dbhash', 'dumbdbm', 'dbm', 'gdbm'):
             self.modules[key] = mapping1[key]
 
+    def test_after_local_imports_refactoring(self):
+        for fix in ("imports", "imports2"):
+            self.fixer = fix
+            self.assert_runs_after("import")
+
 
 class Test_urllib(FixerTestCase):
     fixer = "urllib"
@@ -1754,16 +1817,48 @@ class Test_urllib(FixerTestCase):
                     b = "from %s import %s as foo_bar" % (old, member)
                     a = "from %s import %s as foo_bar" % (new, member)
                     self.check(b, a)
+                    b = "from %s import %s as blah, %s" % (old, member, member)
+                    a = "from %s import %s as blah, %s" % (new, member, member)
+                    self.check(b, a)
 
     def test_star(self):
         for old in self.modules:
             s = "from %s import *" % old
             self.warns_unchanged(s, "Cannot handle star imports")
 
+    def test_indented(self):
+        b = """
+def foo():
+    from urllib import urlencode, urlopen
+"""
+        a = """
+def foo():
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+"""
+        self.check(b, a)
+
+        b = """
+def foo():
+    other()
+    from urllib import urlencode, urlopen
+"""
+        a = """
+def foo():
+    other()
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+"""
+        self.check(b, a)
+
+
+
     def test_import_module_usage(self):
         for old, changes in self.modules.items():
             for new, members in changes:
                 for member in members:
+                    new_import = ", ".join([n for (n, mems)
+                                            in self.modules[old]])
                     b = """
                         import %s
                         foo(%s.%s)
@@ -1771,9 +1866,16 @@ class Test_urllib(FixerTestCase):
                     a = """
                         import %s
                         foo(%s.%s)
-                        """ % (", ".join([n for (n, mems)
-                                           in self.modules[old]]),
-                                         new, member)
+                        """ % (new_import, new, member)
+                    self.check(b, a)
+                    b = """
+                        import %s
+                        %s.%s(%s.%s)
+                        """ % (old, old, member, old, member)
+                    a = """
+                        import %s
+                        %s.%s(%s.%s)
+                        """ % (new_import, new, member, new, member)
                     self.check(b, a)
 
 
@@ -2727,16 +2829,79 @@ class Test_callable(FixerTestCase):
 
     def test_prefix_preservation(self):
         b = """callable(    x)"""
-        a = """hasattr(    x, '__call__')"""
+        a = """import collections\nisinstance(    x, collections.Callable)"""
         self.check(b, a)
 
         b = """if     callable(x): pass"""
-        a = """if     hasattr(x, '__call__'): pass"""
+        a = """import collections
+if     isinstance(x, collections.Callable): pass"""
         self.check(b, a)
 
     def test_callable_call(self):
         b = """callable(x)"""
-        a = """hasattr(x, '__call__')"""
+        a = """import collections\nisinstance(x, collections.Callable)"""
+        self.check(b, a)
+
+    def test_global_import(self):
+        b = """
+def spam(foo):
+    callable(foo)"""[1:]
+        a = """
+import collections
+def spam(foo):
+    isinstance(foo, collections.Callable)"""[1:]
+        self.check(b, a)
+
+        b = """
+import collections
+def spam(foo):
+    callable(foo)"""[1:]
+        # same output if it was already imported
+        self.check(b, a)
+
+        b = """
+from collections import *
+def spam(foo):
+    callable(foo)"""[1:]
+        a = """
+from collections import *
+import collections
+def spam(foo):
+    isinstance(foo, collections.Callable)"""[1:]
+        self.check(b, a)
+
+        b = """
+do_stuff()
+do_some_other_stuff()
+assert callable(do_stuff)"""[1:]
+        a = """
+import collections
+do_stuff()
+do_some_other_stuff()
+assert isinstance(do_stuff, collections.Callable)"""[1:]
+        self.check(b, a)
+
+        b = """
+if isinstance(do_stuff, Callable):
+    assert callable(do_stuff)
+    do_stuff(do_stuff)
+    if not callable(do_stuff):
+        exit(1)
+    else:
+        assert callable(do_stuff)
+else:
+    assert not callable(do_stuff)"""[1:]
+        a = """
+import collections
+if isinstance(do_stuff, Callable):
+    assert isinstance(do_stuff, collections.Callable)
+    do_stuff(do_stuff)
+    if not isinstance(do_stuff, collections.Callable):
+        exit(1)
+    else:
+        assert isinstance(do_stuff, collections.Callable)
+else:
+    assert not isinstance(do_stuff, collections.Callable)"""[1:]
         self.check(b, a)
 
     def test_callable_should_not_change(self):
@@ -2851,6 +3016,11 @@ class Test_map(FixerTestCase):
         a = """x = list(map(f, 'abc'))   #   foo"""
         self.check(b, a)
 
+    def test_None_with_multiple_arguments(self):
+        s = """x = map(None, a, b, c)"""
+        self.warns_unchanged(s, "cannot convert map(None, ...) with "
+                             "multiple arguments")
+
     def test_map_basic(self):
         b = """x = map(f, 'abc')"""
         a = """x = list(map(f, 'abc'))"""
@@ -2862,10 +3032,6 @@ class Test_map(FixerTestCase):
 
         b = """x = map(None, 'abc')"""
         a = """x = list('abc')"""
-        self.check(b, a)
-
-        b = """x = map(None, 'abc', 'def')"""
-        a = """x = list(map(None, 'abc', 'def'))"""
         self.check(b, a)
 
         b = """x = map(lambda x: x+1, range(4))"""
@@ -3255,6 +3421,46 @@ class Test_idioms(FixerTestCase):
             """
         self.check(b, a)
 
+        b = r"""
+            try:
+                m = list(s)
+                m.sort()
+            except: pass
+            """
+
+        a = r"""
+            try:
+                m = sorted(s)
+            except: pass
+            """
+        self.check(b, a)
+
+        b = r"""
+            try:
+                m = list(s)
+                # foo
+                m.sort()
+            except: pass
+            """
+
+        a = r"""
+            try:
+                m = sorted(s)
+                # foo
+            except: pass
+            """
+        self.check(b, a)
+
+        b = r"""
+            m = list(s)
+            # more comments
+            m.sort()"""
+
+        a = r"""
+            m = sorted(s)
+            # more comments"""
+        self.check(b, a)
+
     def test_sort_simple_expr(self):
         b = """
             v = t
@@ -3452,6 +3658,10 @@ class Test_itertools_imports(FixerTestCase):
         a = "from itertools import bar, foo"
         self.check(b, a)
 
+        b = "from itertools import chain, imap, izip"
+        a = "from itertools import chain"
+        self.check(b, a)
+
     def test_comments(self):
         b = "#foo\nfrom itertools import imap, izip"
         a = "#foo\n"
@@ -3499,10 +3709,15 @@ class Test_itertools_imports(FixerTestCase):
         a = "from itertools import bar, filterfalse, foo"
         self.check(b, a)
 
+    def test_import_star(self):
+        s = "from itertools import *"
+        self.unchanged(s)
+
 
     def test_unchanged(self):
         s = "from itertools import foo"
         self.unchanged(s)
+
 
 class Test_import(FixerTestCase):
     fixer = "import"
@@ -3518,7 +3733,7 @@ class Test_import(FixerTestCase):
             self.files_checked.append(name)
             return self.always_exists or (name in self.present_files)
 
-        from ..fixes import fix_import
+        from lib2to3.fixes import fix_import
         fix_import.exists = fake_exists
 
     def tearDown(self):
@@ -3538,8 +3753,7 @@ class Test_import(FixerTestCase):
 
         self.always_exists = False
         self.present_files = set(['__init__.py'])
-        expected_extensions = ('.py', os.path.pathsep, '.pyc', '.so',
-                               '.sl', '.pyd')
+        expected_extensions = ('.py', os.path.sep, '.pyc', '.so', '.sl', '.pyd')
         names_to_test = (p("/spam/eggs.py"), "ni.py", p("../../shrubbery.py"))
 
         for name in names_to_test:
@@ -3562,12 +3776,29 @@ class Test_import(FixerTestCase):
         self.present_files = set(["bar.py"])
         self.unchanged(s)
 
+    def test_with_absolute_import_enabled(self):
+        s = "from __future__ import absolute_import\nimport bar"
+        self.always_exists = False
+        self.present_files = set(["__init__.py", "bar.py"])
+        self.unchanged(s)
+
     def test_in_package(self):
         b = "import bar"
         a = "from . import bar"
         self.always_exists = False
         self.present_files = set(["__init__.py", "bar.py"])
         self.check(b, a)
+
+    def test_import_from_package(self):
+        b = "import bar"
+        a = "from . import bar"
+        self.always_exists = False
+        self.present_files = set(["__init__.py", "bar" + os.path.sep])
+        self.check(b, a)
+
+    def test_already_relative_import(self):
+        s = "from . import bar"
+        self.unchanged(s)
 
     def test_comments_and_indent(self):
         b = "import bar # Foo"
@@ -4095,3 +4326,190 @@ class Test_getcwdu(FixerTestCase):
         b = """os.getcwdu (  )"""
         a = """os.getcwd (  )"""
         self.check(b, a)
+
+
+class Test_operator(FixerTestCase):
+
+    fixer = "operator"
+
+    def test_operator_isCallable(self):
+        b = "operator.isCallable(x)"
+        a = "hasattr(x, '__call__')"
+        self.check(b, a)
+
+    def test_operator_sequenceIncludes(self):
+        b = "operator.sequenceIncludes(x, y)"
+        a = "operator.contains(x, y)"
+        self.check(b, a)
+
+        b = "operator .sequenceIncludes(x, y)"
+        a = "operator .contains(x, y)"
+        self.check(b, a)
+
+        b = "operator.  sequenceIncludes(x, y)"
+        a = "operator.  contains(x, y)"
+        self.check(b, a)
+
+    def test_operator_isSequenceType(self):
+        b = "operator.isSequenceType(x)"
+        a = "import collections\nisinstance(x, collections.Sequence)"
+        self.check(b, a)
+
+    def test_operator_isMappingType(self):
+        b = "operator.isMappingType(x)"
+        a = "import collections\nisinstance(x, collections.Mapping)"
+        self.check(b, a)
+
+    def test_operator_isNumberType(self):
+        b = "operator.isNumberType(x)"
+        a = "import numbers\nisinstance(x, numbers.Number)"
+        self.check(b, a)
+
+    def test_operator_repeat(self):
+        b = "operator.repeat(x, n)"
+        a = "operator.mul(x, n)"
+        self.check(b, a)
+
+        b = "operator .repeat(x, n)"
+        a = "operator .mul(x, n)"
+        self.check(b, a)
+
+        b = "operator.  repeat(x, n)"
+        a = "operator.  mul(x, n)"
+        self.check(b, a)
+
+    def test_operator_irepeat(self):
+        b = "operator.irepeat(x, n)"
+        a = "operator.imul(x, n)"
+        self.check(b, a)
+
+        b = "operator .irepeat(x, n)"
+        a = "operator .imul(x, n)"
+        self.check(b, a)
+
+        b = "operator.  irepeat(x, n)"
+        a = "operator.  imul(x, n)"
+        self.check(b, a)
+
+    def test_bare_isCallable(self):
+        s = "isCallable(x)"
+        t = "You should use 'hasattr(x, '__call__')' here."
+        self.warns_unchanged(s, t)
+
+    def test_bare_sequenceIncludes(self):
+        s = "sequenceIncludes(x, y)"
+        t = "You should use 'operator.contains(x, y)' here."
+        self.warns_unchanged(s, t)
+
+    def test_bare_operator_isSequenceType(self):
+        s = "isSequenceType(z)"
+        t = "You should use 'isinstance(z, collections.Sequence)' here."
+        self.warns_unchanged(s, t)
+
+    def test_bare_operator_isMappingType(self):
+        s = "isMappingType(x)"
+        t = "You should use 'isinstance(x, collections.Mapping)' here."
+        self.warns_unchanged(s, t)
+
+    def test_bare_operator_isNumberType(self):
+        s = "isNumberType(y)"
+        t = "You should use 'isinstance(y, numbers.Number)' here."
+        self.warns_unchanged(s, t)
+
+    def test_bare_operator_repeat(self):
+        s = "repeat(x, n)"
+        t = "You should use 'operator.mul(x, n)' here."
+        self.warns_unchanged(s, t)
+
+    def test_bare_operator_irepeat(self):
+        s = "irepeat(y, 187)"
+        t = "You should use 'operator.imul(y, 187)' here."
+        self.warns_unchanged(s, t)
+
+
+class Test_exitfunc(FixerTestCase):
+
+    fixer = "exitfunc"
+
+    def test_simple(self):
+        b = """
+            import sys
+            sys.exitfunc = my_atexit
+            """
+        a = """
+            import sys
+            import atexit
+            atexit.register(my_atexit)
+            """
+        self.check(b, a)
+
+    def test_names_import(self):
+        b = """
+            import sys, crumbs
+            sys.exitfunc = my_func
+            """
+        a = """
+            import sys, crumbs, atexit
+            atexit.register(my_func)
+            """
+        self.check(b, a)
+
+    def test_complex_expression(self):
+        b = """
+            import sys
+            sys.exitfunc = do(d)/a()+complex(f=23, g=23)*expression
+            """
+        a = """
+            import sys
+            import atexit
+            atexit.register(do(d)/a()+complex(f=23, g=23)*expression)
+            """
+        self.check(b, a)
+
+    def test_comments(self):
+        b = """
+            import sys # Foo
+            sys.exitfunc = f # Blah
+            """
+        a = """
+            import sys
+            import atexit # Foo
+            atexit.register(f) # Blah
+            """
+        self.check(b, a)
+
+        b = """
+            import apples, sys, crumbs, larry # Pleasant comments
+            sys.exitfunc = func
+            """
+        a = """
+            import apples, sys, crumbs, larry, atexit # Pleasant comments
+            atexit.register(func)
+            """
+        self.check(b, a)
+
+    def test_in_a_function(self):
+        b = """
+            import sys
+            def f():
+                sys.exitfunc = func
+            """
+        a = """
+            import sys
+            import atexit
+            def f():
+                atexit.register(func)
+             """
+        self.check(b, a)
+
+    def test_no_sys_import(self):
+        b = """sys.exitfunc = f"""
+        a = """atexit.register(f)"""
+        msg = ("Can't find sys import; Please add an atexit import at the "
+            "top of your file.")
+        self.warns(b, a, msg)
+
+
+    def test_unchanged(self):
+        s = """f(sys.exitfunc)"""
+        self.unchanged(s)

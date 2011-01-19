@@ -43,8 +43,8 @@ RSC=rc.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 F90=df.exe
-# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /FD /c
-# ADD CPP /nologo /MD /W3 /GX /Zi /O2 /I "..\..\Include" /I ".." /I "..\..\modules\zlib" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "USE_DL_EXPORT" /YX /FD /Zm200 /c
+# ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "Py_BUILD_CORE_MODULE" /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /FD /c
+# ADD CPP /nologo /MD /W3 /GX /Zi /O2 /I "..\..\Include" /I ".." /I "..\..\modules\zlib" /D "Py_BUILD_CORE_MODULE" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "USE_DL_EXPORT" /YX /FD /Zm200 /c
 # ADD BASE MTL /nologo /D "NDEBUG" /mktyplib203 /o /win32 "NUL"
 # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /o /win32 "NUL"
 # ADD BASE RSC /l 0x409 /d "NDEBUG"
@@ -54,7 +54,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386
-# ADD LINK32 largeint.lib kernel32.lib user32.lib advapi32.lib shell32.lib /nologo /base:"0x1e000000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"libc" /out:"./python31.dll"
+# ADD LINK32 largeint.lib kernel32.lib user32.lib advapi32.lib shell32.lib /nologo /base:"0x1e000000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"libc" /out:"./python32.dll"
 # SUBTRACT LINK32 /pdb:none
 
 !ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
@@ -71,8 +71,8 @@ LINK32=link.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 F90=df.exe
-# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /FD /c
-# ADD CPP /nologo /MDd /W3 /Gm /GX /Zi /Od /I "..\..\Include" /I ".." /I "..\..\modules\zlib" /D "_DEBUG" /D "USE_DL_EXPORT" /D "WIN32" /D "_WINDOWS" /YX /FD /Zm200 /c
+# ADD BASE CPP /nologo /MTd /W3 /Gm /GX /Zi /Od /D "Py_BUILD_CORE_MODULE" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /YX /FD /c
+# ADD CPP /nologo /MDd /W3 /Gm /GX /Zi /Od /I "..\..\Include" /I ".." /I "..\..\modules\zlib" /D "Py_BUILD_CORE_MODULE" /D "_DEBUG" /D "USE_DL_EXPORT" /D "WIN32" /D "_WINDOWS" /YX /FD /Zm200 /c
 # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /o /win32 "NUL"
 # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /o /win32 "NUL"
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
@@ -82,7 +82,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386 /pdbtype:sept
-# ADD LINK32 largeint.lib kernel32.lib user32.lib advapi32.lib shell32.lib /nologo /base:"0x1e000000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"libc" /out:"./python31_d.dll" /pdbtype:sept
+# ADD LINK32 largeint.lib kernel32.lib user32.lib advapi32.lib shell32.lib /nologo /base:"0x1e000000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"libc" /out:"./python32_d.dll" /pdbtype:sept
 # SUBTRACT LINK32 /pdb:none
 
 !ENDIF 
@@ -133,35 +133,15 @@ SOURCE=..\..\Modules\_csv.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_datetimemodule.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Modules\_functoolsmodule.c
 # End Source File
 # Begin Source File
 
 SOURCE=..\..\Modules\_heapqmodule.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\_io\bytesio.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\_io\stringio.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\_io\fileio.c
-# End Source File
-# Begin Source File
-
-SOURCE="..\..\Modules\_io\bufferedio.c"
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\_io\iobase.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Modules\_io\textio.c
 # End Source File
 # Begin Source File
 
@@ -178,6 +158,10 @@ SOURCE=..\..\Modules\_localemodule.c
 # Begin Source File
 
 SOURCE=..\..\Modules\_lsprof.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_math.c
 # End Source File
 # Begin Source File
 
@@ -202,6 +186,10 @@ SOURCE=..\..\PC\_subprocess.c
 # Begin Source File
 
 SOURCE=..\..\Modules\_threadmodule.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_time.c
 # End Source File
 # Begin Source File
 
@@ -261,11 +249,19 @@ SOURCE=..\..\Objects\boolobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\bufferedio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\bytearrayobject.c
 # End Source File
 # Begin Source File
 
 SOURCE=..\..\Objects\bytes_methods.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\bytesio.c
 # End Source File
 # Begin Source File
 
@@ -290,10 +286,6 @@ SOURCE=..\..\Objects\classobject.c
 # Begin Source File
 
 SOURCE=..\..\Modules\cmathmodule.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\Objects\cobject.c
 # End Source File
 # Begin Source File
 
@@ -325,7 +317,7 @@ SOURCE=..\..\Modules\zlib\crc32.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\Modules\datetimemodule.c
+SOURCE=..\..\Python\dynamic_annotations.c
 # End Source File
 # Begin Source File
 
@@ -369,7 +361,15 @@ SOURCE=..\..\Objects\exceptions.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\fileio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\fileobject.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Python\fileutils.c
 # End Source File
 # Begin Source File
 
@@ -484,6 +484,10 @@ SOURCE=..\..\Modules\zlib\inflate.c
 # Begin Source File
 
 SOURCE=..\..\Modules\zlib\inftrees.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\iobase.c
 # End Source File
 # Begin Source File
 
@@ -643,6 +647,10 @@ SOURCE=..\..\Python\pythonrun.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Python\pytime.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Objects\rangeobject.c
 # End Source File
 # Begin Source File
@@ -675,6 +683,10 @@ SOURCE=..\..\Objects\sliceobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\_io\stringio.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Python\structmember.c
 # End Source File
 # Begin Source File
@@ -692,6 +704,10 @@ SOURCE=..\..\Modules\symtablemodule.c
 # Begin Source File
 
 SOURCE=..\..\Python\sysmodule.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\_io\textio.c
 # End Source File
 # Begin Source File
 

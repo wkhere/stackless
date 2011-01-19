@@ -146,15 +146,11 @@ Assignment of an object to a single target is recursively defined as follows.
   * Otherwise: the name is bound to the object in the global namespace or the
     outer namespace determined by :keyword:`nonlocal`, respectively.
 
+  .. index:: single: destructor
+
   The name is rebound if it was already bound.  This may cause the reference
   count for the object previously bound to the name to reach zero, causing the
   object to be deallocated and its destructor (if it has one) to be called.
-
-  .. index:: single: destructor
-
-  The name is rebound if it was already bound.  This may cause the reference count
-  for the object previously bound to the name to reach zero, causing the object to
-  be deallocated and its destructor (if it has one) to be called.
 
 * If the target is a target list enclosed in parentheses or in square brackets:
   The object must be an iterable with the same number of items as there are
@@ -169,6 +165,25 @@ Assignment of an object to a single target is recursively defined as follows.
   asked to assign the assigned object to the given attribute; if it cannot
   perform the assignment, it raises an exception (usually but not necessarily
   :exc:`AttributeError`).
+
+  .. _attr-target-note:
+
+  Note: If the object is a class instance and the attribute reference occurs on
+  both sides of the assignment operator, the RHS expression, ``a.x`` can access
+  either an instance attribute or (if no instance attribute exists) a class
+  attribute.  The LHS target ``a.x`` is always set as an instance attribute,
+  creating it if necessary.  Thus, the two occurrences of ``a.x`` do not
+  necessarily refer to the same attribute: if the RHS expression refers to a
+  class attribute, the LHS creates a new instance attribute as the target of the
+  assignment::
+
+     class Cls:
+         x = 3             # class variable
+     inst = Cls()
+     inst.x = inst.x + 1   # writes inst.x as 4 leaving Cls.x as 3
+
+  This description does not necessarily apply to descriptor attributes, such as
+  properties created with :func:`property`.
 
   .. index::
      pair: subscription; assignment
@@ -217,9 +232,11 @@ Assignment of an object to a single target is recursively defined as follows.
   from the length of the assigned sequence, thus changing the length of the
   target sequence, if the object allows it.
 
-(In the current implementation, the syntax for targets is taken to be the same
-as for expressions, and invalid syntax is rejected during the code generation
-phase, causing less detailed error messages.)
+.. impl-detail::
+
+   In the current implementation, the syntax for targets is taken to be the same
+   as for expressions, and invalid syntax is rejected during the code generation
+   phase, causing less detailed error messages.
 
 WARNING: Although the definition of assignment implies that overlaps between the
 left-hand side and the right-hand side are 'safe' (for example ``a, b = b, a``
@@ -276,16 +293,8 @@ same way as normal assignments. Similarly, with the exception of the possible
 *in-place* behavior, the binary operation performed by augmented assignment is
 the same as the normal binary operations.
 
-For targets which are attribute references, the initial value is retrieved with
-a :meth:`getattr` and the result is assigned with a :meth:`setattr`.  Notice
-that the two methods do not necessarily refer to the same variable.  When
-:meth:`getattr` refers to a class variable, :meth:`setattr` still writes to an
-instance variable. For example::
-
-   class A:
-       x = 3    # class variable
-   a = A()
-   a.x += 1     # writes a.x as 4 leaving A.x as 3
+For targets which are attribute references, the same :ref:`caveat about class
+and instance attributes <attr-target-note>` applies as for regular assignments.
 
 
 .. _assert:
@@ -379,17 +388,17 @@ namespace, depending on whether the name occurs in a :keyword:`global` statement
 in the same code block.  If the name is unbound, a :exc:`NameError` exception
 will be raised.
 
-.. index:: pair: free; variable
-
-It is illegal to delete a name from the local namespace if it occurs as a free
-variable in a nested block.
-
 .. index:: pair: attribute; deletion
 
 Deletion of attribute references, subscriptions and slicings is passed to the
 primary object involved; deletion of a slicing is in general equivalent to
 assignment of an empty slice of the right type (but even this is determined by
 the sliced object).
+
+.. versionchanged:: 3.2
+
+   Previously it was illegal to delete a name from the local namespace if it
+   occurs as a free variable in a nested block.
 
 
 .. _return:
@@ -668,7 +677,9 @@ Once the name of the module is known (unless otherwise specified, the term
 "module" will refer to both packages and modules), searching
 for the module or package can begin. The first place checked is
 :data:`sys.modules`, the cache of all modules that have been imported
-previously. If the module is found there then it is used in step (2) of import.
+previously. If the module is found there then it is used in step (2) of import
+unless ``None`` is found in :data:`sys.modules`, in which case
+:exc:`ImportError` is raised.
 
 .. index::
     single: sys.meta_path
@@ -685,7 +696,7 @@ within a package (as denoted by the existence of a dot in the name), then a
 second argument to :meth:`find_module` is given as the value of the
 :attr:`__path__` attribute from the parent package (everything up to the last
 dot in the name of the module being imported). If a finder can find the module
-it returns a :term:`loader` (discussed later) or returns :keyword:`None`.
+it returns a :term:`loader` (discussed later) or returns ``None``.
 
 .. index::
     single: sys.path_hooks
@@ -712,11 +723,11 @@ finder cached then :data:`sys.path_hooks` is searched by calling each object in
 the list with a single argument of the path, returning a finder or raises
 :exc:`ImportError`. If a finder is returned then it is cached in
 :data:`sys.path_importer_cache` and then used for that path entry. If no finder
-can be found but the path exists then a value of :keyword:`None` is
+can be found but the path exists then a value of ``None`` is
 stored in :data:`sys.path_importer_cache` to signify that an implicit,
 file-based finder that handles modules stored as individual files should be
 used for that path. If the path does not exist then a finder which always
-returns :keyword:`None` is placed in the cache for the path.
+returns ``None`` is placed in the cache for the path.
 
 .. index::
     single: loader
@@ -780,7 +791,7 @@ first form of :keyword:`import`, an alternate local name can be supplied by
 specifying ":keyword:`as` localname".  If a name is not found,
 :exc:`ImportError` is raised.  If the list of identifiers is replaced by a star
 (``'*'``), all public names defined in the module are bound in the local
-namespace of the :keyword:`import` statement..
+namespace of the :keyword:`import` statement.
 
 .. index:: single: __all__ (optional module attribute)
 
@@ -796,7 +807,7 @@ modules which were imported and used within the module).
 
 The :keyword:`from` form with ``*`` may only occur in a module scope.  The wild
 card form of import --- ``import *`` --- is only allowed at the module level.
-Attempting to use it in class for function definitions will raise a
+Attempting to use it in class or function definitions will raise a
 :exc:`SyntaxError`.
 
 .. index::
@@ -812,7 +823,7 @@ leading dot means the current package where the module making the import
 exists. Two dots means up one package level. Three dots is up two levels, etc.
 So if you execute ``from . import mod`` from a module in the ``pkg`` package
 then you will end up importing ``pkg.mod``. If you execute ``from ..subpkg2
-imprt mod`` from within ``pkg.subpkg1`` you will import ``pkg.subpkg2.mod``.
+import mod`` from within ``pkg.subpkg1`` you will import ``pkg.subpkg2.mod``.
 The specification for relative imports is contained within :pep:`328`.
 
 :func:`importlib.import_module` is provided to support applications that
@@ -881,7 +892,7 @@ Note that there is nothing special about the statement::
 That is not a future statement; it's an ordinary import statement with no
 special semantics or syntax restrictions.
 
-Code compiled by calls to the builtin functions :func:`exec` and :func:`compile`
+Code compiled by calls to the built-in functions :func:`exec` and :func:`compile`
 that occur in a module :mod:`M` containing a future statement will, by default,
 use the new syntax or semantics associated with the future statement.  This can
 be controlled by optional arguments to :func:`compile` --- see the documentation
@@ -924,9 +935,11 @@ Names listed in a :keyword:`global` statement must not be defined as formal
 parameters or in a :keyword:`for` loop control target, :keyword:`class`
 definition, function definition, or :keyword:`import` statement.
 
-(The current implementation does not enforce the latter two restrictions, but
-programs should not abuse this freedom, as future implementations may enforce
-them or silently change the meaning of the program.)
+.. impl-detail::
+
+   The current implementation does not enforce the latter two restrictions, but
+   programs should not abuse this freedom, as future implementations may enforce
+   them or silently change the meaning of the program.
 
 .. index::
    builtin: exec
@@ -936,7 +949,7 @@ them or silently change the meaning of the program.)
 **Programmer's note:** the :keyword:`global` is a directive to the parser.  It
 applies only to code parsed at the same time as the :keyword:`global` statement.
 In particular, a :keyword:`global` statement contained in a string or code
-object supplied to the builtin :func:`exec` function does not affect the code
+object supplied to the built-in :func:`exec` function does not affect the code
 block *containing* the function call, and code contained in such a string is
 unaffected by :keyword:`global` statements in the code containing the function
 call.  The same applies to the :func:`eval` and :func:`compile` functions.

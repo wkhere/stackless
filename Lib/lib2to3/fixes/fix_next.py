@@ -15,6 +15,7 @@ bind_warning = "Calls to builtin next() possibly shadowed by global binding"
 
 
 class FixNext(fixer_base.BaseFix):
+    BM_compatible = True
     PATTERN = """
     power< base=any+ trailer< '.' attr='next' > trailer< '(' ')' > >
     |
@@ -99,4 +100,4 @@ def find_assign(node):
 def is_subtree(root, node):
     if root == node:
         return True
-    return any([is_subtree(c, node) for c in root.children])
+    return any(is_subtree(c, node) for c in root.children)

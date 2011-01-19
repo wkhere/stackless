@@ -12,7 +12,7 @@ import socket
 import platform
 import configparser
 import http.client as httpclient
-import base64
+from base64 import standard_b64encode
 import urllib.parse
 
 # this keeps compatibility for 2.3 and 2.4
@@ -76,7 +76,11 @@ class upload(PyPIRCCommand):
 
         # Fill in the data - send all the meta-data in case we need to
         # register a new release
-        content = open(filename,'rb').read()
+        f = open(filename,'rb')
+        try:
+            content = f.read()
+        finally:
+            f.close()
         meta = self.distribution.metadata
         data = {
             # action
@@ -127,7 +131,7 @@ class upload(PyPIRCCommand):
         user_pass = (self.username + ":" + self.password).encode('ascii')
         # The exact encoding of the authentication string is debated.
         # Anyway PyPI only accepts ascii for both username or password.
-        auth = "Basic " + base64.encodebytes(user_pass).strip().decode('ascii')
+        auth = "Basic " + standard_b64encode(user_pass).decode('ascii')
 
         # Build up the MIME payload for the POST data
         boundary = '--------------GHSKFJDLGDS7543FJKLFHRE75642756743254'
@@ -194,4 +198,5 @@ class upload(PyPIRCCommand):
             self.announce('Upload failed (%s): %s' % (r.status, r.reason),
                           log.ERROR)
         if self.show_response:
-            self.announce('-'*75, r.read(), '-'*75)
+            msg = '\n'.join(('-' * 75, r.read(), '-' * 75))
+            self.announce(msg, log.INFO)

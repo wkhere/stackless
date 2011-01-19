@@ -10,12 +10,19 @@ from .. import patcomp
 
 
 class FixXrange(fixer_base.BaseFix):
-
+    BM_compatible = True
     PATTERN = """
               power<
                  (name='range'|name='xrange') trailer< '(' args=any ')' >
               rest=any* >
               """
+
+    def start_tree(self, tree, filename):
+        super(FixXrange, self).start_tree(tree, filename)
+        self.transformed_xranges = set()
+
+    def finish_tree(self, tree, filename):
+        self.transformed_xranges = None
 
     def transform(self, node, results):
         name = results["name"]
@@ -29,9 +36,12 @@ class FixXrange(fixer_base.BaseFix):
     def transform_xrange(self, node, results):
         name = results["name"]
         name.replace(Name("range", prefix=name.prefix))
+        # This prevents the new range call from being wrapped in a list later.
+        self.transformed_xranges.add(id(node))
 
     def transform_range(self, node, results):
-        if not self.in_special_context(node):
+        if (id(node) not in self.transformed_xranges and
+            not self.in_special_context(node)):
             range_call = Call(Name("range"), [results["args"].clone()])
             # Encase the range call in list().
             list_call = Call(Name("list"), [range_call],
@@ -40,7 +50,6 @@ class FixXrange(fixer_base.BaseFix):
             for n in results["rest"]:
                 list_call.append_child(n)
             return list_call
-        return node
 
     P1 = "power< func=NAME trailer< '(' node=any ')' > any* >"
     p1 = patcomp.compile_pattern(P1)

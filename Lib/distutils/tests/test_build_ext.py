@@ -1,20 +1,20 @@
 import sys
 import os
-import tempfile
 import shutil
 from io import StringIO
 
-from distutils.core import Extension, Distribution
+from distutils.core import Distribution
 from distutils.command.build_ext import build_ext
 from distutils import sysconfig
 from distutils.tests.support import TempdirManager
 from distutils.tests.support import LoggingSilencer
 from distutils.extension import Extension
-from distutils.errors import (UnknownFileError, DistutilsSetupError,
-                              CompileError)
+from distutils.errors import (
+    CompileError, DistutilsSetupError, UnknownFileError)
 
 import unittest
 from test import support
+from test.support import run_unittest
 
 # http://bugs.python.org/issue4373
 # Don't load the xx module more than once.
@@ -32,7 +32,7 @@ class BuildExtTestCase(TempdirManager,
         # Note that we're making changes to sys.path
         super(BuildExtTestCase, self).setUp()
         self.tmp_dir = self.mkdtemp()
-        self.sys_path = sys.path[:]
+        self.sys_path = sys.path, sys.path[:]
         sys.path.append(self.tmp_dir)
         shutil.copy(_get_source_filename(), self.tmp_dir)
         if sys.version > "2.6":
@@ -42,6 +42,25 @@ class BuildExtTestCase(TempdirManager,
             from distutils.command import build_ext
             build_ext.USER_BASE = site.USER_BASE
 
+    def _fixup_command(self, cmd):
+        # When Python was build with --enable-shared, -L. is not good enough
+        # to find the libpython<blah>.so.  This is because regrtest runs it
+        # under a tempdir, not in the top level where the .so lives.  By the
+        # time we've gotten here, Python's already been chdir'd to the
+        # tempdir.
+        #
+        # To further add to the fun, we can't just add library_dirs to the
+        # Extension() instance because that doesn't get plumbed through to the
+        # final compiler command.
+        if (sysconfig.get_config_var('Py_ENABLE_SHARED') and
+            not sys.platform.startswith('win')):
+            runshared = sysconfig.get_config_var('RUNSHARED')
+            if runshared is None:
+                cmd.library_dirs = ['.']
+            else:
+                name, equals, value = runshared.partition('=')
+                cmd.library_dirs = value.split(os.pathsep)
+
     def test_build_ext(self):
         global ALREADY_TESTED
         xx_c = os.path.join(self.tmp_dir, 'xxmodule.c')
@@ -49,6 +68,7 @@ class BuildExtTestCase(TempdirManager,
         dist = Distribution({'name': 'xx', 'ext_modules': [xx_ext]})
         dist.package_dir = self.tmp_dir
         cmd = build_ext(dist)
+        self._fixup_command(cmd)
         if os.name == "nt":
             # On Windows, we must build a debug version iff running
             # a debug build of Python
@@ -74,20 +94,21 @@ class BuildExtTestCase(TempdirManager,
         import xx
 
         for attr in ('error', 'foo', 'new', 'roj'):
-            self.assert_(hasattr(xx, attr))
+            self.assertTrue(hasattr(xx, attr))
 
-        self.assertEquals(xx.foo(2, 5), 7)
-        self.assertEquals(xx.foo(13,15), 28)
-        self.assertEquals(xx.new().demo(), None)
+        self.assertEqual(xx.foo(2, 5), 7)
+        self.assertEqual(xx.foo(13,15), 28)
+        self.assertEqual(xx.new().demo(), None)
         doc = 'This is a template module just for instruction.'
-        self.assertEquals(xx.__doc__, doc)
-        self.assert_(isinstance(xx.Null(), xx.Null))
-        self.assert_(isinstance(xx.Str(), xx.Str))
+        self.assertEqual(xx.__doc__, doc)
+        self.assertTrue(isinstance(xx.Null(), xx.Null))
+        self.assertTrue(isinstance(xx.Str(), xx.Str))
 
     def tearDown(self):
         # Get everything back to normal
         support.unload('xx')
-        sys.path = self.sys_path
+        sys.path = self.sys_path[0]
+        sys.path[:] = self.sys_path[1]
         if sys.version > "2.6":
             import site
             site.USER_BASE = self.old_user_base
@@ -114,7 +135,7 @@ class BuildExtTestCase(TempdirManager,
                 _config_vars['Py_ENABLE_SHARED'] = old_var
 
         # make sure we get some library dirs under solaris
-        self.assert_(len(cmd.library_dirs) > 0)
+        self.assertTrue(len(cmd.library_dirs) > 0)
 
     def test_user_site(self):
         # site.USER_SITE was introduced in 2.6
@@ -128,7 +149,7 @@ class BuildExtTestCase(TempdirManager,
         # making sure the user option is there
         options = [name for name, short, lable in
                    cmd.user_options]
-        self.assert_('user' in options)
+        self.assertTrue('user' in options)
 
         # setting a value
         cmd.user = 1
@@ -144,9 +165,9 @@ class BuildExtTestCase(TempdirManager,
 
         # see if include_dirs and library_dirs
         # were set
-        self.assert_(lib in cmd.library_dirs)
-        self.assert_(lib in cmd.rpath)
-        self.assert_(incl in cmd.include_dirs)
+        self.assertTrue(lib in cmd.library_dirs)
+        self.assertTrue(lib in cmd.rpath)
+        self.assertTrue(incl in cmd.include_dirs)
 
     def test_optional_extension(self):
 
@@ -175,31 +196,31 @@ class BuildExtTestCase(TempdirManager,
 
         from distutils import sysconfig
         py_include = sysconfig.get_python_inc()
-        self.assert_(py_include in cmd.include_dirs)
+        self.assertTrue(py_include in cmd.include_dirs)
 
         plat_py_include = sysconfig.get_python_inc(plat_specific=1)
-        self.assert_(plat_py_include in cmd.include_dirs)
+        self.assertTrue(plat_py_include in cmd.include_dirs)
 
         # make sure cmd.libraries is turned into a list
         # if it's a string
         cmd = build_ext(dist)
         cmd.libraries = 'my_lib'
         cmd.finalize_options()
-        self.assertEquals(cmd.libraries, ['my_lib'])
+        self.assertEqual(cmd.libraries, ['my_lib'])
 
         # make sure cmd.library_dirs is turned into a list
         # if it's a string
         cmd = build_ext(dist)
         cmd.library_dirs = 'my_lib_dir'
         cmd.finalize_options()
-        self.assert_('my_lib_dir' in cmd.library_dirs)
+        self.assertTrue('my_lib_dir' in cmd.library_dirs)
 
         # make sure rpath is turned into a list
         # if it's a list of os.pathsep's paths
         cmd = build_ext(dist)
         cmd.rpath = os.pathsep.join(['one', 'two'])
         cmd.finalize_options()
-        self.assertEquals(cmd.rpath, ['one', 'two'])
+        self.assertEqual(cmd.rpath, ['one', 'two'])
 
         # XXX more tests to perform for win32
 
@@ -208,25 +229,25 @@ class BuildExtTestCase(TempdirManager,
         cmd = build_ext(dist)
         cmd.define = 'one,two'
         cmd.finalize_options()
-        self.assertEquals(cmd.define, [('one', '1'), ('two', '1')])
+        self.assertEqual(cmd.define, [('one', '1'), ('two', '1')])
 
         # make sure undef is turned into a list of
         # strings if they are ','-separated strings
         cmd = build_ext(dist)
         cmd.undef = 'one,two'
         cmd.finalize_options()
-        self.assertEquals(cmd.undef, ['one', 'two'])
+        self.assertEqual(cmd.undef, ['one', 'two'])
 
         # make sure swig_opts is turned into a list
         cmd = build_ext(dist)
         cmd.swig_opts = None
         cmd.finalize_options()
-        self.assertEquals(cmd.swig_opts, [])
+        self.assertEqual(cmd.swig_opts, [])
 
         cmd = build_ext(dist)
         cmd.swig_opts = '1 2'
         cmd.finalize_options()
-        self.assertEquals(cmd.swig_opts, ['1', '2'])
+        self.assertEqual(cmd.swig_opts, ['1', '2'])
 
     def test_check_extensions_list(self):
         dist = Distribution()
@@ -234,7 +255,8 @@ class BuildExtTestCase(TempdirManager,
         cmd.finalize_options()
 
         #'extensions' option must be a list of Extension instances
-        self.assertRaises(DistutilsSetupError, cmd.check_extensions_list, 'foo')
+        self.assertRaises(DistutilsSetupError,
+                          cmd.check_extensions_list, 'foo')
 
         # each element of 'ext_modules' option must be an
         # Extension instance or 2-tuple
@@ -257,13 +279,13 @@ class BuildExtTestCase(TempdirManager,
                              'some': 'bar'})]
         cmd.check_extensions_list(exts)
         ext = exts[0]
-        self.assert_(isinstance(ext, Extension))
+        self.assertTrue(isinstance(ext, Extension))
 
         # check_extensions_list adds in ext the values passed
         # when they are in ('include_dirs', 'library_dirs', 'libraries'
         # 'extra_objects', 'extra_compile_args', 'extra_link_args')
-        self.assertEquals(ext.libraries, 'foo')
-        self.assert_(not hasattr(ext, 'some'))
+        self.assertEqual(ext.libraries, 'foo')
+        self.assertTrue(not hasattr(ext, 'some'))
 
         # 'macros' element of build info dict must be 1- or 2-tuple
         exts = [('foo.bar', {'sources': [''], 'libraries': 'foo',
@@ -272,15 +294,15 @@ class BuildExtTestCase(TempdirManager,
 
         exts[0][1]['macros'] = [('1', '2'), ('3',)]
         cmd.check_extensions_list(exts)
-        self.assertEquals(exts[0].undef_macros, ['3'])
-        self.assertEquals(exts[0].define_macros, [('1', '2')])
+        self.assertEqual(exts[0].undef_macros, ['3'])
+        self.assertEqual(exts[0].define_macros, [('1', '2')])
 
     def test_get_source_files(self):
         modules = [Extension('foo', ['xxx'], optional=False)]
         dist = Distribution({'name': 'xx', 'ext_modules': modules})
         cmd = build_ext(dist)
         cmd.ensure_finalized()
-        self.assertEquals(cmd.get_source_files(), ['xxx'])
+        self.assertEqual(cmd.get_source_files(), ['xxx'])
 
     def test_compiler_option(self):
         # cmd.compiler is an option and
@@ -291,7 +313,7 @@ class BuildExtTestCase(TempdirManager,
         cmd.compiler = 'unix'
         cmd.ensure_finalized()
         cmd.run()
-        self.assertEquals(cmd.compiler, 'unix')
+        self.assertEqual(cmd.compiler, 'unix')
 
     def test_get_outputs(self):
         tmp_dir = self.mkdtemp()
@@ -301,8 +323,9 @@ class BuildExtTestCase(TempdirManager,
         dist = Distribution({'name': 'xx',
                              'ext_modules': [ext]})
         cmd = build_ext(dist)
+        self._fixup_command(cmd)
         cmd.ensure_finalized()
-        self.assertEquals(len(cmd.get_outputs()), 1)
+        self.assertEqual(len(cmd.get_outputs()), 1)
 
         if os.name == "nt":
             cmd.debug = sys.executable.endswith("_d.exe")
@@ -321,28 +344,28 @@ class BuildExtTestCase(TempdirManager,
             so_file = cmd.get_outputs()[0]
         finally:
             os.chdir(old_wd)
-        self.assert_(os.path.exists(so_file))
-        self.assertEquals(os.path.splitext(so_file)[-1],
-                          sysconfig.get_config_var('SO'))
+        self.assertTrue(os.path.exists(so_file))
+        so_ext = sysconfig.get_config_var('SO')
+        self.assertTrue(so_file.endswith(so_ext))
         so_dir = os.path.dirname(so_file)
-        self.assertEquals(so_dir, other_tmp_dir)
+        self.assertEqual(so_dir, other_tmp_dir)
 
         cmd.inplace = 0
+        cmd.compiler = None
         cmd.run()
         so_file = cmd.get_outputs()[0]
-        self.assert_(os.path.exists(so_file))
-        self.assertEquals(os.path.splitext(so_file)[-1],
-                          sysconfig.get_config_var('SO'))
+        self.assertTrue(os.path.exists(so_file))
+        self.assertTrue(so_file.endswith(so_ext))
         so_dir = os.path.dirname(so_file)
-        self.assertEquals(so_dir, cmd.build_lib)
+        self.assertEqual(so_dir, cmd.build_lib)
 
         # inplace = 0, cmd.package = 'bar'
-        cmd.package = 'bar'
+        build_py = cmd.get_finalized_command('build_py')
+        build_py.package_dir = {'': 'bar'}
         path = cmd.get_ext_fullpath('foo')
-        # checking that the last directory is bar
+        # checking that the last directory is the build_dir
         path = os.path.split(path)[0]
-        lastdir = os.path.split(path)[-1]
-        self.assertEquals(lastdir, cmd.package)
+        self.assertEqual(path, cmd.build_lib)
 
         # inplace = 1, cmd.package = 'bar'
         cmd.inplace = 1
@@ -356,7 +379,45 @@ class BuildExtTestCase(TempdirManager,
         # checking that the last directory is bar
         path = os.path.split(path)[0]
         lastdir = os.path.split(path)[-1]
-        self.assertEquals(lastdir, cmd.package)
+        self.assertEqual(lastdir, 'bar')
+
+    def test_ext_fullpath(self):
+        ext = sysconfig.get_config_vars()['SO']
+        # building lxml.etree inplace
+        #etree_c = os.path.join(self.tmp_dir, 'lxml.etree.c')
+        #etree_ext = Extension('lxml.etree', [etree_c])
+        #dist = Distribution({'name': 'lxml', 'ext_modules': [etree_ext]})
+        dist = Distribution()
+        cmd = build_ext(dist)
+        cmd.inplace = 1
+        cmd.distribution.package_dir = {'': 'src'}
+        cmd.distribution.packages = ['lxml', 'lxml.html']
+        curdir = os.getcwd()
+        wanted = os.path.join(curdir, 'src', 'lxml', 'etree' + ext)
+        path = cmd.get_ext_fullpath('lxml.etree')
+        self.assertEqual(wanted, path)
+
+        # building lxml.etree not inplace
+        cmd.inplace = 0
+        cmd.build_lib = os.path.join(curdir, 'tmpdir')
+        wanted = os.path.join(curdir, 'tmpdir', 'lxml', 'etree' + ext)
+        path = cmd.get_ext_fullpath('lxml.etree')
+        self.assertEqual(wanted, path)
+
+        # building twisted.runner.portmap not inplace
+        build_py = cmd.get_finalized_command('build_py')
+        build_py.package_dir = {}
+        cmd.distribution.packages = ['twisted', 'twisted.runner.portmap']
+        path = cmd.get_ext_fullpath('twisted.runner.portmap')
+        wanted = os.path.join(curdir, 'tmpdir', 'twisted', 'runner',
+                              'portmap' + ext)
+        self.assertEqual(wanted, path)
+
+        # building twisted.runner.portmap inplace
+        cmd.inplace = 1
+        path = cmd.get_ext_fullpath('twisted.runner.portmap')
+        wanted = os.path.join(curdir, 'twisted', 'runner', 'portmap' + ext)
+        self.assertEqual(wanted, path)
 
 def test_suite():
     src = _get_source_filename()

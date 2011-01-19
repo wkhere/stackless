@@ -1,3 +1,4 @@
+
 """Doctest for method/function calls.
 
 We're going the use these types for extra testing
@@ -65,17 +66,17 @@ Verify clearing of SF bug #733667
     >>> g()
     Traceback (most recent call last):
       ...
-    TypeError: g() takes at least 1 positional argument (0 given)
+    TypeError: g() takes at least 1 argument (0 given)
 
     >>> g(*())
     Traceback (most recent call last):
       ...
-    TypeError: g() takes at least 1 positional argument (0 given)
+    TypeError: g() takes at least 1 argument (0 given)
 
     >>> g(*(), **{})
     Traceback (most recent call last):
       ...
-    TypeError: g() takes at least 1 positional argument (0 given)
+    TypeError: g() takes at least 1 argument (0 given)
 
     >>> g(1)
     1 () {}
@@ -243,13 +244,55 @@ TypeError if te dictionary is not empty
       ...
     TypeError: id() takes no keyword arguments
 
+A corner case of keyword dictionary items being deleted during
+the function call setup. See <http://bugs.python.org/issue2016>.
+
+    >>> class Name(str):
+    ...     def __eq__(self, other):
+    ...         try:
+    ...              del x[self]
+    ...         except KeyError:
+    ...              pass
+    ...         return str.__eq__(self, other)
+    ...     def __hash__(self):
+    ...         return str.__hash__(self)
+
+    >>> x = {Name("a"):1, Name("b"):2}
+    >>> def f(a, b):
+    ...     print(a,b)
+    >>> f(**x)
+    1 2
+
+A obscure message:
+
+    >>> def f(a, b):
+    ...    pass
+    >>> f(b=1)
+    Traceback (most recent call last):
+      ...
+    TypeError: f() takes exactly 2 arguments (1 given)
+
+The number of arguments passed in includes keywords:
+
+    >>> def f(a):
+    ...    pass
+    >>> f(6, a=4, *(1, 2, 3))
+    Traceback (most recent call last):
+      ...
+    TypeError: f() takes exactly 1 positional argument (5 given)
+    >>> def f(a, *, kw):
+    ...    pass
+    >>> f(6, 4, kw=4)
+    Traceback (most recent call last):
+      ...
+    TypeError: f() takes exactly 1 positional argument (3 given)
 """
 
+import sys
 from test import support
 
 def test_main():
-    from test import test_extcall # self import
-    support.run_doctest(test_extcall, True)
+    support.run_doctest(sys.modules[__name__], True)
 
 if __name__ == '__main__':
     test_main()

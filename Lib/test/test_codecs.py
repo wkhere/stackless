@@ -29,14 +29,14 @@ class MixInCheckStateHandling:
             d = codecs.getincrementaldecoder(encoding)()
             part1 = d.decode(s[:i])
             state = d.getstate()
-            self.assert_(isinstance(state[1], int))
+            self.assertIsInstance(state[1], int)
             # Check that the condition stated in the documentation for
             # IncrementalDecoder.getstate() holds
             if not state[1]:
                 # reset decoder to the default state without anything buffered
                 d.setstate((state[0][:0], 0))
                 # Feeding the previous input may not produce any output
-                self.assert_(not d.decode(state[0]))
+                self.assertTrue(not d.decode(state[0]))
                 # The decoder must return to the same state
                 self.assertEqual(state, d.getstate())
             # Create a new decoder and set it to the state
@@ -72,7 +72,6 @@ class ReadTest(unittest.TestCase, MixInCheckStateHandling):
         # check that there's nothing left in the buffers
         self.assertEqual(r.read(), "")
         self.assertEqual(r.bytebuffer, b"")
-        self.assertEqual(r.charbuffer, "")
 
         # do the check again, this time using a incremental decoder
         d = codecs.getincrementaldecoder(self.encoding)()
@@ -296,11 +295,11 @@ class UTF32Test(ReadTest):
         f.write("spam")
         d = s.getvalue()
         # check whether there is exactly one BOM in it
-        self.assert_(d == self.spamle or d == self.spambe)
+        self.assertTrue(d == self.spamle or d == self.spambe)
         # try to read it back
         s = io.BytesIO(d)
         f = reader(s)
-        self.assertEquals(f.read(), "spamspam")
+        self.assertEqual(f.read(), "spamspam")
 
     def test_badbom(self):
         s = io.BytesIO(4*b"\xff")
@@ -338,6 +337,12 @@ class UTF32Test(ReadTest):
             ]
         )
 
+    def test_handlers(self):
+        self.assertEqual(('\ufffd', 1),
+                         codecs.utf_32_decode(b'\x01', 'replace', True))
+        self.assertEqual(('', 1),
+                         codecs.utf_32_decode(b'\x01', 'ignore', True))
+
     def test_errors(self):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_decode,
                           b"\xff", "strict", True)
@@ -347,6 +352,16 @@ class UTF32Test(ReadTest):
                                          "spamspam", self.spamle)
         self.check_state_handling_decode(self.encoding,
                                          "spamspam", self.spambe)
+
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded_le = b'\xff\xfe\x00\x00' + b'\x00\x00\x01\x00' * 1024
+        self.assertEqual('\U00010000' * 1024,
+                         codecs.utf_32_decode(encoded_le)[0])
+        encoded_be = b'\x00\x00\xfe\xff' + b'\x00\x01\x00\x00' * 1024
+        self.assertEqual('\U00010000' * 1024,
+                         codecs.utf_32_decode(encoded_be)[0])
 
 class UTF32LETest(ReadTest):
     encoding = "utf-32-le"
@@ -381,6 +396,13 @@ class UTF32LETest(ReadTest):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_le_decode,
                           b"\xff", "strict", True)
 
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded = b'\x00\x00\x01\x00' * 1024
+        self.assertEqual('\U00010000' * 1024,
+                         codecs.utf_32_le_decode(encoded)[0])
+
 class UTF32BETest(ReadTest):
     encoding = "utf-32-be"
 
@@ -414,6 +436,14 @@ class UTF32BETest(ReadTest):
         self.assertRaises(UnicodeDecodeError, codecs.utf_32_be_decode,
                           b"\xff", "strict", True)
 
+    def test_issue8941(self):
+        # Issue #8941: insufficient result allocation when decoding into
+        # surrogate pairs on UCS-2 builds.
+        encoded = b'\x00\x01\x00\x00' * 1024
+        self.assertEqual('\U00010000' * 1024,
+                         codecs.utf_32_be_decode(encoded)[0])
+
+
 class UTF16Test(ReadTest):
     encoding = "utf-16"
 
@@ -429,11 +459,11 @@ class UTF16Test(ReadTest):
         f.write("spam")
         d = s.getvalue()
         # check whether there is exactly one BOM in it
-        self.assert_(d == self.spamle or d == self.spambe)
+        self.assertTrue(d == self.spamle or d == self.spambe)
         # try to read it back
         s = io.BytesIO(d)
         f = reader(s)
-        self.assertEquals(f.read(), "spamspam")
+        self.assertEqual(f.read(), "spamspam")
 
     def test_badbom(self):
         s = io.BytesIO(b"\xff\xff")
@@ -461,6 +491,12 @@ class UTF16Test(ReadTest):
             ]
         )
 
+    def test_handlers(self):
+        self.assertEqual(('\ufffd', 1),
+                         codecs.utf_16_decode(b'\x01', 'replace', True))
+        self.assertEqual(('', 1),
+                         codecs.utf_16_decode(b'\x01', 'ignore', True))
+
     def test_errors(self):
         self.assertRaises(UnicodeDecodeError, codecs.utf_16_decode,
                           b"\xff", "strict", True)
@@ -470,6 +506,21 @@ class UTF16Test(ReadTest):
                                          "spamspam", self.spamle)
         self.check_state_handling_decode(self.encoding,
                                          "spamspam", self.spambe)
+
+    def test_bug691291(self):
+        # Files are always opened in binary mode, even if no binary mode was
+        # specified.  This means that no automatic conversion of '\n' is done
+        # on reading and writing.
+        s1 = 'Hello\r\nworld\r\n'
+
+        s = s1.encode(self.encoding)
+        try:
+            with open(support.TESTFN, 'wb') as fp:
+                fp.write(s)
+            with codecs.open(support.TESTFN, 'U', encoding=self.encoding) as reader:
+                self.assertEqual(reader.read(), s1)
+        finally:
+            support.unlink(support.TESTFN)
 
 class UTF16LETest(ReadTest):
     encoding = "utf-16-le"
@@ -493,6 +544,12 @@ class UTF16LETest(ReadTest):
         self.assertRaises(UnicodeDecodeError, codecs.utf_16_le_decode,
                           b"\xff", "strict", True)
 
+    def test_nonbmp(self):
+        self.assertEqual("\U00010203".encode(self.encoding),
+                         b'\x00\xd8\x03\xde')
+        self.assertEqual(b'\x00\xd8\x03\xde'.decode(self.encoding),
+                         "\U00010203")
+
 class UTF16BETest(ReadTest):
     encoding = "utf-16-be"
 
@@ -514,6 +571,12 @@ class UTF16BETest(ReadTest):
     def test_errors(self):
         self.assertRaises(UnicodeDecodeError, codecs.utf_16_be_decode,
                           b"\xff", "strict", True)
+
+    def test_nonbmp(self):
+        self.assertEqual("\U00010203".encode(self.encoding),
+                         b'\xd8\x00\xde\x03')
+        self.assertEqual(b'\xd8\x00\xde\x03'.decode(self.encoding),
+                         "\U00010203")
 
 class UTF8Test(ReadTest):
     encoding = "utf-8"
@@ -544,12 +607,22 @@ class UTF8Test(ReadTest):
     def test_lone_surrogates(self):
         self.assertRaises(UnicodeEncodeError, "\ud800".encode, "utf-8")
         self.assertRaises(UnicodeDecodeError, b"\xed\xa0\x80".decode, "utf-8")
+        self.assertEqual("[\uDC80]".encode("utf-8", "backslashreplace"),
+                         b'[\\udc80]')
+        self.assertEqual("[\uDC80]".encode("utf-8", "xmlcharrefreplace"),
+                         b'[&#56448;]')
+        self.assertEqual("[\uDC80]".encode("utf-8", "surrogateescape"),
+                         b'[\x80]')
+        self.assertEqual("[\uDC80]".encode("utf-8", "ignore"),
+                         b'[]')
+        self.assertEqual("[\uDC80]".encode("utf-8", "replace"),
+                         b'[?]')
 
     def test_surrogatepass_handler(self):
-        self.assertEquals("abc\ud800def".encode("utf-8", "surrogatepass"),
-                          b"abc\xed\xa0\x80def")
-        self.assertEquals(b"abc\xed\xa0\x80def".decode("utf-8", "surrogatepass"),
-                          "abc\ud800def")
+        self.assertEqual("abc\ud800def".encode("utf-8", "surrogatepass"),
+                         b"abc\xed\xa0\x80def")
+        self.assertEqual(b"abc\xed\xa0\x80def".decode("utf-8", "surrogatepass"),
+                         "abc\ud800def")
         self.assertTrue(codecs.lookup_error("surrogatepass"))
 
 class UTF7Test(ReadTest):
@@ -591,18 +664,6 @@ class ReadBufferTest(unittest.TestCase):
         self.assertRaises(TypeError, codecs.readbuffer_encode)
         self.assertRaises(TypeError, codecs.readbuffer_encode, 42)
 
-class CharBufferTest(unittest.TestCase):
-
-    def test_string(self):
-        self.assertEqual(codecs.charbuffer_encode(b"spam"), (b"spam", 4))
-
-    def test_empty(self):
-        self.assertEqual(codecs.charbuffer_encode(b""), (b"", 0))
-
-    def test_bad_args(self):
-        self.assertRaises(TypeError, codecs.charbuffer_encode)
-        self.assertRaises(TypeError, codecs.charbuffer_encode, 42)
-
 class UTF8SigTest(ReadTest):
     encoding = "utf-8-sig"
 
@@ -632,7 +693,7 @@ class UTF8SigTest(ReadTest):
 
     def test_bug1601501(self):
         # SF bug #1601501: check that the codec works with a buffer
-        self.assertEquals(str(b"\xef\xbb\xbf", "utf-8-sig"), "")
+        self.assertEqual(str(b"\xef\xbb\xbf", "utf-8-sig"), "")
 
     def test_bom(self):
         d = codecs.getincrementaldecoder("utf-8-sig")()
@@ -685,7 +746,7 @@ class UTF8SigTest(ReadTest):
 
 class EscapeDecodeTest(unittest.TestCase):
     def test_empty(self):
-        self.assertEquals(codecs.escape_decode(""), ("", 0))
+        self.assertEqual(codecs.escape_decode(""), ("", 0))
 
 class RecodingTest(unittest.TestCase):
     def test_recoding(self):
@@ -812,16 +873,16 @@ class PunycodeTest(unittest.TestCase):
             # code produces only lower case. Converting just puny to
             # lower is also insufficient, since some of the input characters
             # are upper case.
-            self.assertEquals(
+            self.assertEqual(
                 str(uni.encode("punycode"), "ascii").lower(),
                 str(puny, "ascii").lower()
             )
 
     def test_decode(self):
         for uni, puny in punycode_testcases:
-            self.assertEquals(uni, puny.decode("punycode"))
+            self.assertEqual(uni, puny.decode("punycode"))
             puny = puny.decode("ascii").encode("ascii")
-            self.assertEquals(uni, puny.decode("punycode"))
+            self.assertEqual(uni, puny.decode("punycode"))
 
 class UnicodeInternalTest(unittest.TestCase):
     def test_bug1251300(self):
@@ -843,7 +904,7 @@ class UnicodeInternalTest(unittest.TestCase):
             for internal, uni in ok:
                 if sys.byteorder == "little":
                     internal = bytes(reversed(internal))
-                self.assertEquals(uni, internal.decode("unicode_internal"))
+                self.assertEqual(uni, internal.decode("unicode_internal"))
             for internal in not_ok:
                 if sys.byteorder == "little":
                     internal = bytes(reversed(internal))
@@ -855,10 +916,10 @@ class UnicodeInternalTest(unittest.TestCase):
             try:
                 b"\x00\x00\x00\x00\x00\x11\x11\x00".decode("unicode_internal")
             except UnicodeDecodeError as ex:
-                self.assertEquals("unicode_internal", ex.encoding)
-                self.assertEquals(b"\x00\x00\x00\x00\x00\x11\x11\x00", ex.object)
-                self.assertEquals(4, ex.start)
-                self.assertEquals(8, ex.end)
+                self.assertEqual("unicode_internal", ex.encoding)
+                self.assertEqual(b"\x00\x00\x00\x00\x00\x11\x11\x00", ex.object)
+                self.assertEqual(4, ex.start)
+                self.assertEqual(8, ex.end)
             else:
                 self.fail()
 
@@ -870,13 +931,15 @@ class UnicodeInternalTest(unittest.TestCase):
             ignored = decoder(bytes("%s\x22\x22\x22\x22%s" % (ab[:4], ab[4:]),
                                     "ascii"),
                               "UnicodeInternalTest")
-            self.assertEquals(("ab", 12), ignored)
+            self.assertEqual(("ab", 12), ignored)
 
     def test_encode_length(self):
         # Issue 3739
         encoder = codecs.getencoder("unicode_internal")
-        self.assertEquals(encoder("a")[1], 1)
-        self.assertEquals(encoder("\xe9\u0142")[1], 2)
+        self.assertEqual(encoder("a")[1], 1)
+        self.assertEqual(encoder("\xe9\u0142")[1], 2)
+
+        self.assertEqual(codecs.escape_encode(br'\x00')[1], 4)
 
 # From http://www.gnu.org/software/libidn/draft-josefsson-idn-test-vectors.html
 nameprep_tests = [
@@ -1047,101 +1110,101 @@ class NameprepTest(unittest.TestCase):
             else:
                 prepped = str(prepped, "utf-8", "surrogatepass")
                 try:
-                    self.assertEquals(nameprep(orig), prepped)
+                    self.assertEqual(nameprep(orig), prepped)
                 except Exception as e:
                     raise support.TestFailed("Test 3.%d: %s" % (pos+1, str(e)))
 
 class IDNACodecTest(unittest.TestCase):
     def test_builtin_decode(self):
-        self.assertEquals(str(b"python.org", "idna"), "python.org")
-        self.assertEquals(str(b"python.org.", "idna"), "python.org.")
-        self.assertEquals(str(b"xn--pythn-mua.org", "idna"), "pyth\xf6n.org")
-        self.assertEquals(str(b"xn--pythn-mua.org.", "idna"), "pyth\xf6n.org.")
+        self.assertEqual(str(b"python.org", "idna"), "python.org")
+        self.assertEqual(str(b"python.org.", "idna"), "python.org.")
+        self.assertEqual(str(b"xn--pythn-mua.org", "idna"), "pyth\xf6n.org")
+        self.assertEqual(str(b"xn--pythn-mua.org.", "idna"), "pyth\xf6n.org.")
 
     def test_builtin_encode(self):
-        self.assertEquals("python.org".encode("idna"), b"python.org")
-        self.assertEquals("python.org.".encode("idna"), b"python.org.")
-        self.assertEquals("pyth\xf6n.org".encode("idna"), b"xn--pythn-mua.org")
-        self.assertEquals("pyth\xf6n.org.".encode("idna"), b"xn--pythn-mua.org.")
+        self.assertEqual("python.org".encode("idna"), b"python.org")
+        self.assertEqual("python.org.".encode("idna"), b"python.org.")
+        self.assertEqual("pyth\xf6n.org".encode("idna"), b"xn--pythn-mua.org")
+        self.assertEqual("pyth\xf6n.org.".encode("idna"), b"xn--pythn-mua.org.")
 
     def test_stream(self):
         r = codecs.getreader("idna")(io.BytesIO(b"abc"))
         r.read(3)
-        self.assertEquals(r.read(), "")
+        self.assertEqual(r.read(), "")
 
     def test_incremental_decode(self):
-        self.assertEquals(
+        self.assertEqual(
             "".join(codecs.iterdecode((bytes([c]) for c in b"python.org"), "idna")),
             "python.org"
         )
-        self.assertEquals(
+        self.assertEqual(
             "".join(codecs.iterdecode((bytes([c]) for c in b"python.org."), "idna")),
             "python.org."
         )
-        self.assertEquals(
+        self.assertEqual(
             "".join(codecs.iterdecode((bytes([c]) for c in b"xn--pythn-mua.org."), "idna")),
             "pyth\xf6n.org."
         )
-        self.assertEquals(
+        self.assertEqual(
             "".join(codecs.iterdecode((bytes([c]) for c in b"xn--pythn-mua.org."), "idna")),
             "pyth\xf6n.org."
         )
 
         decoder = codecs.getincrementaldecoder("idna")()
-        self.assertEquals(decoder.decode(b"xn--xam", ), "")
-        self.assertEquals(decoder.decode(b"ple-9ta.o", ), "\xe4xample.")
-        self.assertEquals(decoder.decode(b"rg"), "")
-        self.assertEquals(decoder.decode(b"", True), "org")
+        self.assertEqual(decoder.decode(b"xn--xam", ), "")
+        self.assertEqual(decoder.decode(b"ple-9ta.o", ), "\xe4xample.")
+        self.assertEqual(decoder.decode(b"rg"), "")
+        self.assertEqual(decoder.decode(b"", True), "org")
 
         decoder.reset()
-        self.assertEquals(decoder.decode(b"xn--xam", ), "")
-        self.assertEquals(decoder.decode(b"ple-9ta.o", ), "\xe4xample.")
-        self.assertEquals(decoder.decode(b"rg."), "org.")
-        self.assertEquals(decoder.decode(b"", True), "")
+        self.assertEqual(decoder.decode(b"xn--xam", ), "")
+        self.assertEqual(decoder.decode(b"ple-9ta.o", ), "\xe4xample.")
+        self.assertEqual(decoder.decode(b"rg."), "org.")
+        self.assertEqual(decoder.decode(b"", True), "")
 
     def test_incremental_encode(self):
-        self.assertEquals(
+        self.assertEqual(
             b"".join(codecs.iterencode("python.org", "idna")),
             b"python.org"
         )
-        self.assertEquals(
+        self.assertEqual(
             b"".join(codecs.iterencode("python.org.", "idna")),
             b"python.org."
         )
-        self.assertEquals(
+        self.assertEqual(
             b"".join(codecs.iterencode("pyth\xf6n.org.", "idna")),
             b"xn--pythn-mua.org."
         )
-        self.assertEquals(
+        self.assertEqual(
             b"".join(codecs.iterencode("pyth\xf6n.org.", "idna")),
             b"xn--pythn-mua.org."
         )
 
         encoder = codecs.getincrementalencoder("idna")()
-        self.assertEquals(encoder.encode("\xe4x"), b"")
-        self.assertEquals(encoder.encode("ample.org"), b"xn--xample-9ta.")
-        self.assertEquals(encoder.encode("", True), b"org")
+        self.assertEqual(encoder.encode("\xe4x"), b"")
+        self.assertEqual(encoder.encode("ample.org"), b"xn--xample-9ta.")
+        self.assertEqual(encoder.encode("", True), b"org")
 
         encoder.reset()
-        self.assertEquals(encoder.encode("\xe4x"), b"")
-        self.assertEquals(encoder.encode("ample.org."), b"xn--xample-9ta.org.")
-        self.assertEquals(encoder.encode("", True), b"")
+        self.assertEqual(encoder.encode("\xe4x"), b"")
+        self.assertEqual(encoder.encode("ample.org."), b"xn--xample-9ta.org.")
+        self.assertEqual(encoder.encode("", True), b"")
 
 class CodecsModuleTest(unittest.TestCase):
 
     def test_decode(self):
-        self.assertEquals(codecs.decode(b'\xe4\xf6\xfc', 'latin-1'),
-                          '\xe4\xf6\xfc')
+        self.assertEqual(codecs.decode(b'\xe4\xf6\xfc', 'latin-1'),
+                         '\xe4\xf6\xfc')
         self.assertRaises(TypeError, codecs.decode)
-        self.assertEquals(codecs.decode(b'abc'), 'abc')
+        self.assertEqual(codecs.decode(b'abc'), 'abc')
         self.assertRaises(UnicodeDecodeError, codecs.decode, b'\xff', 'ascii')
 
     def test_encode(self):
-        self.assertEquals(codecs.encode('\xe4\xf6\xfc', 'latin-1'),
-                          b'\xe4\xf6\xfc')
+        self.assertEqual(codecs.encode('\xe4\xf6\xfc', 'latin-1'),
+                         b'\xe4\xf6\xfc')
         self.assertRaises(TypeError, codecs.encode)
         self.assertRaises(LookupError, codecs.encode, "foo", "__spam__")
-        self.assertEquals(codecs.encode('abc'), b'abc')
+        self.assertEqual(codecs.encode('abc'), b'abc')
         self.assertRaises(UnicodeEncodeError, codecs.encode, '\xffff', 'ascii')
 
     def test_register(self):
@@ -1177,19 +1240,19 @@ class StreamReaderTest(unittest.TestCase):
 
     def test_readlines(self):
         f = self.reader(self.stream)
-        self.assertEquals(f.readlines(), ['\ud55c\n', '\uae00'])
+        self.assertEqual(f.readlines(), ['\ud55c\n', '\uae00'])
 
 class EncodedFileTest(unittest.TestCase):
 
     def test_basic(self):
         f = io.BytesIO(b'\xed\x95\x9c\n\xea\xb8\x80')
         ef = codecs.EncodedFile(f, 'utf-16-le', 'utf-8')
-        self.assertEquals(ef.read(), b'\\\xd5\n\x00\x00\xae')
+        self.assertEqual(ef.read(), b'\\\xd5\n\x00\x00\xae')
 
         f = io.BytesIO()
         ef = codecs.EncodedFile(f, 'utf-8', 'latin1')
         ef.write(b'\xc3\xbc')
-        self.assertEquals(f.getvalue(), b'\xfc')
+        self.assertEqual(f.getvalue(), b'\xfc')
 
 all_unicode_encodings = [
     "ascii",
@@ -1212,6 +1275,7 @@ all_unicode_encodings = [
     "cp424",
     "cp437",
     "cp500",
+    "cp720",
     "cp737",
     "cp775",
     "cp850",
@@ -1219,6 +1283,7 @@ all_unicode_encodings = [
     "cp855",
     "cp856",
     "cp857",
+    "cp858",
     "cp860",
     "cp861",
     "cp862",
@@ -1307,11 +1372,6 @@ broken_incremental_coders = broken_unicode_with_streams + [
     "idna",
 ]
 
-# The following encodings only support "strict" mode
-only_strict_mode = [
-    "idna",
-]
-
 class BasicUnicodeTest(unittest.TestCase, MixInCheckStateHandling):
     def test_basics(self):
         s = "abc123" # all codecs should be able to encode these
@@ -1335,7 +1395,7 @@ class BasicUnicodeTest(unittest.TestCase, MixInCheckStateHandling):
                 for c in s:
                     writer.write(c)
                     chunk = q.read()
-                    self.assert_(type(chunk) is bytes, type(chunk))
+                    self.assertTrue(type(chunk) is bytes, type(chunk))
                     encodedresult += chunk
                 q = Queue(b"")
                 reader = codecs.getreader(encoding)(q)
@@ -1386,7 +1446,7 @@ class BasicUnicodeTest(unittest.TestCase, MixInCheckStateHandling):
                     result = "".join(codecs.iterdecode(codecs.iterencode("", encoding), encoding))
                     self.assertEqual(result, "")
 
-                if encoding not in only_strict_mode:
+                if encoding not in ("idna", "mbcs"):
                     # check incremental decoder/encoder with errors argument
                     try:
                         encoder = codecs.getincrementalencoder(encoding)("ignore")
@@ -1447,33 +1507,33 @@ class BasicUnicodeTest(unittest.TestCase, MixInCheckStateHandling):
 
 class CharmapTest(unittest.TestCase):
     def test_decode_with_string_map(self):
-        self.assertEquals(
+        self.assertEqual(
             codecs.charmap_decode(b"\x00\x01\x02", "strict", "abc"),
             ("abc", 3)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             codecs.charmap_decode(b"\x00\x01\x02", "replace", "ab"),
             ("ab\ufffd", 3)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             codecs.charmap_decode(b"\x00\x01\x02", "replace", "ab\ufffe"),
             ("ab\ufffd", 3)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             codecs.charmap_decode(b"\x00\x01\x02", "ignore", "ab"),
             ("ab", 3)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             codecs.charmap_decode(b"\x00\x01\x02", "ignore", "ab\ufffe"),
             ("ab", 3)
         )
 
         allbytes = bytes(range(256))
-        self.assertEquals(
+        self.assertEqual(
             codecs.charmap_decode(allbytes, "ignore", ""),
             ("", len(allbytes))
         )
@@ -1482,14 +1542,14 @@ class WithStmtTest(unittest.TestCase):
     def test_encodedfile(self):
         f = io.BytesIO(b"\xc3\xbc")
         with codecs.EncodedFile(f, "latin-1", "utf-8") as ef:
-            self.assertEquals(ef.read(), b"\xfc")
+            self.assertEqual(ef.read(), b"\xfc")
 
     def test_streamreaderwriter(self):
         f = io.BytesIO(b"\xc3\xbc")
         info = codecs.lookup("utf-8")
         with codecs.StreamReaderWriter(f, info.streamreader,
                                        info.streamwriter, 'strict') as srw:
-            self.assertEquals(srw.read(), "\xfc")
+            self.assertEqual(srw.read(), "\xfc")
 
 class TypesTest(unittest.TestCase):
     def test_decode_unicode(self):
@@ -1516,10 +1576,10 @@ class TypesTest(unittest.TestCase):
     def test_unicode_escape(self):
         # Escape-decoding an unicode string is supported ang gives the same
         # result as decoding the equivalent ASCII bytes string.
-        self.assertEquals(codecs.unicode_escape_decode(r"\u1234"), ("\u1234", 6))
-        self.assertEquals(codecs.unicode_escape_decode(br"\u1234"), ("\u1234", 6))
-        self.assertEquals(codecs.raw_unicode_escape_decode(r"\u1234"), ("\u1234", 6))
-        self.assertEquals(codecs.raw_unicode_escape_decode(br"\u1234"), ("\u1234", 6))
+        self.assertEqual(codecs.unicode_escape_decode(r"\u1234"), ("\u1234", 6))
+        self.assertEqual(codecs.unicode_escape_decode(br"\u1234"), ("\u1234", 6))
+        self.assertEqual(codecs.raw_unicode_escape_decode(r"\u1234"), ("\u1234", 6))
+        self.assertEqual(codecs.raw_unicode_escape_decode(br"\u1234"), ("\u1234", 6))
 
 class SurrogateEscapeTest(unittest.TestCase):
 
@@ -1549,6 +1609,115 @@ class SurrogateEscapeTest(unittest.TestCase):
         self.assertEqual("foo\udca5bar".encode("iso-8859-3", "surrogateescape"),
                          b"foo\xa5bar")
 
+    def test_latin1(self):
+        # Issue6373
+        self.assertEqual("\udce4\udceb\udcef\udcf6\udcfc".encode("latin1", "surrogateescape"),
+                         b"\xe4\xeb\xef\xf6\xfc")
+
+
+class BomTest(unittest.TestCase):
+    def test_seek0(self):
+        data = "1234567890"
+        tests = ("utf-16",
+                 "utf-16-le",
+                 "utf-16-be",
+                 "utf-32",
+                 "utf-32-le",
+                 "utf-32-be")
+        for encoding in tests:
+            # Check if the BOM is written only once
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data)
+                f.write(data)
+                f.seek(0)
+                self.assertEqual(f.read(), data * 2)
+                f.seek(0)
+                self.assertEqual(f.read(), data * 2)
+
+            # Check that the BOM is written after a seek(0)
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data[0])
+                self.assertNotEqual(f.tell(), 0)
+                f.seek(0)
+                f.write(data)
+                f.seek(0)
+                self.assertEqual(f.read(), data)
+
+            # (StreamWriter) Check that the BOM is written after a seek(0)
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.writer.write(data[0])
+                self.assertNotEqual(f.writer.tell(), 0)
+                f.writer.seek(0)
+                f.writer.write(data)
+                f.seek(0)
+                self.assertEqual(f.read(), data)
+
+            # Check that the BOM is not written after a seek() at a position
+            # different than the start
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.write(data)
+                f.seek(f.tell())
+                f.write(data)
+                f.seek(0)
+                self.assertEqual(f.read(), data * 2)
+
+            # (StreamWriter) Check that the BOM is not written after a seek()
+            # at a position different than the start
+            with codecs.open(support.TESTFN, 'w+', encoding=encoding) as f:
+                f.writer.write(data)
+                f.writer.seek(f.writer.tell())
+                f.writer.write(data)
+                f.seek(0)
+                self.assertEqual(f.read(), data * 2)
+
+
+bytes_transform_encodings = [
+    "base64_codec",
+    "uu_codec",
+    "quopri_codec",
+    "hex_codec",
+]
+try:
+    import zlib
+except ImportError:
+    pass
+else:
+    bytes_transform_encodings.append("zlib_codec")
+try:
+    import bz2
+except ImportError:
+    pass
+else:
+    bytes_transform_encodings.append("bz2_codec")
+
+class TransformCodecTest(unittest.TestCase):
+
+    def test_basics(self):
+        binput = bytes(range(256))
+        for encoding in bytes_transform_encodings:
+            # generic codecs interface
+            (o, size) = codecs.getencoder(encoding)(binput)
+            self.assertEqual(size, len(binput))
+            (i, size) = codecs.getdecoder(encoding)(o)
+            self.assertEqual(size, len(o))
+            self.assertEqual(i, binput)
+
+    def test_read(self):
+        for encoding in bytes_transform_encodings:
+            sin = codecs.encode(b"\x80", encoding)
+            reader = codecs.getreader(encoding)(io.BytesIO(sin))
+            sout = reader.read()
+            self.assertEqual(sout, b"\x80")
+
+    def test_readline(self):
+        for encoding in bytes_transform_encodings:
+            if encoding in ['uu_codec', 'zlib_codec']:
+                continue
+            sin = codecs.encode(b"\x80", encoding)
+            reader = codecs.getreader(encoding)(io.BytesIO(sin))
+            sout = reader.readline()
+            self.assertEqual(sout, b"\x80")
+
 
 def test_main():
     support.run_unittest(
@@ -1563,7 +1732,6 @@ def test_main():
         UTF7Test,
         UTF16ExTest,
         ReadBufferTest,
-        CharBufferTest,
         RecodingTest,
         PunycodeTest,
         UnicodeInternalTest,
@@ -1577,6 +1745,8 @@ def test_main():
         WithStmtTest,
         TypesTest,
         SurrogateEscapeTest,
+        BomTest,
+        TransformCodecTest,
     )
 
 

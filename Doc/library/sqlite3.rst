@@ -79,18 +79,18 @@ This example uses the iterator form::
    >>> c = conn.cursor()
    >>> c.execute('select * from stocks order by price')
    >>> for row in c:
-   ...    print(row)
+   ...     print(row)
    ...
-   (u'2006-01-05', u'BUY', u'RHAT', 100, 35.140000000000001)
-   (u'2006-03-28', u'BUY', u'IBM', 1000, 45.0)
-   (u'2006-04-06', u'SELL', u'IBM', 500, 53.0)
-   (u'2006-04-05', u'BUY', u'MSOFT', 1000, 72.0)
+   ('2006-01-05', 'BUY', 'RHAT', 100, 35.14)
+   ('2006-03-28', 'BUY', 'IBM', 1000, 45.0)
+   ('2006-04-06', 'SELL', 'IBM', 500, 53.0)
+   ('2006-04-05', 'BUY', 'MSOFT', 1000, 72.0)
    >>>
 
 
 .. seealso::
 
-   http://www.pysqlite.org
+   http://code.google.com/p/pysqlite/
       The pysqlite web page -- sqlite3 is developed externally under the name
       "pysqlite".
 
@@ -136,7 +136,7 @@ Module functions and constants
    first blank for the column name: the column name would simply be "x".
 
 
-.. function:: connect(database[, timeout, isolation_level, detect_types, factory])
+.. function:: connect(database[, timeout, detect_types, isolation_level, check_same_thread, factory, cached_statements])
 
    Opens a connection to the SQLite database file *database*. You can use
    ``":memory:"`` to open a database connection to a database that resides in RAM
@@ -187,7 +187,7 @@ Module functions and constants
    Registers a callable to convert the custom Python type *type* into one of
    SQLite's supported types. The callable *callable* accepts as single parameter
    the Python value, and must return a value of the following types: int,
-   float, str, bytes (UTF-8 encoded) or buffer.
+   float, str or bytes.
 
 
 .. function:: complete_statement(sql)
@@ -227,13 +227,18 @@ Connection Objects
    one of "DEFERRED", "IMMEDIATE" or "EXCLUSIVE". See section
    :ref:`sqlite3-controlling-transactions` for a more detailed explanation.
 
+.. attribute:: Connection.in_transaction
+
+   :const:`True` if a transaction is active (there are uncommitted changes),
+   :const:`False` otherwise.  Read-only attribute.
+
+   .. versionadded:: 3.2
 
 .. method:: Connection.cursor([cursorClass])
 
    The cursor method accepts a single optional parameter *cursorClass*. If
    supplied, this must be a custom cursor class that extends
    :class:`sqlite3.Cursor`.
-
 
 .. method:: Connection.commit()
 
@@ -256,22 +261,22 @@ Connection Objects
 .. method:: Connection.execute(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`execute` method with
-   the parameters given.
+   calling the cursor method, then calls the cursor's :meth:`execute
+   <Cursor.execute>` method with the parameters given.
 
 
 .. method:: Connection.executemany(sql, [parameters])
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`executemany` method
-   with the parameters given.
+   calling the cursor method, then calls the cursor's :meth:`executemany
+   <Cursor.executemany>` method with the parameters given.
 
 
 .. method:: Connection.executescript(sql_script)
 
    This is a nonstandard shortcut that creates an intermediate cursor object by
-   calling the cursor method, then calls the cursor's :meth:`executescript` method
-   with the parameters given.
+   calling the cursor method, then calls the cursor's :meth:`executescript
+   <Cursor.executescript>` method with the parameters given.
 
 
 .. method:: Connection.create_function(name, num_params, func)
@@ -282,7 +287,7 @@ Connection Objects
    as the SQL function.
 
    The function can return any of the types supported by SQLite: bytes, str, int,
-   float, buffer and None.
+   float and None.
 
    Example:
 
@@ -298,7 +303,7 @@ Connection Objects
    final result of the aggregate.
 
    The ``finalize`` method can return any of the types supported by SQLite:
-   bytes, str, int, float, buffer and None.
+   bytes, str, int, float and None.
 
    Example:
 
@@ -363,6 +368,29 @@ Connection Objects
    If you want to clear any previously installed progress handler, call the
    method with :const:`None` for *handler*.
 
+
+.. method:: Connection.enable_load_extension(enabled)
+
+   This routine allows/disallows the SQLite engine to load SQLite extensions
+   from shared libraries.  SQLite extensions can define new functions,
+   aggregates or whole new virtual table implementations.  One well-known
+   extension is the fulltext-search extension distributed with SQLite.
+
+   .. versionadded:: 3.2
+
+   .. literalinclude:: ../includes/sqlite3/load_extension.py
+
+   Loadable extensions are disabled by default. See [#f1]_.
+
+.. method:: Connection.load_extension(path)
+
+   This routine loads a SQLite extension from a shared library.  You have to
+   enable extension loading with :meth:`enable_load_extension` before you can
+   use this routine.
+
+   .. versionadded:: 3.2
+
+   Loadable extensions are disabled by default. See [#f1]_.
 
 .. attribute:: Connection.row_factory
 
@@ -435,7 +463,7 @@ Cursor Objects
 
 .. class:: Cursor
 
-   A SQLite database cursor has the following attributes and methods:
+   A :class:`Cursor` instance has the following attributes and methods.
 
 .. method:: Cursor.execute(sql, [parameters])
 
@@ -589,18 +617,19 @@ Now we plug :class:`Row` in::
     <sqlite3.Cursor object at 0x7f4e7dd8fa80>
     >>> r = c.fetchone()
     >>> type(r)
-    <type 'sqlite3.Row'>
-    >>> r
-    (u'2006-01-05', u'BUY', u'RHAT', 100.0, 35.140000000000001)
+    <class 'sqlite3.Row'>
+    >>> tuple(r)
+    ('2006-01-05', 'BUY', 'RHAT', 100.0, 35.14)
     >>> len(r)
     5
     >>> r[2]
-    u'RHAT'
+    'RHAT'
     >>> r.keys()
     ['date', 'trans', 'symbol', 'qty', 'price']
     >>> r['qty']
     100.0
-    >>> for member in r: print member
+    >>> for member in r:
+    ...     print(member)
     ...
     2006-01-05
     BUY
@@ -632,11 +661,9 @@ The following Python types can thus be sent to SQLite without any problem:
 +-------------------------------+-------------+
 | :class:`float`                | ``REAL``    |
 +-------------------------------+-------------+
-| :class:`bytes` (UTF8-encoded) | ``TEXT``    |
-+-------------------------------+-------------+
 | :class:`str`                  | ``TEXT``    |
 +-------------------------------+-------------+
-| :class:`buffer`               | ``BLOB``    |
+| :class:`bytes`                | ``BLOB``    |
 +-------------------------------+-------------+
 
 
@@ -647,13 +674,13 @@ This is how SQLite types are converted to Python types by default:
 +=============+=============================================+
 | ``NULL``    | :const:`None`                               |
 +-------------+---------------------------------------------+
-| ``INTEGER`` | :class`int`                                 |
+| ``INTEGER`` | :class:`int`                                |
 +-------------+---------------------------------------------+
 | ``REAL``    | :class:`float`                              |
 +-------------+---------------------------------------------+
 | ``TEXT``    | depends on text_factory, str by default     |
 +-------------+---------------------------------------------+
-| ``BLOB``    | buffer                                      |
+| ``BLOB``    | :class:`bytes`                              |
 +-------------+---------------------------------------------+
 
 The type system of the :mod:`sqlite3` module is extensible in two ways: you can
@@ -668,7 +695,7 @@ Using adapters to store additional Python types in SQLite databases
 As described before, SQLite supports only a limited set of types natively. To
 use other Python types with SQLite, you must **adapt** them to one of the
 sqlite3 module's supported types for SQLite: one of NoneType, int, float,
-str, bytes, buffer.
+str, bytes.
 
 The :mod:`sqlite3` module uses Python object adaptation, as described in
 :pep:`246` for this.  The protocol to use is :class:`PrepareProtocol`.
@@ -683,7 +710,7 @@ Letting your object adapt itself
 This is a good approach if you write the class yourself. Let's suppose you have
 a class like this::
 
-   class Point(object):
+   class Point:
        def __init__(self, x, y):
            self.x, self.y = x, y
 
@@ -787,7 +814,8 @@ So if you are within a transaction and issue a command like ``CREATE TABLE
 before executing that command. There are two reasons for doing that. The first
 is that some of these commands don't work within transactions. The other reason
 is that sqlite3 needs to keep track of the transaction state (if a transaction
-is active or not).
+is active or not).  The current transaction state is exposed through the
+:attr:`Connection.in_transaction` attribute of the connection object.
 
 You can control which kind of ``BEGIN`` statements sqlite3 implicitly executes
 (or none at all) via the *isolation_level* parameter to the :func:`connect`
@@ -822,7 +850,7 @@ directly using only a single call on the :class:`Connection` object.
 Accessing columns by name instead of by index
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-One useful feature of the :mod:`sqlite3` module is the builtin
+One useful feature of the :mod:`sqlite3` module is the built-in
 :class:`sqlite3.Row` class designed to be used as a row factory.
 
 Rows wrapped with this class can be accessed both by index (like tuples) and
@@ -840,3 +868,24 @@ exception, the transaction is rolled back; otherwise, the transaction is
 committed:
 
 .. literalinclude:: ../includes/sqlite3/ctx_manager.py
+
+
+Common issues
+-------------
+
+Multithreading
+^^^^^^^^^^^^^^
+
+Older SQLite versions had issues with sharing connections between threads.
+That's why the Python module disallows sharing connections and cursors between
+threads. If you still try to do so, you will get an exception at runtime.
+
+The only exception is calling the :meth:`~Connection.interrupt` method, which
+only makes sense to call from a different thread.
+
+.. rubric:: Footnotes
+
+.. [#f1] The sqlite3 module is not built with loadable extension support by
+  default, because some platforms (notably Mac OS X) have SQLite libraries which
+  are compiled without this feature. To get loadable extension support, you must
+  pass --enable-loadable-sqlite-extensions to configure.

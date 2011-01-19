@@ -26,7 +26,7 @@ class PEP263Test(unittest.TestCase):
         try:
             compile(b"# coding: cp932\nprint '\x94\x4e'", "dummy", "exec")
         except SyntaxError as v:
-            self.assertEquals(v.text, "print '\u5e74'")
+            self.assertEqual(v.text, "print '\u5e74'\n")
         else:
             self.fail()
 
@@ -34,7 +34,26 @@ class PEP263Test(unittest.TestCase):
         c = compile("# coding=latin-1\n\u00c6 = '\u00c6'", "dummy", "exec")
         d = {}
         exec(c, d)
-        self.assertEquals(d['\xc6'], '\xc6')
+        self.assertEqual(d['\xc6'], '\xc6')
+
+    def test_issue3297(self):
+        c = compile("a, b = '\U0001010F', '\\U0001010F'", "dummy", "exec")
+        d = {}
+        exec(c, d)
+        self.assertEqual(d['a'], d['b'])
+        self.assertEqual(len(d['a']), len(d['b']))
+        self.assertEqual(ascii(d['a']), ascii(d['b']))
+
+    def test_issue7820(self):
+        # Ensure that check_bom() restores all bytes in the right order if
+        # check_bom() fails in pydebug mode: a buffer starts with the first
+        # byte of a valid BOM, but next bytes are different
+
+        # one byte in common with the UTF-16-LE BOM
+        self.assertRaises(SyntaxError, eval, b'\xff\x20')
+
+        # two bytes in common with the UTF-8 BOM
+        self.assertRaises(SyntaxError, eval, b'\xef\xbb\x20')
 
 def test_main():
     support.run_unittest(PEP263Test)

@@ -31,7 +31,7 @@ class PyclbrTest(TestCase):
         ''' succeed iff hasattr(obj,attr) or attr in ignore. '''
         if attr in ignore: return
         if not hasattr(obj, attr): print("???", attr)
-        self.failUnless(hasattr(obj, attr),
+        self.assertTrue(hasattr(obj, attr),
                         'expected hasattr(%r, %r)' % (obj, attr))
 
 
@@ -40,12 +40,12 @@ class PyclbrTest(TestCase):
         if key in ignore: return
         if key not in obj:
             print("***",key, file=sys.stderr)
-        self.failUnless(key in obj, "%r in %r" % (key, obj))
+        self.assertIn(key, obj)
 
     def assertEqualsOrIgnored(self, a, b, ignore):
         ''' succeed iff a == b or a in ignore or b in ignore '''
         if a not in ignore and b not in ignore:
-            self.assertEquals(a, b)
+            self.assertEqual(a, b)
 
     def checkModule(self, moduleName, module=None, ignore=()):
         ''' succeed iff pyclbr.readmodule_ex(modulename) corresponds
@@ -84,12 +84,12 @@ class PyclbrTest(TestCase):
             self.assertHasattr(module, name, ignore)
             py_item = getattr(module, name)
             if isinstance(value, pyclbr.Function):
-                self.assert_(isinstance(py_item, (FunctionType, BuiltinFunctionType)))
+                self.assertIsInstance(py_item, (FunctionType, BuiltinFunctionType))
                 if py_item.__module__ != moduleName:
                     continue   # skip functions that came from somewhere else
-                self.assertEquals(py_item.__module__, value.module)
+                self.assertEqual(py_item.__module__, value.module)
             else:
-                self.failUnless(isinstance(py_item, type))
+                self.assertIsInstance(py_item, type)
                 if py_item.__module__ != moduleName:
                     continue   # skip classes that came from somewhere else
 
@@ -116,7 +116,7 @@ class PyclbrTest(TestCase):
 
                 try:
                     self.assertListEq(foundMethods, actualMethods, ignore)
-                    self.assertEquals(py_item.__module__, value.module)
+                    self.assertEqual(py_item.__module__, value.module)
 
                     self.assertEqualsOrIgnored(py_item.__name__, value.name,
                                                ignore)
@@ -141,7 +141,8 @@ class PyclbrTest(TestCase):
     def test_easy(self):
         self.checkModule('pyclbr')
         self.checkModule('ast')
-        self.checkModule('doctest', ignore=("TestResults", "_SpoofOut"))
+        self.checkModule('doctest', ignore=("TestResults", "_SpoofOut",
+                                            "DocTestCase"))
         self.checkModule('difflib', ignore=("Match",))
 
     def test_decorators(self):

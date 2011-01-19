@@ -5,14 +5,13 @@
    :synopsis: Interface to memory-mapped files for Unix and Windows.
 
 
-Memory-mapped file objects behave like both :class:`bytes` and like file
-objects. Unlike normal :class:`bytes` objects, however, these are mutable.
-You can use mmap objects in most places where :class:`bytes` are expected; for
-example, you can use the :mod:`re` module to search through a memory-mapped file.
-Since they're mutable, you can change a single byte by doing ``obj[index] = 97``,
-or change a subsequence by assigning to a slice: ``obj[i1:i2] = b'...'``.
-You can also read and write data starting at the current file position, and
-:meth:`seek` through the file to different positions.
+Memory-mapped file objects behave like both :class:`bytearray` and like
+:term:`file objects <file object>`.  You can use mmap objects in most places
+where :class:`bytearray` are expected; for example, you can use the :mod:`re`
+module to search through a memory-mapped file.  You can also change a single
+byte by doing ``obj[index] = 97``, or change a subsequence by assigning to a
+slice: ``obj[i1:i2] = b'...'``.  You can also read and write data starting at
+the current file position, and :meth:`seek` through the file to different positions.
 
 A memory-mapped file is created by the :class:`mmap` constructor, which is
 different on Unix and on Windows.  In either case you must provide a file
@@ -112,6 +111,18 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
           map.close()
 
 
+   :class:`mmap` can also be used as a context manager in a :keyword:`with`
+   statement.::
+
+      import mmap
+
+      with mmap.mmap(-1, 13) as map:
+          map.write("Hello world!")
+
+   .. versionadded:: 3.2
+      Context manager support.
+
+
    The next example demonstrates how to create an anonymous map and exchange
    data between the parent and child processes::
 
@@ -132,11 +143,17 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
 
    Memory-mapped file objects support the following methods:
 
-
    .. method:: close()
 
       Close the file.  Subsequent calls to other methods of the object will
       result in an exception being raised.
+
+
+   .. attribute:: closed
+
+      True if the file is closed.
+
+      .. versionadded:: 3.2
 
 
    .. method:: find(sub[, start[, end]])
@@ -166,7 +183,7 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
 
       Copy the *count* bytes starting at offset *src* to the destination index
       *dest*.  If the mmap was created with :const:`ACCESS_READ`, then calls to
-      move will throw a :exc:`TypeError` exception.
+      move will raise a :exc:`TypeError` exception.
 
 
    .. method:: read(num)
@@ -192,7 +209,7 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
 
       Resizes the map and the underlying file, if any. If the mmap was created
       with :const:`ACCESS_READ` or :const:`ACCESS_COPY`, resizing the map will
-      throw a :exc:`TypeError` exception.
+      raise a :exc:`TypeError` exception.
 
 
    .. method:: rfind(sub[, start[, end]])
@@ -227,7 +244,7 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
       Write the bytes in *bytes* into memory at the current position of the
       file pointer; the file position is updated to point after the bytes that
       were written. If the mmap was created with :const:`ACCESS_READ`, then
-      writing to it will throw a :exc:`TypeError` exception.
+      writing to it will raise a :exc:`TypeError` exception.
 
 
    .. method:: write_byte(byte)
@@ -235,6 +252,4 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
       Write the the integer *byte* into memory at the current
       position of the file pointer; the file position is advanced by ``1``. If
       the mmap was created with :const:`ACCESS_READ`, then writing to it will
-      throw a :exc:`TypeError` exception.
-
-
+      raise a :exc:`TypeError` exception.

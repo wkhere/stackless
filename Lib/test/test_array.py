@@ -1,21 +1,28 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """Test the arraymodule.
    Roger E. Masse
 """
 
 import unittest
 from test import support
-from weakref import proxy
-import array, io, math
-from pickle import loads, dumps, HIGHEST_PROTOCOL
+import weakref
+import pickle
 import operator
+import io
+import math
+import struct
+import warnings
+
+import array
+from array import _array_reconstructor as array_reconstructor
+
 
 class ArraySubclass(array.array):
     pass
 
 class ArraySubclassWithKwargs(array.array):
     def __init__(self, typecode, newarg=None):
-        array.array.__init__(typecode)
+        array.array.__init__(self)
 
 tests = [] # list to accumulate all tests
 typecodes = "ubBhHiIlLfd"
@@ -29,6 +36,137 @@ class BadConstructorTest(unittest.TestCase):
         self.assertRaises(ValueError, array.array, 'x')
 
 tests.append(BadConstructorTest)
+
+# Machine format codes.
+#
+# Search for "enum machine_format_code" in Modules/arraymodule.c to get the
+# authoritative values.
+UNKNOWN_FORMAT = -1
+UNSIGNED_INT8 = 0
+SIGNED_INT8 = 1
+UNSIGNED_INT16_LE = 2
+UNSIGNED_INT16_BE = 3
+SIGNED_INT16_LE = 4
+SIGNED_INT16_BE = 5
+UNSIGNED_INT32_LE = 6
+UNSIGNED_INT32_BE = 7
+SIGNED_INT32_LE = 8
+SIGNED_INT32_BE = 9
+UNSIGNED_INT64_LE = 10
+UNSIGNED_INT64_BE = 11
+SIGNED_INT64_LE = 12
+SIGNED_INT64_BE = 13
+IEEE_754_FLOAT_LE = 14
+IEEE_754_FLOAT_BE = 15
+IEEE_754_DOUBLE_LE = 16
+IEEE_754_DOUBLE_BE = 17
+UTF16_LE = 18
+UTF16_BE = 19
+UTF32_LE = 20
+UTF32_BE = 21
+
+class ArrayReconstructorTest(unittest.TestCase):
+
+    def test_error(self):
+        self.assertRaises(TypeError, array_reconstructor,
+                          "", "b", 0, b"")
+        self.assertRaises(TypeError, array_reconstructor,
+                          str, "b", 0, b"")
+        self.assertRaises(TypeError, array_reconstructor,
+                          array.array, "b", '', b"")
+        self.assertRaises(TypeError, array_reconstructor,
+                          array.array, "b", 0, "")
+        self.assertRaises(ValueError, array_reconstructor,
+                          array.array, "?", 0, b"")
+        self.assertRaises(ValueError, array_reconstructor,
+                          array.array, "b", UNKNOWN_FORMAT, b"")
+        self.assertRaises(ValueError, array_reconstructor,
+                          array.array, "b", 22, b"")
+        self.assertRaises(ValueError, array_reconstructor,
+                          array.array, "d", 16, b"a")
+
+    def test_numbers(self):
+        testcases = (
+            (['B', 'H', 'I', 'L'], UNSIGNED_INT8, '=BBBB',
+             [0x80, 0x7f, 0, 0xff]),
+            (['b', 'h', 'i', 'l'], SIGNED_INT8, '=bbb',
+             [-0x80, 0x7f, 0]),
+            (['H', 'I', 'L'], UNSIGNED_INT16_LE, '<HHHH',
+             [0x8000, 0x7fff, 0, 0xffff]),
+            (['H', 'I', 'L'], UNSIGNED_INT16_BE, '>HHHH',
+             [0x8000, 0x7fff, 0, 0xffff]),
+            (['h', 'i', 'l'], SIGNED_INT16_LE, '<hhh',
+             [-0x8000, 0x7fff, 0]),
+            (['h', 'i', 'l'], SIGNED_INT16_BE, '>hhh',
+             [-0x8000, 0x7fff, 0]),
+            (['I', 'L'], UNSIGNED_INT32_LE, '<IIII',
+             [1<<31, (1<<31)-1, 0, (1<<32)-1]),
+            (['I', 'L'], UNSIGNED_INT32_BE, '>IIII',
+             [1<<31, (1<<31)-1, 0, (1<<32)-1]),
+            (['i', 'l'], SIGNED_INT32_LE, '<iii',
+             [-1<<31, (1<<31)-1, 0]),
+            (['i', 'l'], SIGNED_INT32_BE, '>iii',
+             [-1<<31, (1<<31)-1, 0]),
+            (['L'], UNSIGNED_INT64_LE, '<QQQQ',
+             [1<<31, (1<<31)-1, 0, (1<<32)-1]),
+            (['L'], UNSIGNED_INT64_BE, '>QQQQ',
+             [1<<31, (1<<31)-1, 0, (1<<32)-1]),
+            (['l'], SIGNED_INT64_LE, '<qqq',
+             [-1<<31, (1<<31)-1, 0]),
+            (['l'], SIGNED_INT64_BE, '>qqq',
+             [-1<<31, (1<<31)-1, 0]),
+            # The following tests for INT64 will raise an OverflowError
+            # when run on a 32-bit machine. The tests are simply skipped
+            # in that case.
+            (['L'], UNSIGNED_INT64_LE, '<QQQQ',
+             [1<<63, (1<<63)-1, 0, (1<<64)-1]),
+            (['L'], UNSIGNED_INT64_BE, '>QQQQ',
+             [1<<63, (1<<63)-1, 0, (1<<64)-1]),
+            (['l'], SIGNED_INT64_LE, '<qqq',
+             [-1<<63, (1<<63)-1, 0]),
+            (['l'], SIGNED_INT64_BE, '>qqq',
+             [-1<<63, (1<<63)-1, 0]),
+            (['f'], IEEE_754_FLOAT_LE, '<ffff',
+             [16711938.0, float('inf'), float('-inf'), -0.0]),
+            (['f'], IEEE_754_FLOAT_BE, '>ffff',
+             [16711938.0, float('inf'), float('-inf'), -0.0]),
+            (['d'], IEEE_754_DOUBLE_LE, '<dddd',
+             [9006104071832581.0, float('inf'), float('-inf'), -0.0]),
+            (['d'], IEEE_754_DOUBLE_BE, '>dddd',
+             [9006104071832581.0, float('inf'), float('-inf'), -0.0])
+        )
+        for testcase in testcases:
+            valid_typecodes, mformat_code, struct_fmt, values = testcase
+            arraystr = struct.pack(struct_fmt, *values)
+            for typecode in valid_typecodes:
+                try:
+                    a = array.array(typecode, values)
+                except OverflowError:
+                    continue  # Skip this test case.
+                b = array_reconstructor(
+                    array.array, typecode, mformat_code, arraystr)
+                self.assertEqual(a, b,
+                    msg="{0!r} != {1!r}; testcase={2!r}".format(a, b, testcase))
+
+    def test_unicode(self):
+        teststr = "Bonne Journ\xe9e \U0002030a\U00020347"
+        testcases = (
+            (UTF16_LE, "UTF-16-LE"),
+            (UTF16_BE, "UTF-16-BE"),
+            (UTF32_LE, "UTF-32-LE"),
+            (UTF32_BE, "UTF-32-BE")
+        )
+        for testcase in testcases:
+            mformat_code, encoding = testcase
+            a = array.array('u', teststr)
+            b = array_reconstructor(
+                array.array, 'u', mformat_code, teststr.encode(encoding))
+            self.assertEqual(a, b,
+                msg="{0!r} != {1!r}; testcase={2!r}".format(a, b, testcase))
+
+
+tests.append(ArrayReconstructorTest)
+
 
 class BaseTest(unittest.TestCase):
     # Required class attributes (provided by subclasses
@@ -49,7 +187,7 @@ class BaseTest(unittest.TestCase):
     def test_constructor(self):
         a = array.array(self.typecode)
         self.assertEqual(a.typecode, self.typecode)
-        self.assert_(a.itemsize>=self.minitemsize)
+        self.assertTrue(a.itemsize>=self.minitemsize)
         self.assertRaises(TypeError, array.array, self.typecode, None)
 
     def test_len(self):
@@ -64,10 +202,10 @@ class BaseTest(unittest.TestCase):
         a = array.array(self.typecode, self.example)
         self.assertRaises(TypeError, a.buffer_info, 42)
         bi = a.buffer_info()
-        self.assert_(isinstance(bi, tuple))
+        self.assertIsInstance(bi, tuple)
         self.assertEqual(len(bi), 2)
-        self.assert_(isinstance(bi[0], int))
-        self.assert_(isinstance(bi[1], int))
+        self.assertIsInstance(bi[0], int)
+        self.assertIsInstance(bi[1], int)
         self.assertEqual(bi[1], len(a))
 
     def test_byteswap(self):
@@ -97,31 +235,38 @@ class BaseTest(unittest.TestCase):
         self.assertNotEqual(id(a), id(b))
         self.assertEqual(a, b)
 
+    def test_reduce_ex(self):
+        a = array.array(self.typecode, self.example)
+        for protocol in range(3):
+            self.assertIs(a.__reduce_ex__(protocol)[0], array.array)
+        for protocol in range(3, pickle.HIGHEST_PROTOCOL):
+            self.assertIs(a.__reduce_ex__(protocol)[0], array_reconstructor)
+
     def test_pickle(self):
-        for protocol in range(HIGHEST_PROTOCOL + 1):
+        for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
             a = array.array(self.typecode, self.example)
-            b = loads(dumps(a, protocol))
+            b = pickle.loads(pickle.dumps(a, protocol))
             self.assertNotEqual(id(a), id(b))
             self.assertEqual(a, b)
 
             a = ArraySubclass(self.typecode, self.example)
             a.x = 10
-            b = loads(dumps(a, protocol))
+            b = pickle.loads(pickle.dumps(a, protocol))
             self.assertNotEqual(id(a), id(b))
             self.assertEqual(a, b)
             self.assertEqual(a.x, b.x)
             self.assertEqual(type(a), type(b))
 
     def test_pickle_for_empty_array(self):
-        for protocol in range(HIGHEST_PROTOCOL + 1):
+        for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
             a = array.array(self.typecode)
-            b = loads(dumps(a, protocol))
+            b = pickle.loads(pickle.dumps(a, protocol))
             self.assertNotEqual(id(a), id(b))
             self.assertEqual(a, b)
 
             a = ArraySubclass(self.typecode)
             a.x = 10
-            b = loads(dumps(a, protocol))
+            b = pickle.loads(pickle.dumps(a, protocol))
             self.assertNotEqual(id(a), id(b))
             self.assertEqual(a, b)
             self.assertEqual(a.x, b.x)
@@ -182,6 +327,36 @@ class BaseTest(unittest.TestCase):
                 f.close()
             support.unlink(support.TESTFN)
 
+    def test_fromfile_ioerror(self):
+        # Issue #5395: Check if fromfile raises a proper IOError
+        # instead of EOFError.
+        a = array.array(self.typecode)
+        f = open(support.TESTFN, 'wb')
+        try:
+            self.assertRaises(IOError, a.fromfile, f, len(self.example))
+        finally:
+            f.close()
+            support.unlink(support.TESTFN)
+
+    def test_filewrite(self):
+        a = array.array(self.typecode, 2*self.example)
+        f = open(support.TESTFN, 'wb')
+        try:
+            f.write(a)
+            f.close()
+            b = array.array(self.typecode)
+            f = open(support.TESTFN, 'rb')
+            b.fromfile(f, len(self.example))
+            self.assertEqual(b, array.array(self.typecode, self.example))
+            self.assertNotEqual(a, b)
+            b.fromfile(f, len(self.example))
+            self.assertEqual(a, b)
+            f.close()
+        finally:
+            if not f.closed:
+                f.close()
+            support.unlink(support.TESTFN)
+
     def test_tofromlist(self):
         a = array.array(self.typecode, 2*self.example)
         b = array.array(self.typecode)
@@ -193,15 +368,40 @@ class BaseTest(unittest.TestCase):
         self.assertEqual(a, b)
 
     def test_tofromstring(self):
+        nb_warnings = 4
+        with warnings.catch_warnings(record=True) as r:
+            warnings.filterwarnings("always",
+                                    message=r"(to|from)string\(\) is deprecated",
+                                    category=DeprecationWarning)
+            a = array.array(self.typecode, 2*self.example)
+            b = array.array(self.typecode)
+            self.assertRaises(TypeError, a.tostring, 42)
+            self.assertRaises(TypeError, b.fromstring)
+            self.assertRaises(TypeError, b.fromstring, 42)
+            b.fromstring(a.tostring())
+            self.assertEqual(a, b)
+            if a.itemsize>1:
+                self.assertRaises(ValueError, b.fromstring, "x")
+                nb_warnings += 1
+        self.assertEqual(len(r), nb_warnings)
+
+    def test_tofrombytes(self):
         a = array.array(self.typecode, 2*self.example)
         b = array.array(self.typecode)
-        self.assertRaises(TypeError, a.tostring, 42)
-        self.assertRaises(TypeError, b.fromstring)
-        self.assertRaises(TypeError, b.fromstring, 42)
-        b.fromstring(a.tostring())
+        self.assertRaises(TypeError, a.tobytes, 42)
+        self.assertRaises(TypeError, b.frombytes)
+        self.assertRaises(TypeError, b.frombytes, 42)
+        b.frombytes(a.tobytes())
+        c = array.array(self.typecode, bytearray(a.tobytes()))
         self.assertEqual(a, b)
+        self.assertEqual(a, c)
         if a.itemsize>1:
-            self.assertRaises(ValueError, b.fromstring, "x")
+            self.assertRaises(ValueError, b.frombytes, b"x")
+
+    def test_fromarray(self):
+        a = array.array(self.typecode, self.example)
+        b = array.array(self.typecode, a)
+        self.assertEqual(a, b)
 
     def test_repr(self):
         a = array.array(self.typecode, 2*self.example)
@@ -216,39 +416,39 @@ class BaseTest(unittest.TestCase):
 
     def test_cmp(self):
         a = array.array(self.typecode, self.example)
-        self.assert_((a == 42) is False)
-        self.assert_((a != 42) is True)
+        self.assertTrue((a == 42) is False)
+        self.assertTrue((a != 42) is True)
 
-        self.assert_((a == a) is True)
-        self.assert_((a != a) is False)
-        self.assert_((a < a) is False)
-        self.assert_((a <= a) is True)
-        self.assert_((a > a) is False)
-        self.assert_((a >= a) is True)
+        self.assertTrue((a == a) is True)
+        self.assertTrue((a != a) is False)
+        self.assertTrue((a < a) is False)
+        self.assertTrue((a <= a) is True)
+        self.assertTrue((a > a) is False)
+        self.assertTrue((a >= a) is True)
 
         al = array.array(self.typecode, self.smallerexample)
         ab = array.array(self.typecode, self.biggerexample)
 
-        self.assert_((a == 2*a) is False)
-        self.assert_((a != 2*a) is True)
-        self.assert_((a < 2*a) is True)
-        self.assert_((a <= 2*a) is True)
-        self.assert_((a > 2*a) is False)
-        self.assert_((a >= 2*a) is False)
+        self.assertTrue((a == 2*a) is False)
+        self.assertTrue((a != 2*a) is True)
+        self.assertTrue((a < 2*a) is True)
+        self.assertTrue((a <= 2*a) is True)
+        self.assertTrue((a > 2*a) is False)
+        self.assertTrue((a >= 2*a) is False)
 
-        self.assert_((a == al) is False)
-        self.assert_((a != al) is True)
-        self.assert_((a < al) is False)
-        self.assert_((a <= al) is False)
-        self.assert_((a > al) is True)
-        self.assert_((a >= al) is True)
+        self.assertTrue((a == al) is False)
+        self.assertTrue((a != al) is True)
+        self.assertTrue((a < al) is False)
+        self.assertTrue((a <= al) is False)
+        self.assertTrue((a > al) is True)
+        self.assertTrue((a >= al) is True)
 
-        self.assert_((a == ab) is False)
-        self.assert_((a != ab) is True)
-        self.assert_((a < ab) is True)
-        self.assert_((a <= ab) is True)
-        self.assert_((a > ab) is False)
-        self.assert_((a >= ab) is False)
+        self.assertTrue((a == ab) is False)
+        self.assertTrue((a != ab) is True)
+        self.assertTrue((a < ab) is True)
+        self.assertTrue((a <= ab) is True)
+        self.assertTrue((a > ab) is False)
+        self.assertTrue((a >= ab) is False)
 
     def test_add(self):
         a = array.array(self.typecode, self.example) \
@@ -267,10 +467,16 @@ class BaseTest(unittest.TestCase):
         a = array.array(self.typecode, self.example[::-1])
         b = a
         a += array.array(self.typecode, 2*self.example)
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(
             a,
             array.array(self.typecode, self.example[::-1]+2*self.example)
+        )
+        a = array.array(self.typecode, self.example)
+        a += a
+        self.assertEqual(
+            a,
+            array.array(self.typecode, self.example + self.example)
         )
 
         b = array.array(self.badtypecode())
@@ -303,6 +509,12 @@ class BaseTest(unittest.TestCase):
             array.array(self.typecode)
         )
 
+        a = 5 * array.array(self.typecode, self.example[:1])
+        self.assertEqual(
+            a,
+            array.array(self.typecode, [a[0]] * 5)
+        )
+
         self.assertRaises(TypeError, a.__mul__, "bad")
 
     def test_imul(self):
@@ -310,22 +522,22 @@ class BaseTest(unittest.TestCase):
         b = a
 
         a *= 5
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(
             a,
             array.array(self.typecode, 5*self.example)
         )
 
         a *= 0
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(a, array.array(self.typecode))
 
         a *= 1000
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(a, array.array(self.typecode))
 
         a *= -1
-        self.assert_(a is b)
+        self.assertTrue(a is b)
         self.assertEqual(a, array.array(self.typecode))
 
         a = array.array(self.typecode, self.example)
@@ -584,11 +796,11 @@ class BaseTest(unittest.TestCase):
                     data.reverse()
                     L[start:stop:step] = data
                     a[start:stop:step] = array.array(self.typecode, data)
-                    self.assertEquals(a, array.array(self.typecode, L))
+                    self.assertEqual(a, array.array(self.typecode, L))
 
                     del L[start:stop:step]
                     del a[start:stop:step]
-                    self.assertEquals(a, array.array(self.typecode, L))
+                    self.assertEqual(a, array.array(self.typecode, L))
 
     def test_index(self):
         example = 2*self.example
@@ -667,6 +879,13 @@ class BaseTest(unittest.TestCase):
             array.array(self.typecode, self.example+self.example[::-1])
         )
 
+        a = array.array(self.typecode, self.example)
+        a.extend(a)
+        self.assertEqual(
+            a,
+            array.array(self.typecode, self.example+self.example)
+        )
+
         b = array.array(self.badtypecode())
         self.assertRaises(TypeError, a.extend, b)
 
@@ -710,27 +929,42 @@ class BaseTest(unittest.TestCase):
     def test_buffer(self):
         a = array.array(self.typecode, self.example)
         m = memoryview(a)
-        b = bytes(m)
-        self.assertEqual(b, a.tostring())
-        self.assertEqual(b[0], a.tostring()[0])
-        # Resizing is forbidden when there are buffer exports
+        expected = m.tobytes()
+        self.assertEqual(a.tobytes(), expected)
+        self.assertEqual(a.tobytes()[0], expected[0])
+        # Resizing is forbidden when there are buffer exports.
+        # For issue 4509, we also check after each error that
+        # the array was not modified.
         self.assertRaises(BufferError, a.append, a[0])
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, a.extend, a[0:1])
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, a.remove, a[0])
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, a.pop, 0)
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, a.fromlist, a.tolist())
-        self.assertRaises(BufferError, a.fromstring, a.tostring())
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, a.frombytes, a.tobytes())
+        self.assertEqual(m.tobytes(), expected)
         if self.typecode == 'u':
             self.assertRaises(BufferError, a.fromunicode, a.tounicode())
-        self.assertRaises(BufferError, operator.setitem, a, slice(0, 0), a)
-        self.assertRaises(BufferError, operator.delitem, a, 0)
-        self.assertRaises(BufferError, operator.delitem, a, slice(0, 1))
+            self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, operator.imul, a, 2)
+        self.assertEqual(m.tobytes(), expected)
         self.assertRaises(BufferError, operator.imul, a, 0)
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, operator.setitem, a, slice(0, 0), a)
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, operator.delitem, a, 0)
+        self.assertEqual(m.tobytes(), expected)
+        self.assertRaises(BufferError, operator.delitem, a, slice(0, 1))
+        self.assertEqual(m.tobytes(), expected)
 
     def test_weakref(self):
         s = array.array(self.typecode, self.example)
-        p = proxy(s)
-        self.assertEqual(p.tostring(), s.tostring())
+        p = weakref.proxy(s)
+        self.assertEqual(p.tobytes(), s.tobytes())
         s = None
         self.assertRaises(ReferenceError, len, p)
 
@@ -749,6 +983,8 @@ class BaseTest(unittest.TestCase):
         ArraySubclassWithKwargs('b', newarg=1)
 
     def test_create_from_bytes(self):
+        # XXX This test probably needs to be moved in a subclass or
+        # generalized to use self.typecode.
         a = array.array('H', b"1234")
         self.assertEqual(len(a) * a.itemsize, 4)
 
@@ -818,6 +1054,9 @@ class NumberTest(BaseTest):
         a = array.array(self.typecode, range(10))
         del a[::1000]
         self.assertEqual(a, array.array(self.typecode, [1,2,3,4,5,6,7,8,9]))
+        # test issue7788
+        a = array.array(self.typecode, range(10))
+        del a[9::1<<333]
 
     def test_assignment(self):
         a = array.array(self.typecode, range(10))
@@ -879,6 +1118,11 @@ class NumberTest(BaseTest):
 
         self.assertRaises(AttributeError, setattr, a, "color", "blue")
 
+    def test_frombytearray(self):
+        a = array.array('b', range(10))
+        b = array.array(self.typecode, a)
+        self.assertEqual(a, b)
+
 class SignedNumberTest(NumberTest):
     example = [-1, 0, 1, 42, 0x7f]
     smallerexample = [-1, 0, 1, 42, 0x7e]
@@ -902,6 +1146,23 @@ class UnsignedNumberTest(NumberTest):
         lower = 0
         upper = int(pow(2, a.itemsize * 8)) - 1
         self.check_overflow(lower, upper)
+
+    def test_bytes_extend(self):
+        s = bytes(self.example)
+
+        a = array.array(self.typecode, self.example)
+        a.extend(s)
+        self.assertEqual(
+            a,
+            array.array(self.typecode, self.example+self.example)
+        )
+
+        a = array.array(self.typecode, self.example)
+        a.extend(bytearray(reversed(s)))
+        self.assertEqual(
+            a,
+            array.array(self.typecode, self.example+self.example[::-1])
+        )
 
 
 class ByteTest(SignedNumberTest):
@@ -965,7 +1226,7 @@ class FPTest(NumberTest):
                 # On alphas treating the byte swapped bit patters as
                 # floats/doubles results in floating point exceptions
                 # => compare the 8bit string values instead
-                self.assertNotEqual(a.tostring(), b.tostring())
+                self.assertNotEqual(a.tobytes(), b.tobytes())
             b.byteswap()
             self.assertEqual(a, b)
 

@@ -32,7 +32,7 @@ unknown_presentation_type(STRINGLIB_CHAR presentation_type,
         PyErr_Format(PyExc_ValueError,
                      "Unknown format code '%c' "
                      "for object of type '%.200s'",
-                     presentation_type,
+                     (char)presentation_type,
                      type_name);
 #if STRINGLIB_IS_UNICODE
     else
@@ -41,6 +41,24 @@ unknown_presentation_type(STRINGLIB_CHAR presentation_type,
                      "for object of type '%.200s'",
                      (unsigned int)presentation_type,
                      type_name);
+#endif
+}
+
+static void
+invalid_comma_type(STRINGLIB_CHAR presentation_type)
+{
+#if STRINGLIB_IS_UNICODE
+    /* See comment in unknown_presentation_type */
+    if (presentation_type > 32 && presentation_type < 128)
+#endif
+        PyErr_Format(PyExc_ValueError,
+                     "Cannot specify ',' with '%c'.",
+                     (char)presentation_type);
+#if STRINGLIB_IS_UNICODE
+    else
+        PyErr_Format(PyExc_ValueError,
+                     "Cannot specify ',' with '\\x%x'.",
+                     (unsigned int)presentation_type);
 #endif
 }
 
@@ -123,6 +141,26 @@ typedef struct {
     STRINGLIB_CHAR type;
 } InternalFormatSpec;
 
+
+#if 0
+/* Occassionally useful for debugging. Should normally be commented out. */
+static void
+DEBUG_PRINT_FORMAT_SPEC(InternalFormatSpec *format)
+{
+    printf("internal format spec: fill_char %d\n", format->fill_char);
+    printf("internal format spec: align %d\n", format->align);
+    printf("internal format spec: alternate %d\n", format->alternate);
+    printf("internal format spec: sign %d\n", format->sign);
+    printf("internal format spec: width %zd\n", format->width);
+    printf("internal format spec: thousands_separators %d\n",
+           format->thousands_separators);
+    printf("internal format spec: precision %zd\n", format->precision);
+    printf("internal format spec: type %c\n", format->type);
+    printf("\n");
+}
+#endif
+
+
 /*
   ptr points to the start of the format_spec, end points just past its end.
   fills in format with the parsed information.
@@ -133,7 +171,8 @@ static int
 parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
                                   Py_ssize_t format_spec_len,
                                   InternalFormatSpec *format,
-                                  char default_type)
+                                  char default_type,
+                                  char default_align)
 {
     STRINGLIB_CHAR *ptr = format_spec;
     STRINGLIB_CHAR *end = format_spec + format_spec_len;
@@ -142,9 +181,10 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
        the input string */
 
     Py_ssize_t consumed;
+    int align_specified = 0;
 
     format->fill_char = '\0';
-    format->align = '\0';
+    format->align = default_align;
     format->alternate = 0;
     format->sign = '\0';
     format->width = -1;
@@ -157,10 +197,12 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
     if (end-ptr >= 2 && is_alignment_token(ptr[1])) {
         format->align = ptr[1];
         format->fill_char = ptr[0];
+        align_specified = 1;
         ptr += 2;
     }
     else if (end-ptr >= 1 && is_alignment_token(ptr[0])) {
         format->align = ptr[0];
+        align_specified = 1;
         ++ptr;
     }
 
@@ -180,7 +222,7 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
     /* The special case for 0-padding (backwards compat) */
     if (format->fill_char == '\0' && end-ptr >= 1 && ptr[0] == '0') {
         format->fill_char = '0';
-        if (format->align == '\0') {
+        if (!align_specified) {
             format->align = '=';
         }
         ++ptr;
@@ -253,8 +295,7 @@ parse_internal_render_format_spec(STRINGLIB_CHAR *format_spec,
             /* These are allowed. See PEP 378.*/
             break;
         default:
-            PyErr_Format(PyExc_ValueError,
-                         "Cannot specify ',' with '%c'.", format->type);
+            invalid_comma_type(format->type);
             return 0;
         }
     }
@@ -279,14 +320,19 @@ calc_padding(Py_ssize_t nchars, Py_ssize_t width, STRINGLIB_CHAR align,
         *n_total = nchars;
     }
 
-    /* figure out how much leading space we need, based on the
+    /* Figure out how much leading space we need, based on the
        aligning */
     if (align == '>')
         *n_lpadding = *n_total - nchars;
     else if (align == '^')
         *n_lpadding = (*n_total - nchars) / 2;
-    else
+    else if (align == '<' || align == '=')
         *n_lpadding = 0;
+    else {
+        /* We should never have an unspecified alignment. */
+        *n_lpadding = 0;
+        assert(0);
+    }
 
     *n_rpadding = *n_total - nchars - *n_lpadding;
 }
@@ -452,7 +498,7 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
 
     /* min_width can go negative, that's okay. format->width == -1 means
        we don't care. */
-    if (format->fill_char == '0')
+    if (format->fill_char == '0' && format->align == '=')
         spec->n_min_width = format->width - n_non_digit_non_padding;
     else
         spec->n_min_width = 0;
@@ -488,9 +534,13 @@ calc_number_widths(NumberFieldWidths *spec, Py_ssize_t n_prefix,
         case '=':
             spec->n_spadding = n_padding;
             break;
-        default:
-            /* Handles '>', plus catch-all just in case. */
+        case '>':
             spec->n_lpadding = n_padding;
+            break;
+        default:
+            /* Shouldn't get here, but treat it as '>' */
+            spec->n_lpadding = n_padding;
+            assert(0);
             break;
         }
     }
@@ -599,8 +649,8 @@ get_locale_info(int type, LocaleInfo *locale_info)
     case LT_DEFAULT_LOCALE:
         locale_info->decimal_point = ".";
         locale_info->thousands_sep = ",";
-        locale_info->grouping = "\3"; /* Group every 3 characters,
-                                         trailing 0 means repeat
+        locale_info->grouping = "\3"; /* Group every 3 characters.  The
+                                         (implicit) trailing 0 means repeat
                                          infinitely. */
         break;
     case LT_NO_LOCALE:
@@ -722,14 +772,6 @@ format_int_or_long_internal(PyObject *value, const InternalFormatSpec *format,
         if (format->sign != '\0') {
             PyErr_SetString(PyExc_ValueError,
                             "Sign not allowed with integer"
-                            " format specifier 'c'");
-            goto done;
-        }
-
-        /* Error to specify a comma. */
-        if (format->thousands_separators) {
-            PyErr_SetString(PyExc_ValueError,
-                            "Thousands separators not allowed with integer"
                             " format specifier 'c'");
             goto done;
         }
@@ -899,20 +941,16 @@ format_float_internal(PyObject *value,
        from a hard-code pseudo-locale */
     LocaleInfo locale;
 
-    /* Alternate is not allowed on floats. */
-    if (format->alternate) {
-        PyErr_SetString(PyExc_ValueError,
-                        "Alternate form (#) not allowed in float format "
-                        "specifier");
-        goto done;
-    }
+    if (format->alternate)
+        flags |= Py_DTSF_ALT;
 
     if (type == '\0') {
-        /* Omitted type specifier. This is like 'g' but with at least one
-           digit after the decimal point, and different default precision.*/
-        type = 'g';
-        default_precision = PyFloat_STR_PRECISION;
+        /* Omitted type specifier.  Behaves in the same way as repr(x)
+           and str(x) if no precision is given, else like 'g', but with
+           at least one digit after the decimal point. */
         flags |= Py_DTSF_ADD_DOT_0;
+        type = 'r';
+        default_precision = 0;
     }
 
     if (type == 'n')
@@ -932,19 +970,8 @@ format_float_internal(PyObject *value,
 
     if (precision < 0)
         precision = default_precision;
-
-#if PY_VERSION_HEX < 0x03010000
-    /* 3.1 no longer converts large 'f' to 'g'. */
-    if (fabs(val) >= 1e50)
-        switch (type) {
-        case 'f':
-            type = 'g';
-            break;
-        case 'F':
-            type = 'G';
-            break;
-        }
-#endif
+    else if (type == 'r')
+        type = 'g';
 
     /* Cast "type", because if we're in unicode we need to pass a
        8-bit char. This is safe, because we've restricted what "type"
@@ -1072,15 +1099,7 @@ format_complex_internal(PyObject *value,
        from a hard-code pseudo-locale */
     LocaleInfo locale;
 
-    /* Alternate is not allowed on complex. */
-    if (format->alternate) {
-        PyErr_SetString(PyExc_ValueError,
-                        "Alternate form (#) not allowed in complex format "
-                        "specifier");
-        goto done;
-    }
-
-    /* Neither is zero pading. */
+    /* Zero padding is not allowed. */
     if (format->fill_char == '0') {
         PyErr_SetString(PyExc_ValueError,
                         "Zero padding is not allowed in complex format "
@@ -1103,13 +1122,17 @@ format_complex_internal(PyObject *value,
     if (im == -1.0 && PyErr_Occurred())
         goto done;
 
+    if (format->alternate)
+        flags |= Py_DTSF_ALT;
+
     if (type == '\0') {
         /* Omitted type specifier. Should be like str(self). */
-        type = 'g';
-        default_precision = PyFloat_STR_PRECISION;
-        add_parens = 1;
-        if (re == 0.0)
+        type = 'r';
+        default_precision = 0;
+        if (re == 0.0 && copysign(1.0, re) == 1.0)
             skip_re = 1;
+        else
+            add_parens = 1;
     }
 
     if (type == 'n')
@@ -1119,6 +1142,8 @@ format_complex_internal(PyObject *value,
 
     if (precision < 0)
         precision = default_precision;
+    else if (type == 'r')
+        type = 'g';
 
     /* Cast "type", because if we're in unicode we need to pass a
        8-bit char. This is safe, because we've restricted what "type"
@@ -1186,7 +1211,7 @@ format_complex_internal(PyObject *value,
     /* Turn off any padding. We'll do it later after we've composed
        the numbers without padding. */
     tmp_format.fill_char = '\0';
-    tmp_format.align = '\0';
+    tmp_format.align = '<';
     tmp_format.width = -1;
 
     /* Calculate how much memory we'll need. */
@@ -1194,8 +1219,11 @@ format_complex_internal(PyObject *value,
                                     n_re_digits, n_re_remainder,
                                     re_has_decimal, &locale, &tmp_format);
 
-    /* Same formatting, but always include a sign. */
-    tmp_format.sign = '+';
+    /* Same formatting, but always include a sign, unless the real part is
+     * going to be omitted, in which case we use whatever sign convention was
+     * requested by the original format. */
+    if (!skip_re)
+        tmp_format.sign = '+';
     n_im_total = calc_number_widths(&im_spec, 0, im_sign_char, p_im,
                                     n_im_digits, n_im_remainder,
                                     im_has_decimal, &locale, &tmp_format);
@@ -1262,7 +1290,7 @@ FORMAT_STRING(PyObject *obj,
 
     /* parse the format_spec */
     if (!parse_internal_render_format_spec(format_spec, format_spec_len,
-                                           &format, 's'))
+                                           &format, 's', '<'))
         goto done;
 
     /* type conversion? */
@@ -1302,7 +1330,7 @@ format_int_or_long(PyObject* obj,
     /* parse the format_spec */
     if (!parse_internal_render_format_spec(format_spec,
                                            format_spec_len,
-                                           &format, 'd'))
+                                           &format, 'd', '>'))
         goto done;
 
     /* type conversion? */
@@ -1413,7 +1441,7 @@ FORMAT_FLOAT(PyObject *obj,
     /* parse the format_spec */
     if (!parse_internal_render_format_spec(format_spec,
                                            format_spec_len,
-                                           &format, '\0'))
+                                           &format, '\0', '>'))
         goto done;
 
     /* type conversion? */
@@ -1461,7 +1489,7 @@ FORMAT_COMPLEX(PyObject *obj,
     /* parse the format_spec */
     if (!parse_internal_render_format_spec(format_spec,
                                            format_spec_len,
-                                           &format, '\0'))
+                                           &format, '\0', '>'))
         goto done;
 
     /* type conversion? */

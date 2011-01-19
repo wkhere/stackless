@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 #
 # Class for profiling python code. rev 1.0  6/2/94
 #
@@ -39,7 +39,7 @@ import time
 import marshal
 from optparse import OptionParser
 
-__all__ = ["run", "runctx", "help", "Profile"]
+__all__ = ["run", "runctx", "Profile"]
 
 # Sample timer for use with
 #i_count = 0
@@ -75,7 +75,7 @@ def run(statement, filename=None, sort=-1):
     else:
         return prof.print_stats(sort)
 
-def runctx(statement, globals, locals, filename=None):
+def runctx(statement, globals, locals, filename=None, sort=-1):
     """Run statement under profiler, supplying your own globals and locals,
     optionally saving results in filename.
 
@@ -90,17 +90,7 @@ def runctx(statement, globals, locals, filename=None):
     if filename is not None:
         prof.dump_stats(filename)
     else:
-        return prof.print_stats()
-
-# Backwards compatibility.
-def help():
-    print("Documentation for the profile module can be found ")
-    print("in the Python Library Reference, section 'The Python Profiler'.")
-
-if os.name == "mac":
-    import MacOS
-    def _get_time_mac(timer=MacOS.GetTicks):
-        return timer() / 60.0
+        return prof.print_stats(sort)
 
 if hasattr(os, "times"):
     def _get_time_times(timer=os.times):
@@ -178,10 +168,6 @@ class Profile:
                 self.timer = resgetrusage
                 self.dispatcher = self.trace_dispatch
                 self.get_time = _get_time_resource
-            elif os.name == 'mac':
-                self.timer = MacOS.GetTicks
-                self.dispatcher = self.trace_dispatch_mac
-                self.get_time = _get_time_mac
             elif hasattr(time, 'clock'):
                 self.timer = self.get_time = time.clock
                 self.dispatcher = self.trace_dispatch_i
@@ -588,8 +574,6 @@ class Profile:
         return mean
 
 #****************************************************************************
-def Stats(*args):
-    print('Report generating functions are in the "pstats" module\a')
 
 def main():
     usage = "profile.py [-o output_file_path] [-s sort] scriptfile [arg] ..."
@@ -598,7 +582,8 @@ def main():
     parser.add_option('-o', '--outfile', dest="outfile",
         help="Save stats to <outfile>", default=None)
     parser.add_option('-s', '--sort', dest="sort",
-        help="Sort order when printing to stdout, based on pstats.Stats class", default=-1)
+        help="Sort order when printing to stdout, based on pstats.Stats class",
+        default=-1)
 
     if not sys.argv[1:]:
         parser.print_usage()
@@ -607,14 +592,18 @@ def main():
     (options, args) = parser.parse_args()
     sys.argv[:] = args
 
-    if (len(sys.argv) > 0):
-        sys.path.insert(0, os.path.dirname(sys.argv[0]))
-        fp = open(sys.argv[0])
-        try:
-            script = fp.read()
-        finally:
-            fp.close()
-        run('exec(%r)' % script, options.outfile, options.sort)
+    if len(args) > 0:
+        progname = args[0]
+        sys.path.insert(0, os.path.dirname(progname))
+        with open(progname, 'rb') as fp:
+            code = compile(fp.read(), progname, 'exec')
+        globs = {
+            '__file__': progname,
+            '__name__': '__main__',
+            '__package__': None,
+            '__cached__': None,
+        }
+        runctx(code, globs, None, options.outfile, options.sort)
     else:
         parser.print_usage()
     return parser

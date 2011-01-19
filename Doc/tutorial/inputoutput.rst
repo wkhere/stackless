@@ -52,10 +52,10 @@ Some examples::
    'Hello, world.'
    >>> repr(s)
    "'Hello, world.'"
-   >>> str(0.1)
-   '0.1'
-   >>> repr(0.1)
-   '0.10000000000000001'
+   >>> str(1.0/7.0)
+   '0.142857142857'
+   >>> repr(1.0/7.0)
+   '0.14285714285714285'
    >>> x = 10 * 3.25
    >>> y = 200 * 200
    >>> s = 'The value of x is ' + repr(x) + ', and y is ' + repr(y) + '...'
@@ -126,20 +126,21 @@ with zeros.  It understands about plus and minus signs::
 
 Basic usage of the :meth:`str.format` method looks like this::
 
-   >>> print('We are the {0} who say "{1}!"'.format('knights', 'Ni'))
+   >>> print('We are the {} who say "{}!"'.format('knights', 'Ni'))
    We are the knights who say "Ni!"
 
 The brackets and characters within them (called format fields) are replaced with
-the objects passed into the format method.  The number in the brackets refers to
-the position of the object passed into the format method. ::
+the objects passed into the :meth:`~str.format` method.  A number in the
+brackets can be used to refer to the position of the object passed into the
+:meth:`~str.format` method. ::
 
    >>> print('{0} and {1}'.format('spam', 'eggs'))
    spam and eggs
    >>> print('{1} and {0}'.format('spam', 'eggs'))
    eggs and spam
 
-If keyword arguments are used in the format method, their values are referred to
-by using the name of the argument. ::
+If keyword arguments are used in the :meth:`~str.format` method, their values
+are referred to by using the name of the argument. ::
 
    >>> print('This {food} is {adjective}.'.format(
    ...       food='spam', adjective='absolutely horrible'))
@@ -151,16 +152,25 @@ Positional and keyword arguments can be arbitrarily combined::
                                                           other='Georg'))
    The story of Bill, Manfred, and Georg.
 
-An optional ``':'`` and format specifier can follow the field name. This also
+``'!a'`` (apply :func:`ascii`), ``'!s'`` (apply :func:`str`) and ``'!r'``
+(apply :func:`repr`) can be used to convert the value before it is formatted::
+
+   >>> import math
+   >>> print('The value of PI is approximately {}.'.format(math.pi))
+   The value of PI is approximately 3.14159265359.
+   >>> print('The value of PI is approximately {!r}.'.format(math.pi))
+   The value of PI is approximately 3.141592653589793.
+
+An optional ``':'`` and format specifier can follow the field name. This allows
 greater control over how the value is formatted.  The following example
-truncates the Pi to three places after the decimal.
+truncates Pi to three places after the decimal.
 
    >>> import math
    >>> print('The value of PI is approximately {0:.3f}.'.format(math.pi))
    The value of PI is approximately 3.142.
 
 Passing an integer after the ``':'`` will cause that field to be a minimum
-number of characters wide.  This is useful for making tables pretty.::
+number of characters wide.  This is useful for making tables pretty. ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 7678}
    >>> for name, phone in table.items():
@@ -181,7 +191,7 @@ square brackets ``'[]'`` to access the keys ::
    Jack: 4098; Sjoerd: 4127; Dcab: 8637678
 
 This could also be done by passing the table as keyword arguments with the '**'
-notation.::
+notation. ::
 
    >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 8637678}
    >>> print('Jack: {Jack:d}; Sjoerd: {Sjoerd:d}; Dcab: {Dcab:d}'.format(**table))
@@ -198,7 +208,7 @@ Old string formatting
 ---------------------
 
 The ``%`` operator can also be used for string formatting. It interprets the
-left argument much like a :cfunc:`sprintf`\ -style format string to be applied
+left argument much like a :c:func:`sprintf`\ -style format string to be applied
 to the right argument, and returns the string resulting from this formatting
 operation. For example::
 
@@ -207,8 +217,8 @@ operation. For example::
    The value of PI is approximately 3.142.
 
 Since :meth:`str.format` is quite new, a lot of Python code still uses the ``%``
-operator. However, because this old style of formatting will eventually removed
-from the language :meth:`str.format` should generally be used.
+operator. However, because this old style of formatting will eventually be
+removed from the language, :meth:`str.format` should generally be used.
 
 More information can be found in the :ref:`old-string-formatting` section.
 
@@ -222,8 +232,8 @@ Reading and Writing Files
    builtin: open
    object: file
 
-:func:`open` returns a file object, and is most commonly used with two
-arguments: ``open(filename, mode)``.
+:func:`open` returns a :term:`file object`, and is most commonly used with
+two arguments: ``open(filename, mode)``.
 
 ::
 
@@ -374,9 +384,9 @@ shorter than writing equivalent :keyword:`try`\ -\ :keyword:`finally` blocks::
     >>> f.closed
     True
 
-File objects have some additional methods, such as :meth:`isatty` and
-:meth:`truncate` which are less frequently used; consult the Library Reference
-for a complete guide to file objects.
+File objects have some additional methods, such as :meth:`~file.isatty` and
+:meth:`~file.truncate` which are less frequently used; consult the Library
+Reference for a complete guide to file objects.
 
 
 .. _tut-pickle:

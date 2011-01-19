@@ -1,6 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import unittest
+import sys
 import os
 from test import support
 
@@ -126,6 +127,30 @@ class TclTest(unittest.TestCase):
     def testPackageRequireException(self):
         tcl = self.interp
         self.assertRaises(TclError,tcl.eval,'package require DNE')
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Requires Windows')
+    def testLoadWithUNC(self):
+        # Build a UNC path from the regular path.
+        # Something like
+        #   \\%COMPUTERNAME%\c$\python27\python.exe
+
+        fullname = os.path.abspath(sys.executable)
+        if fullname[1] != ':':
+            raise unittest.SkipTest('Absolute path should have drive part')
+        unc_name = r'\\%s\%s$\%s' % (os.environ['COMPUTERNAME'],
+                                    fullname[0],
+                                    fullname[3:])
+        if not os.path.exists(unc_name):
+            raise unittest.SkipTest('Cannot connect to UNC Path')
+
+        with support.EnvironmentVarGuard() as env:
+            env.unset("TCL_LIBRARY")
+            f = os.popen('%s -c "import tkinter; print(tkinter)"' % (unc_name,))
+
+        self.assertIn('tkinter', f.read())
+        # exit code must be zero
+        self.assertEqual(f.close(), None)
+
 
 
 def test_main():

@@ -51,6 +51,7 @@ arithmetic.  It offers several advantages over the :class:`float` datatype:
   alterable precision (defaulting to 28 places) which can be as large as needed for
   a given problem:
 
+     >>> from decimal import *
      >>> getcontext().prec = 6
      >>> Decimal(1) / Decimal(7)
      Decimal('0.142857')
@@ -122,15 +123,14 @@ precision, rounding, or enabled traps::
    >>> from decimal import *
    >>> getcontext()
    Context(prec=28, rounding=ROUND_HALF_EVEN, Emin=-999999999, Emax=999999999,
-           capitals=1, flags=[], traps=[Overflow, DivisionByZero,
+           capitals=1, clamp=0, flags=[], traps=[Overflow, DivisionByZero,
            InvalidOperation])
 
    >>> getcontext().prec = 7       # Set a new precision
 
-Decimal instances can be constructed from integers, strings, or tuples.  To
-create a Decimal from a :class:`float`, first convert it to a string.  This
-serves as an explicit reminder of the details of the conversion (including
-representation error).  Decimal numbers include special values such as
+Decimal instances can be constructed from integers, strings, floats, or tuples.
+Construction from an integer or a float performs an exact conversion of the
+value of that integer or float.  Decimal numbers include special values such as
 :const:`NaN` which stands for "Not a number", positive and negative
 :const:`Infinity`, and :const:`-0`.
 
@@ -139,10 +139,12 @@ representation error).  Decimal numbers include special values such as
    Decimal('10')
    >>> Decimal('3.14')
    Decimal('3.14')
+   >>> Decimal(3.14)
+   Decimal('3.140000000000000124344978758017532527446746826171875')
    >>> Decimal((0, (3, 1, 4), -2))
    Decimal('3.14')
    >>> Decimal(str(2.0 ** 0.5))
-   Decimal('1.41421356237')
+   Decimal('1.4142135623730951')
    >>> Decimal(2) ** Decimal('0.5')
    Decimal('1.414213562373095048801688724')
    >>> Decimal('NaN')
@@ -187,9 +189,9 @@ floating point flying circus:
    >>> str(a)
    '1.34'
    >>> float(a)
-   1.3400000000000001
-   >>> round(a, 1)     # round() first converts to binary floating point
-   1.3
+   1.34
+   >>> round(a, 1)
+   Decimal('1.3')
    >>> int(a)
    1
    >>> a * 5
@@ -243,7 +245,7 @@ enabled:
 
    >>> ExtendedContext
    Context(prec=9, rounding=ROUND_HALF_EVEN, Emin=-999999999, Emax=999999999,
-           capitals=1, flags=[], traps=[])
+           capitals=1, clamp=0, flags=[], traps=[])
    >>> setcontext(ExtendedContext)
    >>> Decimal(1) / Decimal(7)
    Decimal('0.142857143')
@@ -268,7 +270,7 @@ using the :meth:`clear_flags` method. ::
    Decimal('3.14159292')
    >>> getcontext()
    Context(prec=9, rounding=ROUND_HALF_EVEN, Emin=-999999999, Emax=999999999,
-           capitals=1, flags=[Inexact, Rounded], traps=[])
+           capitals=1, clamp=0, flags=[Inexact, Rounded], traps=[])
 
 The *flags* entry shows that the rational approximation to :const:`Pi` was
 rounded (digits beyond the context precision were thrown away) and that the
@@ -308,7 +310,7 @@ Decimal objects
 
    Construct a new :class:`Decimal` object based from *value*.
 
-   *value* can be an integer, string, tuple, or another :class:`Decimal`
+   *value* can be an integer, string, tuple, :class:`float`, or another :class:`Decimal`
    object. If no *value* is given, returns ``Decimal('0')``.  If *value* is a
    string, it should conform to the decimal numeric string syntax after leading
    and trailing whitespace characters are removed::
@@ -324,10 +326,21 @@ Decimal objects
       numeric-value  ::=  decimal-part [exponent-part] | infinity
       numeric-string ::=  [sign] numeric-value | [sign] nan
 
+   Other Unicode decimal digits are also permitted where ``digit``
+   appears above.  These include decimal digits from various other
+   alphabets (for example, Arabic-Indic and Devanāgarī digits) along
+   with the fullwidth digits ``'\uff10'`` through ``'\uff19'``.
+
    If *value* is a :class:`tuple`, it should have three components, a sign
    (:const:`0` for positive or :const:`1` for negative), a :class:`tuple` of
    digits, and an integer exponent. For example, ``Decimal((0, (1, 4, 1, 4), -3))``
    returns ``Decimal('1.414')``.
+
+   If *value* is a :class:`float`, the binary floating point value is losslessly
+   converted to its exact decimal equivalent.  This conversion can often require
+   53 or more digits of precision.  For example, ``Decimal(float('1.1'))``
+   converts to
+   ``Decimal('1.100000000000000088817841970012523233890533447265625')``.
 
    The *context* precision does not affect how many digits are stored. That is
    determined exclusively by the number of digits in *value*. For example,
@@ -341,12 +354,28 @@ Decimal objects
 
    Once constructed, :class:`Decimal` objects are immutable.
 
+   .. versionchanged:: 3.2
+      The argument to the constructor is now permitted to be a :class:`float`
+      instance.
+
    Decimal floating point objects share many properties with the other built-in
    numeric types such as :class:`float` and :class:`int`.  All of the usual math
    operations and special methods apply.  Likewise, decimal objects can be
    copied, pickled, printed, used as dictionary keys, used as set elements,
    compared, sorted, and coerced to another type (such as :class:`float` or
-   :class:`long`).
+   :class:`int`).
+
+   Decimal objects cannot generally be combined with floats or
+   instances of :class:`fractions.Fraction` in arithmetic operations:
+   an attempt to add a :class:`Decimal` to a :class:`float`, for
+   example, will raise a :exc:`TypeError`.  However, it is possible to
+   use Python's comparison operators to compare a :class:`Decimal`
+   instance ``x`` with another number ``y``.  This avoids confusing results
+   when doing equality comparisons between numbers of different types.
+
+   .. versionchanged:: 3.2
+      Mixed-type comparisons between :class:`Decimal` instances and other
+      numeric types are now fully supported.
 
    In addition to the standard numeric properties, decimal floating point
    objects also have a number of specialized methods:
@@ -462,6 +491,9 @@ Decimal objects
       `0x1.999999999999ap-4`.  That equivalent value in decimal is
       `0.1000000000000000055511151231257827021181583404541015625`.
 
+      .. note:: From Python 3.2 onwards, a :class:`Decimal` instance
+         can also be constructed directly from a :class:`float`.
+
       .. doctest::
 
           >>> Decimal.from_float(0.1)
@@ -558,10 +590,9 @@ Decimal objects
       operands* (see :ref:`logical_operands_label`).  The result is the
       digit-wise ``and`` of the two operands.
 
-   .. method:: logical_invert(other[, context])
+   .. method:: logical_invert([context])
 
-      :meth:`logical_invert` is a logical operation.  The argument must
-      be a *logical operand* (see :ref:`logical_operands_label`).  The
+      :meth:`logical_invert` is a logical operation.  The
       result is the digit-wise inversion of the operand.
 
    .. method:: logical_or(other[, context])
@@ -585,7 +616,7 @@ Decimal objects
 
    .. method:: max_mag(other[, context])
 
-      Similar to the :meth:`max` method, but the comparison is done using the
+      Similar to the :meth:`.max` method, but the comparison is done using the
       absolute values of the operands.
 
    .. method:: min(other[, context])
@@ -597,7 +628,7 @@ Decimal objects
 
    .. method:: min_mag(other[, context])
 
-      Similar to the :meth:`min` method, but the comparison is done using the
+      Similar to the :meth:`.min` method, but the comparison is done using the
       absolute values of the operands.
 
    .. method:: next_minus([context])
@@ -839,7 +870,7 @@ described below. In addition, the module provides three pre-made contexts:
 
    This context is used by the :class:`Context` constructor as a prototype for new
    contexts.  Changing a field (such a precision) has the effect of changing the
-   default for new contexts creating by the :class:`Context` constructor.
+   default for new contexts created by the :class:`Context` constructor.
 
    This context is most useful in multi-threaded environments.  Changing one of the
    fields before threads are started has the effect of setting system-wide
@@ -856,7 +887,7 @@ In addition to the three supplied contexts, new contexts can be created with the
 :class:`Context` constructor.
 
 
-.. class:: Context(prec=None, rounding=None, traps=None, flags=None, Emin=None, Emax=None, capitals=1)
+.. class:: Context(prec=None, rounding=None, traps=None, flags=None, Emin=None, Emax=None, capitals=None, clamp=None)
 
    Creates a new context.  If a field is not specified or is :const:`None`, the
    default values are copied from the :const:`DefaultContext`.  If the *flags*
@@ -887,13 +918,33 @@ In addition to the three supplied contexts, new contexts can be created with the
    :const:`1`, exponents are printed with a capital :const:`E`; otherwise, a
    lowercase :const:`e` is used: :const:`Decimal('6.02e+23')`.
 
+   The *clamp* field is either :const:`0` (the default) or :const:`1`.
+   If set to :const:`1`, the exponent ``e`` of a :class:`Decimal`
+   instance representable in this context is strictly limited to the
+   range ``Emin - prec + 1 <= e <= Emax - prec + 1``.  If *clamp* is
+   :const:`0` then a weaker condition holds: the adjusted exponent of
+   the :class:`Decimal` instance is at most ``Emax``.  When *clamp* is
+   :const:`1`, a large normal number will, where possible, have its
+   exponent reduced and a corresponding number of zeros added to its
+   coefficient, in order to fit the exponent constraints; this
+   preserves the value of the number but loses information about
+   significant trailing zeros.  For example::
+
+      >>> Context(prec=6, Emax=999, clamp=1).create_decimal('1.23e999')
+      Decimal('1.23000E+999')
+
+   A *clamp* value of :const:`1` allows compatibility with the
+   fixed-width decimal interchange formats specified in IEEE 754.
 
    The :class:`Context` class defines several general purpose methods as well as
    a large number of methods for doing arithmetic directly in a given context.
    In addition, for each of the :class:`Decimal` methods described above (with
    the exception of the :meth:`adjusted` and :meth:`as_tuple` methods) there is
-   a corresponding :class:`Context` method.  For example, ``C.exp(x)`` is
-   equivalent to ``x.exp(context=C)``.
+   a corresponding :class:`Context` method.  For example, for a :class:`Context`
+   instance ``C`` and :class:`Decimal` instance ``x``, ``C.exp(x)`` is
+   equivalent to ``x.exp(context=C)``.  Each :class:`Context` method accepts a
+   Python integer (an instance of :class:`int`) anywhere that a
+   Decimal instance is accepted.
 
 
    .. method:: clear_flags()
@@ -957,7 +1008,6 @@ In addition to the three supplied contexts, new contexts can be created with the
       Returns a value equal to ``Emin - prec + 1`` which is the minimum exponent
       value for subnormal results.  When underflow occurs, the exponent is set
       to :const:`Etiny`.
-
 
    .. method:: Etop()
 
@@ -1211,9 +1261,12 @@ In addition to the three supplied contexts, new contexts can be created with the
          - at least one of ``x`` or ``y`` must be nonzero
          - ``modulo`` must be nonzero and have at most 'precision' digits
 
-      The result of ``Context.power(x, y, modulo)`` is identical to the result
-      that would be obtained by computing ``(x**y) % modulo`` with unbounded
-      precision, but is computed more efficiently.  It is always exact.
+      The value resulting from ``Context.power(x, y, modulo)`` is
+      equal to the value that would be obtained by computing ``(x**y)
+      % modulo`` with unbounded precision, but is computed more
+      efficiently.  The exponent of the result is zero, regardless of
+      the exponents of ``x``, ``y`` and ``modulo``.  The result is
+      always exact.
 
 
    .. method:: quantize(x, y)
@@ -1604,7 +1657,8 @@ to work with the :class:`Decimal` class::
            build(trailneg)
        for i in range(places):
            build(next() if digits else '0')
-       build(dp)
+       if places:
+           build(dp)
        if not digits:
            build('0')
        i = 0
@@ -1664,6 +1718,9 @@ to work with the :class:`Decimal` class::
    def cos(x):
        """Return the cosine of x as measured in radians.
 
+       The Taylor series approximation works best for a small value of x.
+       For larger values, first compute x = x % (2 * pi).
+
        >>> print(cos(Decimal('0.5')))
        0.8775825618903727161162815826
        >>> print(cos(0.5))
@@ -1686,6 +1743,9 @@ to work with the :class:`Decimal` class::
 
    def sin(x):
        """Return the sine of x as measured in radians.
+
+       The Taylor series approximation works best for a small value of x.
+       For larger values, first compute x = x % (2 * pi).
 
        >>> print(sin(Decimal('0.5')))
        0.4794255386042030002732879352
@@ -1813,36 +1873,14 @@ value unchanged:
 
 Q. Is there a way to convert a regular float to a :class:`Decimal`?
 
-A. Yes, all binary floating point numbers can be exactly expressed as a
-Decimal.  An exact conversion may take more precision than intuition would
-suggest, so we trap :const:`Inexact` to signal a need for more precision:
-
-.. testcode::
-
-    def float_to_decimal(f):
-        "Convert a floating point number to a Decimal with no loss of information"
-        n, d = f.as_integer_ratio()
-        with localcontext() as ctx:
-            ctx.traps[Inexact] = True
-            while True:
-                try:
-                   return Decimal(n) / Decimal(d)
-                except Inexact:
-                    ctx.prec += 1
+A. Yes, any binary floating point number can be exactly expressed as a
+Decimal though an exact conversion may take more precision than intuition would
+suggest:
 
 .. doctest::
 
-    >>> float_to_decimal(math.pi)
+    >>> Decimal(math.pi)
     Decimal('3.141592653589793115997963468544185161590576171875')
-
-Q. Why isn't the :func:`float_to_decimal` routine included in the module?
-
-A. There is some question about whether it is advisable to mix binary and
-decimal floating point.  Also, its use requires some care to avoid the
-representation issues associated with binary floating point:
-
-   >>> float_to_decimal(1.1)
-   Decimal('1.100000000000000088817841970012523233890533447265625')
 
 Q. Within a complex calculation, how can I make sure that I haven't gotten a
 spurious result because of insufficient precision or rounding anomalies.

@@ -1,4 +1,3 @@
-
 :mod:`weakref` --- Weak references
 ==================================
 
@@ -59,16 +58,24 @@ is exposed by the :mod:`weakref` module for the benefit of advanced uses.
 
 Not all objects can be weakly referenced; those objects which can include class
 instances, functions written in Python (but not in C), instance methods, sets,
-frozensets, file objects, :term:`generator`\s, type objects, sockets, arrays,
-deques, and regular expression pattern objects.
+frozensets, some :term:`file objects <file object>`, :term:`generator`\s, type
+objects, sockets, arrays, deques, regular expression pattern objects, and code
+objects.
 
-Several builtin types such as :class:`list` and :class:`dict` do not directly
+.. versionchanged:: 3.2
+   Added support for thread.lock, threading.Lock, and code objects.
+
+Several built-in types such as :class:`list` and :class:`dict` do not directly
 support weak references but can add support through subclassing::
 
    class Dict(dict):
        pass
 
    obj = Dict(red=1, green=2, blue=3)   # this object is weak referenceable
+
+Other built-in types such as :class:`tuple` and :class:`int` do not support weak
+references even when subclassed (This is an implementation detail and may be
+different across various Python implementations.).
 
 Extension types can easily be made to support weak references; see
 :ref:`weakref-support`.
@@ -92,10 +99,10 @@ Extension types can easily be made to support weak references; see
    but cannot be propagated; they are handled in exactly the same way as exceptions
    raised from an object's :meth:`__del__` method.
 
-   Weak references are :term:`hashable` if the *object* is hashable.  They will maintain
-   their hash value even after the *object* was deleted.  If :func:`hash` is called
-   the first time only after the *object* was deleted, the call will raise
-   :exc:`TypeError`.
+   Weak references are :term:`hashable` if the *object* is hashable.  They will
+   maintain their hash value even after the *object* was deleted.  If
+   :func:`hash` is called the first time only after the *object* was deleted,
+   the call will raise :exc:`TypeError`.
 
    Weak references support tests for equality, but not ordering.  If the referents
    are still alive, two references have the same equality relationship as their
@@ -153,7 +160,7 @@ than needed.
 
 .. method:: WeakKeyDictionary.keyrefs()
 
-   Return an :term:`iterator` that yields the weak references to the keys.
+   Return an iterable of the weak references to the keys.
 
 
 .. class:: WeakValueDictionary([dict])
@@ -176,7 +183,7 @@ These method have the same issues as the and :meth:`keyrefs` method of
 
 .. method:: WeakValueDictionary.valuerefs()
 
-   Return an :term:`iterator` that yields the weak references to the values.
+   Return an iterable of the weak references to the values.
 
 
 .. class:: WeakSet([elements])

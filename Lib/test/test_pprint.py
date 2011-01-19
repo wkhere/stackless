@@ -2,6 +2,9 @@ import pprint
 import test.support
 import unittest
 import test.test_set
+import random
+import collections
+import itertools
 
 # list, tuple and dict subclasses that do or don't overwrite __repr__
 class list2(list):
@@ -25,6 +28,10 @@ class dict3(dict):
     def __repr__(self):
         return dict.__repr__(self)
 
+class Unorderable:
+    def __repr__(self):
+        return str(id(self))
+
 class QueryTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -34,20 +41,19 @@ class QueryTestCase(unittest.TestCase):
 
     def test_basic(self):
         # Verify .isrecursive() and .isreadable() w/o recursion
-        verify = self.assert_
         pp = pprint.PrettyPrinter()
         for safe in (2, 2.0, 2j, "abc", [3], (2,2), {3: 3}, "yaddayadda",
                      self.a, self.b):
             # module-level convenience functions
-            verify(not pprint.isrecursive(safe),
-                   "expected not isrecursive for %r" % (safe,))
-            verify(pprint.isreadable(safe),
-                   "expected isreadable for %r" % (safe,))
+            self.assertFalse(pprint.isrecursive(safe),
+                             "expected not isrecursive for %r" % (safe,))
+            self.assertTrue(pprint.isreadable(safe),
+                            "expected isreadable for %r" % (safe,))
             # PrettyPrinter methods
-            verify(not pp.isrecursive(safe),
-                   "expected not isrecursive for %r" % (safe,))
-            verify(pp.isreadable(safe),
-                   "expected isreadable for %r" % (safe,))
+            self.assertFalse(pp.isrecursive(safe),
+                             "expected not isrecursive for %r" % (safe,))
+            self.assertTrue(pp.isreadable(safe),
+                            "expected isreadable for %r" % (safe,))
 
     def test_knotted(self):
         # Verify .isrecursive() and .isreadable() w/ recursion
@@ -57,14 +63,13 @@ class QueryTestCase(unittest.TestCase):
         self.d = {}
         self.d[0] = self.d[1] = self.d[2] = self.d
 
-        verify = self.assert_
         pp = pprint.PrettyPrinter()
 
         for icky in self.a, self.b, self.d, (self.d, self.d):
-            verify(pprint.isrecursive(icky), "expected isrecursive")
-            verify(not pprint.isreadable(icky),  "expected not isreadable")
-            verify(pp.isrecursive(icky), "expected isrecursive")
-            verify(not pp.isreadable(icky),  "expected not isreadable")
+            self.assertTrue(pprint.isrecursive(icky), "expected isrecursive")
+            self.assertFalse(pprint.isreadable(icky), "expected not isreadable")
+            self.assertTrue(pp.isrecursive(icky), "expected isrecursive")
+            self.assertFalse(pp.isreadable(icky), "expected not isreadable")
 
         # Break the cycles.
         self.d.clear()
@@ -73,31 +78,30 @@ class QueryTestCase(unittest.TestCase):
 
         for safe in self.a, self.b, self.d, (self.d, self.d):
             # module-level convenience functions
-            verify(not pprint.isrecursive(safe),
-                   "expected not isrecursive for %r" % (safe,))
-            verify(pprint.isreadable(safe),
-                   "expected isreadable for %r" % (safe,))
+            self.assertFalse(pprint.isrecursive(safe),
+                             "expected not isrecursive for %r" % (safe,))
+            self.assertTrue(pprint.isreadable(safe),
+                            "expected isreadable for %r" % (safe,))
             # PrettyPrinter methods
-            verify(not pp.isrecursive(safe),
-                   "expected not isrecursive for %r" % (safe,))
-            verify(pp.isreadable(safe),
-                   "expected isreadable for %r" % (safe,))
+            self.assertFalse(pp.isrecursive(safe),
+                             "expected not isrecursive for %r" % (safe,))
+            self.assertTrue(pp.isreadable(safe),
+                            "expected isreadable for %r" % (safe,))
 
     def test_unreadable(self):
         # Not recursive but not readable anyway
-        verify = self.assert_
         pp = pprint.PrettyPrinter()
         for unreadable in type(3), pprint, pprint.isrecursive:
             # module-level convenience functions
-            verify(not pprint.isrecursive(unreadable),
-                   "expected not isrecursive for %r" % (unreadable,))
-            verify(not pprint.isreadable(unreadable),
-                   "expected not isreadable for %r" % (unreadable,))
+            self.assertFalse(pprint.isrecursive(unreadable),
+                             "expected not isrecursive for %r" % (unreadable,))
+            self.assertFalse(pprint.isreadable(unreadable),
+                             "expected not isreadable for %r" % (unreadable,))
             # PrettyPrinter methods
-            verify(not pp.isrecursive(unreadable),
-                   "expected not isrecursive for %r" % (unreadable,))
-            verify(not pp.isreadable(unreadable),
-                   "expected not isreadable for %r" % (unreadable,))
+            self.assertFalse(pp.isrecursive(unreadable),
+                             "expected not isrecursive for %r" % (unreadable,))
+            self.assertFalse(pp.isreadable(unreadable),
+                             "expected not isreadable for %r" % (unreadable,))
 
     def test_same_as_repr(self):
         # Simple objects, small containers and classes that overwrite __repr__
@@ -108,12 +112,11 @@ class QueryTestCase(unittest.TestCase):
         # it sorted a dict display if and only if the display required
         # multiple lines.  For that reason, dicts with more than one element
         # aren't tested here.
-        verify = self.assert_
         for simple in (0, 0, 0+0j, 0.0, "", b"",
                        (), tuple2(), tuple3(),
                        [], list2(), list3(),
                        {}, dict2(), dict3(),
-                       verify, pprint,
+                       self.assertTrue, pprint,
                        -6, -6, -6-6j, -1.5, "x", b"x", (3,), [3], {3: 6},
                        (1,2), [3,4], {5: 6},
                        tuple2((1,2)), tuple3((1,2)), tuple3(range(100)),
@@ -125,8 +128,9 @@ class QueryTestCase(unittest.TestCase):
             for function in "pformat", "saferepr":
                 f = getattr(pprint, function)
                 got = f(simple)
-                verify(native == got, "expected %s got %s from pprint.%s" %
-                                      (native, got, function))
+                self.assertEqual(native, got,
+                                 "expected %s got %s from pprint.%s" %
+                                 (native, got, function))
 
     def test_basic_line_wrap(self):
         # verify basic line-wrapping operation
@@ -193,6 +197,20 @@ class QueryTestCase(unittest.TestCase):
         self.assertEqual(pprint.pformat({"xy\tab\n": (3,), 5: [[]], (): {}}),
             r"{5: [[]], 'xy\tab\n': (3,), (): {}}")
 
+    def test_ordered_dict(self):
+        words = 'the quick brown fox jumped over a lazy dog'.split()
+        d = collections.OrderedDict(zip(words, itertools.count()))
+        self.assertEqual(pprint.pformat(d),
+"""\
+{'the': 0,
+ 'quick': 1,
+ 'brown': 2,
+ 'fox': 3,
+ 'jumped': 4,
+ 'over': 5,
+ 'a': 6,
+ 'lazy': 7,
+ 'dog': 8}""")
     def test_subclassing(self):
         o = {'names with spaces': 'should be presented using repr()',
              'others.should.not.be': 'like.this'}
@@ -201,7 +219,29 @@ class QueryTestCase(unittest.TestCase):
  others.should.not.be: like.this}"""
         self.assertEqual(DottedPrettyPrinter().pformat(o), exp)
 
+    @test.support.cpython_only
     def test_set_reprs(self):
+        # This test creates a complex arrangement of frozensets and
+        # compares the pretty-printed repr against a string hard-coded in
+        # the test.  The hard-coded repr depends on the sort order of
+        # frozensets.
+        #
+        # However, as the docs point out: "Since sets only define
+        # partial ordering (subset relationships), the output of the
+        # list.sort() method is undefined for lists of sets."
+        #
+        # In a nutshell, the test assumes frozenset({0}) will always
+        # sort before frozenset({1}), but:
+        #
+        # >>> frozenset({0}) < frozenset({1})
+        # False
+        # >>> frozenset({1}) < frozenset({0})
+        # False
+        #
+        # Consequently, this test is fragile and
+        # implementation-dependent.  Small changes to Python's sort
+        # algorithm cause the test to fail when it should pass.
+
         self.assertEqual(pprint.pformat(set()), 'set()')
         self.assertEqual(pprint.pformat(set(range(3))), '{0, 1, 2}')
         self.assertEqual(pprint.pformat(frozenset()), 'frozenset()')
@@ -407,6 +447,20 @@ class QueryTestCase(unittest.TestCase):
         self.assertEqual(pprint.pformat(nested_dict, depth=1), lv1_dict)
         self.assertEqual(pprint.pformat(nested_list, depth=1), lv1_list)
 
+    def test_sort_unorderable_values(self):
+        # Issue 3976:  sorted pprints fail for unorderable values.
+        n = 20
+        keys = [Unorderable() for i in range(n)]
+        random.shuffle(keys)
+        skeys = sorted(keys, key=id)
+        clean = lambda s: s.replace(' ', '').replace('\n','')
+
+        self.assertEqual(clean(pprint.pformat(set(keys))),
+            '{' + ','.join(map(repr, skeys)) + '}')
+        self.assertEqual(clean(pprint.pformat(frozenset(keys))),
+            'frozenset({' + ','.join(map(repr, skeys)) + '})')
+        self.assertEqual(clean(pprint.pformat(dict.fromkeys(keys))),
+            '{' + ','.join('%r:None' % k for k in skeys) + '}')
 
 class DottedPrettyPrinter(pprint.PrettyPrinter):
 

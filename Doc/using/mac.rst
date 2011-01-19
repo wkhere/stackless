@@ -66,7 +66,7 @@ number of standard Unix command line editors, :program:`vim` and
 http://www.barebones.com/products/bbedit/index.shtml) are good choices, as is
 :program:`TextMate` (see http://macromates.com/). Other editors include
 :program:`Gvim` (http://macvim.org) and :program:`Aquamacs`
-(http://aquamacs.org).
+(http://aquamacs.org/).
 
 To run your script from the Terminal window you must make sure that
 :file:`/usr/local/bin` is in your shell search path.
@@ -114,8 +114,8 @@ The IDE
 =======
 
 MacPython ships with the standard IDLE development environment. A good
-introduction to using IDLE can be found at http://hkn.eecs.berkeley.edu/
-dyoo/python/idle_intro/index.html.
+introduction to using IDLE can be found at
+http://hkn.eecs.berkeley.edu/~dyoo/python/idle_intro/index.html.
 
 
 .. _mac-package-manager:
@@ -143,7 +143,7 @@ There are several options for building GUI applications on the Mac with Python.
 the foundation of most modern Mac development. Information on PyObjC is
 available from http://pyobjc.sourceforge.net.
 
-The standard Python GUI toolkit is :mod:`Tkinter`, based on the cross-platform
+The standard Python GUI toolkit is :mod:`tkinter`, based on the cross-platform
 Tk toolkit (http://www.tcl.tk). An Aqua-native version of Tk is bundled with OS
 X by Apple, and the latest version can be downloaded and installed from
 http://www.activestate.com; it can also be built from source.
@@ -153,7 +153,7 @@ Mac OS X. Packages and documentation are available from http://www.wxpython.org.
 
 *PyQt* is another popular cross-platform GUI toolkit that runs natively on Mac
 OS X. More information can be found at
-http://www.riverbankcomputing.co.uk/pyqt/.
+http://www.riverbankcomputing.co.uk/software/pyqt/intro.
 
 
 Distributing Python Applications on the Mac

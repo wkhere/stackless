@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import unittest
 from test import support
@@ -8,26 +8,12 @@ import urllib.request
 import sys
 import os
 import email.message
-
-
-def _open_with_retry(func, host, *args, **kwargs):
-    # Connecting to remote hosts is flaky.  Make it more robust
-    # by retrying the connection several times.
-    last_exc = None
-    for i in range(3):
-        try:
-            return func(host, *args, **kwargs)
-        except IOError as err:
-            last_exc = err
-            continue
-        except:
-            raise
-    raise last_exc
+import time
 
 
 class URLTimeoutTest(unittest.TestCase):
 
-    TIMEOUT = 10.0
+    TIMEOUT = 30.0
 
     def setUp(self):
         socket.setdefaulttimeout(self.TIMEOUT)
@@ -36,7 +22,8 @@ class URLTimeoutTest(unittest.TestCase):
         socket.setdefaulttimeout(None)
 
     def testURLread(self):
-        f = _open_with_retry(urllib.request.urlopen, "http://www.python.org/")
+        with support.transient_internet("www.python.org"):
+            f = urllib.request.urlopen("http://www.python.org/")
         x = f.read()
 
 class urlopenNetworkTests(unittest.TestCase):
@@ -54,18 +41,20 @@ class urlopenNetworkTests(unittest.TestCase):
 
     """
 
-    def urlopen(self, *args):
-        return _open_with_retry(urllib.request.urlopen, *args)
+    def urlopen(self, *args, **kwargs):
+        resource = args[0]
+        with support.transient_internet(resource):
+            return urllib.request.urlopen(*args, **kwargs)
 
     def test_basic(self):
         # Simple test expected to pass.
         open_url = self.urlopen("http://www.python.org/")
         for attr in ("read", "readline", "readlines", "fileno", "close",
                      "info", "geturl"):
-            self.assert_(hasattr(open_url, attr), "object returned from "
+            self.assertTrue(hasattr(open_url, attr), "object returned from "
                             "urlopen lacks the %s attribute" % attr)
         try:
-            self.assert_(open_url.read(), "calling 'read' failed")
+            self.assertTrue(open_url.read(), "calling 'read' failed")
         finally:
             open_url.close()
 
@@ -73,10 +62,10 @@ class urlopenNetworkTests(unittest.TestCase):
         # Test both readline and readlines.
         open_url = self.urlopen("http://www.python.org/")
         try:
-            self.assert_(isinstance(open_url.readline(), bytes),
-                         "readline did not return bytes")
-            self.assert_(isinstance(open_url.readlines(), list),
-                         "readlines did not return a list")
+            self.assertIsInstance(open_url.readline(), bytes,
+                                  "readline did not return a string")
+            self.assertIsInstance(open_url.readlines(), list,
+                                  "readlines did not return a list")
         finally:
             open_url.close()
 
@@ -87,9 +76,9 @@ class urlopenNetworkTests(unittest.TestCase):
             info_obj = open_url.info()
         finally:
             open_url.close()
-            self.assert_(isinstance(info_obj, email.message.Message),
-                         "object returned by 'info' is not an instance of "
-                         "email.message.Message")
+            self.assertIsInstance(info_obj, email.message.Message,
+                                  "object returned by 'info' is not an "
+                                  "instance of email.message.Message")
             self.assertEqual(info_obj.get_content_subtype(), "html")
 
     def test_geturl(self):
@@ -118,11 +107,11 @@ class urlopenNetworkTests(unittest.TestCase):
             # test can't pass on Windows.
             return
         # Make sure fd returned by fileno is valid.
-        open_url = self.urlopen("http://www.python.org/")
+        open_url = self.urlopen("http://www.python.org/", timeout=None)
         fd = open_url.fileno()
         FILE = os.fdopen(fd, encoding='utf-8')
         try:
-            self.assert_(FILE.read(), "reading from file created using fd "
+            self.assertTrue(FILE.read(), "reading from file created using fd "
                                       "returned by fileno failed")
         finally:
             FILE.close()
@@ -145,16 +134,18 @@ class urlretrieveNetworkTests(unittest.TestCase):
     """Tests urllib.request.urlretrieve using the network."""
 
     def urlretrieve(self, *args):
-        return _open_with_retry(urllib.request.urlretrieve, *args)
+        resource = args[0]
+        with support.transient_internet(resource):
+            return urllib.request.urlretrieve(*args)
 
     def test_basic(self):
         # Test basic functionality.
         file_location,info = self.urlretrieve("http://www.python.org/")
-        self.assert_(os.path.exists(file_location), "file location returned by"
+        self.assertTrue(os.path.exists(file_location), "file location returned by"
                         " urlretrieve is not a valid path")
         FILE = open(file_location, encoding='utf-8')
         try:
-            self.assert_(FILE.read(), "reading from the file location returned"
+            self.assertTrue(FILE.read(), "reading from the file location returned"
                          " by urlretrieve failed")
         finally:
             FILE.close()
@@ -165,10 +156,10 @@ class urlretrieveNetworkTests(unittest.TestCase):
         file_location,info = self.urlretrieve("http://www.python.org/",
                                               support.TESTFN)
         self.assertEqual(file_location, support.TESTFN)
-        self.assert_(os.path.exists(file_location))
+        self.assertTrue(os.path.exists(file_location))
         FILE = open(file_location, encoding='utf-8')
         try:
-            self.assert_(FILE.read(), "reading from temporary file failed")
+            self.assertTrue(FILE.read(), "reading from temporary file failed")
         finally:
             FILE.close()
             os.unlink(file_location)
@@ -177,9 +168,19 @@ class urlretrieveNetworkTests(unittest.TestCase):
         # Make sure header returned as 2nd value from urlretrieve is good.
         file_location, header = self.urlretrieve("http://www.python.org/")
         os.unlink(file_location)
-        self.assert_(isinstance(header, email.message.Message),
-                     "header is not an instance of email.message.Message")
+        self.assertIsInstance(header, email.message.Message,
+                              "header is not an instance of email.message.Message")
 
+    def test_data_header(self):
+        logo = "http://www.python.org/community/logos/python-logo-master-v3-TM.png"
+        file_location, fileheaders = self.urlretrieve(logo)
+        os.unlink(file_location)
+        datevalue = fileheaders.get('Date')
+        dateformat = '%a, %d %b %Y %H:%M:%S GMT'
+        try:
+            time.strptime(datevalue, dateformat)
+        except ValueError:
+            self.fail('Date value not in %r format', dateformat)
 
 
 def test_main():

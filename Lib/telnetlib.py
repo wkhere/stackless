@@ -236,7 +236,7 @@ class Telnet:
 
         """
         if self.debuglevel > 0:
-            print('Telnet(%s,%d):' % (self.host, self.port), end=' ')
+            print('Telnet(%s,%s):' % (self.host, self.port), end=' ')
             if args:
                 print(msg % args)
             else:
@@ -459,7 +459,7 @@ class Telnet:
                             # unless we did a WILL/DO before.
                             self.msg('IAC %d not recognized' % ord(c))
                 elif len(self.iacseq) == 2:
-                    cmd = self.iacseq[1]
+                    cmd = self.iacseq[1:2]
                     self.iacseq = b''
                     opt = c
                     if cmd in (DO, DONT):
@@ -552,7 +552,7 @@ class Telnet:
             line = sys.stdin.readline()
             if not line:
                 break
-            self.write(line)
+            self.write(line.encode('ascii'))
 
     def listener(self):
         """Helper for mt_interact() -- this executes in the other thread."""
@@ -563,7 +563,7 @@ class Telnet:
                 print('*** Connection closed by remote host ***')
                 return
             if data:
-                sys.stdout.write(data)
+                sys.stdout.write(data.decode('ascii'))
             else:
                 sys.stdout.flush()
 

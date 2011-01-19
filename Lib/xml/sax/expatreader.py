@@ -219,6 +219,9 @@ class ExpatParser(xmlreader.IncrementalParser, xmlreader.Locator):
         self._parsing = 0
         # break cycle created by expat handlers pointing to our methods
         self._parser = None
+        bs = self._source.getByteStream()
+        if bs is not None:
+            bs.close()
 
     def _reset_cont_handler(self):
         self._parser.ProcessingInstructionHandler = \
@@ -407,8 +410,8 @@ def create_parser(*args, **kwargs):
 # ---
 
 if __name__ == "__main__":
-    import xml.sax
+    import xml.sax.saxutils
     p = create_parser()
-    p.setContentHandler(xml.sax.XMLGenerator())
+    p.setContentHandler(xml.sax.saxutils.XMLGenerator())
     p.setErrorHandler(xml.sax.ErrorHandler())
-    p.parse("../../../hamlet.xml")
+    p.parse("http://www.ibiblio.org/xml/examples/shakespeare/hamlet.xml")

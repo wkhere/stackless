@@ -30,6 +30,21 @@ def count_opcode(code, pickle):
             n += 1
     return n
 
+
+class UnseekableIO(io.BytesIO):
+    def peek(self, *args):
+        raise NotImplementedError
+
+    def seekable(self):
+        return False
+
+    def seek(self, *args):
+        raise io.UnsupportedOperation
+
+    def tell(self):
+        raise io.UnsupportedOperation
+
+
 # We can't very well test the extension registry without putting known stuff
 # in it, but we have to be careful to restore its original state.  Code
 # should do this:
@@ -65,9 +80,21 @@ class C:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
+class D(C):
+    def __init__(self, arg):
+        pass
+
+class E(C):
+    def __getinitargs__(self):
+        return ()
+
 import __main__
 __main__.C = C
 C.__module__ = "__main__"
+__main__.D = D
+D.__module__ = "__main__"
+__main__.E = E
+E.__module__ = "__main__"
 
 class myint(int):
     def __init__(self, x):
@@ -429,6 +456,63 @@ class AbstractPickleTests(unittest.TestCase):
     def test_load_from_data2(self):
         self.assertEqual(self._testdata, self.loads(DATA2))
 
+    def test_load_classic_instance(self):
+        # See issue5180.  Test loading 2.x pickles that
+        # contain an instance of old style class.
+        for X, args in [(C, ()), (D, ('x',)), (E, ())]:
+            xname = X.__name__.encode('ascii')
+            # Protocol 0 (text mode pickle):
+            """
+            0: (    MARK
+            1: i        INST       '__main__ X' (MARK at 0)
+            15: p    PUT        0
+            18: (    MARK
+            19: d        DICT       (MARK at 18)
+            20: p    PUT        1
+            23: b    BUILD
+            24: .    STOP
+            """
+            pickle0 = (b"(i__main__\n"
+                       b"X\n"
+                       b"p0\n"
+                       b"(dp1\nb.").replace(b'X', xname)
+            self.assertEqual(X(*args), self.loads(pickle0))
+
+            # Protocol 1 (binary mode pickle)
+            """
+            0: (    MARK
+            1: c        GLOBAL     '__main__ X'
+            15: q        BINPUT     0
+            17: o        OBJ        (MARK at 0)
+            18: q    BINPUT     1
+            20: }    EMPTY_DICT
+            21: q    BINPUT     2
+            23: b    BUILD
+            24: .    STOP
+            """
+            pickle1 = (b'(c__main__\n'
+                       b'X\n'
+                       b'q\x00oq\x01}q\x02b.').replace(b'X', xname)
+            self.assertEqual(X(*args), self.loads(pickle1))
+
+            # Protocol 2 (pickle2 = b'\x80\x02' + pickle1)
+            """
+            0: \x80 PROTO      2
+            2: (    MARK
+            3: c        GLOBAL     '__main__ X'
+            17: q        BINPUT     0
+            19: o        OBJ        (MARK at 2)
+            20: q    BINPUT     1
+            22: }    EMPTY_DICT
+            23: q    BINPUT     2
+            25: b    BUILD
+            26: .    STOP
+            """
+            pickle2 = (b'\x80\x02(c__main__\n'
+                       b'X\n'
+                       b'q\x00oq\x01}q\x02b.').replace(b'X', xname)
+            self.assertEqual(X(*args), self.loads(pickle2))
+
     # There are gratuitous differences between pickles produced by
     # pickle and cPickle, largely because cPickle starts PUT indices at
     # 1 and pickle starts them at 0.  See XXX comment in cPickle's put2() --
@@ -453,7 +537,7 @@ class AbstractPickleTests(unittest.TestCase):
             s = self.dumps(l, proto)
             x = self.loads(s)
             self.assertEqual(len(x), 1)
-            self.assert_(x is x[0])
+            self.assertTrue(x is x[0])
 
     def test_recursive_tuple(self):
         t = ([],)
@@ -463,7 +547,7 @@ class AbstractPickleTests(unittest.TestCase):
             x = self.loads(s)
             self.assertEqual(len(x), 1)
             self.assertEqual(len(x[0]), 1)
-            self.assert_(x is x[0][0])
+            self.assertTrue(x is x[0][0])
 
     def test_recursive_dict(self):
         d = {}
@@ -472,7 +556,7 @@ class AbstractPickleTests(unittest.TestCase):
             s = self.dumps(d, proto)
             x = self.loads(s)
             self.assertEqual(list(x.keys()), [1])
-            self.assert_(x[1] is x)
+            self.assertTrue(x[1] is x)
 
     def test_recursive_inst(self):
         i = C()
@@ -481,7 +565,7 @@ class AbstractPickleTests(unittest.TestCase):
             s = self.dumps(i, 2)
             x = self.loads(s)
             self.assertEqual(dir(x), dir(i))
-            self.assert_(x.attr is x)
+            self.assertTrue(x.attr is x)
 
     def test_recursive_multi(self):
         l = []
@@ -495,11 +579,11 @@ class AbstractPickleTests(unittest.TestCase):
             self.assertEqual(len(x), 1)
             self.assertEqual(dir(x[0]), dir(i))
             self.assertEqual(list(x[0].attr.keys()), [1])
-            self.assert_(x[0].attr[1] is x)
+            self.assertTrue(x[0].attr[1] is x)
 
     def test_get(self):
         self.assertRaises(KeyError, self.loads, b'g0\np0')
-        self.assertEquals(self.loads(b'((Kdtp0\nh\x00l.))'), [(100,), (100,)])
+        self.assertEqual(self.loads(b'((Kdtp0\nh\x00l.))'), [(100,), (100,)])
 
     def test_insecure_strings(self):
         # XXX Some of these tests are temporarily disabled
@@ -519,7 +603,9 @@ class AbstractPickleTests(unittest.TestCase):
 
     def test_unicode(self):
         endcases = ['', '<\\u>', '<\\\u1234>', '<\n>',
-                    '<\\>', '<\\\U00012345>']
+                    '<\\>', '<\\\U00012345>',
+                    # surrogates
+                    '<\udc80>']
         for proto in protocols:
             for u in endcases:
                 p = self.dumps(u, proto)
@@ -643,7 +729,7 @@ class AbstractPickleTests(unittest.TestCase):
         try:
             self.loads(badpickle)
         except ValueError as detail:
-            self.failUnless(str(detail).startswith(
+            self.assertTrue(str(detail).startswith(
                                             "unsupported pickle protocol"))
         else:
             self.fail("expected bad protocol number to raise ValueError")
@@ -724,7 +810,7 @@ class AbstractPickleTests(unittest.TestCase):
             for x in None, False, True:
                 s = self.dumps(x, proto)
                 y = self.loads(s)
-                self.assert_(x is y, (proto, x, s, y))
+                self.assertTrue(x is y, (proto, x, s, y))
                 expected = expected_opcode[proto, x]
                 self.assertEqual(opcode_in_pickle(expected, s), True)
 
@@ -774,8 +860,8 @@ class AbstractPickleTests(unittest.TestCase):
 
             # Dump using protocol 1 for comparison.
             s1 = self.dumps(x, 1)
-            self.assert_(__name__.encode("utf-8") in s1)
-            self.assert_(b"MyList" in s1)
+            self.assertIn(__name__.encode("utf-8"), s1)
+            self.assertIn(b"MyList", s1)
             self.assertEqual(opcode_in_pickle(opcode, s1), False)
 
             y = self.loads(s1)
@@ -784,8 +870,8 @@ class AbstractPickleTests(unittest.TestCase):
 
             # Dump using protocol 2 for test.
             s2 = self.dumps(x, 2)
-            self.assert_(__name__.encode("utf-8") not in s2)
-            self.assert_(b"MyList" not in s2)
+            self.assertNotIn(__name__.encode("utf-8"), s2)
+            self.assertNotIn(b"MyList", s2)
             self.assertEqual(opcode_in_pickle(opcode, s2), True, repr(s2))
 
             y = self.loads(s2)
@@ -829,14 +915,14 @@ class AbstractPickleTests(unittest.TestCase):
             if proto == 0:
                 self.assertEqual(num_appends, 0)
             else:
-                self.failUnless(num_appends >= 2)
+                self.assertTrue(num_appends >= 2)
 
     def test_dict_chunking(self):
         n = 10  # too small to chunk
         x = dict.fromkeys(range(n))
         for proto in protocols:
             s = self.dumps(x, proto)
-            assert isinstance(s, bytes_types)
+            self.assertIsInstance(s, bytes_types)
             y = self.loads(s)
             self.assertEqual(x, y)
             num_setitems = count_opcode(pickle.SETITEMS, s)
@@ -852,7 +938,7 @@ class AbstractPickleTests(unittest.TestCase):
             if proto == 0:
                 self.assertEqual(num_setitems, 0)
             else:
-                self.failUnless(num_setitems >= 2)
+                self.assertTrue(num_setitems >= 2)
 
     def test_simple_newobj(self):
         x = object.__new__(SimpleNewObj)  # avoid __init__
@@ -1001,6 +1087,16 @@ class AbstractPickleTests(unittest.TestCase):
         dumped = self.dumps(set([3]), 2)
         self.assertEqual(dumped, DATA6)
 
+    def test_large_pickles(self):
+        # Test the correctness of internal buffering routines when handling
+        # large data.
+        for proto in protocols:
+            data = (1, min, b'xy' * (30 * 1024), len)
+            dumped = self.dumps(data, proto)
+            loaded = self.loads(dumped)
+            self.assertEqual(len(loaded), len(data))
+            self.assertEqual(loaded, data)
+
 
 # Test classes for reduce_ex
 
@@ -1045,9 +1141,6 @@ class REX_five(object):
 class MyInt(int):
     sample = 1
 
-class MyLong(int):
-    sample = 1
-
 class MyFloat(float):
     sample = 1.0
 
@@ -1069,7 +1162,7 @@ class MyList(list):
 class MyDict(dict):
     sample = {"a": 1, "b": 2}
 
-myclasses = [MyInt, MyLong, MyFloat,
+myclasses = [MyInt, MyFloat,
              MyComplex,
              MyStr, MyUnicode,
              MyTuple, MyList, MyDict]
@@ -1146,6 +1239,9 @@ class AbstractPickleModuleTests(unittest.TestCase):
         # Test issue4298
         s = bytes([0x58, 0, 0, 0, 0x54])
         self.assertRaises(EOFError, pickle.loads, s)
+        # Test issue7455
+        s = b'0'
+        self.assertRaises(pickle.UnpicklingError, pickle.loads, s)
 
 
 class AbstractPersistentPicklerTests(unittest.TestCase):
@@ -1296,6 +1392,31 @@ class AbstractPicklerUnpicklerObjectTests(unittest.TestCase):
         f.write(pickled2)
         f.seek(0)
         self.assertEqual(unpickler.load(), data2)
+
+    def _check_multiple_unpicklings(self, ioclass):
+        for proto in protocols:
+            data1 = [(x, str(x)) for x in range(2000)] + [b"abcde", len]
+            f = ioclass()
+            pickler = self.pickler_class(f, protocol=proto)
+            pickler.dump(data1)
+            pickled = f.getvalue()
+
+            N = 5
+            f = ioclass(pickled * N)
+            unpickler = self.unpickler_class(f)
+            for i in range(N):
+                if f.seekable():
+                    pos = f.tell()
+                self.assertEqual(unpickler.load(), data1)
+                if f.seekable():
+                    self.assertEqual(f.tell(), pos + len(pickled))
+            self.assertRaises(EOFError, unpickler.load)
+
+    def test_multiple_unpicklings_seekable(self):
+        self._check_multiple_unpicklings(io.BytesIO)
+
+    def test_multiple_unpicklings_unseekable(self):
+        self._check_multiple_unpicklings(UnseekableIO)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ requires('curses')
 curses = import_module('curses')
 curses.panel = import_module('curses.panel')
 
+
 # XXX: if newterm was supported we could use it instead of initscr and not exit
 term = os.environ.get('TERM')
 if not term or term == 'unknown':
@@ -219,8 +220,8 @@ def module_funcs(stdscr):
         if availmask != 0:
             curses.mouseinterval(10)
             # just verify these don't cause errors
+            curses.ungetmouse(0, 0, 0, 0, curses.BUTTON1_PRESSED)
             m = curses.getmouse()
-            curses.ungetmouse(*m)
 
     if hasattr(curses, 'is_term_resized'):
         curses.is_term_resized(*stdscr.getmaxyx())
@@ -259,6 +260,10 @@ def test_resize_term(stdscr):
         if curses.LINES != lines - 1 or curses.COLS != cols + 1:
             raise RuntimeError("Expected resizeterm to update LINES and COLS")
 
+def test_issue6243(stdscr):
+    curses.ungetch(1025)
+    stdscr.getkey()
+
 def main(stdscr):
     curses.savetty()
     try:
@@ -266,19 +271,23 @@ def main(stdscr):
         window_funcs(stdscr)
         test_userptr_without_set(stdscr)
         test_resize_term(stdscr)
+        test_issue6243(stdscr)
     finally:
         curses.resetty()
 
-if __name__ == '__main__':
-    curses.wrapper(main)
-    unit_tests()
-else:
+def test_main():
+    if not sys.stdout.isatty():
+        raise unittest.SkipTest("sys.stdout is not a tty")
     # testing setupterm() inside initscr/endwin
     # causes terminal breakage
-    curses.setupterm(fd=sys.__stdout__.fileno())
+    curses.setupterm(fd=sys.stdout.fileno())
     try:
         stdscr = curses.initscr()
         main(stdscr)
     finally:
         curses.endwin()
+    unit_tests()
+
+if __name__ == '__main__':
+    curses.wrapper(main)
     unit_tests()

@@ -314,8 +314,8 @@ The idea behind the "home scheme" is that you build and maintain a personal
 stash of Python modules.  This scheme's name is derived from the idea of a
 "home" directory on Unix, since it's not unusual for a Unix user to make their
 home directory have a layout similar to :file:`/usr/` or :file:`/usr/local/`.
-This scheme can be used by anyone, regardless of the operating system their
-installing for.
+This scheme can be used by anyone, regardless of the operating system they
+are installing for.
 
 Installing a new module distribution is as simple as ::
 
@@ -691,6 +691,9 @@ And on Windows, the configuration files are:
 | local        | :file:`setup.cfg`                               | \(3)  |
 +--------------+-------------------------------------------------+-------+
 
+On all platforms, the "personal" file can be temporarily disabled by
+passing the `--no-user-cfg` option.
+
 Notes:
 
 (1)
@@ -703,7 +706,8 @@ Notes:
 (2)
    On Unix, if the :envvar:`HOME` environment variable is not defined, the user's
    home directory will be determined with the :func:`getpwuid` function from the
-   standard :mod:`pwd` module.
+   standard :mod:`pwd` module. This is done by the :func:`os.path.expanduser`
+   function used by Distutils.
 
 (3)
    I.e., in the current directory (usually the location of the setup script).
@@ -718,9 +722,10 @@ Notes:
    1.5.2 installation under Windows.
 
 (5)
-   On Windows, if the :envvar:`HOME` environment variable is not defined, no
-   personal configuration file will be found or used.  (In other words, the
-   Distutils make no attempt to guess your home directory on Windows.)
+   On Windows, if the :envvar:`HOME` environment variable is not defined,
+   :envvar:`USERPROFILE` then :envvar:`HOMEDRIVE` and :envvar:`HOMEPATH` will
+   be tried. This is done by the :func:`os.path.expanduser` function used
+   by Distutils.
 
 
 .. _inst-config-syntax:
@@ -924,18 +929,38 @@ section :ref:`inst-config-files`.)
 GNU C / Cygwin / MinGW
 ^^^^^^^^^^^^^^^^^^^^^^
 
-These instructions only apply if you're using a version of Python prior  to
-2.4.1 with a MinGW prior to 3.0.0 (with binutils-2.13.90-20030111-1).
-
 This section describes the necessary steps to use Distutils with the GNU C/C++
 compilers in their Cygwin and MinGW distributions. [#]_ For a Python interpreter
 that was built with Cygwin, everything should work without any of these
 following steps.
 
-These compilers require some special libraries. This task is more complex than
+Not all extensions can be built with MinGW or Cygwin, but many can.  Extensions
+most likely to not work are those that use C++ or depend on Microsoft Visual C
+extensions.
+
+To let Distutils compile your extension with Cygwin you have to type::
+
+   python setup.py build --compiler=cygwin
+
+and for Cygwin in no-cygwin mode [#]_ or for MinGW type::
+
+   python setup.py build --compiler=mingw32
+
+If you want to use any of these options/compilers as default, you should
+consider writing it in your personal or system-wide configuration file for
+Distutils (see section :ref:`inst-config-files`.)
+
+Older Versions of Python and MinGW
+""""""""""""""""""""""""""""""""""
+The following instructions only apply if you're using a version of Python
+inferior to 2.4.1 with a MinGW inferior to 3.0.0 (with
+binutils-2.13.90-20030111-1).
+
+These compilers require some special libraries.  This task is more complex than
 for Borland's C++, because there is no program to convert the library.  First
 you have to create a list of symbols which the Python DLL exports. (You can find
-a good program for this task at http://www.emmestech.com/software/cygwin/pexports-0.43/download_pexports.html)
+a good program for this task at
+http://www.emmestech.com/software/pexports-0.43/download_pexports.html).
 
 .. I don't understand what the next line means. --amk
 .. (inclusive the references on data structures.)
@@ -960,18 +985,6 @@ installation directory.)
 If your extension uses other libraries (zlib,...) you might  have to convert
 them too. The converted files have to reside in the same directories as the
 normal libraries do.
-
-To let Distutils compile your extension with Cygwin you now have to type ::
-
-   python setup.py build --compiler=cygwin
-
-and for Cygwin in no-cygwin mode [#]_ or for MinGW type::
-
-   python setup.py build --compiler=mingw32
-
-If you want to use any of these options/compilers as default, you should
-consider to write it in your personal or system-wide configuration file for
-Distutils (see section :ref:`inst-config-files`.)
 
 
 .. seealso::

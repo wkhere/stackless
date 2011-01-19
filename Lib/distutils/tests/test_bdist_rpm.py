@@ -5,6 +5,7 @@ import sys
 import os
 import tempfile
 import shutil
+from test.support import run_unittest
 
 from distutils.core import Distribution
 from distutils.command.bdist_rpm import bdist_rpm
@@ -29,11 +30,12 @@ class BuildRpmTestCase(support.TempdirManager,
     def setUp(self):
         super(BuildRpmTestCase, self).setUp()
         self.old_location = os.getcwd()
-        self.old_sys_argv = sys.argv[:]
+        self.old_sys_argv = sys.argv, sys.argv[:]
 
     def tearDown(self):
         os.chdir(self.old_location)
-        sys.argv = self.old_sys_argv[:]
+        sys.argv = self.old_sys_argv[0]
+        sys.argv[:] = self.old_sys_argv[1]
         super(BuildRpmTestCase, self).tearDown()
 
     def test_quiet(self):
@@ -74,7 +76,7 @@ class BuildRpmTestCase(support.TempdirManager,
         cmd.run()
 
         dist_created = os.listdir(os.path.join(pkg_dir, 'dist'))
-        self.assert_('foo-0.1-1.noarch.rpm' in dist_created)
+        self.assertTrue('foo-0.1-1.noarch.rpm' in dist_created)
 
     def test_no_optimize_flag(self):
 
@@ -114,11 +116,11 @@ class BuildRpmTestCase(support.TempdirManager,
         cmd.run()
 
         dist_created = os.listdir(os.path.join(pkg_dir, 'dist'))
-        self.assert_('foo-0.1-1.noarch.rpm' in dist_created)
+        self.assertTrue('foo-0.1-1.noarch.rpm' in dist_created)
         os.remove(os.path.join(pkg_dir, 'dist', 'foo-0.1-1.noarch.rpm'))
 
 def test_suite():
     return unittest.makeSuite(BuildRpmTestCase)
 
 if __name__ == '__main__':
-    test_support.run_unittest(test_suite())
+    run_unittest(test_suite())

@@ -436,6 +436,13 @@ def join_header_words(lists):
         if attr: headers.append("; ".join(attr))
     return ", ".join(headers)
 
+def strip_quotes(text):
+    if text.startswith('"'):
+        text = text[1:]
+    if text.endswith('"'):
+        text = text[:-1]
+    return text
+
 def parse_ns_headers(ns_headers):
     """Ad-hoc parser for Netscape protocol cookie-attributes.
 
@@ -453,7 +460,7 @@ def parse_ns_headers(ns_headers):
     """
     known_attrs = ("expires", "domain", "path", "secure",
                    # RFC 2109 attrs (may turn up in Netscape cookies, too)
-                   "port", "max-age")
+                   "version", "port", "max-age")
 
     result = []
     for ns_header in ns_headers:
@@ -473,12 +480,11 @@ def parse_ns_headers(ns_headers):
                     k = lc
                 if k == "version":
                     # This is an RFC 2109 cookie.
+                    v = strip_quotes(v)
                     version_set = True
                 if k == "expires":
                     # convert expires date to seconds since epoch
-                    if v.startswith('"'): v = v[1:]
-                    if v.endswith('"'): v = v[:-1]
-                    v = http2time(v)  # None if invalid
+                    v = http2time(strip_quotes(v))  # None if invalid
             pairs.append((k, v))
 
         if pairs:
@@ -603,17 +609,14 @@ def eff_request_host(request):
     return req_host, erhn
 
 def request_path(request):
-    """request-URI, as defined by RFC 2965."""
+    """Path component of request-URI, as defined by RFC 2965."""
     url = request.get_full_url()
-    path, parameters, query, frag = urllib.parse.urlparse(url)[2:]
-    if parameters:
-        path = "%s;%s" % (path, parameters)
-    path = escape_path(path)
-    req_path = urllib.parse.urlunparse(("", "", path, "", query, frag))
-    if not req_path.startswith("/"):
+    parts = urllib.parse.urlsplit(url)
+    path = escape_path(parts.path)
+    if not path.startswith("/"):
         # fix bad RFC 2396 absoluteURI
-        req_path = "/"+req_path
-    return req_path
+        path = "/" + path
+    return path
 
 def request_port(request):
     host = request.get_host()
@@ -1446,7 +1449,11 @@ class CookieJar:
 
         # set the easy defaults
         version = standard.get("version", None)
-        if version is not None: version = int(version)
+        if version is not None:
+            try:
+                version = int(version)
+            except ValueError:
+                return None  # invalid version, ignore cookie
         secure = standard.get("secure", False)
         # (discard is also set if expires is Absent)
         discard = standard.get("discard", False)
@@ -1967,9 +1974,9 @@ class MozillaCookieJar(FileCookieJar):
     """
     magic_re = re.compile("#( Netscape)? HTTP Cookie File")
     header = """\
-    # Netscape HTTP Cookie File
-    # http://www.netscape.com/newsref/std/cookie_spec.html
-    # This is a generated file!  Do not edit.
+# Netscape HTTP Cookie File
+# http://www.netscape.com/newsref/std/cookie_spec.html
+# This is a generated file!  Do not edit.
 
 """
 

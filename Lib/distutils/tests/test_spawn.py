@@ -2,7 +2,7 @@
 import unittest
 import os
 import time
-from test.support import captured_stdout
+from test.support import captured_stdout, run_unittest
 
 from distutils.spawn import _nt_quote_args
 from distutils.spawn import spawn, find_executable
@@ -20,7 +20,7 @@ class SpawnTestCase(support.TempdirManager,
                                (['nochange', 'nospace'],
                                 ['nochange', 'nospace'])):
             res = _nt_quote_args(args)
-            self.assertEquals(res, wanted)
+            self.assertEqual(res, wanted)
 
 
     @unittest.skipUnless(os.name in ('nt', 'posix'),
@@ -55,4 +55,4 @@ def test_suite():
     return unittest.makeSuite(SpawnTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

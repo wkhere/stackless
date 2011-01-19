@@ -50,9 +50,9 @@ The :mod:`csv` module defines the following functions:
 
    Return a reader object which will iterate over lines in the given *csvfile*.
    *csvfile* can be any object which supports the :term:`iterator` protocol and returns a
-   string each time its :meth:`next` method is called --- file objects and list
-   objects are both suitable.   If *csvfile* is a file object, it should be opened
-   with ``newline=''``. [#]_  An optional
+   string each time its :meth:`!__next__` method is called --- :term:`file objects
+   <file object>` and list objects are both suitable.   If *csvfile* is a file object,
+   it should be opened with ``newline=''``. [#]_  An optional
    *dialect* parameter can be given which is used to define a set of parameters
    specific to a particular CSV dialect.  It may be an instance of a subclass of
    the :class:`Dialect` class or one of the strings returned by the
@@ -97,7 +97,7 @@ The :mod:`csv` module defines the following functions:
 
       >>> import csv
       >>> spamWriter = csv.writer(open('eggs.csv', 'w'), delimiter=' ',
-      ...                         quotechar='|', quoting=QUOTE_MINIMAL)
+      ...                         quotechar='|', quoting=csv.QUOTE_MINIMAL)
       >>> spamWriter.writerow(['Spam'] * 5 + ['Baked Beans'])
       >>> spamWriter.writerow(['Spam', 'Lovely Spam', 'Wonderful Spam'])
 
@@ -141,13 +141,12 @@ The :mod:`csv` module defines the following classes:
    Create an object which operates like a regular reader but maps the information
    read into a dict whose keys are given by the optional  *fieldnames* parameter.
    If the *fieldnames* parameter is omitted, the values in the first row of the
-   *csvfile* will be used as the fieldnames. If the row read has fewer fields than
-   the fieldnames sequence, the value of *restval* will be used as the default
-   value.  If the row read has more fields than the fieldnames sequence, the
-   remaining data is added as a sequence keyed by the value of *restkey*.  If the
-   row read has fewer fields than the fieldnames sequence, the remaining keys take
-   the value of the optional *restval* parameter.  Any other optional or keyword
-   arguments are passed to the underlying :class:`reader` instance.
+   *csvfile* will be used as the fieldnames.  If the row read has more fields
+   than the fieldnames sequence, the remaining data is added as a sequence
+   keyed by the value of *restkey*.  If the row read has fewer fields than the
+   fieldnames sequence, the remaining keys take the value of the optional
+   *restval* parameter.  Any other optional or keyword arguments are passed to
+   the underlying :class:`reader` instance.
 
 
 .. class:: DictWriter(csvfile, fieldnames, restval='', extrasaction='raise', dialect='excel', *args, **kwds)
@@ -186,6 +185,15 @@ The :mod:`csv` module defines the following classes:
 
    The :class:`excel_tab` class defines the usual properties of an Excel-generated
    TAB-delimited file.  It is registered with the dialect name ``'excel-tab'``.
+
+
+.. class:: unix_dialect()
+
+   The :class:`unix_dialect` class defines the usual properties of a CSV file
+   generated on UNIX systems, i.e. using ``'\n'`` as line terminator and quoting
+   all fields.  It is registered with the dialect name ``'unix'``.
+
+   .. versionadded:: 3.2
 
 
 .. class:: Sniffer()
@@ -391,6 +399,16 @@ Writer objects have the following public attribute:
 .. attribute:: csvwriter.dialect
 
    A read-only description of the dialect in use by the writer.
+
+
+DictWriter objects have the following public method:
+
+
+.. method:: DictWriter.writeheader()
+
+   Write a row with the field names (as specified in the constructor).
+
+   .. versionadded:: 3.2
 
 
 .. _csv-examples:

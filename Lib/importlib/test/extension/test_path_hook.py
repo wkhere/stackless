@@ -14,12 +14,12 @@ class PathHookTests(unittest.TestCase):
     # XXX Should it only work for directories containing an extension module?
 
     def hook(self, entry):
-        return _bootstrap._ExtensionFileFinder(entry)
+        return _bootstrap._file_path_hook(entry)
 
     def test_success(self):
         # Path hook should handle a directory where a known extension module
         # exists.
-        self.assert_(hasattr(self.hook(util.PATH), 'find_module'))
+        self.assertTrue(hasattr(self.hook(util.PATH), 'find_module'))
 
 
 def test_main():

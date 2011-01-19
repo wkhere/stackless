@@ -8,7 +8,26 @@ import os
 import subprocess
 
 winsound = support.import_module('winsound')
+ctypes = support.import_module('ctypes')
+import winreg
 
+def has_sound(sound):
+    """Find out if a particular event is configured with a default sound"""
+    try:
+        # Ask the mixer API for the number of devices it knows about.
+        # When there are no devices, PlaySound will fail.
+        if ctypes.windll.winmm.mixerGetNumDevs() is 0:
+            return False
+
+        key = winreg.OpenKeyEx(winreg.HKEY_CURRENT_USER,
+                "AppEvents\Schemes\Apps\.Default\{0}\.Default".format(sound))
+        value = winreg.EnumValue(key, 0)[1]
+        if value is not "":
+            return True
+        else:
+            return False
+    except WindowsError:
+        return False
 
 class BeepTest(unittest.TestCase):
     # As with PlaySoundTest, incorporate the _have_soundcard() check
@@ -84,6 +103,8 @@ class PlaySoundTest(unittest.TestCase):
             "none", winsound.SND_ASYNC | winsound.SND_MEMORY
         )
 
+    @unittest.skipUnless(has_sound("SystemAsterisk"),
+                         "No default SystemAsterisk")
     def test_alias_asterisk(self):
         if _have_soundcard():
             winsound.PlaySound('SystemAsterisk', winsound.SND_ALIAS)
@@ -94,6 +115,8 @@ class PlaySoundTest(unittest.TestCase):
                 'SystemAsterisk', winsound.SND_ALIAS
             )
 
+    @unittest.skipUnless(has_sound("SystemExclamation"),
+                         "No default SystemExclamation")
     def test_alias_exclamation(self):
         if _have_soundcard():
             winsound.PlaySound('SystemExclamation', winsound.SND_ALIAS)
@@ -104,6 +127,7 @@ class PlaySoundTest(unittest.TestCase):
                 'SystemExclamation', winsound.SND_ALIAS
             )
 
+    @unittest.skipUnless(has_sound("SystemExit"), "No default SystemExit")
     def test_alias_exit(self):
         if _have_soundcard():
             winsound.PlaySound('SystemExit', winsound.SND_ALIAS)
@@ -114,6 +138,7 @@ class PlaySoundTest(unittest.TestCase):
                 'SystemExit', winsound.SND_ALIAS
             )
 
+    @unittest.skipUnless(has_sound("SystemHand"), "No default SystemHand")
     def test_alias_hand(self):
         if _have_soundcard():
             winsound.PlaySound('SystemHand', winsound.SND_ALIAS)
@@ -124,6 +149,8 @@ class PlaySoundTest(unittest.TestCase):
                 'SystemHand', winsound.SND_ALIAS
             )
 
+    @unittest.skipUnless(has_sound("SystemQuestion"),
+                         "No default SystemQuestion")
     def test_alias_question(self):
         if _have_soundcard():
             winsound.PlaySound('SystemQuestion', winsound.SND_ALIAS)
@@ -194,11 +221,9 @@ class PlaySoundTest(unittest.TestCase):
                 pass
             winsound.PlaySound(None, winsound.SND_PURGE)
         else:
-            self.assertRaises(
-                RuntimeError,
-                winsound.PlaySound,
-                None, winsound.SND_PURGE
-            )
+            # Issue 8367: PlaySound(None, winsound.SND_PURGE)
+            # does not raise on systems without a sound card.
+            pass
 
 
 def _get_cscript_path():
@@ -224,6 +249,7 @@ def _have_soundcard():
         p = subprocess.Popen([cscript_path, check_script],
                              stdout=subprocess.PIPE)
         __have_soundcard_cache = not p.wait()
+        p.stdout.close()
     return __have_soundcard_cache
 
 

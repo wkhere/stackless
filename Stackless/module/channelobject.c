@@ -320,7 +320,7 @@ channel_callback(PyChannelObject *channel, PyTaskletObject *task, int sending, i
 {
 	PyObject *ret;
 	PyObject *type, *value, *traceback;
-	
+
 	PyErr_Fetch(&type, &value, &traceback);
 	ret = PyObject_CallFunction(channel_hook, "(OOii)", channel,
 								task, sending, willblock);
@@ -465,7 +465,7 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
 		slp_channel_insert(self, source, dir);
 		target = ts->st.current;
 	}
-	
+
 	/* Make sure that the channel will exist past the actual switch, if
 	 * we are softswitching.  A temporary channel might disappear.
 	 */
@@ -1067,7 +1067,7 @@ PyTypeObject _PyChannel_Type = {
 	0,					/* tp_init */
 	0,					/* tp_alloc */
 	channel_new,				/* tp_new */
-	_PyObject_GC_Del,			/* tp_free */
+	PyObject_GC_Del,			/* tp_free */
 };
 
 STACKLESS_DECLARE_METHOD(PyChannel_TypePtr, tp_iternext)

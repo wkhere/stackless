@@ -1,5 +1,12 @@
-import os, sys, string, random, tempfile, unittest
+import os
+import sys
+import shutil
+import string
+import random
+import tempfile
+import unittest
 
+from imp import cache_from_source
 from test.support import run_unittest
 
 class TestImport(unittest.TestCase):
@@ -22,26 +29,21 @@ class TestImport(unittest.TestCase):
         self.package_dir = os.path.join(self.test_dir,
                                         self.package_name)
         os.mkdir(self.package_dir)
-        open(os.path.join(self.package_dir, '__init__.py'), 'w')
+        open(os.path.join(self.package_dir, '__init__.py'), 'w').close()
         self.module_path = os.path.join(self.package_dir, 'foo.py')
 
     def tearDown(self):
-        for file in os.listdir(self.package_dir):
-            os.remove(os.path.join(self.package_dir, file))
-        os.rmdir(self.package_dir)
-        os.rmdir(self.test_dir)
+        shutil.rmtree(self.test_dir)
         self.assertNotEqual(sys.path.count(self.test_dir), 0)
         sys.path.remove(self.test_dir)
         self.remove_modules()
 
     def rewrite_file(self, contents):
-        for extension in "co":
-            compiled_path = self.module_path + extension
-            if os.path.exists(compiled_path):
-                os.remove(compiled_path)
-        f = open(self.module_path, 'w')
-        f.write(contents)
-        f.close()
+        compiled_path = cache_from_source(self.module_path)
+        if os.path.exists(compiled_path):
+            os.remove(compiled_path)
+        with open(self.module_path, 'w') as f:
+            f.write(contents)
 
     def test_package_import__semantics(self):
 
@@ -51,9 +53,9 @@ class TestImport(unittest.TestCase):
         self.rewrite_file('for')
         try: __import__(self.module_name)
         except SyntaxError: pass
-        else: raise RuntimeError('Failed to induce SyntaxError')
-        self.assert_(self.module_name not in sys.modules and
-                     not hasattr(sys.modules[self.package_name], 'foo'))
+        else: raise RuntimeError('Failed to induce SyntaxError') # self.fail()?
+        self.assertNotIn(self.module_name, sys.modules)
+        self.assertFalse(hasattr(sys.modules[self.package_name], 'foo'))
 
         # ...make up a variable name that isn't bound in __builtins__
         var = 'a'

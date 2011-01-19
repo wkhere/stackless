@@ -63,7 +63,7 @@ Here is the :class:`Header` class description:
    character set is used both as *s*'s initial charset and as the default for
    subsequent :meth:`append` calls.
 
-   The maximum line length can be specified explicit via *maxlinelen*.  For
+   The maximum line length can be specified explicitly via *maxlinelen*.  For
    splitting the first line to a shorter value (to account for the field header
    which isn't included in *s*, e.g. :mailheader:`Subject`) pass in the name of the
    field in *header_name*.  The default *maxlinelen* is 76, and the default value
@@ -94,17 +94,18 @@ Here is the :class:`Header` class description:
       decoded with that character set.
 
       If *s* is an instance of :class:`str`, then *charset* is a hint specifying
-      the character set of the characters in the string.  In this case, when
-      producing an :rfc:`2822`\ -compliant header using :rfc:`2047` rules, the
-      Unicode string will be encoded using the following charsets in order:
-      ``us-ascii``, the *charset* hint, ``utf-8``.  The first character set to
-      not provoke a :exc:`UnicodeError` is used.
+      the character set of the characters in the string.
 
-      Optional *errors* is passed through to any :func:`encode` or
-      :func:`ustr.encode` call, and defaults to "strict".
+      In either case, when producing an :rfc:`2822`\ -compliant header using
+      :rfc:`2047` rules, the string will be encoded using the output codec of
+      the charset.  If the string cannot be encoded using the output codec, a
+      UnicodeError will be raised.
+
+      Optional *errors* is passed as the errors argument to the decode call
+      if *s* is a byte string.
 
 
-   .. method:: encode(splitchars=';, \\t', maxlinelen=None)
+   .. method:: encode(splitchars=';, \\t', maxlinelen=None, linesep='\\n')
 
       Encode a message header into an RFC-compliant format, possibly wrapping
       long lines and encapsulating non-ASCII parts in base64 or quoted-printable
@@ -115,19 +116,29 @@ Here is the :class:`Header` class description:
       *maxlinelen*, if given, overrides the instance's value for the maximum
       line length.
 
+      *linesep* specifies the characters used to separate the lines of the
+      folded header.  It defaults to the most useful value for Python
+      application code (``\n``), but ``\r\n`` can be specified in order
+      to produce headers with RFC-compliant line separators.
+
+      .. versionchanged:: 3.2
+         Added the *linesep* argument.
+
 
    The :class:`Header` class also provides a number of methods to support
    standard operators and built-in functions.
 
    .. method:: __str__()
 
-      A synonym for :meth:`Header.encode`.  Useful for ``str(aHeader)``.
+      Returns an approximation of the :class:`Header` as a string, using an
+      unlimited line length.  All pieces are converted to unicode using the
+      specified encoding and joined together appropriately.  Any pieces with a
+      charset of `unknown-8bit` are decoded as `ASCII` using the `replace`
+      error handler.
 
+      .. versionchanged:: 3.2
+         Added handling for the `unknown-8bit` charset.
 
-   .. method:: __unicode__()
-
-      A helper for :class:`str`'s :func:`encode` method.  Returns the header as
-      a Unicode string.
 
    .. method:: __eq__(other)
 

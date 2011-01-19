@@ -33,8 +33,8 @@ Number-theoretic and representation functions
 
 .. function:: copysign(x, y)
 
-   Return *x* with the sign of *y*. ``copysign`` copies the sign bit of an IEEE
-   754 float, ``copysign(1, -0.0)`` returns *-1.0*.
+   Return *x* with the sign of *y*.  On a platform that supports
+   signed zeros, ``copysign(1.0, -0.0)`` returns *-1.0*.
 
 
 .. function:: fabs(x)
@@ -82,7 +82,7 @@ Number-theoretic and representation functions
    loss of precision by tracking multiple intermediate partial sums::
 
         >>> sum([.1, .1, .1, .1, .1, .1, .1, .1, .1, .1])
-        0.99999999999999989
+        0.9999999999999999
         >>> fsum([.1, .1, .1, .1, .1, .1, .1, .1, .1, .1])
         1.0
 
@@ -97,17 +97,23 @@ Number-theoretic and representation functions
    <http://code.activestate.com/recipes/393090/>`_\.
 
 
+.. function:: isfinite(x)
+
+   Return ``True`` if *x* is neither an infinity nor a NaN, and
+   ``False`` otherwise.  (Note that ``0.0`` *is* considered finite.)
+
+   .. versionadded:: 3.2
+
+
 .. function:: isinf(x)
 
-   Checks if the float *x* is positive or negative infinite.
+   Return ``True`` if *x* is a positive or negative infinity, and
+   ``False`` otherwise.
 
 
 .. function:: isnan(x)
 
-   Checks if the float *x* is a NaN (not a number). NaNs are part of the
-   IEEE 754 standards. Operation like but not limited to ``inf * 0``,
-   ``inf / inf`` or any operation involving a NaN, e.g. ``nan * 1``, return
-   a NaN.
+   Return ``True`` if *x* is a NaN (not a number), and ``False`` otherwise.
 
 
 .. function:: ldexp(x, i)
@@ -148,10 +154,28 @@ Power and logarithmic functions
    Return ``e**x``.
 
 
+.. function:: expm1(x)
+
+   Return ``e**x - 1``.  For small floats *x*, the subtraction in
+   ``exp(x) - 1`` can result in a significant loss of precision; the
+   :func:`expm1` function provides a way to compute this quantity to
+   full precision::
+
+      >>> from math import exp, expm1
+      >>> exp(1e-5) - 1  # gives result accurate to 11 places
+      1.0000050000069649e-05
+      >>> expm1(1e-5)    # result accurate to full precision
+      1.0000050000166668e-05
+
+   .. versionadded:: 3.2
+
+
 .. function:: log(x[, base])
 
-   Return the logarithm of *x* to the given *base*. If the *base* is not specified,
-   return the natural logarithm of *x* (that is, the logarithm to base *e*).
+   With one argument, return the natural logarithm of *x* (to base *e*).
+
+   With two arguments, return the logarithm of *x* to the given *base*,
+   calculated as ``log(x)/log(base)``.
 
 
 .. function:: log1p(x)
@@ -162,7 +186,8 @@ Power and logarithmic functions
 
 .. function:: log10(x)
 
-   Return the base-10 logarithm of *x*.
+   Return the base-10 logarithm of *x*.  This is usually more accurate
+   than ``log(x, 10)``.
 
 
 .. function:: pow(x, y)
@@ -204,7 +229,7 @@ Trigonometric functions
    The vector in the plane from the origin to point ``(x, y)`` makes this angle
    with the positive X axis. The point of :func:`atan2` is that the signs of both
    inputs are known to it, so it can compute the correct quadrant for the angle.
-   For example, ``atan(1``) and ``atan2(1, 1)`` are both ``pi/4``, but ``atan2(-1,
+   For example, ``atan(1)`` and ``atan2(1, 1)`` are both ``pi/4``, but ``atan2(-1,
    -1)`` is ``-3*pi/4``.
 
 
@@ -275,36 +300,68 @@ Hyperbolic functions
    Return the hyperbolic tangent of *x*.
 
 
+Special functions
+-----------------
+
+.. function:: erf(x)
+
+   Return the error function at *x*.
+
+   .. versionadded:: 3.2
+
+
+.. function:: erfc(x)
+
+   Return the complementary error function at *x*.
+
+   .. versionadded:: 3.2
+
+
+.. function:: gamma(x)
+
+   Return the Gamma function at *x*.
+
+   .. versionadded:: 3.2
+
+
+.. function:: lgamma(x)
+
+   Return the natural logarithm of the absolute value of the Gamma
+   function at *x*.
+
+   .. versionadded:: 3.2
+
+
 Constants
 ---------
 
 .. data:: pi
 
-   The mathematical constant *pi*.
+   The mathematical constant π = 3.141592..., to available precision.
 
 
 .. data:: e
 
-   The mathematical constant *e*.
+   The mathematical constant e = 2.718281..., to available precision.
 
 
-.. note::
+.. impl-detail::
 
    The :mod:`math` module consists mostly of thin wrappers around the platform C
-   math library functions.  Behavior in exceptional cases is loosely specified
-   by the C standards, and Python inherits much of its math-function
-   error-reporting behavior from the platform C implementation.  As a result,
-   the specific exceptions raised in error cases (and even whether some
-   arguments are considered to be exceptional at all) are not defined in any
-   useful cross-platform or cross-release way.  For example, whether
-   ``math.log(0)`` returns ``-Inf`` or raises :exc:`ValueError` or
-   :exc:`OverflowError` isn't defined, and in cases where ``math.log(0)`` raises
-   :exc:`OverflowError`, ``math.log(0L)`` may raise :exc:`ValueError` instead.
+   math library functions.  Behavior in exceptional cases follows Annex F of
+   the C99 standard where appropriate.  The current implementation will raise
+   :exc:`ValueError` for invalid operations like ``sqrt(-1.0)`` or ``log(0.0)``
+   (where C99 Annex F recommends signaling invalid operation or divide-by-zero),
+   and :exc:`OverflowError` for results that overflow (for example,
+   ``exp(1000.0)``).  A NaN will not be returned from any of the functions
+   above unless one or more of the input arguments was a NaN; in that case,
+   most functions will return a NaN, but (again following C99 Annex F) there
+   are some exceptions to this rule, for example ``pow(float('nan'), 0.0)`` or
+   ``hypot(float('nan'), float('inf'))``.
 
-   All functions return a quiet *NaN* if at least one of the args is *NaN*.
-   Signaling *NaN*\s raise an exception. The exception type still depends on the
-   platform and libm implementation. It's usually :exc:`ValueError` for *EDOM*
-   and :exc:`OverflowError` for errno *ERANGE*.
+   Note that Python makes no effort to distinguish signaling NaNs from
+   quiet NaNs, and behavior for signaling NaNs remains unspecified.
+   Typical behavior is to treat all NaNs as though they were quiet.
 
 
 .. seealso::

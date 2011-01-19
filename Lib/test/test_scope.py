@@ -1,9 +1,6 @@
 import unittest
 from test.support import check_syntax_error, run_unittest
 
-import warnings
-warnings.filterwarnings("ignore", r"import \*", SyntaxWarning, "<test string>")
-warnings.filterwarnings("ignore", r"import \*", SyntaxWarning, "<string>")
 
 class ScopeTests(unittest.TestCase):
 
@@ -195,44 +192,37 @@ class ScopeTests(unittest.TestCase):
 
     def testUnoptimizedNamespaces(self):
 
-        check_syntax_error(self, """\
-def unoptimized_clash1(strip):
-    def f(s):
-        from sys import *
-        return getrefcount(s) # ambiguity: free or local
-    return f
-""")
+        check_syntax_error(self, """if 1:
+            def unoptimized_clash1(strip):
+                def f(s):
+                    from sys import *
+                    return getrefcount(s) # ambiguity: free or local
+                return f
+            """)
 
-        check_syntax_error(self, """\
-def unoptimized_clash2():
-    from sys import *
-    def f(s):
-        return getrefcount(s) # ambiguity: global or local
-    return f
-""")
+        check_syntax_error(self, """if 1:
+            def unoptimized_clash2():
+                from sys import *
+                def f(s):
+                    return getrefcount(s) # ambiguity: global or local
+                return f
+            """)
 
-        check_syntax_error(self, """\
-def unoptimized_clash2():
-    from sys import *
-    def g():
-        def f(s):
-            return getrefcount(s) # ambiguity: global or local
-        return f
-""")
+        check_syntax_error(self, """if 1:
+            def unoptimized_clash2():
+                from sys import *
+                def g():
+                    def f(s):
+                        return getrefcount(s) # ambiguity: global or local
+                    return f
+            """)
 
-        check_syntax_error(self, """\
-def f(x):
-    def g():
-        return x
-    del x # can't del name
-""")
-
-        check_syntax_error(self, """\
-def f():
-    def g():
-        from sys import *
-        return getrefcount # global or local?
-""")
+        check_syntax_error(self, """if 1:
+            def f():
+                def g():
+                    from sys import *
+                    return getrefcount # global or local?
+            """)
 
     def testLambdas(self):
 
@@ -272,32 +262,43 @@ def f():
             inner()
             y = 1
 
-        try:
-            errorInOuter()
-        except UnboundLocalError:
-            pass
-        else:
-            self.fail()
+        self.assertRaises(UnboundLocalError, errorInOuter)
+        self.assertRaises(NameError, errorInInner)
 
-        try:
-            errorInInner()
-        except NameError:
-            pass
-        else:
-            self.fail()
+    def testUnboundLocal_AfterDel(self):
+        # #4617: It is now legal to delete a cell variable.
+        # The following functions must obviously compile,
+        # and give the correct error when accessing the deleted name.
+        def errorInOuter():
+            y = 1
+            del y
+            print(y)
+            def inner():
+                return y
 
+        def errorInInner():
+            def inner():
+                return y
+            y = 1
+            del y
+            inner()
+
+        self.assertRaises(UnboundLocalError, errorInOuter)
+        self.assertRaises(NameError, errorInInner)
+
+    def testUnboundLocal_AugAssign(self):
         # test for bug #1501934: incorrect LOAD/STORE_GLOBAL generation
-        exec("""
-global_x = 1
-def f():
-    global_x += 1
-try:
-    f()
-except UnboundLocalError:
-    pass
-else:
-    fail('scope of global_x not correctly determined')
-""", {'fail': self.fail})
+        exec("""if 1:
+            global_x = 1
+            def f():
+                global_x += 1
+            try:
+                f()
+            except UnboundLocalError:
+                pass
+            else:
+                fail('scope of global_x not correctly determined')
+            """, {'fail': self.fail})
 
     def testComplexDefinitions(self):
 
@@ -316,88 +317,88 @@ else:
         self.assertEqual(makeReturner2(a=11)()['a'], 11)
 
     def testScopeOfGlobalStmt(self):
-# Examples posted by Samuele Pedroni to python-dev on 3/1/2001
+        # Examples posted by Samuele Pedroni to python-dev on 3/1/2001
 
-        exec("""\
-# I
-x = 7
-def f():
-    x = 1
-    def g():
-        global x
-        def i():
-            def h():
-                return x
-            return h()
-        return i()
-    return g()
-self.assertEqual(f(), 7)
-self.assertEqual(x, 7)
+        exec("""if 1:
+            # I
+            x = 7
+            def f():
+                x = 1
+                def g():
+                    global x
+                    def i():
+                        def h():
+                            return x
+                        return h()
+                    return i()
+                return g()
+            self.assertEqual(f(), 7)
+            self.assertEqual(x, 7)
 
-# II
-x = 7
-def f():
-    x = 1
-    def g():
-        x = 2
-        def i():
-            def h():
-                return x
-            return h()
-        return i()
-    return g()
-self.assertEqual(f(), 2)
-self.assertEqual(x, 7)
+            # II
+            x = 7
+            def f():
+                x = 1
+                def g():
+                    x = 2
+                    def i():
+                        def h():
+                            return x
+                        return h()
+                    return i()
+                return g()
+            self.assertEqual(f(), 2)
+            self.assertEqual(x, 7)
 
-# III
-x = 7
-def f():
-    x = 1
-    def g():
-        global x
-        x = 2
-        def i():
-            def h():
-                return x
-            return h()
-        return i()
-    return g()
-self.assertEqual(f(), 2)
-self.assertEqual(x, 2)
+            # III
+            x = 7
+            def f():
+                x = 1
+                def g():
+                    global x
+                    x = 2
+                    def i():
+                        def h():
+                            return x
+                        return h()
+                    return i()
+                return g()
+            self.assertEqual(f(), 2)
+            self.assertEqual(x, 2)
 
-# IV
-x = 7
-def f():
-    x = 3
-    def g():
-        global x
-        x = 2
-        def i():
-            def h():
-                return x
-            return h()
-        return i()
-    return g()
-self.assertEqual(f(), 2)
-self.assertEqual(x, 2)
+            # IV
+            x = 7
+            def f():
+                x = 3
+                def g():
+                    global x
+                    x = 2
+                    def i():
+                        def h():
+                            return x
+                        return h()
+                    return i()
+                return g()
+            self.assertEqual(f(), 2)
+            self.assertEqual(x, 2)
 
-# XXX what about global statements in class blocks?
-# do they affect methods?
+            # XXX what about global statements in class blocks?
+            # do they affect methods?
 
-x = 12
-class Global:
-    global x
-    x = 13
-    def set(self, val):
-        x = val
-    def get(self):
-        return x
+            x = 12
+            class Global:
+                global x
+                x = 13
+                def set(self, val):
+                    x = val
+                def get(self):
+                    return x
 
-g = Global()
-self.assertEqual(g.get(), 13)
-g.set(15)
-self.assertEqual(g.get(), 13)
-""")
+            g = Global()
+            self.assertEqual(g.get(), 13)
+            g.set(15)
+            self.assertEqual(g.get(), 13)
+            """)
 
     def testLeaks(self):
 
@@ -423,28 +424,28 @@ self.assertEqual(g.get(), 13)
 
     def testClassAndGlobal(self):
 
-        exec("""\
-def test(x):
-    class Foo:
-        global x
-        def __call__(self, y):
-            return x + y
-    return Foo()
+        exec("""if 1:
+            def test(x):
+                class Foo:
+                    global x
+                    def __call__(self, y):
+                        return x + y
+                return Foo()
 
-x = 0
-self.assertEqual(test(6)(2), 8)
-x = -1
-self.assertEqual(test(3)(2), 5)
+            x = 0
+            self.assertEqual(test(6)(2), 8)
+            x = -1
+            self.assertEqual(test(3)(2), 5)
 
-looked_up_by_load_name = False
-class X:
-    # Implicit globals inside classes are be looked up by LOAD_NAME, not
-    # LOAD_GLOBAL.
-    locals()['looked_up_by_load_name'] = True
-    passed = looked_up_by_load_name
+            looked_up_by_load_name = False
+            class X:
+                # Implicit globals inside classes are be looked up by LOAD_NAME, not
+                # LOAD_GLOBAL.
+                locals()['looked_up_by_load_name'] = True
+                passed = looked_up_by_load_name
 
-self.assert_(X.passed)
-""")
+            self.assertTrue(X.passed)
+            """)
 
     def testLocalsFunction(self):
 
@@ -458,7 +459,7 @@ self.assert_(X.passed)
             return g
 
         d = f(2)(4)
-        self.assert_('h' in d)
+        self.assertIn('h', d)
         del d['h']
         self.assertEqual(d, {'x': 2, 'y': 7, 'w': 6})
 
@@ -492,8 +493,8 @@ self.assert_(X.passed)
             return C
 
         varnames = f(1).z
-        self.assert_("x" not in varnames)
-        self.assert_("y" in varnames)
+        self.assertNotIn("x", varnames)
+        self.assertIn("y", varnames)
 
     def testLocalsClass_WithTrace(self):
         # Issue23728: after the trace function returns, the locals()
@@ -509,7 +510,7 @@ self.assert_(X.passed)
                 def f(self):
                     return x
 
-            self.assertEquals(x, 12) # Used to raise UnboundLocalError
+            self.assertEqual(x, 12) # Used to raise UnboundLocalError
         finally:
             sys.settrace(None)
 
@@ -640,22 +641,22 @@ self.assert_(X.passed)
         # function to other nested functions in the same block.
         # This test verifies that a global statement in the first
         # function does not affect the second function.
-        CODE = """def f():
-    y = 1
-    def g():
-        global y
-        return y
-    def h():
-        return y + 1
-    return g, h
-y = 9
-g, h = f()
-result9 = g()
-result2 = h()
-"""
         local_ns = {}
         global_ns = {}
-        exec(CODE, local_ns, global_ns)
+        exec("""if 1:
+            def f():
+                y = 1
+                def g():
+                    global y
+                    return y
+                def h():
+                    return y + 1
+                return g, h
+            y = 9
+            g, h = f()
+            result9 = g()
+            result2 = h()
+            """, local_ns, global_ns)
         self.assertEqual(2, global_ns["result2"])
         self.assertEqual(9, global_ns["result9"])
 
@@ -671,7 +672,7 @@ result2 = h()
 
         c = f(0)
         self.assertEqual(c.get(), 1)
-        self.assert_("x" not in c.__class__.__dict__)
+        self.assertNotIn("x", c.__class__.__dict__)
 
 
     def testNonLocalGenerator(self):
@@ -703,6 +704,14 @@ result2 = h()
         g = f(1)
         h = g()
         self.assertEqual(h(), 3)
+
+    def testTopIsNotSignificant(self):
+        # See #9997.
+        def top(a):
+            pass
+        def b():
+            global a
+
 
 
 def test_main():

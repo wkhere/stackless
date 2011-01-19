@@ -40,15 +40,15 @@ Module :mod:`aifc` defines the following function:
 .. function:: open(file, mode=None)
 
    Open an AIFF or AIFF-C file and return an object instance with methods that are
-   described below.  The argument *file* is either a string naming a file or a file
-   object.  *mode* must be ``'r'`` or ``'rb'`` when the file must be opened for
-   reading, or ``'w'``  or ``'wb'`` when the file must be opened for writing.  If
-   omitted, ``file.mode`` is used if it exists, otherwise ``'rb'`` is used.  When
+   described below.  The argument *file* is either a string naming a file or a
+   :term:`file object`.  *mode* must be ``'r'`` or ``'rb'`` when the file must be
+   opened for reading, or ``'w'``  or ``'wb'`` when the file must be opened for writing.
+   If omitted, ``file.mode`` is used if it exists, otherwise ``'rb'`` is used.  When
    used for writing, the file object should be seekable, unless you know ahead of
    time how many samples you are going to write in total and use
    :meth:`writeframesraw` and :meth:`setnframes`.
 
-Objects returned by :func:`open` when a file is opened for reading have the
+Objects returned by :func:`.open` when a file is opened for reading have the
 following methods:
 
 
@@ -133,7 +133,7 @@ following methods:
    Close the AIFF file.  After calling this method, the object can no longer be
    used.
 
-Objects returned by :func:`open` when a file is opened for writing have all the
+Objects returned by :func:`.open` when a file is opened for writing have all the
 above methods, except for :meth:`readframes` and :meth:`setpos`.  In addition
 the following methods exist.  The :meth:`get\*` methods can only be called after
 the corresponding :meth:`set\*` methods have been called.  Before the first

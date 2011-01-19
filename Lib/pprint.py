@@ -35,7 +35,7 @@ saferepr()
 """
 
 import sys as _sys
-
+from collections import OrderedDict as _OrderedDict
 from io import StringIO as _StringIO
 
 __all__ = ["pprint","pformat","isreadable","isrecursive","saferepr",
@@ -69,6 +69,32 @@ def isreadable(object):
 def isrecursive(object):
     """Determine if object requires a recursive representation."""
     return _safe_repr(object, {}, None, 0)[2]
+
+class _safe_key:
+    """Helper function for key functions when sorting unorderable objects.
+
+    The wrapped-object will fallback to an Py2.x style comparison for
+    unorderable types (sorting first comparing the type name and then by
+    the obj ids).  Does not work recursively, so dict.items() must have
+    _safe_key applied to both the key and the value.
+
+    """
+
+    __slots__ = ['obj']
+
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __lt__(self, other):
+        rv = self.obj.__lt__(other.obj)
+        if rv is NotImplemented:
+            rv = (str(type(self.obj)), id(self.obj)) < \
+                 (str(type(other.obj)), id(other.obj))
+        return rv
+
+def _safe_tuple(t):
+    "Helper function for comparing 2-tuples"
+    return _safe_key(t[0]), _safe_key(t[1])
 
 class PrettyPrinter:
     def __init__(self, indent=1, width=80, depth=None, stream=None):
@@ -137,7 +163,7 @@ class PrettyPrinter:
 
         if sepLines:
             r = getattr(typ, "__repr__", None)
-            if issubclass(typ, dict) and r is dict.__repr__:
+            if issubclass(typ, dict):
                 write('{')
                 if self._indent_per_level > 1:
                     write((self._indent_per_level - 1) * ' ')
@@ -145,7 +171,10 @@ class PrettyPrinter:
                 if length:
                     context[objid] = 1
                     indent = indent + self._indent_per_level
-                    items  = sorted(object.items())
+                    if issubclass(typ, _OrderedDict):
+                        items = list(object.items())
+                    else:
+                        items = sorted(object.items(), key=_safe_tuple)
                     key, ent = items[0]
                     rep = self._repr(key, context, level)
                     write(rep)
@@ -178,14 +207,14 @@ class PrettyPrinter:
                         return
                     write('{')
                     endchar = '}'
-                    object = sorted(object)
+                    object = sorted(object, key=_safe_key)
                 elif issubclass(typ, frozenset):
                     if not length:
                         write('frozenset()')
                         return
                     write('frozenset({')
                     endchar = '})'
-                    object = sorted(object)
+                    object = sorted(object, key=_safe_key)
                     indent += 10
                 else:
                     write('(')
@@ -267,14 +296,7 @@ def _safe_repr(object, context, maxlevels, level):
         append = components.append
         level += 1
         saferepr = _safe_repr
-        items = object.items()
-        try:
-            items = sorted(items)
-        except TypeError:
-            def sortkey(item):
-                key, value = item
-                return str(type(key)), key, value
-            items = sorted(items, key=sortkey)
+        items = sorted(object.items(), key=_safe_tuple)
         for k, v in items:
             krepr, kreadable, krecur = saferepr(k, context, maxlevels, level)
             vrepr, vreadable, vrecur = saferepr(v, context, maxlevels, level)

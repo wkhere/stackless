@@ -68,8 +68,8 @@ class BufferSizesTests(unittest.TestCase):
         self.assertEqual(fi.filename(), t2)
         self.assertEqual(fi.lineno(), 21)
         self.assertEqual(fi.filelineno(), 6)
-        self.failIf(fi.isfirstline())
-        self.failIf(fi.isstdin())
+        self.assertFalse(fi.isfirstline())
+        self.assertFalse(fi.isstdin())
 
         if verbose:
             print('%s. Nextfile (bs=%s)' % (start+2, bs))
@@ -138,7 +138,7 @@ class FileInputTests(unittest.TestCase):
             self.assertEqual(fi.filename(), t3)
 
             line = fi.readline()
-            self.failIf(line)
+            self.assertFalse(line)
             self.assertEqual(fi.lineno(), 1)
             self.assertEqual(fi.filelineno(), 0)
             self.assertEqual(fi.filename(), t4)
@@ -230,6 +230,30 @@ class FileInputTests(unittest.TestCase):
 ##             self.assertEqual(lines, ["N\n", "O"])
 ##         finally:
 ##             remove_tempfiles(t1)
+
+    def test_context_manager(self):
+        try:
+            t1 = writeTmp(1, ["A\nB\nC"])
+            t2 = writeTmp(2, ["D\nE\nF"])
+            with FileInput(files=(t1, t2)) as fi:
+                lines = list(fi)
+            self.assertEqual(lines, ["A\n", "B\n", "C", "D\n", "E\n", "F"])
+            self.assertEqual(fi.filelineno(), 3)
+            self.assertEqual(fi.lineno(), 6)
+            self.assertEqual(fi._files, ())
+        finally:
+            remove_tempfiles(t1, t2)
+
+    def test_close_on_exception(self):
+        try:
+            t1 = writeTmp(1, [""])
+            with FileInput(files=t1) as fi:
+                raise IOError
+        except IOError:
+            self.assertEqual(fi._files, ())
+        finally:
+            remove_tempfiles(t1)
+
 
 def test_main():
     run_unittest(BufferSizesTests, FileInputTests)

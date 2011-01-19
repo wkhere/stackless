@@ -6,12 +6,12 @@ class TupleTest(seq_tests.CommonTest):
     type2test = tuple
 
     def test_constructors(self):
-        super().test_len()
+        super().test_constructors()
         # calling built-in types without argument must return empty
         self.assertEqual(tuple(), ())
         t0_3 = (0, 1, 2, 3)
         t0_3_bis = tuple(t0_3)
-        self.assert_(t0_3 is t0_3_bis)
+        self.assertTrue(t0_3 is t0_3_bis)
         self.assertEqual(tuple([]), ())
         self.assertEqual(tuple([0, 1, 2, 3]), (0, 1, 2, 3))
         self.assertEqual(tuple(''), ())
@@ -19,8 +19,8 @@ class TupleTest(seq_tests.CommonTest):
 
     def test_truth(self):
         super().test_truth()
-        self.assert_(not ())
-        self.assert_((42, ))
+        self.assertTrue(not ())
+        self.assertTrue((42, ))
 
     def test_len(self):
         super().test_len()
@@ -33,14 +33,14 @@ class TupleTest(seq_tests.CommonTest):
         u = (0, 1)
         u2 = u
         u += (2, 3)
-        self.assert_(u is not u2)
+        self.assertTrue(u is not u2)
 
     def test_imul(self):
         super().test_imul()
         u = (0, 1)
         u2 = u
         u *= 3
-        self.assert_(u is not u2)
+        self.assertTrue(u is not u2)
 
     def test_tupleresizebug(self):
         # Check that a specific bug in _PyTuple_Resize() is squashed.
@@ -71,7 +71,7 @@ class TupleTest(seq_tests.CommonTest):
         inps = base + [(i, j) for i in base for j in xp] + \
                      [(i, j) for i in xp for j in base] + xp + list(zip(base))
         collisions = len(inps) - len(set(map(hash, inps)))
-        self.assert_(collisions <= 15)
+        self.assertTrue(collisions <= 15)
 
     def test_repr(self):
         l0 = tuple()
@@ -96,6 +96,7 @@ class TupleTest(seq_tests.CommonTest):
         gc.collect()
         self.assertTrue(gc.is_tracked(t), t)
 
+    @support.cpython_only
     def test_track_literals(self):
         # Test GC-optimization of tuple literals
         x, y, z = 1.5, "a", []
@@ -136,16 +137,22 @@ class TupleTest(seq_tests.CommonTest):
         self._tracked(tp(tuple([obj]) for obj in [x, y, z]))
         self._tracked(tuple(tp([obj]) for obj in [x, y, z]))
 
+    @support.cpython_only
     def test_track_dynamic(self):
         # Test GC-optimization of dynamically constructed tuples.
         self.check_track_dynamic(tuple, False)
 
+    @support.cpython_only
     def test_track_subtypes(self):
         # Tuple subtypes must always be tracked
         class MyTuple(tuple):
             pass
         self.check_track_dynamic(MyTuple, True)
 
+    @support.cpython_only
+    def test_bug7466(self):
+        # Trying to untrack an unfinished tuple could crash Python
+        self._not_tracked(tuple(gc.collect() for i in range(101)))
 
 def test_main():
     support.run_unittest(TupleTest)

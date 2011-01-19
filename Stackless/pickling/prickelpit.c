@@ -208,17 +208,17 @@ static int init_type(PyTypeObject *t, int (*initchain)(void))
 	if (PyType_Ready(t)) return -1;
 	init = (PyWrapperDescrObject *) PyDict_GetItemString(t->tp_dict,
 							    "__init__");
-	init->d_type = t->tp_base;
+	PyDescr_TYPE(init) = t->tp_base;
 	reduce = (PyMethodDescrObject *) PyDict_GetItemString(t->tp_dict,
 							    "__reduce__");
-	reduce->d_type = t->tp_base;
+	PyDescr_TYPE(reduce) = t->tp_base;
 	/* insert the __new__ replacement which is special */
 	func = PyCFunction_New(_new_methoddef, (PyObject *)t);
 	if (func == NULL || PyDict_SetItemString(t->tp_dict, "__new__", func))
 		return -1;
 	/* register with copy_reg */
 	if (pickle_reg != NULL &&
-		(retval = PyObject_CallFunction(pickle_reg, "OO", 
+		(retval = PyObject_CallFunction(pickle_reg, "OO",
 										t->tp_base, reduce)) == NULL)
 		ret = -1;
 	Py_XDECREF(retval);
@@ -774,7 +774,7 @@ frameobject_reduce(PyFrameObject *f)
 	if (blockstack_as_tuple == NULL) goto err_exit;
 
 	for (i = 0; i < f->f_iblock; i++) {
-		PyObject *tripel = Py_BuildValue("iii", 
+		PyObject *tripel = Py_BuildValue("iii",
 				f->f_blockstack[i].b_type,
 				f->f_blockstack[i].b_handler,
 				f->f_blockstack[i].b_level);
@@ -868,7 +868,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 	Py_ssize_t tmp;
 
 	if (is_wrong_type(Py_TYPE(f))) return NULL;
-	
+
 	if (!PyArg_ParseTuple (args, frametuplesetstatefmt,
 			       &PyCode_Type, &f_code,
 			       &valid,
@@ -1389,7 +1389,7 @@ dictview_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	inst = PyObject_GC_New(dictviewobject, type->tp_base);
 	if (inst == NULL)
 		return NULL;
-    Py_INCREF(dict);	
+    Py_INCREF(dict);
 	inst->dv_dict = (PyDictObject *)dict;
 	if (inst != NULL)
 		Py_TYPE(inst) = type;

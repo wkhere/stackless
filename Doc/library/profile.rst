@@ -1,4 +1,3 @@
-
 .. _profile:
 
 ********************
@@ -7,30 +6,9 @@ The Python Profilers
 
 .. sectionauthor:: James Roskind
 
+.. module:: profile
+   :synopsis: Python source profiler.
 
-.. index:: single: InfoSeek Corporation
-
-Copyright © 1994, by InfoSeek Corporation, all rights reserved.
-
-Written by James Roskind. [#]_
-
-Permission to use, copy, modify, and distribute this Python software and its
-associated documentation for any purpose (subject to the restriction in the
-following sentence) without fee is hereby granted, provided that the above
-copyright notice appears in all copies, and that both that copyright notice and
-this permission notice appear in supporting documentation, and that the name of
-InfoSeek not be used in advertising or publicity pertaining to distribution of
-the software without specific, written prior permission.  This permission is
-explicitly restricted to the copying and modification of the software to remain
-in Python, compiled Python, or other languages (such as C) wherein the modified
-or derived code is exclusively imported into a Python module.
-
-INFOSEEK CORPORATION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
-INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT
-SHALL INFOSEEK CORPORATION BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
-WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
-OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 .. _profiler-introduction:
 
@@ -41,33 +19,38 @@ Introduction to the profilers
    single: deterministic profiling
    single: profiling, deterministic
 
-A :dfn:`profiler` is a program that describes the run time performance
-of a program, providing a variety of statistics.  This documentation
-describes the profiler functionality provided in the modules
-:mod:`cProfile`, :mod:`profile` and :mod:`pstats`.  This profiler
-provides :dfn:`deterministic profiling` of Python programs.  It also
-provides a series of report generation tools to allow users to rapidly
-examine the results of a profile operation.
+A :dfn:`profiler` is a program that describes the run time performance of a
+program, providing a variety of statistics.  This documentation describes the
+profiler functionality provided in the modules :mod:`cProfile`, :mod:`profile`
+and :mod:`pstats`.  This profiler provides :dfn:`deterministic profiling` of
+Python programs.  It also provides a series of report generation tools to allow
+users to rapidly examine the results of a profile operation.
 
 The Python standard library provides two different profilers:
 
-#. :mod:`cProfile` is recommended for most users; it's a C extension
-   with reasonable overhead
-   that makes it suitable for profiling long-running programs.
-   Based on :mod:`lsprof`,
-   contributed by Brett Rosen and Ted Czotter.
+1. :mod:`cProfile` is recommended for most users; it's a C extension with
+   reasonable overhead that makes it suitable for profiling long-running
+   programs.  Based on :mod:`lsprof`, contributed by Brett Rosen and Ted
+   Czotter.
 
-#. :mod:`profile`, a pure Python module whose interface is imitated by
-   :mod:`cProfile`.  Adds significant overhead to profiled programs.
-   If you're trying to extend
-   the profiler in some way, the task might be easier with this module.
-   Copyright © 1994, by InfoSeek Corporation.
+2. :mod:`profile`, a pure Python module whose interface is imitated by
+   :mod:`cProfile`.  Adds significant overhead to profiled programs.  If you're
+   trying to extend the profiler in some way, the task might be easier with this
+   module.  Copyright © 1994, by InfoSeek Corporation.
 
 The :mod:`profile` and :mod:`cProfile` modules export the same interface, so
 they are mostly interchangeable; :mod:`cProfile` has a much lower overhead but
-is newer and might not be available on all systems.
-:mod:`cProfile` is really a compatibility layer on top of the internal
-:mod:`_lsprof` module.
+is newer and might not be available on all systems.  :mod:`cProfile` is really a
+compatibility layer on top of the internal :mod:`_lsprof` module.
+
+.. note::
+
+   The profiler modules are designed to provide an execution profile for a given
+   program, not for benchmarking purposes (for that, there is :mod:`timeit` for
+   resonably accurate results).  This particularly applies to benchmarking
+   Python code against C code: the profilers introduce overhead for Python code,
+   but not for C-level functions, and so the C code would seem faster than any
+   Python one.
 
 
 .. _profile-instant:
@@ -106,7 +89,7 @@ script.  For example::
 
    cProfile.py [-o output_file] [-s sort_order]
 
-:option:`-s` only applies to standard output (:option:`-o` is not supplied).
+``-s`` only applies to standard output (``-o`` is not supplied).
 Look in the :class:`Stats` documentation for valid sort values.
 
 When you wish to review the profile, you should use the methods in the
@@ -235,7 +218,7 @@ discussion of how to derive "better" profilers from the classes presented, or
 reading the source code for these modules.
 
 
-.. function:: run(command[, filename])
+.. function:: run(command, filename=None, sort=-1)
 
    This function takes a single argument that can be passed to the :func:`exec`
    function, and an optional file name.  In all cases this routine attempts to
@@ -264,8 +247,8 @@ reading the source code for these modules.
       for the number of calls,
 
    tottime
-      for the total time spent in the given function (and excluding time made in calls
-      to sub-functions),
+      for the total time spent in the given function (and excluding time made in
+      calls to sub-functions),
 
    percall
       is the quotient of ``tottime`` divided by ``ncalls``
@@ -285,24 +268,25 @@ reading the source code for these modules.
    calls.  Note that when the function does not recurse, these two values are the
    same, and only the single figure is printed.
 
+   If *sort* is given, it can be one of ``'stdname'`` (sort by filename:lineno),
+   ``'calls'`` (sort by number of calls), ``'time'`` (sort by total time) or
+   ``'cumulative'`` (sort by cumulative time).  The default is ``'stdname'``.
 
-.. function:: runctx(command, globals, locals[, filename])
+
+.. function:: runctx(command, globals, locals, filename=None)
 
    This function is similar to :func:`run`, with added arguments to supply the
    globals and locals dictionaries for the *command* string.
 
-Analysis of the profiler data is done using the :class:`Stats` class.
 
-.. note::
-
-   The :class:`Stats` class is defined in the :mod:`pstats` module.
+Analysis of the profiler data is done using the :class:`pstats.Stats` class.
 
 
 .. module:: pstats
    :synopsis: Statistics object for use with the profiler.
 
 
-.. class:: Stats(filename[, stream=sys.stdout[, ...]])
+.. class:: Stats(*filenames, stream=sys.stdout)
 
    This class constructor creates an instance of a "statistics object" from a
    *filename* (or set of filenames).  :class:`Stats` objects are manipulated by
@@ -342,7 +326,7 @@ The :class:`Stats` Class
    accumulated into a single entry.
 
 
-.. method:: Stats.add(filename[, ...])
+.. method:: Stats.add(*filenames)
 
    This method of the :class:`Stats` class accumulates additional profiling
    information into the current profiling object.  Its arguments should refer to
@@ -359,7 +343,7 @@ The :class:`Stats` Class
    :class:`profile.Profile` and :class:`cProfile.Profile` classes.
 
 
-.. method:: Stats.sort_stats(key[, ...])
+.. method:: Stats.sort_stats(*keys)
 
    This method modifies the :class:`Stats` object by sorting it according to the
    supplied criteria.  The argument is typically a string identifying the basis of
@@ -426,7 +410,7 @@ The :class:`Stats` Class
    .. This method is provided primarily for compatibility with the old profiler.
 
 
-.. method:: Stats.print_stats([restriction, ...])
+.. method:: Stats.print_stats(*restrictions)
 
    This method for the :class:`Stats` class prints out a report as described in the
    :func:`profile.run` definition.
@@ -455,7 +439,7 @@ The :class:`Stats` Class
    then proceed to only print the first 10% of them.
 
 
-.. method:: Stats.print_callers([restriction, ...])
+.. method:: Stats.print_callers(*restrictions)
 
    This method for the :class:`Stats` class prints a list of all functions that
    called each function in the profiled database.  The ordering is identical to
@@ -473,7 +457,7 @@ The :class:`Stats` Class
      the current function while it was invoked by this specific caller.
 
 
-.. method:: Stats.print_callees([restriction, ...])
+.. method:: Stats.print_callees(*restrictions)
 
    This method for the :class:`Stats` class prints a list of all function that were
    called by the indicated function.  Aside from this reversal of direction of
@@ -597,7 +581,7 @@ The resulting profiler will then call :func:`your_time_func`.
    integers, you can also invoke the class constructor with a second argument
    specifying the real duration of one unit of time.  For example, if
    :func:`your_integer_time_func` returns times measured in thousands of seconds,
-   you would constuct the :class:`Profile` instance as follows::
+   you would construct the :class:`Profile` instance as follows::
 
       pr = profile.Profile(your_integer_time_func, 0.001)
 
@@ -606,8 +590,26 @@ The resulting profiler will then call :func:`your_time_func`.
    best results with a custom timer, it might be necessary to hard-code it in the C
    source of the internal :mod:`_lsprof` module.
 
-.. rubric:: Footnotes
 
-.. [#] Updated and converted to LaTeX by Guido van Rossum. Further updated by Armin
-   Rigo to integrate the documentation for the new :mod:`cProfile` module of Python
-   2.5.
+Copyright and License Notices
+=============================
+
+Copyright © 1994, by InfoSeek Corporation, all rights reserved.
+
+Permission to use, copy, modify, and distribute this Python software and its
+associated documentation for any purpose (subject to the restriction in the
+following sentence) without fee is hereby granted, provided that the above
+copyright notice appears in all copies, and that both that copyright notice and
+this permission notice appear in supporting documentation, and that the name of
+InfoSeek not be used in advertising or publicity pertaining to distribution of
+the software without specific, written prior permission.  This permission is
+explicitly restricted to the copying and modification of the software to remain
+in Python, compiled Python, or other languages (such as C) wherein the modified
+or derived code is exclusively imported into a Python module.
+
+INFOSEEK CORPORATION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT
+SHALL INFOSEEK CORPORATION BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
+DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.

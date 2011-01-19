@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """ This module tries to retrieve as much platform-identifying data as
     possible. It makes this information available via function APIs.
@@ -10,7 +10,7 @@
 """
 #    This module is maintained by Marc-Andre Lemburg <mal@egenix.com>.
 #    If you find problems, please submit bug reports/patches via the
-#    Python SourceForge Project Page and assign them to "lemburg".
+#    Python bug tracker (http://bugs.python.org) and assign them to "lemburg".
 #
 #    Still needed:
 #    * more support for WinCE
@@ -32,6 +32,7 @@
 #
 #    <see CVS and SVN checkin messages for history>
 #
+#    1.0.7 - added DEV_NULL
 #    1.0.6 - added linux_distribution()
 #    1.0.5 - fixed Java support to allow running the module on Jython
 #    1.0.4 - added IronPython support
@@ -89,7 +90,7 @@
 
 __copyright__ = """
     Copyright (c) 1999-2000, Marc-Andre Lemburg; mailto:mal@lemburg.com
-    Copyright (c) 2000-2008, eGenix.com Software GmbH; mailto:info@egenix.com
+    Copyright (c) 2000-2010, eGenix.com Software GmbH; mailto:info@egenix.com
 
     Permission to use, copy, modify, and distribute this software and its
     documentation for any purpose and without fee or royalty is hereby granted,
@@ -108,9 +109,24 @@ __copyright__ = """
 
 """
 
-__version__ = '1.0.6'
+__version__ = '1.0.7'
 
 import sys, os, re
+
+### Globals & Constants
+
+# Determine the platform's /dev/null device
+try:
+    DEV_NULL = os.devnull
+except AttributeError:
+    # os.devnull was added in Python 2.4, so emulate it for earlier
+    # Python versions
+    if sys.platform in ('dos','win32','win16','os2'):
+        # Use the old CP/M NUL as device name
+        DEV_NULL = 'NUL'
+    else:
+        # Standard Unix uses /dev/null
+        DEV_NULL = '/dev/null'
 
 ### Platform specific APIs
 
@@ -184,9 +200,8 @@ def _dist_try_harder(distname,version,id):
     """
     if os.path.exists('/var/adm/inst-log/info'):
         # SuSE Linux stores distribution information in that file
-        info = open('/var/adm/inst-log/info').readlines()
         distname = 'SuSE'
-        for line in info:
+        for line in open('/var/adm/inst-log/info'):
             tv = line.split()
             if len(tv) == 2:
                 tag,value = tv
@@ -201,8 +216,7 @@ def _dist_try_harder(distname,version,id):
 
     if os.path.exists('/etc/.installed'):
         # Caldera OpenLinux has some infos in that file (thanks to Colin Kong)
-        info = open('/etc/.installed').readlines()
-        for line in info:
+        for line in open('/etc/.installed'):
             pkg = line.split('-')
             if len(pkg) >= 2 and pkg[0] == 'OpenLinux':
                 # XXX does Caldera support non Intel platforms ? If yes,
@@ -245,6 +259,12 @@ _supported_dists = (
 
 def _parse_release_file(firstline):
 
+    # Default to empty 'version' and 'id' strings.  Both defaults are used
+    # when 'firstline' is empty.  'id' defaults to empty when an id can not
+    # be deduced.
+    version = ''
+    id = ''
+
     # Parse the first line
     m = _lsb_release_version.match(firstline)
     if m is not None:
@@ -262,8 +282,6 @@ def _parse_release_file(firstline):
         version = l[0]
         if len(l) > 1:
             id = l[1]
-        else:
-            id = ''
     return '', version, id
 
 def linux_distribution(distname='', version='', id='',
@@ -307,9 +325,8 @@ def linux_distribution(distname='', version='', id='',
         return _dist_try_harder(distname,version,id)
 
     # Read the first line
-    f = open('/etc/'+file, 'r')
-    firstline = f.readline()
-    f.close()
+    with open('/etc/'+file, 'r') as f:
+        firstline = f.readline()
     _distname, _version, _id = _parse_release_file(firstline)
 
     if _distname and full_distribution_name:
@@ -446,7 +463,16 @@ def _norm_version(version, build=''):
 
 _ver_output = re.compile(r'(?:([\w ]+) ([\w.]+) '
                          '.*'
-                         'Version ([\d.]+))', re.ASCII)
+                         '\[.* ([\d.]+)\])')
+
+# Examples of VER command output:
+#
+#   Windows 2000:  Microsoft Windows 2000 [Version 5.00.2195]
+#   Windows XP:    Microsoft Windows XP [Version 5.1.2600]
+#   Windows Vista: Microsoft Windows [Version 6.0.6002]
+#
+# Note that the "Version" string gets localized on different
+# Windows versions.
 
 def _syscmd_ver(system='', release='', version='',
 
@@ -572,12 +598,20 @@ def win32_ver(release='',version='',csd='',ptype=''):
             VER_PLATFORM_WIN32_WINDOWS = 1
             VER_PLATFORM_WIN32_NT = 2
             VER_NT_WORKSTATION = 1
+            VER_NT_SERVER = 3
+            REG_SZ = 1
 
     # Find out the registry key and some general version infos
-    maj,min,buildno,plat,csd = GetVersionEx()
+    winver = GetVersionEx()
+    maj,min,buildno,plat,csd = winver
     version = '%i.%i.%i' % (maj,min,buildno & 0xFFFF)
-    if csd[:13] == 'Service Pack ':
-        csd = 'SP' + csd[13:]
+    if hasattr(winver, "service_pack"):
+        if winver.service_pack != "":
+            csd = 'SP%s' % winver.service_pack_major
+    else:
+        if csd[:13] == 'Service Pack ':
+            csd = 'SP' + csd[13:]
+
     if plat == VER_PLATFORM_WIN32_WINDOWS:
         regkey = 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion'
         # Try to guess the release name
@@ -592,6 +626,7 @@ def win32_ver(release='',version='',csd='',ptype=''):
                 release = 'postMe'
         elif maj == 5:
             release = '2000'
+
     elif plat == VER_PLATFORM_WIN32_NT:
         regkey = 'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'
         if maj <= 4:
@@ -606,22 +641,36 @@ def win32_ver(release='',version='',csd='',ptype=''):
             else:
                 release = 'post2003'
         elif maj == 6:
-            if min == 0:
-                # Per http://msdn2.microsoft.com/en-us/library/ms724429.aspx
+            if hasattr(winver, "product_type"):
+                product_type = winver.product_type
+            else:
+                product_type = VER_NT_WORKSTATION
+                # Without an OSVERSIONINFOEX capable sys.getwindowsversion(),
+                # or help from the registry, we cannot properly identify
+                # non-workstation versions.
                 try:
-                    productType = GetVersionEx(1)[8]
-                except TypeError:
-                    # sys.getwindowsversion() doesn't take any arguments, so
-                    # we cannot detect 2008 Server that way.
-                    # XXX Add some other means of detecting 2008 Server ?!
+                    key = RegOpenKeyEx(HKEY_LOCAL_MACHINE, regkey)
+                    name, type = RegQueryValueEx(key, "ProductName")
+                    # Discard any type that isn't REG_SZ
+                    if type == REG_SZ and name.find("Server") != -1:
+                        product_type = VER_NT_SERVER
+                except WindowsError:
+                    # Use default of VER_NT_WORKSTATION
+                    pass
+
+            if min == 0:
+                if product_type == VER_NT_WORKSTATION:
                     release = 'Vista'
                 else:
-                    if productType == VER_NT_WORKSTATION:
-                        release = 'Vista'
-                    else:
-                        release = '2008Server'
+                    release = '2008Server'
+            elif min == 1:
+                if product_type == VER_NT_WORKSTATION:
+                    release = '7'
+                else:
+                    release = '2008ServerR2'
             else:
                 release = 'post2008Server'
+
     else:
         if not release:
             # E.g. Win3.1 with win32s
@@ -672,29 +721,21 @@ def _bcd2str(bcd):
 
     return hex(bcd)[2:]
 
-def mac_ver(release='',versioninfo=('','',''),machine=''):
-
-    """ Get MacOS version information and return it as tuple (release,
-        versioninfo, machine) with versioninfo being a tuple (version,
-        dev_stage, non_release_version).
-
-        Entries which cannot be determined are set to the paramter values
-        which default to ''. All tuple entries are strings.
-
+def _mac_ver_gestalt():
+    """
         Thanks to Mark R. Levinson for mailing documentation links and
         code examples for this function. Documentation for the
         gestalt() API is available online at:
 
            http://www.rgaros.nl/gestalt/
-
     """
     # Check whether the version info module is available
     try:
         import _gestalt
     except ImportError:
-        return release,versioninfo,machine
+        return None
     # Get the infos
-    sysv,sysu,sysa = _mac_ver_lookup(('sysv','sysu','sysa'))
+    sysv, sysa = _mac_ver_lookup(('sysv','sysa'))
     # Decode the infos
     if sysv:
         major = (sysv & 0xFF00) >> 8
@@ -712,28 +753,57 @@ def mac_ver(release='',versioninfo=('','',''),machine=''):
         else:
             release = '%s.%i.%i' % (_bcd2str(major),minor,patch)
 
-    if sysu:
-        # NOTE: this block is left as documentation of the
-        # intention of this function, the 'sysu' gestalt is no
-        # longer available and there are no alternatives.
-        major =  int((sysu & 0xFF000000) >> 24)
-        minor =  (sysu & 0x00F00000) >> 20
-        bugfix = (sysu & 0x000F0000) >> 16
-        stage =  (sysu & 0x0000FF00) >> 8
-        nonrel = (sysu & 0x000000FF)
-        version = '%s.%i.%i' % (_bcd2str(major),minor,bugfix)
-        nonrel = _bcd2str(nonrel)
-        stage = {0x20:'development',
-                 0x40:'alpha',
-                 0x60:'beta',
-                 0x80:'final'}.get(stage,'')
-        versioninfo = (version,stage,nonrel)
-
-
     if sysa:
         machine = {0x1: '68k',
                    0x2: 'PowerPC',
                    0xa: 'i386'}.get(sysa,'')
+
+    return release,versioninfo,machine
+
+def _mac_ver_xml():
+    fn = '/System/Library/CoreServices/SystemVersion.plist'
+    if not os.path.exists(fn):
+        return None
+
+    try:
+        import plistlib
+    except ImportError:
+        return None
+
+    pl = plistlib.readPlist(fn)
+    release = pl['ProductVersion']
+    versioninfo=('', '', '')
+    machine = os.uname()[4]
+    if machine in ('ppc', 'Power Macintosh'):
+        # for compatibility with the gestalt based code
+        machine = 'PowerPC'
+
+    return release,versioninfo,machine
+
+
+def mac_ver(release='',versioninfo=('','',''),machine=''):
+
+    """ Get MacOS version information and return it as tuple (release,
+        versioninfo, machine) with versioninfo being a tuple (version,
+        dev_stage, non_release_version).
+
+        Entries which cannot be determined are set to the paramter values
+        which default to ''. All tuple entries are strings.
+    """
+
+    # First try reading the information from an XML file which should
+    # always be present
+    info = _mac_ver_xml()
+    if info is not None:
+        return info
+
+    # If that doesn't work for some reason fall back to reading the
+    # information using gestalt calls.
+    info = _mac_ver_gestalt()
+    if info is not None:
+        return info
+
+    # If that also doesn't work return the default values
     return release,versioninfo,machine
 
 def _java_getprop(name,default):
@@ -902,7 +972,7 @@ def _syscmd_uname(option,default=''):
         # XXX Others too ?
         return default
     try:
-        f = os.popen('uname %s 2> /dev/null' % option)
+        f = os.popen('uname %s 2> %s' % (option, DEV_NULL))
     except (AttributeError,os.error):
         return default
     output = f.read().strip()
@@ -917,17 +987,16 @@ def _syscmd_file(target,default=''):
     """ Interface to the system's file command.
 
         The function uses the -b option of the file command to have it
-        ommit the filename in its output and if possible the -L option
-        to have the command follow symlinks. It returns default in
-        case the command should fail.
+        omit the filename in its output. Follow the symlinks. It returns
+        default in case the command should fail.
 
     """
     if sys.platform in ('dos','win32','win16','os2'):
         # XXX Others too ?
         return default
-    target = _follow_symlinks(target)
+    target = _follow_symlinks(target).replace('"', '\\"')
     try:
-        f = os.popen('file "%s" 2> /dev/null' % target)
+        f = os.popen('file -b "%s" 2> %s' % (target, DEV_NULL))
     except (AttributeError,os.error):
         return default
     output = f.read().strip()
@@ -946,8 +1015,6 @@ _default_architecture = {
     'win16': ('','Windows'),
     'dos': ('','MSDOS'),
 }
-
-_architecture_split = re.compile(r'[\s,]').split
 
 def architecture(executable=sys.executable,bits='',linkage=''):
 
@@ -983,11 +1050,11 @@ def architecture(executable=sys.executable,bits='',linkage=''):
 
     # Get data from the 'file' system command
     if executable:
-        output = _syscmd_file(executable, '')
+        fileout = _syscmd_file(executable, '')
     else:
-        output = ''
+        fileout = ''
 
-    if not output and \
+    if not fileout and \
        executable == sys.executable:
         # "file" command did not return anything; we'll try to provide
         # some sensible defaults then...
@@ -998,9 +1065,6 @@ def architecture(executable=sys.executable,bits='',linkage=''):
             if l:
                 linkage = l
         return bits,linkage
-
-    # Split the output into a list of strings omitting the filename
-    fileout = _architecture_split(output)[1:]
 
     if 'executable' not in fileout:
         # Format not supported
@@ -1064,7 +1128,7 @@ def uname():
     except AttributeError:
         no_os_uname = 1
 
-    if no_os_uname or not filter(None, (system, node, release, version, machine)):
+    if no_os_uname or not list(filter(None, (system, node, release, version, machine))):
         # Hmm, no there is either no uname or uname has returned
         #'unknowns'... we'll have to poke around the system then.
         if no_os_uname:
@@ -1086,7 +1150,11 @@ def uname():
             # http://support.microsoft.com/kb/888731 and
             # http://www.geocities.com/rick_lively/MANUALS/ENV/MSWIN/PROCESSI.HTM
             if not machine:
-                machine = os.environ.get('PROCESSOR_ARCHITECTURE', '')
+                # WOW64 processes mask the native architecture
+                if "PROCESSOR_ARCHITEW6432" in os.environ:
+                    machine = os.environ.get("PROCESSOR_ARCHITEW6432", '')
+                else:
+                    machine = os.environ.get('PROCESSOR_ARCHITECTURE', '')
             if not processor:
                 processor = os.environ.get('PROCESSOR_IDENTIFIER', machine)
 
@@ -1125,10 +1193,6 @@ def uname():
             version = ', '.join(vminfo)
             if not version:
                 version = vendor
-
-        elif os.name == 'mac':
-            release,(version,stage,nonrel),machine = mac_ver()
-            system = 'MacOS'
 
     # System specific extensions
     if system == 'OpenVMS':

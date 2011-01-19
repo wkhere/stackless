@@ -30,114 +30,123 @@
 #define LEAD_UNDERSCORE ""
 #endif
 
+/* The .so extension module ABI tag, supplied by the Makefile via
+   Makefile.pre.in and configure.  This is used to discriminate between
+   incompatible .so files so that extensions for different Python builds can
+   live in the same directory.  E.g. foomodule.cpython-32.so
+*/
 
 const struct filedescr _PyImport_DynLoadFiletab[] = {
 #ifdef __CYGWIN__
-	{".dll", "rb", C_EXTENSION},
-	{"module.dll", "rb", C_EXTENSION},
-#else
+    {".dll", "rb", C_EXTENSION},
+    {"module.dll", "rb", C_EXTENSION},
+#else  /* !__CYGWIN__ */
 #if defined(PYOS_OS2) && defined(PYCC_GCC)
-	{".pyd", "rb", C_EXTENSION},
-	{".dll", "rb", C_EXTENSION},
-#else
+    {".pyd", "rb", C_EXTENSION},
+    {".dll", "rb", C_EXTENSION},
+#else  /* !(defined(PYOS_OS2) && defined(PYCC_GCC)) */
 #ifdef __VMS
-        {".exe", "rb", C_EXTENSION},
-        {".EXE", "rb", C_EXTENSION},
-        {"module.exe", "rb", C_EXTENSION},
-        {"MODULE.EXE", "rb", C_EXTENSION},
-#else
-	{".so", "rb", C_EXTENSION},
-	{"module.so", "rb", C_EXTENSION},
-#endif
-#endif
-#endif
-	{0, 0}
+    {".exe", "rb", C_EXTENSION},
+    {".EXE", "rb", C_EXTENSION},
+    {"module.exe", "rb", C_EXTENSION},
+    {"MODULE.EXE", "rb", C_EXTENSION},
+#else  /* !__VMS */
+    {"." SOABI ".so", "rb", C_EXTENSION},
+    {"module." SOABI ".so", "rb", C_EXTENSION},
+    {".abi" PYTHON_ABI_STRING ".so", "rb", C_EXTENSION},
+    {"module.abi" PYTHON_ABI_STRING ".so", "rb", C_EXTENSION},
+    {".so", "rb", C_EXTENSION},
+    {"module.so", "rb", C_EXTENSION},
+#endif  /* __VMS */
+#endif  /* defined(PYOS_OS2) && defined(PYCC_GCC) */
+#endif  /* __CYGWIN__ */
+    {0, 0}
 };
 
 static struct {
-	dev_t dev;
+    dev_t dev;
 #ifdef __VMS
-	ino_t ino[3];
+    ino_t ino[3];
 #else
-	ino_t ino;
+    ino_t ino;
 #endif
-	void *handle;
+    void *handle;
 } handles[128];
 static int nhandles = 0;
 
 
 dl_funcptr _PyImport_GetDynLoadFunc(const char *fqname, const char *shortname,
-				    const char *pathname, FILE *fp)
+                                    const char *pathname, FILE *fp)
 {
-	dl_funcptr p;
-	void *handle;
-	char funcname[258];
-	char pathbuf[260];
-        int dlopenflags=0;
+    dl_funcptr p;
+    void *handle;
+    char funcname[258];
+    char pathbuf[260];
+    int dlopenflags=0;
 
-	if (strchr(pathname, '/') == NULL) {
-		/* Prefix bare filename with "./" */
-		PyOS_snprintf(pathbuf, sizeof(pathbuf), "./%-.255s", pathname);
-		pathname = pathbuf;
-	}
+    if (strchr(pathname, '/') == NULL) {
+        /* Prefix bare filename with "./" */
+        PyOS_snprintf(pathbuf, sizeof(pathbuf), "./%-.255s", pathname);
+        pathname = pathbuf;
+    }
 
-	PyOS_snprintf(funcname, sizeof(funcname), 
-		      LEAD_UNDERSCORE "PyInit_%.200s", shortname);
+    PyOS_snprintf(funcname, sizeof(funcname),
+                  LEAD_UNDERSCORE "PyInit_%.200s", shortname);
 
-	if (fp != NULL) {
-		int i;
-		struct stat statb;
-		fstat(fileno(fp), &statb);
-		for (i = 0; i < nhandles; i++) {
-			if (statb.st_dev == handles[i].dev &&
-			    statb.st_ino == handles[i].ino) {
-				p = (dl_funcptr) dlsym(handles[i].handle,
-						       funcname);
-				return p;
-			}
-		}
-		if (nhandles < 128) {
-			handles[nhandles].dev = statb.st_dev;
+    if (fp != NULL) {
+        int i;
+        struct stat statb;
+        fstat(fileno(fp), &statb);
+        for (i = 0; i < nhandles; i++) {
+            if (statb.st_dev == handles[i].dev &&
+                statb.st_ino == handles[i].ino) {
+                p = (dl_funcptr) dlsym(handles[i].handle,
+                                       funcname);
+                return p;
+            }
+        }
+        if (nhandles < 128) {
+            handles[nhandles].dev = statb.st_dev;
 #ifdef __VMS
-			handles[nhandles].ino[0] = statb.st_ino[0];
-			handles[nhandles].ino[1] = statb.st_ino[1];
-			handles[nhandles].ino[2] = statb.st_ino[2];
+            handles[nhandles].ino[0] = statb.st_ino[0];
+            handles[nhandles].ino[1] = statb.st_ino[1];
+            handles[nhandles].ino[2] = statb.st_ino[2];
 #else
-			handles[nhandles].ino = statb.st_ino;
+            handles[nhandles].ino = statb.st_ino;
 #endif
-		}
-	}
+        }
+    }
 
 #if !(defined(PYOS_OS2) && defined(PYCC_GCC))
-        dlopenflags = PyThreadState_GET()->interp->dlopenflags;
+    dlopenflags = PyThreadState_GET()->interp->dlopenflags;
 #endif
 
-	if (Py_VerboseFlag)
-		PySys_WriteStderr("dlopen(\"%s\", %x);\n", pathname, 
-				  dlopenflags);
+    if (Py_VerboseFlag)
+        PySys_WriteStderr("dlopen(\"%s\", %x);\n", pathname,
+                          dlopenflags);
 
 #ifdef __VMS
-	/* VMS currently don't allow a pathname, use a logical name instead */
-	/* Concatenate 'python_module_' and shortname */
-	/* so "import vms.bar" will use the logical python_module_bar */
-	/* As C module use only one name space this is probably not a */
-	/* important limitation */
-	PyOS_snprintf(pathbuf, sizeof(pathbuf), "python_module_%-.200s", 
-		      shortname);
-	pathname = pathbuf;
+    /* VMS currently don't allow a pathname, use a logical name instead */
+    /* Concatenate 'python_module_' and shortname */
+    /* so "import vms.bar" will use the logical python_module_bar */
+    /* As C module use only one name space this is probably not a */
+    /* important limitation */
+    PyOS_snprintf(pathbuf, sizeof(pathbuf), "python_module_%-.200s",
+                  shortname);
+    pathname = pathbuf;
 #endif
 
-	handle = dlopen(pathname, dlopenflags);
+    handle = dlopen(pathname, dlopenflags);
 
-	if (handle == NULL) {
-		const char *error = dlerror();
-		if (error == NULL)
-			error = "unknown dlopen() error";
-		PyErr_SetString(PyExc_ImportError, error);
-		return NULL;
-	}
-	if (fp != NULL && nhandles < 128)
-		handles[nhandles++].handle = handle;
-	p = (dl_funcptr) dlsym(handle, funcname);
-	return p;
+    if (handle == NULL) {
+        const char *error = dlerror();
+        if (error == NULL)
+            error = "unknown dlopen() error";
+        PyErr_SetString(PyExc_ImportError, error);
+        return NULL;
+    }
+    if (fp != NULL && nhandles < 128)
+        handles[nhandles++].handle = handle;
+    p = (dl_funcptr) dlsym(handle, funcname);
+    return p;
 }

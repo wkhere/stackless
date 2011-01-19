@@ -22,18 +22,18 @@ The numeric tower
 .. class:: Complex
 
    Subclasses of this type describe complex numbers and include the operations
-   that work on the builtin :class:`complex` type. These are: conversions to
+   that work on the built-in :class:`complex` type. These are: conversions to
    :class:`complex` and :class:`bool`, :attr:`.real`, :attr:`.imag`, ``+``,
    ``-``, ``*``, ``/``, :func:`abs`, :meth:`conjugate`, ``==``, and ``!=``. All
    except ``-`` and ``!=`` are abstract.
 
    .. attribute:: real
 
-      Abstract. Retrieves the :class:`Real` component of this number.
+      Abstract. Retrieves the real component of this number.
 
    .. attribute:: imag
 
-      Abstract. Retrieves the :class:`Real` component of this number.
+      Abstract. Retrieves the imaginary component of this number.
 
    .. method:: conjugate()
 

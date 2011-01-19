@@ -35,8 +35,10 @@ LINKCC=		@LINKCC@
 AR=		@AR@
 RANLIB=		@RANLIB@
 SVNVERSION=	@SVNVERSION@
+SOABI=		@SOABI@
+LDVERSION=	@LDVERSION@
 
-GNULD=          @GNULD@
+GNULD=		@GNULD@
 
 # Shell used by make (some versions default to the login shell, which is bad)
 SHELL=		/bin/sh
@@ -59,12 +61,18 @@ MAKESETUP=      $(srcdir)/Modules/makesetup
 # Compiler options
 OPT=		@OPT@
 BASECFLAGS=	@BASECFLAGS@
-CFLAGS=		$(BASECFLAGS) $(OPT) $(EXTRA_CFLAGS)
+CONFIGURE_CFLAGS=	@CFLAGS@
+CONFIGURE_CPPFLAGS=	@CPPFLAGS@
+CONFIGURE_LDFLAGS=	@LDFLAGS@
+# Avoid assigning CFLAGS, LDFLAGS, etc. so users can use them on the
+# command line to append to these values without stomping the pre-set
+# values.
+PY_CFLAGS=	$(BASECFLAGS) $(OPT) $(CONFIGURE_CFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
 # Both CPPFLAGS and LDFLAGS need to contain the shell's value for setup.py to
 # be able to build extension modules using the directories specified in the
 # environment variables
-CPPFLAGS=	-I. -IInclude -I$(srcdir)/Include -I$(srcdir)/Stackless @CPPFLAGS@
-LDFLAGS=	@LDFLAGS@
+PY_CPPFLAGS=	-I. -IInclude -I$(srcdir)/Include -I$(srcdir)/Stackless $(CONFIGURE_CPPFLAGS) $(CPPFLAGS)
+PY_LDFLAGS=	$(CONFIGURE_LDFLAGS) $(LDFLAGS)
 LDLAST=		@LDLAST@
 SGI_ABI=	@SGI_ABI@
 CCSHARED=	@CCSHARED@
@@ -73,7 +81,7 @@ ARFLAGS=	@ARFLAGS@
 # Extra C flags added for building the interpreter object files.
 CFLAGSFORSHARED=@CFLAGSFORSHARED@
 # C flags used for building the interpreter object files
-PY_CFLAGS=	$(CFLAGS) $(CPPFLAGS) $(CFLAGSFORSHARED) -DPy_BUILD_CORE
+PY_CORE_CFLAGS=	$(PY_CFLAGS) $(PY_CPPFLAGS) $(CFLAGSFORSHARED) -DPy_BUILD_CORE
 # Special C flags for slp_transfer.c
 SLPFLAGS=	@SLPFLAGS@
 
@@ -90,19 +98,19 @@ exec_prefix=	@exec_prefix@
 datarootdir=    @datarootdir@
 
 # Expanded directories
-BINDIR=		$(exec_prefix)/bin
-LIBDIR=		$(exec_prefix)/lib
+BINDIR=		@bindir@
+LIBDIR=		@libdir@
 MANDIR=		@mandir@
 INCLUDEDIR=	@includedir@
 CONFINCLUDEDIR=	$(exec_prefix)/include
 SCRIPTDIR=	$(prefix)/lib
+ABIFLAGS=	@ABIFLAGS@
 
 # Detailed destination directories
 BINLIBDEST=	$(LIBDIR)/python$(VERSION)
 LIBDEST=	$(SCRIPTDIR)/python$(VERSION)
-INCLUDEPY=	$(INCLUDEDIR)/python$(VERSION)
-CONFINCLUDEPY=	$(CONFINCLUDEDIR)/python$(VERSION)
-LIBP=		$(LIBDIR)/python$(VERSION)
+INCLUDEPY=	$(INCLUDEDIR)/python$(LDVERSION)
+CONFINCLUDEPY=	$(CONFINCLUDEDIR)/python$(LDVERSION)
 STACKLESSINCLUDEDIRS=		\
 		core \
 		module \
@@ -112,8 +120,9 @@ STACKLESSINCLUDEDIRS=		\
 
 # Symbols used for using shared libraries
 SO=		@SO@
-LDSHARED=	@LDSHARED@
-BLDSHARED=	@BLDSHARED@
+LDSHARED=	@LDSHARED@ $(PY_LDFLAGS)
+BLDSHARED=	@BLDSHARED@ $(PY_LDFLAGS)
+LDCXXSHARED=	@LDCXXSHARED@
 DESTSHARED=	$(BINLIBDEST)/lib-dynload
 
 # Executable suffix (.exe on Windows and Mac OS X)
@@ -152,7 +161,7 @@ CONFIG_ARGS=	@CONFIG_ARGS@
 SRCDIRS= 	@SRCDIRS@
 
 # Other subdirectories
-SUBDIRSTOO=	Include Lib Misc Demo
+SUBDIRSTOO=	Include Lib Misc
 
 # Files and directories to be distributed
 CONFIGFILES=	configure configure.in acconfig.h pyconfig.h.in Makefile.pre.in
@@ -164,6 +173,7 @@ DIST=		$(DISTFILES) $(DISTDIRS)
 LIBRARY=	@LIBRARY@
 LDLIBRARY=      @LDLIBRARY@
 BLDLIBRARY=     @BLDLIBRARY@
+PY3LIBRARY=     @PY3LIBRARY@
 DLLLIBRARY=	@DLLLIBRARY@
 LDLIBRARYDIR=   @LDLIBRARYDIR@
 INSTSONAME=	@INSTSONAME@
@@ -221,6 +231,8 @@ GRAMMAR_C=	$(srcdir)/Python/graminit.c
 GRAMMAR_INPUT=	$(srcdir)/Grammar/Grammar
 
 
+LIBFFI_INCLUDEDIR=	@LIBFFI_INCLUDEDIR@
+
 ##########################################################################
 # Parser
 PGEN=		Parser/pgen$(EXE)
@@ -242,7 +254,9 @@ PARSER_OBJS=	$(POBJS) Parser/myreadline.o Parser/tokenizer.o
 
 PGOBJS=		\
 		Objects/obmalloc.o \
+		Python/dynamic_annotations.o \
 		Python/mysnprintf.o \
+		Python/pyctype.o \
 		Parser/tokenizer_pgen.o \
 		Parser/printgrammar.o \
 		Parser/pgenmain.o
@@ -297,6 +311,7 @@ PYTHON_OBJS=	\
 		Stackless/pickling/safe_pickle.o \
 		Python/compile.o \
 		Python/codecs.o \
+		Python/dynamic_annotations.o \
 		Python/errors.o \
 		Python/frozen.o \
 		Python/frozenmain.o \
@@ -320,6 +335,7 @@ PYTHON_OBJS=	\
 		Python/pymath.o \
 		Python/pystate.o \
 		Python/pythonrun.o \
+		Python/pytime.o \
 		Python/structmember.o \
 		Python/symtable.o \
 		Python/sysmodule.o \
@@ -329,6 +345,7 @@ PYTHON_OBJS=	\
 		Python/pystrtod.o \
 		Python/dtoa.o \
 		Python/formatter_unicode.o \
+		Python/fileutils.o \
 		Python/$(DYNLOADFILE) \
 		$(LIBOBJS) \
 		$(MACHDEP_OBJS) \
@@ -345,7 +362,6 @@ OBJECT_OBJS=	\
 		Objects/bytesobject.o \
 		Objects/cellobject.o \
 		Objects/classobject.o \
-		Objects/cobject.o \
 		Objects/codeobject.o \
 		Objects/complexobject.o \
 		Objects/descrobject.o \
@@ -393,7 +409,7 @@ LIBRARY_OBJS=	\
 
 # Default target
 all:		build_all
-build_all:	$(BUILDPYTHON) oldsharedmods sharedmods
+build_all:	$(BUILDPYTHON) oldsharedmods sharedmods gdbhooks
 
 # Compile a binary with gcc profile guided optimization.
 profile-opt:
@@ -423,13 +439,11 @@ coverage:
 
 
 # Build the interpreter
-$(BUILDPYTHON):	Modules/python.o $(LIBRARY) $(LDLIBRARY)
-		$(LINKCC) $(LDFLAGS) $(LINKFORSHARED) -o $@ \
-			Modules/python.o \
-			$(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
+$(BUILDPYTHON):	Modules/python.o $(LIBRARY) $(LDLIBRARY) $(PY3LIBRARY)
+	$(LINKCC) $(PY_LDFLAGS) $(LINKFORSHARED) -o $@ Modules/python.o $(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
 
 platform: $(BUILDPYTHON)
-	$(RUNSHARED) ./$(BUILDPYTHON) -E -c 'import sys ; from distutils.util import get_platform ; print(get_platform()+"-"+sys.version[0:3])' >platform
+	$(RUNSHARED) ./$(BUILDPYTHON) -E -c 'import sys ; from sysconfig import get_platform ; print(get_platform()+"-"+sys.version[0:3])' >platform
 
 
 # Build the shared modules
@@ -451,20 +465,34 @@ $(LIBRARY): $(LIBRARY_OBJS)
 	$(AR) $(ARFLAGS) $@ $(MODOBJS)
 	$(RANLIB) $@
 
-libpython$(VERSION).so: $(LIBRARY_OBJS)
+libpython$(LDVERSION).so: $(LIBRARY_OBJS)
 	if test $(INSTSONAME) != $(LDLIBRARY); then \
-		$(LDSHARED) $(LDFLAGS) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+		$(BLDSHARED) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 		$(LN) -f $(INSTSONAME) $@; \
 	else \
-		$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+		$(BLDSHARED) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
 	fi
 
+libpython3.so:	libpython$(LDVERSION).so
+	$(BLDSHARED) -o $@ -Wl,-hl$@ $^
+
 libpython$(VERSION).dylib: $(LIBRARY_OBJS)
-	 $(CC) -dynamiclib -Wl,-single_module $(LDFLAGS) -undefined dynamic_lookup -Wl,-install_name,$(prefix)/lib/libpython$(VERSION).dylib -Wl,-compatibility_version,$(VERSION) -Wl,-current_version,$(VERSION) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
-		 
+	 $(CC) -dynamiclib -Wl,-single_module $(PY_LDFLAGS) -undefined dynamic_lookup -Wl,-install_name,$(prefix)/lib/libpython$(VERSION).dylib -Wl,-compatibility_version,$(VERSION) -Wl,-current_version,$(VERSION) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST); \
+
 
 libpython$(VERSION).sl: $(LIBRARY_OBJS)
-	$(LDSHARED) $(LDFLAGS) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST)
+	$(LDSHARED) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) $(LDLAST)
+
+# Copy up the gdb python hooks into a position where they can be automatically
+# loaded by gdb during Lib/test/test_gdb.py
+#
+# Distributors are likely to want to install this somewhere else e.g. relative
+# to the stripped DWARF data for the shared library.
+gdbhooks: $(BUILDPYTHON)-gdb.py
+
+SRC_GDB_HOOKS=$(srcdir)/Tools/gdb/libpython.py
+$(BUILDPYTHON)-gdb.py: $(SRC_GDB_HOOKS)
+	$(INSTALL_DATA) $(SRC_GDB_HOOKS) $(BUILDPYTHON)-gdb.py
 
 # This rule is here for OPENSTEP/Rhapsody/MacOSX. It builds a temporary
 # minimal framework (not including the Lib directory and such) in the current
@@ -492,14 +520,13 @@ $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK): \
 		$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/Resources/Info.plist
 	$(LN) -fsn $(VERSION) $(PYTHONFRAMEWORKDIR)/Versions/Current
 	$(LN) -fsn Versions/Current/$(PYTHONFRAMEWORK) $(PYTHONFRAMEWORKDIR)/$(PYTHONFRAMEWORK)
-	$(LN) -fsn Versions/Current/Headers $(PYTHONFRAMEWORKDIR)/Headers
 	$(LN) -fsn Versions/Current/Resources $(PYTHONFRAMEWORKDIR)/Resources
 
 # This rule builds the Cygwin Python DLL and import library if configured
 # for a shared core library; otherwise, this rule is a noop.
 $(DLLLIBRARY) libpython$(VERSION).dll.a: $(LIBRARY_OBJS)
 	if test -n "$(DLLLIBRARY)"; then \
-		$(LDSHARED) $(LDFLAGS) -Wl,--out-implib=$@ -o $(DLLLIBRARY) $^ \
+		$(LDSHARED) -Wl,--out-implib=$@ -o $(DLLLIBRARY) $^ \
 			$(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST); \
 	else true; \
 	fi
@@ -543,10 +570,10 @@ Modules/getbuildinfo.o: $(PARSER_OBJS) \
 		$(SIGNAL_OBJS) \
 		$(MODOBJS) \
 		$(srcdir)/Modules/getbuildinfo.c
-	$(CC) -c $(PY_CFLAGS) -DSVNVERSION="\"`LC_ALL=C $(SVNVERSION)`\"" -o $@ $(srcdir)/Modules/getbuildinfo.c
+	$(CC) -c $(PY_CORE_CFLAGS) -DSVNVERSION="\"`LC_ALL=C $(SVNVERSION)`\"" -o $@ $(srcdir)/Modules/getbuildinfo.c
 
 Modules/getpath.o: $(srcdir)/Modules/getpath.c Makefile
-	$(CC) -c $(PY_CFLAGS) -DPYTHONPATH='"$(PYTHONPATH)"' \
+	$(CC) -c $(PY_CORE_CFLAGS) -DPYTHONPATH='"$(PYTHONPATH)"' \
 		-DPREFIX='"$(prefix)"' \
 		-DEXEC_PREFIX='"$(exec_prefix)"' \
 		-DVERSION='"$(VERSION)"' \
@@ -554,16 +581,29 @@ Modules/getpath.o: $(srcdir)/Modules/getpath.c Makefile
 		-o $@ $(srcdir)/Modules/getpath.c
 
 Modules/python.o: $(srcdir)/Modules/python.c
-	$(MAINCC) -c $(PY_CFLAGS) -o $@ $(srcdir)/Modules/python.c
+	$(MAINCC) -c $(PY_CORE_CFLAGS) -o $@ $(srcdir)/Modules/python.c
+
+Python/dynload_shlib.o: $(srcdir)/Python/dynload_shlib.c Makefile
+	$(CC) -c $(PY_CORE_CFLAGS) \
+		-DSOABI='"$(SOABI)"' \
+		-o $@ $(srcdir)/Python/dynload_shlib.c
+
+Python/sysmodule.o: $(srcdir)/Python/sysmodule.c Makefile
+	$(CC) -c $(PY_CORE_CFLAGS) \
+		-DABIFLAGS='"$(ABIFLAGS)"' \
+		-o $@ $(srcdir)/Python/sysmodule.c
 
 $(IO_OBJS): $(IO_H)
 
-$(GRAMMAR_H) $(GRAMMAR_C): $(PGEN) $(GRAMMAR_INPUT)
+# Use a stamp file to prevent make -j invoking pgen twice
+$(GRAMMAR_H) $(GRAMMAR_C): Parser/pgen.stamp
+Parser/pgen.stamp: $(PGEN) $(GRAMMAR_INPUT)
 		-@$(INSTALL) -d Include
-		-$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+		$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+		-touch Parser/pgen.stamp
 
 $(PGEN):	$(PGENOBJS)
-		$(CC) $(OPT) $(LDFLAGS) $(PGENOBJS) $(LIBS) -o $(PGEN)
+		$(CC) $(OPT) $(PY_LDFLAGS) $(PGENOBJS) $(LIBS) -o $(PGEN)
 
 Parser/grammar.o:	$(srcdir)/Parser/grammar.c \
 				$(srcdir)/Include/token.h \
@@ -583,10 +623,10 @@ $(AST_C): $(AST_ASDL) $(ASDLGEN_FILES)
 Python/compile.o Python/symtable.o Python/ast.o: $(GRAMMAR_H) $(AST_H)
 
 Python/getplatform.o: $(srcdir)/Python/getplatform.c
-		$(CC) -c $(PY_CFLAGS) -DPLATFORM='"$(MACHDEP)"' -o $@ $(srcdir)/Python/getplatform.c
+		$(CC) -c $(PY_CORE_CFLAGS) -DPLATFORM='"$(MACHDEP)"' -o $@ $(srcdir)/Python/getplatform.c
 
 Python/importdl.o: $(srcdir)/Python/importdl.c
-		$(CC) -c $(PY_CFLAGS) -I$(DLINCLDIR) -o $@ $(srcdir)/Python/importdl.c
+		$(CC) -c $(PY_CORE_CFLAGS) -I$(DLINCLDIR) -o $@ $(srcdir)/Python/importdl.c
 
 Objects/unicodectype.o:	$(srcdir)/Objects/unicodectype.c \
 				$(srcdir)/Objects/unicodetype_db.h
@@ -599,6 +639,7 @@ BYTESTR_DEPS = \
 		$(srcdir)/Objects/stringlib/fastsearch.h \
 		$(srcdir)/Objects/stringlib/find.h \
 		$(srcdir)/Objects/stringlib/partition.h \
+		$(srcdir)/Objects/stringlib/split.h \
 		$(srcdir)/Objects/stringlib/stringdefs.h \
 		$(srcdir)/Objects/stringlib/string_format.h \
 		$(srcdir)/Objects/stringlib/transmogrify.h \
@@ -607,7 +648,7 @@ BYTESTR_DEPS = \
 
 Objects/bytesobject.o: $(srcdir)/Objects/bytesobject.c $(BYTESTR_DEPS)
 
-Objects/bytearrayobject.o: $(srcdir)/Objects/bytearrayobject.c $(BYTESTR_DEPS) 
+Objects/bytearrayobject.o: $(srcdir)/Objects/bytearrayobject.c $(BYTESTR_DEPS)
 
 Objects/unicodeobject.o: $(srcdir)/Objects/unicodeobject.c \
 				$(BYTESTR_DEPS)
@@ -615,12 +656,15 @@ Objects/unicodeobject.o: $(srcdir)/Objects/unicodeobject.c \
 $(OPCODETARGETS_H): $(OPCODETARGETGEN_FILES)
 	$(OPCODETARGETGEN) $(OPCODETARGETS_H)
 
-Python/ceval.o: $(OPCODETARGETS_H)
+Python/ceval.o: $(OPCODETARGETS_H) Python/ceval_gil.h
 
 Python/formatter_unicode.o: $(srcdir)/Python/formatter_unicode.c \
 				$(BYTESTR_DEPS) \
 				$(srcdir)/Objects/stringlib/formatter.h
 
+Objects/typeobject.o: $(srcdir)/Objects/typeslots.inc
+$(srcdir)/Objects/typeslots.inc: $(srcdir)/Include/typeslots.h $(srcdir)/Objects/typeslots.py
+	$(PYTHON) $(srcdir)/Objects/typeslots.py < $(srcdir)/Include/typeslots.h > $(srcdir)/Objects/typeslots.inc
 
 Stackless/core/slp_transfer.o: $(srcdir)/Stackless/core/slp_transfer.c
 		$(CC) -c $(PY_CFLAGS) $(SLPFLAGS) -I$(DLINCLDIR) -o $@ $(srcdir)/Stackless/core/slp_transfer.c
@@ -643,7 +687,6 @@ PYTHON_HEADERS= \
 		Include/cellobject.h \
 		Include/ceval.h \
 		Include/classobject.h \
-		Include/cobject.h \
 		Include/code.h \
 		Include/codecs.h \
 		Include/compile.h \
@@ -651,10 +694,12 @@ PYTHON_HEADERS= \
 		Include/descrobject.h \
 		Include/dictobject.h \
 		Include/dtoa.h \
+		Include/dynamic_annotations.h \
 		Include/enumobject.h \
 		Include/errcode.h \
 		Include/eval.h \
 		Include/fileobject.h \
+		Include/fileutils.h \
 		Include/floatobject.h \
 		Include/frameobject.h \
 		Include/funcobject.h \
@@ -681,6 +726,7 @@ PYTHON_HEADERS= \
 		Include/pgen.h \
 		Include/pgenheaders.h \
 		Include/pyarena.h \
+		Include/pyatomic.h \
 		Include/pycapsule.h \
 		Include/pyctype.h \
 		Include/pydebug.h \
@@ -695,6 +741,7 @@ PYTHON_HEADERS= \
 		Include/pystrtod.h \
 		Include/pythonrun.h \
 		Include/pythread.h \
+		Include/pytime.h \
 		Include/rangeobject.h \
 		Include/setobject.h \
 		Include/sliceobject.h \
@@ -745,7 +792,7 @@ $(LIBRARY_OBJS) $(MODOBJS) Modules/python.o: $(PYTHON_HEADERS)
 
 TESTOPTS=	-l $(EXTRATESTOPTS)
 TESTPROG=	$(srcdir)/Lib/test/regrtest.py
-TESTPYTHON=	$(RUNSHARED) ./$(BUILDPYTHON) -E -bb
+TESTPYTHON=	$(RUNSHARED) ./$(BUILDPYTHON) -Wd -E -bb $(TESTPYTHONOPTS)
 test:		all platform
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS)
@@ -755,8 +802,8 @@ testall:	all platform
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		$(TESTPYTHON) $(srcdir)/Lib/compileall.py
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
-		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
-		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
+		-$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
+		$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
 
 teststackless:	all platform
 		pushd Stackless/unittests; $(RUNSHARED) ../../$(BUILDPYTHON) -E -tt runAll.py; popd
@@ -769,9 +816,9 @@ testuniversal:	all platform
 			exit 1 ;\
 		fi
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
-		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
-		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall
-		$(RUNSHARED) /usr/libexec/oah/translate ./$(BUILDPYTHON) -E $(TESTPROG) $(TESTOPTS) -uall
+		-$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
+		$(TESTPYTHON) $(TESTPROG) -uall $(TESTOPTS)
+		$(RUNSHARED) /usr/libexec/oah/translate ./$(BUILDPYTHON) -E $(TESTPROG) -uall $(TESTOPTS)
 
 
 # Like testall, but with a single pass only
@@ -780,7 +827,7 @@ buildbottest:	all platform
 		-@if which pybuildbot.identify >/dev/null 2>&1; then \
 			pybuildbot.identify "CC='$(CC)'" "CXX='$(CXX)'"; \
 		fi
-		$(TESTPYTHON) $(TESTPROG) $(TESTOPTS) -uall -rw
+		$(TESTPYTHON) $(TESTPROG) -uall -rwW $(TESTOPTS)
 
 QUICKTESTOPTS=	$(TESTOPTS) -x test_subprocess test_io test_lib2to3 \
 		test_multibytecodec test_urllib2_localnet test_itertools \
@@ -835,7 +882,13 @@ altbininstall: $(BUILDPYTHON)
 		else	true; \
 		fi; \
 	done
-	$(INSTALL_PROGRAM) $(BUILDPYTHON) $(DESTDIR)$(BINDIR)/python$(VERSION)$(EXE)
+	$(INSTALL_PROGRAM) $(BUILDPYTHON) $(DESTDIR)$(BINDIR)/python$(LDVERSION)$(EXE)
+	-if test "$(VERSION)" != "$(LDVERSION)"; then \
+		if test -f $(DESTDIR)$(BINDIR)/$(PYTHON)$(VERSION)$(EXE) -o -h $(DESTDIR)$(BINDIR)/$(PYTHON)$(VERSION)$(EXE); \
+		then rm -f $(DESTDIR)$(BINDIR)/python$(VERSION)$(EXE); \
+		fi; \
+		(cd $(DESTDIR)$(BINDIR); $(LN) python$(LDVERSION)$(EXE) python$(VERSION)$(EXE)); \
+	fi
 	if test -f $(LDLIBRARY); then \
 		if test -n "$(DLLLIBRARY)" ; then \
 			$(INSTALL_SHARED) $(DLLLIBRARY) $(DESTDIR)$(BINDIR); \
@@ -844,6 +897,9 @@ altbininstall: $(BUILDPYTHON)
 			if test $(LDLIBRARY) != $(INSTSONAME); then \
 				(cd $(DESTDIR)$(LIBDIR); $(LN) -sf $(INSTSONAME) $(LDLIBRARY)) \
 			fi \
+		fi; \
+		if test -n "$(PY3LIBRARY)"; then \
+			$(INSTALL_SHARED) $(PY3LIBRARY) $(DESTDIR)$(LIBDIR)/$(PY3LIBRARY); \
 		fi; \
 	else	true; \
 	fi
@@ -854,10 +910,22 @@ bininstall: altbininstall
 	else true; \
 	fi
 	(cd $(DESTDIR)$(BINDIR); $(LN) python$(VERSION)$(EXE) $(PYTHON)3$(EXE))
+	-if test "$(VERSION)" != "$(LDVERSION)"; then \
+		rm -f $(DESTDIR)$(BINDIR)/python$(VERSION)-config; \
+		(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(LDVERSION)-config python$(VERSION)-config); \
+		rm -f $(DESTDIR)$(LIBPC)/python-$(LDVERSION).pc; \
+		(cd $(DESTDIR)$(LIBPC); $(LN) -s python-$(VERSION).pc python-$(LDVERSION).pc); \
+	fi
 	-rm -f $(DESTDIR)$(BINDIR)/python3-config
 	(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(VERSION)-config python3-config)
 	-rm -f $(DESTDIR)$(LIBPC)/python3.pc
 	(cd $(DESTDIR)$(LIBPC); $(LN) -s python-$(VERSION).pc python3.pc)
+	-rm -f $(DESTDIR)$(BINDIR)/idle3
+	(cd $(DESTDIR)$(BINDIR); $(LN) -s idle$(VERSION) idle3)
+	-rm -f $(DESTDIR)$(BINDIR)/pydoc3
+	(cd $(DESTDIR)$(BINDIR); $(LN) -s pydoc$(VERSION) pydoc3)
+	-rm -f $(DESTDIR)$(BINDIR)/2to3
+	(cd $(DESTDIR)$(BINDIR); $(LN) -s 2to3-$(VERSION) 2to3)
 
 # Install the manual page
 maninstall:
@@ -877,11 +945,13 @@ PLATDIR=	plat-$(MACHDEP)
 EXTRAPLATDIR= @EXTRAPLATDIR@
 MACHDEPS=	$(PLATDIR) $(EXTRAPLATDIR)
 XMLLIBSUBDIRS=  xml xml/dom xml/etree xml/parsers xml/sax
-LIBSUBDIRS=	tkinter site-packages test test/output test/data \
-		test/decimaltestdata \
-		encodings \
+LIBSUBDIRS=	tkinter tkinter/test tkinter/test/test_tkinter \
+                tkinter/test/test_ttk site-packages test \
+		test/decimaltestdata test/xmltestdata test/subprocessdata \
+		test/tracedmodules test/encoded_modules \
+		concurrent concurrent/futures encodings \
 		email email/mime email/test email/test/data \
-		html json json/tests http dbm xmlrpc \
+		html json test/json_tests http dbm xmlrpc \
 		sqlite3 sqlite3/test \
 		logging csv wsgiref urllib \
 		lib2to3 lib2to3/fixes lib2to3/pgen2 lib2to3/tests \
@@ -891,8 +961,9 @@ LIBSUBDIRS=	tkinter site-packages test test/output test/data \
 		importlib importlib/test importlib/test/builtin \
 		importlib/test/extension importlib/test/frozen \
 		importlib/test/import_ importlib/test/source \
-		setuptools setuptools/command setuptools/tests setuptools.egg-info \
+		turtledemo \
 		multiprocessing multiprocessing/dummy \
+		unittest unittest/test \
 		curses pydoc_data $(MACHDEPS)
 libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 	@for i in $(SCRIPTDIR) $(LIBDEST); \
@@ -914,7 +985,7 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 		else	true; \
 		fi; \
 	done
-	@for i in $(srcdir)/Lib/*.py $(srcdir)/Lib/*.doc $(srcdir)/Lib/*.egg-info ; \
+	@for i in $(srcdir)/Lib/*.py $(srcdir)/Lib/*.egg-info ; \
 	do \
 		if test -x $$i; then \
 			$(INSTALL_SCRIPT) $$i $(DESTDIR)$(LIBDEST); \
@@ -953,12 +1024,12 @@ libinstall:	build_all $(srcdir)/Lib/$(PLATDIR)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi $(DESTDIR)$(LIBDEST)/compileall.py \
 		-d $(LIBDEST) -f \
-		-x 'bad_coding|badsyntax|site-packages|py2_test_grammar|crlf|different_encoding' \
+		-x 'bad_coding|badsyntax|site-packages|lib2to3/tests/data' \
 		$(DESTDIR)$(LIBDEST)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi -O $(DESTDIR)$(LIBDEST)/compileall.py \
 		-d $(LIBDEST) -f \
-		-x 'bad_coding|badsyntax|site-packages|py2_test_grammar|crlf|different_encoding' \
+		-x 'bad_coding|badsyntax|site-packages|lib2to3/tests/data' \
 		$(DESTDIR)$(LIBDEST)
 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
 		./$(BUILDPYTHON) -Wi $(DESTDIR)$(LIBDEST)/compileall.py \
@@ -980,6 +1051,11 @@ $(srcdir)/Lib/$(PLATDIR):
 	export DYLD_FRAMEWORK_PATH; DYLD_FRAMEWORK_PATH="`pwd`"; \
 	export EXE; EXE="$(BUILDEXE)"; \
 	cd $(srcdir)/Lib/$(PLATDIR); $(RUNSHARED) ./regen
+
+python-config: $(srcdir)/Misc/python-config.in
+	# Substitution happens here, as the completely-expanded BINDIR
+	# is not available in configure
+	sed -e "s,@EXENAME@,$(BINDIR)/python$(LDVERSION)$(EXE)," < $(srcdir)/Misc/python-config.in >python-config
 
 # Install the include files
 INCLDIRSTOMAKE=$(INCLUDEDIR) $(CONFINCLUDEDIR) $(INCLUDEPY) $(CONFINCLUDEPY)
@@ -1014,13 +1090,13 @@ inclinstall:
 
 # Install the library and miscellaneous stuff needed for extending/embedding
 # This goes into $(exec_prefix)
-LIBPL=		$(LIBP)/config
+LIBPL=		$(LIBDEST)/config-$(LDVERSION)
 
 # pkgconfig directory
 LIBPC=		$(LIBDIR)/pkgconfig
 
-libainstall:	all
-	@for i in $(LIBDIR) $(LIBP) $(LIBPL) $(LIBPC); \
+libainstall:	all python-config
+	@for i in $(LIBDIR) $(LIBPL) $(LIBPC); \
 	do \
 		if test ! -d $(DESTDIR)$$i; then \
 			echo "Creating directory $$i"; \
@@ -1050,10 +1126,7 @@ libainstall:	all
 	$(INSTALL_DATA) Misc/python.pc $(DESTDIR)$(LIBPC)/python-$(VERSION).pc
 	$(INSTALL_SCRIPT) $(srcdir)/Modules/makesetup $(DESTDIR)$(LIBPL)/makesetup
 	$(INSTALL_SCRIPT) $(srcdir)/install-sh $(DESTDIR)$(LIBPL)/install-sh
-	# Substitution happens here, as the completely-expanded BINDIR
-	# is not available in configure
-	sed -e "s,@EXENAME@,$(BINDIR)/python$(VERSION)$(EXE)," < $(srcdir)/Misc/python-config.in >python-config
-	$(INSTALL_SCRIPT) python-config $(DESTDIR)$(BINDIR)/python$(VERSION)-config
+	$(INSTALL_SCRIPT) python-config $(DESTDIR)$(BINDIR)/python$(LDVERSION)-config
 	rm python-config
 	@if [ -s Modules/python.exp -a \
 		"`echo $(MACHDEP) | sed 's/^\(...\).*/\1/'`" = "aix" ]; then \
@@ -1073,7 +1146,7 @@ libainstall:	all
 
 # Install the dynamically loadable modules
 # This goes into $(exec_prefix)
-sharedinstall:
+sharedinstall: sharedmods
 	$(RUNSHARED) ./$(BUILDPYTHON) -E $(srcdir)/setup.py install \
 	   	--prefix=$(prefix) \
 		--install-scripts=$(BINDIR) \
@@ -1111,7 +1184,7 @@ frameworkinstallstructure:	$(LDLIBRARY)
 		else	true; \
 		fi; \
 	done
-	$(LN) -fsn include/python$(VERSION) $(DESTDIR)$(prefix)/Headers
+	$(LN) -fsn include/python$(LDVERSION) $(DESTDIR)$(prefix)/Headers
 	sed 's/%VERSION%/'"`$(RUNSHARED) ./$(BUILDPYTHON) -c 'import platform; print(platform.python_version())'`"'/g' < $(RESSRCDIR)/Info.plist > $(DESTDIR)$(prefix)/Resources/Info.plist
 	$(LN) -fsn $(VERSION) $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/Versions/Current
 	$(LN) -fsn Versions/Current/$(PYTHONFRAMEWORK) $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/$(PYTHONFRAMEWORK)
@@ -1123,30 +1196,22 @@ frameworkinstallstructure:	$(LDLIBRARY)
 # Install a number of symlinks to keep software that expects a normal unix
 # install (which includes python-config) happy.
 frameworkinstallmaclib:
-	ln -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config/libpython$(VERSION).a"
+	ln -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config-$(LDVERSION)/libpython$(VERSION).a"
+	ln -fs "../../../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/python$(VERSION)/config-$(LDVERSION)/libpython$(VERSION).dylib"
 	ln -fs "../$(PYTHONFRAMEWORK)" "$(DESTDIR)$(prefix)/lib/libpython$(VERSION).dylib"
 
 # This installs the IDE, the Launcher and other apps into /Applications
 frameworkinstallapps:
 	cd Mac && $(MAKE) installapps DESTDIR="$(DESTDIR)"
 
-frameworkinstallapps4way:
-	cd Mac && $(MAKE) installapps4way DESTDIR="$(DESTDIR)"
-
 # This install the unix python and pythonw tools in /usr/local/bin
 frameworkinstallunixtools:
 	cd Mac && $(MAKE) installunixtools DESTDIR="$(DESTDIR)"
 
-frameworkinstallunixtools4way:
-	cd Mac && $(MAKE) installunixtools4way DESTDIR="$(DESTDIR)"
-
 frameworkaltinstallunixtools:
 	cd Mac && $(MAKE) altinstallunixtools DESTDIR="$(DESTDIR)"
 
-frameworkaltinstallunixtools4way:
-	cd Mac && $(MAKE) altinstallunixtools4way DESTDIR="$(DESTDIR)"
-
-# This installs the Demos and Tools into the applications directory.
+# This installs the Tools into the applications directory.
 # It is not part of a normal frameworkinstall
 frameworkinstallextras:
 	cd Mac && $(MAKE) installextras DESTDIR="$(DESTDIR)"
@@ -1172,7 +1237,7 @@ config.status:	$(srcdir)/configure
 
 # Some make's put the object file in the current directory
 .c.o:
-	$(CC) -c $(PY_CFLAGS) -o $@ $<
+	$(CC) -c $(PY_CORE_CFLAGS) -o $@ $<
 
 # Run reindent on the library
 reindent:
@@ -1186,8 +1251,8 @@ recheck:
 
 # Rebuild the configure script from configure.in; also rebuild pyconfig.h.in
 autoconf:
-	(cd $(srcdir); autoconf)
-	(cd $(srcdir); autoheader)
+	(cd $(srcdir); autoconf -Wall)
+	(cd $(srcdir); autoheader -Wall)
 
 # Create a tags file for vi
 tags::
@@ -1204,9 +1269,10 @@ TAGS::
 	for i in $(SRCDIRS); do etags -a $$i/*.[ch]; done
 
 # Sanitation targets -- clean leaves libraries, executables and tags
-# files, which clobber removes those as well
+# files, which clobber removes as well
 pycremoval:
-	find $(srcdir) -name '*.py[co]' -exec rm -f {} ';'
+	-find $(srcdir) -name '*.py[co]' -exec rm -f {} ';'
+	-find $(srcdir) -name '__pycache__' -exec rmdir {} '+'
 
 rmtestturds:
 	-rm -f *BAD *GOOD *SKIPPED
@@ -1220,17 +1286,19 @@ docclean:
 	-rm -rf Doc/tools/sphinx Doc/tools/pygments Doc/tools/docutils
 
 clean: pycremoval
-	find . -name '*.o' -exec rm -f {} ';'
+	find . -name '*.[oa]' -exec rm -f {} ';'
 	find . -name '*.s[ol]' -exec rm -f {} ';'
+	find . -name '*.so.[0-9]*.[0-9]*' -exec rm -f {} ';'
 	find build -name 'fficonfig.h' -exec rm -f {} ';' || true
 	find build -name 'fficonfig.py' -exec rm -f {} ';' || true
+	-rm -f Lib/lib2to3/*Grammar*.pickle
 
 profile-removal:
 	find . -name '*.gc??' -exec rm -f {} ';'
 
 clobber: clean profile-removal
 	-rm -f $(BUILDPYTHON) $(PGEN) $(LIBRARY) $(LDLIBRARY) $(DLLLIBRARY) \
-		tags TAGS \
+		tags TAGS Parser/pgen.stamp \
 		config.cache config.log pyconfig.h Modules/config.c
 	-rm -rf build platform
 	-rm -rf $(PYTHONFRAMEWORKDIR)
@@ -1239,8 +1307,14 @@ clobber: clean profile-removal
 # remove all generated files, even Makefile[.pre]
 # Keep configure and Python-ast.[ch], it's possible they can't be generated
 distclean: clobber
+	for file in Lib/test/data/* ; do \
+	    if test "$$file" != "Lib/test/data/README"; then rm "$$file"; fi; \
+	done
 	-rm -f core Makefile Makefile.pre config.status \
-		Modules/Setup Modules/Setup.local Modules/Setup.config
+		Modules/Setup Modules/Setup.local Modules/Setup.config \
+		Modules/ld_so_aix Misc/python.pc
+	-rm -f python*-gdb.py
+	-rm -f pybuilddir.txt
 	find $(srcdir) '(' -name '*.fdc' -o -name '*~' \
 			   -o -name '[@,#]*' -o -name '*.old' \
 			   -o -name '*.orig' -o -name '*.rej' \
@@ -1259,7 +1333,7 @@ funny:
 		-o -type d \
 		-o -name '*.[chs]' \
 		-o -name '*.py' \
-		-o -name '*.doc' \
+		-o -name '*.pyw' \
 		-o -name '*.dat' \
 		-o -name '*.el' \
 		-o -name '*.fd' \
@@ -1271,20 +1345,18 @@ funny:
 		-o -name '*.xpm' \
 		-o -name '*.uue' \
 		-o -name '*.decTest' \
-		-o -name '*,[vpt]' \
+		-o -name '*.tmCommand' \
+		-o -name '*.tmSnippet' \
 		-o -name 'Setup' \
 		-o -name 'Setup.*' \
 		-o -name regen \
 		-o -name README \
+		-o -name NEWS \
+		-o -name HISTORY \
 		-o -name Makefile \
 		-o -name ChangeLog \
-		-o -name Repository \
-		-o -name Root \
-		-o -name Entries \
-		-o -name Tag \
-		-o -name tags \
-		-o -name TAGS \
-		-o -name .cvsignore \
+		-o -name .hgignore \
+		-o -name .bzrignore \
 		-o -name MANIFEST \
 		-o -print
 
@@ -1302,7 +1374,11 @@ Python/thread.o: @THREADHEADERS@
 .PHONY: maninstall libinstall inclinstall libainstall sharedinstall
 .PHONY: frameworkinstall frameworkinstallframework frameworkinstallstructure
 .PHONY: frameworkinstallmaclib frameworkinstallapps frameworkinstallunixtools
-.PHONY: frameworkaltinstallunixtools recheck autoconf clean clobber distclean 
+.PHONY: frameworkaltinstallunixtools recheck autoconf clean clobber distclean
 .PHONY: smelly funny patchcheck
+.PHONY: gdbhooks
 
 # IF YOU PUT ANYTHING HERE IT WILL GO AWAY
+# Local Variables:
+# mode: makefile
+# End:

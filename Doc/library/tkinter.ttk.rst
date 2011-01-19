@@ -116,12 +116,13 @@ All the :mod:`ttk` Widgets accepts the following options:
    |           | for the parent widget.                                       |
    +-----------+--------------------------------------------------------------+
    | takefocus | Determines whether the window accepts the focus during       |
-   |           | keyboard traversal. 0, 1 or an empty is return. If 0 is      |
-   |           | returned, it means that the window should be skipped entirely|
-   |           | during keyboard traversal. If 1, it means that the window    |
-   |           | should receive the input focus as long as it is viewable. And|
-   |           | an empty string means that the traversal scripts make the    |
-   |           | decision about whether or not to focus on the window.        |
+   |           | keyboard traversal. 0, 1 or an empty string is returned.     |
+   |           | If 0 is returned, it means that the window should be skipped |
+   |           | entirely during keyboard traversal. If 1, it means that the  |
+   |           | window should receive the input focus as long as it is       |
+   |           | viewable. And an empty string means that the traversal       |
+   |           | scripts make the decision about whether or not to focus      |
+   |           | on the window.                                               |
    +-----------+--------------------------------------------------------------+
    | style     | May be used to specify a custom widget style.                |
    +-----------+--------------------------------------------------------------+
@@ -262,7 +263,7 @@ methods :meth:`tkinter.Widget.cget` and :meth:`tkinter.Widget.configure`.
       *x* and *y* are pixel coordinates relative to the widget.
 
 
-   .. method:: instate(statespec[, callback=None[, *args[, **kw]]])
+   .. method:: instate(statespec, callback=None, *args, **kw)
 
       Test the widget's state. If a callback is not specified, returns True
       if the widget state matches *statespec* and False otherwise. If callback
@@ -270,7 +271,7 @@ methods :meth:`tkinter.Widget.cget` and :meth:`tkinter.Widget.configure`.
       *statespec*.
 
 
-   .. method:: state([statespec=None])
+   .. method:: state(statespec=None)
 
       Modify or inquire widget state. If *statespec* is specified, sets the
       widget state according to it and return a new *statespec* indicating
@@ -349,7 +350,7 @@ ttk.Combobox
 
 .. class:: Combobox
 
-   .. method:: current([newindex=None])
+   .. method:: current(newindex=None)
 
       If *newindex* is specified, sets the combobox value to the element
       position *newindex*. Otherwise, returns the index of the current value or
@@ -510,7 +511,7 @@ ttk.Notebook
       See `Tab Options`_ for the list of available options.
 
 
-   .. method:: select([tab_id])
+   .. method:: select(tab_id=None)
 
       Selects the specified *tab_id*.
 
@@ -519,7 +520,7 @@ ttk.Notebook
       omitted, returns the widget name of the currently selected pane.
 
 
-   .. method:: tab(tab_id[, option=None[, **kw]])
+   .. method:: tab(tab_id, option=None, **kw)
 
       Query or modify the options of the specific *tab_id*.
 
@@ -600,14 +601,14 @@ ttk.Progressbar
 
 .. class:: Progressbar
 
-   .. method:: start([interval])
+   .. method:: start(interval=None)
 
       Begin autoincrement mode: schedules a recurring timer event that calls
       :meth:`Progressbar.step` every *interval* milliseconds. If omitted,
       *interval* defaults to 50 milliseconds.
 
 
-   .. method:: step([amount])
+   .. method:: step(amount=None)
 
       Increments the progress bar's value by *amount*.
 
@@ -842,7 +843,7 @@ ttk.Treeview
 
 .. class:: Treeview
 
-   .. method:: bbox(item[, column=None])
+   .. method:: bbox(item, column=None)
 
       Returns the bounding box (relative to the treeview widget's window) of
       the specified *item* in the form (x, y, width, height).
@@ -852,7 +853,7 @@ ttk.Treeview
       scrolled offscreen), returns an empty string.
 
 
-   .. method:: get_children([item])
+   .. method:: get_children(item=None)
 
       Returns the list of children belonging to *item*.
 
@@ -869,7 +870,7 @@ ttk.Treeview
       *item*'s children.
 
 
-   .. method:: column(column[, option=None[, **kw]])
+   .. method:: column(column, option=None, **kw)
 
       Query or modify the options for the specified *column*.
 
@@ -918,13 +919,13 @@ ttk.Treeview
       Returns True if the specified *item* is present in the tree.
 
 
-   .. method:: focus([item=None])
+   .. method:: focus(item=None)
 
       If *item* is specified, sets the focus item to *item*. Otherwise, returns
       the current focus item, or '' if there is none.
 
 
-   .. method:: heading(column[, option=None[, **kw]])
+   .. method:: heading(column, option=None, **kw)
 
       Query or modify the heading options for the specified *column*.
 
@@ -997,7 +998,7 @@ ttk.Treeview
       Returns the integer index of *item* within its parent's list of children.
 
 
-   .. method:: insert(parent, index[, iid=None[, **kw]])
+   .. method:: insert(parent, index, iid=None, **kw)
 
       Creates a new item and returns the item identifier of the newly created
       item.
@@ -1014,7 +1015,7 @@ ttk.Treeview
       See `Item Options`_ for the list of available points.
 
 
-   .. method:: item(item[, option[, **kw]])
+   .. method:: item(item, option=None, **kw)
 
       Query or modify the options for the specified *item*.
 
@@ -1066,7 +1067,7 @@ ttk.Treeview
       the tree.
 
 
-   .. method:: selection([selop=None[, items=None]])
+   .. method:: selection(selop=None, items=None)
 
       If *selop* is not specified, returns selected items. Otherwise, it will
       act according to the following selection methods.
@@ -1092,7 +1093,7 @@ ttk.Treeview
       Toggle the selection state of each item in *items*.
 
 
-   .. method:: set(item[, column=None[, value=None]])
+   .. method:: set(item, column=None, value=None)
 
       With one argument, returns a dictionary of column/value pairs for the
       specified *item*. With two arguments, returns the current value of the
@@ -1100,14 +1101,14 @@ ttk.Treeview
       *column* in given *item* to the specified *value*.
 
 
-   .. method:: tag_bind(tagname[, sequence=None[, callback=None]])
+   .. method:: tag_bind(tagname, sequence=None, callback=None)
 
       Bind a callback for the given event *sequence* to the tag *tagname*.
       When an event is delivered to an item, the callbacks for each of the
       item's tags option are called.
 
 
-   .. method:: tag_configure(tagname[, option=None[, **kw]])
+   .. method:: tag_configure(tagname, option=None, **kw)
 
       Query or modify the options for the specified *tagname*.
 
@@ -1117,7 +1118,7 @@ ttk.Treeview
       corresponding values for the given *tagname*.
 
 
-   .. method:: tag_has(tagname[, item])
+   .. method:: tag_has(tagname, item=None)
 
       If *item* is specified, returns 1 or 0 depending on whether the specified
       *item* has the given *tagname*. Otherwise, returns a list of all items
@@ -1216,7 +1217,7 @@ option. If you don't know the class name of a widget, use the method
       blue foreground when the widget were in active or pressed states.
 
 
-   .. method:: lookup(style, option[, state=None[, default=None]])
+   .. method:: lookup(style, option, state=None, default=None)
 
       Returns the value specified for *option* in *style*.
 
@@ -1228,10 +1229,10 @@ option. If you don't know the class name of a widget, use the method
 
          from tkinter import ttk
 
-         print ttk.Style().lookup("TButton", "font")
+         print(ttk.Style().lookup("TButton", "font"))
 
 
-   .. method:: layout(style[, layoutspec=None])
+   .. method:: layout(style, layoutspec=None)
 
       Define the widget layout for given *style*. If *layoutspec* is omitted,
       return the layout specification for given style.
@@ -1314,7 +1315,7 @@ option. If you don't know the class name of a widget, use the method
       Returns the list of *elementname*'s options.
 
 
-   .. method:: theme_create(themename[, parent=None[, settings=None]])
+   .. method:: theme_create(themename, parent=None, settings=None)
 
       Create a new theme.
 
@@ -1366,7 +1367,7 @@ option. If you don't know the class name of a widget, use the method
       Returns a list of all known themes.
 
 
-   .. method:: theme_use([themename])
+   .. method:: theme_use(themename=None)
 
       If *themename* is not given, returns the theme in use.  Otherwise, sets
       the current theme to *themename*, refreshes all widgets and emits a

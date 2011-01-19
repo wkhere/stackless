@@ -7,7 +7,7 @@ from weakref import proxy
 import io
 import _pyio as pyio
 
-from test.support import TESTFN, findfile, run_unittest
+from test.support import TESTFN, run_unittest
 from collections import UserList
 
 class AutoFileTests(unittest.TestCase):
@@ -25,7 +25,7 @@ class AutoFileTests(unittest.TestCase):
         # verify weak references
         p = proxy(self.f)
         p.write(b'teststring')
-        self.assertEquals(self.f.tell(), p.tell())
+        self.assertEqual(self.f.tell(), p.tell())
         self.f.close()
         self.f = None
         self.assertRaises(ReferenceError, getattr, p, 'tell')
@@ -44,7 +44,7 @@ class AutoFileTests(unittest.TestCase):
         a = array('b', b'x'*10)
         self.f = self.open(TESTFN, 'rb')
         n = self.f.readinto(a)
-        self.assertEquals(b'12', a.tostring()[:n])
+        self.assertEqual(b'12', a.tobytes()[:n])
 
     def testReadinto_text(self):
         # verify readinto refuses text files
@@ -61,7 +61,7 @@ class AutoFileTests(unittest.TestCase):
         self.f.close()
         self.f = self.open(TESTFN, 'rb')
         buf = self.f.read()
-        self.assertEquals(buf, b'12')
+        self.assertEqual(buf, b'12')
 
     def testWritelinesIntegers(self):
         # verify writelines with integers
@@ -82,14 +82,14 @@ class AutoFileTests(unittest.TestCase):
 
     def testErrors(self):
         f = self.f
-        self.assertEquals(f.name, TESTFN)
-        self.assert_(not f.isatty())
-        self.assert_(not f.closed)
+        self.assertEqual(f.name, TESTFN)
+        self.assertTrue(not f.isatty())
+        self.assertTrue(not f.closed)
 
         if hasattr(f, "readinto"):
             self.assertRaises((IOError, TypeError), f.readinto, "")
         f.close()
-        self.assert_(f.closed)
+        self.assertTrue(f.closed)
 
     def testMethods(self):
         methods = [('fileno', ()),
@@ -106,12 +106,11 @@ class AutoFileTests(unittest.TestCase):
                    ('writelines', ([],)),
                    ('__iter__', ()),
                    ]
-        if not sys.platform.startswith('atheos'):
-            methods.append(('truncate', ()))
+        methods.append(('truncate', ()))
 
         # __exit__ should close the file
         self.f.__exit__(None, None, None)
-        self.assert_(self.f.closed)
+        self.assertTrue(self.f.closed)
 
         for methodname, args in methods:
             method = getattr(self.f, methodname)
@@ -119,12 +118,12 @@ class AutoFileTests(unittest.TestCase):
             self.assertRaises(ValueError, method, *args)
 
         # file is closed, __exit__ shouldn't do anything
-        self.assertEquals(self.f.__exit__(None, None, None), None)
+        self.assertEqual(self.f.__exit__(None, None, None), None)
         # it must also return None if an exception was given
         try:
             1/0
         except:
-            self.assertEquals(self.f.__exit__(*sys.exc_info()), None)
+            self.assertEqual(self.f.__exit__(*sys.exc_info()), None)
 
     def testReadWhenWriting(self):
         self.assertRaises(IOError, self.f.read)
@@ -167,7 +166,7 @@ class OtherFileTests(unittest.TestCase):
         except ValueError as msg:
             if msg.args[0] != 0:
                 s = str(msg)
-                if s.find(TESTFN) != -1 or s.find(bad_mode) == -1:
+                if TESTFN in s or bad_mode not in s:
                     self.fail("bad error message for invalid mode: %s" % s)
             # if msg.args[0] == 0, we're probably on Windows where there may be
             # no obvious way to discover why open() failed.
@@ -190,7 +189,7 @@ class OtherFileTests(unittest.TestCase):
                 f.close()
             except IOError as msg:
                 self.fail('error setting buffer size %d: %s' % (s, str(msg)))
-            self.assertEquals(d, s)
+            self.assertEqual(d, s)
 
     def testTruncateOnWindows(self):
         # SF bug <http://www.python.org/sf/801631>
@@ -282,7 +281,7 @@ class OtherFileTests(unittest.TestCase):
             except ValueError:
                 self.fail("readinto() after next() with supposedly empty "
                           "iteration-buffer failed anyway")
-            line = buf.tostring()
+            line = buf.tobytes()
             if line != testline:
                 self.fail("readinto() after next() with empty buffer "
                           "failed. Got %r, expected %r" % (line, testline))
@@ -304,6 +303,8 @@ class OtherFileTests(unittest.TestCase):
             if lines != testlines:
                 self.fail("readlines() after next() with empty buffer "
                           "failed. Got %r, expected %r" % (line, testline))
+            f.close()
+
             # Reading after iteration hit EOF shouldn't hurt either
             f = self.open(TESTFN, 'rb')
             try:

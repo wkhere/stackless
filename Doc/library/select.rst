@@ -1,4 +1,3 @@
-
 :mod:`select` --- Waiting for I/O completion
 ============================================
 
@@ -6,9 +5,9 @@
    :synopsis: Wait for I/O completion on multiple streams.
 
 
-This module provides access to the :cfunc:`select` and :cfunc:`poll` functions
-available in most operating systems, :cfunc:`epoll` available on Linux 2.5+ and
-:cfunc:`kqueue` available on most BSD.
+This module provides access to the :c:func:`select` and :c:func:`poll` functions
+available in most operating systems, :c:func:`epoll` available on Linux 2.5+ and
+:c:func:`kqueue` available on most BSD.
 Note that on Windows, it only works for sockets; on other operating systems,
 it also works for other file types (in particular, on Unix, it works on pipes).
 It cannot be used on regular files to determine whether a file has grown since
@@ -20,11 +19,11 @@ The module defines the following:
 .. exception:: error
 
    The exception raised when an error occurs.  The accompanying value is a pair
-   containing the numeric error code from :cdata:`errno` and the corresponding
-   string, as would be printed by the C function :cfunc:`perror`.
+   containing the numeric error code from :c:data:`errno` and the corresponding
+   string, as would be printed by the C function :c:func:`perror`.
 
 
-.. function:: epoll([sizehint=-1])
+.. function:: epoll(sizehint=-1)
 
    (Only supported on Linux 2.5.44 and newer.)  Returns an edge polling object,
    which can be used as Edge or Level Triggered interface for I/O events; see
@@ -42,19 +41,19 @@ The module defines the following:
 
 .. function:: kqueue()
 
-   (Only supported on BSD.)  Returns a kernel queue object object; see section
+   (Only supported on BSD.)  Returns a kernel queue object; see section
    :ref:`kqueue-objects` below for the methods supported by kqueue objects.
 
 
-.. function:: kevent(ident, filter=KQ_FILTER_READ, flags=KQ_ADD, fflags=0, data=0, udata=0)
+.. function:: kevent(ident, filter=KQ_FILTER_READ, flags=KQ_EV_ADD, fflags=0, data=0, udata=0)
 
-   (Only supported on BSD.)  Returns a kernel event object object; see section
-   :ref:`kevent-objects` below for the methods supported by kqueue objects.
+   (Only supported on BSD.)  Returns a kernel event object; see section
+   :ref:`kevent-objects` below for the methods supported by kevent objects.
 
 
 .. function:: select(rlist, wlist, xlist[, timeout])
 
-   This is a straightforward interface to the Unix :cfunc:`select` system call.
+   This is a straightforward interface to the Unix :c:func:`select` system call.
    The first three arguments are sequences of 'waitable objects': either
    integers representing file descriptors or objects with a parameterless method
    named :meth:`fileno` returning such an integer:
@@ -79,20 +78,30 @@ The module defines the following:
       single: socket() (in module socket)
       single: popen() (in module os)
 
-   Among the acceptable object types in the sequences are Python file objects (e.g.
-   ``sys.stdin``, or objects returned by :func:`open` or :func:`os.popen`), socket
-   objects returned by :func:`socket.socket`.  You may also define a :dfn:`wrapper`
-   class yourself, as long as it has an appropriate :meth:`fileno` method (that
-   really returns a file descriptor, not just a random integer).
+   Among the acceptable object types in the sequences are Python :term:`file
+   objects <file object>` (e.g. ``sys.stdin``, or objects returned by
+   :func:`open` or :func:`os.popen`), socket objects returned by
+   :func:`socket.socket`.  You may also define a :dfn:`wrapper` class yourself,
+   as long as it has an appropriate :meth:`fileno` method (that really returns
+   a file descriptor, not just a random integer).
 
    .. note::
 
       .. index:: single: WinSock
 
       File objects on Windows are not acceptable, but sockets are.  On Windows,
-      the underlying :cfunc:`select` function is provided by the WinSock
+      the underlying :c:func:`select` function is provided by the WinSock
       library, and does not handle file descriptors that don't originate from
       WinSock.
+
+.. attribute:: select.PIPE_BUF
+
+   Files reported as ready for writing by :func:`select`, :func:`poll` or
+   similar interfaces in this module are guaranteed to not block on a write
+   of up to :const:`PIPE_BUF` bytes.
+   This value is guaranteed by POSIX to be at least 512.  Availability: Unix.
+
+   .. versionadded:: 3.2
 
 
 .. _epoll-objects:
@@ -123,15 +132,15 @@ Edge and Level Trigger Polling (epoll) Objects
    | :const:`EPOLLONESHOT` | Set one-shot behavior. After one event is     |
    |                       | pulled out, the fd is internally disabled     |
    +-----------------------+-----------------------------------------------+
-   | :const:`EPOLLRDNORM`  | ???                                           |
+   | :const:`EPOLLRDNORM`  | Equivalent to :const:`EPOLLIN`                |
    +-----------------------+-----------------------------------------------+
-   | :const:`EPOLLRDBAND`  | ???                                           |
+   | :const:`EPOLLRDBAND`  | Priority data band can be read.               |
    +-----------------------+-----------------------------------------------+
-   | :const:`EPOLLWRNORM`  | ???                                           |
+   | :const:`EPOLLWRNORM`  | Equivalent to :const:`EPOLLOUT`               |
    +-----------------------+-----------------------------------------------+
-   | :const:`EPOLLWRBAND`  | ???                                           |
+   | :const:`EPOLLWRBAND`  | Priority data may be written.                 |
    +-----------------------+-----------------------------------------------+
-   | :const:`EPOLLMSG`     | ???                                           |
+   | :const:`EPOLLMSG`     | Ignored.                                      |
    +-----------------------+-----------------------------------------------+
 
 
@@ -180,13 +189,13 @@ Edge and Level Trigger Polling (epoll) Objects
 Polling Objects
 ---------------
 
-The :cfunc:`poll` system call, supported on most Unix systems, provides better
+The :c:func:`poll` system call, supported on most Unix systems, provides better
 scalability for network servers that service many, many clients at the same
-time. :cfunc:`poll` scales better because the system call only requires listing
-the file descriptors of interest, while :cfunc:`select` builds a bitmap, turns
+time. :c:func:`poll` scales better because the system call only requires listing
+the file descriptors of interest, while :c:func:`select` builds a bitmap, turns
 on bits for the fds of interest, and then afterward the whole bitmap has to be
-linearly scanned again. :cfunc:`select` is O(highest file descriptor), while
-:cfunc:`poll` is O(number of file descriptors).
+linearly scanned again. :c:func:`select` is O(highest file descriptor), while
+:c:func:`poll` is O(number of file descriptors).
 
 
 .. method:: poll.register(fd[, eventmask])
@@ -225,7 +234,7 @@ linearly scanned again. :cfunc:`select` is O(highest file descriptor), while
 .. method:: poll.modify(fd, eventmask)
 
    Modifies an already registered fd. This has the same effect as
-   :meth:`register(fd, eventmask)`.  Attempting to modify a file descriptor
+   ``register(fd, eventmask)``.  Attempting to modify a file descriptor
    that was never registered causes an :exc:`IOError` exception with errno
    :const:`ENOENT` to be raised.
 
@@ -299,7 +308,7 @@ http://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
 
 .. attribute:: kevent.filter
 
-   Name of the kernel filter
+   Name of the kernel filter.
 
    +---------------------------+---------------------------------------------+
    | Constant                  | Meaning                                     |
@@ -308,7 +317,7 @@ http://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
    |                           | there is data available to read             |
    +---------------------------+---------------------------------------------+
    | :const:`KQ_FILTER_WRITE`  | Takes a descriptor and returns whenever     |
-   |                           | there is data available to read             |
+   |                           | there is data available to write            |
    +---------------------------+---------------------------------------------+
    | :const:`KQ_FILTER_AIO`    | AIO requests                                |
    +---------------------------+---------------------------------------------+
@@ -328,7 +337,7 @@ http://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
 
 .. attribute:: kevent.flags
 
-   Filter action
+   Filter action.
 
    +---------------------------+---------------------------------------------+
    | Constant                  | Meaning                                     |
@@ -357,10 +366,9 @@ http://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
 
 .. attribute:: kevent.fflags
 
-   Filter specific flags
+   Filter specific flags.
 
-
-   :const:`KQ_FILTER_READ` and  :const:`KQ_FILTER_WRITE` filter flags
+   :const:`KQ_FILTER_READ` and  :const:`KQ_FILTER_WRITE` filter flags:
 
    +----------------------------+--------------------------------------------+
    | Constant                   | Meaning                                    |
@@ -368,8 +376,7 @@ http://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
    | :const:`KQ_NOTE_LOWAT`     | low water mark of a socket buffer          |
    +----------------------------+--------------------------------------------+
 
-
-   :const:`KQ_FILTER_VNODE` filter flags
+   :const:`KQ_FILTER_VNODE` filter flags:
 
    +----------------------------+--------------------------------------------+
    | Constant                   | Meaning                                    |
@@ -389,8 +396,7 @@ http://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
    | :const:`KQ_NOTE_REVOKE`    | access to the file was revoked             |
    +----------------------------+--------------------------------------------+
 
-
-   :const:`KQ_FILTER_PROC` filter flags
+   :const:`KQ_FILTER_PROC` filter flags:
 
    +----------------------------+--------------------------------------------+
    | Constant                   | Meaning                                    |
@@ -413,7 +419,7 @@ http://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
    | :const:`KQ_NOTE_TRACKERR`  | unable to attach to a child                |
    +----------------------------+--------------------------------------------+
 
-   :const:`KQ_FILTER_NETDEV` filter flags [not available on Mac OS X]
+   :const:`KQ_FILTER_NETDEV` filter flags (not available on Mac OS X):
 
    +----------------------------+--------------------------------------------+
    | Constant                   | Meaning                                    |
@@ -428,9 +434,9 @@ http://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2
 
 .. attribute:: kevent.data
 
-   Filter specific data
+   Filter specific data.
 
 
 .. attribute:: kevent.udata
 
-   User defined value
+   User defined value.

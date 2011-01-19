@@ -17,6 +17,7 @@ __revision__ = "$Id$"
 import os
 import subprocess
 import sys
+import re
 
 from distutils.errors import DistutilsExecError, DistutilsPlatformError, \
                              CompileError, LibError, LinkError
@@ -37,9 +38,18 @@ HKEYS = (winreg.HKEY_USERS,
          winreg.HKEY_LOCAL_MACHINE,
          winreg.HKEY_CLASSES_ROOT)
 
-VS_BASE = r"Software\Microsoft\VisualStudio\%0.1f"
-WINSDK_BASE = r"Software\Microsoft\Microsoft SDKs\Windows"
-NET_BASE = r"Software\Microsoft\.NETFramework"
+NATIVE_WIN64 = (sys.platform == 'win32' and sys.maxsize > 2**32)
+if NATIVE_WIN64:
+    # Visual C++ is a 32-bit application, so we need to look in
+    # the corresponding registry branch, if we're running a
+    # 64-bit Python on Win64
+    VS_BASE = r"Software\Wow6432Node\Microsoft\VisualStudio\%0.1f"
+    WINSDK_BASE = r"Software\Wow6432Node\Microsoft\Microsoft SDKs\Windows"
+    NET_BASE = r"Software\Wow6432Node\Microsoft\.NETFramework"
+else:
+    VS_BASE = r"Software\Microsoft\VisualStudio\%0.1f"
+    WINSDK_BASE = r"Software\Microsoft\Microsoft SDKs\Windows"
+    NET_BASE = r"Software\Microsoft\.NETFramework"
 
 # A map keyed by get_platform() return values to values accepted by
 # 'vcvarsall.bat'.  Note a cross-compile may combine these (eg, 'x86_amd64' is
@@ -253,23 +263,27 @@ def query_vcvarsall(version, arch="x86"):
     popen = subprocess.Popen('"%s" %s & set' % (vcvarsall, arch),
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
+    try:
+        stdout, stderr = popen.communicate()
+        if popen.wait() != 0:
+            raise DistutilsPlatformError(stderr.decode("mbcs"))
 
-    stdout, stderr = popen.communicate()
-    if popen.wait() != 0:
-        raise DistutilsPlatformError(stderr.decode("mbcs"))
+        stdout = stdout.decode("mbcs")
+        for line in stdout.split("\n"):
+            line = Reg.convert_mbcs(line)
+            if '=' not in line:
+                continue
+            line = line.strip()
+            key, value = line.split('=', 1)
+            key = key.lower()
+            if key in interesting:
+                if value.endswith(os.pathsep):
+                    value = value[:-1]
+                result[key] = removeDuplicates(value)
 
-    stdout = stdout.decode("mbcs")
-    for line in stdout.split("\n"):
-        line = Reg.convert_mbcs(line)
-        if '=' not in line:
-            continue
-        line = line.strip()
-        key, value = line.split('=', 1)
-        key = key.lower()
-        if key in interesting:
-            if value.endswith(os.pathsep):
-                value = value[:-1]
-            result[key] = removeDuplicates(value)
+    finally:
+        popen.stdout.close()
+        popen.stderr.close()
 
     if len(result) != len(interesting):
         raise ValueError(str(list(result.keys())))
@@ -645,6 +659,8 @@ class MSVCCompiler(CCompiler) :
                 mfid = 1
             else:
                 mfid = 2
+                # Remove references to the Visual C runtime
+                self._remove_visual_c_ref(temp_manifest)
             out_arg = '-outputresource:%s;%s' % (output_filename, mfid)
             try:
                 self.spawn(['mt.exe', '-nologo', '-manifest',
@@ -654,6 +670,33 @@ class MSVCCompiler(CCompiler) :
         else:
             log.debug("skipping %s (up-to-date)", output_filename)
 
+    def _remove_visual_c_ref(self, manifest_file):
+        try:
+            # Remove references to the Visual C runtime, so they will
+            # fall through to the Visual C dependency of Python.exe.
+            # This way, when installed for a restricted user (e.g.
+            # runtimes are not in WinSxS folder, but in Python's own
+            # folder), the runtimes do not need to be in every folder
+            # with .pyd's.
+            manifest_f = open(manifest_file)
+            try:
+                manifest_buf = manifest_f.read()
+            finally:
+                manifest_f.close()
+            pattern = re.compile(
+                r"""<assemblyIdentity.*?name=("|')Microsoft\."""\
+                r"""VC\d{2}\.CRT("|').*?(/>|</assemblyIdentity>)""",
+                re.DOTALL)
+            manifest_buf = re.sub(pattern, "", manifest_buf)
+            pattern = "<dependentAssembly>\s*</dependentAssembly>"
+            manifest_buf = re.sub(pattern, "", manifest_buf)
+            manifest_f = open(manifest_file, 'w')
+            try:
+                manifest_f.write(manifest_buf)
+            finally:
+                manifest_f.close()
+        except IOError:
+            pass
 
     # -- Miscellaneous methods -----------------------------------------
     # These are all used by the 'gen_lib_options() function, in

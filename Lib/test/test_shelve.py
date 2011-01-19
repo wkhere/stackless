@@ -122,6 +122,32 @@ class TestCase(unittest.TestCase):
         self.assertEqual(len(d1), 1)
         self.assertEqual(len(d2), 1)
 
+    def test_keyencoding(self):
+        d = {}
+        key = 'PÃ¶p'
+        # the default keyencoding is utf-8
+        shelve.Shelf(d)[key] = [1]
+        self.assertIn(key.encode('utf-8'), d)
+        # but a different one can be given
+        shelve.Shelf(d, keyencoding='latin1')[key] = [1]
+        self.assertIn(key.encode('latin1'), d)
+        # with all consequences
+        s = shelve.Shelf(d, keyencoding='ascii')
+        self.assertRaises(UnicodeEncodeError, s.__setitem__, key, [1])
+
+    def test_writeback_also_writes_immediately(self):
+        # Issue 5754
+        d = {}
+        key = 'key'
+        encodedkey = key.encode('utf-8')
+        s = shelve.Shelf(d, writeback=True)
+        s[key] = [1]
+        p1 = d[encodedkey]  # Will give a KeyError if backing store not updated
+        s['key'].append(2)
+        s.close()
+        p2 = d[encodedkey]
+        self.assertNotEqual(p1, p2)  # Write creates new object in store
+
 
 from test import mapping_tests
 

@@ -11,6 +11,7 @@ import unittest
 from test.support import run_unittest
 from reprlib import repr as r # Don't shadow builtin repr
 from reprlib import Repr
+from reprlib import recursive_repr
 
 
 def nestedTuple(nesting):
@@ -22,7 +23,7 @@ def nestedTuple(nesting):
 class ReprTests(unittest.TestCase):
 
     def test_string(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         eq(r("abc"), "'abc'")
         eq(r("abcdefghijklmnop"),"'abcdefghijklmnop'")
 
@@ -36,7 +37,7 @@ class ReprTests(unittest.TestCase):
         eq(r(s), expected)
 
     def test_tuple(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         eq(r((1,)), "(1,)")
 
         t3 = (1, 2, 3)
@@ -51,7 +52,7 @@ class ReprTests(unittest.TestCase):
         from array import array
         from collections import deque
 
-        eq = self.assertEquals
+        eq = self.assertEqual
         # Tuples give up after 6 elements
         eq(r(()), "()")
         eq(r((1,)), "(1,)")
@@ -101,7 +102,7 @@ class ReprTests(unittest.TestCase):
                    "array('i', [1, 2, 3, 4, 5, ...])")
 
     def test_numbers(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         eq(r(123), repr(123))
         eq(r(123), repr(123))
         eq(r(1.0/3), repr(1.0/3))
@@ -111,7 +112,7 @@ class ReprTests(unittest.TestCase):
         eq(r(n), expected)
 
     def test_instance(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         i1 = ClassWithRepr("a")
         eq(r(i1), repr(i1))
 
@@ -123,31 +124,31 @@ class ReprTests(unittest.TestCase):
         eq(r(i3), ("<ClassWithFailingRepr instance at %x>"%id(i3)))
 
         s = r(ClassWithFailingRepr)
-        self.failUnless(s.startswith("<class "))
-        self.failUnless(s.endswith(">"))
-        self.failUnless(s.find("...") in [12, 13])
+        self.assertTrue(s.startswith("<class "))
+        self.assertTrue(s.endswith(">"))
+        self.assertIn(s.find("..."), [12, 13])
 
     def test_lambda(self):
-        self.failUnless(repr(lambda x: x).startswith(
+        self.assertTrue(repr(lambda x: x).startswith(
             "<function <lambda"))
         # XXX anonymous functions?  see func_repr
 
     def test_builtin_function(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         # Functions
         eq(repr(hash), '<built-in function hash>')
         # Methods
-        self.failUnless(repr(''.split).startswith(
+        self.assertTrue(repr(''.split).startswith(
             '<built-in method split of str object at 0x'))
 
     def test_range(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         eq(repr(range(1)), 'range(0, 1)')
         eq(repr(range(1, 2)), 'range(1, 2)')
         eq(repr(range(1, 4, 3)), 'range(1, 4, 3)')
 
     def test_nesting(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         # everything is meant to give up after 6 levels.
         eq(r([[[[[[[]]]]]]]), "[[[[[[[]]]]]]]")
         eq(r([[[[[[[[]]]]]]]]), "[[[[[[[...]]]]]]]")
@@ -168,7 +169,7 @@ class ReprTests(unittest.TestCase):
         pass
 
     def test_descriptors(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         # method descriptors
         eq(repr(dict.items), "<method 'items' of 'dict' objects>")
         # XXX member descriptors
@@ -178,9 +179,9 @@ class ReprTests(unittest.TestCase):
         class C:
             def foo(cls): pass
         x = staticmethod(C.foo)
-        self.failUnless(repr(x).startswith('<staticmethod object at 0x'))
+        self.assertTrue(repr(x).startswith('<staticmethod object at 0x'))
         x = classmethod(C.foo)
-        self.failUnless(repr(x).startswith('<classmethod object at 0x'))
+        self.assertTrue(repr(x).startswith('<classmethod object at 0x'))
 
     def test_unsortable(self):
         # Repr.repr() used to call sorted() on sets, frozensets and dicts
@@ -229,7 +230,7 @@ class LongReprTest(unittest.TestCase):
         del sys.path[0]
 
     def test_module(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         touch(os.path.join(self.subpkgname, self.pkgname + '.py'))
         from areallylongpackageandmodulenametotestreprtruncation.areallylongpackageandmodulenametotestreprtruncation import areallylongpackageandmodulenametotestreprtruncation
         eq(repr(areallylongpackageandmodulenametotestreprtruncation),
@@ -237,7 +238,7 @@ class LongReprTest(unittest.TestCase):
         eq(repr(sys), "<module 'sys' (built-in)>")
 
     def test_type(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         touch(os.path.join(self.subpkgname, 'foo.py'), '''\
 class foo(object):
     pass
@@ -258,7 +259,7 @@ class bar:
 ''')
         from areallylongpackageandmodulenametotestreprtruncation.areallylongpackageandmodulenametotestreprtruncation import bar
         # Module name may be prefixed with "test.", depending on how run.
-        self.assertEquals(repr(bar.bar), "<class '%s.bar'>" % bar.__name__)
+        self.assertEqual(repr(bar.bar), "<class '%s.bar'>" % bar.__name__)
 
     def test_instance(self):
         touch(os.path.join(self.subpkgname, 'baz.py'), '''\
@@ -267,22 +268,22 @@ class baz:
 ''')
         from areallylongpackageandmodulenametotestreprtruncation.areallylongpackageandmodulenametotestreprtruncation import baz
         ibaz = baz.baz()
-        self.failUnless(repr(ibaz).startswith(
+        self.assertTrue(repr(ibaz).startswith(
             "<%s.baz object at 0x" % baz.__name__))
 
     def test_method(self):
-        eq = self.assertEquals
+        eq = self.assertEqual
         touch(os.path.join(self.subpkgname, 'qux.py'), '''\
 class aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
     def amethod(self): pass
 ''')
         from areallylongpackageandmodulenametotestreprtruncation.areallylongpackageandmodulenametotestreprtruncation import qux
         # Unbound methods first
-        self.failUnless(repr(qux.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.amethod).startswith(
+        self.assertTrue(repr(qux.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.amethod).startswith(
         '<function amethod'))
         # Bound method next
         iqux = qux.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa()
-        self.failUnless(repr(iqux.amethod).startswith(
+        self.assertTrue(repr(iqux.amethod).startswith(
             '<bound method aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.amethod of <%s.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa object at 0x' \
             % (qux.__name__,) ))
 
@@ -301,11 +302,38 @@ class ClassWithFailingRepr:
     def __repr__(self):
         raise Exception("This should be caught by Repr.repr_instance")
 
+class MyContainer:
+    'Helper class for TestRecursiveRepr'
+    def __init__(self, values):
+        self.values = list(values)
+    def append(self, value):
+        self.values.append(value)
+    @recursive_repr()
+    def __repr__(self):
+        return '<' + ', '.join(map(str, self.values)) + '>'
+
+class MyContainer2(MyContainer):
+    @recursive_repr('+++')
+    def __repr__(self):
+        return '<' + ', '.join(map(str, self.values)) + '>'
+
+class TestRecursiveRepr(unittest.TestCase):
+    def test_recursive_repr(self):
+        m = MyContainer(list('abcde'))
+        m.append(m)
+        m.append('x')
+        m.append(m)
+        self.assertEqual(repr(m), '<a, b, c, d, e, ..., x, ...>')
+        m = MyContainer2(list('abcde'))
+        m.append(m)
+        m.append('x')
+        m.append(m)
+        self.assertEqual(repr(m), '<a, b, c, d, e, +++, x, +++>')
 
 def test_main():
     run_unittest(ReprTests)
-    if os.name != 'mac':
-        run_unittest(LongReprTest)
+    run_unittest(LongReprTest)
+    run_unittest(TestRecursiveRepr)
 
 
 if __name__ == "__main__":

@@ -48,3 +48,4 @@ BaseException
            +-- ImportWarning
            +-- UnicodeWarning
            +-- BytesWarning
+           +-- ResourceWarning

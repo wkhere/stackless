@@ -1,4 +1,3 @@
-
 :mod:`tempfile` --- Generate temporary files and directories
 ============================================================
 
@@ -26,12 +25,11 @@ no longer necessary to use the global *tempdir* and *template* variables.
 To maintain backward compatibility, the argument order is somewhat odd; it
 is recommended to use keyword arguments for clarity.
 
-The module defines the following user-callable functions:
+The module defines the following user-callable items:
 
+.. function:: TemporaryFile(mode='w+b', buffering=None, encoding=None, newline=None, suffix='', prefix='tmp', dir=None)
 
-.. function:: TemporaryFile([mode='w+b'[, bufsize=-1[, suffix=''[, prefix='tmp'[, dir=None]]]]])
-
-   Return a file-like object that can be used as a temporary storage area.
+   Return a :term:`file-like object` that can be used as a temporary storage area.
    The file is created using :func:`mkstemp`. It will be destroyed as soon
    as it is closed (including an implicit close when the object is garbage
    collected).  Under Unix, the directory entry for the file is removed
@@ -42,18 +40,18 @@ The module defines the following user-callable functions:
    The *mode* parameter defaults to ``'w+b'`` so that the file created can
    be read and written without being closed.  Binary mode is used so that it
    behaves consistently on all platforms without regard for the data that is
-   stored.  *bufsize* defaults to ``-1``, meaning that the operating system
-   default is used.
+   stored.  *buffering*, *encoding* and *newline* are interpreted as for
+   :func:`open`.
 
    The *dir*, *prefix* and *suffix* parameters are passed to :func:`mkstemp`.
 
    The returned object is a true file object on POSIX platforms.  On other
-   platforms, it is a file-like object whose :attr:`file` attribute is the
+   platforms, it is a file-like object whose :attr:`!file` attribute is the
    underlying true file object. This file-like object can be used in a
    :keyword:`with` statement, just like a normal file.
 
 
-.. function:: NamedTemporaryFile([mode='w+b'[, bufsize=-1[, suffix=''[, prefix='tmp'[, dir=None[, delete=True]]]]]])
+.. function:: NamedTemporaryFile(mode='w+b', buffering=None, encoding=None, newline=None, suffix='', prefix='tmp', dir=None, delete=True)
 
    This function operates exactly as :func:`TemporaryFile` does, except that
    the file is guaranteed to have a visible name in the file system (on
@@ -63,12 +61,12 @@ The module defines the following user-callable functions:
    still open, varies across platforms (it can be so used on Unix; it cannot
    on Windows NT or later).  If *delete* is true (the default), the file is
    deleted as soon as it is closed.
-   The returned object is always a file-like object whose :attr:`file`
+   The returned object is always a file-like object whose :attr:`!file`
    attribute is the underlying true file object. This file-like object can
    be used in a :keyword:`with` statement, just like a normal file.
 
 
-.. function:: SpooledTemporaryFile([max_size=0, [mode='w+b'[, bufsize=-1[, suffix=''[, prefix='tmp'[, dir=None]]]]]])
+.. function:: SpooledTemporaryFile(max_size=0, mode='w+b', buffering=None, encoding=None, newline=None, suffix='', prefix='tmp', dir=None)
 
    This function operates exactly as :func:`TemporaryFile` does, except that
    data is spooled in memory until the file size exceeds *max_size*, or
@@ -85,7 +83,25 @@ The module defines the following user-callable functions:
    used in a :keyword:`with` statement, just like a normal file.
 
 
-.. function:: mkstemp([suffix=''[, prefix='tmp'[, dir=None[, text=False]]]])
+.. function:: TemporaryDirectory(suffix='', prefix='tmp', dir=None)
+
+   This function creates a temporary directory using :func:`mkdtemp`
+   (the supplied arguments are passed directly to the underlying function).
+   The resulting object can be used as a context manager (see
+   :ref:`context-managers`).  On completion of the context (or destruction
+   of the temporary directory object), the newly created temporary directory
+   and all its contents are removed from the filesystem.
+
+   The directory name can be retrieved from the :attr:`name` member
+   of the returned object.
+
+   The directory can be explicitly cleaned up by calling the
+   :func:`cleanup` method.
+
+   .. versionadded:: 3.2
+
+
+.. function:: mkstemp(suffix='', prefix='tmp', dir=None, text=False)
 
    Creates a temporary file in the most secure manner possible.  There are
    no race conditions in the file's creation, assuming that the platform
@@ -123,7 +139,7 @@ The module defines the following user-callable functions:
    of that file, in that order.
 
 
-.. function:: mkdtemp([suffix=''[, prefix='tmp'[, dir=None]]])
+.. function:: mkdtemp(suffix='', prefix='tmp', dir=None)
 
    Creates a temporary directory in the most secure manner possible. There
    are no race conditions in the directory's creation.  The directory is
@@ -138,7 +154,7 @@ The module defines the following user-callable functions:
    :func:`mkdtemp` returns the absolute pathname of the new directory.
 
 
-.. function:: mktemp([suffix=''[, prefix='tmp'[, dir=None]]])
+.. function:: mktemp(suffix='', prefix='tmp', dir=None)
 
    .. deprecated:: 2.3
       Use :func:`mkstemp` instead.
@@ -211,4 +227,37 @@ the appropriate function arguments, instead.
 
    Return the filename prefix used to create temporary files.  This does not
    contain the directory component.
+
+
+Examples
+--------
+
+Here are some examples of typical usage of the :mod:`tempfile` module::
+
+    >>> import tempfile
+
+    # create a temporary file and write some data to it
+    >>> fp = tempfile.TemporaryFile()
+    >>> fp.write('Hello world!')
+    # read data from file
+    >>> fp.seek(0)
+    >>> fp.read()
+    'Hello world!'
+    # close the file, it will be removed
+    >>> fp.close()
+
+    # create a temporary file using a context manager
+    >>> with tempfile.TemporaryFile() as fp:
+    ...     fp.write('Hello world!')
+    ...     fp.seek(0)
+    ...     fp.read()
+    'Hello world!'
+    >>>
+    # file is now closed and removed
+
+    # create a temporary directory using the context manager
+    >>> with tempfile.TemporaryDirectory() as tmpdirname:
+    ...     print 'created temporary directory', tmpdirname
+    >>>
+    # directory and contents have been removed
 

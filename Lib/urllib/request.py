@@ -30,7 +30,9 @@ handler, the argument will be installed instead of the default.
 install_opener -- Installs a new opener as the default opener.
 
 objects of interest:
-OpenerDirector --
+
+OpenerDirector -- Sets up the User Agent as the Python-urllib client and manages
+the Handler classes, while dealing with requests and responses.
 
 Request -- An object that encapsulates the state of a request.  The
 state can be as simple as the URL.  It can also include extra HTTP
@@ -92,18 +94,19 @@ import re
 import socket
 import sys
 import time
+import collections
 
 from urllib.error import URLError, HTTPError, ContentTooShortError
 from urllib.parse import (
     urlparse, urlsplit, urljoin, unwrap, quote, unquote,
     splittype, splithost, splitport, splituser, splitpasswd,
-    splitattr, splitquery, splitvalue, to_bytes, urlunparse)
+    splitattr, splitquery, splitvalue, splittag, to_bytes, urlunparse)
 from urllib.response import addinfourl, addclosehook
 
 # check for SSL
 try:
     import ssl
-except:
+except ImportError:
     _have_ssl = False
 else:
     _have_ssl = True
@@ -112,11 +115,27 @@ else:
 __version__ = sys.version[:3]
 
 _opener = None
-def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+def urlopen(url, data=None, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
+            *, cafile=None, capath=None):
     global _opener
-    if _opener is None:
-        _opener = build_opener()
-    return _opener.open(url, data, timeout)
+    if cafile or capath:
+        if not _have_ssl:
+            raise ValueError('SSL support not available')
+        context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        context.options |= ssl.OP_NO_SSLv2
+        if cafile or capath:
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(cafile, capath)
+            check_hostname = True
+        else:
+            check_hostname = False
+        https_handler = HTTPSHandler(context=context, check_hostname=check_hostname)
+        opener = build_opener(https_handler)
+    elif _opener is None:
+        _opener = opener = build_opener()
+    else:
+        opener = _opener
+    return opener.open(url, data, timeout)
 
 def install_opener(opener):
     global _opener
@@ -161,8 +180,10 @@ class Request:
                  origin_req_host=None, unverifiable=False):
         # unwrap('<URL:type://host/path>') --> 'type://host/path'
         self.full_url = unwrap(url)
+        self.full_url, fragment = splittag(self.full_url)
         self.data = data
         self.headers = {}
+        self._tunnel_host = None
         for key, value in headers.items():
             self.add_header(key, value)
         self.unredirected_hdrs = {}
@@ -218,8 +239,12 @@ class Request:
     # End deprecated methods
 
     def set_proxy(self, host, type):
-        self.host, self.type = host, type
-        self.selector = self.full_url
+        if self.type == 'https' and not self._tunnel_host:
+            self._tunnel_host = self.host
+        else:
+            self.type= type
+            self.selector = self.full_url
+        self.host = host
 
     def has_proxy(self):
         return self.selector == self.full_url
@@ -250,8 +275,9 @@ class OpenerDirector:
     def __init__(self):
         client_version = "Python-urllib/%s" % __version__
         self.addheaders = [('User-agent', client_version)]
-        # manage the individual handlers
+        # self.handlers is retained only for backward compatibility
         self.handlers = []
+        # manage the individual handlers
         self.handle_open = {}
         self.handle_error = {}
         self.process_response = {}
@@ -301,8 +327,6 @@ class OpenerDirector:
             added = True
 
         if added:
-            # the handlers must work in an specific order, the order
-            # is specified in a Handler attribute
             bisect.insort(self.handlers, handler)
             handler.add_parent(self)
 
@@ -393,7 +417,7 @@ def build_opener(*handlers):
     """Create an opener object from a list of handlers.
 
     The opener will use several default handlers, including support
-    for HTTP and FTP.
+    for HTTP, FTP and when applicable HTTPS.
 
     If any of the handlers passed as arguments are subclasses of the
     default handlers, the default handlers will not be used.
@@ -552,7 +576,7 @@ class HTTPRedirectHandler(BaseHandler):
         fp.read()
         fp.close()
 
-        return self.parent.open(new)
+        return self.parent.open(new, timeout=req.timeout)
 
     http_error_301 = http_error_303 = http_error_307 = http_error_302
 
@@ -652,6 +676,10 @@ class ProxyHandler(BaseHandler):
         proxy_type, user, password, hostport = _parse_proxy(proxy)
         if proxy_type is None:
             proxy_type = orig_type
+
+        if req.host and proxy_bypass(req.host):
+            return None
+
         if user and password:
             user_pass = '%s:%s' % (unquote(user),
                                    unquote(password))
@@ -659,7 +687,7 @@ class ProxyHandler(BaseHandler):
             req.add_header('Proxy-authorization', 'Basic ' + creds)
         hostport = unquote(hostport)
         req.set_proxy(hostport, proxy_type)
-        if orig_type == proxy_type:
+        if orig_type == proxy_type or orig_type == 'https':
             # let other handlers take care of it
             return None
         else:
@@ -669,7 +697,7 @@ class ProxyHandler(BaseHandler):
             # {'http': 'ftp://proxy.example.com'}, we may end up turning
             # a request for http://acme.example.com/a into one for
             # ftp://proxy.example.com/a
-            return self.parent.open(req)
+            return self.parent.open(req, timeout=req.timeout)
 
 class HTTPPasswordMgr:
 
@@ -764,18 +792,33 @@ class AbstractBasicAuthHandler:
             password_mgr = HTTPPasswordMgr()
         self.passwd = password_mgr
         self.add_password = self.passwd.add_password
+        self.retried = 0
+
+    def reset_retry_count(self):
+        self.retried = 0
 
     def http_error_auth_reqed(self, authreq, host, req, headers):
         # host may be an authority (without userinfo) or a URL with an
         # authority
         # XXX could be multiple headers
         authreq = headers.get(authreq, None)
+
+        if self.retried > 5:
+            # retry sending the username:password 5 times before failing.
+            raise HTTPError(req.get_full_url(), 401, "basic auth failed",
+                    headers, None)
+        else:
+            self.retried += 1
+
         if authreq:
             mo = AbstractBasicAuthHandler.rx.search(authreq)
             if mo:
                 scheme, quote, realm = mo.groups()
                 if scheme.lower() == 'basic':
-                    return self.retry_http_basic_auth(host, req, realm)
+                    response = self.retry_http_basic_auth(host, req, realm)
+                    if response and response.code != 401:
+                        self.retried = 0
+                    return response
 
     def retry_http_basic_auth(self, host, req, realm):
         user, pw = self.passwd.find_user_password(realm, host)
@@ -784,8 +827,8 @@ class AbstractBasicAuthHandler:
             auth = "Basic " + base64.b64encode(raw.encode()).decode("ascii")
             if req.headers.get(self.auth_header, None) == auth:
                 return None
-            req.add_header(self.auth_header, auth)
-            return self.parent.open(req)
+            req.add_unredirected_header(self.auth_header, auth)
+            return self.parent.open(req, timeout=req.timeout)
         else:
             return None
 
@@ -796,8 +839,10 @@ class HTTPBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
 
     def http_error_401(self, req, fp, code, msg, headers):
         url = req.full_url
-        return self.http_error_auth_reqed('www-authenticate',
+        response = self.http_error_auth_reqed('www-authenticate',
                                           url, req, headers)
+        self.reset_retry_count()
+        return response
 
 
 class ProxyBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
@@ -810,8 +855,10 @@ class ProxyBasicAuthHandler(AbstractBasicAuthHandler, BaseHandler):
         # should not, RFC 3986 s. 3.2.1) support requests for URLs containing
         # userinfo.
         authority = req.host
-        return self.http_error_auth_reqed('proxy-authenticate',
+        response = self.http_error_auth_reqed('proxy-authenticate',
                                           authority, req, headers)
+        self.reset_retry_count()
+        return response
 
 
 def randombytes(n):
@@ -836,6 +883,7 @@ class AbstractDigestAuthHandler:
         self.add_password = self.passwd.add_password
         self.retried = 0
         self.nonce_count = 0
+        self.last_nonce = None
 
     def reset_retry_count(self):
         self.retried = 0
@@ -866,7 +914,7 @@ class AbstractDigestAuthHandler:
             if req.headers.get(self.auth_header, None) == auth_val:
                 return None
             req.add_unredirected_header(self.auth_header, auth_val)
-            resp = self.parent.open(req)
+            resp = self.parent.open(req, timeout=req.timeout)
             return resp
 
     def get_cnonce(self, nonce):
@@ -911,7 +959,11 @@ class AbstractDigestAuthHandler:
                         # XXX selector: what about proxies and full urls
                         req.selector)
         if qop == 'auth':
-            self.nonce_count += 1
+            if nonce == self.last_nonce:
+                self.nonce_count += 1
+            else:
+                self.nonce_count = 1
+                self.last_nonce = nonce
             ncvalue = '%08x' % self.nonce_count
             cnonce = self.get_cnonce(nonce)
             noncebit = "%s:%s:%s:%s:%s" % (nonce, ncvalue, cnonce, qop, H(A2))
@@ -1001,8 +1053,16 @@ class AbstractHTTPHandler(BaseHandler):
                     'Content-type',
                     'application/x-www-form-urlencoded')
             if not request.has_header('Content-length'):
-                request.add_unredirected_header(
-                    'Content-length', '%d' % len(data))
+                try:
+                    mv = memoryview(data)
+                except TypeError:
+                    if isinstance(data, collections.Iterable):
+                        raise ValueError("Content-Length should be specified \
+                                for iterable data of type %r %r" % (type(data),
+                                data))
+                else:
+                    request.add_unredirected_header(
+                            'Content-length', '%d' % (len(mv) * mv.itemsize))
 
         sel_host = host
         if request.has_proxy():
@@ -1017,7 +1077,7 @@ class AbstractHTTPHandler(BaseHandler):
 
         return request
 
-    def do_open(self, http_class, req):
+    def do_open(self, http_class, req, **http_conn_args):
         """Return an HTTPResponse object for the request, using http_class.
 
         http_class must implement the HTTPConnection API from http.client.
@@ -1026,9 +1086,12 @@ class AbstractHTTPHandler(BaseHandler):
         if not host:
             raise URLError('no host given')
 
-        h = http_class(host, timeout=req.timeout) # will parse host:port
-        headers = dict(req.headers)
-        headers.update(req.unredirected_hdrs)
+        # will parse host:port
+        h = http_class(host, timeout=req.timeout, **http_conn_args)
+
+        headers = dict(req.unredirected_hdrs)
+        headers.update(dict((k, v) for k, v in req.headers.items()
+                            if k not in headers))
 
         # TODO(jhylton): Should this be redesigned to handle
         # persistent connections?
@@ -1041,6 +1104,17 @@ class AbstractHTTPHandler(BaseHandler):
         # request.
         headers["Connection"] = "close"
         headers = dict((name.title(), val) for name, val in headers.items())
+
+        if req._tunnel_host:
+            tunnel_headers = {}
+            proxy_auth_hdr = "Proxy-Authorization"
+            if proxy_auth_hdr in headers:
+                tunnel_headers[proxy_auth_hdr] = headers[proxy_auth_hdr]
+                # Proxy-Authorization should not be sent to origin
+                # server.
+                del headers[proxy_auth_hdr]
+            h.set_tunnel(req._tunnel_host, headers=tunnel_headers)
+
         try:
             h.request(req.get_method(), req.selector, req.data, headers)
             r = h.getresponse()  # an HTTPResponse instance
@@ -1065,10 +1139,18 @@ class HTTPHandler(AbstractHTTPHandler):
     http_request = AbstractHTTPHandler.do_request_
 
 if hasattr(http.client, 'HTTPSConnection'):
+    import ssl
+
     class HTTPSHandler(AbstractHTTPHandler):
 
+        def __init__(self, debuglevel=0, context=None, check_hostname=None):
+            AbstractHTTPHandler.__init__(self, debuglevel)
+            self._context = context
+            self._check_hostname = check_hostname
+
         def https_open(self, req):
-            return self.do_open(http.client.HTTPSConnection, req)
+            return self.do_open(http.client.HTTPSConnection, req,
+                context=self._context, check_hostname=self._check_hostname)
 
         https_request = AbstractHTTPHandler.do_request_
 
@@ -1152,9 +1234,10 @@ class FileHandler(BaseHandler):
     # Use local file or FTP depending on form of URL
     def file_open(self, req):
         url = req.selector
-        if url[:2] == '//' and url[2:3] != '/':
-            req.type = 'ftp'
-            return self.parent.open(req)
+        if url[:2] == '//' and url[2:3] != '/' and (req.host and
+                req.host != 'localhost'):
+            if not req.host is self.get_names():
+                raise URLError("file:// scheme is supported only on localhost")
         else:
             return self.open_local_file(req)
 
@@ -1163,8 +1246,9 @@ class FileHandler(BaseHandler):
     def get_names(self):
         if FileHandler.names is None:
             try:
-                FileHandler.names = (socket.gethostbyname('localhost'),
-                                    socket.gethostbyname(socket.gethostname()))
+                FileHandler.names = tuple(
+                    socket.gethostbyname_ex('localhost')[2] +
+                    socket.gethostbyname_ex(socket.gethostname())[2])
             except socket.gaierror:
                 FileHandler.names = (socket.gethostbyname('localhost'),)
         return FileHandler.names
@@ -1174,13 +1258,13 @@ class FileHandler(BaseHandler):
         import email.utils
         import mimetypes
         host = req.host
-        file = req.selector
-        localfile = url2pathname(file)
+        filename = req.selector
+        localfile = url2pathname(filename)
         try:
             stats = os.stat(localfile)
             size = stats.st_size
             modified = email.utils.formatdate(stats.st_mtime, usegmt=True)
-            mtype = mimetypes.guess_type(file)[0]
+            mtype = mimetypes.guess_type(filename)[0]
             headers = email.message_from_string(
                 'Content-type: %s\nContent-length: %d\nLast-modified: %s\n' %
                 (mtype or 'text/plain', size, modified))
@@ -1188,7 +1272,11 @@ class FileHandler(BaseHandler):
                 host, port = splitport(host)
             if not host or \
                 (not port and _safe_gethostbyname(host) in self.get_names()):
-                return addinfourl(open(localfile, 'rb'), headers, 'file:'+file)
+                if host:
+                    origurl = 'file://' + host + filename
+                else:
+                    origurl = 'file://' + filename
+                return addinfourl(open(localfile, 'rb'), headers, origurl)
         except OSError as msg:
             # users shouldn't expect OSErrors coming from urlopen()
             raise URLError(msg)
@@ -1220,8 +1308,8 @@ class FTPHandler(BaseHandler):
         else:
             passwd = None
         host = unquote(host)
-        user = unquote(user or '')
-        passwd = unquote(passwd or '')
+        user = user or ''
+        passwd = passwd or ''
 
         try:
             host = socket.gethostbyname(host)
@@ -1310,9 +1398,7 @@ class CacheFTPHandler(FTPHandler):
 MAXFTPCACHE = 10        # Trim the ftp cache beyond this size
 
 # Helper for non-unix systems
-if os.name == 'mac':
-    from macurl2path import url2pathname, pathname2url
-elif os.name == 'nt':
+if os.name == 'nt':
     from nturl2path import url2pathname, pathname2url
 else:
     def url2pathname(pathname):
@@ -1398,7 +1484,7 @@ class URLopener:
     def open(self, fullurl, data=None):
         """Use URLopener().open(file) instead of open(file, 'r')."""
         fullurl = unwrap(to_bytes(fullurl))
-        fullurl = quote(fullurl, safe="%/:=&?~#+!$,;'@()*[]")
+        fullurl = quote(fullurl, safe="%/:=&?~#+!$,;'@()*[]|")
         if self.tempcache and fullurl in self.tempcache:
             filename, headers = self.tempcache[fullurl]
             fp = open(filename, 'rb')
@@ -1451,7 +1537,7 @@ class URLopener:
             try:
                 fp = self.open_local_file(url1)
                 hdrs = fp.info()
-                del fp
+                fp.close()
                 return url2pathname(splithost(url1)[1]), hdrs
             except IOError as msg:
                 pass
@@ -1495,8 +1581,6 @@ class URLopener:
                 tfp.close()
         finally:
             fp.close()
-        del fp
-        del tfp
 
         # raise exception if actual size does not match content-length header
         if size >= 0 and read < size:
@@ -1553,13 +1637,13 @@ class URLopener:
 
         if proxy_passwd:
             import base64
-            proxy_auth = base64.b64encode(proxy_passwd).strip()
+            proxy_auth = base64.b64encode(proxy_passwd.encode()).decode('ascii')
         else:
             proxy_auth = None
 
         if user_passwd:
             import base64
-            auth = base64.b64encode(user_passwd).strip()
+            auth = base64.b64encode(user_passwd.encode()).decode('ascii')
         else:
             auth = None
         http_conn = connection_factory(host)
@@ -1636,7 +1720,7 @@ class URLopener:
         if not isinstance(url, str):
             raise URLError('file error', 'proxy support for file protocol currently not implemented')
         if url[:2] == '//' and url[2:3] != '/' and url[2:12].lower() != 'localhost/':
-            return self.open_ftp(url)
+            raise ValueError("file:// scheme is supported only on localhost")
         else:
             return self.open_local_file(url)
 
@@ -1663,7 +1747,7 @@ class URLopener:
             return addinfourl(open(localname, 'rb'), headers, urlfile)
         host, port = splitport(host)
         if (not port
-           and socket.gethostbyname(host) in (localhost(), thishost())):
+           and socket.gethostbyname(host) in (localhost() + thishost())):
             urlfile = file
             if file[:1] == '/':
                 urlfile = 'file://' + file
@@ -1753,7 +1837,7 @@ class URLopener:
         else:
             encoding = ''
         msg = []
-        msg.append('Date: %s'%time.strftime('%a, %d %b %Y %T GMT',
+        msg.append('Date: %s'%time.strftime('%a, %d %b %Y %H:%M:%S GMT',
                                             time.gmtime(time.time())))
         msg.append('Content-type: %s' % type)
         if encoding == 'base64':
@@ -1829,7 +1913,8 @@ class FancyURLopener(URLopener):
         else:
             return self.http_error_default(url, fp, errcode, errmsg, headers)
 
-    def http_error_401(self, url, fp, errcode, errmsg, headers, data=None):
+    def http_error_401(self, url, fp, errcode, errmsg, headers, data=None,
+            retry=False):
         """Error 401 -- authentication required.
         This function supports Basic authentication only."""
         if not 'www-authenticate' in headers:
@@ -1845,13 +1930,17 @@ class FancyURLopener(URLopener):
         if scheme.lower() != 'basic':
             URLopener.http_error_default(self, url, fp,
                                          errcode, errmsg, headers)
+        if not retry:
+            URLopener.http_error_default(self, url, fp, errcode, errmsg,
+                    headers)
         name = 'retry_' + self.type + '_basic_auth'
         if data is None:
             return getattr(self,name)(url, realm)
         else:
             return getattr(self,name)(url, realm, data)
 
-    def http_error_407(self, url, fp, errcode, errmsg, headers, data=None):
+    def http_error_407(self, url, fp, errcode, errmsg, headers, data=None,
+            retry=False):
         """Error 407 -- proxy authentication required.
         This function supports Basic authentication only."""
         if not 'proxy-authenticate' in headers:
@@ -1867,6 +1956,9 @@ class FancyURLopener(URLopener):
         if scheme.lower() != 'basic':
             URLopener.http_error_default(self, url, fp,
                                          errcode, errmsg, headers)
+        if not retry:
+            URLopener.http_error_default(self, url, fp, errcode, errmsg,
+                    headers)
         name = 'retry_proxy_' + self.type + '_basic_auth'
         if data is None:
             return getattr(self,name)(url, realm)
@@ -1937,7 +2029,7 @@ class FancyURLopener(URLopener):
         else:
             return self.open(newurl, data)
 
-    def get_user_passwd(self, host, realm, clear_cache = 0):
+    def get_user_passwd(self, host, realm, clear_cache=0):
         key = realm + '@' + host.lower()
         if key in self.auth_cache:
             if clear_cache:
@@ -1973,10 +2065,10 @@ def localhost():
 
 _thishost = None
 def thishost():
-    """Return the IP address of the current host."""
+    """Return the IP addresses of the current host."""
     global _thishost
     if _thishost is None:
-        _thishost = socket.gethostbyname(socket.gethostname())
+        _thishost = tuple(socket.gethostbyname_ex(socket.gethostname()[2]))
     return _thishost
 
 _ftperrors = None
@@ -2114,44 +2206,87 @@ def proxy_bypass_environment(host):
 
 
 if sys.platform == 'darwin':
-    def getproxies_internetconfig():
+    from _scproxy import _get_proxy_settings, _get_proxies
+
+    def proxy_bypass_macosx_sysconf(host):
+        """
+        Return True iff this host shouldn't be accessed using a proxy
+
+        This function uses the MacOSX framework SystemConfiguration
+        to fetch the proxy information.
+        """
+        import re
+        import socket
+        from fnmatch import fnmatch
+
+        hostonly, port = splitport(host)
+
+        def ip2num(ipAddr):
+            parts = ipAddr.split('.')
+            parts = list(map(int, parts))
+            if len(parts) != 4:
+                parts = (parts + [0, 0, 0, 0])[:4]
+            return (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]
+
+        proxy_settings = _get_proxy_settings()
+
+        # Check for simple host names:
+        if '.' not in host:
+            if proxy_settings['exclude_simple']:
+                return True
+
+        hostIP = None
+
+        for value in proxy_settings.get('exceptions', ()):
+            # Items in the list are strings like these: *.local, 169.254/16
+            if not value: continue
+
+            m = re.match(r"(\d+(?:\.\d+)*)(/\d+)?", value)
+            if m is not None:
+                if hostIP is None:
+                    try:
+                        hostIP = socket.gethostbyname(hostonly)
+                        hostIP = ip2num(hostIP)
+                    except socket.error:
+                        continue
+
+                base = ip2num(m.group(1))
+                mask = m.group(2)
+                if mask is None:
+                    mask = 8 * (m.group(1).count('.') + 1)
+
+                else:
+                    mask = int(mask[1:])
+                    mask = 32 - mask
+
+                if (hostIP >> mask) == (base >> mask):
+                    return True
+
+            elif fnmatch(host, value):
+                return True
+
+        return False
+
+
+    def getproxies_macosx_sysconf():
         """Return a dictionary of scheme -> proxy server URL mappings.
 
-        By convention the mac uses Internet Config to store
-        proxies.  An HTTP proxy, for instance, is stored under
-        the HttpProxy key.
-
+        This function uses the MacOSX framework SystemConfiguration
+        to fetch the proxy information.
         """
-        try:
-            import ic
-        except ImportError:
-            return {}
+        return _get_proxies()
 
-        try:
-            config = ic.IC()
-        except ic.error:
-            return {}
-        proxies = {}
-        # HTTP:
-        if 'UseHTTPProxy' in config and config['UseHTTPProxy']:
-            try:
-                value = config['HTTPProxyHost']
-            except ic.error:
-                pass
-            else:
-                proxies['http'] = 'http://%s' % value
-        # FTP: XXX To be done.
-        # Gopher: XXX To be done.
-        return proxies
+
 
     def proxy_bypass(host):
         if getproxies_environment():
             return proxy_bypass_environment(host)
         else:
-            return 0
+            return proxy_bypass_macosx_sysconf(host)
 
     def getproxies():
-        return getproxies_environment() or getproxies_internetconfig()
+        return getproxies_environment() or getproxies_macosx_sysconf()
+
 
 elif os.name == 'nt':
     def getproxies_registry():
@@ -2190,6 +2325,7 @@ elif os.name == 'nt':
                         proxies['http'] = proxyServer
                     else:
                         proxies['http'] = 'http://%s' % proxyServer
+                        proxies['https'] = 'https://%s' % proxyServer
                         proxies['ftp'] = 'ftp://%s' % proxyServer
             internetSettings.Close()
         except (WindowsError, ValueError, TypeError):

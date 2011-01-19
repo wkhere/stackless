@@ -87,7 +87,7 @@ The following constructs bind names: formal parameters to functions,
 :keyword:`import` statements, class and function definitions (these bind the
 class or function name in the defining block), and targets that are identifiers
 if occurring in an assignment, :keyword:`for` loop header, or after
-:keyword:`as` in a :keyword:`with` statement or :keyword.`except` clause.
+:keyword:`as` in a :keyword:`with` statement or :keyword:`except` clause.
 The :keyword:`import` statement
 of the form ``from ... import *`` binds all names defined in the imported
 module, except those beginning with an underscore.  This form may only be used
@@ -112,15 +112,15 @@ If the :keyword:`global` statement occurs within a block, all uses of the name
 specified in the statement refer to the binding of that name in the top-level
 namespace.  Names are resolved in the top-level namespace by searching the
 global namespace, i.e. the namespace of the module containing the code block,
-and the builtin namespace, the namespace of the module :mod:`builtins`.  The
-global namespace is searched first.  If the name is not found there, the builtin
+and the builtins namespace, the namespace of the module :mod:`builtins`.  The
+global namespace is searched first.  If the name is not found there, the builtins
 namespace is searched.  The global statement must precede all uses of the name.
 
 .. XXX document "nonlocal" semantics here
 
 .. index:: pair: restricted; execution
 
-The built-in namespace associated with the execution of a code block is actually
+The builtins namespace associated with the execution of a code block is actually
 found by looking up the name ``__builtins__`` in its global namespace; this
 should be a dictionary or a module (in the latter case the module's dictionary
 is used).  By default, when in the :mod:`__main__` module, ``__builtins__`` is
@@ -129,10 +129,10 @@ the built-in module :mod:`builtins`; when in any other module,
 itself.  ``__builtins__`` can be set to a user-created dictionary to create a
 weak form of restricted execution.
 
-.. note::
+.. impl-detail::
 
    Users should not touch ``__builtins__``; it is strictly an implementation
-   detail.  Users wanting to override values in the built-in namespace should
+   detail.  Users wanting to override values in the builtins namespace should
    :keyword:`import` the :mod:`builtins` module and modify its
    attributes appropriately.
 
@@ -141,9 +141,9 @@ weak form of restricted execution.
 The namespace for a module is automatically created the first time a module is
 imported.  The main module for a script is always called :mod:`__main__`.
 
-The global statement has the same scope as a name binding operation in the same
-block.  If the nearest enclosing scope for a free variable contains a global
-statement, the free variable is treated as a global.
+The :keyword:`global` statement has the same scope as a name binding operation
+in the same block.  If the nearest enclosing scope for a free variable contains
+a global statement, the free variable is treated as a global.
 
 A class definition is an executable statement that may use and define names.
 These references follow the normal rules for name resolution.  The namespace of

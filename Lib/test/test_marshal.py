@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from test import support
 import marshal
@@ -11,16 +11,10 @@ class HelperMixin:
         new = marshal.loads(marshal.dumps(sample, *extra))
         self.assertEqual(sample, new)
         try:
-            f = open(support.TESTFN, "wb")
-            try:
+            with open(support.TESTFN, "wb") as f:
                 marshal.dump(sample, f, *extra)
-            finally:
-                f.close()
-            f = open(support.TESTFN, "rb")
-            try:
+            with open(support.TESTFN, "rb") as f:
                 new = marshal.load(f)
-            finally:
-                f.close()
             self.assertEqual(sample, new)
         finally:
             support.unlink(support.TESTFN)
@@ -155,8 +149,8 @@ class BugsTestCase(unittest.TestCase):
 
     def test_version_argument(self):
         # Python 2.4.0 crashes for any call to marshal.dumps(x, y)
-        self.assertEquals(marshal.loads(marshal.dumps(5, 0)), 5)
-        self.assertEquals(marshal.loads(marshal.dumps(5, 1)), 5)
+        self.assertEqual(marshal.loads(marshal.dumps(5, 0)), 5)
+        self.assertEqual(marshal.loads(marshal.dumps(5, 1)), 5)
 
     def test_fuzz(self):
         # simple test that it's at least not *totally* trivial to
@@ -211,6 +205,11 @@ class BugsTestCase(unittest.TestCase):
         size = int(1e6)
         testString = 'abc' * size
         marshal.dumps(testString)
+
+    def test_invalid_longs(self):
+        # Issue #7019: marshal.loads shouldn't produce unnormalized PyLongs
+        invalid_string = b'l\x02\x00\x00\x00\x00\x00\x00\x00'
+        self.assertRaises(ValueError, marshal.loads, invalid_string)
 
 
 def test_main():

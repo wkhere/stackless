@@ -1,10 +1,12 @@
 """Tests for distutils.cmd."""
 import unittest
 import os
+from test.support import captured_stdout, run_unittest
 
 from distutils.cmd import Command
 from distutils.dist import Distribution
 from distutils.errors import DistutilsOptionError
+from distutils import debug
 
 class MyCmd(Command):
     def initialize_options(self):
@@ -42,7 +44,7 @@ class CommandTestCase(unittest.TestCase):
 
         # making sure execute gets called properly
         def _execute(func, args, exec_msg, level):
-            self.assertEquals(exec_msg, 'generating out from in')
+            self.assertEqual(exec_msg, 'generating out from in')
         cmd.force = True
         cmd.execute = _execute
         cmd.make_file(infiles='in', outfile='out', func='func', args=())
@@ -61,7 +63,7 @@ class CommandTestCase(unittest.TestCase):
 
         wanted = ["command options for 'MyCmd':", '  option1 = 1',
                   '  option2 = 1']
-        self.assertEquals(msgs, wanted)
+        self.assertEqual(msgs, wanted)
 
     def test_ensure_string(self):
         cmd = self.cmd
@@ -70,7 +72,7 @@ class CommandTestCase(unittest.TestCase):
 
         cmd.option2 = None
         cmd.ensure_string('option2', 'xxx')
-        self.assert_(hasattr(cmd, 'option2'))
+        self.assertTrue(hasattr(cmd, 'option2'))
 
         cmd.option3 = 1
         self.assertRaises(DistutilsOptionError, cmd.ensure_string, 'option3')
@@ -79,7 +81,7 @@ class CommandTestCase(unittest.TestCase):
         cmd = self.cmd
         cmd.option1 = 'ok,dok'
         cmd.ensure_string_list('option1')
-        self.assertEquals(cmd.option1, ['ok', 'dok'])
+        self.assertEqual(cmd.option1, ['ok', 'dok'])
 
         cmd.option2 = ['xxx', 'www']
         cmd.ensure_string_list('option2')
@@ -97,13 +99,29 @@ class CommandTestCase(unittest.TestCase):
 
     def test_ensure_dirname(self):
         cmd = self.cmd
-        cmd.option1 = os.path.dirname(__file__)
+        cmd.option1 = os.path.dirname(__file__) or os.curdir
         cmd.ensure_dirname('option1')
         cmd.option2 = 'xxx'
         self.assertRaises(DistutilsOptionError, cmd.ensure_dirname, 'option2')
+
+    def test_debug_print(self):
+        cmd = self.cmd
+        with captured_stdout() as stdout:
+            cmd.debug_print('xxx')
+        stdout.seek(0)
+        self.assertEqual(stdout.read(), '')
+
+        debug.DEBUG = True
+        try:
+            with captured_stdout() as stdout:
+                cmd.debug_print('xxx')
+            stdout.seek(0)
+            self.assertEqual(stdout.read(), 'xxx\n')
+        finally:
+            debug.DEBUG = False
 
 def test_suite():
     return unittest.makeSuite(CommandTestCase)
 
 if __name__ == '__main__':
-    test_support.run_unittest(test_suite())
+    run_unittest(test_suite())

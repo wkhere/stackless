@@ -3,7 +3,33 @@
 #
 # multiprocessing/connection.py
 #
-# Copyright (c) 2006-2008, R Oudkerk --- see COPYING.txt
+# Copyright (c) 2006-2008, R Oudkerk
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. Neither the name of author nor the names of any contributors may be
+#    used to endorse or promote products derived from this software
+#    without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
 #
 
 __all__ = [ 'Client', 'Listener', 'Pipe' ]
@@ -27,6 +53,8 @@ from multiprocessing.forking import duplicate, close
 #
 
 BUFSIZE = 8192
+# A very generous timeout when it comes to local connections...
+CONNECTION_TIMEOUT = 20.
 
 _mmap_counter = itertools.count()
 
@@ -40,6 +68,13 @@ if hasattr(socket, 'AF_UNIX'):
 if sys.platform == 'win32':
     default_family = 'AF_PIPE'
     families += ['AF_PIPE']
+
+
+def _init_timeout(timeout=CONNECTION_TIMEOUT):
+    return time.time() + timeout
+
+def _check_timeout(t):
+    return time.time() > t
 
 #
 #
@@ -164,7 +199,7 @@ if sys.platform != 'win32':
 
 else:
 
-    from ._multiprocessing import win32
+    from _multiprocessing import win32
 
     def Pipe(duplex=True):
         '''
@@ -246,24 +281,24 @@ def SocketClient(address):
     Return a connection object connected to the socket given by `address`
     '''
     family = address_type(address)
-    s = socket.socket( getattr(socket, family) )
+    with socket.socket( getattr(socket, family) ) as s:
+        t = _init_timeout()
 
-    while 1:
-        try:
-            s.connect(address)
-        except socket.error as e:
-            if e.args[0] != errno.ECONNREFUSED: # connection refused
-                debug('failed to connect to address %s', address)
-                raise
-            time.sleep(0.01)
+        while 1:
+            try:
+                s.connect(address)
+            except socket.error as e:
+                if e.args[0] != errno.ECONNREFUSED or _check_timeout(t):
+                    debug('failed to connect to address %s', address)
+                    raise
+                time.sleep(0.01)
+            else:
+                break
         else:
-            break
-    else:
-        raise
+            raise
 
-    fd = duplicate(s.fileno())
+        fd = duplicate(s.fileno())
     conn = _multiprocessing.Connection(fd)
-    s.close()
     return conn
 
 #
@@ -322,6 +357,7 @@ if sys.platform == 'win32':
         '''
         Return a connection object connected to the pipe given by `address`
         '''
+        t = _init_timeout()
         while 1:
             try:
                 win32.WaitNamedPipe(address, 1000)
@@ -331,7 +367,7 @@ if sys.platform == 'win32':
                     )
             except WindowsError as e:
                 if e.args[0] not in (win32.ERROR_SEM_TIMEOUT,
-                                     win32.ERROR_PIPE_BUSY):
+                                     win32.ERROR_PIPE_BUSY) or _check_timeout(t):
                     raise
             else:
                 break

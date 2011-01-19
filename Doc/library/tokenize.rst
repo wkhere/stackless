@@ -6,6 +6,9 @@
 .. moduleauthor:: Ka Ping Yee
 .. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>
 
+**Source code:** :source:`Lib/tokenize.py`
+
+--------------
 
 The :mod:`tokenize` module provides a lexical scanner for Python source code,
 implemented in Python.  The scanner in this module returns comments as tokens
@@ -18,9 +21,8 @@ The primary entry point is a :term:`generator`:
 
    The :func:`tokenize` generator requires one argument, *readline*, which
    must be a callable object which provides the same interface as the
-   :meth:`readline` method of built-in file objects (see section
-   :ref:`bltin-file-objects`).  Each call to the function should return one
-   line of input as bytes.
+   :meth:`io.IOBase.readline` method of file objects.  Each call to the
+   function should return one line of input as bytes.
 
    The generator produces 5-tuples with these members: the token type; the
    token string; a 2-tuple ``(srow, scol)`` of ints specifying the row and
@@ -94,15 +96,31 @@ function it uses to do this is available:
     (as a string) and a list of any lines (not decoded from bytes) it has read
     in.
 
-    It detects the encoding from the presence of a utf-8 bom or an encoding
-    cookie as specified in pep-0263. If both a bom and a cookie are present,
-    but disagree, a SyntaxError will be raised.
+    It detects the encoding from the presence of a UTF-8 BOM or an encoding
+    cookie as specified in :pep:`263`. If both a BOM and a cookie are present,
+    but disagree, a SyntaxError will be raised. Note that if the BOM is found,
+    ``'utf-8-sig'`` will be returned as an encoding.
 
-    If no encoding is specified, then the default of 'utf-8' will be returned.
+    If no encoding is specified, then the default of ``'utf-8'`` will be
+    returned.
+
+    Use :func:`open` to open Python source files: it uses
+    :func:`detect_encoding` to detect the file encoding.
 
 
-Example of a script re-writer that transforms float literals into Decimal
+.. function:: open(filename)
+
+   Open a file in read only mode using the encoding detected by
+   :func:`detect_encoding`.
+
+   .. versionadded:: 3.2
+
+
+Example of a script rewriter that transforms float literals into Decimal
 objects::
+
+    from tokenize import tokenize, untokenize, NUMBER, STRING, NAME, OP
+    from io import BytesIO
 
     def decistmt(s):
         """Substitute Decimals for floats in a string of statements.
@@ -139,5 +157,4 @@ objects::
             else:
                 result.append((toknum, tokval))
         return untokenize(result).decode('utf-8')
-
 

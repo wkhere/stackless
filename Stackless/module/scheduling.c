@@ -252,7 +252,7 @@ PyTypeObject PyBomb_Type = {
 	0,					/* tp_init */
 	0,					/* tp_alloc */
 	bomb_new,				/* tp_new */
-	_PyObject_GC_Del,			/* tp_free */
+	PyObject_GC_Del,			/* tp_free */
 };
 
 
@@ -352,13 +352,13 @@ slp_schedule_callback(PyTaskletObject *prev, PyTaskletObject *next)
 	 */
 	 tmp = ts->st.del_post_switch;
 	 ts->st.del_post_switch = NULL;
-		
+
 	PyErr_Fetch(&type, &value, &traceback);
 	ret = PyObject_CallFunction(_slp_schedule_hook, "(OO)", prev, next);
-		
+
 	assert(ts->st.del_post_switch == NULL);
 	ts->st.del_post_switch = tmp;
-		
+
 	if (ret != NULL)
 		PyErr_Restore(type, value, traceback);
 	else {
@@ -483,7 +483,7 @@ jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
 	PyThreadState *ts = PyThreadState_GET();
 
 	ts->frame = f->f_back;
-	
+
 	/* reinstate the del_post_switch */
 	assert(ts->st.del_post_switch == NULL);
 	ts->st.del_post_switch = ((PyCFrameObject*)f)->ob1;
@@ -609,7 +609,7 @@ schedule_task_block(PyTaskletObject *prev, int stackless)
 	PyTaskletObject *next = NULL;
 	PyObject *self_lock, *unlocker_lock;
 	int revive_main = 0;
-	
+
 #ifdef WITH_THREAD
 	if ( !(ts->st.runflags & Py_WATCHDOG_THREADBLOCK) && ts->st.main->next == NULL)
 		/* we also must never block if watchdog is running not in threadblocking mode */
@@ -772,7 +772,7 @@ static PyObject *schedule_task_unblock(PyTaskletObject *prev,
 	release_lock(unlock_lock);
 	PR("unblocker RELEASED unlocker lock");
 	Py_DECREF(unlock_lock);
-	
+
 	return retval;
 }
 
@@ -809,7 +809,7 @@ static void slp_schedule_soft_irq(PyThreadState *ts, PyTaskletObject *prev,
 	slp_current_insert(ts->st.main);
 	Py_INCREF(ts->st.main);
 	ts->st.current = tmp;
-	
+
 	*next = ts->st.main;
 }
 

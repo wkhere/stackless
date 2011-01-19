@@ -58,7 +58,7 @@ class OSSAudioDevTests(unittest.TestCase):
         dsp.fileno()
 
         # Make sure the read-only attributes work.
-        self.failIf(dsp.closed)
+        self.assertFalse(dsp.closed)
         self.assertEqual(dsp.name, "/dev/dsp")
         self.assertEqual(dsp.mode, "w", "bad dsp.mode: %r" % dsp.mode)
 
@@ -76,7 +76,7 @@ class OSSAudioDevTests(unittest.TestCase):
 
         # set parameters based on .au file headers
         dsp.setparameters(AFMT_S16_NE, nchannels, rate)
-        self.assertTrue(abs(expected_time - 2.94) < 1e-2, expected_time)
+        self.assertTrue(abs(expected_time - 3.51) < 1e-2, expected_time)
         t1 = time.time()
         dsp.write(data)
         dsp.close()
@@ -84,7 +84,7 @@ class OSSAudioDevTests(unittest.TestCase):
         elapsed_time = t2 - t1
 
         percent_diff = (abs(elapsed_time - expected_time) / expected_time) * 100
-        self.failUnless(percent_diff <= 10.0,
+        self.assertTrue(percent_diff <= 10.0,
                         "elapsed time (%s) > 10%% off of expected time (%s)" %
                         (elapsed_time, expected_time))
 
@@ -133,7 +133,7 @@ class OSSAudioDevTests(unittest.TestCase):
                       ]:
             (fmt, channels, rate) = config
             result = dsp.setparameters(fmt, channels, rate, False)
-            self.failIfEqual(result, config,
+            self.assertNotEqual(result, config,
                              "unexpectedly got requested configuration")
 
             try:
@@ -157,7 +157,18 @@ class OSSAudioDevTests(unittest.TestCase):
             #self.set_bad_parameters(dsp)
         finally:
             dsp.close()
-            self.failUnless(dsp.closed)
+            self.assertTrue(dsp.closed)
+
+    def test_mixer_methods(self):
+        # Issue #8139: ossaudiodev didn't initialize its types properly,
+        # therefore some methods were unavailable.
+        with ossaudiodev.openmixer() as mixer:
+            self.assertGreaterEqual(mixer.fileno(), 0)
+
+    def test_with(self):
+        with ossaudiodev.open('w') as dsp:
+            pass
+        self.assertTrue(dsp.closed)
 
 
 def test_main():

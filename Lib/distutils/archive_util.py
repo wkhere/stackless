@@ -68,7 +68,7 @@ def make_tarball(base_name, base_dir, compress="gzip", verbose=0, dry_run=0):
 def make_zipfile(base_name, base_dir, verbose=0, dry_run=0):
     """Create a zip file from all the files under 'base_dir'.
 
-    The output zip file will be named 'base_dir' + ".zip".  Uses either the
+    The output zip file will be named 'base_name' + ".zip".  Uses either the
     "zipfile" Python module (if available) or the InfoZIP "zip" utility
     (if installed and found on the default search path).  If neither tool is
     available, raises DistutilsExecError.  Returns the name of the output zip
@@ -171,10 +171,11 @@ def make_archive(base_name, format, root_dir=None, base_dir=None, verbose=0,
     func = format_info[0]
     for arg, val in format_info[1]:
         kwargs[arg] = val
-    filename = func(base_name, base_dir, **kwargs)
-
-    if root_dir is not None:
-        log.debug("changing back to '%s'", save_cwd)
-        os.chdir(save_cwd)
+    try:
+        filename = func(base_name, base_dir, **kwargs)
+    finally:
+        if root_dir is not None:
+            log.debug("changing back to '%s'", save_cwd)
+            os.chdir(save_cwd)
 
     return filename

@@ -12,7 +12,7 @@ Becomes:
 
 # Local imports
 from .. import fixer_base
-from os.path import dirname, join, exists, pathsep
+from os.path import dirname, join, exists, sep
 from ..fixer_util import FromImport, syms, token
 
 
@@ -36,6 +36,7 @@ def traverse_imports(names):
 
 
 class FixImport(fixer_base.BaseFix):
+    BM_compatible = True
 
     PATTERN = """
     import_from< 'from' imp=any 'import' ['('] any [')'] >
@@ -43,7 +44,13 @@ class FixImport(fixer_base.BaseFix):
     import_name< 'import' imp=any >
     """
 
+    def start_tree(self, tree, name):
+        super(FixImport, self).start_tree(tree, name)
+        self.skip = "absolute_import" in tree.future_features
+
     def transform(self, node, results):
+        if self.skip:
+            return
         imp = results['imp']
 
         if node.type == syms.import_from:
@@ -56,7 +63,6 @@ class FixImport(fixer_base.BaseFix):
             if self.probably_a_local_import(imp.value):
                 imp.value = "." + imp.value
                 imp.changed()
-                return node
         else:
             have_local = False
             have_absolute = False
@@ -72,19 +78,22 @@ class FixImport(fixer_base.BaseFix):
                     self.warning(node, "absolute and local imports together")
                 return
 
-            new = FromImport('.', [imp])
+            new = FromImport(".", [imp])
             new.prefix = node.prefix
             return new
 
     def probably_a_local_import(self, imp_name):
-        imp_name = imp_name.split('.', 1)[0]
+        if imp_name.startswith("."):
+            # Relative imports are certainly not local imports.
+            return False
+        imp_name = imp_name.split(".", 1)[0]
         base_path = dirname(self.filename)
         base_path = join(base_path, imp_name)
         # If there is no __init__.py next to the file its not in a package
         # so can't be a relative import.
-        if not exists(join(dirname(base_path), '__init__.py')):
+        if not exists(join(dirname(base_path), "__init__.py")):
             return False
-        for ext in ['.py', pathsep, '.pyc', '.so', '.sl', '.pyd']:
+        for ext in [".py", sep, ".pyc", ".so", ".sl", ".pyd"]:
             if exists(base_path + ext):
                 return True
         return False

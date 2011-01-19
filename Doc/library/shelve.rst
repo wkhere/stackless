@@ -7,6 +7,10 @@
 
 .. index:: module: pickle
 
+**Source code:** :source:`Lib/shelve.py`
+
+--------------
+
 A "shelf" is a persistent, dictionary-like object.  The difference with "dbm"
 databases is that the values (not the keys!) in a shelf can be essentially
 arbitrary Python objects --- anything that the :mod:`pickle` module can handle.
@@ -14,7 +18,7 @@ This includes most class instances, recursive data types, and objects containing
 lots of shared  sub-objects.  The keys are ordinary strings.
 
 
-.. function:: open(filename[, flag='c'[, protocol=None[, writeback=False]]])
+.. function:: open(filename, flag='c', protocol=None, writeback=False)
 
    Open a persistent dictionary.  The filename specified is the base filename for
    the underlying database.  As a side-effect, an extension may be added to the
@@ -27,27 +31,45 @@ lots of shared  sub-objects.  The keys are ordinary strings.
 
    Because of Python semantics, a shelf cannot know when a mutable
    persistent-dictionary entry is modified.  By default modified objects are
-   written only when assigned to the shelf (see :ref:`shelve-example`).  If
-   the optional *writeback* parameter is set to *True*, all entries accessed
-   are cached in memory, and written back at close time; this can make it
-   handier to mutate mutable entries in the persistent dictionary, but, if
-   many entries are accessed, it can consume vast amounts of memory for the
-   cache, and it can make the close operation very slow since all accessed
-   entries are written back (there is no way to determine which accessed
-   entries are mutable, nor which ones were actually mutated).
+   written *only* when assigned to the shelf (see :ref:`shelve-example`).  If the
+   optional *writeback* parameter is set to *True*, all entries accessed are also
+   cached in memory, and written back on :meth:`~Shelf.sync` and
+   :meth:`~Shelf.close`; this can make it handier to mutate mutable entries in
+   the persistent dictionary, but, if many entries are accessed, it can consume
+   vast amounts of memory for the cache, and it can make the close operation
+   very slow since all accessed entries are written back (there is no way to
+   determine which accessed entries are mutable, nor which ones were actually
+   mutated).
+
+   .. note::
+
+      Do not rely on the shelf being closed automatically; always call
+      :meth:`close` explicitly when you don't need it any more, or use a
+      :keyword:`with` statement with :func:`contextlib.closing`.
+
+.. warning::
+
+   Because the :mod:`shelve` module is backed by :mod:`pickle`, it is insecure
+   to load a shelf from an untrusted source.  Like with pickle, loading a shelf
+   can execute arbitrary code.
 
 Shelf objects support all methods supported by dictionaries.  This eases the
 transition from dictionary based scripts to those requiring persistent storage.
 
-One additional method is supported:
-
+Two additional methods are supported:
 
 .. method:: Shelf.sync()
 
-   Write back all entries in the cache if the shelf was opened with *writeback* set
-   to *True*. Also empty the cache and synchronize the persistent dictionary on
-   disk, if feasible.  This is called automatically when the shelf is closed with
-   :meth:`close`.
+   Write back all entries in the cache if the shelf was opened with *writeback*
+   set to :const:`True`.  Also empty the cache and synchronize the persistent
+   dictionary on disk, if feasible.  This is called automatically when the shelf
+   is closed with :meth:`close`.
+
+.. method:: Shelf.close()
+
+   Synchronize and close the persistent *dict* object.  Operations on a closed
+   shelf will fail with a :exc:`ValueError`.
+
 
 .. seealso::
 
@@ -71,11 +93,6 @@ Restrictions
   database should be fairly small, and in rare cases key collisions may cause
   the database to refuse updates.
 
-* Depending on the implementation, closing a persistent dictionary may or may
-  not be necessary to flush changes to disk.  The :meth:`__del__` method of the
-  :class:`Shelf` class calls the :meth:`close` method, so the programmer generally
-  need not do this explicitly.
-
 * The :mod:`shelve` module does not support *concurrent* read/write access to
   shelved objects.  (Multiple simultaneous read accesses are safe.)  When a
   program has a shelf open for writing, no other program should have it open for
@@ -84,7 +101,7 @@ Restrictions
   implementation used.
 
 
-.. class:: Shelf(dict[, protocol=None[, writeback=False]])
+.. class:: Shelf(dict, protocol=None, writeback=False, keyencoding='utf-8')
 
    A subclass of :class:`collections.MutableMapping` which stores pickled values
    in the *dict* object.
@@ -98,26 +115,33 @@ Restrictions
    This allows natural operations on mutable entries, but can consume much more
    memory and make sync and close take a long time.
 
+   The *keyencoding* parameter is the encoding used to encode keys before they
+   are used with the underlying dict.
 
-.. class:: BsdDbShelf(dict[, protocol=None[, writeback=False]])
+   .. versionadded:: 3.2
+      The *keyencoding* parameter; previously, keys were always encoded in
+      UTF-8.
 
-   A subclass of :class:`Shelf` which exposes :meth:`first`, :meth:`next`,
+
+.. class:: BsdDbShelf(dict, protocol=None, writeback=False, keyencoding='utf-8')
+
+   A subclass of :class:`Shelf` which exposes :meth:`first`, :meth:`!next`,
    :meth:`previous`, :meth:`last` and :meth:`set_location` which are available
    in the third-party :mod:`bsddb` module from `pybsddb
    <http://www.jcea.es/programacion/pybsddb.htm>`_ but not in other database
    modules.  The *dict* object passed to the constructor must support those
    methods.  This is generally accomplished by calling one of
    :func:`bsddb.hashopen`, :func:`bsddb.btopen` or :func:`bsddb.rnopen`.  The
-   optional *protocol* and *writeback* parameters have the same interpretation
-   as for the :class:`Shelf` class.
+   optional *protocol*, *writeback*, and *keyencoding* parameters have the same
+   interpretation as for the :class:`Shelf` class.
 
 
-.. class:: DbfilenameShelf(filename[, flag='c'[, protocol=None[, writeback=False]]])
+.. class:: DbfilenameShelf(filename, flag='c', protocol=None, writeback=False)
 
    A subclass of :class:`Shelf` which accepts a *filename* instead of a dict-like
    object.  The underlying file will be opened using :func:`dbm.open`.  By
    default, the file will be created and opened for both read and write.  The
-   optional *flag* parameter has the same interpretation as for the :func:`open`
+   optional *flag* parameter has the same interpretation as for the :func:`.open`
    function.  The optional *protocol* and *writeback* parameters have the same
    interpretation as for the :class:`Shelf` class.
 
@@ -141,8 +165,8 @@ object)::
                    # such key)
    del d[key]      # delete data stored at key (raises KeyError
                    # if no such key)
-   flag = key in d   # true if the key exists
-   klist = d.keys() # a list of all existing keys (slow!)
+   flag = key in d        # true if the key exists
+   klist = list(d.keys()) # a list of all existing keys (slow!)
 
    # as d was opened WITHOUT writeback=True, beware:
    d['xx'] = range(4)  # this works as expected, but...
@@ -167,7 +191,4 @@ object)::
 
    Module :mod:`pickle`
       Object serialization used by :mod:`shelve`.
-
-   Module :mod:`cPickle`
-      High-performance version of :mod:`pickle`.
 

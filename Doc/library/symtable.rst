@@ -67,7 +67,7 @@ Examining Symbol Tables
 
       Return ``True`` if the block uses ``exec``.
 
-   .. method:: has_import_start()
+   .. method:: has_import_star()
 
       Return ``True`` if the block uses a starred from-import.
 
@@ -143,6 +143,10 @@ Examining Symbol Tables
    .. method:: is_global()
 
       Return ``True`` if the symbol is global.
+
+   .. method:: is_declared_global()
+
+      Return ``True`` if the symbol is declared global with a global statement.
 
    .. method:: is_local()
 

@@ -18,9 +18,9 @@ if sys.platform == "win32":
             windll.kernel32.GetProcAddress.restype = c_void_p
 
             hdll = windll.kernel32.LoadLibraryA(b"kernel32")
-            funcaddr = windll.kernel32.GetProcAddress(hdll, "GetModuleHandleA")
+            funcaddr = windll.kernel32.GetProcAddress(hdll, b"GetModuleHandleA")
 
-            self.failUnlessEqual(call_function(funcaddr, (None,)),
+            self.assertEqual(call_function(funcaddr, (None,)),
                                  windll.kernel32.GetModuleHandleA(None))
 
 class CallbackTracbackTestCase(unittest.TestCase):
@@ -49,27 +49,27 @@ class CallbackTracbackTestCase(unittest.TestCase):
     def test_ValueError(self):
         cb = CFUNCTYPE(c_int, c_int)(callback_func)
         out = self.capture_stderr(cb, 42)
-        self.failUnlessEqual(out.splitlines()[-1],
+        self.assertEqual(out.splitlines()[-1],
                              "ValueError: 42")
 
     def test_IntegerDivisionError(self):
         cb = CFUNCTYPE(c_int, c_int)(callback_func)
         out = self.capture_stderr(cb, 0)
-        self.failUnlessEqual(out.splitlines()[-1][:19],
+        self.assertEqual(out.splitlines()[-1][:19],
                              "ZeroDivisionError: ")
 
     def test_FloatDivisionError(self):
         cb = CFUNCTYPE(c_int, c_double)(callback_func)
         out = self.capture_stderr(cb, 0.0)
-        self.failUnlessEqual(out.splitlines()[-1][:19],
+        self.assertEqual(out.splitlines()[-1][:19],
                              "ZeroDivisionError: ")
 
     def test_TypeErrorDivisionError(self):
         cb = CFUNCTYPE(c_int, c_char_p)(callback_func)
-        out = self.capture_stderr(cb, "spam")
-        self.failUnlessEqual(out.splitlines()[-1],
+        out = self.capture_stderr(cb, b"spam")
+        self.assertEqual(out.splitlines()[-1],
                              "TypeError: "
-                             "unsupported operand type(s) for /: 'int' and 'str'")
+                             "unsupported operand type(s) for /: 'int' and 'bytes'")
 
 if __name__ == '__main__':
     unittest.main()

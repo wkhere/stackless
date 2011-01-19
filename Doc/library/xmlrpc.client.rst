@@ -17,7 +17,7 @@ supports writing XML-RPC client code; it handles all the details of translating
 between conformable Python objects and XML on the wire.
 
 
-.. class:: ServerProxy(uri[, transport[, encoding[, verbose[,  allow_none[, use_datetime]]]]])
+.. class:: ServerProxy(uri, transport=None, encoding=None, verbose=False, allow_none=False, use_datetime=False)
 
    A :class:`ServerProxy` instance is an object that manages communication with a
    remote XML-RPC server.  The required first argument is a URI (Uniform Resource
@@ -87,7 +87,7 @@ between conformable Python objects and XML on the wire.
    :exc:`ProtocolError` used to signal an error in the HTTP/HTTPS transport layer.
    Both :exc:`Fault` and :exc:`ProtocolError` derive from a base class called
    :exc:`Error`.  Note that the xmlrpc client module currently does not marshal
-   instances of subclasses of builtin types.
+   instances of subclasses of built-in types.
 
    When passing strings, characters special to XML such as ``<``, ``>``, and ``&``
    will be automatically escaped.  However, it's the caller's responsibility to
@@ -283,9 +283,8 @@ XMLRPC::
    import xmlrpc.client
 
    def python_logo():
-        handle = open("python_logo.jpg")
-        return xmlrpc.client.Binary(handle.read())
-        handle.close()
+       with open("python_logo.jpg", "rb") as handle:
+           return xmlrpc.client.Binary(handle.read())
 
    server = SimpleXMLRPCServer(("localhost", 8000))
    print("Listening on port 8000...")
@@ -298,9 +297,8 @@ The client gets the image and saves it to a file::
    import xmlrpc.client
 
    proxy = xmlrpc.client.ServerProxy("http://localhost:8000/")
-   handle = open("fetched_python_logo.jpg", "w")
-   handle.write(proxy.python_logo().data)
-   handle.close()
+   with open("fetched_python_logo.jpg", "wb") as handle:
+       handle.write(proxy.python_logo().data)
 
 .. _fault-objects:
 
@@ -385,8 +383,8 @@ by providing an invalid URI::
 
    import xmlrpc.client
 
-   # create a ServerProxy with an invalid URI
-   proxy = xmlrpc.client.ServerProxy("http://invalidaddress/")
+   # create a ServerProxy with an URI that doesn't respond to XMLRPC requests
+   proxy = xmlrpc.client.ServerProxy("http://google.com/")
 
    try:
        proxy.some_method()
@@ -458,7 +456,7 @@ The client code for the preceding server::
 Convenience Functions
 ---------------------
 
-.. function:: dumps(params[, methodname[,  methodresponse[, encoding[, allow_none]]]])
+.. function:: dumps(params, methodname=None, methodresponse=None, encoding=None, allow_none=False)
 
    Convert *params* into an XML-RPC request. or into a response if *methodresponse*
    is true. *params* can be either a tuple of arguments or an instance of the
@@ -469,7 +467,7 @@ Convenience Functions
    it via an extension,  provide a true value for *allow_none*.
 
 
-.. function:: loads(data[, use_datetime])
+.. function:: loads(data, use_datetime=False)
 
    Convert an XML-RPC request or response into Python objects, a ``(params,
    methodname)``.  *params* is a tuple of argument; *methodname* is a string, or

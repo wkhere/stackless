@@ -60,6 +60,10 @@ exec_tests = [
     "break",
     # Continue
     "continue",
+    # for statements with naked tuples (see http://bugs.python.org/issue6704)
+    "for a,b in c: pass",
+    "[(a,b) for a,b in c]",
+    "((a,b) for a,b in c)",
 ]
 
 # These are compiled through "single"
@@ -116,20 +120,20 @@ eval_tests = [
 
 class AST_Tests(unittest.TestCase):
 
-    def _assert_order(self, ast_node, parent_pos):
+    def _assertTrueorder(self, ast_node, parent_pos):
         if not isinstance(ast_node, ast.AST) or ast_node._fields is None:
             return
         if isinstance(ast_node, (ast.expr, ast.stmt, ast.excepthandler)):
             node_pos = (ast_node.lineno, ast_node.col_offset)
-            self.assert_(node_pos >= parent_pos)
+            self.assertTrue(node_pos >= parent_pos)
             parent_pos = (ast_node.lineno, ast_node.col_offset)
         for name in ast_node._fields:
             value = getattr(ast_node, name)
             if isinstance(value, list):
                 for child in value:
-                    self._assert_order(child, parent_pos)
+                    self._assertTrueorder(child, parent_pos)
             elif value is not None:
-                self._assert_order(value, parent_pos)
+                self._assertTrueorder(value, parent_pos)
 
     def test_snippets(self):
         for input, output, kind in ((exec_tests, exec_results, "exec"),
@@ -137,25 +141,43 @@ class AST_Tests(unittest.TestCase):
                                     (eval_tests, eval_results, "eval")):
             for i, o in zip(input, output):
                 ast_tree = compile(i, "?", kind, ast.PyCF_ONLY_AST)
-                self.assertEquals(to_tuple(ast_tree), o)
-                self._assert_order(ast_tree, (0, 0))
+                self.assertEqual(to_tuple(ast_tree), o)
+                self._assertTrueorder(ast_tree, (0, 0))
+
+    def test_slice(self):
+        slc = ast.parse("x[::]").body[0].value.slice
+        self.assertIsNone(slc.upper)
+        self.assertIsNone(slc.lower)
+        self.assertIsNone(slc.step)
+
+    def test_from_import(self):
+        im = ast.parse("from . import y").body[0]
+        self.assertIsNone(im.module)
+
+    def test_base_classes(self):
+        self.assertTrue(issubclass(ast.For, ast.stmt))
+        self.assertTrue(issubclass(ast.Name, ast.expr))
+        self.assertTrue(issubclass(ast.stmt, ast.AST))
+        self.assertTrue(issubclass(ast.expr, ast.AST))
+        self.assertTrue(issubclass(ast.comprehension, ast.AST))
+        self.assertTrue(issubclass(ast.Gt, ast.AST))
 
     def test_nodeclasses(self):
         x = ast.BinOp(1, 2, 3, lineno=0)
-        self.assertEquals(x.left, 1)
-        self.assertEquals(x.op, 2)
-        self.assertEquals(x.right, 3)
-        self.assertEquals(x.lineno, 0)
+        self.assertEqual(x.left, 1)
+        self.assertEqual(x.op, 2)
+        self.assertEqual(x.right, 3)
+        self.assertEqual(x.lineno, 0)
 
         # node raises exception when not given enough arguments
         self.assertRaises(TypeError, ast.BinOp, 1, 2)
 
         # can set attributes through kwargs too
         x = ast.BinOp(left=1, op=2, right=3, lineno=0)
-        self.assertEquals(x.left, 1)
-        self.assertEquals(x.op, 2)
-        self.assertEquals(x.right, 3)
-        self.assertEquals(x.lineno, 0)
+        self.assertEqual(x.left, 1)
+        self.assertEqual(x.op, 2)
+        self.assertEqual(x.right, 3)
+        self.assertEqual(x.lineno, 0)
 
         # this used to fail because Sub._fields was None
         x = ast.Sub()
@@ -173,7 +195,14 @@ class AST_Tests(unittest.TestCase):
             for protocol in protocols:
                 for ast in (compile(i, "?", "exec", 0x400) for i in exec_tests):
                     ast2 = mod.loads(mod.dumps(ast, protocol))
-                    self.assertEquals(to_tuple(ast2), to_tuple(ast))
+                    self.assertEqual(to_tuple(ast2), to_tuple(ast))
+
+    def test_invalid_sum(self):
+        pos = dict(lineno=2, col_offset=3)
+        m = ast.Module([ast.Expr(ast.expr(**pos), **pos)])
+        with self.assertRaises(TypeError) as cm:
+            compile(m, "<test>", "exec")
+        self.assertIn("but got <_ast.expr", str(cm.exception))
 
 
 class ASTHelpers_Test(unittest.TestCase):
@@ -235,6 +264,14 @@ class ASTHelpers_Test(unittest.TestCase):
             'op=Add(), right=Num(n=1, lineno=4, col_offset=4), lineno=4, '
             'col_offset=0))'
         )
+        # issue10869: do not increment lineno of root twice
+        src = ast.parse('1 + 1', mode='eval')
+        self.assertEqual(ast.increment_lineno(src.body, n=3), src.body)
+        self.assertEqual(ast.dump(src, include_attributes=True),
+            'Expression(body=BinOp(left=Num(n=1, lineno=4, col_offset=0), '
+            'op=Add(), right=Num(n=1, lineno=4, col_offset=4), lineno=4, '
+            'col_offset=0))'
+        )
 
     def test_iter_fields(self):
         node = ast.parse('foo()', mode='eval')
@@ -263,13 +300,17 @@ class ASTHelpers_Test(unittest.TestCase):
         self.assertEqual(ast.literal_eval('[1, 2, 3]'), [1, 2, 3])
         self.assertEqual(ast.literal_eval('{"foo": 42}'), {"foo": 42})
         self.assertEqual(ast.literal_eval('(True, False, None)'), (True, False, None))
+        self.assertEqual(ast.literal_eval('{1, 2, 3}'), {1, 2, 3})
+        self.assertEqual(ast.literal_eval('b"hi"'), b"hi")
         self.assertRaises(ValueError, ast.literal_eval, 'foo()')
+        self.assertEqual(ast.literal_eval('-6'), -6)
+        self.assertEqual(ast.literal_eval('-6j+3'), 3-6j)
+        self.assertEqual(ast.literal_eval('3.25'), 3.25)
 
     def test_literal_eval_issue4907(self):
         self.assertEqual(ast.literal_eval('2j'), 2j)
         self.assertEqual(ast.literal_eval('10 + 2j'), 10 + 2j)
         self.assertEqual(ast.literal_eval('1.5 - 2j'), 1.5 - 2j)
-        self.assertRaises(ValueError, ast.literal_eval, '2 + (3 + 4j)')
 
 
 def test_main():
@@ -311,6 +352,9 @@ exec_results = [
 ('Module', [('Pass', (1, 0))]),
 ('Module', [('Break', (1, 0))]),
 ('Module', [('Continue', (1, 0))]),
+('Module', [('For', (1, 0), ('Tuple', (1, 4), [('Name', (1, 4), 'a', ('Store',)), ('Name', (1, 6), 'b', ('Store',))], ('Store',)), ('Name', (1, 11), 'c', ('Load',)), [('Pass', (1, 14))], [])]),
+('Module', [('Expr', (1, 0), ('ListComp', (1, 1), ('Tuple', (1, 2), [('Name', (1, 2), 'a', ('Load',)), ('Name', (1, 4), 'b', ('Load',))], ('Load',)), [('comprehension', ('Tuple', (1, 11), [('Name', (1, 11), 'a', ('Store',)), ('Name', (1, 13), 'b', ('Store',))], ('Store',)), ('Name', (1, 18), 'c', ('Load',)), [])]))]),
+('Module', [('Expr', (1, 0), ('GeneratorExp', (1, 1), ('Tuple', (1, 2), [('Name', (1, 2), 'a', ('Load',)), ('Name', (1, 4), 'b', ('Load',))], ('Load',)), [('comprehension', ('Tuple', (1, 11), [('Name', (1, 11), 'a', ('Store',)), ('Name', (1, 13), 'b', ('Store',))], ('Store',)), ('Name', (1, 18), 'c', ('Load',)), [])]))]),
 ]
 single_results = [
 ('Interactive', [('Expr', (1, 0), ('BinOp', (1, 0), ('Num', (1, 0), 1), ('Add',), ('Num', (1, 2), 2)))]),

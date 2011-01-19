@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 Synopsis: %(prog)s [-h|-b|-g|-r|-a|-d] [ picklefile ] dbfile
@@ -38,12 +38,12 @@ try:
 except ImportError:
     gdbm = None
 try:
-    import dbm as anydbm
+    import dbm.ndbm as anydbm
 except ImportError:
     anydbm = None
 import sys
 try:
-    import cPickle as pickle
+    import pickle as pickle
 except ImportError:
     import pickle
 

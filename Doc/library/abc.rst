@@ -122,7 +122,7 @@ This module provides the following class:
 
 It also provides the following decorators:
 
-.. function:: abstractmethod(function)
+.. decorator:: abstractmethod(function)
 
    A decorator indicating abstract methods.
 
@@ -155,6 +155,36 @@ It also provides the following decorators:
       overrides it.  This could be useful as an end-point for a
       super-call in a framework that uses cooperative
       multiple-inheritance.
+
+
+.. decorator:: abstractclassmethod(function)
+
+   A subclass of the built-in :func:`classmethod`, indicating an abstract
+   classmethod. Otherwise it is similar to :func:`abstractmethod`.
+
+   Usage::
+
+      class C(metaclass=ABCMeta):
+          @abstractclassmethod
+          def my_abstract_classmethod(cls, ...):
+              ...
+
+   .. versionadded:: 3.2
+
+
+.. decorator:: abstractstaticmethod(function)
+
+   A subclass of the built-in :func:`staticmethod`, indicating an abstract
+   staticmethod. Otherwise it is similar to :func:`abstractmethod`.
+
+   Usage::
+
+      class C(metaclass=ABCMeta):
+          @abstractstaticmethod
+          def my_abstract_staticmethod(...):
+              ...
+
+   .. versionadded:: 3.2
 
 
 .. function:: abstractproperty(fget=None, fset=None, fdel=None, doc=None)

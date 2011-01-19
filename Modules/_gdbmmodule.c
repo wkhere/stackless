@@ -30,7 +30,7 @@ supported.");
 
 typedef struct {
     PyObject_HEAD
-    int di_size;	/* -1 means recompute */
+    int di_size;        /* -1 means recompute */
     GDBM_FILE di_dbm;
 } dbmobject;
 
@@ -135,6 +135,28 @@ dbm_subscript(dbmobject *dp, register PyObject *key)
     return v;
 }
 
+PyDoc_STRVAR(dbm_get__doc__,
+"get(key[, default]) -> value\n\
+Get the value for key, or default if not present; if not given,\n\
+default is None.");
+
+static PyObject *
+dbm_get(dbmobject *dp, PyObject *args)
+{
+    PyObject *v, *res;
+    PyObject *def = Py_None;
+
+    if (!PyArg_UnpackTuple(args, "get", 1, 2, &v, &def))
+        return NULL;
+    res = dbm_subscript(dp, v);
+    if (res == NULL && PyErr_ExceptionMatches(PyExc_KeyError)) {
+        PyErr_Clear();
+        Py_INCREF(def);
+        return def;
+    }
+    return res;
+}
+
 static int
 dbm_ass_sub(dbmobject *dp, PyObject *v, PyObject *w)
 {
@@ -176,8 +198,31 @@ dbm_ass_sub(dbmobject *dp, PyObject *v, PyObject *w)
     return 0;
 }
 
+PyDoc_STRVAR(dbm_setdefault__doc__,
+"setdefault(key[, default]) -> value\n\
+Get value for key, or set it to default and return default if not present;\n\
+if not given, default is None.");
+
+static PyObject *
+dbm_setdefault(dbmobject *dp, PyObject *args)
+{
+    PyObject *v, *res;
+    PyObject *def = Py_None;
+
+    if (!PyArg_UnpackTuple(args, "setdefault", 1, 2, &v, &def))
+        return NULL;
+    res = dbm_subscript(dp, v);
+    if (res == NULL && PyErr_ExceptionMatches(PyExc_KeyError)) {
+        PyErr_Clear();
+        if (dbm_ass_sub(dp, v, def) < 0)
+            return NULL;
+        return dbm_subscript(dp, v);
+    }
+    return res;
+}
+
 static PyMappingMethods dbm_as_mapping = {
-    (lenfunc)dbm_length,		/*mp_length*/
+    (lenfunc)dbm_length,                /*mp_length*/
     (binaryfunc)dbm_subscript,          /*mp_subscript*/
     (objobjargproc)dbm_ass_sub,         /*mp_ass_subscript*/
 };
@@ -247,15 +292,15 @@ dbm_contains(PyObject *self, PyObject *arg)
     datum key;
 
     if ((dp)->di_dbm == NULL) {
-	PyErr_SetString(DbmError,
-			"GDBM object has already been closed");
-	return -1;
+        PyErr_SetString(DbmError,
+                        "GDBM object has already been closed");
+        return -1;
     }
     if (!PyBytes_Check(arg)) {
-	PyErr_Format(PyExc_TypeError,
-		     "gdbm key must be bytes, not %.100s",
-		     arg->ob_type->tp_name);
-	return -1;
+        PyErr_Format(PyExc_TypeError,
+                     "gdbm key must be bytes, not %.100s",
+                     arg->ob_type->tp_name);
+        return -1;
     }
     key.dptr = PyBytes_AS_STRING(arg);
     key.dsize = PyBytes_GET_SIZE(arg);
@@ -263,16 +308,16 @@ dbm_contains(PyObject *self, PyObject *arg)
 }
 
 static PySequenceMethods dbm_as_sequence = {
-	0,			/* sq_length */
-	0,			/* sq_concat */
-	0,			/* sq_repeat */
-	0,			/* sq_item */
-	0,			/* sq_slice */
-	0,			/* sq_ass_item */
-	0,			/* sq_ass_slice */
-	dbm_contains,		/* sq_contains */
-	0,			/* sq_inplace_concat */
-	0,			/* sq_inplace_repeat */
+        0,                      /* sq_length */
+        0,                      /* sq_concat */
+        0,                      /* sq_repeat */
+        0,                      /* sq_item */
+        0,                      /* sq_slice */
+        0,                      /* sq_ass_item */
+        0,                      /* sq_ass_slice */
+        dbm_contains,           /* sq_contains */
+        0,                      /* sq_inplace_concat */
+        0,                      /* sq_inplace_repeat */
 };
 
 PyDoc_STRVAR(dbm_firstkey__doc__,
@@ -372,13 +417,15 @@ dbm_sync(register dbmobject *dp, PyObject *unused)
 }
 
 static PyMethodDef dbm_methods[] = {
-    {"close",	  (PyCFunction)dbm_close,   METH_NOARGS, dbm_close__doc__},
-    {"keys",	  (PyCFunction)dbm_keys,    METH_NOARGS, dbm_keys__doc__},
+    {"close",     (PyCFunction)dbm_close,   METH_NOARGS, dbm_close__doc__},
+    {"keys",      (PyCFunction)dbm_keys,    METH_NOARGS, dbm_keys__doc__},
     {"firstkey",  (PyCFunction)dbm_firstkey,METH_NOARGS, dbm_firstkey__doc__},
-    {"nextkey",	  (PyCFunction)dbm_nextkey, METH_VARARGS, dbm_nextkey__doc__},
+    {"nextkey",   (PyCFunction)dbm_nextkey, METH_VARARGS, dbm_nextkey__doc__},
     {"reorganize",(PyCFunction)dbm_reorganize,METH_NOARGS, dbm_reorganize__doc__},
     {"sync",      (PyCFunction)dbm_sync,    METH_NOARGS, dbm_sync__doc__},
-    {NULL,		NULL}		/* sentinel */
+    {"get",       (PyCFunction)dbm_get,     METH_VARARGS, dbm_get__doc__},
+    {"setdefault",(PyCFunction)dbm_setdefault,METH_VARARGS, dbm_setdefault__doc__},
+    {NULL,              NULL}           /* sentinel */
 };
 
 static PyTypeObject Dbmtype = {
@@ -486,7 +533,7 @@ dbmopen(PyObject *self, PyObject *args)
 #endif
             default:
                 PyOS_snprintf(buf, sizeof(buf), "Flag '%c' is not supported.",
-                	      *flags);
+                              *flags);
                 PyErr_SetString(DbmError, buf);
                 return NULL;
         }
@@ -514,15 +561,15 @@ static PyMethodDef dbmmodule_methods[] = {
 
 
 static struct PyModuleDef _gdbmmodule = {
-	PyModuleDef_HEAD_INIT,
-	"_gdbm",
-	gdbmmodule__doc__,
-	-1,
-	dbmmodule_methods,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+        PyModuleDef_HEAD_INIT,
+        "_gdbm",
+        gdbmmodule__doc__,
+        -1,
+        dbmmodule_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
 };
 
 PyMODINIT_FUNC
@@ -530,10 +577,10 @@ PyInit__gdbm(void) {
     PyObject *m, *d, *s;
 
     if (PyType_Ready(&Dbmtype) < 0)
-	    return NULL;
+            return NULL;
     m = PyModule_Create(&_gdbmmodule);
     if (m == NULL)
-	return NULL;
+        return NULL;
     d = PyModule_GetDict(m);
     DbmError = PyErr_NewException("_gdbm.error", PyExc_IOError, NULL);
     if (DbmError != NULL) {

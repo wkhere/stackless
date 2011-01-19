@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """Basic tests for os.popen()
 
   Particularly useful for platforms that fake popen.
@@ -22,7 +22,8 @@ class PopenTest(unittest.TestCase):
     def _do_test_commandline(self, cmdline, expected):
         cmd = '%s -c "import sys; print(sys.argv)" %s'
         cmd = cmd % (python, cmdline)
-        data = os.popen(cmd).read()
+        with os.popen(cmd) as p:
+            data = p.read()
         got = eval(data)[1:] # strip off argv[0]
         self.assertEqual(got, expected)
 
@@ -41,6 +42,21 @@ class PopenTest(unittest.TestCase):
             ["foo", 'a "quoted" arg', "bar"]
         )
         support.reap_children()
+
+    def test_return_code(self):
+        self.assertEqual(os.popen("exit 0").close(), None)
+        if os.name == 'nt':
+            self.assertEqual(os.popen("exit 42").close(), 42)
+        else:
+            self.assertEqual(os.popen("exit 42").close(), 42 << 8)
+
+    def test_contextmanager(self):
+        with os.popen("echo hello") as f:
+            self.assertEqual(f.read(), "hello\n")
+
+    def test_iterating(self):
+        with os.popen("echo hello") as f:
+            self.assertEqual(list(f), ["hello\n"])
 
 def test_main():
     support.run_unittest(PopenTest)

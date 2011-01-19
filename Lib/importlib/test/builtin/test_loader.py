@@ -18,10 +18,10 @@ class LoaderTests(abc.LoaderTests):
 
     def verify(self, module):
         """Verify that the module matches against what it should have."""
-        self.assert_(isinstance(module, types.ModuleType))
+        self.assertTrue(isinstance(module, types.ModuleType))
         for attr, value in self.verification.items():
             self.assertEqual(getattr(module, attr), value)
-        self.assert_(module.__name__ in sys.modules)
+        self.assertTrue(module.__name__ in sys.modules)
 
     load_module = staticmethod(lambda name:
                                 machinery.BuiltinImporter.load_module(name))
@@ -49,18 +49,20 @@ class LoaderTests(abc.LoaderTests):
         with util.uncache(builtin_util.NAME):
             module1 = self.load_module(builtin_util.NAME)
             module2 = self.load_module(builtin_util.NAME)
-            self.assert_(module1 is module2)
+            self.assertTrue(module1 is module2)
 
     def test_unloadable(self):
         name = 'dssdsdfff'
         assert name not in sys.builtin_module_names
-        self.assertRaises(ImportError, self.load_module, name)
+        with self.assertRaises(ImportError):
+            self.load_module(name)
 
     def test_already_imported(self):
         # Using the name of a module already imported but not a built-in should
         # still fail.
         assert hasattr(importlib, '__file__')  # Not a built-in.
-        self.assertRaises(ImportError, self.load_module, 'importlib')
+        with self.assertRaises(ImportError):
+            self.load_module('importlib')
 
 
 class InspectLoaderTests(unittest.TestCase):
@@ -70,23 +72,24 @@ class InspectLoaderTests(unittest.TestCase):
     def test_get_code(self):
         # There is no code object.
         result = machinery.BuiltinImporter.get_code(builtin_util.NAME)
-        self.assert_(result is None)
+        self.assertTrue(result is None)
 
     def test_get_source(self):
         # There is no source.
         result = machinery.BuiltinImporter.get_source(builtin_util.NAME)
-        self.assert_(result is None)
+        self.assertTrue(result is None)
 
     def test_is_package(self):
         # Cannot be a package.
         result = machinery.BuiltinImporter.is_package(builtin_util.NAME)
-        self.assert_(not result)
+        self.assertTrue(not result)
 
     def test_not_builtin(self):
         # Modules not built-in should raise ImportError.
         for meth_name in ('get_code', 'get_source', 'is_package'):
             method = getattr(machinery.BuiltinImporter, meth_name)
-        self.assertRaises(ImportError, method, builtin_util.BAD_NAME)
+        with self.assertRaises(ImportError):
+            method(builtin_util.BAD_NAME)
 
 
 

@@ -11,8 +11,8 @@ from test import support
 class Pep247Test(unittest.TestCase):
 
     def check_module(self, module, key=None):
-        self.assert_(hasattr(module, 'digest_size'))
-        self.assert_(module.digest_size is None or module.digest_size > 0)
+        self.assertTrue(hasattr(module, 'digest_size'))
+        self.assertTrue(module.digest_size is None or module.digest_size > 0)
         self.check_object(module.new, module.digest_size, key)
 
     def check_object(self, cls, digest_size, key):
@@ -30,23 +30,23 @@ class Pep247Test(unittest.TestCase):
             obj3 = cls()
             obj3.update(b'string')
             h2 = obj3.digest()
-        self.assertEquals(h1, h2)
-        self.assert_(hasattr(obj1, 'digest_size'))
+        self.assertEqual(h1, h2)
+        self.assertTrue(hasattr(obj1, 'digest_size'))
 
         if digest_size is not None:
-            self.assertEquals(obj1.digest_size, digest_size)
+            self.assertEqual(obj1.digest_size, digest_size)
 
-        self.assertEquals(obj1.digest_size, len(h1))
+        self.assertEqual(obj1.digest_size, len(h1))
         obj1.update(b'string')
         obj_copy = obj1.copy()
-        self.assertEquals(obj1.digest(), obj_copy.digest())
-        self.assertEquals(obj1.hexdigest(), obj_copy.hexdigest())
+        self.assertEqual(obj1.digest(), obj_copy.digest())
+        self.assertEqual(obj1.hexdigest(), obj_copy.hexdigest())
 
         digest, hexdigest = obj1.digest(), obj1.hexdigest()
         hd2 = ""
         for byte in digest:
             hd2 += '%02x' % byte
-        self.assertEquals(hd2, hexdigest)
+        self.assertEqual(hd2, hexdigest)
 
     def test_md5(self):
         self.check_object(md5, None, None)

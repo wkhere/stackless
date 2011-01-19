@@ -21,11 +21,11 @@ errors = 'surrogatepass'
 class UnicodeMethodsTest(unittest.TestCase):
 
     # update this, if the database changes
-    expectedchecksum = '6ec65b65835614ec00634c674bba0e50cd32c189'
+    expectedchecksum = '21b90f1aed00081b81ca7942b22196af090015a0'
 
     def test_method_checksum(self):
         h = hashlib.sha1()
-        for i in range(65536):
+        for i in range(0x10000):
             char = chr(i)
             data = [
                 # Predicates (single char)
@@ -80,8 +80,7 @@ class UnicodeDatabaseTest(unittest.TestCase):
 class UnicodeFunctionsTest(UnicodeDatabaseTest):
 
     # update this, if the database changes
-    expectedchecksum = '3136d5afd787dc2bcb1bdcac95e385349fbebbca'
-
+    expectedchecksum = 'c23dfc0b5eaf3ca2aad32d733de96bb182ccda50'
     def test_function_checksum(self):
         data = []
         h = hashlib.sha1()
@@ -90,9 +89,9 @@ class UnicodeFunctionsTest(UnicodeDatabaseTest):
             char = chr(i)
             data = [
                 # Properties
-                str(self.db.digit(char, -1)),
-                str(self.db.numeric(char, -1)),
-                str(self.db.decimal(char, -1)),
+                format(self.db.digit(char, -1), '.12g'),
+                format(self.db.numeric(char, -1), '.12g'),
+                format(self.db.decimal(char, -1), '.12g'),
                 self.db.category(char),
                 self.db.bidirectional(char),
                 self.db.decomposition(char),
@@ -119,6 +118,7 @@ class UnicodeFunctionsTest(UnicodeDatabaseTest):
         self.assertEqual(self.db.numeric('9'), 9)
         self.assertEqual(self.db.numeric('\u215b'), 0.125)
         self.assertEqual(self.db.numeric('\u2468'), 9.0)
+        self.assertEqual(self.db.numeric('\ua627'), 7.0)
         self.assertEqual(self.db.numeric('\U00020000', None), None)
 
         self.assertRaises(TypeError, self.db.numeric)
@@ -186,6 +186,24 @@ class UnicodeFunctionsTest(UnicodeDatabaseTest):
         # The rest can be found in test_normalization.py
         # which requires an external file.
 
+    def test_pr29(self):
+        # http://www.unicode.org/review/pr-29.html
+        # See issues #1054943 and #10254.
+        composed = ("\u0b47\u0300\u0b3e", "\u1100\u0300\u1161",
+                    'Li\u030dt-s\u1e73\u0301',
+                    '\u092e\u093e\u0930\u094d\u0915 \u091c\u093c'
+                    + '\u0941\u0915\u0947\u0930\u092c\u0930\u094d\u0917',
+                    '\u0915\u093f\u0930\u094d\u0917\u093f\u091c\u093c'
+                    + '\u0938\u094d\u0924\u093e\u0928')
+        for text in composed:
+            self.assertEqual(self.db.normalize('NFC', text), text)
+
+    def test_issue10254(self):
+        # Crash reported in #10254
+        a = 'C\u0338' * 20  + 'C\u0327'
+        b = 'C\u0338' * 20  + '\xC7'
+        self.assertEqual(self.db.normalize('NFC', a), b)
+
     def test_east_asian_width(self):
         eaw = self.db.east_asian_width
         self.assertRaises(TypeError, eaw, b'a')
@@ -219,7 +237,8 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         self.assertEqual(popen.returncode, 1)
         error = "SyntaxError: (unicode error) \\N escapes not supported " \
             "(can't load unicodedata module)"
-        self.assertTrue(error in popen.stderr.read().decode("ascii"))
+        self.assertIn(error, popen.stderr.read().decode("ascii"))
+        popen.stderr.close()
 
     def test_decimal_numeric_consistent(self):
         # Test that decimal and numeric are consistent,
@@ -232,7 +251,7 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
             if dec != -1:
                 self.assertEqual(dec, self.db.numeric(c))
                 count += 1
-        self.assert_(count >= 10) # should have tested at least the ASCII digits
+        self.assertTrue(count >= 10) # should have tested at least the ASCII digits
 
     def test_digit_numeric_consistent(self):
         # Test that digit and numeric are consistent,
@@ -245,21 +264,21 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
             if dec != -1:
                 self.assertEqual(dec, self.db.numeric(c))
                 count += 1
-        self.assert_(count >= 10) # should have tested at least the ASCII digits
+        self.assertTrue(count >= 10) # should have tested at least the ASCII digits
 
     def test_bug_1704793(self):
-        self.assertEquals(self.db.lookup("GOTHIC LETTER FAIHU"), '\U00010346')
+        self.assertEqual(self.db.lookup("GOTHIC LETTER FAIHU"), '\U00010346')
 
     def test_ucd_510(self):
         import unicodedata
         # In UCD 5.1.0, a mirrored property changed wrt. UCD 3.2.0
-        self.assert_(unicodedata.mirrored("\u0f3a"))
-        self.assert_(not unicodedata.ucd_3_2_0.mirrored("\u0f3a"))
+        self.assertTrue(unicodedata.mirrored("\u0f3a"))
+        self.assertTrue(not unicodedata.ucd_3_2_0.mirrored("\u0f3a"))
         # Also, we now have two ways of representing
         # the upper-case mapping: as delta, or as absolute value
-        self.assert_("a".upper()=='A')
-        self.assert_("\u1d79".upper()=='\ua77d')
-        self.assert_(".".upper()=='.')
+        self.assertTrue("a".upper()=='A')
+        self.assertTrue("\u1d79".upper()=='\ua77d')
+        self.assertTrue(".".upper()=='.')
 
     def test_bug_5828(self):
         self.assertEqual("\u1d79".lower(), "\u1d79")
@@ -277,6 +296,25 @@ class UnicodeMiscTest(UnicodeDatabaseTest):
         self.assertEqual("\u01c4".title(), "\u01c5")
         self.assertEqual("\u01c5".title(), "\u01c5")
         self.assertEqual("\u01c6".title(), "\u01c5")
+
+    def test_linebreak_7643(self):
+        for i in range(0x10000):
+            lines = (chr(i) + 'A').splitlines()
+            if i in (0x0a, 0x0b, 0x0c, 0x0d, 0x85,
+                     0x1c, 0x1d, 0x1e, 0x2028, 0x2029):
+                self.assertEqual(len(lines), 2,
+                                 r"\u%.4x should be a linebreak" % i)
+            else:
+                self.assertEqual(len(lines), 1,
+                                 r"\u%.4x should not be a linebreak" % i)
+
+    def test_UCS4(self):
+        # unicodedata should work with code points outside the BMP
+        # even on a narrow Unicode build
+        self.assertEqual(self.db.category("\U0001012A"), "No")
+        self.assertEqual(self.db.numeric("\U0001012A"), 9000)
+        self.assertEqual(self.db.decimal("\U0001D7FD"), 7)
+        self.assertEqual(self.db.digit("\U0001D7FD"), 7)
 
 def test_main():
     test.support.run_unittest(

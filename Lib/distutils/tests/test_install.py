@@ -6,6 +6,8 @@ import sys
 import unittest
 import site
 
+from test.support import captured_stdout, run_unittest
+
 from distutils.command.install import install
 from distutils.command import install as install_module
 from distutils.command.install import INSTALL_SCHEMES
@@ -14,8 +16,8 @@ from distutils.errors import DistutilsOptionError
 
 from distutils.tests import support
 
-
 class InstallTestCase(support.TempdirManager,
+                      support.EnvironGuard,
                       support.LoggingSilencer,
                       unittest.TestCase):
 
@@ -88,7 +90,7 @@ class InstallTestCase(support.TempdirManager,
 
     def _test_user_site(self):
         for key in ('nt_user', 'unix_user', 'os2_home'):
-            self.assert_(key in INSTALL_SCHEMES)
+            self.assertTrue(key in INSTALL_SCHEMES)
 
         dist = Distribution({'name': 'xx'})
         cmd = install(dist)
@@ -96,24 +98,24 @@ class InstallTestCase(support.TempdirManager,
         # making sure the user option is there
         options = [name for name, short, lable in
                    cmd.user_options]
-        self.assert_('user' in options)
+        self.assertTrue('user' in options)
 
         # setting a value
         cmd.user = 1
 
         # user base and site shouldn't be created yet
-        self.assert_(not os.path.exists(self.user_base))
-        self.assert_(not os.path.exists(self.user_site))
+        self.assertTrue(not os.path.exists(self.user_base))
+        self.assertTrue(not os.path.exists(self.user_site))
 
         # let's run finalize
         cmd.ensure_finalized()
 
         # now they should
-        self.assert_(os.path.exists(self.user_base))
-        self.assert_(os.path.exists(self.user_site))
+        self.assertTrue(os.path.exists(self.user_base))
+        self.assertTrue(os.path.exists(self.user_site))
 
-        self.assert_('userbase' in cmd.config_vars)
-        self.assert_('usersite' in cmd.config_vars)
+        self.assertTrue('userbase' in cmd.config_vars)
+        self.assertTrue('usersite' in cmd.config_vars)
 
     def test_handle_extra_path(self):
         dist = Distribution({'name': 'xx', 'extra_path': 'path,dirs'})
@@ -121,23 +123,23 @@ class InstallTestCase(support.TempdirManager,
 
         # two elements
         cmd.handle_extra_path()
-        self.assertEquals(cmd.extra_path, ['path', 'dirs'])
-        self.assertEquals(cmd.extra_dirs, 'dirs')
-        self.assertEquals(cmd.path_file, 'path')
+        self.assertEqual(cmd.extra_path, ['path', 'dirs'])
+        self.assertEqual(cmd.extra_dirs, 'dirs')
+        self.assertEqual(cmd.path_file, 'path')
 
         # one element
         cmd.extra_path = ['path']
         cmd.handle_extra_path()
-        self.assertEquals(cmd.extra_path, ['path'])
-        self.assertEquals(cmd.extra_dirs, 'path')
-        self.assertEquals(cmd.path_file, 'path')
+        self.assertEqual(cmd.extra_path, ['path'])
+        self.assertEqual(cmd.extra_dirs, 'path')
+        self.assertEqual(cmd.path_file, 'path')
 
         # none
         dist.extra_path = cmd.extra_path = None
         cmd.handle_extra_path()
-        self.assertEquals(cmd.extra_path, None)
-        self.assertEquals(cmd.extra_dirs, '')
-        self.assertEquals(cmd.path_file, None)
+        self.assertEqual(cmd.extra_path, None)
+        self.assertEqual(cmd.extra_dirs, '')
+        self.assertEqual(cmd.path_file, None)
 
         # three elements (no way !)
         cmd.extra_path = 'path,dirs,again'
@@ -180,11 +182,25 @@ class InstallTestCase(support.TempdirManager,
 
         # let's check the RECORD file was created with one
         # line (the egg info file)
-        with open(cmd.record) as f:
-            self.assertEquals(len(f.readlines()), 1)
+        f = open(cmd.record)
+        try:
+            self.assertEqual(len(f.readlines()), 1)
+        finally:
+            f.close()
+
+    def test_debug_mode(self):
+        # this covers the code called when DEBUG is set
+        old_logs_len = len(self.logs)
+        install_module.DEBUG = True
+        try:
+            with captured_stdout() as stdout:
+                self.test_record()
+        finally:
+            install_module.DEBUG = False
+        self.assertTrue(len(self.logs) > old_logs_len)
 
 def test_suite():
     return unittest.makeSuite(InstallTestCase)
 
 if __name__ == "__main__":
-    unittest.main(defaultTest="test_suite")
+    run_unittest(test_suite())

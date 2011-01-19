@@ -20,11 +20,11 @@ None
 The memory block stores pointers to strings, and the strings itself
 assigned from Python must be kept.
 
->>> array[4] = 'foo bar'
+>>> array[4] = b'foo bar'
 >>> array._objects
 {'4': b'foo bar'}
 >>> array[4]
-'foo bar'
+b'foo bar'
 >>>
 
 It gets more complicated when the ctypes instance itself is contained
@@ -45,7 +45,7 @@ of 'x' ('_b_base_' is either None, or the root object owning the memory block):
 <ctypes.test.test_objects.X object at 0x...>
 >>>
 
->>> x.array[0] = 'spam spam spam'
+>>> x.array[0] = b'spam spam spam'
 >>> x._objects
 {'0:2': b'spam spam spam'}
 >>> x.array._b_base_._objects
