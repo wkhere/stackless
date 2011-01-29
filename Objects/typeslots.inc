@@ -45,28 +45,128 @@ offsetof(PyHeapTypeObject, as_sequence.sq_inplace_repeat),
 offsetof(PyHeapTypeObject, as_sequence.sq_item),
 offsetof(PyHeapTypeObject, as_sequence.sq_length),
 offsetof(PyHeapTypeObject, as_sequence.sq_repeat),
-offsetof(PyHeapTypeObject, tp_alloc),
-offsetof(PyHeapTypeObject, tp_base),
-offsetof(PyHeapTypeObject, tp_bases),
-offsetof(PyHeapTypeObject, tp_call),
-offsetof(PyHeapTypeObject, tp_clear),
-offsetof(PyHeapTypeObject, tp_dealloc),
-offsetof(PyHeapTypeObject, tp_del),
-offsetof(PyHeapTypeObject, tp_descr_get),
-offsetof(PyHeapTypeObject, tp_descr_set),
-offsetof(PyHeapTypeObject, tp_doc),
-offsetof(PyHeapTypeObject, tp_getattr),
-offsetof(PyHeapTypeObject, tp_getattro),
-offsetof(PyHeapTypeObject, tp_hash),
-offsetof(PyHeapTypeObject, tp_init),
-offsetof(PyHeapTypeObject, tp_is_gc),
-offsetof(PyHeapTypeObject, tp_iter),
-offsetof(PyHeapTypeObject, tp_iternext),
-offsetof(PyHeapTypeObject, tp_methods),
-offsetof(PyHeapTypeObject, tp_new),
-offsetof(PyHeapTypeObject, tp_repr),
-offsetof(PyHeapTypeObject, tp_richcompare),
-offsetof(PyHeapTypeObject, tp_setattr),
-offsetof(PyHeapTypeObject, tp_setattro),
-offsetof(PyHeapTypeObject, tp_str),
-offsetof(PyHeapTypeObject, tp_traverse),
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_alloc),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_alloc),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_base),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_base),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_bases),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_bases),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_call),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_call),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_clear),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_clear),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_dealloc),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_dealloc),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_del),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_del),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_descr_get),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_descr_get),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_descr_set),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_descr_set),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_doc),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_doc),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_getattr),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_getattr),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_getattro),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_getattro),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_hash),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_hash),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_init),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_init),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_is_gc),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_is_gc),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_iter),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_iter),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_iternext),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_iternext),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_methods),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_methods),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_new),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_new),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_repr),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_repr),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_richcompare),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_richcompare),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_setattr),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_setattr),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_setattro),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_setattro),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_str),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_str),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_traverse),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_traverse),
+#endif
