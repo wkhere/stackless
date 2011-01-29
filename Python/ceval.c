@@ -1459,11 +1459,8 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
                 goto fast_next_opcode;
             }
 #ifdef STACKLESS
-            if (tstate->st.interrupt &&
-                !tstate->curexc_type) {
-                int ticks = _Py_CheckInterval - _Py_Ticker;
-                int mt = tstate->st.ticker -= ticks;
-                if (mt <= 0) {
+            if (tstate->st.interrupt && !tstate->curexc_type) {
+                if (tstate->tick_counter < tstate->st.tick_watermark) {
                     PyObject *ires;
                     ires = tstate->st.interrupt();
                     if (ires == NULL) {
@@ -3266,8 +3263,8 @@ fast_yield:
     }
 
     /* pop frame */
-#ifndef STACKLESS
 exit_eval_frame:
+#ifndef STACKLESS
     Py_LeaveRecursiveCall();
     tstate->frame = f->f_back;
 
@@ -3325,7 +3322,7 @@ stackless_interrupt_call:
        (look for the word 'Promise' above) */
     f->f_lasti = INSTR_OFFSET() - 1;
     f = tstate->frame;
-       return (PyObject *) Py_UnwindToken;
+    return (PyObject *) Py_UnwindToken;
 #endif
 }
 

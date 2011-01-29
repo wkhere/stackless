@@ -218,7 +218,7 @@ interrupt_timeout_return(void)
 		current->flags.atomic || ts->st.schedlock ||
 		!TASKLET_NESTING_OK(current))
 	{
-		ts->st.ticker = ts->st.interval;
+		ts->st.tick_watermark = ts->tick_counter + ts->st.interval;
 		current->flags.pending_irq = 1;
 		Py_INCREF(Py_None);
 		return Py_None;
@@ -262,7 +262,8 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	else
 		ts->st.interrupt = interrupt_timeout_return;
 
-	ts->st.ticker = ts->st.interval = timeout;
+	ts->st.interval = timeout;
+	ts->st.tick_watermark = ts->tick_counter + timeout;
 
 	/* remove main. Will get back at the end. */
 	slp_current_remove();

@@ -57,9 +57,7 @@ void slp_check_pending_irq()
 		if (!TASKLET_NESTING_OK(current))
 			return;
 		/* trigger interrupt */
-		if (_Py_Ticker > 0)
-			_Py_Ticker = 0;
-		ts->st.ticker = 0;
+		ts->st.tick_watermark = ts->tick_counter;
 		current->flags.pending_irq = 0;
 	}
 }

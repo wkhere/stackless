@@ -783,6 +783,9 @@ _Pickler_New(void)
     self->fast_nesting = 0;
     self->fix_imports = 0;
     self->fast_memo = NULL;
+#ifdef STACKLESS
+    self->module_dict_ids = NULL;
+#endif
 
     self->memo = PyMemoTable_New();
     if (self->memo == NULL) {

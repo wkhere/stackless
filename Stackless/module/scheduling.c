@@ -591,10 +591,10 @@ new_lock(void)
 	lock = PyThread_allocate_lock();
 	if (lock == NULL) return NULL;
 
-	return PyCObject_FromVoidPtr(lock, destruct_lock);
+	return PyCapsule_New(lock, 0, destruct_lock);
 }
 
-#define get_lock(obj) PyCObject_AsVoidPtr(obj)
+#define get_lock(obj) PyCapsule_GetPointer(obj, 0)
 
 #define acquire_lock(lock, flag) PyThread_acquire_lock(get_lock(lock), flag)
 #define release_lock(lock) PyThread_release_lock(get_lock(lock))
@@ -859,7 +859,7 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 	notify_schedule(ts, prev, next);
 
 	if (!(ts->st.runflags & PY_WATCHDOG_TOTALTIMEOUT))
-		ts->st.ticker = ts->st.interval; /* reset timeslice */
+		ts->st.tick_watermark = ts->tick_counter + ts->st.interval; /* reset timeslice */
 	prev->recursion_depth = ts->recursion_depth;
 	prev->f.frame = ts->frame;
 

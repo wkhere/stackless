@@ -60,7 +60,4 @@
 
 #define PyDoc_STR(s) s
 
-/* the ticker is still by thread */
-#define _Py_Ticker (ts->ticker)
-
 #endif /* pre 2.3 */
