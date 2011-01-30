@@ -1454,7 +1454,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 
 #ifdef STACKLESS
         if (tstate->st.interrupt && !tstate->curexc_type) {
-            if (tstate->st.tick_counter < tstate->st.tick_watermark) {
+            if (tstate->st.tick_counter > tstate->st.tick_watermark) {
                 PyObject *ires;
                 ires = tstate->st.interrupt();
                 if (ires == NULL) {
