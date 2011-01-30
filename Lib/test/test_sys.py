@@ -215,6 +215,8 @@ class SysModuleTest(unittest.TestCase):
         self.assertEqual(sys.getrecursionlimit(), 10000)
         sys.setrecursionlimit(oldlimit)
 
+    @unittest.skipIf(hasattr(sys, 'gettrace') and sys.gettrace(),
+                     'fatal error if run with a trace function')
     def test_recursionlimit_recovery(self):
         # NOTE: this test is slightly fragile in that it depends on the current
         # recursion count when executing the test being low enough so as to

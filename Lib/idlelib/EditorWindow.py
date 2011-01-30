@@ -772,7 +772,8 @@ class EditorWindow(object):
         "Load and update the recent files list and menus"
         rf_list = []
         if os.path.exists(self.recent_files_path):
-            rf_list_file = open(self.recent_files_path,'r')
+            rf_list_file = open(self.recent_files_path,'r',
+                                encoding='utf_8', errors='replace')
             try:
                 rf_list = rf_list_file.readlines()
             finally:
@@ -790,7 +791,8 @@ class EditorWindow(object):
         rf_list = [path for path in rf_list if path not in bad_paths]
         ulchars = "1234567890ABCDEFGHIJK"
         rf_list = rf_list[0:len(ulchars)]
-        rf_file = open(self.recent_files_path, 'w')
+        rf_file = open(self.recent_files_path, 'w',
+                        encoding='utf_8', errors='replace')
         try:
             rf_file.writelines(rf_list)
         finally:
@@ -1544,7 +1546,12 @@ keynames = {
 
 def get_accelerator(keydefs, eventname):
     keylist = keydefs.get(eventname)
-    if not keylist:
+    # issue10940: temporary workaround to prevent hang with OS X Cocoa Tk 8.5
+    # if not keylist:
+    if (not keylist) or (macosxSupport.runningAsOSXApp() and eventname in {
+                            "<<open-module>>",
+                            "<<goto-line>>",
+                            "<<change-indentwidth>>"}):
         return ""
     s = keylist[0]
     s = re.sub(r"-[a-z]\b", lambda m: m.group().upper(), s)

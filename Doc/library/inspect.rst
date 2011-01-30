@@ -6,6 +6,9 @@
 .. moduleauthor:: Ka-Ping Yee <ping@lfw.org>
 .. sectionauthor:: Ka-Ping Yee <ping@lfw.org>
 
+**Source code:** :source:`Lib/inspect.py`
+
+--------------
 
 The :mod:`inspect` module provides several useful functions to help get
 information about live objects such as modules, classes, methods, functions,
@@ -637,9 +640,9 @@ generator to be determined easily.
    Get current state of a generator-iterator.
 
    Possible states are:
-   -  GEN_CREATED: Waiting to start execution.
-   -  GEN_RUNNING: Currently being executed by the interpreter.
-   -  GEN_SUSPENDED: Currently suspended at a yield expression.
-   -  GEN_CLOSED: Execution has completed.
+    * GEN_CREATED: Waiting to start execution.
+    * GEN_RUNNING: Currently being executed by the interpreter.
+    * GEN_SUSPENDED: Currently suspended at a yield expression.
+    * GEN_CLOSED: Execution has completed.
 
    .. versionadded:: 3.2

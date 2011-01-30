@@ -11,6 +11,10 @@
 
 .. index:: module: urllib.request
 
+**Source code:** :source:`Lib/http/client.py`
+
+--------------
+
 This module defines classes which implement the client side of the HTTP and
 HTTPS protocols.  It is normally not used directly --- the module
 :mod:`urllib.request` uses it to handle URLs that use HTTP and HTTPS.
@@ -32,7 +36,7 @@ The module provides the following classes:
    used.  If the optional *timeout* parameter is given, blocking
    operations (like connection attempts) will timeout after that many seconds
    (if it is not given, the global default timeout setting is used).
-   The optional *source_address* parameter may be a typle of a (host, port)
+   The optional *source_address* parameter may be a tuple of a (host, port)
    to use as the source address the HTTP connection is made from.
 
    For example, the following calls all create instances that connect to the server
@@ -396,7 +400,7 @@ HTTPConnection Objects
    contents of the file is sent; this file object should support ``fileno()``
    and ``read()`` methods. The header Content-Length is automatically set to
    the length of the file as reported by stat. The *body* argument may also be
-   an iterable and Contet-Length header should be explicitly provided when the
+   an iterable and Content-Length header should be explicitly provided when the
    body is an iterable.
 
    The *headers* argument should be a mapping of extra HTTP

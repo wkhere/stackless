@@ -55,6 +55,7 @@ focuses on a few highlights and gives a few examples.  For full details, see the
 
    :pep:`392` - Python 3.2 Release Schedule
 
+
 PEP 384: Defining a Stable ABI
 ==============================
 
@@ -78,6 +79,7 @@ need to be recompiled for every feature release.
    :pep:`384` - Defining a Stable ABI
       PEP written by Martin von Löwis.
 
+
 PEP 389: Argparse Command Line Parsing Module
 =============================================
 
@@ -86,7 +88,7 @@ overcome the limitations of :mod:`optparse` which did not provide support for
 positional arguments (not just options), subcommands, required options and other
 common patterns of specifying and validating options.
 
-This module has already has wide-spread success in the community as a
+This module has already has widespread success in the community as a
 third-party module.  Being more fully featured than its predecessor, the
 :mod:`argparse` module is now the preferred module for command-line processing.
 The older module is still being kept available because of the substantial amount
@@ -101,14 +103,14 @@ or more positional arguments is present, and making a required option::
                 description = 'Manage servers',         # main description for help
                 epilog = 'Tested on Solaris and Linux') # displayed after help
     parser.add_argument('action',                       # argument name
-                choices = ['deploy', 'start', 'stop'],  # one of four allowed values
+                choices = ['deploy', 'start', 'stop'],  # three allowed values
                 help = 'action on each target')         # help msg
     parser.add_argument('targets',
                 metavar = 'HOSTNAME',                   # var name used in help msg
-                nargs = '+',                            # require 1 or more targets
+                nargs = '+',                            # require one or more targets
                 help = 'url for target machines')       # help msg explanation
     parser.add_argument('-u', '--user',                 # -u or --user option
-                required = True,                        # make this a required argument
+                required = True,                        # make it a required argument
                 help = 'login as user')
 
 Example of calling the parser on a command string::
@@ -167,8 +169,7 @@ each with their own argument patterns and help displays::
    :pep:`389` - New Command Line Parsing Module
       PEP written by Steven Bethard.
 
-   :ref:`upgrading-optparse-code` for details on the differences from
-      :mod:`optparse`.
+   :ref:`upgrading-optparse-code` for details on the differences from :mod:`optparse`.
 
 
 PEP 391:  Dictionary Based Configuration for Logging
@@ -208,8 +209,10 @@ dictionary::
 If that dictionary is stored in a file called :file:`conf.json`, it can be
 loaded and called with code like this::
 
-   >>> import logging.config
-   >>> logging.config.dictConfig(json.load(open('conf.json', 'rb')))
+   >>> import json, logging.config
+   >>> with open('conf.json', 'rb') as f:
+           conf = json.load(f)
+   >>> logging.config.dictConfig(conf)
    >>> logging.info("Transaction completed normally")
    >>> logging.critical("Abnormal termination")
 
@@ -218,16 +221,17 @@ loaded and called with code like this::
    :pep:`391` - Dictionary Based Configuration for Logging
       PEP written by Vinay Sajip.
 
+
 PEP 3148:  The ``concurrent.futures`` module
 ============================================
 
-Code for creating and managing concurrency is being collected in a new toplevel
+Code for creating and managing concurrency is being collected in a new top-level
 namespace, *concurrent*.  Its first member is a *futures* package which provides
-a uniform high level interface for managing threads and processes.
+a uniform high-level interface for managing threads and processes.
 
 The design for :mod:`concurrent.futures` was inspired by
 *java.util.concurrent.package*.  In that model, a running call and its result
-are represented by a :class:`~concurrent.futures.Future` object which abstracts
+are represented by a :class:`~concurrent.futures.Future` object that abstracts
 features common to threads, processes, and remote procedure calls.  That object
 supports status checks (running or done), timeouts, cancellations, adding
 callbacks, and access to results or exceptions.
@@ -249,15 +253,15 @@ Both classes share a common interface with three methods:
 returning a :class:`~concurrent.futures.Future` object;
 :meth:`~concurrent.futures.Executor.map` for scheduling many asynchronous calls
 at a time, and :meth:`~concurrent.futures.Executor.shutdown` for freeing
-resources.  The class is a :term:`context manager` and can be used within a
+resources.  The class is a :term:`context manager` and can be used in a
 :keyword:`with` statement to assure that resources are automatically released
 when currently pending futures are done executing.
 
 A simple of example of :class:`~concurrent.futures.ThreadPoolExecutor` is a
 launch of four parallel threads for copying files::
 
-  import shutil
-  with ThreadPoolExecutor(max_workers=4) as e:
+  import threading, shutil
+  with threading.ThreadPoolExecutor(max_workers=4) as e:
       e.submit(shutil.copy, 'src1.txt', 'dest1.txt')
       e.submit(shutil.copy, 'src2.txt', 'dest2.txt')
       e.submit(shutil.copy, 'src3.txt', 'dest3.txt')
@@ -274,7 +278,6 @@ launch of four parallel threads for copying files::
    :ref:`Code for computing prime numbers in
    parallel<processpoolexecutor-example>`, an example demonstrating
    :class:`~concurrent.futures.ProcessPoolExecutor`.
-
 
 
 PEP 3147:  PYC Repository Directories
@@ -324,7 +327,17 @@ aspects that are visible to the programmer:
   'c:/py32/lib/__pycache__/collections.cpython-32.pyc'
 
 * The :mod:`py_compile` and :mod:`compileall` modules have been updated to
-  reflect the new naming convention and target directory.
+  reflect the new naming convention and target directory.  The command-line
+  invocation of *compileall* has new command-line options include ``-i`` for
+  specifying a list of files and directories to compile, and ``-b`` which causes
+  bytecode files to be written to their legacy location rather than
+  *__pycache__*.
+
+* The :mod:`importlib.abc` module has been updated with new :term:`abstract base
+  classes <abstract base class>` for the loading bytecode files.  The obsolete
+  ABCs, :class:`~importlib.abc.PyLoader` and
+  :class:`~importlib.abc.PyPycLoader`, have been deprecated (instructions on how
+  to stay Python 3.1 compatible are included with the documentation).
 
 .. seealso::
 
@@ -362,6 +375,7 @@ module::
    :pep:`3149` - ABI Version Tagged .so Files
       PEP written by Barry Warsaw.
 
+
 PEP 3333: Python Web Server Gateway Interface v1.0.1
 =====================================================
 
@@ -375,7 +389,7 @@ request/response headers and metadata versus *byte strings* which are used for
 the bodies of requests and responses.
 
 The *native strings* are always of type :class:`str` but are restricted to code
-points between *u0000* through *u00FF* which are translatable to bytes using
+points between *U+0000* through *U+00FF* which are translatable to bytes using
 *Latin-1* encoding.  These strings are used for the keys and values in the
 environ dictionary and for response headers and statuses in the
 :func:`start_response` function.  They must follow :rfc:`2616` with respect to
@@ -398,7 +412,7 @@ points:
 
 For server implementers writing CGI-to-WSGI pathways or other CGI-style
 protocols, the users must to be able access the environment using native strings
-eventhough the underlying platform may have a different convention.  To bridge
+even though the underlying platform may have a different convention.  To bridge
 this gap, the :mod:`wsgiref` module has a new function,
 :func:`wsgiref.handlers.read_environ` for transcoding CGI variables from
 :attr:`os.environ` into native strings and returning a new dictionary.
@@ -407,6 +421,7 @@ this gap, the :mod:`wsgiref` module has a new function,
 
    :pep:`3333` - Python Web Server Gateway Interface v1.0.1
       PEP written by Phillip Eby.
+
 
 Other Language Changes
 ======================
@@ -427,6 +442,36 @@ Some smaller changes made to the core Python language are:
 
   (Suggested by Mark Dickinson and implemented by Eric Smith in :issue:`7094`.)
 
+* There is also a new :meth:`str.format_map` method that extends the
+  capabilities of the existing :meth:`str.format` method by accepting arbitrary
+  :term:`mapping` objects.  This new method makes it possible to use string
+  formatting with any of one of Python's many dictionary-like tools such as
+  :class:`~collections.defaultdict`, :class:`~shelve.Shelf`,
+  :class:`~configparser.ConfigParser`, or :mod:`dbm`.  It also useful with
+  custom :class:`dict` subclasses that normalize keys before look-up or that
+  supply a :meth:`__missing__` method for unknown keys::
+
+    >>> import shelve
+    >>> d = shelve.open('tmp.shl')
+    >>> 'The {project_name} status is {status} as of {date}'.format_map(d)
+    'The testing project status is green as of February 15, 2011'
+
+    >>> class LowerCasedDict(dict):
+            def __getitem__(self, key):
+                return dict.__getitem__(self, key.lower())
+    >>> lcd = LowerCasedDict(part='widgets', quantity=10)
+    >>> 'There are {QUANTITY} {Part} in stock'.format_map(lcd)
+    'There are 10 widgets in stock'
+
+    >>> class PlaceholderDict(dict):
+            def __missing__(self, key):
+                return '<{}>'.format(key)
+    >>> 'Hello {name}, welcome to {location}'.format_map(PlaceholderDict())
+    'Hello <name>, welcome to <location>'
+
+ (Suggested by Raymond Hettinger and implemented by Eric Smith in
+ :issue:`6081`.)
+
 * The interpreter can now be started with a quiet option, ``-q``, to suppress
   the copyright and version information from being displayed in the interactive
   mode.  The option can be introspected using the :attr:`sys.flags` attribute::
@@ -445,7 +490,18 @@ Some smaller changes made to the core Python language are:
   would otherwise be absent from the class dictionary.  Formerly, *hasattr*
   would catch any exception, possibly masking genuine errors.  Now, *hasattr*
   has been tightened to only catch :exc:`AttributeError` and let other
-  exceptions pass through.
+  exceptions pass through::
+
+    >>> class A:
+            @property
+            def f(self):
+                return 1 // 0
+
+    >>> a = A()
+    >>> hasattr(a, 'f')
+    Traceback (most recent call last):
+      ...
+    ZeroDivisionError: integer division or modulo by zero
 
   (Discovered by Yury Selivanov and fixed by Benjamin Peterson; :issue:`9666`.)
 
@@ -467,8 +523,7 @@ Some smaller changes made to the core Python language are:
   original object.
 
   >>> with memoryview(b'abcdefgh') as v:
-  ...     print(v.tolist())
-  ...
+          print(v.tolist())
   [97, 98, 99, 100, 101, 102, 103, 104]
 
   (Added by Antoine Pitrou; :issue:`9757`.)
@@ -476,52 +531,59 @@ Some smaller changes made to the core Python language are:
 * Previously it was illegal to delete a name from the local namespace if it
   occurs as a free variable in a nested block::
 
-   >>> def outer(x):
-   ...     def inner():
-   ...        return x
-   ...     inner()
-   ...     del x
+       def outer(x):
+           def inner():
+              return x
+           inner()
+           del x
 
   This is now allowed.  Remember that the target of an :keyword:`except` clause
   is cleared, so this code which used to work with Python 2.6, raised a
   :exc:`SyntaxError` with Python 3.1 and now works again::
 
-   >>> def f():
-   ...     def print_error():
-   ...        print(e)
-   ...     try:
-   ...        something
-   ...     except Exception as e:
-   ...        print_error()
-   ...        # implicit "del e" here
+       def f():
+           def print_error():
+              print(e)
+           try:
+              something
+           except Exception as e:
+              print_error()
+              # implicit "del e" here
 
   (See :issue:`4617`.)
 
 * The internal :c:type:`structsequence` tool now creates subclasses of tuple.
   This means that C structures like those returned by :func:`os.stat`,
-  :func:`time.gmtime`, and :func:`sys.version_info` now work like a
+  :func:`time.gmtime`, and :attr:`sys.version_info` now work like a
   :term:`named tuple` and now work with functions and methods that
-  expect a tuple as an argument.  The is a big step forward in making the C
-  structures as flexible as their pure Python counterparts.
+  expect a tuple as an argument.  This is a big step forward in making the C
+  structures as flexible as their pure Python counterparts:
+
+  >>> isinstance(sys.version_info, tuple)
+  True
+  >>> 'Version %d.%d.%d %s(%d)' % sys.version_info
+  'Version 3.2.0 final(0)'
 
   (Suggested by Arfrever Frehtes Taifersar Arahesis and implemented
   by Benjamin Peterson in :issue:`8413`.)
 
-* Warnings are now easier to control.  A :envvar:`PYTHONWARNINGS` environment
-  variable is now available as an alternative to using ``-W`` at the command
-  line.
+* Warnings are now easier to control using the :envvar:`PYTHONWARNINGS`
+  environment variable as an alternative to using ``-W`` at the command line::
+
+    $ export PYTHONWARNINGS='ignore::RuntimeWarning::,once::UnicodeWarning::'
 
   (Suggested by Barry Warsaw and implemented by Philip Jenvey in :issue:`7301`.)
 
 * A new warning category, :exc:`ResourceWarning`, has been added.  It is
   emitted when potential issues with resource consumption or cleanup
-  are detected.  It is silenced by default in normal release builds, but
+  are detected.  It is silenced by default in normal release builds but
   can be enabled through the means provided by the :mod:`warnings`
   module, or on the command line.
 
   A :exc:`ResourceWarning` is issued at interpreter shutdown if the
-  :data:`gc.garbage` list isn't empty.  This is meant to make the programmer
-  aware that their code contains object finalization issues.
+  :data:`gc.garbage` list isn't empty, and if :attr:`gc.DEBUG_UNCOLLECTABLE` is
+  set, all uncollectable objects are printed.  This is meant to make the
+  programmer aware that their code contains object finalization issues.
 
   A :exc:`ResourceWarning` is also issued when a :term:`file object` is destroyed
   without having been explicitly closed.  While the deallocator for such
@@ -541,8 +603,8 @@ Some smaller changes made to the core Python language are:
   of an effort to make more objects fully implement the
   :class:`collections.Sequence` :term:`abstract base class`.  As a result, the
   language will have a more uniform API.  In addition, :class:`range` objects
-  now support slicing and negative indices.  This makes *range* more
-  interoperable with lists::
+  now support slicing and negative indices, even with values larger than
+  :attr:`sys.maxsize`.  This makes *range* more interoperable with lists::
 
       >>> range(0, 100, 2).count(10)
       1
@@ -553,8 +615,8 @@ Some smaller changes made to the core Python language are:
       >>> range(0, 100, 2)[0:5]
       range(0, 10, 2)
 
-  (Contributed by Daniel Stutzbach in :issue:`9213` and by Alexander Belopolsky
-  in :issue:`2690`.)
+  (Contributed by Daniel Stutzbach in :issue:`9213`, by Alexander Belopolsky
+  in :issue:`2690`, and by Nick Coghlan in :issue:`10889`.)
 
 * The :func:`callable` builtin function from Py2.x was resurrected.  It provides
   a concise, readable alternative to using an :term:`abstract base class` in an
@@ -567,8 +629,10 @@ Some smaller changes made to the core Python language are:
 
   (See :issue:`10518`.)
 
-* Python's import mechanism can now load module installed in directories with
-  non-ASCII characters in the path name.
+* Python's import mechanism can now load modules installed in directories with
+  non-ASCII characters in the path name:
+
+  >>> import møøse.bites
 
   (Required extensive work by Victor Stinner in :issue:`9425`.)
 
@@ -586,13 +650,13 @@ For the first time, there is correct handling of inputs with mixed encodings.
 Throughout the standard library, there has been more careful attention to
 encodings and text versus bytes issues.  In particular, interactions with the
 operating system are now better able to pass non-ASCII data using the Windows
-mcbs encoding, locale-aware encodings, or UTF-8.
+MBCS encoding, locale-aware encodings, or UTF-8.
 
 Another significant win is the addition of substantially better support for
 *SSL* connections and security certificates.
 
 In addition, more classes now implement a :term:`context manager` to support
-convenient and reliable resource clean-up using the :keyword:`with`-statement.
+convenient and reliable resource clean-up using a :keyword:`with` statement.
 
 email
 -----
@@ -676,16 +740,17 @@ functools
   resource whenever the results are expected to be the same.
 
   For example, adding a caching decorator to a database query function can save
-  database accesses for popular searches::
+  database accesses for popular searches:
 
-     @functools.lru_cache(maxsize=300)
-     def get_phone_number(name):
-         c = conn.cursor()
-         c.execute('SELECT phonenumber FROM phonelist WHERE name=?', (name,))
-         return c.fetchone()[0]
+  >>> import functools
+  >>> @functools.lru_cache(maxsize=300)
+  >>> def get_phone_number(name):
+          c = conn.cursor()
+          c.execute('SELECT phonenumber FROM phonelist WHERE name=?', (name,))
+          return c.fetchone()[0]
 
   >>> for name in user_requests:
-  ...     get_phone_number(name)        # cached lookup
+          get_phone_number(name)        # cached lookup
 
   To help with choosing an effective cache size, the wrapped function is
   instrumented for tracking cache statistics:
@@ -706,6 +771,11 @@ functools
   be introspected.  It also copies :attr:`__annotations__` if defined.  And now
   it also gracefully skips over missing attributes such as :attr:`__doc__` which
   might not be defined for the wrapped callable.
+
+  In the above example, the cache can be removed by recovering the original
+  function:
+
+  >>> get_phone_number = get_phone_number.__wrapped__    # uncached function
 
   (By Nick Coghlan and Terrence Cole; :issue:`9567`, :issue:`3445`, and
   :issue:`8814`.)
@@ -731,7 +801,7 @@ functools
 
   (Contributed by Raymond Hettinger.)
 
-* To aid in porting programs from Python 2, the :func:`~functools.cmp_to_key`
+* To aid in porting programs from Python 2, the :func:`functools.cmp_to_key`
   function converts an old-style comparison function to
   modern :term:`key function`:
 
@@ -747,7 +817,7 @@ itertools
 ---------
 
 * The :mod:`itertools` module has a new :func:`~itertools.accumulate` function
-  modeled on APL's *scan* operator and on Numpy's *accumulate* function:
+  modeled on APL's *scan* operator and Numpy's *accumulate* function:
 
   >>> list(accumulate(8, 2, 50))
   [8, 10, 60]
@@ -787,25 +857,27 @@ collections
 
 * The :class:`collections.OrderedDict` class has a new method
   :meth:`~collections.OrderedDict.move_to_end` which takes an existing key and
-  moves it to either the beginning or end of an ordered sequence.  When the
-  dictionary sequence is being used as a queue, these operations correspond to
-  "move to the front of the line" or "move to the back of the line":
+  moves it to either the first or last position in the ordered sequence.
+
+  The default is to move an item to the last position.  This is equivalent of
+  renewing an entry with ``od[k] = od.pop(k)``.
+
+  A fast move-to-end operation is useful for resequencing entries.  For example,
+  an ordered dictionary can be used to track order of access by aging entries
+  from the oldest to the most recently accessed.
 
   >>> d = OrderedDict.fromkeys(['a', 'b', 'X', 'd', 'e'])
   >>> list(d)
   ['a', 'b', 'X', 'd', 'e']
-  >>> d.move_to_end('X', last=True)
+  >>> d.move_to_end('X')
   >>> list(d)
   ['a', 'b', 'd', 'e', 'X']
-  >>> d.move_to_end('X', last=False)
-  >>> list(d)
-  ['X', 'a', 'b', 'd', 'e']
 
   (Contributed by Raymond Hettinger.)
 
-* The :class:`collections.deque` grew two new methods :meth:`~collections.deque.count`
-  and :meth:`collections.deque.reverse` that make them more substitutable for
-  :class:`list` when needed:
+* The :class:`collections.deque` class grew two new methods
+  :meth:`~collections.deque.count` and :meth:`~collections.deque.reverse` that
+  make them more substitutable for :class:`list` objects:
 
   >>> d = deque('simsalabim')
   >>> d.count('s')
@@ -829,13 +901,10 @@ Barriers can work with an arbitrary number of threads.  This is a generalization
 of a `Rendezvous <http://en.wikipedia.org/wiki/Synchronous_rendezvous>`_ which
 is defined for only two threads.
 
-The barrier is designed to be cyclic, making it reusable once all of the
-waiting threads are released.
-
-If any of the predecessor tasks can hang or be delayed, a barrier can be created
-with an optional *timeout* parameter.  Then if the timeout period elapses before
-all the predecessor tasks reach the barrier point, all waiting threads are
-released and a :exc:`~threading.BrokenBarrierError` exception is raised.
+Implemented as a two-phase cyclic barrier, :class:`~threading.Barrier` objects
+are suitable for use in loops.  The separate *filling* and *draining* phases
+assure that all threads get released (drained) before any one of them can loop
+back and re-enter the barrier.  The barrier fully resets after each cycle.
 
 Example of using barriers::
 
@@ -855,6 +924,26 @@ is similar to one with :meth:`threading.Thread.join`, but the threads stay alive
 and continue to do work (summarizing ballots) after the barrier point is
 crossed.
 
+If any of the predecessor tasks can hang or be delayed, a barrier can be created
+with an optional *timeout* parameter.  Then if the timeout period elapses before
+all the predecessor tasks reach the barrier point, all waiting threads are
+released and a :exc:`~threading.BrokenBarrierError` exception is raised::
+
+    def get_votes(site):
+        ballots = conduct_election(site)
+        try:
+            all_polls_closed.wait(timeout = midnight - time.now())
+        except BrokenBarrierError:
+            lockbox = seal_ballots(ballots)
+            queue.put(lockbox)
+        else:
+            totals = summarize(ballots)
+            publish(site, totals)
+
+In this example, the barrier enforces a more robust rule.  If some election
+sites do not finish before midnight, the barrier times-out and the ballots are
+sealed and deposited in a queue for later handling.
+
 See `Barrier Synchronization Patterns
 <http://parlab.eecs.berkeley.edu/wiki/_media/patterns/paraplop_g1_3.pdf>`_ for
 more examples of how barriers can be used in parallel computing.  Also, there is
@@ -870,30 +959,102 @@ datetime and time
 * The :mod:`datetime` module has a new type :class:`~datetime.timezone` that
   implements the :class:`~datetime.tzinfo` interface by returning a fixed UTC
   offset and timezone name. This makes it easier to create timezone-aware
-  datetime objects:
+  datetime objects::
 
-  >>> datetime.now(timezone.utc)
-  datetime.datetime(2010, 12, 8, 21, 4, 2, 923754, tzinfo=datetime.timezone.utc)
+    >>> import datetime
 
-  >>> datetime.strptime("01/01/2000 12:00 +0000", "%m/%d/%Y %H:%M %z")
-  datetime.datetime(2000, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    >>> datetime.now(timezone.utc)
+    datetime.datetime(2010, 12, 8, 21, 4, 2, 923754, tzinfo=datetime.timezone.utc)
+
+    >>> datetime.strptime("01/01/2000 12:00 +0000", "%m/%d/%Y %H:%M %z")
+    datetime.datetime(2000, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
 
 * Also, :class:`~datetime.timedelta` objects can now be multiplied by
   :class:`float` and divided by :class:`float` and :class:`int` objects.
   And :class:`~datetime.timedelta` objects can now divide one another.
 
-* The :class:`~datetime.datetime` class and the :meth:`datetime.date.strftime`
-  method are no longer restricted to years after 1900.  The new supported year
-  range is from 1000 to 9999 inclusive.
+* The :meth:`datetime.date.strftime` method is no longer restricted to years
+  after 1900.  The new supported year range is from 1000 to 9999 inclusive.
 
-* The rules for two-digit years in time tuples have changed. Now, the
-  :func:`time.asctime` and :func:`time.strftime` functions will format any year
-  when :attr:`time.accept2dyear` is false and will accept four-digit years
-  otherwise.  The :func:`time.mktime` and :func:`time.strftime` functions now
-  accept full range supported by the operating system.  Conversion of two-digit
-  years to four-digit is deprecated.
+* Whenever a two-digit year is used in a time tuple, the interpretation has been
+  governed by :attr:`time.accept2dyear`.  The default is *True* which means that
+  for a two-digit year, the century is guessed according to the POSIX rules
+  governing the ``%y`` strptime format.
 
-(Contributed by Alexander Belopolsky and Victor Stinner.)
+  Starting with Py3.2, use of the century guessing heuristic will emit a
+  :exc:`DeprecationWarning`.  Instead, it is recommended that
+  :attr:`time.accept2dyear` be set to *False* so that large date ranges
+  can be used without guesswork::
+
+    >>> import time, warnings
+    >>> warnings.resetwarnings()      # remove the default warning filters
+
+    >>> time.accept2dyear = True      # guess whether 11 means 11 or 2011
+    >>> time.asctime((11, 1, 1, 12, 34, 56, 4, 1, 0))
+    Warning (from warnings module):
+      ...
+    DeprecationWarning: Century info guessed for a 2-digit year.
+    'Fri Jan  1 12:34:56 2011'
+
+    >>> time.accept2dyear = False     # use the full range of allowable dates
+    >>> time.asctime((11, 1, 1, 12, 34, 56, 4, 1, 0))
+    'Fri Jan  1 12:34:56 11'
+
+  Several functions now have significantly expanded date ranges.  When
+  :attr:`time.accept2dyear` is false, the :func:`time.asctime` function will
+  accept any year that fits in a C int, while the :func:`time.mktime` and
+  :func:`time.strftime` functions will accept the full range supported by the
+  corresponding operating system functions.
+
+(Contributed by Alexander Belopolsky and Victor Stinner in :issue:`1289118`,
+:issue:`5094`, :issue:`6641`, :issue:`2706`, :issue:`1777412`, :issue:`8013`,
+and :issue:`10827`.)
+
+.. XXX http://bugs.python.org/issue?%40search_text=datetime&%40sort=-activity
+
+math
+----
+
+The :mod:`math` module has been updated with six new functions inspired by the
+C99 standard.
+
+The :func:`~math.isfinite` function provides a reliable and fast way to detect
+special values.  It returns *True* for regular numbers and *False* for *Nan* or
+*Infinity*:
+
+>>> [isfinite(x) for x in (123, 4.56, float('Nan'), float('Inf'))]
+[True, True, False, False]
+
+The :func:`~math.expm1` function computes ``e**x-1`` for small values of *x*
+without incuring the loss of precision that usually accompanies the subtraction
+of nearly equal quantities:
+
+>>> expm1(0.013671875)   # more accurate way to compute e**x-1 for a small x
+0.013765762467652909
+
+The :func:`~math.erf` function computes a probability integral or `Gaussian
+error function <http://en.wikipedia.org/wiki/Error_function>`_.  The
+complementary error function, :func:`~math.erfc`, is ``1 - erf(x)``:
+
+>>> erf(1.0/sqrt(2.0))   # portion of normal distribution within 1 standard deviation
+0.682689492137086
+>>> erfc(1.0/sqrt(2.0))  # portion of normal distribution outside 1 standard deviation
+0.31731050786291404
+>>> erf(1.0/sqrt(2.0)) + erfc(1.0/sqrt(2.0))
+1.0
+
+The :func:`~math.gamma` function is a continuous extension of the factorial
+function.  See http://en.wikipedia.org/wiki/Gamma_function for details.  Because
+the function is related to factorials, it grows large even for small values of
+*x*, so there is also a :func:`~math.lgamma` function for computing the natural
+logarithm of the gamma function:
+
+>>> gamma(7.0)           # six factorial
+720.0
+>>> lgamma(801.0)        # log(800 factorial)
+4551.950730698041
+
+(Contributed by Mark Dickinson.)
 
 abc
 ---
@@ -901,11 +1062,100 @@ abc
 The :mod:`abc` module now supports :func:`~abc.abstractclassmethod` and
 :func:`~abc.abstractstaticmethod`.
 
-These tools make it possible to define an :term:`Abstract Base Class` that
+These tools make it possible to define an :term:`abstract base class` that
 requires a particular :func:`classmethod` or :func:`staticmethod` to be
-implemented.
+implemented::
+
+    class Temperature(metaclass=ABCMeta):
+        @abc.abstractclassmethod
+        def from_fahrenheit(self, t):
+            ...
+        @abc.abstractclassmethod
+        def from_celsius(self, t):
+            ...
 
 (Patch submitted by Daniel Urban; :issue:`5867`.)
+
+io
+--
+
+The :class:`io.BytesIO` has a new method, :meth:`~io.BytesIO.getbuffer`, which
+provides functionality similar to :func:`memoryview`.  It creates an editable
+view of the data without making a copy.  The buffer's random access and support
+for slice notation are well-suited to in-place editing::
+
+    >>> REC_LEN, LOC_START, LOC_LEN = 34, 7, 11
+
+    >>> def change_location(buffer, record_number, location):
+            start = record_number * REC_LEN + LOC_START
+            buffer[start: start+LOC_LEN] = location
+
+    >>> import io
+
+    >>> byte_stream = io.BytesIO(
+        b'G3805  storeroom  Main chassis    '
+        b'X7899  shipping   Reserve cog     '
+        b'L6988  receiving  Primary sprocket'
+    )
+    >>> buffer = byte_stream.getbuffer()
+    >>> change_location(buffer, 1, b'warehouse  ')
+    >>> change_location(buffer, 0, b'showroom   ')
+    >>> print(byte_stream.getvalue())
+    b'G3805  showroom   Main chassis    ' ->
+    b'X7899  warehouse  Reserve cog     ' ->
+    b'L6988  receiving  Primary sprocket'
+
+(Contributed by Antoine Pitrou in :issue:`5506`.)
+
+reprlib
+-------
+
+When writing a :meth:`__repr__` method for a custom container, it is easy to
+forget to handle the case where a member refers back to the container itself.
+Python's builtin objects such as :class:`list` and :class:`set` handle
+self-reference by displaying "..." in the recursive part of the representation
+string.
+
+To help write such :meth:`__repr__` methods, the :mod:`reprlib` module has a new
+decorator, :func:`~reprlib.recursive_repr`, for detecting recursive calls to
+:meth:`__repr__` and substituting a placeholder string instead::
+
+        >>> class MyList(list):
+                @recursive_repr()
+                def __repr__(self):
+                    return '<' + '|'.join(map(repr, self)) + '>'
+
+        >>> m = MyList('abc')
+        >>> m.append(m)
+        >>> m.append('x')
+        >>> print(m)
+        <'a'|'b'|'c'|...|'x'>
+
+(Contributed by Raymond Hettinger in :issue:`9826` and :issue:`9840`.)
+
+csv
+---
+
+The :mod:`csv` module now supports a new dialect, :class:`~csv.unix_dialect`,
+which applies quoting for all fields and a traditional Unix style with ``'\n'`` as
+the line terminator.  The registered dialect name is ``unix``.
+
+The :class:`csv.DictWriter` has a new method,
+:meth:`~csv.DictWriter.writeheader` for writing-out an initial row to document
+the field names::
+
+    >>> import csv, sys
+    >>> w = csv.DictWriter(sys.stdout, ['name', 'dept'], dialect='unix')
+    >>> w.writeheader()
+    "name","dept"
+    >>> w.writerows([
+            {'name': 'tom', 'dept': 'accounting'},
+            {'name': 'susan', 'dept': 'Salesl'}])
+    "tom","accounting"
+    "susan","sales"
+
+(New dialect suggested by Jay Talbot in :issue:`5975`, and the new method
+suggested by Ed Abraham in :issue:`1537721`.)
 
 contextlib
 ----------
@@ -920,7 +1170,7 @@ both roles.
 
 The basic idea is that both context managers and function decorators can be used
 for pre-action and post-action wrappers.  Context managers wrap a group of
-statements using the :keyword:`with`-statement, and function decorators wrap a
+statements using a :keyword:`with` statement, and function decorators wrap a
 group of statements enclosed in a function.  So, occasionally there is a need to
 write a pre-action or post-action wrapper that can be used in either role.
 
@@ -928,32 +1178,35 @@ For example, it is sometimes useful to wrap functions or groups of statements
 with a logger that can track the time of entry and time of exit.  Rather than
 writing both a function decorator and a context manager for the task, the
 :func:`~contextlib.contextmanager` provides both capabilities in a single
-definition:
+definition::
 
->>> import logging
->>> logging.basicConfig(level=logging.INFO)
->>> @contextmanager
-... def track_entry_and_exit(name):
-...     logging.info('Entering: {}'.format(name))
-...     yield
-...     logging.info('Exiting: {}'.format(name))
+    from contextlib import contextmanager
+    import logging
 
-Formerly, this would have only been usable as a context manager:
+    logging.basicConfig(level=logging.INFO)
 
->>> with track_entry_and_exit('widget loader'):
-...     print('Some time consuming activity goes here')
-...     load_widget()
+    @contextmanager
+    def track_entry_and_exit(name):
+        logging.info('Entering: {}'.format(name))
+        yield
+        logging.info('Exiting: {}'.format(name))
 
-Now, it can be used as a decorator as well:
+Formerly, this would have only been usable as a context manager::
 
->>> @track_entry_and_exit('widget loader')
-... def activity():
-...     print('Some time consuming activity goes here')
-...     load_widget()
+    with track_entry_and_exit('widget loader'):
+        print('Some time consuming activity goes here')
+        load_widget()
+
+Now, it can be used as a decorator as well::
+
+    @track_entry_and_exit('widget loader')
+    def activity():
+        print('Some time consuming activity goes here')
+        load_widget()
 
 Trying to fulfill two roles at once places some limitations on the technique.
 Context managers normally have the flexibility to return an argument usable by
-the :keyword:`with`-statement, but there is no parallel for function decorators.
+a :keyword:`with` statement, but there is no parallel for function decorators.
 
 In the above example, there is not a clean way for the *track_entry_and_exit*
 context manager to return a logging instance for use in the body of enclosed
@@ -968,11 +1221,19 @@ Mark Dickinson crafted an elegant and efficient scheme for assuring that
 different numeric datatypes will have the same hash value whenever their actual
 values are equal (:issue:`8188`)::
 
-   >>> assert hash(Fraction(3, 2)) == hash(1.5) == \
-              hash(Decimal("1.5")) == hash(complex(1.5, 0))
+   assert hash(Fraction(3, 2)) == hash(1.5) == \
+          hash(Decimal("1.5")) == hash(complex(1.5, 0))
+
+Some of the hashing details are exposed through a new attribute,
+:attr:`sys.hash_info`, which describes the bit width of the hash value, the
+prime modulus, the hash values for *infinity* and *nan*, and the multiplier
+used for the imaginary part of a number:
+
+>>> sys.hash_info
+sys.hash_info(width=64, modulus=2305843009213693951, inf=314159, nan=0, imag=1000003)
 
 An early decision to limit the inter-operability of various numeric types has
-been relaxed.  It is still unsupported (and ill-advised) to to have implicit
+been relaxed.  It is still unsupported (and ill-advised) to have implicit
 mixing in arithmetic expressions such as ``Decimal('1.1') + float('1.1')``
 because the latter loses information in the process of constructing the binary
 float.  However, since existing floating point value can be converted losslessly
@@ -1012,9 +1273,9 @@ connection when done::
 
  >>> from ftplib import FTP
  >>> with FTP("ftp1.at.proftpd.org") as ftp:
- ...     ftp.login()
- ...     ftp.dir()
- ...
+         ftp.login()
+         ftp.dir()
+
  '230 Anonymous login ok, restrictions apply.'
  dr-xr-xr-x   9 ftp      ftp           154 May  6 10:43 .
  dr-xr-xr-x   9 ftp      ftp           154 May  6 10:43 ..
@@ -1031,11 +1292,33 @@ also grew auto-closing context managers::
 (Contributed by Tarek Ziadé and Giampaolo Rodolà in :issue:`4972`, and
 by Georg Brandl in :issue:`8046` and :issue:`1286`.)
 
+The :class:`~ftplib.FTP_TLS` class now accepts a *context* parameter, which is a
+:class:`ssl.SSLContext` object allowing bundling SSL configuration options,
+certificates and private keys into a single (potentially long-lived) structure.
+
+(Contributed by Giampaolo Rodolà; :issue:`8806`.)
+
 popen
 -----
 
 The :func:`os.popen` and :func:`subprocess.Popen` functions now support
-the :keyword:`with` statement for auto-closing of the file descriptors.
+:keyword:`with` statements for auto-closing of the file descriptors.
+
+(Contributed by Antoine Pitrou in :issue:`7461`.)
+
+select
+------
+
+The :mod:`select` module now exposes a new, constant attribute,
+:attr:`~select.PIPE_BUF`, which gives the minimum number of bytes which are
+guaranteed not to block when :func:`select.select` says a pipe is ready
+for writing.
+
+>>> import select
+>>> select.PIPE_BUF
+512
+
+(Available on Unix systems. Patch by Sébastien Sablé in :issue:`9862`)
 
 gzip and zipfile
 ----------------
@@ -1071,19 +1354,158 @@ and can be wrapped in a :class:`io.BufferedReader` object for more speedups.  It
 also solves an issue where interleaved calls to *read* and *readline* gave the
 wrong results.
 
-(Patch submitted by by Nir Aides in :issue:`7610`.)
+(Patch submitted by Nir Aides in :issue:`7610`.)
+
+tarfile
+-------
+
+The :class:`~tarfile.TarFile` class can now be used as a content manager.  In
+addition, its :meth:`~tarfile.TarFile.add` method has a new option, *filter*,
+that controls which files are added to the archive and allows the file metadata
+to be edited.
+
+The new *filter* option replaces the older, less flexible *exclude* parameter
+which is now deprecated.  If specified, the optional *filter* parameter needs to
+be a :term:`keyword argument`.  The user-supplied filter function accepts a
+:class:`~tarfile.TarInfo` object and returns an updated
+:class:`~tarfile.TarInfo` object, or if it wants the file to be excluded, the
+function can return *None*::
+
+    >>> import tarfile, glob
+
+    >>> def myfilter(tarinfo):
+           if tarinfo.isfile():             # only save real files
+                tarinfo.uname = 'monty'     # redact the user name
+                return tarinfo
+
+    >>> with tarfile.open(name='myarchive.tar.gz', mode='w:gz') as tf:
+            for filename in glob.glob('*.txt'):
+                tf.add(filename, filter=myfilter)
+            tf.list()
+    -rw-r--r-- monty/501        902 2011-01-26 17:59:11 annotations.txt
+    -rw-r--r-- monty/501        123 2011-01-26 17:59:11 general_questions.txt
+    -rw-r--r-- monty/501       3514 2011-01-26 17:59:11 prion.txt
+    -rw-r--r-- monty/501        124 2011-01-26 17:59:11 py_todo.txt
+    -rw-r--r-- monty/501       1399 2011-01-26 17:59:11 semaphore_notes.txt
+
+(Proposed by Tarek Ziadé and implemented by Lars Gustäbel in :issue:`6856`.)
+
+hashlib
+-------
+
+The :mod:`hashlib` module has two new constant attributes listing the hashing
+algorithms guaranteed to be present in all implementations and those available
+on the current implementation::
+
+    >>> import hashlib
+
+    >>> hashlib.algorithms_guaranteed
+    {'sha1', 'sha224', 'sha384', 'sha256', 'sha512', 'md5'}
+
+    >>> hashlib.algorithms_available
+    {'md2', 'SHA256', 'SHA512', 'dsaWithSHA', 'mdc2', 'SHA224', 'MD4', 'sha256',
+    'sha512', 'ripemd160', 'SHA1', 'MDC2', 'SHA', 'SHA384', 'MD2',
+    'ecdsa-with-SHA1','md4', 'md5', 'sha1', 'DSA-SHA', 'sha224',
+    'dsaEncryption', 'DSA', 'RIPEMD160', 'sha', 'MD5', 'sha384'}
+
+(Suggested by Carl Chenet in :issue:`7418`.)
+
+ast
+---
+
+The :mod:`ast` module has a wonderful a general-purpose tool for safely
+evaluating strings containing Python expressions using the Python literal
+syntax.  The :func:`ast.literal_eval` function serves as a secure alternative to
+the builtin :func:`eval` function which is easily abused.  Python 3.2 adds
+:class:`bytes` and :class:`set` literals to the list of supported types:
+strings, bytes, numbers, tuples, lists, dicts, sets, booleans, and None.
+
+::
+
+    >>> from ast import literal_request
+
+    >>> request = "{'req': 3, 'func': 'pow', 'args': (2, 0.5)}"
+    >>> literal_eval(request)
+    {'args': (2, 0.5), 'req': 3, 'func': 'pow'}
+
+    >>> request = "os.system('do something harmful')"
+    >>> literal_eval(request)
+    Traceback (most recent call last):
+      ...
+    ValueError: malformed node or string: <_ast.Call object at 0x101739a10>
+
+(Implemented by Georg Brandl.)
+
+os
+--
+
+Different operating systems use various encodings for filenames and environment
+variables.  The :mod:`os` module provides two new functions,
+:func:`~os.fsencode` and :func:`~os.fsdecode`, for encoding and decoding
+filenames:
+
+>>> filename = 'Sehenswürdigkeiten'
+>>> os.fsencode(filename)
+b'Sehensw\xc3\xbcrdigkeiten'
+
+Some operating systems allow direct access to the unencoded bytes in the
+environment.  If so, the :attr:`os.supports_bytes_environ` constant will be
+true.
+
+For direct access to unencoded environment variables (if available),
+use the new :func:`os.getenvb` function or use :data:`os.environb`
+which is a bytes version of :data:`os.environ`.
+
+(Contributed by Victor Stinner.)
 
 shutil
 ------
 
 The :func:`shutil.copytree` function has two new options:
 
-  * *ignore_dangling_symlinks*: when ``symlinks=False`` so that the function
-    copies the file pointed to by the symlink, not the symlink itself. This
-    option will silence the error raised if the file doesn't exist.
+* *ignore_dangling_symlinks*: when ``symlinks=False`` so that the function
+  copies a file pointed to by a symlink, not the symlink itself. This option
+  will silence the error raised if the file doesn't exist.
 
-  * *copy_function*: is a callable that will be used to copy files.
-    :func:`shutil.copy2` is used by default.
+* *copy_function*: is a callable that will be used to copy files.
+  :func:`shutil.copy2` is used by default.
+
+(Contributed by Tarek Ziadé.)
+
+In addition, the :mod:`shutil` module now supports :ref:`archiving operations
+<archiving-operations>` for zipfiles, uncompressed tarfiles, gzipped tarfiles,
+and bzipped tarfiles.  And there are functions for registering additional
+archiving file formats (such as xz compressed tarfiles or custom formats).
+
+The principal functions are :func:`~shutil.make_archive` and
+:func:`~shutil.unpack_archive`.  By default, both operate on the current
+directory (which can be set by :func:`os.chdir`) and on any sub-directories.
+The archive filename needs to specified with a full pathname.  The archiving
+step is non-destructive (the original files are left unchanged).
+
+::
+
+    >>> import shutil, pprint
+
+    >>> os.chdir('mydata')                               # change to the source directory
+    >>> f = make_archive('/var/backup/mydata', 'zip')    # archive the current directory
+    >>> f                                                # show the name of archive
+    '/var/backup/mydata.zip'
+    >>> os.chdir('tmp')                                  # change to an unpacking
+    >>> shutil.unpack_archive('/var/backup/mydata.zip')  # recover the data
+
+    >>> pprint.pprint(shutil.get_archive_formats())      # display known formats
+    [('bztar', "bzip2'ed tar-file"),
+     ('gztar', "gzip'ed tar-file"),
+     ('tar', 'uncompressed tar file'),
+     ('zip', 'ZIP file')]
+
+    >>> shutil.register_archive_format(                  # register a new archive format
+            name = 'xz',
+            function = 'xz.compress',
+            extra_args = [('level', 8)],
+            description = 'xz compression'
+    )
 
 (Contributed by Tarek Ziadé.)
 
@@ -1101,6 +1523,17 @@ The :mod:`sqlite3` module was updated to version 2.6.0.  It has two new capabili
   extension distributed with SQLite.
 
 (Contributed by R. David Murray and Shashwat Anand; :issue:`8845`.)
+
+html
+----
+
+A new :mod:`html` module was introduced with only a single function,
+:func:`~html.escape`, which is used for escaping reserved characters from HTML
+markup:
+
+>>> import html
+>>> html.escape('x > 2 && x < 7')
+'x &gt; 2 &amp;&amp; x &lt; 7'
 
 socket
 ------
@@ -1120,44 +1553,44 @@ The :mod:`socket` module has two new improvements.
 ssl
 ---
 
-* The :mod:`ssl` module has a new class, :class:`~ssl.SSLContext` which serves
-  as a container for various persistent SSL data, such as protocol settings,
-  certificates, private keys, and various other options.  The
-  :meth:`~ssl.SSLContext.wrap_socket` method allows to create an SSL socket from
-  such an SSL context.  (Added by Antoine Pitrou; :issue:`8550`.)
+The :mod:`ssl` module added a number of features to satisfy common requirements
+for secure (encrypted, authenticated) internet connections:
 
-* A new function, :func:`ssl.match_hostname`, helps implement server identity
-  verification for higher-level protocols by implementing the rules of
-  HTTPS (from :rfc:`2818`), which are also suitable for other protocols.
-  (Added by Antoine Pitrou, :issue:`1589`).
+* A new class, :class:`~ssl.SSLContext`, serves as a container for persistent
+  SSL data, such as protocol settings, certificates, private keys, and various
+  other options. It includes a :meth:`~ssl.SSLContext.wrap_socket` for creating
+  an SSL socket from an SSL context.
+
+* A new function, :func:`ssl.match_hostname`, supports server identity
+  verification for higher-level protocols by implementing the rules of HTTPS
+  (from :rfc:`2818`) which are also suitable for other protocols.
 
 * The :func:`ssl.wrap_socket` constructor function now takes a *ciphers*
-  argument that's a string listing the encryption algorithms to be allowed; the
-  format of the string is described `in the OpenSSL documentation
-  <http://www.openssl.org/docs/apps/ciphers.html#CIPHER_LIST_FORMAT>`__.  (Added
-  by Antoine Pitrou; :issue:`8322`.)
+  argument.  The *ciphers* string lists the allowed encryption algorithms using
+  the format described in the `OpenSSL documentation
+  <http://www.openssl.org/docs/apps/ciphers.html#CIPHER_LIST_FORMAT>`__.
 
-* When linked against a recent enough version of OpenSSL, the :mod:`ssl`
-  module now supports the Server Name Indication extension to the TLS
-  protocol, allowing for several "virtual hosts" using different certificates
-  on a single IP/port.  This extension is only supported in client mode,
-  and is activated by passing the *server_hostname* argument to
-  :meth:`SSLContext.wrap_socket`.
-  (Added by Antoine Pitrou, :issue:`5639`.)
+* When linked against recent versions of OpenSSL, the :mod:`ssl` module now
+  supports the Server Name Indication extension to the TLS protocol, allowing
+  multiple "virtual hosts" using different certificates on a single IP port.
+  This extension is only supported in client mode, and is activated by passing
+  the *server_hostname* argument to :meth:`ssl.SSLContext.wrap_socket`.
 
 * Various options have been added to the :mod:`ssl` module, such as
-  :data:`~ssl.OP_NO_SSLv2` which allows to force disabling of the insecure and
-  obsolete SSLv2 protocol.  (Added by Antoine Pitrou; :issue:`4870`.)
+  :data:`~ssl.OP_NO_SSLv2` which disables the insecure and obsolete SSLv2
+  protocol.
 
-* Another change makes the extension load all of OpenSSL's ciphers and digest
-  algorithms so that they're all available.  Some SSL certificates couldn't be
-  verified, reporting an "unknown algorithm" error.  (Reported by Beda Kosata,
-  and fixed by Antoine Pitrou; :issue:`8484`.)
+* The extension now loads all the OpenSSL ciphers and digest algorithms.  If
+  some SSL certificates cannot be verified, they are reported as an "unknown
+  algorithm" error.
 
-* The version of OpenSSL being used is now available as the module attributes
-  :data:`ssl.OPENSSL_VERSION` (a string), :data:`ssl.OPENSSL_VERSION_INFO` (a
-  5-tuple), and :data:`ssl.OPENSSL_VERSION_NUMBER` (an integer).  (Added by
-  Antoine Pitrou; :issue:`8321`.)
+* The version of OpenSSL being used is now accessible using the module
+  attributes :data:`ssl.OPENSSL_VERSION` (a string),
+  :data:`ssl.OPENSSL_VERSION_INFO` (a 5-tuple), and
+  :data:`ssl.OPENSSL_VERSION_NUMBER` (an integer).
+
+(Contributed by Antoine Pitrou in :issue:`8850`, :issue:`1589`, :issue:`8322`,
+:issue:`5639`, :issue:`4870`, :issue:`8484`, and :issue:`8321`.)
 
 nntp
 ----
@@ -1167,7 +1600,11 @@ text semantics as well as more practical APIs.  These improvements break
 compatibility with the nntplib version in Python 3.1, which was partly
 dysfunctional in itself.
 
-(Contributed by Antoine Pitrou in :issue:`9360`)
+Support for secure connections through both implicit (using
+:class:`nntplib.NNTP_SSL`) and explicit (using :meth:`nntplib.NNTP.starttls`)
+TLS has also been added.
+
+(Contributed by Antoine Pitrou in :issue:`9360` and Andrew Vant in :issue:`1926`.)
 
 certificates
 ------------
@@ -1178,6 +1615,45 @@ server certificate checking against a set of Certificate Authorities,
 as recommended in public uses of HTTPS.
 
 (Added by Antoine Pitrou, :issue:`9003`.)
+
+imaplib
+-------
+
+Support for explicit TLS on standard IMAP4 connections has been added through
+the new :mod:`imaplib.IMAP4.starttls` method.
+
+(Contributed by Lorenzo M. Catucci and Antoine Pitrou, :issue:`4471`.)
+
+http.client
+-----------
+
+There were a number of small API improvements in the :mod:`http.client` module.
+The old-style HTTP 0.9 simple responses are no longer supported and the *strict*
+parameter is deprecated in all classes.
+
+The :class:`~http.client.HTTPConnection` and
+:class:`~http.client.HTTPSConnection` classes now have a *source_address*
+parameter for a (host, port) tuple indicating where the HTTP connection is made
+from.
+
+Support for certificate checking and HTTPS virtual hosts were added to
+:class:`~http.client.HTTPSConnection`.
+
+The :meth:`~http.client.HTTPConnection.request` method on connection objects
+allowed an optional *body* argument so that a :term:`file object` could be used
+to supply the content of the request.  Conveniently, the *body* argument now
+also accepts an :term:`iterable` object so long as it includes an explicit
+``Content-Length`` header.  This extended interface is much more flexible than
+before.
+
+To establish an HTTPS connection through a proxy server, there is a new
+:meth:`~http.client.HTTPConnection.set_tunnel` method that sets the host and
+port for HTTP Connect tunneling.
+
+To match the behaviour of :mod:`http.server`, the HTTP client library now also
+encodes headers with ISO-8859-1 (Latin-1) encoding.  It was already doing that
+for incoming headers, so now the behaviour is consistent for both incoming and
+outgoing traffic. (See work by Armin Ronacher in :issue:`10980`.)
 
 unittest
 --------
@@ -1190,7 +1666,7 @@ names.
 * The command-line call ``python -m unittest`` can now accept file paths
   instead of module names for running specific tests (:issue:`10620`).  The new
   test discovery can find tests within packages, locating any test importable
-  from the top level directory.  The top level directory can be specified with
+  from the top-level directory.  The top-level directory can be specified with
   the `-t` option, a pattern for matching files with ``-p``, and a directory to
   start discovery with ``-s``::
 
@@ -1209,12 +1685,12 @@ names.
 * The :mod:`unittest` module has two new methods,
   :meth:`~unittest.TestCase.assertWarns` and
   :meth:`~unittest.TestCase.assertWarnsRegex` to verify that a given warning type
-  is triggered by the code under test:
+  is triggered by the code under test::
 
-  >>> with self.assertWarns(DeprecationWarning):
-  ...     legacy_function('XYZ')
+      with self.assertWarns(DeprecationWarning):
+          legacy_function('XYZ')
 
-  (Contributed by Michael Foord and Ezio Melotti.)
+  (Contributed by Antoine Pitrou, :issue:`9754`.)
 
   Another new method, :meth:`~unittest.TestCase.assertCountEqual` is used to
   compare two iterables to determine if their element counts are equal (whether
@@ -1248,20 +1724,24 @@ names.
 * To improve consistency, some long-standing method aliases are being
   deprecated in favor of the preferred names:
 
-   - replace :meth:`assert_` with :meth:`.assertTrue`
-   - replace :meth:`assertEquals` with :meth:`.assertEqual`
-   - replace :meth:`assertNotEquals` with :meth:`.assertNotEqual`
-   - replace :meth:`assertAlmostEquals` with :meth:`.assertAlmostEqual`
-   - replace :meth:`assertNotAlmostEquals` with :meth:`.assertNotAlmostEqual`
+   ===============================   ==============================
+   Old Name                          Preferred Name
+   ===============================   ==============================
+   :meth:`assert_`                   :meth:`.assertTrue`
+   :meth:`assertEquals`              :meth:`.assertEqual`
+   :meth:`assertNotEquals`           :meth:`.assertNotEqual`
+   :meth:`assertAlmostEquals`        :meth:`.assertAlmostEqual`
+   :meth:`assertNotAlmostEquals`     :meth:`.assertNotAlmostEqual`
+   ===============================   ==============================
 
   Likewise, the ``TestCase.fail*`` methods deprecated in Python 3.1 are expected
-  to be removed in Python 3.3. See also the :ref:`deprecated-aliases` section in
+  to be removed in Python 3.3.  Also see the :ref:`deprecated-aliases` section in
   the :mod:`unittest` documentation.
 
   (Contributed by Ezio Melotti; :issue:`9424`.)
 
 * The :meth:`~unittest.TestCase.assertDictContainsSubset` method was deprecated
-  because it was mis-implemented with the arguments in the wrong order.  This
+  because it was misimplemented with the arguments in the wrong order.  This
   created hard-to-debug optical illusions where tests like
   ``TestCase().assertDictContainsSubset({'a':1, 'b':2}, {'a':1})`` would fail.
 
@@ -1273,7 +1753,7 @@ random
 The integer methods in the :mod:`random` module now do a better job of producing
 uniform distributions.  Previously, they computed selections with
 ``int(n*random())`` which had a slight bias whenever *n* was not a power of two.
-Now, multiple selections are made from a range upto the next power of two and a
+Now, multiple selections are made from a range up to the next power of two and a
 selection is kept only when it falls within the range ``0 <= x < n``.  The
 functions and methods affected are :func:`~random.randrange`,
 :func:`~random.randint`, :func:`~random.choice`, :func:`~random.shuffle` and
@@ -1305,10 +1785,10 @@ tempfile
 
 The :mod:`tempfile` module has a new context manager,
 :class:`~tempfile.TemporaryDirectory` which provides easy deterministic
-cleanup of temporary directories:
+cleanup of temporary directories::
 
->>> with tempfile.TemporaryDirectory() as tmpdirname:
-...     print('created temporary dir:', tmpdirname)
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        print('created temporary dir:', tmpdirname)
 
 (Contributed by Neil Schemenauer and Nick Coghlan; :issue:`5178`.)
 
@@ -1317,23 +1797,135 @@ inspect
 
 * The :mod:`inspect` module has a new function
   :func:`~inspect.getgeneratorstate` to easily identify the current state of a
-  generator as one of ``GEN_CREATED``, ``GEN_RUNNING``, ``GEN_SUSPENDED`` or
-  ``GEN_CLOSED``. (Contributed by Rodolpho Eckhardt and Nick Coghlan,
-  :issue:`10220`.)
+  generator-iterator::
+
+    >>> from inspect import getgeneratorstate
+    >>> def gen():
+            yield 'demo'
+    >>> g = gen()
+    >>> getgeneratorstate(g)
+    'GEN_CREATED'
+    >>> next(g)
+    'demo'
+    >>> getgeneratorstate(g)
+    'GEN_SUSPENDED'
+    >>> next(g, None)
+    >>> getgeneratorstate(g)
+    'GEN_CLOSED'
+
+  (Contributed by Rodolpho Eckhardt and Nick Coghlan, :issue:`10220`.)
 
 * To support lookups without the possibility of activating a dynamic attribute,
   the :mod:`inspect` module has a new function, :func:`~inspect.getattr_static`.
-  Unlike, :func:`hasattr`, this is a true read-only search, guaranteed not to
-  change state while it is searching.  (Contributed by Michael Foord.)
+  Unlike :func:`hasattr`, this is a true read-only search, guaranteed not to
+  change state while it is searching::
+
+    >>> class A:
+            @property
+            def f(self):
+                print('Running')
+                return 10
+
+    >>> a = A()
+    >>> getattr(a, 'f')
+    Running
+    10
+    >>> inspect.getattr_static(a, 'f')
+    <property object at 0x1022bd788>
+
+ (Contributed by Michael Foord.)
 
 pydoc
 -----
 
-The :mod:`pydoc` module now provides a much improved Web server interface,
-as well as a new command-line option to automatically open a browser
-window to display that server.
+The :mod:`pydoc` module now provides a much-improved Web server interface, as
+well as a new command-line option ``-b`` to automatically open a browser window
+to display that server::
+
+    $ pydoc3.2 -b
 
 (Contributed by Ron Adam; :issue:`2001`.)
+
+dis
+---
+
+The :mod:`dis` module gained two new functions for inspecting code,
+:func:`~dis.code_info` and :func:`~dis.show_code`.  Both provide detailed code
+object information for the supplied function, method, source code string or code
+object.  The former returns a string and the latter prints it::
+
+    >>> import dis, random
+    >>> dis.show_code(random.choice)
+    Name:              choice
+    Filename:          /Library/Frameworks/Python.framework/Versions/3.2/lib/python3.2/random.py
+    Argument count:    2
+    Kw-only arguments: 0
+    Number of locals:  3
+    Stack size:        11
+    Flags:             OPTIMIZED, NEWLOCALS, NOFREE
+    Constants:
+       0: 'Choose a random element from a non-empty sequence.'
+       1: 'Cannot choose from an empty sequence'
+    Names:
+       0: _randbelow
+       1: len
+       2: ValueError
+       3: IndexError
+    Variable names:
+       0: self
+       1: seq
+       2: i
+
+(Contributed by Nick Coghlan in :issue:`9147`.)
+
+dbm
+---
+
+All database modules now support :meth:`get` and :meth:`setdefault` are now
+available in all database modules
+
+(Suggested by Ray Allen in :issue:`9523`.)
+
+ctypes
+------
+
+A new type, :class:`ctypes.c_ssize_t` represents the C :c:type:`ssize_t` datatype.
+
+site
+----
+
+The :mod:`site` module has three new functions useful for reporting on the
+details of a given Python installation.
+
+* :func:`~site.getsitepackages` lists all global site-packages directories.
+
+* :func:`~site.getuserbase` reports on the user's base directory where data can
+  be stored.
+
+* :func:`~site.getusersitepackages` reveals the user-specific site-packages
+  directory path.
+
+::
+
+    >>> import site
+    >>> site.getsitepackages()
+    ['/Library/Frameworks/Python.framework/Versions/3.2/lib/python3.2/site-packages',
+     '/Library/Frameworks/Python.framework/Versions/3.2/lib/site-python',
+     '/Library/Python/3.2/site-packages']
+    >>> site.getuserbase()
+    '/Users/raymondhettinger/Library/Python/3.2'
+    >>> site.getusersitepackages()
+    '/Users/raymondhettinger/Library/Python/3.2/lib/python/site-packages'
+
+Conveniently, some of site's functionality is accessible directly from the
+command-line::
+
+    $ python -m site --user-base
+    /Users/raymondhettinger/.local
+    $ python -m site --user-site
+    /Users/raymondhettinger/.local/lib/python3.2/site-packages
+
+(Contributed by Tarek Ziadé.)
 
 sysconfig
 ---------
@@ -1396,6 +1988,8 @@ There is also a convenient command-line interface::
           srcdir = "C:\Python32"
           userbase = "C:\Documents and Settings\Raymond\Application Data\Python"
 
+(Moved out of Distutils by Tarek Ziadé.)
+
 pdb
 ---
 
@@ -1428,55 +2022,62 @@ duplicates are not allowed in a single configuration source.
 
 Config parsers gained a new API based on the mapping protocol::
 
-  >>> parser = ConfigParser()
-  >>> parser.read_string("""
-  ... [DEFAULT]
-  ... monty = python
-  ...
-  ... [phrases]
-  ... the = who
-  ... full = metal jacket
-  ... """)
-  >>> parser['phrases']['full']
-  'metal jacket'
-  >>> section = parser['phrases']
-  >>> section['the']
-  'who'
-  >>> section['british'] = '%(the)s %(full)s %(monty)s!'
-  >>> parser['phrases']['british']
-  'who metal jacket python!'
-  >>> 'british' in section
-  True
+    >>> parser = ConfigParser()
+    >>> parser.read_string("""
+    [DEFAULT]
+    location = upper left
+    visible = yes
+    editable = no
+    color = blue
 
-The new API is implemented on top of the classical API so custom parser
+    [main]
+    title = Main Menu
+    color = green
+
+    [options]
+    title = Options
+    """)
+    >>> parser['main']['color']
+    'green'
+    >>> parser['main']['editable']
+    'no'
+    >>> section = parser['options']
+    >>> section['title']
+    'Options'
+    >>> section['title'] = 'Options (editable: %(editable)s)'
+    >>> section['title']
+    'Options (editable: no)'
+
+The new API is implemented on top of the classical API, so custom parser
 subclasses should be able to use it without modifications.
 
 The INI file structure accepted by config parsers can now be customized. Users
 can specify alternative option/value delimiters and comment prefixes, change the
-name of the *DEFAULT* section or switch the interpolation syntax.  Along with
-support for pluggable interpolation, an additional interpolation handler
-:class:`~configparser.ExtendedInterpolation` was introduced::
+name of the *DEFAULT* section or switch the interpolation syntax.
+
+There is support for pluggable interpolation including an additional interpolation
+handler :class:`~configparser.ExtendedInterpolation`::
 
   >>> parser = ConfigParser(interpolation=ExtendedInterpolation())
   >>> parser.read_dict({'buildout': {'directory': '/home/ambv/zope9'},
-  ...                   'custom': {'prefix': '/usr/local'}})
+                        'custom': {'prefix': '/usr/local'}})
   >>> parser.read_string("""
-  ... [buildout]
-  ... parts =
-  ...   zope9
-  ...   instance
-  ... find-links =
-  ...   ${buildout:directory}/downloads/dist
-  ...
-  ... [zope9]
-  ... recipe = plone.recipe.zope9install
-  ... location = /opt/zope
-  ...
-  ... [instance]
-  ... recipe = plone.recipe.zope9instance
-  ... zope9-location = ${zope9:location}
-  ... zope-conf = ${custom:prefix}/etc/zope.conf
-  ... """)
+      [buildout]
+      parts =
+        zope9
+        instance
+      find-links =
+        ${buildout:directory}/downloads/dist
+
+      [zope9]
+      recipe = plone.recipe.zope9install
+      location = /opt/zope
+
+      [instance]
+      recipe = plone.recipe.zope9instance
+      zope9-location = ${zope9:location}
+      zope-conf = ${custom:prefix}/etc/zope.conf
+      """)
   >>> parser['buildout']['find-links']
   '\n/home/ambv/zope9/downloads/dist'
   >>> parser['instance']['zope-conf']
@@ -1493,27 +2094,79 @@ reading directly from dictionaries and strings.
 
 (All changes contributed by Łukasz Langa.)
 
-.. XXX: Mention urllib.parse changes
-          Issue 9873 (Nick Coghlan):
-            - ASCII byte sequence support in URL parsing
-            - named tuple for urldefrag return value
-          Issue 5468 (Dan Mahn) for urlencode:
-            - bytes input support
-            - non-UTF8 percent encoding of non-ASCII characters
-          Issue 2987 for IPv6 (RFC2732) support in urlparse
+urllib.parse
+------------
 
+A number of usability improvements were made for the :mod:`urllib.parse` module.
+
+The :func:`~urllib.parse.urlparse` function now supports `IPv6
+<http://en.wikipedia.org/wiki/IPv6>`_ addresses as described in :rfc:`2732`:
+
+    >>> import urllib.parse
+    >>> urllib.parse.urlparse('http://[dead:beef:cafe:5417:affe:8FA3:deaf:feed]/foo/')
+    ParseResult(scheme='http',
+                netloc='[dead:beef:cafe:5417:affe:8FA3:deaf:feed]',
+                path='/foo/',
+                params='',
+                query='',
+                fragment='')
+
+The :func:`~urllib.parse.urldefrag` function now returns a :term:`named tuple`::
+
+    >>> r = urllib.parse.urldefrag('http://python.org/about/#target')
+    >>> r
+    DefragResult(url='http://python.org/about/', fragment='target')
+    >>> r[0]
+    'http://python.org/about/
+    >>> r.fragment
+    'target'
+
+And, the :func:`~urllib.parse.urlencode` function is now much more flexible,
+accepting either a string or bytes type for the *query* argument.  If it is a
+string, then the *safe*, *encoding*, and *error* parameters are sent to
+:func:`~urllib.parse.quote_plus` for encoding::
+
+    >>> urllib.parse.urlencode([
+             ('type', 'telenovela'),
+             ('name', '¿Dónde Está Elisa?')],
+             encoding='latin-1')
+    'type=telenovela&name=%BFD%F3nde+Est%E1+Elisa%3F'
+
+As detailed in :ref:`parsing-ascii-encoded-bytes`, all the :mod:`urllib.parse`
+functions now accept ASCII-encoded byte strings as input, so long as they are
+not mixed with regular strings.  If ASCII-encoded byte strings are given as
+parameters, the return types will also be an ASCII-encoded byte strings:
+
+    >>> urllib.parse.urlparse(b'http://www.python.org:80/about/')
+    ParseResultBytes(scheme=b'http', netloc=b'www.python.org:80',
+                     path=b'/about/', params=b'', query=b'', fragment=b'')
+
+(Work by Nick Coghlan, Dan Mahn, and Senthil Kumaran in :issue:`2987`,
+:issue:`5468`, and :issue:`9873`.)
+
+turtledemo
+----------
+
+The demonstration code for the :mod:`turtle` module was moved from the *Demo*
+directory to main library.  It includes over a dozen sample scripts with
+lively displays.  Being on :attr:`sys.path`, it can now be run directly
+from the command-line::
+
+    $ python -m turtledemo
+
+(Moved from the Demo directory by Alexander Belopolsky in :issue:`10199`.)
 
 Multi-threading
 ===============
 
 * The mechanism for serializing execution of concurrently running Python threads
-  (generally known as the GIL or Global Interpreter Lock) has been rewritten.
-  Among the objectives were more predictable switching intervals and reduced
-  overhead due to lock contention and the number of ensuing system calls.  The
-  notion of a "check interval" to allow thread switches has been abandoned and
-  replaced by an absolute duration expressed in seconds.  This parameter is
-  tunable through :func:`sys.setswitchinterval()`.  It currently defaults to 5
-  milliseconds.
+  (generally known as the :term:`GIL` or :term:`Global Interpreter Lock`) has
+  been rewritten.  Among the objectives were more predictable switching
+  intervals and reduced overhead due to lock contention and the number of
+  ensuing system calls.  The notion of a "check interval" to allow thread
+  switches has been abandoned and replaced by an absolute duration expressed in
+  seconds.  This parameter is tunable through :func:`sys.setswitchinterval()`.
+  It currently defaults to 5 milliseconds.
 
   Additional details about the implementation can be read from a `python-dev
   mailing-list message
@@ -1524,13 +2177,14 @@ Multi-threading
   (Contributed by Antoine Pitrou.)
 
 * Regular and recursive locks now accept an optional *timeout* argument to their
-  :meth:`acquire` method.  (Contributed by Antoine Pitrou; :issue:`7316`.)
+  :meth:`~threading.Lock.acquire` method.  (Contributed by Antoine Pitrou;
+  :issue:`7316`.)
 
 * Similarly, :meth:`threading.Semaphore.acquire` also gained a *timeout*
   argument.  (Contributed by Torsten Landschoff; :issue:`850728`.)
 
 * Regular and recursive lock acquisitions can now be interrupted by signals on
-  platforms using pthreads.  This means that Python programs that deadlock while
+  platforms using Pthreads.  This means that Python programs that deadlock while
   acquiring locks can be successfully killed by repeatedly sending SIGINT to the
   process (by pressing :kbd:`Ctrl+C` in most shells).
   (Contributed by Reid Kleckner; :issue:`8844`.)
@@ -1553,7 +2207,7 @@ A number of small performance enhancements have been added:
       if extension in {'xml', 'html', 'xhtml', 'css'}:
           handle(name)
 
-  (Patch and additional tests by Dave Malcolm; :issue:`6690`).
+  (Patch and additional tests contributed by Dave Malcolm; :issue:`6690`).
 
 * Serializing and unserializing data using the :mod:`pickle` module is now
   several times faster.
@@ -1566,9 +2220,8 @@ A number of small performance enhancements have been added:
   when called with a :term:`key function`.  Previously, every element of
   a list was wrapped with a temporary object that remembered the key value
   associated with each element.  Now, two arrays of keys and values are
-  sorted in parallel.  This save the memory consumed by the sort wrappers,
-  and it saves time lost during comparisons which were delegated by the
-  sort wrappers.
+  sorted in parallel.  This saves the memory consumed by the sort wrappers,
+  and it saves time lost to delegating comparisons.
 
   (Patch by Daniel Stutzbach in :issue:`9915`.)
 
@@ -1612,49 +2265,40 @@ multi-line arguments a bit faster (:issue:`7113` by Łukasz Langa).
 Unicode
 =======
 
-Python has been updated to Unicode 6.0.0.  The new features of the
-Unicode Standard that will affect Python users include:
+Python has been updated to `Unicode 6.0.0
+<http://unicode.org/versions/Unicode6.0.0/>`_.  The update to the standard adds
+over 2,000 new characters including `emoji <http://en.wikipedia.org/wiki/Emoji>`_
+symbols which are important for mobile phones.
 
-* addition of 2,088 characters, including over 1,000 additional
-  symbols—chief among them the additional emoji symbols, which are
-  especially important for mobile phones;
+In addition, the updated standard has altered the character properties for two
+Kannada characters (U+0CF1, U+0CF2) and one New Tai Lue numeric character
+(U+19DA), making the former eligible for use in identifiers while disqualifying
+the latter.  For more information, see `Unicode Character Database Changes
+<http://www.unicode.org/versions/Unicode6.0.0/#Database_Changes>`_.
 
-* changes to character properties for existing characters including
 
-  - a general category change to two Kannada characters (U+0CF1,
-    U+0CF2), which has the effect of making them newly eligible for
-    inclusion in identifiers;
+Codecs
+======
 
-  - a general category change to one New Tai Lue numeric character
-    (U+19DA), which has the effect of disqualifying it from
-    inclusion in identifiers.
+Support was added for *cp720* Arabic DOS encoding (:issue:`1616979`).
 
-  For more information, see `Unicode Character Database Changes
-  <http://www.unicode.org/versions/Unicode6.0.0/#Database_Changes>`_
-  at the `Unicode Consortium <http://www.unicode.org/>`_ web site.
+MBCS encoding no longer ignores the error handler argument. In the default
+strict mode, it raises an :exc:`UnicodeDecodeError` when it encounters an
+undecodable byte sequence and an :exc:`UnicodeEncodeError` for an unencodable
+character.
 
-The :mod:`os` module has two new functions: :func:`~os.fsencode` and
-:func:`~os.fsdecode`. Add :data:`os.environb`: bytes version of
-:data:`os.environ`, :func:`os.getenvb` function and
-:data:`os.supports_bytes_environ` constant.
+The MBCS codec supports ``'strict'`` and ``'ignore'`` error handlers for
+decoding, and ``'strict'`` and ``'replace'`` for encoding.
 
-``'mbcs'`` encoding doesn't ignore the error handler argument any more. By
-default (strict mode), it raises an UnicodeDecodeError on undecodable byte
-sequence and UnicodeEncodeError on unencodable character. To get the ``'mbcs'``
-encoding of Python 3.1, use ``'ignore'`` error handler to decode and
-``'replace'`` error handler to encode. ``'mbcs'`` supports ``'strict'`` and
-``'ignore'`` error handlers for decoding, and ``'strict'`` and ``'replace'``
-for encoding.
+To emulate Python3.1 MBCS encoding, select the ``'ignore'`` handler for decoding
+and the ``'replace'`` handler for encoding.
 
-On Mac OS X, Python uses ``'utf-8'`` to decode the command line arguments,
-instead of the locale encoding (which is ISO-8859-1 if the ``LANG`` environment
-variable is not set).
+On Mac OS X, Python decodes command line arguments with ``'utf-8'`` rather than
+the locale encoding.
 
-By default, tarfile uses ``'utf-8'`` encoding on Windows (instead of
-``'mbcs'``), and the ``'surrogateescape'`` error handler on all operating
+By default, :mod:`tarfile` uses ``'utf-8'`` encoding on Windows (instead of
+``'mbcs'``) and the ``'surrogateescape'`` error handler on all operating
 systems.
-
-Also, support was added for *cp720* Arabic DOS encoding (:issue:`1616979`).
 
 
 Documentation
@@ -1662,27 +2306,37 @@ Documentation
 
 The documentation continues to be improved.
 
-A table of quick links has been added to the top of lengthy sections such as
-:ref:`built-in-funcs`.  In the case of :mod:`itertools`, the links are
-accompanied by tables of cheatsheet-style summaries to provide an overview and
-memory jog without having to read all of the docs.
+* A table of quick links has been added to the top of lengthy sections such as
+  :ref:`built-in-funcs`.  In the case of :mod:`itertools`, the links are
+  accompanied by tables of cheatsheet-style summaries to provide an overview and
+  memory jog without having to read all of the docs.
 
-In some cases, the pure Python source code can be a helpful adjunct to the
-documentation, so now many modules now feature quick links to the latest version
-of the source code.  For example, the :mod:`functools` module documentation has
-a quick link at the top labeled: **Source code** :source:`Lib/functools.py`.
+* In some cases, the pure Python source code can be a helpful adjunct to the
+  documentation, so now many modules now feature quick links to the latest
+  version of the source code.  For example, the :mod:`functools` module
+  documentation has a quick link at the top labeled:
 
-The docs now contain more examples and recipes.  In particular, :mod:`re` module
-has an extensive section, :ref:`re-examples`.  Likewise, the :mod:`itertools`
-module continues to be updated with new :ref:`itertools-recipes`.
+    **Source code** :source:`Lib/functools.py`.
 
-The :mod:`datetime` module now has an auxiliary implementation in pure Python.
-No functionality was changed.  This just provides an easier-to-read
-alternate implementation.  (Contributed by Alexander Belopolsky.)
+  (Contributed by Raymond Hettinger; see
+  `rationale <http://rhettinger.wordpress.com/2011/01/28/open-your-source-more/>`_.)
 
-The unmaintained :file:`Demo` directory has been removed.  Some demos were
-integrated into the documentation, some were moved to the :file:`Tools/demo`
-directory, and others were removed altogether.  (Contributed by Georg Brandl.)
+* The docs now contain more examples and recipes.  In particular, :mod:`re`
+  module has an extensive section, :ref:`re-examples`.  Likewise, the
+  :mod:`itertools` module continues to be updated with new
+  :ref:`itertools-recipes`.
+
+* The :mod:`datetime` module now has an auxiliary implementation in pure Python.
+  No functionality was changed.  This just provides an easier-to-read alternate
+  implementation.
+
+  (Contributed by Alexander Belopolsky in :issue:`9528`.)
+
+* The unmaintained :file:`Demo` directory has been removed.  Some demos were
+  integrated into the documentation, some were moved to the :file:`Tools/demo`
+  directory, and others were removed altogether.
+
+  (Contributed by Georg Brandl in :issue:`7962`.)
 
 
 IDLE
@@ -1696,6 +2350,22 @@ IDLE
 * IDLE on Mac OS X now works with both Carbon AquaTk and Cocoa AquaTk.
 
   (Contributed by Kevin Walzer, Ned Deily, and Ronald Oussoren; :issue:`6075`.)
+
+Code Repository
+===============
+
+In addition to the existing Subversion code repository at http://svn.python.org
+there is now a `Mercurial <http://mercurial.selenic.com/>`_ repository at
+http://hg.python.org/ .
+
+After the 3.2 release, there are plans to switch to Mercurial as the primary
+repository.  This distributed version control system should make it easier for
+members of the community to create and share external changesets.  See
+:pep:`385` for details.
+
+To learn to use the new version control system, see the `tutorial by Joel
+Spolsky <http://hginit.com>`_ or the `Guide to Mercurial Workflows
+<http://mercurial.selenic.com/guide/>`_.
 
 
 Build and C API Changes
@@ -1754,7 +2424,7 @@ Changes to Python's build process and to the C API include:
   detection of cases where the conversion won't fit (:issue:`7767`).
 
 * The :c:func:`PyUnicode_CompareWithASCIIString` now returns *not equal*
-  if the Python string in *NUL* terminated.
+  if the Python string is *NUL* terminated.
 
 * There is a new function :c:func:`PyErr_NewExceptionWithDoc` that is
   like :c:func:`PyErr_NewException` but allows a docstring to be specified.
@@ -1770,8 +2440,13 @@ Changes to Python's build process and to the C API include:
   longer used and it had never been documented (:issue:`8837`).
 
 There were a number of other small changes to the C-API.  See the
-:file:`Misc/NEWS` file for a complete list.
+:source:`Misc/NEWS` file for a complete list.
 
+Also, there were a number of updates to the OS X build, see
+:source:`Mac/BuildScript/README.txt` for details.  For users running a 32/64-bit
+build, there is a known problem with the default Tcl/Tk on OS X 10.6.
+Accordingly, we recommend installing an updated alternative such as
+`ActiveState Tcl/Tk 8.5 <http://www.activestate.com/activetcl/downloads>`_ .
 
 Porting to Python 3.2
 =====================
@@ -1782,7 +2457,7 @@ require changes to your code:
 * The :mod:`configparser` module has a number of clean-ups.  The major change is
   to replace the old :class:`ConfigParser` class with long-standing preferred
   alternative :class:`SafeConfigParser`.  In addition there are a number of
-  smaller incompatibilites:
+  smaller incompatibilities:
 
   * The interpolation syntax is now validated on
     :meth:`~configparser.ConfigParser.get` and
@@ -1815,6 +2490,10 @@ require changes to your code:
 
 * :class:`bytearray` objects can no longer be used as filenames; instead,
   they should be converted to :class:`bytes`.
+
+* The :meth:`array.tostring` and :meth:`array.fromstring` have been renamed to
+  :meth:`array.tobytes` and :meth:`array.frombytes` for clarity.  The old names
+  have been deprecated. (See :issue:`8990`.)
 
 * ``PyArg_Parse*()`` functions:
 
@@ -1850,10 +2529,10 @@ require changes to your code:
   and it does a better job finalizing multiple context managers when one of them
   raises an exception::
 
-    >>> with open('mylog.txt') as infile, open('a.out', 'w') as outfile:
-    ...     for line in infile:
-    ...         if '<critical>' in line:
-    ...             outfile.write(line)
+    with open('mylog.txt') as infile, open('a.out', 'w') as outfile:
+        for line in infile:
+            if '<critical>' in line:
+                outfile.write(line)
 
   (Contributed by Georg Brandl and Mattias Brändström;
   `appspot issue 53094 <http://codereview.appspot.com/53094>`_.)
@@ -1875,3 +2554,31 @@ require changes to your code:
 
 * The new, longer :func:`str` value on floats may break doctests which rely on
   the old output format.
+
+* In :class:`subprocess.Popen`, the default value for *close_fds* is now
+  ``True`` under Unix; under Windows, it is ``True`` if the three standard
+  streams are set to ``None``, ``False`` otherwise.  Previously, *close_fds*
+  was always ``False`` by default, which produced difficult to solve bugs
+  or race conditions when open file descriptors would leak into the child
+  process.
+
+* Support for legacy HTTP 0.9 has been removed from :mod:`urllib.request`
+  and :mod:`http.client`.  Such support is still present on the server side
+  (in :mod:`http.server`).
+
+  (Contributed by Antoine Pitrou, :issue:`10711`.)
+
+* SSL sockets in timeout mode now raise :exc:`socket.timeout` when a timeout
+  occurs, rather than a generic :exc:`~ssl.SSLError`.
+
+  (Contributed by Antoine Pitrou, :issue:`10272`.)
+
+* The misleading functions :c:func:`PyEval_AcquireLock()` and
+  :c:func:`PyEval_ReleaseLock()` have been officially deprecated.  The
+  thread-state aware APIs (such as :c:func:`PyEval_SaveThread()`
+  and :c:func:`PyEval_RestoreThread()`) should be used instead.
+
+* Due to security risks, :func:`asyncore.handle_accept` has been deprecated, and
+  a new functions, :func:`asyncore.handle_accepted` was added to replace it.
+
+  (Contributed by Giampaolo Rodola in :issue:`6706`.)
