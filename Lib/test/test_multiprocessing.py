@@ -18,6 +18,11 @@ import random
 import logging
 import test.support
 
+try:
+    import stackless
+    usingStackless = True
+except ImportError:
+    usingStackless = False
 
 # Skip tests if _multiprocessing wasn't built.
 _multiprocessing = test.support.import_module('_multiprocessing')
@@ -1115,6 +1120,10 @@ class _TestPoolWorkerErrors(BaseTestCase):
         p.join()
 
     def test_unpickleable_result(self):
+        # Stackless does not have this limitation.
+        if usingStackless:
+            return
+    
         from multiprocessing.pool import MaybeEncodingError
         p = multiprocessing.Pool(2)
 
