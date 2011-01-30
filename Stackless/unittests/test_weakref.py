@@ -18,23 +18,23 @@ class TestWeakReferences(unittest.TestCase):
         counter = Counter()
         t = tasklet(lambda:None)()
         t_ref = weakref.ref(t, counter)
-        self.assertEquals(t_ref(), t)
+        self.assertEqual(t_ref(), t)
         del t
         # we need to kill it at this point to get collected
         stackless.run()
-        self.assertEquals(t_ref(), None)
-        self.assertEquals(counter.get(), 1)
+        self.assertEqual(t_ref(), None)
+        self.assertEqual(counter.get(), 1)
 
     def testSimpleChannelWeakRef(self):
         counter = Counter()
         c = channel()
         c_ref = weakref.ref(c, counter)
-        self.assertEquals(c_ref(), c)
+        self.assertEqual(c_ref(), c)
         del c
         # we need to kill it at this point to get collected
         stackless.run()
-        self.assertEquals(c_ref(), None)
-        self.assertEquals(counter.get(), 1)
+        self.assertEqual(c_ref(), None)
+        self.assertEqual(counter.get(), 1)
 
 if __name__ == '__main__':
     import sys

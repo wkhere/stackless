@@ -11,21 +11,21 @@ class TestExceptionState(unittest.TestCase):
             1/0
         except Exception as e:
             ei = sys.exc_info()
-            self.assertEquals(ei[0], ZeroDivisionError)
+            self.assertEqual(ei[0], ZeroDivisionError)
             schedule()
             ei = sys.exc_info()
-            self.assertEquals(ei[0], ZeroDivisionError)
-            self.failUnless("by zero" in str(ei[1]))
+            self.assertEqual(ei[0], ZeroDivisionError)
+            self.assertTrue("by zero" in str(ei[1]))
 
     def testExceptionState(self):
         t = tasklet(self.Tasklet)
         t()
         t.run()
         ei = sys.exc_info()
-        self.assertEquals(ei, (None,)*3)
+        self.assertEqual(ei, (None,)*3)
         t.run()
         ei = sys.exc_info()
-        self.assertEquals(ei, (None,)*3)
+        self.assertEqual(ei, (None,)*3)
 
 class TestTracingState(unittest.TestCase):
     def __init__(self, *args):
@@ -45,7 +45,7 @@ class TestTracingState(unittest.TestCase):
         n = len(self.trace)
         self.foo()
         n2 = len(self.trace)
-        self.failUnless(n2 > n)
+        self.assertGreater(n2, n)
 
         schedule()
 
@@ -53,7 +53,7 @@ class TestTracingState(unittest.TestCase):
         n = len(self.trace)
         self.foo()
         n2 = len(self.trace)
-        self.failUnless(n2 > n)
+        self.assertGreater(n2, n)
 
     def testTracingState(self):
         t = tasklet(self.Tasklet)

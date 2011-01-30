@@ -136,7 +136,7 @@ class TestPickledTasklets(unittest.TestCase):
         self.verbose = VERBOSE
 
         # A useful check to make sure that crap doesn't roll downhill to us from other test suites.
-        self.failUnless(stackless.getruncount() == 1, "Leakage from other tests, with tasklets still in the scheduler")
+        self.assertEqual(stackless.getruncount(), 1, "Leakage from other tests, with tasklets still in the scheduler")
 
     def tearDown(self):
         # Tasklets created in pickling tests can be left in the scheduler when they finish.  We can feel free to
@@ -160,7 +160,7 @@ class TestPickledTasklets(unittest.TestCase):
         if self.verbose: print("starting tasklet")
         t.run()
 
-        self.assertEquals(is_empty(), True)
+        self.assertEqual(is_empty(), True)
 
         # do we want to do this??
         #t.tempval = None
@@ -184,10 +184,10 @@ class TestPickledTasklets(unittest.TestCase):
         new_ident, new_rval = get_result()
         t.run()
         old_ident, old_rval = get_result()
-        self.assertEquals(old_ident, ident)
-        self.assertEquals(new_rval, old_rval)
-        self.assertNotEquals(new_ident, old_ident)
-        self.assertEquals(is_empty(), True)
+        self.assertEqual(old_ident, ident)
+        self.assertEqual(new_rval, old_rval)
+        self.assertNotEqual(new_ident, old_ident)
+        self.assertEqual(is_empty(), True)
 
     # compatibility to 2.2.3
     global have_enumerate
@@ -209,7 +209,7 @@ class TestConcretePickledTasklets(TestPickledTasklets):
         t1 = CustomTasklet(nothing)()
         s = pickle.dumps(t1)
         t2 = pickle.loads(s)
-        self.assertEquals(t1.__class__, t2.__class__)
+        self.assertEqual(t1.__class__, t2.__class__)
 
     def testGenerator(self):
         self.run_pickled(genoutertest, 20, 13)
@@ -326,32 +326,32 @@ class TestConcretePickledTasklets(TestPickledTasklets):
         import xml.sax
         m1 = xml.sax
         m2 = pickle.loads(pickle.dumps(m1))
-        self.assertEquals(m1, m2)
+        self.assertEqual(m1, m2)
 
     def testFunctionModulePreservation(self):
         # The 'module' name on the function was not being preserved.
         f1 = lambda: None
         f2 = pickle.loads(pickle.dumps(f1))
-        self.assertEquals(f1.__module__, f2.__module__)
+        self.assertEqual(f1.__module__, f2.__module__)
 
 class TestDictViewPickling(TestPickledTasklets):
     def testDictKeyViewPickling(self):
         d = { 1: 2 }
         view1 = d.keys()
         view2 = pickle.loads(pickle.dumps(view1))
-        self.assertEquals(list(view1), list(view2))
+        self.assertEqual(list(view1), list(view2))
 
     def testDictItemViewPickling(self):
         d = { 1: 2 }
         view1 = d.items()
         view2 = pickle.loads(pickle.dumps(view1))
-        self.assertEquals(list(view1), list(view2))
+        self.assertEqual(list(view1), list(view2))
 
     def testDictValueViewPickling(self):
         d = { 1: 2 }
         view1 = d.values()
         view2 = pickle.loads(pickle.dumps(view1))
-        self.assertEquals(list(view1), list(view2))
+        self.assertEqual(list(view1), list(view2))
 
 if __name__ == '__main__':
     if not sys.argv[1:]:

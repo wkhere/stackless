@@ -8,3 +8,9 @@ class TestException(unittest.TestCase):
         # crash.  This has been fixed.
         exc = TaskletExit()
         exc.code
+
+if __name__ == '__main__':
+    import sys
+    if not sys.argv[1:]:
+        sys.argv.append('-v')
+    unittest.main()
