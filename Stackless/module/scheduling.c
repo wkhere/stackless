@@ -859,7 +859,7 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless)
 	notify_schedule(ts, prev, next);
 
 	if (!(ts->st.runflags & PY_WATCHDOG_TOTALTIMEOUT))
-		ts->st.tick_watermark = ts->tick_counter + ts->st.interval; /* reset timeslice */
+		ts->st.tick_watermark = ts->st.tick_counter + ts->st.interval; /* reset timeslice */
 	prev->recursion_depth = ts->recursion_depth;
 	prev->f.frame = ts->frame;
 

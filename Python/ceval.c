@@ -1452,33 +1452,35 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
            async I/O handler); see Py_AddPendingCall() and
            Py_MakePendingCalls() above. */
 
+#ifdef STACKLESS
+        if (tstate->st.interrupt && !tstate->curexc_type) {
+            if (tstate->st.tick_counter < tstate->st.tick_watermark) {
+                PyObject *ires;
+                ires = tstate->st.interrupt();
+                if (ires == NULL) {
+                    why = WHY_EXCEPTION;
+                    goto on_error;
+
+                }
+                else if (STACKLESS_UNWINDING(ires)) {
+                    goto stackless_interrupt_call;
+                }
+                /* hard switch, drop value */
+                Py_DECREF(ires);
+            }
+        }
+
+        /* standard ticker code */
+		tstate->st.tick_counter++;
+#endif
+
         if (_Py_atomic_load_relaxed(&eval_breaker)) {
             if (*next_instr == SETUP_FINALLY) {
                 /* Make the last opcode before
                    a try: finally: block uninterruptable. */
                 goto fast_next_opcode;
             }
-#ifdef STACKLESS
-            if (tstate->st.interrupt && !tstate->curexc_type) {
-                if (tstate->tick_counter < tstate->st.tick_watermark) {
-                    PyObject *ires;
-                    ires = tstate->st.interrupt();
-                    if (ires == NULL) {
-                        why = WHY_EXCEPTION;
-                        goto on_error;
-
-                    }
-                    else if (STACKLESS_UNWINDING(ires)) {
-                        goto stackless_interrupt_call;
-                    }
-                    /* hard switch, drop value */
-                    Py_DECREF(ires);
-                }
-            }
-
-            /* standard ticker code */
-#endif
-            tstate->tick_counter++;
+			tstate->tick_counter++;
 #ifdef WITH_TSC
             ticked = 1;
 #endif

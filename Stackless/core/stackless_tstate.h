@@ -27,6 +27,7 @@ typedef struct _sts {
 	int runcount;
 
 	/* scheduling */
+	long tick_counter;
 	long tick_watermark;
 	long interval;
 	PyObject * (*interrupt) (void);    /* the fast scheduler */
@@ -57,6 +58,7 @@ typedef struct _sts {
 	tstate->st.serial_last_jump = 0; \
 	tstate->st.cstack_base = NULL; \
 	tstate->st.cstack_root = NULL; \
+	tstate->st.tick_counter = 0; \
 	tstate->st.tick_watermark = 0; \
 	tstate->st.interval = 0; \
 	tstate->st.interrupt = NULL; \
