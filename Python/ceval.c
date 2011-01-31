@@ -917,6 +917,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 
 #define DISPATCH() \
     { \
+        SLP_CHECK_INTERRUPT() \
         if (!_Py_atomic_load_relaxed(&eval_breaker)) {      \
                     FAST_DISPATCH(); \
         } \
@@ -1170,6 +1171,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         tstate->exc_traceback = f->f_exc_traceback; \
         f->f_exc_traceback = tmp; \
     }
+
+/* Stackless specific defines start here.. */
+
+#define SLP_CHECK_INTERRUPT() ;
 
 #endif  /* not STACKLESS */
 
@@ -1383,6 +1388,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 
 #define DISPATCH() \
     { \
+        SLP_CHECK_INTERRUPT() \
         if (!_Py_atomic_load_relaxed(&eval_breaker)) {      \
                     FAST_DISPATCH(); \
         } \
@@ -1637,6 +1643,26 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
         f->f_exc_traceback = tmp; \
     }
 
+/* Stackless specific defines start here.. */
+
+#define SLP_CHECK_INTERRUPT() \
+    if (tstate->st.interrupt && !tstate->curexc_type) { \
+        if (tstate->st.tick_counter > tstate->st.tick_watermark) { \
+            PyObject *ires; \
+            ires = tstate->st.interrupt(); \
+            if (ires == NULL) { \
+                why = WHY_EXCEPTION; \
+                goto on_error; \
+            } \
+            else if (STACKLESS_UNWINDING(ires)) { \
+                goto stackless_interrupt_call; \
+            } \
+            /* hard switch, drop value */ \
+            Py_DECREF(ires); \
+        } \
+    } \
+    tstate->st.tick_counter++;
+
 #endif /* STACKLESS */
 
     co = f->f_code;
@@ -1787,25 +1813,7 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
            Py_MakePendingCalls() above. */
 
 #ifdef STACKLESS
-        if (tstate->st.interrupt && !tstate->curexc_type) {
-            if (tstate->st.tick_counter > tstate->st.tick_watermark) {
-                PyObject *ires;
-                ires = tstate->st.interrupt();
-                if (ires == NULL) {
-                    why = WHY_EXCEPTION;
-                    goto on_error;
-
-                }
-                else if (STACKLESS_UNWINDING(ires)) {
-                    goto stackless_interrupt_call;
-                }
-                /* hard switch, drop value */
-                Py_DECREF(ires);
-            }
-        }
-
-        /* standard ticker code */
-        tstate->st.tick_counter++;
+		SLP_CHECK_INTERRUPT()
 #endif
 
         if (_Py_atomic_load_relaxed(&eval_breaker)) {
