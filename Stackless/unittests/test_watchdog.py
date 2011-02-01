@@ -40,26 +40,26 @@ class SimpleScheduler(object):
         while stackless.runcount > 1:
             try:
                 returned = stackless.run(self.bytecodes, soft = self.softSchedule)
-                
+
             except Exception, e:
-                                
-                # Can't clear off exception easily... 
+
+                # Can't clear off exception easily...
                 while stackless.runcount > 1:
                     stackless.current.next.kill()
 
                 raise e
-                        
+
             else:
                 self.schedule_cb(returned)
 
 def runtask6(name):
     me = stackless.getcurrent()
     cur_depth = me.recursion_depth
-    
+
     for ii in xrange(1000):
         assert cur_depth == me.recursion_depth
 
-    
+
 
 def runtask_print(name):
     x = 0
@@ -74,7 +74,7 @@ def runtask(name):
     for ii in xrange(1000):
         if ii % 50 == 0:
             sys._getframe() # a dummy
-            
+
         x += 1
 
     return name
@@ -85,7 +85,7 @@ def runtask2(name):
     for ii in xrange(1000):
         if ii % 50 == 0:
             stackless.schedule() # same time, but should give up timeslice
-            
+
         x += 1
 
     return name
@@ -109,7 +109,7 @@ def recurse_level_then_do_schedule(count):
     else:
         recurse_level_then_do_schedule(count - 1)
 
-        
+
 def runtask5(name):
     for ii in [1, 10, 100, 500]:
         recurse_level_then_do_schedule(ii)
@@ -131,7 +131,7 @@ def runtask_bad(name):
 
 
 class ServerTasklet(stackless.tasklet):
-    
+
     def __init__(self, func, name=None):
         if not name:
             name = "at %08x" % (id(self))
@@ -153,7 +153,7 @@ def servertask(name, chan):
         r = chan.receive()
         self.count += 1
 
-    
+
 class TestWatchdog(unittest.TestCase):
     softSchedule = False
     def setUp(self):
@@ -162,18 +162,17 @@ class TestWatchdog(unittest.TestCase):
     def tearDown(self):
         del self.verbose
 
-        
     def run_tasklets(self, fn, n=100):
         scheduler = SimpleScheduler(n, self.softSchedule)
         tasklets = []
         for name in ["t1", "t2", "t3"]:
             tasklets.append(stackless.tasklet(fn)(name))
         # allow scheduling with hard switching
-        map(lambda t:t.set_ignore_nesting(1), tasklets)
+        list(map(lambda t:t.set_ignore_nesting(1), tasklets))
 
         scheduler.autoschedule()
         for ii in tasklets:
-            self.failIf(ii.alive) 
+            self.assertFalse(ii.alive)
 
         return scheduler.get_schedule_count()
 
@@ -222,24 +221,24 @@ class TestWatchdog(unittest.TestCase):
         chan = stackless.channel()
         server = ServerTasklet(servertask)
         server_task = server("server", chan)
-        
+
         scheduler = SimpleScheduler(100, self.softSchedule)
-        
+
         tasklets = [stackless.tasklet(runtask4)(name, chan)
-                     for name in ["client1", "client2", "client3"]] 
-    
+                     for name in ["client1", "client2", "client3"]]
+
         scheduler.autoschedule()
-        self.assertEquals(server.count, 60)
+        self.assertEqual(server.count, 60)
 
         # Kill server
-        self.failUnlessRaises(StopIteration, lambda:chan.send_exception(StopIteration))
+        self.assertRaises(StopIteration, lambda:chan.send_exception(StopIteration))
 
 
     def test_atomic(self):
         self.run_tasklets(runtask_atomic)
 
     def test_exception(self):
-        self.failUnlessRaises(UserWarning, lambda:self.run_tasklets(runtask_bad))
+        self.assertRaises(UserWarning, lambda:self.run_tasklets(runtask_bad))
 
     def get_pickled_tasklet(self):
         orig = stackless.tasklet(runtask_print)("pickleme")
@@ -247,7 +246,7 @@ class TestWatchdog(unittest.TestCase):
         not_finished = stackless.run(100)
         self.assertEqual(not_finished, orig)
         return pickle.dumps(not_finished)
-    
+
     def test_pickle(self):
         # Run global
         t = pickle.loads(self.get_pickled_tasklet())
@@ -255,7 +254,7 @@ class TestWatchdog(unittest.TestCase):
         if is_soft():
             stackless.run()
         else:
-            self.failUnlessRaises(RuntimeError, stackless.run)
+            self.assertRaises(RuntimeError, stackless.run)
 
         # Run on tasklet
         t = pickle.loads(self.get_pickled_tasklet())
@@ -263,7 +262,7 @@ class TestWatchdog(unittest.TestCase):
         if is_soft():
             t.run()
         else:
-            self.failUnlessRaises(RuntimeError, t.run)
+            self.assertRaises(RuntimeError, t.run)
             return # enough crap
 
         # Run on watchdog
@@ -328,7 +327,7 @@ class TestWatchdogSoft(TestWatchdog):
             for i in range(10):
                 stackless.run(50000, soft=True, totaltimeout=True, ignore_nesting=True)
                 #print "**", stackless.runcount
-                self.failUnless(stackless.runcount == 3 or stackless.runcount == 4)
+                self.assertTrue(stackless.runcount == 3 or stackless.runcount == 4)
         finally:
             for t in c:
                 t.kill()
@@ -340,4 +339,5 @@ if __name__ == '__main__':
     import sys
     if not sys.argv[1:]:
         sys.argv.append('-v')
+
     unittest.main()

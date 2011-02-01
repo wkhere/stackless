@@ -35,7 +35,7 @@ class ChannelCallbackTestCase(unittest.TestCase):
 
         # compare sent value with monitored one
         # found = chanMon.history[0][1].tempval
-        # self.failUnlessEqual(val, found) # FAILS - why?
+        # self.assertEqual(val, found) # FAILS - why?
         # 
         # fails, because the value is moved from sender to receiver
         # also, I need to modify channels a little :-)
@@ -43,7 +43,7 @@ class ChannelCallbackTestCase(unittest.TestCase):
         # 
         # print chanMon.history
         found = chanMon.history[0][-1]
-        self.failUnlessEqual(val, found)
+        self.assertEqual(val, found)
 
 
 if __name__ == '__main__':
