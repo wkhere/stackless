@@ -35,13 +35,10 @@ typedef struct _sts {
 	int schedlock;
 	int runflags;				/* flags for stackless.run() behaviour */
 #ifdef WITH_THREAD
-	struct {
-		PyObject *self_lock;		/* to block the thread */
-		PyObject *unlock_lock;		/* synchronize access to unblock the thread */
-		int is_locked;
-		PyObject *unlock_target;	/*which tasklet to wake up when unblocked */
-		PyObject *unlocker_lock;	/* self_lock of the unlocker */
-	} thread;
+    struct {
+        PyObject *block_lock;                   /* to block the thread */
+        int is_blocked;
+    } thread;
 #endif
 	/* number of nested interpreters (1.0/2.0 merge) */
 	int nesting_level;
@@ -86,18 +83,15 @@ void slp_kill_tasks_with_stacks(struct _ts *tstate);
 #ifdef WITH_THREAD
 
 #define STACKLESS_PYSTATE_NEW \
-	__STACKLESS_PYSTATE_NEW \
-	tstate->st.thread.self_lock = NULL; \
-	tstate->st.thread.unlock_lock = NULL; \
-	tstate->st.thread.is_locked = 0;\
-	tstate->st.thread.unlock_target = NULL; \
-	tstate->st.thread.unlocker_lock = NULL;
+    __STACKLESS_PYSTATE_NEW \
+    tstate->st.thread.block_lock = NULL; \
+    tstate->st.thread.is_blocked = 0;
 
 
 #define STACKLESS_PYSTATE_CLEAR \
-	__STACKLESS_PYSTATE_CLEAR \
-	Py_CLEAR(tstate->st.thread.self_lock); \
-	Py_CLEAR(tstate->st.thread.unlock_lock);
+    __STACKLESS_PYSTATE_CLEAR \
+    Py_CLEAR(tstate->st.thread.block_lock); \
+    tstate->st.thread.is_blocked = 0;
 
 #else
 

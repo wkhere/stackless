@@ -41,31 +41,39 @@ PyStackless_Schedule_M(PyObject *retval, int remove)
 PyObject *
 PyStackless_Schedule(PyObject *retval, int remove)
 {
-	STACKLESS_GETARG();
-	PyThreadState *ts = PyThreadState_GET();
-	PyTaskletObject *prev = ts->st.current, *next = prev->next;
-	PyObject *ret = NULL;
+    STACKLESS_GETARG();
+    PyThreadState *ts = PyThreadState_GET();
+    PyTaskletObject *prev = ts->st.current, *next = prev->next;
+    PyObject *ret = NULL;
+    int switched;
 
-	if (ts->st.main == NULL) return PyStackless_Schedule_M(retval, remove);
-	/* make sure we hold a reference to the previous tasklet */
-	Py_INCREF(prev);
-	TASKLET_SETVAL(prev, retval);
-	if (remove) {
-		slp_current_remove();
-		Py_DECREF(prev);
-		if (next == prev)
-			next = 0; /* we were the last runnable tasklet */
-	}
-	/* we mustn't DECREF prev here (after the slp_schedule_task().
-	 * This could be the last reference, thus
-	 * promting emergency reactivation of the tasklet,
-	 * and soft switching isn't really done until we have unwound.
-	 * Use the delayed release mechanism instead.
-	 */
-	assert(ts->st.del_post_switch == NULL);
-	ts->st.del_post_switch = (PyObject*)prev;
+    if (ts->st.main == NULL) return PyStackless_Schedule_M(retval, remove);
+    /* make sure we hold a reference to the previous tasklet */
+    Py_INCREF(prev);
+    TASKLET_SETVAL(prev, retval);
+    if (remove) {
+        slp_current_remove();
+        Py_DECREF(prev);
+        if (next == prev)
+            next = 0; /* we were the last runnable tasklet */
+    }
+    /* we mustn't DECREF prev here (after the slp_schedule_task().
+     * This could be the last reference, thus
+     * promting emergency reactivation of the tasklet,
+     * and soft switching isn't really done until we have unwound.
+     * Use the delayed release mechanism instead.
+     */
+    assert(ts->st.del_post_switch == NULL);
+    ts->st.del_post_switch = (PyObject*)prev;
 
-	return slp_schedule_task(prev, next, stackless);
+    ret = slp_schedule_task(prev, next, stackless, &switched);
+
+    /* however, if this was a no-op (e.g. prev==next, or an error occurred)
+     * we need to decref prev ourselves
+     */
+    if (!switched)
+        Py_CLEAR(ts->st.del_post_switch);
+    return ret;
 }
 
 PyObject *
@@ -226,7 +234,7 @@ interrupt_timeout_return(void)
 	else
 		current->flags.pending_irq = 0;
 
-	return slp_schedule_task(ts->st.current, ts->st.main, 1);
+    return slp_schedule_task(ts->st.current, ts->st.main, 1, 0);
 }
 
 static PyObject *
@@ -269,14 +277,11 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
 	slp_current_remove();
 	Py_DECREF(ts->st.main);
 
-	/* now let them run until the end. */
-	ts->st.runflags = flags;
-	retval = slp_schedule_task(ts->st.main, ts->st.current, 0);
-	ts->st.runflags = 0;
-	ts->st.interrupt = NULL;
-
-	/* we should be back in the main tasklet */
-	assert(ts->st.current == ts->st.main);
+    /* now let them run until the end. */
+    ts->st.runflags = flags;
+    retval = slp_schedule_task(ts->st.main, ts->st.current, 0, 0);
+    ts->st.runflags = 0;
+    ts->st.interrupt = NULL;
 
 	/* retval really should be PyNone here (or NULL).  Technically, it is the
 	 * tempval of some tasklet that has quit.  Even so, it is quite
