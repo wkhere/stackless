@@ -291,4 +291,4 @@ Exceptions
    not be caught and discarded inherit from :exc:`BaseException`, rather than
    :exc:`Exception`.
 
-   This class is derived from :exc:`EnvironmentError`. 
+   This class is derived from :exc:`SystemExit`. 
