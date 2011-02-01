@@ -576,11 +576,14 @@ next ? next->flags.blocked : 0)
 /* make sure that locks live longer than their threads */
 
 static void
-destruct_lock(PyThread_type_lock lock)
+destruct_lock(PyObject *capsule)
 {
-	PyThread_acquire_lock(lock, 0);
-	PyThread_release_lock(lock);
-	PyThread_free_lock(lock);
+    PyThread_type_lock lock = PyCapsule_GetPointer(capsule, 0);
+    if (lock) {
+		PyThread_acquire_lock(lock, 0);
+		PyThread_release_lock(lock);
+		PyThread_free_lock(lock);
+	}
 }
 
 static PyObject *
