@@ -18,7 +18,7 @@ extensions = ['sphinx.ext.refcounting', 'sphinx.ext.coverage',
 templates_path = ['tools/sphinxext']
 
 # General substitutions.
-project = 'Python'
+project = 'Stackless Python'
 copyright = '1990-%s, Python Software Foundation' % time.strftime('%Y')
 
 # The default replacements for |version| and |release|.

@@ -4,6 +4,7 @@
 
 .. toctree::
 
+   stackless-python.rst
    whatsnew/index.rst
    tutorial/index.rst
    using/index.rst
