@@ -733,7 +733,7 @@ slp_schedule_task(PyTaskletObject *prev, PyTaskletObject *next, int stackless,
     PyObject *retval;
     int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
     int no_soft_irq;
-    
+
     if (did_switch)
         *did_switch = 0; /* only set this if an actual switch occurs */
 

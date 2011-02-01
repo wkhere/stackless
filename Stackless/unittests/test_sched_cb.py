@@ -25,14 +25,13 @@ class SchedulingCallbackTestCase(unittest.TestCase):
         stackless.tasklet(stackless.test_cframe)(3)
         stackless.tasklet(stackless.test_cframe)(3)
         # precondition
-        self.assertTrue(
-            mon1.count == 0,
+        self.assertEqual(mon1.count, 0,
             "No callbacks before running")
         # running
         stackless.run()
         # postcondition
-        self.assertTrue(
-            mon1.count >= 2*3,
+        self.assertGreaterEqual(
+            mon1.count, 2*3,
             "At least as may callbacks as many test_cframe calls")
 
 

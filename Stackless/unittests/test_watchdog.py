@@ -155,7 +155,6 @@ class TestWatchdog(unittest.TestCase):
     def tearDown(self):
         del self.verbose
 
-
     def run_tasklets(self, fn, n=100):
         scheduler = SimpleScheduler(n, self.softSchedule)
         tasklets = []
@@ -166,7 +165,7 @@ class TestWatchdog(unittest.TestCase):
 
         scheduler.autoschedule()
         for ii in tasklets:
-            self.assertFalse(ii.alive) 
+            self.assertFalse(ii.alive)
 
         return scheduler.get_schedule_count()
 
@@ -203,9 +202,9 @@ class TestWatchdog(unittest.TestCase):
             print()
             print(20*"*", "runtask:", n1, "runtask2:", n2)
         if not self.softSchedule:
-            self.assertTrue(n1 > n2)
+            self.assertGreater(n1, n2)
         else:
-            self.assertTrue(n1 < n2)
+            self.assertLess(n1, n2)
 
 
     def test_exec_tasklet(self):
@@ -222,7 +221,7 @@ class TestWatchdog(unittest.TestCase):
                      for name in ["client1", "client2", "client3"]]
 
         scheduler.autoschedule()
-        self.assertEquals(server.count, 60)
+        self.assertEqual(server.count, 60)
 
         # Kill server
         self.assertRaises(StopIteration, lambda:chan.send_exception(StopIteration))

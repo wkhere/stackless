@@ -1,12 +1,13 @@
 import unittest
 import stackless
+import threading
 
 class TestChannels(unittest.TestCase):
     def setUp(self):
-        self.failUnless(stackless.getruncount() == 1, "Leakage from other tests, with %d tasklets still in the scheduler" % (stackless.getruncount() - 1))
+        self.assertEqual(stackless.getruncount(), 1, "Leakage from other tests, with %d tasklets still in the scheduler" % (stackless.getruncount() - 1))
 
     def tearDown(self):
-        self.failUnless(stackless.getruncount() == 1, "Leakage from this test, with %d tasklets still in the scheduler" % (stackless.getruncount() - 1))        
+        self.assertEqual(stackless.getruncount(), 1, "Leakage from this test, with %d tasklets still in the scheduler" % (stackless.getruncount() - 1))        
 
     def testBlockingSend(self):
         ''' Test that when a tasklet sends to a channel without waiting receivers, the tasklet is blocked. '''
@@ -42,7 +43,7 @@ class TestChannels(unittest.TestCase):
         self.assertTrue(tasklet.blocked, "The tasklet should have been run and have blocked on the channel waiting for a corresponding sender")
 
         # The channel should have a balance indicating one blocked sender.
-        self.assertTrue(channel.balance == -1, "The channel balance should indicate one blocked receiver waiting for a corresponding sender")
+        self.assertEqual(channel.balance, -1, "The channel balance should indicate one blocked receiver waiting for a corresponding sender")
 
     def testNonBlockingSend(self):
         ''' Test that when there is a waiting receiver, we can send without blocking with normal channel behaviour. '''
@@ -96,14 +97,42 @@ class TestChannels(unittest.TestCase):
 
         tasklet.kill()
         
-        self.assertTrue(value == originalValue, "We received a value, but it was not the one we sent.  Completely unexpected.")
+        self.assertEqual(value, originalValue, "We received a value, but it was not the one we sent.  Completely unexpected.")
 
     def testMainTaskletBlockingWithoutASender(self):
         ''' Test that the last runnable tasklet cannot be blocked on a channel. '''    
-        self.assertTrue(stackless.getruncount() == 1, "Leakage from other tests, with tasklets still in the scheduler.")
+        self.assertEqual(stackless.getruncount(), 1, "Leakage from other tests, with tasklets still in the scheduler.")
         
         c = stackless.channel()
         self.assertRaises(RuntimeError, c.receive)
+
+    def testInterthreadCommunication(self):
+        ''' Test that tasklets in different threads sending over channels to each other work. '''    
+        self.assertEqual(stackless.getruncount(), 1, "Leakage from other tests, with tasklets still in the scheduler.")
+
+        commandChannel = stackless.channel()
+
+        def master_func():
+            commandChannel.send("ECHO 1")
+            commandChannel.send("ECHO 2")
+            commandChannel.send("ECHO 3")
+            commandChannel.send("QUIT")
+
+        def slave_func():
+            while 1:
+                command = commandChannel.receive()
+                if command == "QUIT":
+                    break
+
+        def scheduler_run(tasklet_func):
+            t = stackless.tasklet(tasklet_func)()
+            while t.alive:
+                stackless.run()
+
+        thread = threading.Thread(target=scheduler_run, args=(master_func,))
+        thread.start()
+
+        scheduler_run(slave_func)
 
 
 if __name__ == '__main__':

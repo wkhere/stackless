@@ -21,7 +21,7 @@ class TestGarbageCollection(unittest.TestCase):
                 leakage.append(x)
 
         if len(leakage):
-            self.assertTrue(len(leakage) == 0, "Leaked %s" % repr(leakage))
+            self.failUnless(len(leakage) == 0, "Leaked %s" % repr(leakage))
 
 if __name__ == '__main__':
     unittest.main()

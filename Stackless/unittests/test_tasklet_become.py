@@ -31,7 +31,7 @@ class TestTaskletBecome(unittest.TestCase):
         bar = f(ch)
         if VERBOSE: print("Back in  main(TestTaskletBecome):", bar)
         ch.send("Did it work out right?")
-        self.assertEquals(42, bar)
+        self.assertEqual(42, bar)
 
 
 if __name__ == '__main__':
