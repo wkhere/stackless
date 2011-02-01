@@ -24,7 +24,7 @@ Example - running a simple function within a tasklet::
 
     >>> def function(n):
     ...     for i in range(n):
-    ...         print i+1
+    ...         print(i+1)
     ...         stackless.schedule()
     ...
     >>> stackless.tasklet(function)(3)
@@ -42,7 +42,7 @@ The code to run in a tasklet::
 
     def function(n):
         for i in range(n):
-            print i+1
+            print(i+1)
             stackless.schedule()
 
 The first step is having code to run in a tasklet.  Here
@@ -103,7 +103,7 @@ Idiom - detecting uncooperative tasklets::
         if t is not None:
             t.insert()
 
-            print "*** Uncooperative tasklet", t, "detected ***"
+            print("*** Uncooperative tasklet", t, "detected ***")
             traceback.print_stack(t.frame)
 
 Scheduling cooperatively, but pre-empting uncooperative tasklets::
@@ -133,7 +133,7 @@ is better.
 Killing the interrupted tasklet::
 
     if t is not None:
-        print "*** Uncooperative tasklet", t, "detected ***"
+        print("*** Uncooperative tasklet", t, "detected ***")
         traceback.print_stack(t.frame)
 
         t.kill()
@@ -241,7 +241,7 @@ Example - running a simple tasklet within the scheduler::
     >>> def function():
     ...     i = 0
     ...     while True:
-    ...         print i+1
+    ...         print(i+1)
     ...         i += 1
     ...
     >>> stackless.tasklet(function)()

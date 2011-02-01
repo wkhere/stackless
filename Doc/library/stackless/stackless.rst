@@ -130,7 +130,7 @@ The main scheduling related functions:
 
        def tasklet_function():
            result = wait_for_result()
-           print "received result", result
+           print("received result", result)
 
    One drawback of this approach over channels, is that it bypasses the
    useful :attr:`tasklet.block_trap` attribute.  The ability to guard against
@@ -291,4 +291,4 @@ Exceptions
    not be caught and discarded inherit from :exc:`BaseException`, rather than
    :exc:`Exception`.
 
-   This class is derived from :exc:`EnvironmentError`. 
+   This class is derived from :exc:`SystemExit`. 

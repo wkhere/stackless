@@ -43,7 +43,7 @@ The ``channel`` class
        ...
        >>> stackless.tasklet(sender)(5)
        >>> stackless.run()
-       >>> print c.receive()
+       >>> print(c.receive())
        5
 
 .. method:: channel.receive()
@@ -58,7 +58,7 @@ The ``channel`` class
        >>> c = stackless.channel()
        >>> def receiver(chan):
        ...     value = chan.receive()
-       ...     print value
+       ...     print(value)
        ...
        >>> stackless.tasklet(receiver)(c)
        >>> stackless.run()
@@ -101,7 +101,7 @@ The ``channel`` class
        ...     while count < len(sequence):
        ...             count += 1
        ...             value = channel.receive()
-       ...             print value
+       ...             print(value)
        ...
        >>> c = stackless.channel()
        >>> stackless.tasklet(sender)(c)
@@ -130,7 +130,7 @@ The ``channel`` class
        ...
        >>> def receiver(channel):
        ...     for value in channel:
-       ...         print value
+       ...         print(value)
        ...
        >>> c = stackless.channel()
        >>> stackless.tasklet(sender)(c)
@@ -271,8 +271,8 @@ Read-only attributes are provided for checking channel state and contents.
        >>> t = channel.queue
        >>> idx = 0
        >>> while t is not None:
-       ...     print idx, id(t)
+       ...     print(idx, id(t))
        ...     t = t.next
        ...     idx += 1
        ... else:
-       ...     print "The channel is empty."
+       ...     print("The channel is empty.")

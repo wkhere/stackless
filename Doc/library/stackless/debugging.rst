@@ -46,10 +46,10 @@ Vilhelm's code::
     def contextDispatch( prev, next ):
         if not prev: #Creating next
             # I never see this print out
-            print "Creating ", next
+            print("Creating ", next)
         elif not next: #Destroying prev
             # I never see this print out either
-            print "Destroying ", prev
+            print("Destroying ", prev)
         else:
             # Prev is being suspended
             # Next is resuming

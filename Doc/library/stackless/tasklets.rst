@@ -18,7 +18,7 @@ scheduler.
 Example - launching a more concrete tasklet::
 
     >>> def func(*args, **kwargs):
-    ...     print "scheduled with", args, "and", kwargs
+    ...     print("scheduled with", args, "and", kwargs)
     ...
     >>> stackless.tasklet(func)(1, 2, 3, string="test")
     <stackless.tasklet object at 0x01C58030>
@@ -128,7 +128,7 @@ The ``tasklet`` class
    
        >>> def f():
        ...     while 1:
-       ...             print id(stackless.current)
+       ...             print(id(stackless.current))
        ...             stackless.schedule()
        ...
        >>> t1 = stackless.tasklet(f)()

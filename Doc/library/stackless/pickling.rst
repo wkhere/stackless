@@ -22,7 +22,7 @@ Example - pickling a tasklet::
     ...    while 1:
     ...        busy_count += 1
     ...        if busy_count % 10 == 0:
-    ...            print busy_count
+    ...            print(busy_count)
     ...
     >>> stackless.tasklet(func)()
     <stackless.tasklet object at 0x01BD16B0>

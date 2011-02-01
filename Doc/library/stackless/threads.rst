@@ -39,13 +39,13 @@ Example - scheduler per thread::
     import stackless
     
     def secondary_thread_func():
-        print "THREAD(2): Has", stackless.runcount, "tasklets in its scheduler"
-    
+        print("THREAD(2): Has", stackless.runcount, "tasklets in its scheduler")
+
     def main_thread_func():
-        print "THREAD(1): Waiting for death of THREAD(2)"
+        print("THREAD(1): Waiting for death of THREAD(2)")
         while thread.is_alive():
             stackless.schedule()
-        print "THREAD(1): Death of THREAD(2) detected"
+        print("THREAD(1): Death of THREAD(2) detected")
     
     mainThreadTasklet = stackless.tasklet(main_thread_func)()
     
@@ -55,9 +55,8 @@ Example - scheduler per thread::
     stackless.run()
 
 Output::
-
-    THREAD(2): HasTHREAD(1): Waiting for death of THREAD(2)
-     1 tasklets in its scheduler
+    THREAD(2): Has 1 tasklets in its scheduler
+    THREAD(1): Waiting for death of THREAD(2)
     THREAD(1): Death of THREAD(2) detected
 
 This example demonstrates that there actually are two independent schedulers
@@ -86,32 +85,32 @@ Example - interthread channel usage::
 
     import threading
     import stackless
-    
+
     commandChannel = stackless.channel()
-    
+
     def master_func():
         commandChannel.send("ECHO 1")
         commandChannel.send("ECHO 2")
         commandChannel.send("ECHO 3")
         commandChannel.send("QUIT")
-    
+
     def slave_func():
-        print "SLAVE STARTING"
+        print("SLAVE STARTING")
         while 1:
             command = commandChannel.receive()
-            print "SLAVE:", command
+            print("SLAVE:", command)
             if command == "QUIT":
                 break
-        print "SLAVE ENDING"
-    
+        print("SLAVE ENDING")
+
     def scheduler_run(tasklet_func):
         t = stackless.tasklet(tasklet_func)()
         while t.alive:
             stackless.run()
-    
+
     thread = threading.Thread(target=scheduler_run, args=(master_func,))
     thread.start()
-   
+
     scheduler_run(slave_func)
 
 Output::
