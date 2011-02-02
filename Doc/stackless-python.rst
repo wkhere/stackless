@@ -18,15 +18,6 @@ facilitate more readable code.
 If you are reading this text as part of a version of Python you have installed,
 then you have installed Stackless rather than standard Python.
 
-.. image:: http://www.paypal.com/en_US/i/btn/btn_donate_LG.gif
-   :alt: Donate
-   :align: right
-   :target: http://www.disinterest.org/donate.html
-
-If this documentation is of use to you, *please consider donating* via:
-
-    `http://disinterest.org/donate.html <http://disinterest.org/donate.html>`_.
-
 Overview
 ========
 
@@ -105,13 +96,10 @@ There are a range of resources available outside of this document:
 
  * The Stackless `mailing list <http://www.stackless.com/mailman/listinfo/stackless>`_.
  * The Stackless `examples project <http://code.google.com/p/stacklessexamples>`_.
- * Grant Olson's tutorial: `Introduction to Concurrent Programming with Stackless Python <http://members.verizon.net/olsongt/stackless/why_stackless.html>`_.
+ * Grant Olson's tutorial: `Introduction to Concurrent Programming with Stackless Python <http://www.grant-olson.net/python/intro-to-stackless-python>`_.
 
 History
 =======
-
-.. I emailed Christian with this text, and asked him to read it over.
-.. Still to receive a reply, so it will do for now. -- richard.
 
 Continuations are a feature that require the programming language they are
 part of, to be implemented in a way conducive to their presence.  In order to
