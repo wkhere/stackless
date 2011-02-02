@@ -227,6 +227,7 @@ tasklets.
        channel.preference = -1
        
        old_value = stackless.current.block_trap
+       stackless.current.block_trap = True
        try:
            while channel.balance > 0:
                total += channel.receive()           
