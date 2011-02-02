@@ -56,7 +56,11 @@ The main scheduling related functions:
        ...
        
    The optional argument *threadblock* affects the way Stackless works when
-   channels are used for communication between threads.  Normally, 
+   channels are used for communication between threads.  Normally when
+   the scheduler has no remaining tasklets to run besides the current one,
+   the main tasklet is reawakened.  By engaging this option, if there are other
+   running Python threads then the current one will instead block expecting
+   them to eventually wake it up.
    
    The optional argument *soft* affects how pre-emptive scheduling behaves.
    When a pre-emptive interruption would normally occur, instead of
@@ -141,7 +145,7 @@ Callback related functions:
 
 .. function:: set_channel_callback(callable)
 
-   Install a callback for channels.  Every send or receive action will result
+   Install a global channel callback.  Every send or receive action will result
    in *callable* being called.  Setting a value of ``None`` will result in the
    callback being disabled.
    

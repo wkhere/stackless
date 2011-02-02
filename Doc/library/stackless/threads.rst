@@ -12,7 +12,7 @@ It does not:
 
  * Magically move tasklets between threads to do some wonderful
    load balancing.
- * Magically magic away the global interpreter lock.
+ * Magically remove the global interpreter lock.
  * Solve all your scalability needs out of the box.
 
 But it does allow its functionality to be used flexibly, when you
