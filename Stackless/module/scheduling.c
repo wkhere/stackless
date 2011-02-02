@@ -526,18 +526,6 @@ make_deadlock_bomb(void)
     return slp_curexc_to_bomb();
 }
 
-static int
-is_thread_alive(long thread_id)
-{
-    PyThreadState *ts = PyThreadState_Get();
-    PyInterpreterState *interp = ts->interp;
-
-    for (ts = interp->tstate_head; ts != NULL; ts = ts->next)
-        if (ts->thread_id == thread_id)
-            return 1;
-    return 0;
-}
-
 #ifdef WITH_THREAD
 
 /* make sure that locks live longer than their threads */
@@ -658,10 +646,8 @@ static PyObject *schedule_task_interthread(PyTaskletObject *prev,
                                        int stackless,
                                        int *did_switch)
 {
-    PyThreadState *ts = PyThreadState_GET();
     PyThreadState *nts = next->cstate->tstate;
     PyObject *retval;
-    long thread_id = nts->thread_id;
 
     /* get myself ready, since the previous task is going to continue on the
      * curren thread
