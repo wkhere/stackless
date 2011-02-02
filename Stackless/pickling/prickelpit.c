@@ -408,30 +408,30 @@ slp_find_execname(PyFrameObject *f, int *valid)
 	PyObject *dic = dp ? dp->dict : NULL;
 	PyObject *exec_addr = PyLong_FromVoidPtr(f->f_execute);
 
-	if (exec_addr == NULL) return NULL;
-	exec_name = dic ? PyDict_GetItem(dic, exec_addr) : NULL;
-	if (exec_name == NULL) {
-		char msg[500];
-		PyErr_Clear();
-		sprintf(msg, "frame exec function at %08x is not registered!",
-			(unsigned int)(void *)f->f_execute);
-		PyErr_SetString(PyExc_ValueError, msg);
-		valid = 0;
-	}
-	else {
-		PyFrame_ExecFunc *good, *bad;
-		if (slp_find_execfuncs(Py_TYPE(f), exec_name, &good, &bad)) {
-			exec_name = NULL;
-			goto err_exit;
-		}
-		if (f->f_execute == bad)
-			valid = 0;
-		else if (f->f_execute != good) {
-			PyErr_SetString(PyExc_SystemError,
-			    "inconsistent c?frame function registration");
-			goto err_exit;
-		}
-	}
+    if (exec_addr == NULL) return NULL;
+    exec_name = dic ? PyDict_GetItem(dic, exec_addr) : NULL;
+    if (exec_name == NULL) {
+        char msg[500];
+        PyErr_Clear();
+        sprintf(msg, "frame exec function at %lx is not registered!",
+            (unsigned long)(void *)f->f_execute);
+        PyErr_SetString(PyExc_ValueError, msg);
+        valid = 0;
+    }
+    else {
+        PyFrame_ExecFunc *good, *bad;
+        if (slp_find_execfuncs(Py_TYPE(f), exec_name, &good, &bad)) {
+            exec_name = NULL;
+            goto err_exit;
+        }
+        if (f->f_execute == bad)
+            valid = 0;
+        else if (f->f_execute != good) {
+            PyErr_SetString(PyExc_SystemError,
+                "inconsistent c?frame function registration");
+            goto err_exit;
+        }
+    }
 err_exit:
 	Py_XDECREF(exec_addr);
 	Py_XINCREF(exec_name);
@@ -575,7 +575,7 @@ static int init_codetype(void)
  */
 
 static PyTypeObject wrap_PyCell_Type;
-extern PyTypeObject *_Pywrap_PyCell_Type = &wrap_PyCell_Type;
+PyTypeObject *_Pywrap_PyCell_Type = &wrap_PyCell_Type;
 
 static PyObject *
 cell_reduce(PyCellObject *cell)
