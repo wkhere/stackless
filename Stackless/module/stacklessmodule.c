@@ -1122,7 +1122,7 @@ int init_slpmoduletype(void)
     return 0;
 }
 
-static int init_stackless_methods()
+static int init_stackless_methods(void)
 {
     _stackless_method *p = _stackless_methtable;
 

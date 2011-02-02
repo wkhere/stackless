@@ -415,8 +415,8 @@ slp_find_execname(PyFrameObject *f, int *valid)
     if (exec_name == NULL) {
         char msg[500];
         PyErr_Clear();
-        sprintf(msg, "frame exec function at %08x is not registered!",
-            (unsigned int)(void *)f->f_execute);
+        sprintf(msg, "frame exec function at %lx is not registered!",
+            (unsigned long)(void *)f->f_execute);
         PyErr_SetString(PyExc_ValueError, msg);
         valid = 0;
     }
@@ -576,7 +576,7 @@ static int init_codetype(void)
  */
 
 static PyTypeObject wrap_PyCell_Type;
-extern PyTypeObject *_Pywrap_PyCell_Type = &wrap_PyCell_Type;
+PyTypeObject *_Pywrap_PyCell_Type = &wrap_PyCell_Type;
 
 static PyObject *
 cell_reduce(PyCellObject *cell)

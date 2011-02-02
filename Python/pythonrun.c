@@ -1151,7 +1151,7 @@ handle_system_exit(void)
 }
 
 #ifdef STACKLESS
-void PyStackless_HandleSystemExit()
+void PyStackless_HandleSystemExit(void)
 {
 	handle_system_exit();
 }
