@@ -755,7 +755,7 @@ if test $enable_shared = "yes"; then
 	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(LDVERSION)'
 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
-	  if test $with_pydebug == no
+	  if test "$with_pydebug" != yes
 	  then
 	      PY3LIBRARY=libpython3.so
 	  fi
@@ -770,8 +770,7 @@ if test $enable_shared = "yes"; then
 		;;
 	  esac
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
-	  PY3LIBRARY=libpython3.so
-	  if test $with_pydebug == no
+	  if test "$with_pydebug" != yes
           then
 	      PY3LIBRARY=libpython3.so
 	  fi
@@ -1395,6 +1394,12 @@ fi
 if test "$use_lfs" = "yes"; then
 # Two defines needed to enable largefile support on various platforms
 # These may affect some typedefs
+case $ac_sys_system/$ac_sys_release in
+AIX*)
+    AC_DEFINE(_LARGE_FILES, 1, 
+    [This must be defined on AIX systems to enable large file support.])
+    ;;
+esac
 AC_DEFINE(_LARGEFILE_SOURCE, 1, 
 [This must be defined on some systems to enable large file support.])
 AC_DEFINE(_FILE_OFFSET_BITS, 64,
@@ -1661,7 +1666,7 @@ if test -z "$LDSHARED"
 then
 	case $ac_sys_system/$ac_sys_release in
 	AIX*)
-		BLDSHARED="\$(srcdir)/Modules/ld_so_aix \$(CC) -bI:Modules/python.exp -L\$(srcdir)"
+		BLDSHARED="\$(srcdir)/Modules/ld_so_aix \$(CC) -bI:\$(srcdir)/Modules/python.exp"
 		LDSHARED="\$(BINLIBDEST)/config/ld_so_aix \$(CC) -bI:\$(BINLIBDEST)/config/python.exp"
 		;;
 	IRIX/5*) LDSHARED="ld -shared";;
@@ -1931,7 +1936,7 @@ AC_CHECK_LIB(intl, textdomain,
 case "$ac_sys_system" in
 	AIX*)	AC_MSG_CHECKING(for genuine AIX C++ extensions support)
 		AC_LINK_IFELSE([
-		  AC_LANG_PROGRAM([[#include "/usr/lpp/xlC/include/load.h"]],
+		  AC_LANG_PROGRAM([[#include <load.h>]],
 				  [[loadAndInit("", 0, "")]])
 		],[
 		  AC_DEFINE(AIX_GENUINE_CPLUSPLUS, 1,

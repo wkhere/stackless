@@ -1911,6 +1911,12 @@ type_init(PyObject *cls, PyObject *args, PyObject *kwds)
     return res;
 }
 
+long
+PyType_GetFlags(PyTypeObject *type)
+{
+    return type->tp_flags;
+}
+
 static PyObject *
 type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 {
@@ -2380,6 +2386,17 @@ PyObject* PyType_FromSpec(PyType_Spec *spec)
 	    goto fail;
 	}
 	*(void**)(res_start + slotoffsets[slot->slot]) = slot->pfunc;
+
+        /* need to make a copy of the docstring slot, which usually
+           points to a static string literal */
+        if (slot->slot == Py_tp_doc) {
+            ssize_t len = strlen(slot->pfunc)+1;
+            char *tp_doc = PyObject_MALLOC(len);
+            if (tp_doc == NULL)
+	    	goto fail;
+            memcpy(tp_doc, slot->pfunc, len);
+            res->ht_type.tp_doc = tp_doc;
+        }
     }
 
     return (PyObject*)res;

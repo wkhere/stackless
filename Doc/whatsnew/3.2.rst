@@ -11,7 +11,10 @@
 
    * Anyone can add text to this document.  Do not spend very much time
    on the wording of your changes, because your text will probably
-   get rewritten.
+   get rewritten.  (Note, during release candidate phase or just before
+   a beta release, please use the tracker instead -- this helps avoid
+   merge conflicts.   If you must add a suggested entry directly,
+   please put it in an XXX comment and the maintainer will take notice).
 
    * The maintainer will go through Misc/NEWS periodically and add
    changes; it's therefore more important to add your changes to
@@ -88,7 +91,7 @@ overcome the limitations of :mod:`optparse` which did not provide support for
 positional arguments (not just options), subcommands, required options and other
 common patterns of specifying and validating options.
 
-This module has already has widespread success in the community as a
+This module has already had widespread success in the community as a
 third-party module.  Being more fully featured than its predecessor, the
 :mod:`argparse` module is now the preferred module for command-line processing.
 The older module is still being kept available because of the substantial amount
@@ -190,7 +193,7 @@ dictionary::
 
    {"version": 1,
     "formatters": {"brief": {"format": "%(levelname)-8s: %(name)-15s: %(message)s"},
-                   "full": {"format": "%(asctime)s %(name)-15s %(levelname)-8s %(message)s"},
+                   "full": {"format": "%(asctime)s %(name)-15s %(levelname)-8s %(message)s"}
                    },
     "handlers": {"console": {
                       "class": "logging.StreamHandler",
@@ -201,7 +204,7 @@ dictionary::
                       "class": "logging.StreamHandler",
                       "formatter": "full",
                       "level": "ERROR",
-                      "stream": "ext://sys.stderr"},
+                      "stream": "ext://sys.stderr"}
                  },
     "root": {"level": "DEBUG", "handlers": ["console", "console_priority"]}}
 
@@ -210,11 +213,13 @@ If that dictionary is stored in a file called :file:`conf.json`, it can be
 loaded and called with code like this::
 
    >>> import json, logging.config
-   >>> with open('conf.json', 'rb') as f:
+   >>> with open('conf.json') as f:
            conf = json.load(f)
    >>> logging.config.dictConfig(conf)
    >>> logging.info("Transaction completed normally")
+   INFO    : root           : Transaction completed normally
    >>> logging.critical("Abnormal termination")
+   2011-02-17 11:14:36,694 root            CRITICAL Abnormal termination
 
 .. seealso::
 
@@ -260,8 +265,8 @@ when currently pending futures are done executing.
 A simple of example of :class:`~concurrent.futures.ThreadPoolExecutor` is a
 launch of four parallel threads for copying files::
 
-  import threading, shutil
-  with threading.ThreadPoolExecutor(max_workers=4) as e:
+  import concurrent.futures, shutil
+  with concurrent.futures.ThreadPoolExecutor(max_workers=4) as e:
       e.submit(shutil.copy, 'src1.txt', 'dest1.txt')
       e.submit(shutil.copy, 'src2.txt', 'dest2.txt')
       e.submit(shutil.copy, 'src3.txt', 'dest3.txt')
@@ -328,13 +333,13 @@ aspects that are visible to the programmer:
 
 * The :mod:`py_compile` and :mod:`compileall` modules have been updated to
   reflect the new naming convention and target directory.  The command-line
-  invocation of *compileall* has new command-line options include ``-i`` for
-  specifying a list of files and directories to compile, and ``-b`` which causes
+  invocation of *compileall* has new options: ``-i`` for
+  specifying a list of files and directories to compile and ``-b`` which causes
   bytecode files to be written to their legacy location rather than
   *__pycache__*.
 
 * The :mod:`importlib.abc` module has been updated with new :term:`abstract base
-  classes <abstract base class>` for the loading bytecode files.  The obsolete
+  classes <abstract base class>` for loading bytecode files.  The obsolete
   ABCs, :class:`~importlib.abc.PyLoader` and
   :class:`~importlib.abc.PyPycLoader`, have been deprecated (instructions on how
   to stay Python 3.1 compatible are included with the documentation).
@@ -368,7 +373,7 @@ module::
    >>> sysconfig.get_config_var('SOABI')    # find the version tag
    'cpython-32mu'
    >>> sysconfig.get_config_var('SO')       # find the full filename extension
-   'cpython-32mu.so'
+   '.cpython-32mu.so'
 
 .. seealso::
 
@@ -391,7 +396,7 @@ the bodies of requests and responses.
 The *native strings* are always of type :class:`str` but are restricted to code
 points between *U+0000* through *U+00FF* which are translatable to bytes using
 *Latin-1* encoding.  These strings are used for the keys and values in the
-environ dictionary and for response headers and statuses in the
+environment dictionary and for response headers and statuses in the
 :func:`start_response` function.  They must follow :rfc:`2616` with respect to
 encoding. That is, they must either be *ISO-8859-1* characters or use
 :rfc:`2047` MIME encoding.
@@ -445,9 +450,9 @@ Some smaller changes made to the core Python language are:
 * There is also a new :meth:`str.format_map` method that extends the
   capabilities of the existing :meth:`str.format` method by accepting arbitrary
   :term:`mapping` objects.  This new method makes it possible to use string
-  formatting with any of one of Python's many dictionary-like tools such as
+  formatting with any of Python's many dictionary-like objects such as
   :class:`~collections.defaultdict`, :class:`~shelve.Shelf`,
-  :class:`~configparser.ConfigParser`, or :mod:`dbm`.  It also useful with
+  :class:`~configparser.ConfigParser`, or :mod:`dbm`.  It is also useful with
   custom :class:`dict` subclasses that normalize keys before look-up or that
   supply a :meth:`__missing__` method for unknown keys::
 
@@ -472,7 +477,7 @@ Some smaller changes made to the core Python language are:
  (Suggested by Raymond Hettinger and implemented by Eric Smith in
  :issue:`6081`.)
 
-* The interpreter can now be started with a quiet option, ``-q``, to suppress
+* The interpreter can now be started with a quiet option, ``-q``, to prevent
   the copyright and version information from being displayed in the interactive
   mode.  The option can be introspected using the :attr:`sys.flags` attribute::
 
@@ -510,6 +515,7 @@ Some smaller changes made to the core Python language are:
   caused confusion and is no longer needed now that the shortest possible
   :func:`repr` is displayed by default:
 
+   >>> import math
    >>> repr(math.pi)
    '3.141592653589793'
    >>> str(math.pi)
@@ -630,11 +636,10 @@ Some smaller changes made to the core Python language are:
   (See :issue:`10518`.)
 
 * Python's import mechanism can now load modules installed in directories with
-  non-ASCII characters in the path name:
+  non-ASCII characters in the path name.  This solved an aggravating problem
+  with home directories for users with non-ASCII characters in their usernames.
 
-  >>> import møøse.bites
-
-  (Required extensive work by Victor Stinner in :issue:`9425`.)
+ (Required extensive work by Victor Stinner in :issue:`9425`.)
 
 
 New, Improved, and Deprecated Modules
@@ -643,14 +648,15 @@ New, Improved, and Deprecated Modules
 Python's standard library has undergone significant maintenance efforts and
 quality improvements.
 
-The biggest news for Python 3.2 is that the :mod:`email` package and
-:mod:`nntplib` modules now work correctly with the bytes/text model in Python 3.
-For the first time, there is correct handling of inputs with mixed encodings.
+The biggest news for Python 3.2 is that the :mod:`email` package, :mod:`mailbox`
+module, and :mod:`nntplib` modules now work correctly with the bytes/text model
+in Python 3.  For the first time, there is correct handling of messages with
+mixed encodings.
 
 Throughout the standard library, there has been more careful attention to
 encodings and text versus bytes issues.  In particular, interactions with the
-operating system are now better able to pass non-ASCII data using the Windows
-MBCS encoding, locale-aware encodings, or UTF-8.
+operating system are now better able to exchange non-ASCII data using the
+Windows MBCS encoding, locale-aware encodings, or UTF-8.
 
 Another significant win is the addition of substantially better support for
 *SSL* connections and security certificates.
@@ -763,8 +769,11 @@ functools
 
   >>> get_phone_number.cache_clear()
 
-  (Contributed by Raymond Hettinger and incorporating design ideas from
-  Jim Baker, Miki Tebeka, and Nick Coghlan.)
+  (Contributed by Raymond Hettinger and incorporating design ideas from Jim
+  Baker, Miki Tebeka, and Nick Coghlan; see `recipe 498245
+  <http://code.activestate.com/recipes/498245>`_\, `recipe 577479
+  <http://code.activestate.com/recipes/577479>`_\, :issue:`10586`, and
+  :issue:`10593`.)
 
 * The :func:`functools.wraps` decorator now adds a :attr:`__wrapped__` attribute
   pointing to the original callable function.  This allows wrapped functions to
@@ -819,7 +828,8 @@ itertools
 * The :mod:`itertools` module has a new :func:`~itertools.accumulate` function
   modeled on APL's *scan* operator and Numpy's *accumulate* function:
 
-  >>> list(accumulate(8, 2, 50))
+  >>> from itertools import accumulate
+  >>> list(accumulate([8, 2, 50]))
   [8, 10, 60]
 
   >>> prob_dist = [0.1, 0.4, 0.2, 0.3]
@@ -908,6 +918,8 @@ back and re-enter the barrier.  The barrier fully resets after each cycle.
 
 Example of using barriers::
 
+    from threading import Barrier, Thread
+
     def get_votes(site):
         ballots = conduct_election(site)
         all_polls_closed.wait()        # do not count until all polls are closed
@@ -961,7 +973,7 @@ datetime and time
   offset and timezone name. This makes it easier to create timezone-aware
   datetime objects::
 
-    >>> import datetime
+    >>> from datetime import datetime, timezone
 
     >>> datetime.now(timezone.utc)
     datetime.datetime(2010, 12, 8, 21, 4, 2, 923754, tzinfo=datetime.timezone.utc)
@@ -1026,7 +1038,7 @@ special values.  It returns *True* for regular numbers and *False* for *Nan* or
 [True, True, False, False]
 
 The :func:`~math.expm1` function computes ``e**x-1`` for small values of *x*
-without incuring the loss of precision that usually accompanies the subtraction
+without incurring the loss of precision that usually accompanies the subtraction
 of nearly equal quantities:
 
 >>> expm1(0.013671875)   # more accurate way to compute e**x-1 for a small x
@@ -1066,12 +1078,12 @@ These tools make it possible to define an :term:`abstract base class` that
 requires a particular :func:`classmethod` or :func:`staticmethod` to be
 implemented::
 
-    class Temperature(metaclass=ABCMeta):
+    class Temperature(metaclass=abc.ABCMeta):
         @abc.abstractclassmethod
-        def from_fahrenheit(self, t):
+        def from_fahrenheit(cls, t):
             ...
         @abc.abstractclassmethod
-        def from_celsius(self, t):
+        def from_celsius(cls, t):
             ...
 
 (Patch submitted by Daniel Urban; :issue:`5867`.)
@@ -1101,8 +1113,8 @@ for slice notation are well-suited to in-place editing::
     >>> change_location(buffer, 1, b'warehouse  ')
     >>> change_location(buffer, 0, b'showroom   ')
     >>> print(byte_stream.getvalue())
-    b'G3805  showroom   Main chassis    ' ->
-    b'X7899  warehouse  Reserve cog     ' ->
+    b'G3805  showroom   Main chassis    '
+    b'X7899  warehouse  Reserve cog     '
     b'L6988  receiving  Primary sprocket'
 
 (Contributed by Antoine Pitrou in :issue:`5506`.)
@@ -1132,6 +1144,44 @@ decorator, :func:`~reprlib.recursive_repr`, for detecting recursive calls to
         <'a'|'b'|'c'|...|'x'>
 
 (Contributed by Raymond Hettinger in :issue:`9826` and :issue:`9840`.)
+
+logging
+-------
+
+In addition to dictionary-based configuration described above, the
+:mod:`logging` package has many other improvements.
+
+The logging documentation has been augmented by a :ref:`basic tutorial
+<logging-basic-tutorial>`\, an :ref:`advanced tutorial
+<logging-advanced-tutorial>`\, and a :ref:`cookbook <logging-cookbook>` of
+logging recipes.  These documents are the fastest way to learn about logging.
+
+The :func:`logging.basicConfig` set-up function gained a *style* argument to
+support three different types of string formatting.  It defaults to "%" for
+traditional %-formatting, can be set to "{" for the new :meth:`str.format` style, or
+can be set to "$" for the shell-style formatting provided by
+:class:`string.Template`.  The following three configurations are equivalent::
+
+    >>> from logging import basicConfig
+    >>> basicConfig(style='%', format="%(name)s -> %(levelname)s: %(message)s")
+    >>> basicConfig(style='{', format="{name} -> {levelname} {message}")
+    >>> basicConfig(style='$', format="$name -> $levelname: $message")
+
+If no configuration is set-up before a logging event occurs, there is now a
+default configuration using a :class:`~logging.StreamHandler` directed to
+:attr:`sys.stderr` for events of ``WARNING`` level or higher.  Formerly, an
+event occurring before a configuration was set-up would either raise an
+exception or silently drop the event depending on the value of
+:attr:`logging.raiseExceptions`.  The new default handler is stored in
+:attr:`logging.lastResort`.
+
+The use of filters has been simplified.  Instead of creating a
+:class:`~logging.Filter` object, the predicate can be any Python callable that
+returns *True* or *False*.
+
+There were a number of other improvements that add flexibility and simplify
+configuration.  See the module documentation for a full listing of changes in
+Python 3.2.
 
 csv
 ---
@@ -1304,7 +1354,8 @@ popen
 The :func:`os.popen` and :func:`subprocess.Popen` functions now support
 :keyword:`with` statements for auto-closing of the file descriptors.
 
-(Contributed by Antoine Pitrou in :issue:`7461`.)
+(Contributed by Antoine Pitrou and Brian Curtin in :issue:`7461` and
+:issue:`10554`.)
 
 select
 ------
@@ -1359,7 +1410,7 @@ wrong results.
 tarfile
 -------
 
-The :class:`~tarfile.TarFile` class can now be used as a content manager.  In
+The :class:`~tarfile.TarFile` class can now be used as a context manager.  In
 addition, its :meth:`~tarfile.TarFile.add` method has a new option, *filter*,
 that controls which files are added to the archive and allows the file metadata
 to be edited.
@@ -1414,7 +1465,7 @@ ast
 ---
 
 The :mod:`ast` module has a wonderful a general-purpose tool for safely
-evaluating strings containing Python expressions using the Python literal
+evaluating expression strings using the Python literal
 syntax.  The :func:`ast.literal_eval` function serves as a secure alternative to
 the builtin :func:`eval` function which is easily abused.  Python 3.2 adds
 :class:`bytes` and :class:`set` literals to the list of supported types:
@@ -1422,7 +1473,7 @@ strings, bytes, numbers, tuples, lists, dicts, sets, booleans, and None.
 
 ::
 
-    >>> from ast import literal_request
+    >>> from ast import literal_eval
 
     >>> request = "{'req': 3, 'func': 'pow', 'args': (2, 0.5)}"
     >>> literal_eval(request)
@@ -1434,7 +1485,7 @@ strings, bytes, numbers, tuples, lists, dicts, sets, booleans, and None.
       ...
     ValueError: malformed node or string: <_ast.Call object at 0x101739a10>
 
-(Implemented by Georg Brandl.)
+(Implemented by Benjamin Peterson and Georg Brandl.)
 
 os
 --
@@ -1480,7 +1531,7 @@ archiving file formats (such as xz compressed tarfiles or custom formats).
 The principal functions are :func:`~shutil.make_archive` and
 :func:`~shutil.unpack_archive`.  By default, both operate on the current
 directory (which can be set by :func:`os.chdir`) and on any sub-directories.
-The archive filename needs to specified with a full pathname.  The archiving
+The archive filename needs to be specified with a full pathname.  The archiving
 step is non-destructive (the original files are left unchanged).
 
 ::
@@ -1488,7 +1539,8 @@ step is non-destructive (the original files are left unchanged).
     >>> import shutil, pprint
 
     >>> os.chdir('mydata')                               # change to the source directory
-    >>> f = make_archive('/var/backup/mydata', 'zip')    # archive the current directory
+    >>> f = shutil.make_archive('/var/backup/mydata',
+                                'zip')                   # archive the current directory
     >>> f                                                # show the name of archive
     '/var/backup/mydata.zip'
     >>> os.chdir('tmp')                                  # change to an unpacking
@@ -1502,8 +1554,8 @@ step is non-destructive (the original files are left unchanged).
 
     >>> shutil.register_archive_format(                  # register a new archive format
             name = 'xz',
-            function = 'xz.compress',
-            extra_args = [('level', 8)],
+            function = xz.compress,                      # callable archiving function
+            extra_args = [('level', 8)],                 # arguments to the function
             description = 'xz compression'
     )
 
@@ -1512,7 +1564,7 @@ step is non-destructive (the original files are left unchanged).
 sqlite3
 -------
 
-The :mod:`sqlite3` module was updated to version 2.6.0.  It has two new capabilities.
+The :mod:`sqlite3` module was updated to pysqlite version 2.6.0.  It has two new capabilities.
 
 * The :attr:`sqlite3.Connection.in_transit` attribute is true if there is an
   active transaction for uncommitted changes.
@@ -1650,9 +1702,9 @@ To establish an HTTPS connection through a proxy server, there is a new
 :meth:`~http.client.HTTPConnection.set_tunnel` method that sets the host and
 port for HTTP Connect tunneling.
 
-To match the behaviour of :mod:`http.server`, the HTTP client library now also
+To match the behavior of :mod:`http.server`, the HTTP client library now also
 encodes headers with ISO-8859-1 (Latin-1) encoding.  It was already doing that
-for incoming headers, so now the behaviour is consistent for both incoming and
+for incoming headers, so now the behavior is consistent for both incoming and
 outgoing traffic. (See work by Armin Ronacher in :issue:`10980`.)
 
 unittest
@@ -1706,8 +1758,8 @@ names.
   diagnostics when a test fails.  When possible, the failure is recorded along
   with a diff of the output.  This is especially helpful for analyzing log files
   of failed test runs. However, since diffs can sometime be voluminous, there is
-  a new :attr:`~unittest.TestCase.maxDiff` attribute which sets maximum length of
-  diffs.
+  a new :attr:`~unittest.TestCase.maxDiff` attribute that sets maximum length of
+  diffs displayed.
 
 * In addition, the method names in the module have undergone a number of clean-ups.
 
@@ -1764,21 +1816,24 @@ functions and methods affected are :func:`~random.randrange`,
 poplib
 ------
 
-* :class:`~poplib.POP3_SSL` class now accepts a *context* parameter, which is a
-  :class:`ssl.SSLContext` object allowing bundling SSL configuration options,
-  certificates and private keys into a single (potentially long-lived)
-  structure.
+:class:`~poplib.POP3_SSL` class now accepts a *context* parameter, which is a
+:class:`ssl.SSLContext` object allowing bundling SSL configuration options,
+certificates and private keys into a single (potentially long-lived)
+structure.
 
-  (Contributed by Giampaolo Rodolà; :issue:`8807`.)
+(Contributed by Giampaolo Rodolà; :issue:`8807`.)
 
-* :class:`asyncore.dispatcher` now provides a
-  :meth:`~asyncore.dispatcher.handle_accepted()` method
-  returning a `(sock, addr)` pair which is called when a connection has actually
-  been established with a new remote endpoint. This is supposed to be used as a
-  replacement for old :meth:`~asyncore.dispatcher.handle_accept()` and avoids
-  the user  to call :meth:`~asyncore.dispatcher.accept()` directly.
+asyncore
+--------
 
-  (Contributed by Giampaolo Rodolà; :issue:`6706`.)
+:class:`asyncore.dispatcher` now provides a
+:meth:`~asyncore.dispatcher.handle_accepted()` method
+returning a `(sock, addr)` pair which is called when a connection has actually
+been established with a new remote endpoint. This is supposed to be used as a
+replacement for old :meth:`~asyncore.dispatcher.handle_accept()` and avoids
+the user  to call :meth:`~asyncore.dispatcher.accept()` directly.
+
+(Contributed by Giampaolo Rodolà; :issue:`6706`.)
 
 tempfile
 --------
@@ -1876,13 +1931,38 @@ object.  The former returns a string and the latter prints it::
        1: seq
        2: i
 
+In addition, the :func:`~dis.dis` function now accepts string arguments
+so that the common idiom ``dis(compile(s, '', 'eval'))`` can be shortened
+to ``dis(s)``::
+
+    >>> dis('3*x+1 if x%2==1 else x//2')
+      1           0 LOAD_NAME                0 (x)
+                  3 LOAD_CONST               0 (2)
+                  6 BINARY_MODULO
+                  7 LOAD_CONST               1 (1)
+                 10 COMPARE_OP               2 (==)
+                 13 POP_JUMP_IF_FALSE       28
+                 16 LOAD_CONST               2 (3)
+                 19 LOAD_NAME                0 (x)
+                 22 BINARY_MULTIPLY
+                 23 LOAD_CONST               1 (1)
+                 26 BINARY_ADD
+                 27 RETURN_VALUE
+            >>   28 LOAD_NAME                0 (x)
+                 31 LOAD_CONST               0 (2)
+                 34 BINARY_FLOOR_DIVIDE
+                 35 RETURN_VALUE
+
+Taken together, these improvements make it easier to explore how CPython is
+implemented and to see for yourself what the language syntax does
+under-the-hood.
+
 (Contributed by Nick Coghlan in :issue:`9147`.)
 
 dbm
 ---
 
-All database modules now support :meth:`get` and :meth:`setdefault` are now
-available in all database modules
+All database modules now support the :meth:`get` and :meth:`setdefault` methods.
 
 (Suggested by Ray Allen in :issue:`9523`.)
 
@@ -1925,13 +2005,13 @@ command-line::
     $ python -m site --user-site
     /Users/raymondhettinger/.local/lib/python3.2/site-packages
 
-(Contributed by Tarek Ziadé.)
+(Contributed by Tarek Ziadé in :issue:`6693`.)
 
 sysconfig
 ---------
 
 The new :mod:`sysconfig` module makes it straightforward to discover
-installation paths and configuration variables which vary across platforms and
+installation paths and configuration variables that vary across platforms and
 installations.
 
 The module offers access simple access functions for platform and version
@@ -2094,6 +2174,8 @@ reading directly from dictionaries and strings.
 
 (All changes contributed by Łukasz Langa.)
 
+.. XXX consider showing a difflib example
+
 urllib.parse
 ------------
 
@@ -2117,7 +2199,7 @@ The :func:`~urllib.parse.urldefrag` function now returns a :term:`named tuple`::
     >>> r
     DefragResult(url='http://python.org/about/', fragment='target')
     >>> r[0]
-    'http://python.org/about/
+    'http://python.org/about/'
     >>> r.fragment
     'target'
 
@@ -2143,6 +2225,39 @@ parameters, the return types will also be an ASCII-encoded byte strings:
 
 (Work by Nick Coghlan, Dan Mahn, and Senthil Kumaran in :issue:`2987`,
 :issue:`5468`, and :issue:`9873`.)
+
+mailbox
+-------
+
+Thanks to a concerted effort by R. David Murray, the :mod:`mailbox` module has
+been fixed for Python 3.2.  The challenge was that mailbox had been originally
+designed with a text interface, but email messages are best represented with
+:class:`bytes` because various parts of a message may have different encodings.
+
+The solution harnessed the :mod:`email` package's binary support for parsing
+arbitrary email messages.  In addition, the solution required a number of API
+changes.
+
+As expected, the :meth:`~mailbox.Mailbox.add` method for
+:class:`mailbox.Mailbox` objects now accepts binary input.
+
+:class:`~io.StringIO` and text file input are deprecated.  Also, string input
+will fail early if non-ASCII characters are used.  Previously it would fail when
+the email was processed in a later step.
+
+There is also support for binary output.  The :meth:`~mailbox.Mailbox.get_file`
+method now returns a file in the binary mode (where it used to incorrectly set
+the file to text-mode).  There is also a new :meth:`~mailbox.Mailbox.get_bytes`
+method that returns a :class:`bytes` representation of a message corresponding
+to a given *key*.
+
+It is still possible to get non-binary output using the old API's
+:meth:`~mailbox.Mailbox.get_string` method, but that approach
+is not very useful.  Instead, it is best to extract messages from
+a :class:`~mailbox.Message` object or to load them from binary input.
+
+(Contributed by R. David Murray, with efforts from Steffen Daode Nurpmeso and an
+initial patch by Victor Stinner in :issue:`9124`.)
 
 turtledemo
 ----------
@@ -2418,13 +2533,13 @@ Changes to Python's build process and to the C API include:
   function declaration, which was kept for backwards compatibility reasons, is
   now removed -- the macro was introduced in 1997 (:issue:`8276`).
 
-* The is a new function :c:func:`PyLong_AsLongLongAndOverflow` which
+* There is a new function :c:func:`PyLong_AsLongLongAndOverflow` which
   is analogous to :c:func:`PyLong_AsLongAndOverflow`.  They both serve to
   convert Python :class:`int` into a native fixed-width type while providing
   detection of cases where the conversion won't fit (:issue:`7767`).
 
-* The :c:func:`PyUnicode_CompareWithASCIIString` now returns *not equal*
-  if the Python string is *NUL* terminated.
+* The :c:func:`PyUnicode_CompareWithASCIIString` function now returns *not
+  equal* if the Python string is *NUL* terminated.
 
 * There is a new function :c:func:`PyErr_NewExceptionWithDoc` that is
   like :c:func:`PyErr_NewException` but allows a docstring to be specified.
@@ -2442,11 +2557,12 @@ Changes to Python's build process and to the C API include:
 There were a number of other small changes to the C-API.  See the
 :source:`Misc/NEWS` file for a complete list.
 
-Also, there were a number of updates to the OS X build, see
+Also, there were a number of updates to the Mac OS X build, see
 :source:`Mac/BuildScript/README.txt` for details.  For users running a 32/64-bit
-build, there is a known problem with the default Tcl/Tk on OS X 10.6.
+build, there is a known problem with the default Tcl/Tk on Mac OS X 10.6.
 Accordingly, we recommend installing an updated alternative such as
-`ActiveState Tcl/Tk 8.5 <http://www.activestate.com/activetcl/downloads>`_ .
+`ActiveState Tcl/Tk 8.5.9 <http://www.activestate.com/activetcl/downloads>`_\.
+See http://www.python.org/download/mac/tcltk/ for additional details.
 
 Porting to Python 3.2
 =====================
@@ -2579,6 +2695,6 @@ require changes to your code:
   and :c:func:`PyEval_RestoreThread()`) should be used instead.
 
 * Due to security risks, :func:`asyncore.handle_accept` has been deprecated, and
-  a new functions, :func:`asyncore.handle_accepted` was added to replace it.
+  a new function, :func:`asyncore.handle_accepted`, was added to replace it.
 
   (Contributed by Giampaolo Rodola in :issue:`6706`.)

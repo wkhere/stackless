@@ -170,3 +170,18 @@ offsetof(PyHeapTypeObject, as_sequence.sq_repeat),
 #else
   offsetof(PyHeapTypeObject, ht_type.tp_traverse),
 #endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_members),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_members),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_getset),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_getset),
+#endif
+#ifdef STACKLESS
+  offsetof(PyHeapTypeObject, tp_free),
+#else
+  offsetof(PyHeapTypeObject, ht_type.tp_free),
+#endif

@@ -365,3 +365,24 @@ howto/logging,,:And,"WARNING:And this, too"
 howto/logging,,:logger,severity:logger name:message
 howto/logging,,:message,severity:logger name:message
 library/logging.handlers,,:port,host:port
+documenting/markup,613,`,:ref:`link text <reference-label>`
+library/imaplib,116,:MM,"""DD-Mmm-YYYY HH:MM:SS"
+library/imaplib,116,:SS,"""DD-Mmm-YYYY HH:MM:SS"
+whatsnew/3.2,,::,"$ export PYTHONWARNINGS='ignore::RuntimeWarning::,once::UnicodeWarning::'"
+howto/pyporting,75,::,# make sure to use :: Python *and* :: Python :: 3 so
+howto/pyporting,75,::,"'Programming Language :: Python',"
+howto/pyporting,75,::,'Programming Language :: Python :: 3'
+whatsnew/3.2,,:gz,">>> with tarfile.open(name='myarchive.tar.gz', mode='w:gz') as tf:"
+whatsnew/3.2,,:directory,${buildout:directory}/downloads/dist
+whatsnew/3.2,,:location,zope9-location = ${zope9:location}
+whatsnew/3.2,,:prefix,zope-conf = ${custom:prefix}/etc/zope.conf
+whatsnew/3.2,,:beef,>>> urllib.parse.urlparse('http://[dead:beef:cafe:5417:affe:8FA3:deaf:feed]/foo/')
+whatsnew/3.2,,:cafe,>>> urllib.parse.urlparse('http://[dead:beef:cafe:5417:affe:8FA3:deaf:feed]/foo/')
+whatsnew/3.2,,:affe,>>> urllib.parse.urlparse('http://[dead:beef:cafe:5417:affe:8FA3:deaf:feed]/foo/')
+whatsnew/3.2,,:deaf,>>> urllib.parse.urlparse('http://[dead:beef:cafe:5417:affe:8FA3:deaf:feed]/foo/')
+whatsnew/3.2,,:feed,>>> urllib.parse.urlparse('http://[dead:beef:cafe:5417:affe:8FA3:deaf:feed]/foo/')
+whatsnew/3.2,,:beef,"netloc='[dead:beef:cafe:5417:affe:8FA3:deaf:feed]',"
+whatsnew/3.2,,:cafe,"netloc='[dead:beef:cafe:5417:affe:8FA3:deaf:feed]',"
+whatsnew/3.2,,:affe,"netloc='[dead:beef:cafe:5417:affe:8FA3:deaf:feed]',"
+whatsnew/3.2,,:deaf,"netloc='[dead:beef:cafe:5417:affe:8FA3:deaf:feed]',"
+whatsnew/3.2,,:feed,"netloc='[dead:beef:cafe:5417:affe:8FA3:deaf:feed]',"

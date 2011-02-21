@@ -1048,6 +1048,9 @@ class AbstractHTTPHandler(BaseHandler):
 
         if request.data is not None:  # POST
             data = request.data
+            if isinstance(data, str):
+                raise TypeError("POST data should be bytes"
+                        " or an iterable of bytes. It cannot be str.")
             if not request.has_header('Content-type'):
                 request.add_unredirected_header(
                     'Content-type',
@@ -1057,8 +1060,8 @@ class AbstractHTTPHandler(BaseHandler):
                     mv = memoryview(data)
                 except TypeError:
                     if isinstance(data, collections.Iterable):
-                        raise ValueError("Content-Length should be specified \
-                                for iterable data of type %r %r" % (type(data),
+                        raise ValueError("Content-Length should be specified "
+                                "for iterable data of type %r %r" % (type(data),
                                 data))
                 else:
                     request.add_unredirected_header(
