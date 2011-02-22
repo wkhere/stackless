@@ -2395,7 +2395,11 @@ PyObject* PyType_FromSpec(PyType_Spec *spec)
             if (tp_doc == NULL)
 	    	goto fail;
             memcpy(tp_doc, slot->pfunc, len);
+#ifdef STACKLESS
+            res->tp_doc = tp_doc;
+#else
             res->ht_type.tp_doc = tp_doc;
+#endif
         }
     }
 
